@@ -2,7 +2,8 @@
   "tagName": "div",
   "$elements": [
     { "$ref": "../components/hs-nav.json" },
-    { "$ref": "../components/hs-footer.json" }
+    { "$ref": "../components/hs-footer.json" },
+    { "$ref": "../components/hs-callbar.json" }
   ],
   "style": {
     "minHeight": "100vh",
@@ -17,6 +18,7 @@
       "style": { "flex": "1" },
       "children": [{ "tagName": "slot" }]
     },
-    { "tagName": "hs-footer" }
+    { "tagName": "hs-footer" },
+    { "tagName": "hs-callbar" }
   ]
 }

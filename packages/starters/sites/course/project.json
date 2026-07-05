@@ -8,32 +8,45 @@
   "$head": [
     {
       "tagName": "meta",
-      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+      "attributes": {
+        "name": "viewport",
+        "content": "width=device-width, initial-scale=1"
+      }
     },
     {
       "tagName": "meta",
       "attributes": {
         "name": "description",
-        "content": "Craft & Code Academy is a project-based web development bootcamp — six guided modules, live mentorship, and a portfolio-ready capstone."
+        "content": "Craft & Code Academy is a project-based web development bootcamp — 14 weeks, six guided modules, live mentorship, and a deployed full-stack capstone."
       }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+      "attributes": {
+        "rel": "icon",
+        "href": "/favicon.svg"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.googleapis.com"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.gstatic.com",
+        "crossorigin": ""
+      }
     },
     {
       "tagName": "link",
       "attributes": {
         "rel": "stylesheet",
-        "href": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+        "href": "https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       }
     }
   ],
@@ -44,24 +57,39 @@
     "--sm": "(max-width: 640px)"
   },
   "style": {
-    "--color-primary": "#2563eb",
-    "--color-primary-hover": "#1d4ed8",
-    "--color-ink": "#0f172a",
-    "--color-bg-dark": "#0f172a",
-    "--color-bg-cream": "#f4f6fb",
+    "--color-primary": "#4f46e5",
+    "--color-primary-hover": "#4338ca",
+    "--color-primary-light": "#6366f1",
+    "--color-indigo-050": "#eef2ff",
+    "--color-indigo-soft": "rgba(79, 70, 229, 0.08)",
+    "--color-indigo-line": "rgba(79, 70, 229, 0.16)",
+    "--color-accent": "#a3e635",
+    "--color-accent-cyan": "#22d3ee",
+    "--color-ink": "#0b1020",
+    "--color-terminal": "#0b1020",
+    "--color-terminal-2": "#141c39",
+    "--color-terminal-line": "#243056",
+    "--color-bg-dark": "#0b1020",
+    "--color-bg-cream": "#f4f5fb",
+    "--color-bg-soft": "#f9fafd",
     "--color-bg-white": "#ffffff",
-    "--color-text-primary": "#0f172a",
+    "--color-text-primary": "#0f1424",
+    "--color-ink-2": "#20263f",
     "--color-text-white": "#ffffff",
-    "--color-text-muted": "#64748b",
-    "--color-border": "#e2e8f0",
-    "--color-accent": "#2563eb",
-    "--font-heading": "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--color-text-muted": "#5b6479",
+    "--color-text-faint": "#8a93a8",
+    "--color-border": "#e4e7f2",
+    "--color-border-strong": "#cdd3e6",
+    "--font-heading": "'Sora', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--font-body": "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--font-mono": "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
     "--max-width": "1200px",
     "--max-width-narrow": "820px",
-    "--radius": "0.75rem",
+    "--radius": "0.85rem",
+    "--radius-sm": "0.55rem",
     "margin": "0",
     "padding": "0",
-    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "fontFamily": "var(--font-body)",
     "lineHeight": "1.6",
     "color": "var(--color-text-primary)",
     "backgroundColor": "var(--color-bg-white)"
@@ -74,7 +102,12 @@
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
     "formats": ["webp", "avif"],
-    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "quality": {
+      "webp": 80,
+      "avif": 65,
+      "jpeg": 80,
+      "png": 80
+    },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
@@ -85,10 +118,18 @@
       "schema": {
         "type": "object",
         "properties": {
-          "title": { "type": "string" },
-          "summary": { "type": "string" },
-          "duration": { "type": "string" },
-          "order": { "type": "number" }
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "string"
+          },
+          "order": {
+            "type": "number"
+          }
         },
         "required": ["title", "order"]
       }

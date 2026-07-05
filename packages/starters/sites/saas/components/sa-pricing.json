@@ -55,7 +55,7 @@
                 "fontWeight": "600",
                 "fontFamily": "inherit",
                 "transition": "background-color 0.15s, color 0.15s, box-shadow 0.15s",
-                "backgroundColor": "${state.billing === 'monthly' ? 'var(--color-bg-white)' : 'transparent'}",
+                "backgroundColor": "${state.billing === 'monthly' ? 'var(--color-bg-elev2)' : 'transparent'}",
                 "color": "${state.billing === 'monthly' ? 'var(--color-text-primary)' : 'var(--color-text-muted)'}",
                 "boxShadow": "${state.billing === 'monthly' ? '0 1px 4px rgba(20, 20, 43, 0.1)' : 'none'}"
               }
@@ -79,7 +79,7 @@
                 "fontWeight": "600",
                 "fontFamily": "inherit",
                 "transition": "background-color 0.15s, color 0.15s, box-shadow 0.15s",
-                "backgroundColor": "${state.billing === 'annual' ? 'var(--color-bg-white)' : 'transparent'}",
+                "backgroundColor": "${state.billing === 'annual' ? 'var(--color-bg-elev2)' : 'transparent'}",
                 "color": "${state.billing === 'annual' ? 'var(--color-text-primary)' : 'var(--color-text-muted)'}",
                 "boxShadow": "${state.billing === 'annual' ? '0 1px 4px rgba(20, 20, 43, 0.1)' : 'none'}"
               }
@@ -213,9 +213,9 @@
             "flexDirection": "column",
             "padding": "2rem",
             "borderRadius": "var(--radius)",
-            "border": "2px solid var(--color-primary)",
-            "backgroundColor": "var(--color-bg-white)",
-            "boxShadow": "0 20px 48px rgba(99, 102, 241, 0.18)"
+            "border": "1px solid rgba(124, 116, 255, 0.6)",
+            "backgroundColor": "var(--color-bg-elev)",
+            "boxShadow": "0 24px 70px -18px var(--glow)"
           },
           "children": [
             {
@@ -299,15 +299,16 @@
                 "display": "block",
                 "textAlign": "center",
                 "padding": "0.7rem 1rem",
-                "borderRadius": "var(--radius)",
-                "backgroundColor": "var(--color-primary)",
-                "color": "var(--color-text-white)",
+                "borderRadius": "999px",
+                "background": "var(--grad-btn)",
+                "color": "#ffffff",
                 "textDecoration": "none",
                 "fontWeight": "600",
                 "fontSize": "0.95rem",
                 "marginBottom": "1.5rem",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                "boxShadow": "0 10px 26px -8px var(--glow)",
+                "transition": "transform 0.15s",
+                ":hover": { "transform": "translateY(-2px)" }
               },
               "textContent": "Start 14-day trial"
             },

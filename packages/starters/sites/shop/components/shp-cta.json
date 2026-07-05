@@ -4,58 +4,116 @@
     "heading": "",
     "text": "",
     "cta": "Visit the Shop",
-    "ctaHref": "/contact/"
+    "ctaHref": "/contact/",
+    "cta2": "",
+    "cta2Href": "/products/"
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-dark)",
-    "color": "var(--color-text-white)",
-    "padding": "clamp(3.5rem, 8vw, 5.5rem) 1.5rem",
-    "textAlign": "center"
+    "padding": "clamp(2.5rem, 6vw, 4rem) 1.5rem"
   },
   "children": [
     {
       "tagName": "div",
-      "style": { "maxWidth": "var(--max-width-narrow)", "margin": "0 auto" },
+      "style": {
+        "position": "relative",
+        "overflow": "hidden",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "borderRadius": "var(--radius-lg)",
+        "backgroundColor": "var(--color-bg-dark)",
+        "backgroundImage": "radial-gradient(circle at 85% 10%, rgba(38,208,124,0.28), transparent 45%), radial-gradient(circle at 10% 95%, rgba(38,208,124,0.12), transparent 40%)",
+        "color": "var(--color-text-white)",
+        "padding": "clamp(2.5rem, 6vw, 4.5rem) clamp(1.5rem, 5vw, 4rem)",
+        "textAlign": "center"
+      },
       "children": [
         {
-          "tagName": "h2",
-          "style": {
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "clamp(1.9rem, 4vw, 2.75rem)",
-            "fontWeight": "700",
-            "lineHeight": "1.12",
-            "letterSpacing": "-0.02em",
-            "margin": "0 0 1rem"
-          },
-          "textContent": "${state.heading}"
-        },
-        {
-          "tagName": "p",
-          "style": {
-            "fontSize": "1.1rem",
-            "lineHeight": "1.7",
-            "opacity": "0.85",
-            "margin": "0 0 2rem"
-          },
-          "textContent": "${state.text}"
-        },
-        {
-          "tagName": "a",
-          "attributes": { "href": "${state.ctaHref}" },
-          "style": {
-            "display": "inline-block",
-            "backgroundColor": "var(--color-primary)",
-            "color": "var(--color-text-white)",
-            "padding": "0.9rem 2.25rem",
-            "borderRadius": "999px",
-            "fontSize": "1.05rem",
-            "fontWeight": "600",
-            "textDecoration": "none",
-            "transition": "background-color 0.15s",
-            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
-          },
-          "textContent": "${state.cta}"
+          "tagName": "div",
+          "style": { "maxWidth": "var(--max-width-narrow)", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "h2",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "clamp(1.9rem, 4.5vw, 3rem)",
+                "fontWeight": "800",
+                "lineHeight": "1.04",
+                "letterSpacing": "-0.03em",
+                "margin": "0 0 1rem"
+              },
+              "textContent": "${state.heading}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "1.1rem",
+                "lineHeight": "1.65",
+                "color": "rgba(255,255,255,0.78)",
+                "margin": "0 auto 2rem",
+                "maxWidth": "48ch"
+              },
+              "textContent": "${state.text}"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "gap": "0.75rem",
+                "justifyContent": "center",
+                "flexWrap": "wrap"
+              },
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "${state.ctaHref}" },
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.95rem 2.1rem",
+                    "borderRadius": "999px",
+                    "fontSize": "1.05rem",
+                    "fontWeight": "700",
+                    "textDecoration": "none",
+                    "boxShadow": "0 14px 30px -12px rgba(10,157,84,0.8)",
+                    "transition": "transform 0.15s, background-color 0.15s",
+                    ":hover": {
+                      "backgroundColor": "var(--color-primary-hover)",
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    { "tagName": "span", "textContent": "${state.cta}" },
+                    { "tagName": "span", "textContent": "→" }
+                  ]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "${state.cta2Href}" },
+                  "style": {
+                    "display": "${state.cta2 ? 'inline-flex' : 'none'}",
+                    "alignItems": "center",
+                    "border": "1px solid rgba(255,255,255,0.28)",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.95rem 1.85rem",
+                    "borderRadius": "999px",
+                    "fontSize": "1.05rem",
+                    "fontWeight": "700",
+                    "textDecoration": "none",
+                    "transition": "background-color 0.15s, border-color 0.15s",
+                    ":hover": {
+                      "backgroundColor": "rgba(255,255,255,0.1)",
+                      "borderColor": "rgba(255,255,255,0.5)"
+                    }
+                  },
+                  "textContent": "${state.cta2}"
+                }
+              ]
+            }
+          ]
         }
       ]
     }

@@ -8,63 +8,93 @@
   "$head": [
     {
       "tagName": "meta",
-      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+      "attributes": {
+        "name": "viewport",
+        "content": "width=device-width, initial-scale=1"
+      }
     },
     {
       "tagName": "meta",
       "attributes": {
         "name": "description",
-        "content": "Cadence Cycles is a neighborhood bike shop selling road, mountain, gravel, and kids' bikes, plus gear, service, and expert fittings."
+        "content": "Cadence Cycles is a neighborhood bike shop — shop road, mountain, gravel, and kids' bikes plus gear, with free shipping over $50, expert fittings, and in-house service."
       }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+      "attributes": {
+        "rel": "icon",
+        "href": "/favicon.svg"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.googleapis.com"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.gstatic.com",
+        "crossorigin": ""
+      }
     },
     {
       "tagName": "link",
       "attributes": {
         "rel": "stylesheet",
-        "href": "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap"
+        "href": "https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap"
       }
     }
   ],
   "$media": {
-    "--": "1200px",
+    "--": "1240px",
     "--lg": "(max-width: 1024px)",
     "--md": "(max-width: 768px)",
     "--sm": "(max-width: 640px)"
   },
   "style": {
-    "--color-primary": "#16a34a",
-    "--color-primary-hover": "#15803d",
-    "--color-ink": "#0f172a",
-    "--color-bg-dark": "#0f172a",
-    "--color-bg-cream": "#f3f6f4",
+    "--color-primary": "#0a9d54",
+    "--color-primary-hover": "#08823f",
+    "--color-brand-bright": "#26d07c",
+    "--color-brand-tint": "#e7f8ef",
+    "--color-ink": "#0d1117",
+    "--color-bg-dark": "#0d1117",
+    "--color-bg-ink-soft": "#161c24",
+    "--color-bg-cream": "#f4f6f5",
+    "--color-panel": "#eef1f1",
     "--color-bg-white": "#ffffff",
-    "--color-text-primary": "#0f172a",
+    "--color-text-primary": "#0d1117",
+    "--color-text-secondary": "#39424c",
+    "--color-text-muted": "#69727c",
     "--color-text-white": "#ffffff",
-    "--color-text-muted": "#64748b",
-    "--color-border": "#e2e8f0",
+    "--color-border": "#e3e7e8",
+    "--color-line-strong": "#ccd3d5",
     "--color-accent": "#f59e0b",
-    "--font-heading": "'Space Grotesk', 'Segoe UI', system-ui, sans-serif",
-    "--max-width": "1200px",
-    "--max-width-narrow": "820px",
-    "--radius": "0.75rem",
+    "--color-sale": "#e11d48",
+    "--color-sale-tint": "#ffe4ea",
+    "--color-gold": "#e8890c",
+    "--color-gold-tint": "#fdf0d5",
+    "--font-heading": "'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--font-body": "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--max-width": "1240px",
+    "--max-width-narrow": "760px",
+    "--radius": "0.9rem",
+    "--radius-sm": "0.55rem",
+    "--radius-lg": "1.4rem",
+    "--shadow-card": "0 1px 2px rgba(13,17,23,0.05), 0 14px 34px -18px rgba(13,17,23,0.22)",
+    "--shadow-float": "0 34px 80px -34px rgba(13,17,23,0.42)",
     "margin": "0",
     "padding": "0",
-    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "fontFamily": "var(--font-body)",
+    "fontSize": "17px",
     "lineHeight": "1.6",
     "color": "var(--color-text-primary)",
-    "backgroundColor": "var(--color-bg-white)"
+    "backgroundColor": "var(--color-bg-white)",
+    "WebkitFontSmoothing": "antialiased"
   },
   "imports": {
     "Markdown": "@jxsuite/parser/Markdown.class.json",
@@ -75,7 +105,12 @@
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
     "formats": ["webp", "avif"],
-    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "quality": {
+      "webp": 80,
+      "avif": 65,
+      "jpeg": 80,
+      "png": 80
+    },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
@@ -86,12 +121,31 @@
       "schema": {
         "type": "object",
         "properties": {
-          "title": { "type": "string" },
-          "sku": { "type": "string" },
-          "price": { "type": "string" },
-          "category": { "type": "string" },
-          "image": { "type": "string", "format": "image" },
-          "order": { "type": "number" }
+          "title": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "price": {
+            "type": "string"
+          },
+          "oldPrice": {
+            "type": "string"
+          },
+          "badge": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "format": "image"
+          },
+          "order": {
+            "type": "number"
+          }
         },
         "required": ["title", "sku"]
       }

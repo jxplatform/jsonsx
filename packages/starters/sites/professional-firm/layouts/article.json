@@ -8,7 +8,7 @@
     "minHeight": "100vh",
     "display": "flex",
     "flexDirection": "column",
-    "backgroundColor": "var(--color-bg-white)"
+    "backgroundColor": "var(--color-paper)"
   },
   "children": [
     { "tagName": "pf-nav" },
@@ -19,26 +19,108 @@
         {
           "tagName": "div",
           "style": {
-            "maxWidth": "720px",
+            "maxWidth": "1040px",
             "margin": "0 auto",
-            "padding": "clamp(2.5rem, 6vw, 4.5rem) 1.5rem clamp(3rem, 8vw, 5rem)"
+            "padding": "clamp(2.5rem, 6vw, 4.5rem) 1.5rem clamp(3rem, 8vw, 5rem)",
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 200px) minmax(0, 1fr)",
+            "gap": "clamp(2rem, 5vw, 4rem)",
+            "alignItems": "start",
+            "@--md": { "gridTemplateColumns": "1fr", "gap": "2rem" }
           },
           "children": [
             {
-              "tagName": "a",
-              "attributes": { "href": "/insights/" },
+              "tagName": "aside",
               "style": {
-                "display": "inline-block",
-                "marginBottom": "2rem",
-                "color": "var(--color-primary)",
-                "textDecoration": "none",
-                "fontWeight": "600",
-                "fontSize": "0.9rem",
-                ":hover": { "color": "var(--color-primary-hover)" }
+                "position": "sticky",
+                "top": "6rem",
+                "borderTop": "3px solid var(--color-accent)",
+                "paddingTop": "1.25rem",
+                "@--md": {
+                  "position": "static",
+                  "borderTop": "1px solid var(--color-rule)"
+                }
               },
-              "textContent": "← Back to insights"
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "alignItems": "baseline",
+                    "gap": "0.5rem",
+                    "marginBottom": "1.5rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-serif)",
+                        "fontSize": "1.15rem",
+                        "fontWeight": "600",
+                        "color": "var(--color-ink)"
+                      },
+                      "textContent": "Meridian"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-sans)",
+                        "fontSize": "0.62rem",
+                        "fontWeight": "600",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.22em",
+                        "color": "var(--color-accent)"
+                      },
+                      "textContent": "Quarterly"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-sans)",
+                    "fontSize": "0.68rem",
+                    "fontWeight": "600",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.14em",
+                    "color": "var(--color-muted)",
+                    "lineHeight": "1.8",
+                    "paddingBottom": "1.25rem",
+                    "marginBottom": "1.25rem",
+                    "borderBottom": "1px solid var(--color-hairline)"
+                  },
+                  "children": [
+                    { "tagName": "div", "textContent": "Filed under" },
+                    {
+                      "tagName": "div",
+                      "style": { "color": "var(--color-ink)" },
+                      "textContent": "Insight"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/insights/" },
+                  "style": {
+                    "fontFamily": "var(--font-sans)",
+                    "fontSize": "0.72rem",
+                    "fontWeight": "600",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.14em",
+                    "color": "var(--color-ink)",
+                    "textDecoration": "none",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-accent)" }
+                  },
+                  "textContent": "← All insights"
+                }
+              ]
             },
-            { "tagName": "slot" }
+            {
+              "tagName": "div",
+              "style": { "maxWidth": "var(--measure)", "minWidth": "0" },
+              "children": [{ "tagName": "slot" }]
+            }
           ]
         }
       ]

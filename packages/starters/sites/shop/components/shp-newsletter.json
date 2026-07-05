@@ -1,0 +1,166 @@
+{
+  "tagName": "shp-newsletter",
+  "state": {
+    "eyebrow": "Join the club",
+    "heading": "Get $10 off your first order",
+    "text": "New arrivals, seasonal sales, and shop events — plus a welcome code for your first ride. No spam, unsubscribe anytime."
+  },
+  "style": {
+    "display": "block",
+    "padding": "clamp(2.5rem, 6vw, 4rem) 1.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "position": "relative",
+        "overflow": "hidden",
+        "borderRadius": "var(--radius-lg)",
+        "backgroundColor": "var(--color-primary)",
+        "backgroundImage": "radial-gradient(circle at 88% 15%, rgba(255,255,255,0.22), transparent 42%), radial-gradient(circle at 6% 92%, rgba(13,17,23,0.25), transparent 46%)",
+        "padding": "clamp(2rem, 5vw, 3.25rem)",
+        "display": "grid",
+        "gridTemplateColumns": "1.1fr 1fr",
+        "gap": "clamp(1.75rem, 4vw, 3rem)",
+        "alignItems": "center",
+        "@--md": { "gridTemplateColumns": "1fr" }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.45rem",
+                "margin": "0 0 0.85rem",
+                "fontSize": "0.72rem",
+                "fontWeight": "800",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.14em",
+                "color": "rgba(255,255,255,0.85)"
+              },
+              "children": [
+                { "tagName": "span", "textContent": "✦" },
+                { "tagName": "span", "textContent": "${state.eyebrow}" }
+              ]
+            },
+            {
+              "tagName": "h2",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "clamp(1.7rem, 3.5vw, 2.5rem)",
+                "fontWeight": "800",
+                "lineHeight": "1.05",
+                "letterSpacing": "-0.025em",
+                "margin": "0 0 0.75rem",
+                "color": "var(--color-text-white)"
+              },
+              "textContent": "${state.heading}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "fontSize": "1.02rem",
+                "lineHeight": "1.6",
+                "color": "rgba(255,255,255,0.85)",
+                "maxWidth": "44ch"
+              },
+              "textContent": "${state.text}"
+            }
+          ]
+        },
+        {
+          "tagName": "form",
+          "attributes": { "action": "#", "method": "post" },
+          "style": {
+            "backgroundColor": "var(--color-bg-white)",
+            "borderRadius": "var(--radius)",
+            "padding": "1.35rem",
+            "boxShadow": "var(--shadow-float)"
+          },
+          "children": [
+            {
+              "tagName": "label",
+              "attributes": { "for": "nl-email" },
+              "style": {
+                "display": "block",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.1em",
+                "color": "var(--color-text-muted)",
+                "marginBottom": "0.55rem"
+              },
+              "textContent": "Email address"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "gap": "0.5rem",
+                "@--sm": { "flexDirection": "column" }
+              },
+              "children": [
+                {
+                  "tagName": "input",
+                  "attributes": {
+                    "id": "nl-email",
+                    "type": "email",
+                    "name": "email",
+                    "placeholder": "you@email.com",
+                    "required": "true",
+                    "aria-label": "Email address"
+                  },
+                  "style": {
+                    "flex": "1",
+                    "minWidth": "0",
+                    "padding": "0.85rem 1rem",
+                    "border": "1px solid var(--color-line-strong)",
+                    "borderRadius": "var(--radius-sm)",
+                    "fontSize": "1rem",
+                    "fontFamily": "inherit",
+                    "color": "var(--color-text-primary)"
+                  }
+                },
+                {
+                  "tagName": "button",
+                  "attributes": { "type": "submit" },
+                  "style": {
+                    "flexShrink": "0",
+                    "backgroundColor": "var(--color-ink)",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.85rem 1.6rem",
+                    "border": "none",
+                    "borderRadius": "var(--radius-sm)",
+                    "fontSize": "1rem",
+                    "fontFamily": "inherit",
+                    "fontWeight": "700",
+                    "cursor": "pointer",
+                    "transition": "transform 0.15s, background-color 0.15s",
+                    ":hover": { "transform": "translateY(-1px)", "backgroundColor": "#000000" }
+                  },
+                  "textContent": "Get my code"
+                }
+              ]
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0.85rem 0 0",
+                "fontSize": "0.8rem",
+                "color": "var(--color-text-muted)"
+              },
+              "textContent": "Demo form — wire it to your email provider in components/shp-newsletter.json."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

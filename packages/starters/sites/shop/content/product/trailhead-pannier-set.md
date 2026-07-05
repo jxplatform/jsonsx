@@ -3,6 +3,7 @@ title: Trailhead Pannier Set
 sku: trailhead-pannier-set
 price: $119
 category: Accessories
+badge: New
 image: /images/product-6.jpg
 order: 8
 ---

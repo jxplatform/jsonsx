@@ -3,22 +3,23 @@
   "state": {
     "eyebrow": "",
     "heading": "",
+    "headingAccent": "",
     "subheading": "",
     "cta": "Enroll Now",
     "ctaHref": "/enroll/",
     "cta2": "",
     "cta2Href": "/curriculum/",
     "note": "",
-    "bg": { "type": "string", "format": "image", "default": "" }
+    "o1": "",
+    "o2": "",
+    "o3": ""
   },
   "style": {
     "display": "block",
     "position": "relative",
-    "minHeight": "82vh",
-    "color": "var(--color-text-white)",
-    "backgroundImage": "url('${state.bg}')",
-    "backgroundSize": "cover",
-    "backgroundPosition": "center"
+    "overflow": "hidden",
+    "backgroundColor": "var(--color-bg-white)",
+    "backgroundImage": "radial-gradient(ellipse 45% 50% at 88% 0%, rgba(79,70,229,0.12), transparent 60%), radial-gradient(ellipse 40% 45% at 5% 95%, rgba(34,211,238,0.08), transparent 60%)"
   },
   "children": [
     {
@@ -26,79 +27,124 @@
       "style": {
         "position": "absolute",
         "inset": "0",
-        "background": "linear-gradient(115deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.72) 45%, rgba(37,99,235,0.55) 100%)"
+        "backgroundImage": "radial-gradient(circle, rgba(15,20,36,0.05) 1px, transparent 1px)",
+        "backgroundSize": "30px 30px",
+        "opacity": "0.6",
+        "pointerEvents": "none"
       }
     },
     {
       "tagName": "div",
       "style": {
         "position": "relative",
-        "zIndex": "10",
-        "display": "flex",
-        "alignItems": "center",
-        "minHeight": "82vh",
+        "zIndex": "2",
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "4rem 1.5rem"
+        "padding": "clamp(3rem, 7vw, 5.5rem) 1.5rem clamp(3.5rem, 7vw, 6rem)",
+        "display": "grid",
+        "gridTemplateColumns": "1.02fr 0.98fr",
+        "gap": "clamp(2.5rem, 5vw, 4.5rem)",
+        "alignItems": "center",
+        "@--lg": { "gridTemplateColumns": "1fr", "gap": "3rem" }
       },
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "660px" },
           "children": [
             {
               "tagName": "p",
               "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.18em",
+                "display": "${state.eyebrow ? 'inline-flex' : 'none'}",
+                "alignItems": "center",
+                "gap": "0.55rem",
+                "fontFamily": "var(--font-mono)",
                 "fontSize": "0.8rem",
-                "fontWeight": "700",
-                "marginBottom": "1rem",
-                "color": "#93c5fd"
+                "fontWeight": "600",
+                "color": "var(--color-primary)",
+                "backgroundColor": "var(--color-indigo-050)",
+                "border": "1px solid var(--color-indigo-line)",
+                "padding": "0.4rem 0.85rem",
+                "borderRadius": "999px",
+                "margin": "0 0 1.5rem"
               },
-              "textContent": "${state.eyebrow}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.45rem",
+                    "height": "0.45rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-accent)",
+                    "boxShadow": "0 0 0 3px rgba(163,230,53,0.25)"
+                  }
+                },
+                { "tagName": "span", "textContent": "${state.eyebrow}" }
+              ]
             },
             {
               "tagName": "h1",
               "style": {
                 "fontFamily": "var(--font-heading)",
-                "fontSize": "clamp(2.5rem, 6vw, 4.25rem)",
+                "fontSize": "clamp(2.4rem, 5.4vw, 4rem)",
                 "fontWeight": "800",
-                "lineHeight": "1.05",
-                "margin": "0 0 1.25rem",
-                "letterSpacing": "-0.03em"
+                "lineHeight": "1.04",
+                "letterSpacing": "-0.035em",
+                "margin": "0 0 1.35rem",
+                "color": "var(--color-text-primary)"
               },
-              "textContent": "${state.heading}"
+              "children": [
+                { "tagName": "span", "textContent": "${state.heading} " },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "position": "relative",
+                    "color": "var(--color-primary)",
+                    "whiteSpace": "nowrap"
+                  },
+                  "children": [{ "tagName": "span", "textContent": "${state.headingAccent}" }]
+                }
+              ]
             },
             {
               "tagName": "p",
               "style": {
-                "fontSize": "clamp(1.1rem, 2vw, 1.35rem)",
+                "fontSize": "clamp(1.05rem, 1.6vw, 1.22rem)",
                 "lineHeight": "1.6",
-                "margin": "0 0 2rem",
-                "opacity": "0.92",
-                "maxWidth": "52ch"
+                "color": "var(--color-text-muted)",
+                "margin": "0 0 1.85rem",
+                "maxWidth": "50ch"
               },
               "textContent": "${state.subheading}"
             },
             {
               "tagName": "div",
-              "style": { "display": "flex", "gap": "0.75rem", "flexWrap": "wrap" },
+              "style": {
+                "display": "flex",
+                "gap": "0.75rem",
+                "flexWrap": "wrap",
+                "marginBottom": "1.65rem"
+              },
               "children": [
                 {
                   "tagName": "a",
                   "attributes": { "href": "${state.ctaHref}" },
                   "style": {
-                    "display": "inline-block",
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
                     "backgroundColor": "var(--color-primary)",
                     "color": "var(--color-text-white)",
-                    "padding": "0.85rem 2rem",
-                    "borderRadius": "var(--radius)",
-                    "fontSize": "1.05rem",
-                    "fontWeight": "700",
+                    "padding": "0.9rem 1.9rem",
+                    "borderRadius": "999px",
+                    "fontSize": "1.02rem",
+                    "fontWeight": "600",
                     "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                    "boxShadow": "0 14px 30px -12px rgba(79,70,229,0.9)",
+                    "transition": "transform 0.15s, background-color 0.15s",
+                    ":hover": {
+                      "backgroundColor": "var(--color-primary-hover)",
+                      "transform": "translateY(-2px)"
+                    }
                   },
                   "textContent": "${state.cta}"
                 },
@@ -106,30 +152,320 @@
                   "tagName": "a",
                   "attributes": { "href": "${state.cta2Href}" },
                   "style": {
-                    "display": "${state.cta2 ? 'inline-block' : 'none'}",
-                    "border": "1px solid rgba(255,255,255,0.6)",
-                    "color": "var(--color-text-white)",
-                    "padding": "0.85rem 2rem",
-                    "borderRadius": "var(--radius)",
-                    "fontSize": "1.05rem",
+                    "display": "${state.cta2 ? 'inline-flex' : 'none'}",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "border": "1px solid var(--color-border-strong)",
+                    "backgroundColor": "var(--color-bg-white)",
+                    "color": "var(--color-text-primary)",
+                    "padding": "0.9rem 1.7rem",
+                    "borderRadius": "999px",
+                    "fontSize": "1.02rem",
                     "fontWeight": "600",
                     "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "rgba(255,255,255,0.12)" }
+                    "transition": "border-color 0.15s, color 0.15s",
+                    ":hover": {
+                      "borderColor": "var(--color-primary)",
+                      "color": "var(--color-primary)"
+                    }
                   },
                   "textContent": "${state.cta2}"
                 }
               ]
             },
             {
+              "tagName": "div",
+              "style": {
+                "display": "${state.o1 ? 'flex' : 'none'}",
+                "flexWrap": "wrap",
+                "gap": "0.55rem",
+                "marginBottom": "1.35rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.45rem",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.8rem",
+                    "fontWeight": "500",
+                    "color": "var(--color-text-primary)",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "border": "1px solid var(--color-border)",
+                    "padding": "0.4rem 0.8rem",
+                    "borderRadius": "0.5rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "#65a30d", "fontWeight": "700" },
+                      "textContent": "✔"
+                    },
+                    { "tagName": "span", "textContent": "${state.o1}" }
+                  ]
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.45rem",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.8rem",
+                    "fontWeight": "500",
+                    "color": "var(--color-text-primary)",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "border": "1px solid var(--color-border)",
+                    "padding": "0.4rem 0.8rem",
+                    "borderRadius": "0.5rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "#65a30d", "fontWeight": "700" },
+                      "textContent": "✔"
+                    },
+                    { "tagName": "span", "textContent": "${state.o2}" }
+                  ]
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.45rem",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.8rem",
+                    "fontWeight": "500",
+                    "color": "var(--color-text-primary)",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "border": "1px solid var(--color-border)",
+                    "padding": "0.4rem 0.8rem",
+                    "borderRadius": "0.5rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "#65a30d", "fontWeight": "700" },
+                      "textContent": "✔"
+                    },
+                    { "tagName": "span", "textContent": "${state.o3}" }
+                  ]
+                }
+              ]
+            },
+            {
               "tagName": "p",
               "style": {
-                "display": "${state.note ? 'block' : 'none'}",
-                "margin": "1.5rem 0 0",
-                "fontSize": "0.9rem",
-                "opacity": "0.8"
+                "display": "${state.note ? 'flex' : 'none'}",
+                "alignItems": "center",
+                "gap": "0.5rem",
+                "margin": "0",
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.82rem",
+                "color": "var(--color-text-muted)"
               },
-              "textContent": "${state.note}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": { "color": "var(--color-primary)" },
+                  "textContent": "▸"
+                },
+                { "tagName": "span", "textContent": "${state.note}" }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "position": "relative"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "position": "absolute",
+                "inset": "-12% -8% -14% -8%",
+                "background": "radial-gradient(circle at 60% 40%, rgba(79,70,229,0.28), transparent 65%)",
+                "filter": "blur(12px)",
+                "pointerEvents": "none"
+              }
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "position": "relative",
+                "borderRadius": "0.9rem",
+                "overflow": "hidden",
+                "backgroundColor": "var(--color-terminal)",
+                "border": "1px solid var(--color-terminal-line)",
+                "boxShadow": "0 40px 80px -32px rgba(11,16,32,0.75)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "padding": "0.75rem 1rem",
+                    "borderBottom": "1px solid var(--color-terminal-line)",
+                    "backgroundColor": "var(--color-terminal-2)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "width": "0.72rem",
+                        "height": "0.72rem",
+                        "borderRadius": "999px",
+                        "backgroundColor": "#ff5f57"
+                      }
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "width": "0.72rem",
+                        "height": "0.72rem",
+                        "borderRadius": "999px",
+                        "backgroundColor": "#febc2e"
+                      }
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "width": "0.72rem",
+                        "height": "0.72rem",
+                        "borderRadius": "999px",
+                        "backgroundColor": "#28c840"
+                      }
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "marginLeft": "0.75rem",
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.75rem",
+                        "color": "var(--color-text-faint)"
+                      },
+                      "textContent": "~/craft-code — start-here.sh"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.35rem 1.5rem 1.6rem",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.9rem",
+                    "lineHeight": "2",
+                    "color": "rgba(255,255,255,0.92)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-accent)" },
+                          "textContent": "$ "
+                        },
+                        { "tagName": "span", "textContent": "enroll " },
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-accent-cyan)" },
+                          "textContent": "--track "
+                        },
+                        {
+                          "tagName": "span",
+                          "style": { "color": "#fcd34d" },
+                          "textContent": "web-dev"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "color": "var(--color-text-faint)" },
+                      "textContent": "# 14 weeks · 6 guided modules · live cohort"
+                    },
+                    {
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-accent)", "fontWeight": "700" },
+                          "textContent": "✔ "
+                        },
+                        { "tagName": "span", "textContent": "mentorship + small-group code review" }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-accent)", "fontWeight": "700" },
+                          "textContent": "✔ "
+                        },
+                        { "tagName": "span", "textContent": "build real, portfolio-ready projects" }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-accent)", "fontWeight": "700" },
+                          "textContent": "✔ "
+                        },
+                        { "tagName": "span", "textContent": "deploy a full-stack capstone" }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "marginTop": "0.35rem" },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-accent)" },
+                          "textContent": "$ "
+                        },
+                        { "tagName": "span", "textContent": "./ship-your-career.sh" }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "display": "flex", "alignItems": "center", "gap": "0.4rem" },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-primary-light)" },
+                          "textContent": "→"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": { "color": "#ffffff", "fontWeight": "600" },
+                          "textContent": "92% hired within 6 months"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "display": "inline-block",
+                            "width": "0.62rem",
+                            "height": "1.15rem",
+                            "backgroundColor": "var(--color-accent)",
+                            "marginLeft": "0.15rem",
+                            "borderRadius": "1px"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
             }
           ]
         }

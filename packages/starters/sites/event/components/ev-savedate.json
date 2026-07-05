@@ -8,14 +8,18 @@
     "hours": "18",
     "minutes": "05",
     "seconds": "30",
-    "cta": "Get Tickets",
+    "cta": "Get tickets",
     "ctaHref": "/tickets/"
   },
   "style": {
     "display": "block",
-    "background": "linear-gradient(120deg, var(--color-bg-dark) 0%, #3b1e6e 55%, #7c3aed 100%)",
+    "position": "relative",
+    "overflow": "hidden",
     "color": "var(--color-text-white)",
-    "padding": "clamp(2.5rem, 6vw, 4rem) 1.5rem"
+    "borderTop": "1px solid var(--color-border)",
+    "borderBottom": "1px solid var(--color-border)",
+    "background": "radial-gradient(ellipse 60% 120% at 15% 50%, rgba(34,224,255,0.16), transparent 60%), radial-gradient(ellipse 60% 120% at 85% 50%, rgba(255,61,154,0.18), transparent 60%), var(--color-bg-cream)",
+    "padding": "clamp(2.75rem, 6vw, 4rem) 1.5rem"
   },
   "children": [
     {
@@ -24,10 +28,15 @@
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
         "display": "grid",
-        "gridTemplateColumns": "1.1fr 1fr",
+        "gridTemplateColumns": "1fr auto",
         "gap": "clamp(2rem, 5vw, 3.5rem)",
         "alignItems": "center",
-        "@--md": { "gridTemplateColumns": "1fr", "textAlign": "center" }
+        "@--lg": {
+          "gridTemplateColumns": "1fr",
+          "gap": "2.25rem",
+          "textAlign": "center",
+          "justifyItems": "center"
+        }
       },
       "children": [
         {
@@ -36,24 +45,40 @@
             {
               "tagName": "p",
               "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.55rem",
                 "textTransform": "uppercase",
                 "letterSpacing": "0.18em",
-                "fontSize": "0.8rem",
-                "fontWeight": "600",
-                "color": "var(--color-accent)",
-                "margin": "0 0 0.75rem"
+                "fontSize": "0.78rem",
+                "fontWeight": "700",
+                "margin": "0 0 0.9rem",
+                "color": "var(--color-accent)"
               },
-              "textContent": "${state.eyebrow}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.5rem",
+                    "height": "0.5rem",
+                    "borderRadius": "999px",
+                    "background": "var(--color-lime)",
+                    "boxShadow": "0 0 10px var(--color-lime)"
+                  }
+                },
+                { "tagName": "span", "textContent": "${state.eyebrow}" }
+              ]
             },
             {
               "tagName": "h2",
               "style": {
                 "fontFamily": "var(--font-heading)",
-                "fontSize": "clamp(1.8rem, 4vw, 2.6rem)",
-                "fontWeight": "700",
-                "letterSpacing": "-0.02em",
-                "lineHeight": "1.12",
-                "margin": "0 0 0.9rem"
+                "fontSize": "clamp(1.9rem, 4.2vw, 2.9rem)",
+                "fontWeight": "800",
+                "letterSpacing": "-0.03em",
+                "lineHeight": "1.08",
+                "margin": "0 0 0.9rem",
+                "color": "var(--color-text-primary)"
               },
               "textContent": "${state.heading}"
             },
@@ -61,10 +86,10 @@
               "tagName": "p",
               "style": {
                 "fontSize": "1.05rem",
-                "lineHeight": "1.7",
-                "opacity": "0.88",
+                "lineHeight": "1.65",
+                "color": "var(--color-text-muted)",
                 "margin": "0 0 1.75rem",
-                "maxWidth": "46ch"
+                "maxWidth": "44ch"
               },
               "textContent": "${state.text}"
             },
@@ -73,13 +98,14 @@
               "attributes": { "href": "${state.ctaHref}" },
               "style": {
                 "display": "inline-block",
-                "backgroundColor": "var(--color-text-white)",
-                "color": "var(--color-primary)",
-                "padding": "0.85rem 2.25rem",
+                "background": "var(--grad-btn)",
+                "color": "#ffffff",
+                "padding": "0.9rem 2.25rem",
                 "borderRadius": "999px",
                 "fontSize": "1.02rem",
                 "fontWeight": "700",
                 "textDecoration": "none",
+                "boxShadow": "0 12px 34px -8px var(--glow)",
                 "transition": "transform 0.15s",
                 ":hover": { "transform": "translateY(-2px)" }
               },
@@ -90,147 +116,208 @@
         {
           "tagName": "div",
           "style": {
-            "display": "grid",
-            "gridTemplateColumns": "repeat(4, 1fr)",
-            "gap": "0.75rem",
-            "@--sm": { "gap": "0.5rem" }
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "0.5rem",
+            "@--sm": { "gap": "0.3rem" }
           },
           "children": [
             {
               "tagName": "div",
               "style": {
                 "textAlign": "center",
-                "padding": "1.25rem 0.5rem",
-                "borderRadius": "var(--radius)",
-                "background": "rgba(255, 255, 255, 0.1)",
-                "border": "1px solid rgba(255, 255, 255, 0.18)",
-                "backdropFilter": "blur(4px)"
+                "minWidth": "4.6rem",
+                "padding": "1.1rem 0.6rem",
+                "borderRadius": "0.9rem",
+                "background": "rgba(255,255,255,0.03)",
+                "border": "1px solid var(--color-border)",
+                "boxShadow": "0 0 40px -18px var(--glow-cyan)",
+                "@--sm": { "minWidth": "3.7rem", "padding": "0.85rem 0.35rem" }
               },
               "children": [
                 {
                   "tagName": "div",
                   "style": {
                     "fontFamily": "var(--font-heading)",
-                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
-                    "fontWeight": "700",
+                    "fontSize": "clamp(1.9rem, 4.5vw, 2.9rem)",
+                    "fontWeight": "800",
                     "lineHeight": "1",
-                    "fontVariantNumeric": "tabular-nums"
+                    "fontVariantNumeric": "tabular-nums",
+                    "background": "var(--grad)",
+                    "backgroundClip": "text",
+                    "webkitBackgroundClip": "text",
+                    "webkitTextFillColor": "transparent",
+                    "color": "var(--color-accent)"
                   },
                   "textContent": "${state.days}"
                 },
                 {
                   "tagName": "div",
                   "style": {
-                    "marginTop": "0.4rem",
-                    "fontSize": "0.7rem",
+                    "marginTop": "0.45rem",
+                    "fontSize": "0.66rem",
                     "textTransform": "uppercase",
-                    "letterSpacing": "0.1em",
-                    "opacity": "0.75"
+                    "letterSpacing": "0.14em",
+                    "color": "var(--color-text-muted)"
                   },
                   "textContent": "Days"
                 }
               ]
             },
             {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.8rem",
+                "fontWeight": "800",
+                "color": "var(--color-border)",
+                "@--sm": { "display": "none" }
+              },
+              "textContent": ":"
+            },
+            {
               "tagName": "div",
               "style": {
                 "textAlign": "center",
-                "padding": "1.25rem 0.5rem",
-                "borderRadius": "var(--radius)",
-                "background": "rgba(255, 255, 255, 0.1)",
-                "border": "1px solid rgba(255, 255, 255, 0.18)",
-                "backdropFilter": "blur(4px)"
+                "minWidth": "4.6rem",
+                "padding": "1.1rem 0.6rem",
+                "borderRadius": "0.9rem",
+                "background": "rgba(255,255,255,0.03)",
+                "border": "1px solid var(--color-border)",
+                "boxShadow": "0 0 40px -18px var(--glow-cyan)",
+                "@--sm": { "minWidth": "3.7rem", "padding": "0.85rem 0.35rem" }
               },
               "children": [
                 {
                   "tagName": "div",
                   "style": {
                     "fontFamily": "var(--font-heading)",
-                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
-                    "fontWeight": "700",
+                    "fontSize": "clamp(1.9rem, 4.5vw, 2.9rem)",
+                    "fontWeight": "800",
                     "lineHeight": "1",
-                    "fontVariantNumeric": "tabular-nums"
+                    "fontVariantNumeric": "tabular-nums",
+                    "background": "var(--grad)",
+                    "backgroundClip": "text",
+                    "webkitBackgroundClip": "text",
+                    "webkitTextFillColor": "transparent",
+                    "color": "var(--color-accent)"
                   },
                   "textContent": "${state.hours}"
                 },
                 {
                   "tagName": "div",
                   "style": {
-                    "marginTop": "0.4rem",
-                    "fontSize": "0.7rem",
+                    "marginTop": "0.45rem",
+                    "fontSize": "0.66rem",
                     "textTransform": "uppercase",
-                    "letterSpacing": "0.1em",
-                    "opacity": "0.75"
+                    "letterSpacing": "0.14em",
+                    "color": "var(--color-text-muted)"
                   },
                   "textContent": "Hours"
                 }
               ]
             },
             {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.8rem",
+                "fontWeight": "800",
+                "color": "var(--color-border)",
+                "@--sm": { "display": "none" }
+              },
+              "textContent": ":"
+            },
+            {
               "tagName": "div",
               "style": {
                 "textAlign": "center",
-                "padding": "1.25rem 0.5rem",
-                "borderRadius": "var(--radius)",
-                "background": "rgba(255, 255, 255, 0.1)",
-                "border": "1px solid rgba(255, 255, 255, 0.18)",
-                "backdropFilter": "blur(4px)"
+                "minWidth": "4.6rem",
+                "padding": "1.1rem 0.6rem",
+                "borderRadius": "0.9rem",
+                "background": "rgba(255,255,255,0.03)",
+                "border": "1px solid var(--color-border)",
+                "boxShadow": "0 0 40px -18px var(--glow-cyan)",
+                "@--sm": { "minWidth": "3.7rem", "padding": "0.85rem 0.35rem" }
               },
               "children": [
                 {
                   "tagName": "div",
                   "style": {
                     "fontFamily": "var(--font-heading)",
-                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
-                    "fontWeight": "700",
+                    "fontSize": "clamp(1.9rem, 4.5vw, 2.9rem)",
+                    "fontWeight": "800",
                     "lineHeight": "1",
-                    "fontVariantNumeric": "tabular-nums"
+                    "fontVariantNumeric": "tabular-nums",
+                    "background": "var(--grad)",
+                    "backgroundClip": "text",
+                    "webkitBackgroundClip": "text",
+                    "webkitTextFillColor": "transparent",
+                    "color": "var(--color-accent)"
                   },
                   "textContent": "${state.minutes}"
                 },
                 {
                   "tagName": "div",
                   "style": {
-                    "marginTop": "0.4rem",
-                    "fontSize": "0.7rem",
+                    "marginTop": "0.45rem",
+                    "fontSize": "0.66rem",
                     "textTransform": "uppercase",
-                    "letterSpacing": "0.1em",
-                    "opacity": "0.75"
+                    "letterSpacing": "0.14em",
+                    "color": "var(--color-text-muted)"
                   },
                   "textContent": "Mins"
                 }
               ]
             },
             {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.8rem",
+                "fontWeight": "800",
+                "color": "var(--color-border)",
+                "@--sm": { "display": "none" }
+              },
+              "textContent": ":"
+            },
+            {
               "tagName": "div",
               "style": {
                 "textAlign": "center",
-                "padding": "1.25rem 0.5rem",
-                "borderRadius": "var(--radius)",
-                "background": "rgba(255, 255, 255, 0.1)",
-                "border": "1px solid rgba(255, 255, 255, 0.18)",
-                "backdropFilter": "blur(4px)"
+                "minWidth": "4.6rem",
+                "padding": "1.1rem 0.6rem",
+                "borderRadius": "0.9rem",
+                "background": "rgba(255,255,255,0.03)",
+                "border": "1px solid var(--color-border)",
+                "boxShadow": "0 0 40px -18px var(--glow)",
+                "@--sm": { "minWidth": "3.7rem", "padding": "0.85rem 0.35rem" }
               },
               "children": [
                 {
                   "tagName": "div",
                   "style": {
                     "fontFamily": "var(--font-heading)",
-                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
-                    "fontWeight": "700",
+                    "fontSize": "clamp(1.9rem, 4.5vw, 2.9rem)",
+                    "fontWeight": "800",
                     "lineHeight": "1",
-                    "fontVariantNumeric": "tabular-nums"
+                    "fontVariantNumeric": "tabular-nums",
+                    "background": "var(--grad)",
+                    "backgroundClip": "text",
+                    "webkitBackgroundClip": "text",
+                    "webkitTextFillColor": "transparent",
+                    "color": "var(--color-primary)"
                   },
                   "textContent": "${state.seconds}"
                 },
                 {
                   "tagName": "div",
                   "style": {
-                    "marginTop": "0.4rem",
-                    "fontSize": "0.7rem",
+                    "marginTop": "0.45rem",
+                    "fontSize": "0.66rem",
                     "textTransform": "uppercase",
-                    "letterSpacing": "0.1em",
-                    "opacity": "0.75"
+                    "letterSpacing": "0.14em",
+                    "color": "var(--color-text-muted)"
                   },
                   "textContent": "Secs"
                 }

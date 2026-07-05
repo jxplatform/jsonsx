@@ -4,21 +4,31 @@
     "eyebrow": "",
     "heading": "",
     "text": "",
-    "cta": "Get Tickets",
+    "cta": "Get tickets",
     "ctaHref": "/tickets/",
     "note": ""
   },
   "style": {
     "display": "block",
     "position": "relative",
-    "backgroundColor": "var(--color-bg-dark)",
-    "backgroundImage": "linear-gradient(120deg, rgba(124, 58, 237, 0.55), rgba(236, 72, 153, 0.35))",
+    "overflow": "hidden",
     "color": "var(--color-text-white)",
+    "background": "radial-gradient(ellipse 55% 90% at 12% 100%, rgba(34,224,255,0.28), transparent 60%), radial-gradient(ellipse 55% 90% at 88% 0%, rgba(255,61,154,0.32), transparent 60%), radial-gradient(ellipse 50% 60% at 50% 50%, rgba(168,85,247,0.2), transparent 65%), var(--color-bg)",
     "padding": "clamp(3.5rem, 8vw, 5.5rem) 1.5rem",
-    "textAlign": "center",
-    "overflow": "hidden"
+    "textAlign": "center"
   },
   "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "position": "absolute",
+        "inset": "0",
+        "backgroundImage": "radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)",
+        "backgroundSize": "38px 38px",
+        "opacity": "0.5",
+        "pointerEvents": "none"
+      }
+    },
     {
       "tagName": "div",
       "style": {
@@ -31,35 +41,51 @@
         {
           "tagName": "p",
           "style": {
-            "display": "${state.eyebrow ? 'block' : 'none'}",
+            "display": "${state.eyebrow ? 'inline-flex' : 'none'}",
+            "alignItems": "center",
+            "gap": "0.55rem",
             "textTransform": "uppercase",
             "letterSpacing": "0.16em",
-            "fontSize": "0.8rem",
-            "fontWeight": "600",
-            "opacity": "0.85",
-            "margin": "0 0 0.9rem"
+            "fontSize": "0.78rem",
+            "fontWeight": "700",
+            "color": "var(--color-accent)",
+            "margin": "0 0 1rem"
           },
-          "textContent": "${state.eyebrow}"
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "width": "0.5rem",
+                "height": "0.5rem",
+                "borderRadius": "999px",
+                "background": "var(--color-lime)",
+                "boxShadow": "0 0 10px var(--color-lime)"
+              }
+            },
+            { "tagName": "span", "textContent": "${state.eyebrow}" }
+          ]
         },
         {
           "tagName": "h2",
           "style": {
             "fontFamily": "var(--font-heading)",
-            "fontSize": "clamp(1.9rem, 4vw, 2.9rem)",
-            "fontWeight": "700",
-            "lineHeight": "1.12",
-            "letterSpacing": "-0.02em",
-            "margin": "0 0 1rem"
+            "fontSize": "clamp(2rem, 4.5vw, 3.1rem)",
+            "fontWeight": "800",
+            "lineHeight": "1.08",
+            "letterSpacing": "-0.035em",
+            "margin": "0 0 1.1rem",
+            "color": "var(--color-text-primary)"
           },
           "textContent": "${state.heading}"
         },
         {
           "tagName": "p",
           "style": {
-            "fontSize": "1.1rem",
+            "fontSize": "1.12rem",
             "lineHeight": "1.7",
-            "opacity": "0.9",
-            "margin": "0 0 2rem"
+            "color": "var(--color-text-muted)",
+            "margin": "0 auto 2.1rem",
+            "maxWidth": "52ch"
           },
           "textContent": "${state.text}"
         },
@@ -68,16 +94,19 @@
           "attributes": { "href": "${state.ctaHref}" },
           "style": {
             "display": "inline-block",
-            "backgroundColor": "var(--color-text-white)",
-            "color": "var(--color-primary)",
-            "padding": "0.95rem 2.5rem",
+            "background": "var(--grad-btn)",
+            "color": "#ffffff",
+            "padding": "1rem 2.6rem",
             "borderRadius": "999px",
-            "fontSize": "1.05rem",
+            "fontSize": "1.08rem",
             "fontWeight": "700",
             "textDecoration": "none",
+            "boxShadow": "0 14px 40px -10px var(--glow)",
             "transition": "transform 0.15s, box-shadow 0.15s",
-            "boxShadow": "0 10px 30px rgba(0, 0, 0, 0.25)",
-            ":hover": { "transform": "translateY(-2px)" }
+            ":hover": {
+              "transform": "translateY(-2px)",
+              "boxShadow": "0 20px 50px -10px var(--glow)"
+            }
           },
           "textContent": "${state.cta}"
         },
@@ -85,9 +114,9 @@
           "tagName": "p",
           "style": {
             "display": "${state.note ? 'block' : 'none'}",
-            "margin": "1.1rem 0 0",
+            "margin": "1.2rem 0 0",
             "fontSize": "0.9rem",
-            "opacity": "0.8"
+            "color": "var(--color-text-muted)"
           },
           "textContent": "${state.note}"
         }

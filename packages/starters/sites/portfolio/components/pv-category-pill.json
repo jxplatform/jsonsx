@@ -5,15 +5,16 @@
   },
   "style": {
     "display": "inline-block",
-    "padding": "0.3rem 0.8rem",
-    "border": "1px solid var(--color-border)",
+    "padding": "0.4rem 1rem",
+    "border": "1px solid var(--color-line)",
     "borderRadius": "999px",
-    "fontSize": "0.72rem",
+    "fontSize": "0.68rem",
     "fontWeight": "600",
-    "letterSpacing": "0.14em",
+    "letterSpacing": "0.16em",
     "textTransform": "uppercase",
-    "color": "var(--color-primary)",
-    "backgroundColor": "var(--color-bg-cream)"
+    "color": "var(--color-text-muted)",
+    "transition": "border-color 0.15s, color 0.15s",
+    ":hover": { "borderColor": "var(--color-primary)", "color": "var(--color-primary)" }
   },
   "children": [
     {

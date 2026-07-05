@@ -1,6 +1,7 @@
 {
   "tagName": "co-cta",
   "state": {
+    "kicker": "$ ./enroll --now",
     "heading": "",
     "text": "",
     "cta": "Enroll Now",
@@ -9,7 +10,9 @@
   },
   "style": {
     "display": "block",
-    "backgroundImage": "linear-gradient(120deg, var(--color-bg-dark) 0%, #1e293b 55%, var(--color-primary) 130%)",
+    "position": "relative",
+    "overflow": "hidden",
+    "backgroundColor": "var(--color-ink)",
     "color": "var(--color-text-white)",
     "padding": "clamp(3.5rem, 8vw, 5.5rem) 1.5rem",
     "textAlign": "center"
@@ -17,16 +20,51 @@
   "children": [
     {
       "tagName": "div",
-      "style": { "maxWidth": "var(--max-width-narrow)", "margin": "0 auto" },
+      "style": {
+        "position": "absolute",
+        "inset": "0",
+        "backgroundImage": "radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)",
+        "backgroundSize": "28px 28px",
+        "opacity": "0.5",
+        "pointerEvents": "none"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "absolute",
+        "inset": "0",
+        "background": "radial-gradient(ellipse 60% 100% at 50% 120%, rgba(79,70,229,0.4), transparent 62%)",
+        "pointerEvents": "none"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "relative",
+        "zIndex": "2",
+        "maxWidth": "var(--max-width-narrow)",
+        "margin": "0 auto"
+      },
       "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "fontFamily": "var(--font-mono)",
+            "fontSize": "0.85rem",
+            "color": "var(--color-accent)",
+            "margin": "0 0 1.1rem"
+          },
+          "textContent": "${state.kicker}"
+        },
         {
           "tagName": "h2",
           "style": {
             "fontFamily": "var(--font-heading)",
             "fontSize": "clamp(1.9rem, 4vw, 2.75rem)",
             "fontWeight": "800",
-            "lineHeight": "1.15",
-            "letterSpacing": "-0.02em",
+            "lineHeight": "1.12",
+            "letterSpacing": "-0.03em",
             "margin": "0 0 1rem"
           },
           "textContent": "${state.heading}"
@@ -35,9 +73,10 @@
           "tagName": "p",
           "style": {
             "fontSize": "1.1rem",
-            "lineHeight": "1.7",
-            "opacity": "0.85",
-            "margin": "0 0 2rem"
+            "lineHeight": "1.65",
+            "color": "rgba(255,255,255,0.72)",
+            "margin": "0 auto 2rem",
+            "maxWidth": "54ch"
           },
           "textContent": "${state.text}"
         },
@@ -45,28 +84,41 @@
           "tagName": "a",
           "attributes": { "href": "${state.ctaHref}" },
           "style": {
-            "display": "inline-block",
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "0.5rem",
             "backgroundColor": "var(--color-primary)",
             "color": "var(--color-text-white)",
-            "padding": "0.9rem 2.25rem",
-            "borderRadius": "var(--radius)",
+            "padding": "0.95rem 2.25rem",
+            "borderRadius": "999px",
             "fontSize": "1.05rem",
-            "fontWeight": "700",
+            "fontWeight": "600",
             "textDecoration": "none",
-            "transition": "background-color 0.15s",
-            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+            "boxShadow": "0 16px 36px -12px rgba(79,70,229,1)",
+            "transition": "transform 0.15s, background-color 0.15s",
+            ":hover": {
+              "backgroundColor": "var(--color-primary-hover)",
+              "transform": "translateY(-2px)"
+            }
           },
           "textContent": "${state.cta}"
         },
         {
           "tagName": "p",
           "style": {
-            "display": "${state.note ? 'block' : 'none'}",
-            "margin": "1.25rem 0 0",
-            "fontSize": "0.9rem",
-            "opacity": "0.7"
+            "display": "${state.note ? 'flex' : 'none'}",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "gap": "0.5rem",
+            "margin": "1.35rem 0 0",
+            "fontFamily": "var(--font-mono)",
+            "fontSize": "0.8rem",
+            "color": "rgba(255,255,255,0.55)"
           },
-          "textContent": "${state.note}"
+          "children": [
+            { "tagName": "span", "style": { "color": "var(--color-accent)" }, "textContent": "▸" },
+            { "tagName": "span", "textContent": "${state.note}" }
+          ]
         }
       ]
     }

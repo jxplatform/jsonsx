@@ -6,8 +6,9 @@
     "text": ""
   },
   "style": {
-    "display": "block",
-    "padding": "1.75rem",
+    "display": "flex",
+    "flexDirection": "column",
+    "padding": "1.9rem 1.75rem 2rem",
     "backgroundColor": "var(--color-bg-cream)",
     "borderRadius": "var(--radius)",
     "border": "1px solid var(--color-border)"
@@ -19,22 +20,24 @@
         "display": "inline-flex",
         "alignItems": "center",
         "justifyContent": "center",
-        "width": "3rem",
-        "height": "3rem",
+        "width": "3.1rem",
+        "height": "3.1rem",
         "borderRadius": "999px",
-        "backgroundColor": "rgba(21,128,61,0.1)",
+        "backgroundColor": "var(--color-bg-white)",
+        "border": "1px solid var(--color-border)",
         "fontSize": "1.5rem",
         "lineHeight": "1",
-        "marginBottom": "1rem"
+        "marginBottom": "1.1rem"
       },
       "textContent": "${state.icon}"
     },
     {
       "tagName": "h3",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "1.25rem",
+        "fontFamily": "var(--font-display)",
+        "fontSize": "1.35rem",
         "fontWeight": "600",
+        "color": "var(--color-primary-deep)",
         "margin": "0 0 0.5rem"
       },
       "textContent": "${state.title}"
@@ -44,7 +47,8 @@
       "style": {
         "margin": "0",
         "color": "var(--color-text-muted)",
-        "fontSize": "0.98rem",
+        "fontSize": "1rem",
+        "fontWeight": "600",
         "lineHeight": "1.65"
       },
       "textContent": "${state.text}"

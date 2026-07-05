@@ -2,13 +2,14 @@
 title: "About — Aperture Studio"
 ---
 
-:::::section{style.padding="clamp(3rem, 6vw, 5rem) 1.5rem" style.backgroundColor="var(--color-bg-cream)"}
+:::::section{style.padding="clamp(7rem, 12vw, 10rem) 0 clamp(2rem, 5vw, 3.5rem)"}
 ::pv-section-header{props.eyebrow="The studio" props.heading="An image-forward practice" props.subheading="Available light, a patient pace, and a tight final edit — that is the whole philosophy."}
 :::::
 
 :::::pv-about-split{props.image="/images/about.jpg" props.imageAlt="Aperture Studio photographer with camera"}
-
-### Photographs that still feel like the moment
+::::h2{style.fontFamily="var(--font-heading)" style.fontWeight="400" style.fontSize="clamp(2rem, 4vw, 3rem)" style.lineHeight="1.05" style.letterSpacing="-0.01em" style.margin="0 0 1.25rem" style.color="var(--color-text-primary)"}
+Photographs that still feel like the moment
+::::
 
 Aperture Studio began as one photographer, a single lens, and a stubborn preference for natural light. Years later the tools have grown but the approach has not: show up early, watch closely, and only press the shutter when something real is happening.
 

@@ -8,7 +8,7 @@
     {
       "tagName": "form",
       "attributes": { "action": "#", "method": "post" },
-      "style": { "display": "grid", "gap": "1rem", "marginTop": "1.5rem" },
+      "style": { "display": "grid", "gap": "0.9rem", "marginTop": "1.5rem" },
       "children": [
         {
           "tagName": "input",
@@ -21,10 +21,18 @@
           },
           "style": {
             "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem"
+            "padding": "0.8rem 0.95rem",
+            "border": "1px solid var(--color-border-strong)",
+            "borderRadius": "var(--radius-sm)",
+            "fontSize": "1rem",
+            "fontFamily": "inherit",
+            "backgroundColor": "var(--color-bg-white)",
+            "outline": "none",
+            "transition": "border-color 0.15s, box-shadow 0.15s",
+            ":focus": {
+              "borderColor": "var(--color-primary)",
+              "boxShadow": "0 0 0 3px var(--color-accent-soft)"
+            }
           }
         },
         {
@@ -38,15 +46,28 @@
           },
           "style": {
             "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem"
+            "padding": "0.8rem 0.95rem",
+            "border": "1px solid var(--color-border-strong)",
+            "borderRadius": "var(--radius-sm)",
+            "fontSize": "1rem",
+            "fontFamily": "inherit",
+            "backgroundColor": "var(--color-bg-white)",
+            "outline": "none",
+            "transition": "border-color 0.15s, box-shadow 0.15s",
+            ":focus": {
+              "borderColor": "var(--color-primary)",
+              "boxShadow": "0 0 0 3px var(--color-accent-soft)"
+            }
           }
         },
         {
           "tagName": "div",
-          "style": { "display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "1rem" },
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "1fr 1fr",
+            "gap": "0.9rem",
+            "@--sm": { "gridTemplateColumns": "1fr" }
+          },
           "children": [
             {
               "tagName": "input",
@@ -58,10 +79,18 @@
               },
               "style": {
                 "width": "100%",
-                "padding": "0.75rem 0.9rem",
-                "border": "1px solid var(--color-border)",
-                "borderRadius": "var(--radius)",
-                "fontSize": "1rem"
+                "padding": "0.8rem 0.95rem",
+                "border": "1px solid var(--color-border-strong)",
+                "borderRadius": "var(--radius-sm)",
+                "fontSize": "1rem",
+                "fontFamily": "inherit",
+                "backgroundColor": "var(--color-bg-white)",
+                "outline": "none",
+                "transition": "border-color 0.15s, box-shadow 0.15s",
+                ":focus": {
+                  "borderColor": "var(--color-primary)",
+                  "boxShadow": "0 0 0 3px var(--color-accent-soft)"
+                }
               }
             },
             {
@@ -74,10 +103,18 @@
               },
               "style": {
                 "width": "100%",
-                "padding": "0.75rem 0.9rem",
-                "border": "1px solid var(--color-border)",
-                "borderRadius": "var(--radius)",
-                "fontSize": "1rem"
+                "padding": "0.8rem 0.95rem",
+                "border": "1px solid var(--color-border-strong)",
+                "borderRadius": "var(--radius-sm)",
+                "fontSize": "1rem",
+                "fontFamily": "inherit",
+                "backgroundColor": "var(--color-bg-white)",
+                "outline": "none",
+                "transition": "border-color 0.15s, box-shadow 0.15s",
+                ":focus": {
+                  "borderColor": "var(--color-primary)",
+                  "boxShadow": "0 0 0 3px var(--color-accent-soft)"
+                }
               }
             }
           ]
@@ -92,29 +129,41 @@
           },
           "style": {
             "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
+            "padding": "0.8rem 0.95rem",
+            "border": "1px solid var(--color-border-strong)",
+            "borderRadius": "var(--radius-sm)",
             "fontSize": "1rem",
-            "fontFamily": "inherit"
+            "fontFamily": "inherit",
+            "backgroundColor": "var(--color-bg-white)",
+            "outline": "none",
+            "resize": "vertical",
+            "transition": "border-color 0.15s, box-shadow 0.15s",
+            ":focus": {
+              "borderColor": "var(--color-primary)",
+              "boxShadow": "0 0 0 3px var(--color-accent-soft)"
+            }
           }
         },
         {
           "tagName": "button",
           "attributes": { "type": "submit" },
-          "textContent": "Send Message",
+          "textContent": "Request a call",
           "style": {
             "backgroundColor": "var(--color-primary)",
             "color": "var(--color-text-white)",
-            "padding": "0.85rem 1.5rem",
+            "padding": "0.9rem 1.6rem",
             "border": "none",
-            "borderRadius": "var(--radius)",
+            "borderRadius": "999px",
             "fontSize": "1rem",
+            "fontFamily": "inherit",
             "fontWeight": "700",
             "cursor": "pointer",
             "justifySelf": "start",
-            "transition": "background-color 0.15s",
-            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+            "transition": "background-color 0.15s, transform 0.15s",
+            ":hover": {
+              "backgroundColor": "var(--color-primary-hover)",
+              "transform": "translateY(-1px)"
+            }
           }
         }
       ]

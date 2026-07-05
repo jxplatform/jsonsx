@@ -2,7 +2,9 @@
 title: Aero Road Helmet
 sku: aero-road-helmet
 price: $149
+oldPrice: $179
 category: Accessories
+badge: Sale
 image: /images/product-5.jpg
 order: 7
 ---

@@ -1,46 +1,72 @@
 {
   "tagName": "co-outcome-card",
   "state": {
+    "number": "",
     "icon": "",
     "title": "",
     "text": ""
   },
   "style": {
     "display": "block",
+    "position": "relative",
     "padding": "1.75rem",
     "backgroundColor": "var(--color-bg-white)",
     "borderRadius": "var(--radius)",
     "border": "1px solid var(--color-border)",
-    "transition": "transform 0.15s, box-shadow 0.15s",
+    "transition": "transform 0.15s, box-shadow 0.15s, border-color 0.15s",
     ":hover": {
-      "transform": "translateY(-3px)",
-      "boxShadow": "0 12px 32px rgba(37,99,235,0.12)"
+      "transform": "translateY(-4px)",
+      "boxShadow": "0 18px 40px -18px rgba(79,70,229,0.4)",
+      "borderColor": "var(--color-primary-light)"
     }
   },
   "children": [
     {
       "tagName": "div",
       "style": {
-        "display": "inline-flex",
+        "display": "flex",
         "alignItems": "center",
-        "justifyContent": "center",
-        "width": "2.75rem",
-        "height": "2.75rem",
-        "borderRadius": "0.6rem",
-        "backgroundColor": "rgba(37,99,235,0.1)",
-        "fontSize": "1.4rem",
-        "marginBottom": "1rem",
-        "lineHeight": "1"
+        "justifyContent": "space-between",
+        "marginBottom": "1.1rem"
       },
-      "textContent": "${state.icon}"
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "width": "2.9rem",
+            "height": "2.9rem",
+            "borderRadius": "0.65rem",
+            "backgroundColor": "var(--color-indigo-050)",
+            "border": "1px solid var(--color-indigo-line)",
+            "fontSize": "1.45rem",
+            "lineHeight": "1"
+          },
+          "textContent": "${state.icon}"
+        },
+        {
+          "tagName": "span",
+          "style": {
+            "fontFamily": "var(--font-mono)",
+            "fontSize": "0.85rem",
+            "fontWeight": "600",
+            "color": "var(--color-text-faint)"
+          },
+          "textContent": "${state.number}"
+        }
+      ]
     },
     {
       "tagName": "h3",
       "style": {
         "fontFamily": "var(--font-heading)",
-        "fontSize": "1.2rem",
+        "fontSize": "1.18rem",
         "fontWeight": "700",
-        "margin": "0 0 0.5rem"
+        "letterSpacing": "-0.01em",
+        "margin": "0 0 0.5rem",
+        "color": "var(--color-text-primary)"
       },
       "textContent": "${state.title}"
     },

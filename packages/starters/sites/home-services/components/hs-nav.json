@@ -1,109 +1,274 @@
 {
   "tagName": "hs-nav",
   "state": {
-    "brand": "Summit Heating & Cooling",
+    "brand": "SUMMIT",
+    "brandSub": "HEATING & COOLING",
     "phone": "(970) 555-0148",
-    "phoneHref": "tel:+19705550148"
+    "phoneHref": "tel:+19705550148",
+    "hours": "Mon–Fri 7a–6p · Sat 8a–2p",
+    "region": "Licensed & Insured · Serving Northern Colorado"
   },
   "style": {
     "display": "block",
     "position": "sticky",
     "top": "0",
-    "zIndex": "50",
-    "backgroundColor": "rgba(255, 255, 255, 0.9)",
-    "backdropFilter": "blur(8px)",
-    "borderBottom": "1px solid var(--color-border)"
+    "zIndex": "60"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
-        "maxWidth": "var(--max-width)",
-        "margin": "0 auto",
-        "padding": "0.9rem 1.5rem",
-        "display": "flex",
-        "alignItems": "center",
-        "justifyContent": "space-between",
-        "gap": "1.5rem"
+        "backgroundColor": "var(--color-steel)",
+        "color": "var(--color-text-steel-muted)",
+        "borderBottom": "1px solid var(--color-steel-line)",
+        "fontFamily": "var(--font-body)"
       },
       "children": [
         {
-          "tagName": "a",
-          "attributes": { "href": "/" },
+          "tagName": "div",
           "style": {
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "1.25rem",
-            "fontWeight": "800",
-            "color": "var(--color-text-primary)",
-            "textDecoration": "none",
-            "letterSpacing": "-0.02em"
-          },
-          "textContent": "${state.brand}"
-        },
-        {
-          "tagName": "nav",
-          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "padding": "0.4rem 1.5rem",
             "display": "flex",
             "alignItems": "center",
-            "gap": "1.75rem",
-            "@--sm": { "gap": "0.9rem" }
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "fontSize": "0.82rem",
+            "fontWeight": "500"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "letterSpacing": "0.02em",
+                "@--md": { "display": "none" }
+              },
+              "textContent": "${state.region}"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "1.1rem",
+                "marginLeft": "auto"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "letterSpacing": "0.02em",
+                    "@--lg": { "display": "none" }
+                  },
+                  "textContent": "${state.hours}"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.4rem",
+                    "padding": "0.15rem 0.6rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "600",
+                    "fontSize": "0.72rem",
+                    "letterSpacing": "0.08em",
+                    "textTransform": "uppercase"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "width": "0.45rem",
+                        "height": "0.45rem",
+                        "borderRadius": "999px",
+                        "backgroundColor": "#ffffff",
+                        "boxShadow": "0 0 0 3px rgba(255,255,255,0.35)"
+                      }
+                    },
+                    { "tagName": "span", "textContent": "24/7 Emergency" }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "backgroundColor": "var(--color-bg-white)",
+        "borderBottom": "2px solid var(--color-steel)",
+        "boxShadow": "0 6px 24px -18px rgba(14,26,35,0.6)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "padding": "0.7rem 1.5rem",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1.5rem"
           },
           "children": [
             {
               "tagName": "a",
-              "attributes": { "href": "/services/" },
+              "attributes": { "href": "/" },
               "style": {
-                "color": "var(--color-text-primary)",
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.7rem",
                 "textDecoration": "none",
-                "fontWeight": "600",
-                "fontSize": "0.95rem",
-                "@--sm": { "display": "none" },
-                ":hover": { "color": "var(--color-primary)" }
+                "color": "var(--color-text-primary)"
               },
-              "textContent": "Services"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "2.6rem",
+                    "height": "2.6rem",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "borderRadius": "0.35rem",
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "700",
+                    "fontSize": "1.5rem",
+                    "lineHeight": "1",
+                    "clipPath": "polygon(0 0, 100% 0, 100% 78%, 50% 100%, 0 78%)"
+                  },
+                  "textContent": "▲"
+                },
+                {
+                  "tagName": "span",
+                  "style": { "display": "flex", "flexDirection": "column", "lineHeight": "1" },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "1.35rem",
+                        "letterSpacing": "0.06em"
+                      },
+                      "textContent": "${state.brand}"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "500",
+                        "fontSize": "0.6rem",
+                        "letterSpacing": "0.24em",
+                        "color": "var(--color-primary)",
+                        "marginTop": "0.15rem"
+                      },
+                      "textContent": "${state.brandSub}"
+                    }
+                  ]
+                }
+              ]
             },
             {
-              "tagName": "a",
-              "attributes": { "href": "/about/" },
+              "tagName": "nav",
               "style": {
-                "color": "var(--color-text-primary)",
-                "textDecoration": "none",
-                "fontWeight": "600",
-                "fontSize": "0.95rem",
-                "@--sm": { "display": "none" },
-                ":hover": { "color": "var(--color-primary)" }
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "1.75rem"
               },
-              "textContent": "About"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "${state.phoneHref}" },
-              "style": {
-                "color": "var(--color-text-primary)",
-                "textDecoration": "none",
-                "fontWeight": "700",
-                "fontSize": "0.95rem",
-                "@--md": { "display": "none" },
-                ":hover": { "color": "var(--color-primary)" }
-              },
-              "textContent": "${state.phone}"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/contact/" },
-              "style": {
-                "display": "inline-block",
-                "backgroundColor": "var(--color-primary)",
-                "color": "var(--color-text-white)",
-                "padding": "0.55rem 1.25rem",
-                "borderRadius": "var(--radius)",
-                "textDecoration": "none",
-                "fontWeight": "700",
-                "fontSize": "0.95rem",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
-              },
-              "textContent": "Free Quote"
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/services/" },
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.06em",
+                    "color": "var(--color-text-primary)",
+                    "textDecoration": "none",
+                    "fontWeight": "600",
+                    "fontSize": "0.95rem",
+                    "@--md": { "display": "none" },
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "Services"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/about/" },
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.06em",
+                    "color": "var(--color-text-primary)",
+                    "textDecoration": "none",
+                    "fontWeight": "600",
+                    "fontSize": "0.95rem",
+                    "@--md": { "display": "none" },
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "About"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "${state.phoneHref}" },
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "fontFamily": "var(--font-heading)",
+                    "color": "var(--color-text-primary)",
+                    "textDecoration": "none",
+                    "fontWeight": "700",
+                    "fontSize": "1.05rem",
+                    "letterSpacing": "0.01em",
+                    "@--sm": { "display": "none" },
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-primary)", "fontSize": "1.1rem" },
+                      "textContent": "☏"
+                    },
+                    { "tagName": "span", "textContent": "${state.phone}" }
+                  ]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/contact/" },
+                  "style": {
+                    "display": "inline-block",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.6rem 1.35rem",
+                    "borderRadius": "var(--radius-sm)",
+                    "textDecoration": "none",
+                    "fontFamily": "var(--font-heading)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.05em",
+                    "fontWeight": "600",
+                    "fontSize": "0.95rem",
+                    "boxShadow": "0 10px 22px -12px rgba(244,81,30,0.9)",
+                    "transition": "background-color 0.15s, transform 0.15s",
+                    ":hover": {
+                      "backgroundColor": "var(--color-primary-hover)",
+                      "transform": "translateY(-1px)"
+                    }
+                  },
+                  "textContent": "Free Quote"
+                }
+              ]
             }
           ]
         }

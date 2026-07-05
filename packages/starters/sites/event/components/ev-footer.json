@@ -1,18 +1,31 @@
 {
   "tagName": "ev-footer",
   "state": {
-    "brand": "Horizon Conf 2026",
+    "brand": "Horizon Conf",
     "tagline": "One day. Two stages. The people building what's next.",
     "date": "June 12, 2026",
     "venue": "The Foundry, Portland OR"
   },
   "style": {
     "display": "block",
+    "position": "relative",
     "backgroundColor": "var(--color-bg-dark)",
     "color": "var(--color-text-white)",
-    "padding": "3.5rem 1.5rem 2rem"
+    "borderTop": "1px solid var(--color-border)",
+    "padding": "clamp(3rem, 6vw, 4.5rem) 1.5rem 2.25rem"
   },
   "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "position": "absolute",
+        "top": "0",
+        "left": "0",
+        "right": "0",
+        "height": "2px",
+        "background": "var(--grad)"
+      }
+    },
     {
       "tagName": "div",
       "style": {
@@ -30,16 +43,50 @@
             {
               "tagName": "div",
               "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.4rem",
-                "fontWeight": "700",
-                "marginBottom": "0.75rem"
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.6rem",
+                "marginBottom": "0.9rem"
               },
-              "textContent": "${state.brand}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "1.7rem",
+                    "height": "1.7rem",
+                    "borderRadius": "0.55rem",
+                    "background": "var(--grad-btn)",
+                    "boxShadow": "0 0 18px var(--glow)",
+                    "color": "#ffffff",
+                    "fontSize": "0.9rem",
+                    "fontWeight": "800",
+                    "fontFamily": "var(--font-heading)"
+                  },
+                  "textContent": "H"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.4rem",
+                    "fontWeight": "800",
+                    "letterSpacing": "-0.02em"
+                  },
+                  "textContent": "${state.brand}"
+                }
+              ]
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.75", "maxWidth": "34ch" },
+              "style": {
+                "margin": "0",
+                "color": "var(--color-text-muted)",
+                "maxWidth": "34ch",
+                "lineHeight": "1.7"
+              },
               "textContent": "${state.tagline}"
             }
           ]
@@ -51,21 +98,22 @@
               "tagName": "div",
               "style": {
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.12em",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "color": "var(--color-accent)",
+                "marginBottom": "0.85rem"
               },
               "textContent": "When & where"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "style": { "margin": "0 0 0.35rem", "color": "var(--color-text-primary)" },
               "textContent": "${state.date}"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.85" },
+              "style": { "margin": "0", "color": "var(--color-text-muted)" },
               "textContent": "${state.venue}"
             }
           ]
@@ -77,10 +125,11 @@
               "tagName": "div",
               "style": {
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.12em",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "color": "var(--color-accent)",
+                "marginBottom": "0.85rem"
               },
               "textContent": "Explore"
             },
@@ -89,10 +138,11 @@
               "attributes": { "href": "/schedule/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "color": "var(--color-text-muted)",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.4rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
               },
               "textContent": "Schedule"
             },
@@ -101,10 +151,11 @@
               "attributes": { "href": "/speakers/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "color": "var(--color-text-muted)",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.4rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
               },
               "textContent": "Speakers"
             },
@@ -113,9 +164,10 @@
               "attributes": { "href": "/tickets/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
-                "textDecoration": "none"
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
               },
               "textContent": "Tickets"
             }
@@ -127,11 +179,11 @@
       "tagName": "div",
       "style": {
         "maxWidth": "var(--max-width)",
-        "margin": "2.5rem auto 0",
+        "margin": "2.75rem auto 0",
         "paddingTop": "1.5rem",
-        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
+        "borderTop": "1px solid var(--color-border)",
         "fontSize": "0.85rem",
-        "opacity": "0.6"
+        "color": "var(--color-text-muted)"
       },
       "children": [
         {

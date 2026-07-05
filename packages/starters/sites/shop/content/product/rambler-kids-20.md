@@ -3,6 +3,7 @@ title: Rambler Kids 20"
 sku: rambler-kids-20
 price: $429
 category: Kids
+badge: ""
 image: /images/product-4.jpg
 order: 6
 ---

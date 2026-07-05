@@ -1,124 +1,130 @@
 {
   "tagName": "bl-masthead",
   "state": {
-    "eyebrow": "",
-    "heading": "",
-    "subheading": "",
+    "edition": "Field Notes · Vol. IV · Published most Sundays",
+    "heading": "The Long Field",
+    "subheading": "Slow essays on design, technology, and the craft of making things well — written by hand, one at a time.",
+    "colophon": "Est. 2021 · Set in Fraunces & Newsreader · Marren Oda, editor",
     "cta": "Read the latest",
-    "ctaHref": "#latest",
-    "cta2": "",
-    "cta2Href": "/about/",
-    "bg": { "type": "string", "format": "image", "default": "" }
+    "ctaHref": "#latest"
   },
   "style": {
     "display": "block",
-    "position": "relative",
-    "minHeight": "72vh",
-    "color": "var(--color-text-white)",
-    "backgroundImage": "url('${state.bg}')",
-    "backgroundSize": "cover",
-    "backgroundPosition": "center"
+    "backgroundColor": "var(--color-paper)",
+    "padding": "clamp(2rem, 5vw, 3.5rem) 1.5rem clamp(2.5rem, 6vw, 4rem)"
   },
   "children": [
     {
       "tagName": "div",
-      "style": {
-        "position": "absolute",
-        "inset": "0",
-        "background": "linear-gradient(180deg, rgba(10,12,16,0.35) 0%, rgba(10,12,16,0.78) 100%)"
-      }
-    },
-    {
-      "tagName": "div",
-      "style": {
-        "position": "relative",
-        "zIndex": "10",
-        "display": "flex",
-        "alignItems": "center",
-        "minHeight": "72vh",
-        "maxWidth": "var(--max-width)",
-        "margin": "0 auto",
-        "padding": "4rem 1.5rem"
-      },
+      "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "680px" },
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "1.25rem",
+            "marginBottom": "clamp(1.25rem, 3vw, 2rem)"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "flex": "1", "height": "1px", "backgroundColor": "var(--color-rule)" }
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-body)",
+                "fontSize": "0.74rem",
+                "fontWeight": "500",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.22em",
+                "color": "var(--color-text-muted)",
+                "textAlign": "center",
+                "whiteSpace": "nowrap",
+                "@--sm": { "whiteSpace": "normal", "letterSpacing": "0.14em" }
+              },
+              "textContent": "${state.edition}"
+            },
+            {
+              "tagName": "span",
+              "style": { "flex": "1", "height": "1px", "backgroundColor": "var(--color-rule)" }
+            }
+          ]
+        },
+        {
+          "tagName": "h1",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontWeight": "900",
+            "fontSize": "clamp(3.2rem, 15vw, 11rem)",
+            "lineHeight": "0.9",
+            "letterSpacing": "-0.035em",
+            "textAlign": "center",
+            "margin": "0",
+            "color": "var(--color-text-primary)"
+          },
+          "textContent": "${state.heading}"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "marginTop": "clamp(1.5rem, 3vw, 2.25rem)",
+            "paddingTop": "clamp(1.5rem, 3vw, 2.25rem)",
+            "borderTop": "3px double var(--color-rule)",
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "center",
+            "gap": "1.1rem"
+          },
           "children": [
             {
               "tagName": "p",
               "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.2em",
-                "fontSize": "0.8rem",
-                "fontWeight": "600",
-                "marginBottom": "1rem",
-                "color": "#bae6fd"
-              },
-              "textContent": "${state.eyebrow}"
-            },
-            {
-              "tagName": "h1",
-              "style": {
                 "fontFamily": "var(--font-heading)",
-                "fontSize": "clamp(2.6rem, 6vw, 4.5rem)",
-                "fontWeight": "600",
-                "lineHeight": "1.05",
-                "margin": "0 0 1.25rem",
-                "letterSpacing": "-0.02em"
-              },
-              "textContent": "${state.heading}"
-            },
-            {
-              "tagName": "p",
-              "style": {
-                "fontSize": "clamp(1.15rem, 2vw, 1.4rem)",
-                "lineHeight": "1.6",
-                "margin": "0 0 2rem",
-                "opacity": "0.92",
-                "maxWidth": "52ch"
+                "fontStyle": "italic",
+                "fontWeight": "400",
+                "fontSize": "clamp(1.3rem, 3vw, 1.9rem)",
+                "lineHeight": "1.4",
+                "textAlign": "center",
+                "maxWidth": "30ch",
+                "margin": "0",
+                "color": "var(--color-text-primary)"
               },
               "textContent": "${state.subheading}"
             },
             {
-              "tagName": "div",
-              "style": { "display": "flex", "gap": "0.75rem", "flexWrap": "wrap" },
-              "children": [
-                {
-                  "tagName": "a",
-                  "attributes": { "href": "${state.ctaHref}" },
-                  "style": {
-                    "display": "inline-block",
-                    "backgroundColor": "var(--color-primary)",
-                    "color": "var(--color-text-white)",
-                    "padding": "0.85rem 2rem",
-                    "borderRadius": "var(--radius)",
-                    "fontSize": "1.05rem",
-                    "fontWeight": "600",
-                    "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "var(--color-primary-hover)" }
-                  },
-                  "textContent": "${state.cta}"
-                },
-                {
-                  "tagName": "a",
-                  "attributes": { "href": "${state.cta2Href}" },
-                  "style": {
-                    "display": "${state.cta2 ? 'inline-block' : 'none'}",
-                    "border": "1px solid rgba(255,255,255,0.6)",
-                    "color": "var(--color-text-white)",
-                    "padding": "0.85rem 2rem",
-                    "borderRadius": "var(--radius)",
-                    "fontSize": "1.05rem",
-                    "fontWeight": "600",
-                    "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "rgba(255,255,255,0.12)" }
-                  },
-                  "textContent": "${state.cta2}"
-                }
-              ]
+              "tagName": "p",
+              "style": {
+                "fontFamily": "var(--font-body)",
+                "fontSize": "0.76rem",
+                "fontWeight": "500",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.16em",
+                "color": "var(--color-text-muted)",
+                "textAlign": "center",
+                "margin": "0"
+              },
+              "textContent": "${state.colophon}"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "${state.ctaHref}" },
+              "style": {
+                "marginTop": "0.5rem",
+                "fontFamily": "var(--font-body)",
+                "fontSize": "0.8rem",
+                "fontWeight": "600",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.16em",
+                "color": "var(--color-primary)",
+                "textDecoration": "none",
+                "borderBottom": "1px solid var(--color-primary)",
+                "paddingBottom": "0.15rem",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "0.6" }
+              },
+              "textContent": "${state.cta} ↓"
             }
           ]
         }

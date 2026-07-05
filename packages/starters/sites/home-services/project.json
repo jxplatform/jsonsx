@@ -8,7 +8,10 @@
   "$head": [
     {
       "tagName": "meta",
-      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+      "attributes": {
+        "name": "viewport",
+        "content": "width=device-width, initial-scale=1"
+      }
     },
     {
       "tagName": "meta",
@@ -19,21 +22,31 @@
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+      "attributes": {
+        "rel": "icon",
+        "href": "/favicon.svg"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.googleapis.com"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.gstatic.com",
+        "crossorigin": ""
+      }
     },
     {
       "tagName": "link",
       "attributes": {
         "rel": "stylesheet",
-        "href": "https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"
+        "href": "https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow:wght@400;500;600;700&display=swap"
       }
     }
   ],
@@ -44,27 +57,61 @@
     "--sm": "(max-width: 640px)"
   },
   "style": {
-    "--color-primary": "#ea580c",
-    "--color-primary-hover": "#c2410c",
-    "--color-ink": "#1c1917",
-    "--color-bg-dark": "#1c1917",
-    "--color-bg-cream": "#f5f5f4",
+    "--color-primary": "#f4511e",
+    "--color-primary-hover": "#d84315",
+    "--color-primary-soft": "rgba(244, 81, 30, 0.12)",
+    "--color-ink": "#0e1a23",
+    "--color-steel": "#122430",
+    "--color-steel-2": "#1a3341",
+    "--color-steel-line": "#28414f",
+    "--color-bg-dark": "#0e1a23",
+    "--color-bg-steel": "#122430",
+    "--color-bg-cream": "#eef1f4",
+    "--color-bg-concrete": "#e5eaee",
     "--color-bg-white": "#ffffff",
-    "--color-text-primary": "#1c1917",
+    "--color-text-primary": "#14212b",
     "--color-text-white": "#ffffff",
-    "--color-text-muted": "#57534e",
-    "--color-border": "#e7e5e4",
-    "--color-accent": "#ea580c",
-    "--font-heading": "'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--color-text-muted": "#5c6b77",
+    "--color-text-steel-muted": "#9fb2be",
+    "--color-border": "#d9e0e6",
+    "--color-border-strong": "#c1cbd3",
+    "--color-accent": "#f4511e",
+    "--hazard": "repeating-linear-gradient(-45deg, #f4511e 0 16px, #0e1a23 16px 32px)",
+    "--font-heading": "'Oswald', 'Arial Narrow', 'Segoe UI', system-ui, sans-serif",
+    "--font-body": "'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
     "--max-width": "1200px",
     "--max-width-narrow": "820px",
     "--radius": "0.5rem",
+    "--radius-sm": "0.35rem",
+    "--shadow-card": "0 2px 4px rgba(14,26,35,0.05), 0 16px 40px -22px rgba(14,26,35,0.35)",
+    "--shadow-float": "0 34px 70px -30px rgba(14,26,35,0.5)",
     "margin": "0",
     "padding": "0",
-    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "fontFamily": "var(--font-body)",
+    "fontSize": "17px",
     "lineHeight": "1.6",
     "color": "var(--color-text-primary)",
-    "backgroundColor": "var(--color-bg-white)"
+    "backgroundColor": "var(--color-bg-white)",
+    "WebkitFontSmoothing": "antialiased",
+    "h1": {
+      "fontFamily": "var(--font-heading)"
+    },
+    "h2": {
+      "fontFamily": "var(--font-heading)"
+    },
+    "h3": {
+      "fontFamily": "var(--font-heading)"
+    },
+    "h4": {
+      "fontFamily": "var(--font-heading)"
+    },
+    "strong": {
+      "color": "var(--color-text-primary)"
+    },
+    "a": {
+      "color": "var(--color-primary)",
+      "fontWeight": "600"
+    }
   },
   "imports": {
     "Markdown": "@jxsuite/parser/Markdown.class.json",
@@ -75,7 +122,12 @@
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
     "formats": ["webp", "avif"],
-    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "quality": {
+      "webp": 80,
+      "avif": 65,
+      "jpeg": 80,
+      "png": 80
+    },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
@@ -86,10 +138,18 @@
       "schema": {
         "type": "object",
         "properties": {
-          "name": { "type": "string" },
-          "summary": { "type": "string" },
-          "icon": { "type": "string" },
-          "order": { "type": "number" }
+          "name": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "order": {
+            "type": "number"
+          }
         },
         "required": ["name", "summary"]
       }

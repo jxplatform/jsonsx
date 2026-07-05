@@ -1,122 +1,168 @@
 {
   "tagName": "pf-hero",
   "state": {
-    "eyebrow": "",
+    "eyebrow": "Tax · Assurance · Advisory",
+    "marker": "Est. 2007",
     "heading": "",
-    "subheading": "",
-    "cta": "Book a Consultation",
+    "lede": "",
+    "aside": "",
+    "cta": "Book a consultation",
     "ctaHref": "/contact/",
-    "cta2": "",
-    "cta2Href": "/services/",
-    "bg": { "type": "string", "format": "image", "default": "" }
+    "cta2": "Read the Quarterly",
+    "cta2Href": "/insights/"
   },
   "style": {
     "display": "block",
-    "position": "relative",
-    "minHeight": "74vh",
-    "color": "var(--color-text-white)",
-    "backgroundImage": "url('${state.bg}')",
-    "backgroundSize": "cover",
-    "backgroundPosition": "center"
+    "backgroundColor": "var(--color-paper)",
+    "padding": "clamp(2.5rem, 6vw, 4.5rem) 1.5rem clamp(2.5rem, 6vw, 4rem)"
   },
   "children": [
     {
       "tagName": "div",
-      "style": {
-        "position": "absolute",
-        "inset": "0",
-        "background": "linear-gradient(120deg, rgba(15,23,42,0.86) 0%, rgba(30,58,138,0.68) 100%)"
-      }
-    },
-    {
-      "tagName": "div",
-      "style": {
-        "position": "relative",
-        "zIndex": "10",
-        "display": "flex",
-        "alignItems": "center",
-        "minHeight": "74vh",
-        "maxWidth": "var(--max-width)",
-        "margin": "0 auto",
-        "padding": "4rem 1.5rem"
-      },
+      "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "680px" },
+          "style": {
+            "display": "flex",
+            "alignItems": "baseline",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "paddingBottom": "0.9rem",
+            "borderBottom": "1px solid var(--color-rule)",
+            "fontFamily": "var(--font-sans)",
+            "fontSize": "0.72rem",
+            "fontWeight": "600",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.18em"
+          },
           "children": [
             {
-              "tagName": "p",
-              "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.18em",
-                "fontSize": "0.8rem",
-                "fontWeight": "600",
-                "marginBottom": "1rem",
-                "color": "#bfdbfe"
-              },
+              "tagName": "span",
+              "style": { "color": "var(--color-accent)" },
               "textContent": "${state.eyebrow}"
             },
             {
-              "tagName": "h1",
-              "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "clamp(2.5rem, 6vw, 4.25rem)",
-                "fontWeight": "700",
-                "lineHeight": "1.08",
-                "margin": "0 0 1.25rem",
-                "letterSpacing": "-0.02em"
-              },
-              "textContent": "${state.heading}"
-            },
+              "tagName": "span",
+              "style": { "color": "var(--color-muted)" },
+              "textContent": "${state.marker}"
+            }
+          ]
+        },
+        {
+          "tagName": "h1",
+          "style": {
+            "fontFamily": "var(--font-serif)",
+            "fontWeight": "500",
+            "fontSize": "clamp(2.6rem, 6.4vw, 5.2rem)",
+            "lineHeight": "1.04",
+            "letterSpacing": "-0.02em",
+            "margin": "clamp(1.75rem, 4vw, 3rem) 0 0",
+            "maxWidth": "18ch",
+            "color": "var(--color-ink)"
+          },
+          "textContent": "${state.heading}"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "marginTop": "clamp(1.75rem, 4vw, 2.75rem)",
+            "paddingTop": "clamp(1.5rem, 3vw, 2.25rem)",
+            "borderTop": "1px solid var(--color-hairline)",
+            "display": "grid",
+            "gridTemplateColumns": "1.35fr 1fr",
+            "gap": "clamp(1.5rem, 5vw, 4rem)",
+            "alignItems": "start",
+            "@--md": { "gridTemplateColumns": "1fr", "gap": "1.75rem" }
+          },
+          "children": [
             {
-              "tagName": "p",
-              "style": {
-                "fontSize": "clamp(1.1rem, 2vw, 1.35rem)",
-                "lineHeight": "1.6",
-                "margin": "0 0 2rem",
-                "opacity": "0.92",
-                "maxWidth": "52ch"
-              },
-              "textContent": "${state.subheading}"
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0 0 1.75rem",
+                    "fontSize": "clamp(1.05rem, 1.6vw, 1.22rem)",
+                    "lineHeight": "1.65",
+                    "color": "var(--color-ink)",
+                    "maxWidth": "48ch"
+                  },
+                  "textContent": "${state.lede}"
+                },
+                {
+                  "tagName": "div",
+                  "style": { "display": "flex", "gap": "0.75rem", "flexWrap": "wrap" },
+                  "children": [
+                    {
+                      "tagName": "a",
+                      "attributes": { "href": "${state.ctaHref}" },
+                      "style": {
+                        "display": "inline-block",
+                        "backgroundColor": "var(--color-ink)",
+                        "color": "var(--color-paper)",
+                        "padding": "0.8rem 1.6rem",
+                        "fontFamily": "var(--font-sans)",
+                        "fontSize": "0.78rem",
+                        "fontWeight": "600",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.14em",
+                        "textDecoration": "none",
+                        "transition": "background-color 0.15s",
+                        ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                      },
+                      "textContent": "${state.cta}"
+                    },
+                    {
+                      "tagName": "a",
+                      "attributes": { "href": "${state.cta2Href}" },
+                      "style": {
+                        "display": "${state.cta2 ? 'inline-flex' : 'none'}",
+                        "alignItems": "center",
+                        "color": "var(--color-ink)",
+                        "padding": "0.8rem 0.4rem",
+                        "fontFamily": "var(--font-sans)",
+                        "fontSize": "0.78rem",
+                        "fontWeight": "600",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.14em",
+                        "textDecoration": "none",
+                        "borderBottom": "1px solid var(--color-accent)",
+                        "transition": "color 0.15s",
+                        ":hover": { "color": "var(--color-accent)" }
+                      },
+                      "textContent": "${state.cta2} →"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "tagName": "div",
-              "style": { "display": "flex", "gap": "0.75rem", "flexWrap": "wrap" },
+              "style": {
+                "display": "${state.aside ? 'block' : 'none'}",
+                "borderLeft": "1px solid var(--color-hairline)",
+                "paddingLeft": "clamp(1.25rem, 3vw, 2rem)",
+                "@--md": {
+                  "borderLeft": "none",
+                  "paddingLeft": "0",
+                  "borderTop": "1px solid var(--color-hairline)",
+                  "paddingTop": "1.5rem"
+                }
+              },
               "children": [
                 {
-                  "tagName": "a",
-                  "attributes": { "href": "${state.ctaHref}" },
+                  "tagName": "p",
                   "style": {
-                    "display": "inline-block",
-                    "backgroundColor": "var(--color-primary)",
-                    "color": "var(--color-text-white)",
-                    "padding": "0.85rem 2rem",
-                    "borderRadius": "var(--radius)",
-                    "fontSize": "1.05rem",
-                    "fontWeight": "600",
-                    "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                    "margin": "0",
+                    "fontFamily": "var(--font-serif)",
+                    "fontStyle": "italic",
+                    "fontWeight": "400",
+                    "fontSize": "clamp(1.15rem, 2vw, 1.5rem)",
+                    "lineHeight": "1.5",
+                    "color": "var(--color-ink)"
                   },
-                  "textContent": "${state.cta}"
-                },
-                {
-                  "tagName": "a",
-                  "attributes": { "href": "${state.cta2Href}" },
-                  "style": {
-                    "display": "${state.cta2 ? 'inline-block' : 'none'}",
-                    "border": "1px solid rgba(255,255,255,0.6)",
-                    "color": "var(--color-text-white)",
-                    "padding": "0.85rem 2rem",
-                    "borderRadius": "var(--radius)",
-                    "fontSize": "1.05rem",
-                    "fontWeight": "600",
-                    "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "rgba(255,255,255,0.12)" }
-                  },
-                  "textContent": "${state.cta2}"
+                  "textContent": "${state.aside}"
                 }
               ]
             }

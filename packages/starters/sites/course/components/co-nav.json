@@ -1,43 +1,37 @@
 {
   "tagName": "co-nav",
   "state": {
-    "brand": "Craft & Code Academy"
+    "brand": "Craft & Code"
   },
   "style": {
     "display": "block",
     "position": "sticky",
     "top": "0",
-    "zIndex": "50",
-    "backgroundColor": "rgba(255, 255, 255, 0.9)",
-    "backdropFilter": "blur(8px)",
-    "borderBottom": "1px solid var(--color-border)"
+    "zIndex": "50"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
-        "maxWidth": "var(--max-width)",
-        "margin": "0 auto",
-        "padding": "1rem 1.5rem",
-        "display": "flex",
-        "alignItems": "center",
-        "justifyContent": "space-between",
-        "gap": "1.5rem"
+        "backgroundColor": "var(--color-ink)",
+        "color": "var(--color-text-white)",
+        "borderBottom": "1px solid var(--color-terminal-line)"
       },
       "children": [
         {
-          "tagName": "a",
-          "attributes": { "href": "/" },
+          "tagName": "div",
           "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "padding": "0.5rem 1.5rem",
             "display": "flex",
             "alignItems": "center",
-            "gap": "0.6rem",
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "1.3rem",
-            "fontWeight": "800",
-            "color": "var(--color-text-primary)",
-            "textDecoration": "none",
-            "letterSpacing": "-0.02em"
+            "justifyContent": "center",
+            "gap": "1rem",
+            "flexWrap": "wrap",
+            "fontFamily": "var(--font-mono)",
+            "fontSize": "0.78rem",
+            "letterSpacing": "0.01em"
           },
           "children": [
             {
@@ -45,71 +39,202 @@
               "style": {
                 "display": "inline-flex",
                 "alignItems": "center",
-                "justifyContent": "center",
-                "width": "1.9rem",
-                "height": "1.9rem",
-                "borderRadius": "0.55rem",
-                "backgroundColor": "var(--color-primary)",
-                "color": "var(--color-text-white)",
-                "fontSize": "0.95rem",
-                "fontWeight": "800"
+                "gap": "0.5rem"
               },
-              "textContent": "</>"
-            },
-            { "tagName": "span", "textContent": "${state.brand}" }
-          ]
-        },
-        {
-          "tagName": "nav",
-          "style": {
-            "display": "flex",
-            "alignItems": "center",
-            "gap": "1.75rem",
-            "@--sm": { "gap": "1rem" }
-          },
-          "children": [
-            {
-              "tagName": "a",
-              "attributes": { "href": "/curriculum/" },
-              "style": {
-                "color": "var(--color-text-primary)",
-                "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
-                "@--sm": { "display": "none" },
-                ":hover": { "color": "var(--color-primary)" }
-              },
-              "textContent": "Curriculum"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.5rem",
+                    "height": "0.5rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-accent)",
+                    "boxShadow": "0 0 0 3px rgba(163,230,53,0.2)",
+                    "flex": "none"
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": { "color": "rgba(255,255,255,0.92)" },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-accent)" },
+                      "textContent": "next_cohort"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": { "color": "rgba(255,255,255,0.5)" },
+                      "textContent": " = "
+                    },
+                    { "tagName": "span", "textContent": "Sept 8, 2026" }
+                  ]
+                }
+              ]
             },
             {
-              "tagName": "a",
-              "attributes": { "href": "/about/" },
-              "style": {
-                "color": "var(--color-text-primary)",
-                "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
-                "@--sm": { "display": "none" },
-                ":hover": { "color": "var(--color-primary)" }
-              },
-              "textContent": "About"
+              "tagName": "span",
+              "style": { "color": "var(--color-terminal-line)", "@--sm": { "display": "none" } },
+              "textContent": "·"
+            },
+            {
+              "tagName": "span",
+              "style": { "color": "rgba(255,255,255,0.7)", "@--sm": { "display": "none" } },
+              "textContent": "6 of 24 seats left"
+            },
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-terminal-line)", "@--sm": { "display": "none" } },
+              "textContent": "·"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/enroll/" },
               "style": {
-                "display": "inline-block",
-                "backgroundColor": "var(--color-primary)",
-                "color": "var(--color-text-white)",
-                "padding": "0.55rem 1.4rem",
-                "borderRadius": "var(--radius)",
+                "color": "var(--color-accent-cyan)",
                 "textDecoration": "none",
-                "fontWeight": "700",
-                "fontSize": "0.95rem",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                "fontWeight": "600",
+                ":hover": { "textDecoration": "underline" }
               },
-              "textContent": "Enroll"
+              "textContent": "apply →"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "backgroundColor": "rgba(255, 255, 255, 0.85)",
+        "backdropFilter": "blur(10px)",
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "padding": "0.85rem 1.5rem",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1.5rem"
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/" },
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.65rem",
+                "textDecoration": "none"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "2rem",
+                    "height": "2rem",
+                    "borderRadius": "0.5rem",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.85rem",
+                    "fontWeight": "700",
+                    "boxShadow": "0 6px 16px -6px rgba(79,70,229,0.7)"
+                  },
+                  "textContent": "</>"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.2rem",
+                    "fontWeight": "800",
+                    "color": "var(--color-text-primary)",
+                    "letterSpacing": "-0.02em"
+                  },
+                  "children": [
+                    { "tagName": "span", "textContent": "${state.brand}" },
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-primary)" },
+                      "textContent": " Academy"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "nav",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "1.9rem",
+                "@--sm": { "gap": "1rem" }
+              },
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/curriculum/" },
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em",
+                    "color": "var(--color-text-muted)",
+                    "textDecoration": "none",
+                    "fontWeight": "500",
+                    "fontSize": "0.78rem",
+                    "@--sm": { "display": "none" },
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "Curriculum"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/about/" },
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em",
+                    "color": "var(--color-text-muted)",
+                    "textDecoration": "none",
+                    "fontWeight": "500",
+                    "fontSize": "0.78rem",
+                    "@--sm": { "display": "none" },
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "About"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/enroll/" },
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.4rem",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.55rem 1.3rem",
+                    "borderRadius": "999px",
+                    "textDecoration": "none",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "boxShadow": "0 8px 20px -8px rgba(79,70,229,0.8)",
+                    "transition": "transform 0.15s, background-color 0.15s",
+                    ":hover": {
+                      "backgroundColor": "var(--color-primary-hover)",
+                      "transform": "translateY(-1px)"
+                    }
+                  },
+                  "textContent": "Enroll"
+                }
+              ]
             }
           ]
         }

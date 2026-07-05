@@ -6,7 +6,7 @@
     "location": "",
     "heading": "",
     "subheading": "",
-    "cta": "Get Tickets",
+    "cta": "Get tickets",
     "ctaHref": "/tickets/",
     "cta2": "",
     "cta2Href": "/schedule/",
@@ -15,24 +15,19 @@
   "style": {
     "display": "block",
     "position": "relative",
-    "minHeight": "82vh",
+    "overflow": "hidden",
     "color": "var(--color-text-white)",
-    "backgroundColor": "var(--color-bg-dark)",
-    "backgroundImage": "linear-gradient(125deg, rgba(124, 58, 237, 0.92) 0%, rgba(20, 11, 46, 0.86) 55%, rgba(236, 72, 153, 0.55) 100%), url('${state.bg}')",
-    "backgroundSize": "cover",
-    "backgroundPosition": "center",
-    "overflow": "hidden"
+    "background": "radial-gradient(ellipse 50% 45% at 8% 0%, rgba(34,224,255,0.22), transparent 60%), radial-gradient(ellipse 55% 55% at 92% 12%, rgba(255,61,154,0.28), transparent 62%), radial-gradient(ellipse 60% 50% at 55% 115%, rgba(168,85,247,0.22), transparent 60%), var(--color-bg)"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
         "position": "absolute",
-        "top": "-30%",
-        "right": "-10%",
-        "width": "50%",
-        "height": "120%",
-        "background": "radial-gradient(circle, rgba(236, 72, 153, 0.35) 0%, transparent 60%)",
+        "inset": "0",
+        "backgroundImage": "radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)",
+        "backgroundSize": "38px 38px",
+        "opacity": "0.5",
         "pointerEvents": "none"
       }
     },
@@ -40,34 +35,36 @@
       "tagName": "div",
       "style": {
         "position": "relative",
-        "zIndex": "10",
-        "display": "flex",
-        "alignItems": "center",
-        "minHeight": "82vh",
+        "zIndex": "5",
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "5rem 1.5rem"
+        "padding": "clamp(3.5rem, 8vw, 6.5rem) 1.5rem clamp(2.5rem, 6vw, 4rem)",
+        "display": "grid",
+        "gridTemplateColumns": "1.05fr 0.95fr",
+        "gap": "clamp(2rem, 5vw, 4rem)",
+        "alignItems": "center",
+        "@--md": { "gridTemplateColumns": "1fr", "gap": "2.5rem" }
       },
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "720px" },
           "children": [
             {
               "tagName": "div",
               "style": {
                 "display": "inline-flex",
                 "alignItems": "center",
-                "gap": "0.6rem",
-                "padding": "0.45rem 1rem",
+                "gap": "0.55rem",
+                "padding": "0.4rem 0.95rem",
                 "borderRadius": "999px",
-                "border": "1px solid rgba(255, 255, 255, 0.28)",
-                "background": "rgba(255, 255, 255, 0.08)",
+                "border": "1px solid var(--color-border)",
+                "background": "rgba(255,255,255,0.04)",
                 "backdropFilter": "blur(4px)",
-                "fontSize": "0.85rem",
+                "fontSize": "0.82rem",
                 "fontWeight": "600",
-                "letterSpacing": "0.04em",
-                "marginBottom": "1.5rem"
+                "letterSpacing": "0.02em",
+                "marginBottom": "1.5rem",
+                "color": "var(--color-text-primary)"
               },
               "children": [
                 {
@@ -75,74 +72,127 @@
                   "style": {
                     "width": "0.5rem",
                     "height": "0.5rem",
-                    "borderRadius": "50%",
-                    "background": "var(--color-accent)"
+                    "borderRadius": "999px",
+                    "background": "var(--color-lime)",
+                    "boxShadow": "0 0 10px var(--color-lime)"
                   }
                 },
-                {
-                  "tagName": "span",
-                  "textContent": "${state.eyebrow}"
-                }
+                { "tagName": "span", "textContent": "${state.eyebrow}" }
               ]
             },
             {
               "tagName": "h1",
               "style": {
                 "fontFamily": "var(--font-heading)",
-                "fontSize": "clamp(2.75rem, 7vw, 5rem)",
-                "fontWeight": "700",
-                "lineHeight": "1.02",
-                "margin": "0 0 1.25rem",
-                "letterSpacing": "-0.03em"
+                "fontSize": "clamp(2.9rem, 7.5vw, 5.6rem)",
+                "fontWeight": "800",
+                "lineHeight": "0.98",
+                "margin": "0 0 1.3rem",
+                "letterSpacing": "-0.04em",
+                "background": "linear-gradient(102deg, #22e0ff 0%, #7c8bff 30%, #a855f7 56%, #ff3d9a 88%)",
+                "backgroundClip": "text",
+                "webkitBackgroundClip": "text",
+                "webkitTextFillColor": "transparent",
+                "color": "#22e0ff"
               },
               "textContent": "${state.heading}"
             },
             {
               "tagName": "p",
               "style": {
-                "fontSize": "clamp(1.15rem, 2vw, 1.4rem)",
+                "fontSize": "clamp(1.05rem, 1.8vw, 1.3rem)",
                 "lineHeight": "1.6",
-                "margin": "0 0 1.75rem",
-                "opacity": "0.94",
-                "maxWidth": "50ch"
+                "margin": "0 0 1.9rem",
+                "color": "var(--color-text-muted)",
+                "maxWidth": "48ch"
               },
               "textContent": "${state.subheading}"
             },
             {
               "tagName": "div",
               "style": {
-                "display": "flex",
-                "alignItems": "center",
-                "gap": "1.25rem",
-                "flexWrap": "wrap",
-                "marginBottom": "2.25rem",
-                "fontSize": "1.05rem",
-                "fontWeight": "600"
+                "display": "inline-flex",
+                "alignItems": "stretch",
+                "borderRadius": "0.85rem",
+                "border": "1px solid var(--color-border)",
+                "background": "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01))",
+                "overflow": "hidden",
+                "marginBottom": "2.1rem",
+                "@--sm": { "display": "flex", "width": "100%" }
               },
               "children": [
                 {
-                  "tagName": "span",
-                  "style": { "display": "flex", "alignItems": "center", "gap": "0.5rem" },
-                  "children": [
-                    { "tagName": "span", "textContent": "📅" },
-                    { "tagName": "span", "textContent": "${state.date}" }
-                  ]
-                },
-                {
-                  "tagName": "span",
+                  "tagName": "div",
                   "style": {
-                    "width": "1px",
-                    "height": "1.1rem",
-                    "background": "rgba(255,255,255,0.4)",
-                    "@--sm": { "display": "none" }
+                    "width": "0.4rem",
+                    "background": "var(--grad)"
                   }
                 },
                 {
-                  "tagName": "span",
-                  "style": { "display": "flex", "alignItems": "center", "gap": "0.5rem" },
+                  "tagName": "div",
+                  "style": {
+                    "padding": "0.7rem 1.15rem",
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem"
+                  },
                   "children": [
-                    { "tagName": "span", "textContent": "📍" },
-                    { "tagName": "span", "textContent": "${state.location}" }
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontSize": "0.68rem",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.16em",
+                        "color": "var(--color-text-muted)"
+                      },
+                      "textContent": "Date"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.98rem"
+                      },
+                      "textContent": "${state.date}"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "width": "1px",
+                    "background": "repeating-linear-gradient(180deg, var(--color-border) 0 4px, transparent 4px 8px)"
+                  }
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "0.7rem 1.15rem",
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontSize": "0.68rem",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.16em",
+                        "color": "var(--color-text-muted)"
+                      },
+                      "textContent": "Venue"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.98rem"
+                      },
+                      "textContent": "${state.location}"
+                    }
                   ]
                 }
               ]
@@ -156,16 +206,19 @@
                   "attributes": { "href": "${state.ctaHref}" },
                   "style": {
                     "display": "inline-block",
-                    "background": "linear-gradient(135deg, var(--color-primary), var(--color-accent))",
-                    "color": "var(--color-text-white)",
-                    "padding": "0.9rem 2.25rem",
+                    "background": "var(--grad-btn)",
+                    "color": "#ffffff",
+                    "padding": "0.95rem 2.25rem",
                     "borderRadius": "999px",
                     "fontSize": "1.05rem",
-                    "fontWeight": "600",
+                    "fontWeight": "700",
                     "textDecoration": "none",
+                    "boxShadow": "0 12px 34px -8px var(--glow)",
                     "transition": "transform 0.15s, box-shadow 0.15s",
-                    "boxShadow": "0 10px 30px rgba(124, 58, 237, 0.45)",
-                    ":hover": { "transform": "translateY(-2px)" }
+                    ":hover": {
+                      "transform": "translateY(-2px)",
+                      "boxShadow": "0 18px 44px -8px var(--glow)"
+                    }
                   },
                   "textContent": "${state.cta}"
                 },
@@ -173,21 +226,203 @@
                   "tagName": "a",
                   "attributes": { "href": "${state.cta2Href}" },
                   "style": {
-                    "display": "${state.cta2 ? 'inline-block' : 'none'}",
-                    "border": "1px solid rgba(255,255,255,0.55)",
-                    "color": "var(--color-text-white)",
-                    "padding": "0.9rem 2.25rem",
+                    "display": "${state.cta2 ? 'inline-flex' : 'none'}",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "border": "1px solid var(--color-border)",
+                    "backgroundColor": "rgba(255,255,255,0.03)",
+                    "color": "var(--color-text-primary)",
+                    "padding": "0.95rem 2rem",
                     "borderRadius": "999px",
                     "fontSize": "1.05rem",
-                    "fontWeight": "600",
+                    "fontWeight": "700",
                     "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "rgba(255,255,255,0.12)" }
+                    "transition": "background-color 0.15s, border-color 0.15s",
+                    ":hover": {
+                      "backgroundColor": "rgba(255,255,255,0.07)",
+                      "borderColor": "var(--color-text-muted)"
+                    }
                   },
                   "textContent": "${state.cta2}"
                 }
               ]
             }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "position": "relative",
+            "transform": "rotate(2deg)",
+            "@--md": {
+              "transform": "none",
+              "maxWidth": "460px",
+              "margin": "0 auto",
+              "width": "100%"
+            }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "position": "relative",
+                "borderRadius": "1.15rem",
+                "padding": "0.5rem",
+                "background": "linear-gradient(150deg, rgba(34,224,255,0.6), rgba(168,85,247,0.4) 45%, rgba(255,61,154,0.55))",
+                "boxShadow": "0 40px 90px -30px rgba(0,0,0,0.85), 0 0 90px -30px var(--glow)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "position": "relative",
+                    "borderRadius": "0.85rem",
+                    "overflow": "hidden",
+                    "aspectRatio": "4 / 5",
+                    "backgroundColor": "var(--color-bg-elev)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "img",
+                      "attributes": {
+                        "src": "${state.bg}",
+                        "alt": "Horizon Conf main stage",
+                        "width": "1600",
+                        "height": "1067",
+                        "loading": "eager"
+                      },
+                      "style": {
+                        "position": "absolute",
+                        "inset": "0",
+                        "width": "100%",
+                        "height": "100%",
+                        "objectFit": "cover",
+                        "display": "block"
+                      }
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "position": "absolute",
+                        "inset": "0",
+                        "background": "linear-gradient(160deg, rgba(34,224,255,0.28) 0%, transparent 40%, rgba(10,7,17,0.35) 75%, rgba(255,61,154,0.35) 100%)",
+                        "mixBlendMode": "screen"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "position": "absolute",
+                "top": "-1rem",
+                "left": "-1rem",
+                "padding": "0.55rem 1rem",
+                "borderRadius": "0.7rem",
+                "background": "var(--color-bg-elev2)",
+                "border": "1px solid var(--color-border)",
+                "boxShadow": "0 12px 30px -10px rgba(0,0,0,0.7)",
+                "fontFamily": "var(--font-heading)",
+                "fontWeight": "800",
+                "fontSize": "0.85rem",
+                "letterSpacing": "0.02em",
+                "transform": "rotate(-4deg)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "background": "var(--grad)",
+                    "backgroundClip": "text",
+                    "webkitBackgroundClip": "text",
+                    "webkitTextFillColor": "transparent",
+                    "color": "var(--color-accent)"
+                  },
+                  "textContent": "2 stages · 24 speakers"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "position": "absolute",
+                "bottom": "-1.1rem",
+                "right": "-0.6rem",
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.5rem",
+                "padding": "0.55rem 1rem",
+                "borderRadius": "999px",
+                "background": "var(--color-bg-elev2)",
+                "border": "1px solid var(--color-border)",
+                "boxShadow": "0 12px 30px -10px rgba(0,0,0,0.7)",
+                "fontWeight": "700",
+                "fontSize": "0.82rem",
+                "transform": "rotate(3deg)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.5rem",
+                    "height": "0.5rem",
+                    "borderRadius": "999px",
+                    "background": "var(--color-lime)",
+                    "boxShadow": "0 0 10px var(--color-lime)"
+                  }
+                },
+                { "tagName": "span", "textContent": "One day only" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "relative",
+        "zIndex": "5",
+        "width": "112%",
+        "marginLeft": "-6%",
+        "transform": "rotate(-2.5deg)",
+        "background": "var(--grad)",
+        "padding": "0.65rem 0",
+        "overflow": "hidden",
+        "boxShadow": "0 20px 50px -20px var(--glow)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "1.5rem",
+            "justifyContent": "center",
+            "whiteSpace": "nowrap",
+            "fontFamily": "var(--font-heading)",
+            "fontWeight": "800",
+            "fontSize": "clamp(0.85rem, 1.6vw, 1.05rem)",
+            "letterSpacing": "0.12em",
+            "textTransform": "uppercase",
+            "color": "var(--color-ink)"
+          },
+          "children": [
+            { "tagName": "span", "textContent": "Design" },
+            { "tagName": "span", "textContent": "✦" },
+            { "tagName": "span", "textContent": "Engineering" },
+            { "tagName": "span", "textContent": "✦" },
+            { "tagName": "span", "textContent": "Motion" },
+            { "tagName": "span", "textContent": "✦" },
+            { "tagName": "span", "textContent": "AI" },
+            { "tagName": "span", "textContent": "✦" },
+            { "tagName": "span", "textContent": "Systems" },
+            { "tagName": "span", "textContent": "✦" },
+            { "tagName": "span", "textContent": "Workshops" },
+            { "tagName": "span", "textContent": "✦" },
+            { "tagName": "span", "textContent": "The hallway track" }
           ]
         }
       ]

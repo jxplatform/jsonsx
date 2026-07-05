@@ -4,37 +4,52 @@
     "eyebrow": "",
     "heading": "",
     "subheading": "",
-    "align": "center"
+    "align": "left"
   },
   "style": {
     "display": "block",
-    "maxWidth": "var(--max-width-narrow)",
-    "margin": "0 auto 2.5rem",
+    "maxWidth": "${state.align === 'center' ? 'var(--max-width-narrow)' : 'var(--max-width)'}",
+    "margin": "${state.align === 'center' ? '0 auto 2.75rem' : '0 auto 2.5rem'}",
+    "padding": "0 1.5rem",
     "textAlign": "${state.align}"
   },
   "children": [
     {
       "tagName": "p",
       "style": {
-        "display": "${state.eyebrow ? 'block' : 'none'}",
+        "display": "${state.eyebrow ? 'inline-flex' : 'none'}",
+        "alignItems": "center",
+        "gap": "0.6rem",
         "textTransform": "uppercase",
-        "letterSpacing": "0.16em",
-        "fontSize": "0.8rem",
+        "letterSpacing": "0.14em",
+        "fontSize": "0.74rem",
         "fontWeight": "700",
         "color": "var(--color-primary)",
-        "margin": "0 0 0.75rem"
+        "margin": "0 0 0.9rem"
       },
-      "textContent": "${state.eyebrow}"
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "width": "1.6rem",
+            "height": "2px",
+            "backgroundColor": "var(--color-accent)",
+            "borderRadius": "2px"
+          }
+        },
+        { "tagName": "span", "textContent": "${state.eyebrow}" }
+      ]
     },
     {
       "tagName": "h2",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "clamp(1.9rem, 4vw, 2.6rem)",
-        "fontWeight": "800",
-        "lineHeight": "1.15",
-        "letterSpacing": "-0.02em",
-        "margin": "0"
+        "fontFamily": "var(--font-display)",
+        "fontSize": "clamp(1.9rem, 3.6vw, 2.8rem)",
+        "fontWeight": "500",
+        "lineHeight": "1.1",
+        "letterSpacing": "-0.015em",
+        "margin": "0",
+        "color": "var(--color-text-primary)"
       },
       "textContent": "${state.heading}"
     },
@@ -42,10 +57,11 @@
       "tagName": "p",
       "style": {
         "display": "${state.subheading ? 'block' : 'none'}",
-        "fontSize": "1.1rem",
-        "lineHeight": "1.7",
+        "fontSize": "1.08rem",
+        "lineHeight": "1.65",
         "color": "var(--color-text-muted)",
-        "margin": "1rem 0 0"
+        "margin": "${state.align === 'center' ? '1rem auto 0' : '1rem 0 0'}",
+        "maxWidth": "56ch"
       },
       "textContent": "${state.subheading}"
     }

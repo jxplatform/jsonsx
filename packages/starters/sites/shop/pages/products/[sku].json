@@ -10,7 +10,7 @@
       "tagName": "meta",
       "attributes": {
         "name": "description",
-        "content": "${state.product.data.title} — ${state.product.data.category} bike at Cadence Cycles, ${state.product.data.price}."
+        "content": "${state.product.data.title} — shop this ${state.product.data.category} bike at Cadence Cycles. Fitted in-store with a free first tune-up, free shipping, and 30-day returns."
       }
     }
   ],
@@ -29,66 +29,204 @@
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "clamp(2rem, 5vw, 3.5rem) 1.5rem"
+        "padding": "clamp(1.5rem, 4vw, 2.5rem) 1.5rem clamp(3rem, 6vw, 4.5rem)"
       },
       "children": [
         {
-          "tagName": "a",
-          "attributes": { "href": "/products/" },
+          "tagName": "div",
           "style": {
-            "display": "inline-flex",
+            "display": "flex",
             "alignItems": "center",
-            "gap": "0.4rem",
-            "color": "var(--color-primary)",
-            "textDecoration": "none",
+            "gap": "0.5rem",
+            "fontSize": "0.85rem",
             "fontWeight": "600",
-            "fontSize": "0.95rem",
-            "marginBottom": "2rem"
+            "color": "var(--color-text-muted)",
+            "marginBottom": "1.75rem",
+            "flexWrap": "wrap"
           },
-          "textContent": "← Back to the shop"
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/" },
+              "style": {
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "Home"
+            },
+            { "tagName": "span", "style": { "opacity": "0.5" }, "textContent": "/" },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/products/" },
+              "style": {
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "Shop"
+            },
+            { "tagName": "span", "style": { "opacity": "0.5" }, "textContent": "/" },
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-text-primary)" },
+              "textContent": "${state.product.data.category}"
+            }
+          ]
         },
         {
           "tagName": "div",
           "style": {
             "display": "grid",
-            "gridTemplateColumns": "1fr 1fr",
-            "gap": "clamp(2rem, 5vw, 3.5rem)",
+            "gridTemplateColumns": "1.05fr 0.95fr",
+            "gap": "clamp(1.75rem, 4vw, 3.25rem)",
             "alignItems": "start",
             "@--md": { "gridTemplateColumns": "1fr" }
           },
           "children": [
             {
-              "tagName": "img",
-              "attributes": {
-                "src": "${state.product.data.image}",
-                "alt": "${state.product.data.title}",
-                "loading": "eager"
-              },
-              "style": {
-                "width": "100%",
-                "aspectRatio": "1 / 1",
-                "objectFit": "cover",
-                "borderRadius": "var(--radius)",
-                "display": "block",
-                "backgroundColor": "var(--color-bg-cream)",
-                "boxShadow": "0 12px 40px rgba(15,23,42,0.12)"
-              }
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "position": "relative",
+                    "aspectRatio": "1 / 1",
+                    "borderRadius": "var(--radius-lg)",
+                    "overflow": "hidden",
+                    "backgroundColor": "var(--color-panel)",
+                    "border": "1px solid var(--color-border)",
+                    "boxShadow": "var(--shadow-card)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "img",
+                      "attributes": {
+                        "src": "${state.product.data.image}",
+                        "alt": "${state.product.data.title}",
+                        "loading": "eager"
+                      },
+                      "style": {
+                        "position": "absolute",
+                        "inset": "0",
+                        "width": "100%",
+                        "height": "100%",
+                        "objectFit": "cover",
+                        "display": "block"
+                      }
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "display": "${state.product.data.badge ? 'inline-flex' : 'none'}",
+                        "position": "absolute",
+                        "top": "1rem",
+                        "left": "1rem",
+                        "alignItems": "center",
+                        "padding": "0.35rem 0.8rem",
+                        "borderRadius": "999px",
+                        "fontSize": "0.72rem",
+                        "fontWeight": "800",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.06em",
+                        "color": "var(--color-text-white)",
+                        "backgroundColor": "${state.product.data.badge === 'Sale' ? 'var(--color-sale)' : (state.product.data.badge === 'New' ? 'var(--color-primary)' : 'var(--color-gold)')}",
+                        "boxShadow": "0 8px 18px -8px rgba(13,17,23,0.5)"
+                      },
+                      "textContent": "${state.product.data.badge}"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "grid",
+                    "gridTemplateColumns": "repeat(3, 1fr)",
+                    "gap": "0.6rem",
+                    "marginTop": "0.85rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "display": "flex",
+                        "alignItems": "center",
+                        "gap": "0.5rem",
+                        "padding": "0.7rem 0.75rem",
+                        "borderRadius": "var(--radius-sm)",
+                        "backgroundColor": "var(--color-bg-cream)",
+                        "fontSize": "0.8rem",
+                        "fontWeight": "600",
+                        "color": "var(--color-text-secondary)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-primary)" },
+                          "textContent": "🔧"
+                        },
+                        { "tagName": "span", "textContent": "Fitted free" }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "display": "flex",
+                        "alignItems": "center",
+                        "gap": "0.5rem",
+                        "padding": "0.7rem 0.75rem",
+                        "borderRadius": "var(--radius-sm)",
+                        "backgroundColor": "var(--color-bg-cream)",
+                        "fontSize": "0.8rem",
+                        "fontWeight": "600",
+                        "color": "var(--color-text-secondary)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-primary)" },
+                          "textContent": "🚚"
+                        },
+                        { "tagName": "span", "textContent": "Ships fast" }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "display": "flex",
+                        "alignItems": "center",
+                        "gap": "0.5rem",
+                        "padding": "0.7rem 0.75rem",
+                        "borderRadius": "var(--radius-sm)",
+                        "backgroundColor": "var(--color-bg-cream)",
+                        "fontSize": "0.8rem",
+                        "fontWeight": "600",
+                        "color": "var(--color-text-secondary)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-primary)" },
+                          "textContent": "↩"
+                        },
+                        { "tagName": "span", "textContent": "30-day returns" }
+                      ]
+                    }
+                  ]
+                }
+              ]
             },
             {
               "tagName": "div",
               "children": [
                 {
-                  "tagName": "span",
+                  "tagName": "div",
                   "style": {
-                    "display": "inline-block",
-                    "padding": "0.3rem 0.8rem",
-                    "borderRadius": "999px",
-                    "fontSize": "0.75rem",
-                    "fontWeight": "600",
+                    "fontSize": "0.72rem",
+                    "fontWeight": "700",
                     "textTransform": "uppercase",
-                    "letterSpacing": "0.06em",
-                    "backgroundColor": "rgba(22, 163, 74, 0.12)",
-                    "color": "var(--color-primary-hover)"
+                    "letterSpacing": "0.12em",
+                    "color": "var(--color-primary)"
                   },
                   "textContent": "${state.product.data.category}"
                 },
@@ -96,33 +234,96 @@
                   "tagName": "h1",
                   "style": {
                     "fontFamily": "var(--font-heading)",
-                    "fontSize": "clamp(2rem, 5vw, 2.9rem)",
-                    "fontWeight": "700",
-                    "lineHeight": "1.1",
-                    "letterSpacing": "-0.02em",
-                    "margin": "1rem 0 0.5rem"
+                    "fontSize": "clamp(2rem, 4.5vw, 3rem)",
+                    "fontWeight": "800",
+                    "lineHeight": "1.04",
+                    "letterSpacing": "-0.03em",
+                    "margin": "0.6rem 0 0.75rem"
                   },
                   "textContent": "${state.product.data.title}"
                 },
                 {
                   "tagName": "div",
                   "style": {
-                    "fontFamily": "var(--font-heading)",
-                    "fontSize": "1.9rem",
-                    "fontWeight": "700",
-                    "color": "var(--color-primary)",
-                    "margin": "0 0 1.5rem"
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "marginBottom": "1.35rem",
+                    "fontSize": "0.9rem"
                   },
-                  "textContent": "${state.product.data.price}"
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-accent)", "letterSpacing": "0.08em" },
+                      "textContent": "★★★★★"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-text-muted)", "fontWeight": "600" },
+                      "textContent": "4.9 · 128 reviews"
+                    }
+                  ]
                 },
                 {
                   "tagName": "div",
                   "style": {
-                    "fontSize": "1.08rem",
+                    "display": "flex",
+                    "alignItems": "baseline",
+                    "gap": "0.85rem",
+                    "flexWrap": "wrap",
+                    "paddingBottom": "1.5rem",
+                    "marginBottom": "1.5rem",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontSize": "2.4rem",
+                        "fontWeight": "800",
+                        "letterSpacing": "-0.02em",
+                        "color": "var(--color-text-primary)",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "textContent": "${state.product.data.price}"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "display": "${state.product.data.oldPrice ? 'inline' : 'none'}",
+                        "fontSize": "1.3rem",
+                        "fontWeight": "600",
+                        "color": "var(--color-text-muted)",
+                        "textDecoration": "line-through",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "textContent": "${state.product.data.oldPrice}"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "display": "${state.product.data.oldPrice ? 'inline-flex' : 'none'}",
+                        "alignItems": "center",
+                        "padding": "0.28rem 0.7rem",
+                        "borderRadius": "999px",
+                        "backgroundColor": "var(--color-sale-tint)",
+                        "color": "var(--color-sale)",
+                        "fontSize": "0.75rem",
+                        "fontWeight": "800",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.05em"
+                      },
+                      "textContent": "On sale"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontSize": "1.05rem",
                     "lineHeight": "1.75",
-                    "color": "var(--color-text-primary)",
-                    "borderTop": "1px solid var(--color-border)",
-                    "paddingTop": "1.5rem"
+                    "color": "var(--color-text-secondary)"
                   },
                   "children": "${state.product.$children ?? []}"
                 },
@@ -132,60 +333,150 @@
                     "display": "flex",
                     "flexWrap": "wrap",
                     "gap": "0.75rem",
-                    "marginTop": "2rem"
+                    "marginTop": "1.75rem"
                   },
                   "children": [
                     {
                       "tagName": "a",
                       "attributes": { "href": "/contact/" },
                       "style": {
-                        "display": "inline-block",
+                        "display": "inline-flex",
+                        "alignItems": "center",
+                        "gap": "0.5rem",
                         "backgroundColor": "var(--color-primary)",
                         "color": "var(--color-text-white)",
-                        "padding": "0.9rem 2rem",
+                        "padding": "1rem 2.25rem",
                         "borderRadius": "999px",
                         "fontSize": "1.05rem",
-                        "fontWeight": "600",
+                        "fontWeight": "700",
                         "textDecoration": "none",
-                        "transition": "background-color 0.15s",
-                        ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                        "boxShadow": "0 14px 30px -12px rgba(10,157,84,0.8)",
+                        "transition": "transform 0.15s, background-color 0.15s",
+                        ":hover": {
+                          "backgroundColor": "var(--color-primary-hover)",
+                          "transform": "translateY(-2px)"
+                        }
                       },
-                      "textContent": "Reserve this bike →"
+                      "children": [
+                        { "tagName": "span", "textContent": "🛒" },
+                        { "tagName": "span", "textContent": "Add to cart" }
+                      ]
                     },
                     {
                       "tagName": "a",
-                      "attributes": { "href": "/products/" },
+                      "attributes": { "href": "/contact/" },
                       "style": {
-                        "display": "inline-block",
-                        "border": "1px solid var(--color-border)",
+                        "display": "inline-flex",
+                        "alignItems": "center",
+                        "border": "1px solid var(--color-line-strong)",
                         "color": "var(--color-text-primary)",
-                        "padding": "0.9rem 2rem",
+                        "padding": "1rem 1.85rem",
                         "borderRadius": "999px",
                         "fontSize": "1.05rem",
-                        "fontWeight": "600",
+                        "fontWeight": "700",
                         "textDecoration": "none",
                         "transition": "border-color 0.15s",
                         ":hover": { "borderColor": "var(--color-primary)" }
                       },
-                      "textContent": "Keep browsing"
+                      "textContent": "Reserve in-store"
                     }
                   ]
                 },
                 {
-                  "tagName": "p",
+                  "tagName": "div",
                   "style": {
-                    "marginTop": "1.5rem",
-                    "fontSize": "0.9rem",
-                    "color": "var(--color-text-muted)",
-                    "lineHeight": "1.6"
+                    "marginTop": "1.75rem",
+                    "padding": "1.25rem",
+                    "borderRadius": "var(--radius)",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "display": "grid",
+                    "gap": "0.7rem"
                   },
-                  "textContent": "Every bike is fitted and safety-checked in-store before you ride away. Free first tune-up included."
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "display": "flex",
+                        "alignItems": "center",
+                        "gap": "0.6rem",
+                        "fontSize": "0.92rem",
+                        "fontWeight": "500",
+                        "color": "var(--color-text-secondary)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-primary)", "fontWeight": "800" },
+                          "textContent": "✓"
+                        },
+                        {
+                          "tagName": "span",
+                          "textContent": "Professionally assembled and safety-checked before pickup."
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "display": "flex",
+                        "alignItems": "center",
+                        "gap": "0.6rem",
+                        "fontSize": "0.92rem",
+                        "fontWeight": "500",
+                        "color": "var(--color-text-secondary)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-primary)", "fontWeight": "800" },
+                          "textContent": "✓"
+                        },
+                        {
+                          "tagName": "span",
+                          "textContent": "Free first tune-up and a lifetime of expert advice."
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "display": "flex",
+                        "alignItems": "center",
+                        "gap": "0.6rem",
+                        "fontSize": "0.92rem",
+                        "fontWeight": "500",
+                        "color": "var(--color-text-secondary)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": { "color": "var(--color-primary)", "fontWeight": "800" },
+                          "textContent": "✓"
+                        },
+                        {
+                          "tagName": "span",
+                          "textContent": "In stock now — 30-day returns, no questions asked."
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             }
           ]
         }
       ]
+    },
+    {
+      "tagName": "shp-cta",
+      "$props": {
+        "heading": "Not sure it's the right fit?",
+        "text": "Tell us where and how you ride and our mechanics will match you to the right frame, size, and setup — no pressure.",
+        "cta": "Ask a mechanic",
+        "ctaHref": "/contact/",
+        "cta2": "Keep browsing",
+        "cta2Href": "/products/"
+      }
     }
   ]
 }

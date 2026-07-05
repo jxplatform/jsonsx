@@ -6,46 +6,73 @@
     "text": ""
   },
   "style": {
+    "position": "relative",
     "display": "block",
-    "padding": "0.25rem"
+    "padding": "1.75rem 1.5rem 1.6rem",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "overflow": "hidden"
   },
   "children": [
     {
+      "tagName": "span",
+      "style": {
+        "position": "absolute",
+        "top": "-0.75rem",
+        "right": "0.5rem",
+        "fontFamily": "var(--font-heading)",
+        "fontWeight": "700",
+        "fontSize": "5.5rem",
+        "lineHeight": "1",
+        "color": "var(--color-bg-concrete)",
+        "pointerEvents": "none",
+        "userSelect": "none"
+      },
+      "textContent": "${state.number}"
+    },
+    {
       "tagName": "div",
       "style": {
-        "display": "flex",
+        "position": "relative",
+        "display": "inline-flex",
         "alignItems": "center",
         "justifyContent": "center",
-        "width": "2.75rem",
-        "height": "2.75rem",
-        "borderRadius": "50%",
+        "minWidth": "2.4rem",
+        "height": "2.4rem",
+        "padding": "0 0.6rem",
         "backgroundColor": "var(--color-primary)",
         "color": "var(--color-text-white)",
         "fontFamily": "var(--font-heading)",
-        "fontSize": "1.2rem",
-        "fontWeight": "800",
-        "marginBottom": "1rem"
+        "fontWeight": "700",
+        "fontSize": "1.15rem",
+        "borderRadius": "var(--radius-sm)",
+        "marginBottom": "1rem",
+        "clipPath": "polygon(0 0, 100% 0, 100% 74%, 82% 100%, 0 100%)"
       },
       "textContent": "${state.number}"
     },
     {
       "tagName": "h3",
       "style": {
+        "position": "relative",
         "fontFamily": "var(--font-heading)",
-        "fontSize": "1.2rem",
-        "fontWeight": "700",
-        "letterSpacing": "-0.01em",
-        "margin": "0 0 0.4rem"
+        "fontSize": "1.28rem",
+        "fontWeight": "600",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.02em",
+        "margin": "0 0 0.45rem"
       },
       "textContent": "${state.title}"
     },
     {
       "tagName": "p",
       "style": {
+        "position": "relative",
         "margin": "0",
         "color": "var(--color-text-muted)",
         "fontSize": "0.98rem",
-        "lineHeight": "1.65"
+        "lineHeight": "1.6"
       },
       "textContent": "${state.text}"
     }

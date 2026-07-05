@@ -9,7 +9,7 @@
     "perk2": "",
     "perk3": "",
     "perk4": "",
-    "cta": "Get Tickets",
+    "cta": "Get tickets",
     "ctaHref": "/tickets/",
     "featured": false,
     "badge": "Most popular"
@@ -18,11 +18,15 @@
     "display": "flex",
     "flexDirection": "column",
     "position": "relative",
-    "padding": "2rem",
+    "padding": "2.1rem",
     "borderRadius": "var(--radius)",
-    "border": "${state.featured ? '2px solid var(--color-primary)' : '1px solid var(--color-border)'}",
-    "backgroundColor": "${state.featured ? 'var(--color-bg-white)' : 'var(--color-bg-white)'}",
-    "boxShadow": "${state.featured ? '0 24px 60px rgba(124, 58, 237, 0.18)' : '0 4px 20px rgba(23, 18, 43, 0.05)'}"
+    "border": "${state.featured ? '2px solid transparent' : '1px solid var(--color-border)'}",
+    "backgroundColor": "${state.featured ? 'var(--color-bg-elev)' : 'var(--color-bg-elev)'}",
+    "backgroundImage": "${state.featured ? 'linear-gradient(var(--color-bg-elev), var(--color-bg-elev)), var(--grad)' : 'none'}",
+    "backgroundOrigin": "border-box",
+    "backgroundClip": "${state.featured ? 'padding-box, border-box' : 'border-box'}",
+    "boxShadow": "${state.featured ? '0 30px 70px -22px var(--glow)' : 'none'}",
+    "transform": "${state.featured ? 'translateY(-6px)' : 'none'}"
   },
   "children": [
     {
@@ -33,15 +37,16 @@
         "top": "-0.85rem",
         "left": "50%",
         "transform": "translateX(-50%)",
-        "background": "linear-gradient(135deg, var(--color-primary), var(--color-accent))",
-        "color": "var(--color-text-white)",
-        "fontSize": "0.72rem",
-        "fontWeight": "700",
-        "letterSpacing": "0.08em",
+        "background": "var(--grad-btn)",
+        "color": "#ffffff",
+        "fontSize": "0.7rem",
+        "fontWeight": "800",
+        "letterSpacing": "0.1em",
         "textTransform": "uppercase",
-        "padding": "0.35rem 0.9rem",
+        "padding": "0.35rem 0.95rem",
         "borderRadius": "999px",
-        "whiteSpace": "nowrap"
+        "whiteSpace": "nowrap",
+        "boxShadow": "0 10px 26px -8px var(--glow)"
       },
       "textContent": "${state.badge}"
     },
@@ -49,16 +54,18 @@
       "tagName": "h3",
       "style": {
         "fontFamily": "var(--font-heading)",
-        "fontSize": "1.35rem",
+        "fontSize": "1.4rem",
         "fontWeight": "700",
-        "margin": "0 0 0.4rem"
+        "letterSpacing": "-0.01em",
+        "margin": "0 0 0.4rem",
+        "color": "var(--color-text-primary)"
       },
       "textContent": "${state.tier}"
     },
     {
       "tagName": "p",
       "style": {
-        "margin": "0 0 1.25rem",
+        "margin": "0 0 1.35rem",
         "fontSize": "0.95rem",
         "lineHeight": "1.55",
         "color": "var(--color-text-muted)"
@@ -70,17 +77,23 @@
       "style": {
         "display": "flex",
         "alignItems": "baseline",
-        "gap": "0.35rem",
-        "marginBottom": "1.5rem"
+        "gap": "0.4rem",
+        "marginBottom": "1.6rem"
       },
       "children": [
         {
           "tagName": "span",
           "style": {
             "fontFamily": "var(--font-heading)",
-            "fontSize": "2.5rem",
-            "fontWeight": "700",
-            "letterSpacing": "-0.02em"
+            "fontSize": "2.7rem",
+            "fontWeight": "800",
+            "letterSpacing": "-0.03em",
+            "lineHeight": "1",
+            "color": "${state.featured ? 'transparent' : 'var(--color-text-primary)'}",
+            "background": "${state.featured ? 'var(--grad)' : 'none'}",
+            "backgroundClip": "${state.featured ? 'text' : 'border-box'}",
+            "webkitBackgroundClip": "${state.featured ? 'text' : 'border-box'}",
+            "webkitTextFillColor": "${state.featured ? 'transparent' : 'var(--color-text-primary)'}"
           },
           "textContent": "${state.price}"
         },
@@ -95,11 +108,11 @@
       "tagName": "ul",
       "style": {
         "listStyle": "none",
-        "margin": "0 0 1.75rem",
+        "margin": "0 0 1.85rem",
         "padding": "0",
         "display": "flex",
         "flexDirection": "column",
-        "gap": "0.65rem",
+        "gap": "0.7rem",
         "flex": "1"
       },
       "children": [
@@ -107,14 +120,15 @@
           "tagName": "li",
           "style": {
             "display": "${state.perk1 ? 'flex' : 'none'}",
-            "gap": "0.6rem",
+            "gap": "0.65rem",
             "alignItems": "flex-start",
-            "fontSize": "0.95rem"
+            "fontSize": "0.95rem",
+            "color": "var(--color-text-primary)"
           },
           "children": [
             {
               "tagName": "span",
-              "style": { "color": "var(--color-primary)", "fontWeight": "700" },
+              "style": { "color": "var(--color-lime)", "fontWeight": "800" },
               "textContent": "✓"
             },
             { "tagName": "span", "textContent": "${state.perk1}" }
@@ -124,14 +138,15 @@
           "tagName": "li",
           "style": {
             "display": "${state.perk2 ? 'flex' : 'none'}",
-            "gap": "0.6rem",
+            "gap": "0.65rem",
             "alignItems": "flex-start",
-            "fontSize": "0.95rem"
+            "fontSize": "0.95rem",
+            "color": "var(--color-text-primary)"
           },
           "children": [
             {
               "tagName": "span",
-              "style": { "color": "var(--color-primary)", "fontWeight": "700" },
+              "style": { "color": "var(--color-lime)", "fontWeight": "800" },
               "textContent": "✓"
             },
             { "tagName": "span", "textContent": "${state.perk2}" }
@@ -141,14 +156,15 @@
           "tagName": "li",
           "style": {
             "display": "${state.perk3 ? 'flex' : 'none'}",
-            "gap": "0.6rem",
+            "gap": "0.65rem",
             "alignItems": "flex-start",
-            "fontSize": "0.95rem"
+            "fontSize": "0.95rem",
+            "color": "var(--color-text-primary)"
           },
           "children": [
             {
               "tagName": "span",
-              "style": { "color": "var(--color-primary)", "fontWeight": "700" },
+              "style": { "color": "var(--color-lime)", "fontWeight": "800" },
               "textContent": "✓"
             },
             { "tagName": "span", "textContent": "${state.perk3}" }
@@ -158,14 +174,15 @@
           "tagName": "li",
           "style": {
             "display": "${state.perk4 ? 'flex' : 'none'}",
-            "gap": "0.6rem",
+            "gap": "0.65rem",
             "alignItems": "flex-start",
-            "fontSize": "0.95rem"
+            "fontSize": "0.95rem",
+            "color": "var(--color-text-primary)"
           },
           "children": [
             {
               "tagName": "span",
-              "style": { "color": "var(--color-primary)", "fontWeight": "700" },
+              "style": { "color": "var(--color-lime)", "fontWeight": "800" },
               "textContent": "✓"
             },
             { "tagName": "span", "textContent": "${state.perk4}" }
@@ -179,15 +196,16 @@
       "style": {
         "display": "block",
         "textAlign": "center",
-        "padding": "0.85rem 1.5rem",
+        "padding": "0.9rem 1.5rem",
         "borderRadius": "999px",
         "fontSize": "1rem",
-        "fontWeight": "600",
+        "fontWeight": "700",
         "textDecoration": "none",
-        "transition": "transform 0.15s, box-shadow 0.15s",
-        "color": "${state.featured ? 'var(--color-text-white)' : 'var(--color-primary)'}",
-        "background": "${state.featured ? 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' : 'transparent'}",
-        "border": "${state.featured ? 'none' : '1px solid var(--color-primary)'}",
+        "transition": "transform 0.15s, box-shadow 0.15s, background-color 0.15s",
+        "color": "${state.featured ? '#ffffff' : 'var(--color-text-primary)'}",
+        "background": "${state.featured ? 'var(--grad-btn)' : 'rgba(255,255,255,0.04)'}",
+        "border": "${state.featured ? 'none' : '1px solid var(--color-border)'}",
+        "boxShadow": "${state.featured ? '0 12px 30px -8px var(--glow)' : 'none'}",
         ":hover": { "transform": "translateY(-2px)" }
       },
       "textContent": "${state.cta}"

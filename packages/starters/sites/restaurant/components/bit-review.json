@@ -6,47 +6,77 @@
     "role": ""
   },
   "style": {
-    "display": "block",
-    "padding": "1.75rem",
-    "backgroundColor": "var(--color-bg-white)",
-    "border": "1px solid var(--color-border)",
-    "borderRadius": "var(--radius)",
-    "boxShadow": "0 4px 20px rgba(28,25,23,0.05)"
+    "display": "block"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "4.5rem",
+        "lineHeight": "0.6",
+        "fontWeight": "700",
         "color": "var(--color-primary)",
-        "fontSize": "1.1rem",
-        "marginBottom": "0.75rem",
-        "letterSpacing": "0.1em"
+        "marginBottom": "1rem",
+        "height": "2rem"
       },
-      "textContent": "★★★★★"
+      "textContent": "“"
     },
     {
       "tagName": "p",
       "style": {
         "fontFamily": "var(--font-heading)",
-        "fontSize": "1.15rem",
-        "lineHeight": "1.6",
+        "fontSize": "clamp(1.5rem, 3vw, 2.15rem)",
         "fontStyle": "italic",
-        "margin": "0 0 1.25rem"
+        "fontWeight": "400",
+        "lineHeight": "1.35",
+        "letterSpacing": "-0.01em",
+        "margin": "0 0 1.75rem",
+        "color": "var(--color-text-primary)"
       },
-      "textContent": "“${state.quote}”"
+      "textContent": "${state.quote}"
     },
     {
       "tagName": "div",
+      "style": {
+        "display": "flex",
+        "alignItems": "center",
+        "gap": "0.85rem"
+      },
       "children": [
         {
-          "tagName": "div",
-          "style": { "fontWeight": "600" },
-          "textContent": "${state.author}"
+          "tagName": "span",
+          "style": {
+            "width": "2rem",
+            "height": "1px",
+            "backgroundColor": "var(--color-primary)"
+          }
         },
         {
           "tagName": "div",
-          "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
-          "textContent": "${state.role}"
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-body)",
+                "fontWeight": "700",
+                "fontSize": "0.85rem",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.1em",
+                "color": "var(--color-text-primary)"
+              },
+              "textContent": "${state.author}"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-body)",
+                "fontSize": "0.85rem",
+                "color": "var(--color-text-muted)"
+              },
+              "textContent": "${state.role}"
+            }
+          ]
         }
       ]
     }

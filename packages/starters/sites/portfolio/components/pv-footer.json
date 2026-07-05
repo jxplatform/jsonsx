@@ -2,15 +2,15 @@
   "tagName": "pv-footer",
   "state": {
     "brand": "Aperture Studio",
-    "tagline": "An image-forward photography studio telling honest, timeless stories.",
+    "tagline": "Available light, unhurried days, prints worth keeping.",
     "email": "hello@aperturestudio.example",
     "phone": "(555) 204-7788"
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-dark)",
-    "color": "var(--color-text-white)",
-    "padding": "4rem 1.5rem 2rem"
+    "backgroundColor": "var(--color-bg)",
+    "borderTop": "1px solid var(--color-line)",
+    "padding": "clamp(3.5rem, 8vw, 5.5rem) clamp(1.5rem, 4vw, 4rem) 2.5rem"
   },
   "children": [
     {
@@ -18,10 +18,11 @@
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "display": "grid",
-        "gridTemplateColumns": "2fr 1fr 1fr",
+        "display": "flex",
+        "alignItems": "flex-end",
+        "justifyContent": "space-between",
         "gap": "2.5rem",
-        "@--md": { "gridTemplateColumns": "1fr" }
+        "flexWrap": "wrap"
       },
       "children": [
         {
@@ -31,93 +32,105 @@
               "tagName": "div",
               "style": {
                 "fontFamily": "var(--font-heading)",
-                "fontSize": "1.6rem",
-                "fontWeight": "600",
-                "marginBottom": "0.75rem"
+                "fontWeight": "400",
+                "fontSize": "clamp(2.4rem, 6vw, 4rem)",
+                "lineHeight": "1",
+                "letterSpacing": "-0.01em",
+                "margin": "0 0 0.75rem",
+                "color": "var(--color-text-primary)"
               },
               "textContent": "${state.brand}"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.7", "maxWidth": "34ch", "lineHeight": "1.7" },
+              "style": {
+                "margin": "0",
+                "fontFamily": "var(--font-heading)",
+                "fontStyle": "italic",
+                "fontSize": "1.15rem",
+                "color": "var(--color-text-muted)"
+              },
               "textContent": "${state.tagline}"
             }
           ]
         },
         {
           "tagName": "div",
+          "style": {
+            "display": "flex",
+            "flexDirection": "column",
+            "gap": "0.6rem",
+            "textAlign": "right",
+            "@--sm": { "textAlign": "left" }
+          },
           "children": [
             {
-              "tagName": "div",
+              "tagName": "a",
+              "attributes": { "href": "mailto:${state.email}" },
               "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.12em",
-                "fontSize": "0.72rem",
-                "opacity": "0.55",
-                "marginBottom": "0.85rem"
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontSize": "0.82rem",
+                "letterSpacing": "0.04em",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-primary)" }
               },
-              "textContent": "Studio"
-            },
-            {
-              "tagName": "p",
-              "style": { "margin": "0 0 0.4rem", "opacity": "0.8" },
               "textContent": "${state.email}"
             },
             {
-              "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.8" },
+              "tagName": "span",
+              "style": {
+                "color": "var(--color-text-muted)",
+                "fontSize": "0.82rem",
+                "letterSpacing": "0.04em"
+              },
               "textContent": "${state.phone}"
-            }
-          ]
-        },
-        {
-          "tagName": "div",
-          "children": [
+            },
             {
-              "tagName": "div",
+              "tagName": "nav",
               "style": {
+                "display": "flex",
+                "gap": "1.5rem",
+                "justifyContent": "flex-end",
+                "marginTop": "0.5rem",
+                "fontSize": "0.68rem",
+                "fontWeight": "600",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.12em",
-                "fontSize": "0.72rem",
-                "opacity": "0.55",
-                "marginBottom": "0.85rem"
+                "letterSpacing": "0.18em",
+                "@--sm": { "justifyContent": "flex-start" }
               },
-              "textContent": "Explore"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/work/" },
-              "style": {
-                "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.8",
-                "textDecoration": "none",
-                "marginBottom": "0.4rem"
-              },
-              "textContent": "Work"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/about/" },
-              "style": {
-                "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.8",
-                "textDecoration": "none",
-                "marginBottom": "0.4rem"
-              },
-              "textContent": "About"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/contact/" },
-              "style": {
-                "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.8",
-                "textDecoration": "none"
-              },
-              "textContent": "Contact"
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/work/" },
+                  "style": {
+                    "color": "var(--color-text-muted)",
+                    "textDecoration": "none",
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "Work"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/about/" },
+                  "style": {
+                    "color": "var(--color-text-muted)",
+                    "textDecoration": "none",
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "About"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/contact/" },
+                  "style": {
+                    "color": "var(--color-text-muted)",
+                    "textDecoration": "none",
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "Contact"
+                }
+              ]
             }
           ]
         }
@@ -127,17 +140,26 @@
       "tagName": "div",
       "style": {
         "maxWidth": "var(--max-width)",
-        "margin": "2.5rem auto 0",
+        "margin": "clamp(3rem, 6vw, 4.5rem) auto 0",
         "paddingTop": "1.5rem",
-        "borderTop": "1px solid rgba(255, 255, 255, 0.14)",
-        "fontSize": "0.82rem",
-        "opacity": "0.55"
+        "borderTop": "1px solid var(--color-line)",
+        "display": "flex",
+        "justifyContent": "space-between",
+        "gap": "1rem",
+        "flexWrap": "wrap",
+        "fontSize": "0.72rem",
+        "letterSpacing": "0.1em",
+        "textTransform": "uppercase",
+        "color": "var(--color-text-muted)"
       },
       "children": [
         {
-          "tagName": "p",
-          "style": { "margin": "0" },
-          "textContent": "© Aperture Studio. Built with Jx."
+          "tagName": "span",
+          "textContent": "© Aperture Studio"
+        },
+        {
+          "tagName": "span",
+          "textContent": "Built with Jx"
         }
       ]
     }

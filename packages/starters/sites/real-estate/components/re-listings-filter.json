@@ -13,7 +13,8 @@
         "baths": 2,
         "sqft": 1850,
         "city": "Maplewood",
-        "image": "/images/listing-1.jpg"
+        "image": "/images/listing-1.jpg",
+        "status": "New"
       },
       {
         "Title": "Harbor View Modern",
@@ -23,7 +24,8 @@
         "baths": 3,
         "sqft": 2600,
         "city": "Bayport",
-        "image": "/images/listing-2.jpg"
+        "image": "/images/listing-2.jpg",
+        "status": "For Sale"
       },
       {
         "Title": "Lakeview Loft",
@@ -33,7 +35,8 @@
         "baths": 2,
         "sqft": 1200,
         "city": "Lakeview",
-        "image": "/images/listing-3.jpg"
+        "image": "/images/listing-3.jpg",
+        "status": "New"
       },
       {
         "Title": "Willow Creek Cottage",
@@ -43,7 +46,8 @@
         "baths": 1,
         "sqft": 980,
         "city": "Cedar Grove",
-        "image": "/images/listing-4.jpg"
+        "image": "/images/listing-4.jpg",
+        "status": "For Sale"
       },
       {
         "Title": "Summit Ridge Contemporary",
@@ -53,7 +57,8 @@
         "baths": 4,
         "sqft": 3400,
         "city": "Harbor Hills",
-        "image": "/images/listing-5.jpg"
+        "image": "/images/listing-5.jpg",
+        "status": "For Sale"
       },
       {
         "Title": "Birchwood Family Home",
@@ -63,7 +68,8 @@
         "baths": 3,
         "sqft": 2200,
         "city": "Northshore",
-        "image": "/images/listing-6.jpg"
+        "image": "/images/listing-6.jpg",
+        "status": "For Sale"
       }
     ],
     "visibleCount": {
@@ -96,196 +102,80 @@
     }
   },
   "style": {
-    "display": "block",
+    "display": "grid",
+    "gridTemplateColumns": "290px 1fr",
+    "gap": "clamp(1.5rem, 3vw, 2.5rem)",
+    "alignItems": "start",
     "maxWidth": "var(--max-width)",
     "margin": "0 auto",
-    "padding": "0 1.5rem"
+    "padding": "0 1.5rem",
+    "@--lg": { "gridTemplateColumns": "1fr" }
   },
   "children": [
     {
-      "tagName": "div",
+      "tagName": "aside",
       "style": {
-        "display": "flex",
-        "flexWrap": "wrap",
-        "gap": "2rem",
-        "alignItems": "flex-end",
-        "justifyContent": "space-between",
-        "padding": "1.5rem",
-        "backgroundColor": "var(--color-bg-cream)",
+        "position": "sticky",
+        "top": "5rem",
+        "backgroundColor": "var(--color-bg-white)",
         "border": "1px solid var(--color-border)",
-        "borderRadius": "var(--radius)",
-        "marginBottom": "2rem"
+        "borderRadius": "var(--radius-lg)",
+        "boxShadow": "var(--shadow-card)",
+        "padding": "1.5rem",
+        "@--lg": { "position": "static" }
       },
       "children": [
         {
           "tagName": "div",
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "paddingBottom": "1.1rem",
+            "marginBottom": "1.25rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
           "children": [
             {
               "tagName": "div",
               "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.12em",
-                "fontSize": "0.72rem",
-                "fontWeight": "700",
-                "color": "var(--color-text-muted)",
-                "marginBottom": "0.6rem"
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.5rem",
+                "fontFamily": "var(--font-heading)",
+                "fontWeight": "800",
+                "fontSize": "1.05rem",
+                "letterSpacing": "-0.01em"
               },
-              "textContent": "Bedrooms"
-            },
-            {
-              "tagName": "div",
-              "style": { "display": "flex", "gap": "0.4rem", "flexWrap": "wrap" },
               "children": [
                 {
-                  "tagName": "button",
-                  "textContent": "Any",
-                  "onclick": { "$ref": "#/state/setBeds0" },
-                  "style": {
-                    "padding": "0.5rem 1rem",
-                    "borderRadius": "999px",
-                    "border": "1px solid var(--color-border)",
-                    "cursor": "pointer",
-                    "fontWeight": "600",
-                    "fontSize": "0.9rem",
-                    "transition": "all 0.15s",
-                    "backgroundColor": "${state.minBeds === 0 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-                    "color": "${state.minBeds === 0 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
-                  }
+                  "tagName": "span",
+                  "style": { "color": "var(--color-primary)" },
+                  "textContent": "⛃"
                 },
-                {
-                  "tagName": "button",
-                  "textContent": "2+",
-                  "onclick": { "$ref": "#/state/setBeds2" },
-                  "style": {
-                    "padding": "0.5rem 1rem",
-                    "borderRadius": "999px",
-                    "border": "1px solid var(--color-border)",
-                    "cursor": "pointer",
-                    "fontWeight": "600",
-                    "fontSize": "0.9rem",
-                    "transition": "all 0.15s",
-                    "backgroundColor": "${state.minBeds === 2 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-                    "color": "${state.minBeds === 2 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
-                  }
-                },
-                {
-                  "tagName": "button",
-                  "textContent": "3+",
-                  "onclick": { "$ref": "#/state/setBeds3" },
-                  "style": {
-                    "padding": "0.5rem 1rem",
-                    "borderRadius": "999px",
-                    "border": "1px solid var(--color-border)",
-                    "cursor": "pointer",
-                    "fontWeight": "600",
-                    "fontSize": "0.9rem",
-                    "transition": "all 0.15s",
-                    "backgroundColor": "${state.minBeds === 3 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-                    "color": "${state.minBeds === 3 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
-                  }
-                },
-                {
-                  "tagName": "button",
-                  "textContent": "4+",
-                  "onclick": { "$ref": "#/state/setBeds4" },
-                  "style": {
-                    "padding": "0.5rem 1rem",
-                    "borderRadius": "999px",
-                    "border": "1px solid var(--color-border)",
-                    "cursor": "pointer",
-                    "fontWeight": "600",
-                    "fontSize": "0.9rem",
-                    "transition": "all 0.15s",
-                    "backgroundColor": "${state.minBeds === 4 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-                    "color": "${state.minBeds === 4 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
-                  }
-                }
+                { "tagName": "span", "textContent": "Filters" }
               ]
-            }
-          ]
-        },
-        {
-          "tagName": "div",
-          "children": [
-            {
-              "tagName": "div",
-              "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.12em",
-                "fontSize": "0.72rem",
-                "fontWeight": "700",
-                "color": "var(--color-text-muted)",
-                "marginBottom": "0.6rem"
-              },
-              "textContent": "Max Price"
             },
             {
-              "tagName": "div",
-              "style": { "display": "flex", "gap": "0.4rem", "flexWrap": "wrap" },
+              "tagName": "span",
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.35rem",
+                "padding": "0.3rem 0.7rem",
+                "borderRadius": "999px",
+                "backgroundColor": "var(--color-teal-tint)",
+                "color": "var(--color-primary)",
+                "fontWeight": "800",
+                "fontSize": "0.82rem",
+                "fontVariantNumeric": "tabular-nums"
+              },
               "children": [
+                { "tagName": "span", "textContent": "${state.visibleCount}" },
                 {
-                  "tagName": "button",
-                  "textContent": "Any",
-                  "onclick": { "$ref": "#/state/setPrice0" },
-                  "style": {
-                    "padding": "0.5rem 1rem",
-                    "borderRadius": "999px",
-                    "border": "1px solid var(--color-border)",
-                    "cursor": "pointer",
-                    "fontWeight": "600",
-                    "fontSize": "0.9rem",
-                    "transition": "all 0.15s",
-                    "backgroundColor": "${state.maxPrice === 0 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-                    "color": "${state.maxPrice === 0 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
-                  }
-                },
-                {
-                  "tagName": "button",
-                  "textContent": "$400k",
-                  "onclick": { "$ref": "#/state/setPrice400" },
-                  "style": {
-                    "padding": "0.5rem 1rem",
-                    "borderRadius": "999px",
-                    "border": "1px solid var(--color-border)",
-                    "cursor": "pointer",
-                    "fontWeight": "600",
-                    "fontSize": "0.9rem",
-                    "transition": "all 0.15s",
-                    "backgroundColor": "${state.maxPrice === 400000 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-                    "color": "${state.maxPrice === 400000 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
-                  }
-                },
-                {
-                  "tagName": "button",
-                  "textContent": "$700k",
-                  "onclick": { "$ref": "#/state/setPrice700" },
-                  "style": {
-                    "padding": "0.5rem 1rem",
-                    "borderRadius": "999px",
-                    "border": "1px solid var(--color-border)",
-                    "cursor": "pointer",
-                    "fontWeight": "600",
-                    "fontSize": "0.9rem",
-                    "transition": "all 0.15s",
-                    "backgroundColor": "${state.maxPrice === 700000 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-                    "color": "${state.maxPrice === 700000 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
-                  }
-                },
-                {
-                  "tagName": "button",
-                  "textContent": "$1.2M",
-                  "onclick": { "$ref": "#/state/setPrice1200" },
-                  "style": {
-                    "padding": "0.5rem 1rem",
-                    "borderRadius": "999px",
-                    "border": "1px solid var(--color-border)",
-                    "cursor": "pointer",
-                    "fontWeight": "600",
-                    "fontSize": "0.9rem",
-                    "transition": "all 0.15s",
-                    "backgroundColor": "${state.maxPrice === 1200000 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-                    "color": "${state.maxPrice === 1200000 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
-                  }
+                  "tagName": "span",
+                  "style": { "fontWeight": "600", "color": "var(--color-text-muted)" },
+                  "textContent": "of 6"
                 }
               ]
             }
@@ -294,44 +184,271 @@
         {
           "tagName": "div",
           "style": {
-            "fontSize": "0.95rem",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.1em",
+            "fontSize": "0.72rem",
             "fontWeight": "700",
-            "color": "var(--color-text-primary)",
-            "whiteSpace": "nowrap"
+            "color": "var(--color-text-muted)",
+            "marginBottom": "0.7rem"
           },
-          "textContent": "${state.visibleCount} homes"
+          "textContent": "Bedrooms"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(4, 1fr)",
+            "gap": "0.4rem",
+            "marginBottom": "1.5rem"
+          },
+          "children": [
+            {
+              "tagName": "button",
+              "textContent": "Any",
+              "onclick": { "$ref": "#/state/setBeds0" },
+              "style": {
+                "padding": "0.55rem 0.4rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.minBeds === 0 ? 'var(--color-primary)' : 'var(--color-border-strong)'}",
+                "cursor": "pointer",
+                "fontWeight": "700",
+                "fontSize": "0.88rem",
+                "fontFamily": "inherit",
+                "transition": "all 0.15s",
+                "backgroundColor": "${state.minBeds === 0 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.minBeds === 0 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "2+",
+              "onclick": { "$ref": "#/state/setBeds2" },
+              "style": {
+                "padding": "0.55rem 0.4rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.minBeds === 2 ? 'var(--color-primary)' : 'var(--color-border-strong)'}",
+                "cursor": "pointer",
+                "fontWeight": "700",
+                "fontSize": "0.88rem",
+                "fontFamily": "inherit",
+                "transition": "all 0.15s",
+                "backgroundColor": "${state.minBeds === 2 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.minBeds === 2 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "3+",
+              "onclick": { "$ref": "#/state/setBeds3" },
+              "style": {
+                "padding": "0.55rem 0.4rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.minBeds === 3 ? 'var(--color-primary)' : 'var(--color-border-strong)'}",
+                "cursor": "pointer",
+                "fontWeight": "700",
+                "fontSize": "0.88rem",
+                "fontFamily": "inherit",
+                "transition": "all 0.15s",
+                "backgroundColor": "${state.minBeds === 3 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.minBeds === 3 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "4+",
+              "onclick": { "$ref": "#/state/setBeds4" },
+              "style": {
+                "padding": "0.55rem 0.4rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.minBeds === 4 ? 'var(--color-primary)' : 'var(--color-border-strong)'}",
+                "cursor": "pointer",
+                "fontWeight": "700",
+                "fontSize": "0.88rem",
+                "fontFamily": "inherit",
+                "transition": "all 0.15s",
+                "backgroundColor": "${state.minBeds === 4 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.minBeds === 4 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              }
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "textTransform": "uppercase",
+            "letterSpacing": "0.1em",
+            "fontSize": "0.72rem",
+            "fontWeight": "700",
+            "color": "var(--color-text-muted)",
+            "marginBottom": "0.7rem"
+          },
+          "textContent": "Max price"
+        },
+        {
+          "tagName": "div",
+          "style": { "display": "grid", "gridTemplateColumns": "repeat(2, 1fr)", "gap": "0.4rem" },
+          "children": [
+            {
+              "tagName": "button",
+              "textContent": "Any",
+              "onclick": { "$ref": "#/state/setPrice0" },
+              "style": {
+                "padding": "0.6rem 0.5rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.maxPrice === 0 ? 'var(--color-primary)' : 'var(--color-border-strong)'}",
+                "cursor": "pointer",
+                "fontWeight": "700",
+                "fontSize": "0.88rem",
+                "fontFamily": "inherit",
+                "fontVariantNumeric": "tabular-nums",
+                "transition": "all 0.15s",
+                "backgroundColor": "${state.maxPrice === 0 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.maxPrice === 0 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "≤ $400k",
+              "onclick": { "$ref": "#/state/setPrice400" },
+              "style": {
+                "padding": "0.6rem 0.5rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.maxPrice === 400000 ? 'var(--color-primary)' : 'var(--color-border-strong)'}",
+                "cursor": "pointer",
+                "fontWeight": "700",
+                "fontSize": "0.88rem",
+                "fontFamily": "inherit",
+                "fontVariantNumeric": "tabular-nums",
+                "transition": "all 0.15s",
+                "backgroundColor": "${state.maxPrice === 400000 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.maxPrice === 400000 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "≤ $700k",
+              "onclick": { "$ref": "#/state/setPrice700" },
+              "style": {
+                "padding": "0.6rem 0.5rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.maxPrice === 700000 ? 'var(--color-primary)' : 'var(--color-border-strong)'}",
+                "cursor": "pointer",
+                "fontWeight": "700",
+                "fontSize": "0.88rem",
+                "fontFamily": "inherit",
+                "fontVariantNumeric": "tabular-nums",
+                "transition": "all 0.15s",
+                "backgroundColor": "${state.maxPrice === 700000 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.maxPrice === 700000 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "≤ $1.2M",
+              "onclick": { "$ref": "#/state/setPrice1200" },
+              "style": {
+                "padding": "0.6rem 0.5rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.maxPrice === 1200000 ? 'var(--color-primary)' : 'var(--color-border-strong)'}",
+                "cursor": "pointer",
+                "fontWeight": "700",
+                "fontSize": "0.88rem",
+                "fontFamily": "inherit",
+                "fontVariantNumeric": "tabular-nums",
+                "transition": "all 0.15s",
+                "backgroundColor": "${state.maxPrice === 1200000 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.maxPrice === 1200000 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              }
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "1.5rem 0 0",
+            "fontSize": "0.82rem",
+            "color": "var(--color-text-muted)",
+            "lineHeight": "1.5"
+          },
+          "textContent": "Results update instantly — no page reloads."
         }
       ]
     },
     {
       "tagName": "div",
-      "style": {
-        "display": "grid",
-        "gridTemplateColumns": "repeat(3, 1fr)",
-        "gap": "1.5rem",
-        "@--md": { "gridTemplateColumns": "repeat(2, 1fr)" },
-        "@--sm": { "gridTemplateColumns": "1fr" }
-      },
-      "children": {
-        "$prototype": "Array",
-        "items": { "$ref": "#/state/listings" },
-        "map": {
-          "tagName": "re-listing-card",
-          "$props": {
-            "heading": { "$ref": "$map/item/Title" },
-            "price": { "$ref": "$map/item/price" },
-            "beds": { "$ref": "$map/item/beds" },
-            "baths": { "$ref": "$map/item/baths" },
-            "sqft": { "$ref": "$map/item/sqft" },
-            "city": { "$ref": "$map/item/city" },
-            "image": { "$ref": "$map/item/image" },
-            "href": { "$ref": "$map/item/link" }
-          },
+      "children": [
+        {
+          "tagName": "div",
           "style": {
-            "display": "${(state.minBeds === 0 || item.beds >= state.minBeds) && (state.maxPrice === 0 || item.price <= state.maxPrice) ? 'block' : 'none'}"
+            "display": "flex",
+            "alignItems": "baseline",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "marginBottom": "1.25rem",
+            "flexWrap": "wrap"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontWeight": "700",
+                "fontSize": "1rem",
+                "color": "var(--color-text-primary)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "color": "var(--color-primary)",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.visibleCount}"
+                },
+                { "tagName": "span", "textContent": " homes on the north shore" }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "fontSize": "0.85rem",
+                "color": "var(--color-text-muted)",
+                "fontWeight": "600"
+              },
+              "textContent": "Sorted by newest"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, 1fr)",
+            "gap": "1.35rem",
+            "@--sm": { "gridTemplateColumns": "1fr" }
+          },
+          "children": {
+            "$prototype": "Array",
+            "items": { "$ref": "#/state/listings" },
+            "map": {
+              "tagName": "re-listing-card",
+              "$props": {
+                "heading": { "$ref": "$map/item/Title" },
+                "price": { "$ref": "$map/item/price" },
+                "beds": { "$ref": "$map/item/beds" },
+                "baths": { "$ref": "$map/item/baths" },
+                "sqft": { "$ref": "$map/item/sqft" },
+                "city": { "$ref": "$map/item/city" },
+                "status": { "$ref": "$map/item/status" },
+                "image": { "$ref": "$map/item/image" },
+                "href": { "$ref": "$map/item/link" }
+              },
+              "style": {
+                "display": "${(state.minBeds === 0 || item.beds >= state.minBeds) && (state.maxPrice === 0 || item.price <= state.maxPrice) ? 'block' : 'none'}"
+              }
+            }
           }
         }
-      }
+      ]
     }
   ]
 }

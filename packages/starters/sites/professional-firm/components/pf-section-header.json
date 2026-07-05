@@ -2,39 +2,62 @@
   "tagName": "pf-section-header",
   "state": {
     "eyebrow": "",
+    "index": "",
     "heading": "",
-    "subheading": "",
-    "align": "center"
+    "subheading": ""
   },
   "style": {
     "display": "block",
-    "maxWidth": "var(--max-width-narrow)",
-    "margin": "0 auto 2.5rem",
-    "textAlign": "${state.align}"
+    "maxWidth": "var(--max-width)",
+    "margin": "0 auto clamp(2rem, 4vw, 3rem)"
   },
   "children": [
     {
-      "tagName": "p",
+      "tagName": "div",
       "style": {
-        "display": "${state.eyebrow ? 'block' : 'none'}",
-        "textTransform": "uppercase",
-        "letterSpacing": "0.16em",
-        "fontSize": "0.8rem",
+        "display": "flex",
+        "alignItems": "baseline",
+        "justifyContent": "space-between",
+        "gap": "1rem",
+        "paddingBottom": "1rem",
+        "borderBottom": "1px solid var(--color-rule)",
+        "fontFamily": "var(--font-sans)",
+        "fontSize": "0.72rem",
         "fontWeight": "600",
-        "color": "var(--color-primary)",
-        "margin": "0 0 0.75rem"
+        "textTransform": "uppercase",
+        "letterSpacing": "0.18em"
       },
-      "textContent": "${state.eyebrow}"
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "display": "${state.eyebrow ? 'inline' : 'none'}",
+            "color": "var(--color-accent)"
+          },
+          "textContent": "${state.eyebrow}"
+        },
+        {
+          "tagName": "span",
+          "style": {
+            "display": "${state.index ? 'inline' : 'none'}",
+            "color": "var(--color-muted)",
+            "fontVariantNumeric": "tabular-nums"
+          },
+          "textContent": "${state.index}"
+        }
+      ]
     },
     {
       "tagName": "h2",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "clamp(1.9rem, 4vw, 2.6rem)",
-        "fontWeight": "700",
-        "lineHeight": "1.15",
+        "fontFamily": "var(--font-serif)",
+        "fontSize": "clamp(1.9rem, 4vw, 2.9rem)",
+        "fontWeight": "500",
+        "lineHeight": "1.12",
         "letterSpacing": "-0.02em",
-        "margin": "0"
+        "margin": "1.5rem 0 0",
+        "maxWidth": "20ch",
+        "color": "var(--color-ink)"
       },
       "textContent": "${state.heading}"
     },
@@ -42,10 +65,11 @@
       "tagName": "p",
       "style": {
         "display": "${state.subheading ? 'block' : 'none'}",
-        "fontSize": "1.1rem",
-        "lineHeight": "1.7",
-        "color": "var(--color-text-muted)",
-        "margin": "1rem 0 0"
+        "fontSize": "1.08rem",
+        "lineHeight": "1.65",
+        "color": "var(--color-muted)",
+        "margin": "1rem 0 0",
+        "maxWidth": "56ch"
       },
       "textContent": "${state.subheading}"
     }

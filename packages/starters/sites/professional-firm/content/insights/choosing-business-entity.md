@@ -3,6 +3,7 @@ title: "LLC, S-Corp, or C-Corp: Choosing the Right Entity"
 excerpt: The structure you register determines how you are taxed, how you raise money, and how much paperwork you carry. Here is how to think it through.
 date: October 21, 2025
 author: Priya Nair
+category: Structure
 order: 3
 ---
 

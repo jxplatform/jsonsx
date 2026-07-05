@@ -3,6 +3,7 @@
   "state": {
     "eyebrow": "",
     "heading": "",
+    "headingAccent": "",
     "subheading": "",
     "cta": "Get started free",
     "ctaHref": "/pricing/",
@@ -16,11 +17,21 @@
     "display": "block",
     "position": "relative",
     "overflow": "hidden",
-    "backgroundColor": "var(--color-bg-dark)",
     "color": "var(--color-text-white)",
-    "background": "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99, 102, 241, 0.35), transparent 70%), var(--color-bg-dark)"
+    "background": "radial-gradient(ellipse 48% 42% at 15% 0%, rgba(124,116,255,0.38), transparent 60%), radial-gradient(ellipse 42% 40% at 88% 8%, rgba(34,211,238,0.20), transparent 62%), radial-gradient(ellipse 65% 55% at 50% 118%, rgba(244,114,182,0.16), transparent 60%), var(--color-bg)"
   },
   "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "position": "absolute",
+        "inset": "0",
+        "backgroundImage": "radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px)",
+        "backgroundSize": "34px 34px",
+        "opacity": "0.6",
+        "pointerEvents": "none"
+      }
+    },
     {
       "tagName": "div",
       "style": {
@@ -37,37 +48,63 @@
           "style": {
             "display": "${state.eyebrow ? 'inline-flex' : 'none'}",
             "alignItems": "center",
-            "gap": "0.5rem",
-            "padding": "0.375rem 0.9rem",
+            "gap": "0.55rem",
+            "padding": "0.4rem 0.95rem",
             "borderRadius": "999px",
-            "border": "1px solid rgba(255, 255, 255, 0.18)",
-            "backgroundColor": "rgba(255, 255, 255, 0.06)",
+            "border": "1px solid var(--color-border)",
+            "backgroundColor": "rgba(255, 255, 255, 0.04)",
             "fontSize": "0.8125rem",
             "fontWeight": "500",
-            "color": "rgba(255, 255, 255, 0.85)",
+            "color": "var(--color-text-primary)",
             "margin": "0 0 1.75rem"
           },
-          "textContent": "${state.eyebrow}"
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "width": "0.5rem",
+                "height": "0.5rem",
+                "borderRadius": "999px",
+                "background": "var(--grad-btn)",
+                "boxShadow": "0 0 10px var(--glow)"
+              }
+            },
+            { "tagName": "span", "textContent": "${state.eyebrow}" }
+          ]
         },
         {
           "tagName": "h1",
           "style": {
             "fontFamily": "var(--font-heading)",
-            "fontSize": "clamp(2.5rem, 6.5vw, 4.5rem)",
+            "fontSize": "clamp(2.6rem, 6.8vw, 5rem)",
             "fontWeight": "700",
-            "lineHeight": "1.05",
+            "lineHeight": "1.02",
             "letterSpacing": "-0.04em",
             "margin": "0 auto 1.5rem",
-            "maxWidth": "16ch"
+            "maxWidth": "18ch",
+            "color": "var(--color-text-primary)"
           },
-          "textContent": "${state.heading}"
+          "children": [
+            { "tagName": "span", "textContent": "${state.heading} " },
+            {
+              "tagName": "span",
+              "style": {
+                "background": "var(--grad)",
+                "backgroundClip": "text",
+                "webkitBackgroundClip": "text",
+                "webkitTextFillColor": "transparent",
+                "color": "#22d3ee"
+              },
+              "textContent": "${state.headingAccent}"
+            }
+          ]
         },
         {
           "tagName": "p",
           "style": {
             "fontSize": "clamp(1.05rem, 2vw, 1.3rem)",
             "lineHeight": "1.65",
-            "color": "rgba(255, 255, 255, 0.72)",
+            "color": "var(--color-text-muted)",
             "margin": "0 auto 2.25rem",
             "maxWidth": "52ch"
           },
@@ -87,15 +124,19 @@
               "attributes": { "href": "${state.ctaHref}" },
               "style": {
                 "display": "inline-block",
-                "backgroundColor": "var(--color-primary)",
-                "color": "var(--color-text-white)",
-                "padding": "0.85rem 2rem",
-                "borderRadius": "var(--radius)",
+                "background": "var(--grad-btn)",
+                "color": "#ffffff",
+                "padding": "0.9rem 2rem",
+                "borderRadius": "999px",
                 "fontSize": "1.02rem",
                 "fontWeight": "600",
                 "textDecoration": "none",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                "boxShadow": "0 10px 30px -8px var(--glow)",
+                "transition": "transform 0.15s, box-shadow 0.15s",
+                ":hover": {
+                  "transform": "translateY(-2px)",
+                  "boxShadow": "0 16px 40px -8px var(--glow)"
+                }
               },
               "textContent": "${state.cta}"
             },
@@ -104,15 +145,19 @@
               "attributes": { "href": "${state.cta2Href}" },
               "style": {
                 "display": "${state.cta2 ? 'inline-block' : 'none'}",
-                "border": "1px solid rgba(255, 255, 255, 0.28)",
-                "color": "var(--color-text-white)",
-                "padding": "0.85rem 2rem",
-                "borderRadius": "var(--radius)",
+                "border": "1px solid var(--color-border)",
+                "backgroundColor": "rgba(255,255,255,0.03)",
+                "color": "var(--color-text-primary)",
+                "padding": "0.9rem 2rem",
+                "borderRadius": "999px",
                 "fontSize": "1.02rem",
                 "fontWeight": "600",
                 "textDecoration": "none",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "rgba(255, 255, 255, 0.1)" }
+                "transition": "background-color 0.15s, border-color 0.15s",
+                ":hover": {
+                  "backgroundColor": "rgba(255, 255, 255, 0.07)",
+                  "borderColor": "var(--color-text-muted)"
+                }
               },
               "textContent": "${state.cta2}"
             }
@@ -123,7 +168,7 @@
           "style": {
             "display": "${state.note ? 'block' : 'none'}",
             "fontSize": "0.85rem",
-            "color": "rgba(255, 255, 255, 0.5)",
+            "color": "var(--color-text-muted)",
             "margin": "1.25rem 0 0"
           },
           "textContent": "${state.note}"
@@ -132,25 +177,97 @@
           "tagName": "div",
           "style": {
             "display": "${state.image ? 'block' : 'none'}",
-            "maxWidth": "960px",
+            "position": "relative",
+            "maxWidth": "1000px",
             "margin": "3.5rem auto 0"
           },
           "children": [
             {
-              "tagName": "img",
-              "attributes": {
-                "src": "${state.image}",
-                "alt": "${state.imageAlt}",
-                "loading": "eager"
-              },
+              "tagName": "div",
               "style": {
-                "display": "block",
-                "width": "100%",
-                "height": "auto",
-                "borderRadius": "var(--radius)",
-                "border": "1px solid rgba(255, 255, 255, 0.12)",
-                "boxShadow": "0 32px 80px rgba(0, 0, 0, 0.5)"
+                "position": "absolute",
+                "inset": "-1px",
+                "borderRadius": "calc(var(--radius) + 2px)",
+                "padding": "1px",
+                "background": "linear-gradient(160deg, rgba(139,123,255,0.7), rgba(34,211,238,0.25) 40%, transparent 70%)",
+                "pointerEvents": "none"
               }
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "position": "relative",
+                "borderRadius": "var(--radius)",
+                "overflow": "hidden",
+                "border": "1px solid var(--color-border)",
+                "backgroundColor": "var(--color-bg-elev)",
+                "boxShadow": "0 40px 90px -30px rgba(0,0,0,0.8), 0 0 80px -20px var(--glow)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "padding": "0.75rem 1rem",
+                    "borderBottom": "1px solid var(--color-border)",
+                    "backgroundColor": "var(--color-bg-elev2)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "width": "0.7rem",
+                        "height": "0.7rem",
+                        "borderRadius": "999px",
+                        "backgroundColor": "#ff5f57"
+                      }
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "width": "0.7rem",
+                        "height": "0.7rem",
+                        "borderRadius": "999px",
+                        "backgroundColor": "#febc2e"
+                      }
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "width": "0.7rem",
+                        "height": "0.7rem",
+                        "borderRadius": "999px",
+                        "backgroundColor": "#28c840"
+                      }
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "marginLeft": "0.75rem",
+                        "fontSize": "0.75rem",
+                        "color": "var(--color-text-muted)",
+                        "fontFamily": "var(--font-heading)"
+                      },
+                      "textContent": "app.flowlark.com"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "img",
+                  "attributes": {
+                    "src": "${state.image}",
+                    "alt": "${state.imageAlt}",
+                    "loading": "eager"
+                  },
+                  "style": {
+                    "display": "block",
+                    "width": "100%",
+                    "height": "auto"
+                  }
+                }
+              ]
             }
           ]
         }

@@ -3,7 +3,9 @@
   "state": {
     "image": { "type": "string", "format": "image", "default": "" },
     "imageAlt": "",
-    "reverse": false
+    "reverse": false,
+    "badgeValue": "20+",
+    "badgeLabel": "Years serving Northern Colorado"
   },
   "style": {
     "display": "block",
@@ -17,15 +19,33 @@
         "margin": "0 auto",
         "display": "grid",
         "gridTemplateColumns": "1fr 1fr",
-        "gap": "clamp(2rem, 5vw, 4rem)",
+        "gap": "clamp(2rem, 5vw, 4.5rem)",
         "alignItems": "center",
-        "@--md": { "gridTemplateColumns": "1fr" }
+        "@--md": { "gridTemplateColumns": "1fr", "gap": "2.75rem" }
       },
       "children": [
         {
           "tagName": "div",
-          "style": { "order": "${state.reverse ? '2' : '1'}" },
+          "style": {
+            "position": "relative",
+            "order": "${state.reverse ? '2' : '1'}",
+            "paddingBottom": "1.25rem",
+            "paddingRight": "1.25rem"
+          },
           "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "position": "absolute",
+                "bottom": "0",
+                "right": "0",
+                "width": "62%",
+                "height": "70%",
+                "backgroundColor": "var(--color-steel)",
+                "borderRadius": "var(--radius)",
+                "clipPath": "polygon(0 0, 100% 0, 100% 100%, 12% 100%)"
+              }
+            },
             {
               "tagName": "img",
               "attributes": {
@@ -34,12 +54,55 @@
                 "loading": "lazy"
               },
               "style": {
+                "position": "relative",
                 "width": "100%",
                 "height": "auto",
                 "borderRadius": "var(--radius)",
                 "display": "block",
-                "boxShadow": "0 12px 40px rgba(28,25,23,0.14)"
+                "boxShadow": "var(--shadow-float)"
               }
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "position": "absolute",
+                "bottom": "-0.6rem",
+                "left": "-0.6rem",
+                "zIndex": "3",
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.75rem",
+                "padding": "0.85rem 1.15rem",
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "borderRadius": "var(--radius-sm)",
+                "boxShadow": "0 18px 34px -16px rgba(244,81,30,0.85)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "700",
+                    "fontSize": "2rem",
+                    "lineHeight": "1"
+                  },
+                  "textContent": "${state.badgeValue}"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.04em",
+                    "fontSize": "0.72rem",
+                    "fontWeight": "500",
+                    "lineHeight": "1.15",
+                    "maxWidth": "12ch"
+                  },
+                  "textContent": "${state.badgeLabel}"
+                }
+              ]
             }
           ]
         },
@@ -47,8 +110,8 @@
           "tagName": "div",
           "style": {
             "order": "${state.reverse ? '1' : '2'}",
-            "fontSize": "1.08rem",
-            "lineHeight": "1.8",
+            "fontSize": "1.1rem",
+            "lineHeight": "1.75",
             "color": "var(--color-text-primary)"
           },
           "children": [{ "tagName": "slot" }]

@@ -1,100 +1,354 @@
 {
   "tagName": "shp-nav",
   "state": {
-    "brand": "Cadence Cycles"
+    "brand": "Cadence",
+    "cartCount": "2"
   },
   "style": {
     "display": "block",
     "position": "sticky",
     "top": "0",
-    "zIndex": "50",
-    "backgroundColor": "rgba(255, 255, 255, 0.9)",
-    "backdropFilter": "blur(8px)",
-    "borderBottom": "1px solid var(--color-border)"
+    "zIndex": "50"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
-        "maxWidth": "var(--max-width)",
-        "margin": "0 auto",
-        "padding": "1rem 1.5rem",
-        "display": "flex",
-        "alignItems": "center",
-        "justifyContent": "space-between",
-        "gap": "1.5rem"
+        "backgroundColor": "var(--color-bg-dark)",
+        "color": "var(--color-text-white)"
       },
       "children": [
         {
-          "tagName": "a",
-          "attributes": { "href": "/" },
+          "tagName": "div",
           "style": {
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "1.4rem",
-            "fontWeight": "700",
-            "color": "var(--color-text-primary)",
-            "textDecoration": "none",
-            "letterSpacing": "-0.02em"
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "padding": "0.5rem 1.5rem",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "gap": "1.4rem",
+            "fontSize": "0.72rem",
+            "fontWeight": "600",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.14em"
           },
           "children": [
             {
               "tagName": "span",
-              "style": { "color": "var(--color-primary)" },
-              "textContent": "◎ "
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.5rem",
+                "color": "var(--color-brand-bright)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.42rem",
+                    "height": "0.42rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-brand-bright)",
+                    "boxShadow": "0 0 0 3px rgba(38,208,124,0.22)"
+                  }
+                },
+                { "tagName": "span", "textContent": "Free shipping over $50" }
+              ]
             },
-            { "tagName": "span", "textContent": "${state.brand}" }
+            {
+              "tagName": "span",
+              "style": { "opacity": "0.32", "@--sm": { "display": "none" } },
+              "textContent": "•"
+            },
+            {
+              "tagName": "span",
+              "style": { "opacity": "0.82", "@--sm": { "display": "none" } },
+              "textContent": "Free first tune-up on every new bike"
+            },
+            {
+              "tagName": "span",
+              "style": { "opacity": "0.32", "@--md": { "display": "none" } },
+              "textContent": "•"
+            },
+            {
+              "tagName": "span",
+              "style": { "opacity": "0.82", "@--md": { "display": "none" } },
+              "textContent": "48-hour service turnaround"
+            }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "backgroundColor": "rgba(255,255,255,0.92)",
+        "backdropFilter": "blur(12px)",
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
         {
-          "tagName": "nav",
+          "tagName": "div",
           "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "padding": "0.85rem 1.5rem",
             "display": "flex",
             "alignItems": "center",
-            "gap": "1.75rem",
-            "@--sm": { "gap": "1rem" }
+            "gap": "1.5rem"
           },
           "children": [
             {
               "tagName": "a",
-              "attributes": { "href": "/products/" },
+              "attributes": { "href": "/", "aria-label": "Cadence Cycles home" },
               "style": {
-                "color": "var(--color-text-primary)",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.6rem",
                 "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
-                ":hover": { "color": "var(--color-primary)" }
+                "flexShrink": "0"
               },
-              "textContent": "Shop"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "2.15rem",
+                    "height": "2.15rem",
+                    "borderRadius": "0.6rem",
+                    "background": "linear-gradient(150deg, var(--color-brand-bright), var(--color-primary))",
+                    "color": "var(--color-text-white)",
+                    "fontSize": "1.2rem",
+                    "fontWeight": "800",
+                    "boxShadow": "0 8px 18px -8px rgba(10,157,84,0.7)"
+                  },
+                  "textContent": "◎"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "lineHeight": "1"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontSize": "1.28rem",
+                        "fontWeight": "800",
+                        "letterSpacing": "-0.03em",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "${state.brand}"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontSize": "0.58rem",
+                        "fontWeight": "700",
+                        "letterSpacing": "0.28em",
+                        "textTransform": "uppercase",
+                        "color": "var(--color-primary)",
+                        "marginTop": "0.24rem"
+                      },
+                      "textContent": "Cycles Co."
+                    }
+                  ]
+                }
+              ]
             },
             {
-              "tagName": "a",
-              "attributes": { "href": "/about/" },
+              "tagName": "nav",
               "style": {
-                "color": "var(--color-text-primary)",
-                "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
-                "@--sm": { "display": "none" },
-                ":hover": { "color": "var(--color-primary)" }
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "1.35rem",
+                "@--lg": { "display": "none" }
               },
-              "textContent": "About"
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/products/" },
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "textDecoration": "none",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "Road"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/products/" },
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "textDecoration": "none",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "Mountain"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/products/" },
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "textDecoration": "none",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "Gravel"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/products/" },
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "textDecoration": "none",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "Kids"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/products/" },
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.35rem",
+                    "color": "var(--color-sale)",
+                    "textDecoration": "none",
+                    "fontWeight": "700",
+                    "fontSize": "0.9rem",
+                    "transition": "opacity 0.15s",
+                    ":hover": { "opacity": "0.75" }
+                  },
+                  "textContent": "Sale"
+                }
+              ]
             },
             {
-              "tagName": "a",
-              "attributes": { "href": "/contact/" },
+              "tagName": "label",
               "style": {
-                "display": "inline-block",
-                "backgroundColor": "var(--color-primary)",
-                "color": "var(--color-text-white)",
-                "padding": "0.55rem 1.25rem",
+                "marginLeft": "auto",
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.55rem",
+                "flex": "0 1 320px",
+                "padding": "0 0.9rem",
+                "height": "2.5rem",
                 "borderRadius": "999px",
-                "textDecoration": "none",
-                "fontWeight": "600",
-                "fontSize": "0.95rem",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                "backgroundColor": "var(--color-bg-cream)",
+                "border": "1px solid var(--color-border)",
+                "transition": "border-color 0.15s",
+                "@--md": { "display": "none" },
+                ":focus-within": { "borderColor": "var(--color-primary)" }
               },
-              "textContent": "Visit Us"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": { "color": "var(--color-text-muted)", "fontSize": "0.95rem" },
+                  "textContent": "⌕"
+                },
+                {
+                  "tagName": "input",
+                  "attributes": {
+                    "type": "search",
+                    "name": "q",
+                    "placeholder": "Search bikes, gear…",
+                    "aria-label": "Search products"
+                  },
+                  "style": {
+                    "flex": "1",
+                    "minWidth": "0",
+                    "border": "none",
+                    "outline": "none",
+                    "background": "transparent",
+                    "fontFamily": "inherit",
+                    "fontSize": "0.9rem",
+                    "color": "var(--color-text-primary)"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/products/", "aria-label": "Search products" },
+              "style": {
+                "display": "none",
+                "marginLeft": "auto",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "width": "2.5rem",
+                "height": "2.5rem",
+                "borderRadius": "999px",
+                "border": "1px solid var(--color-border)",
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontSize": "1.05rem",
+                "@--md": { "display": "inline-flex" }
+              },
+              "textContent": "⌕"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/", "aria-label": "View cart" },
+              "style": {
+                "position": "relative",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.55rem",
+                "flexShrink": "0",
+                "padding": "0.55rem 1.1rem 0.55rem 0.95rem",
+                "borderRadius": "999px",
+                "backgroundColor": "var(--color-ink)",
+                "color": "var(--color-text-white)",
+                "textDecoration": "none",
+                "fontWeight": "700",
+                "fontSize": "0.9rem",
+                "transition": "transform 0.15s, background-color 0.15s",
+                ":hover": { "transform": "translateY(-1px)", "backgroundColor": "#000000" }
+              },
+              "children": [
+                { "tagName": "span", "style": { "fontSize": "1.1rem" }, "textContent": "🛒" },
+                {
+                  "tagName": "span",
+                  "style": { "@--sm": { "display": "none" } },
+                  "textContent": "Cart"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "minWidth": "1.25rem",
+                    "height": "1.25rem",
+                    "padding": "0 0.35rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-brand-bright)",
+                    "color": "var(--color-ink)",
+                    "fontSize": "0.72rem",
+                    "fontWeight": "800",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.cartCount}"
+                }
+              ]
             }
           ]
         }

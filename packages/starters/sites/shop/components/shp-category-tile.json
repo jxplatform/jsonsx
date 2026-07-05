@@ -1,0 +1,104 @@
+{
+  "tagName": "shp-category-tile",
+  "state": {
+    "icon": "",
+    "name": "",
+    "count": "",
+    "href": "/products/"
+  },
+  "style": { "display": "block", "minWidth": "0" },
+  "children": [
+    {
+      "tagName": "a",
+      "attributes": { "href": "${state.href}" },
+      "style": {
+        "position": "relative",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "0.75rem",
+        "height": "100%",
+        "padding": "1.35rem 1.25rem",
+        "borderRadius": "var(--radius)",
+        "backgroundColor": "var(--color-bg-white)",
+        "border": "1px solid var(--color-border)",
+        "textDecoration": "none",
+        "color": "var(--color-text-primary)",
+        "overflow": "hidden",
+        "transition": "border-color 0.18s, transform 0.18s, box-shadow 0.18s",
+        ":hover": {
+          "borderColor": "var(--color-primary)",
+          "transform": "translateY(-4px)",
+          "boxShadow": "var(--shadow-card)"
+        },
+        ":hover .cat-go": {
+          "backgroundColor": "var(--color-primary)",
+          "color": "var(--color-text-white)"
+        }
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "width": "3rem",
+            "height": "3rem",
+            "borderRadius": "0.75rem",
+            "backgroundColor": "var(--color-brand-tint)",
+            "fontSize": "1.55rem",
+            "lineHeight": "1"
+          },
+          "textContent": "${state.icon}"
+        },
+        {
+          "tagName": "div",
+          "style": { "marginTop": "auto" },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.15rem",
+                "fontWeight": "800",
+                "letterSpacing": "-0.01em"
+              },
+              "textContent": "${state.name}"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "marginTop": "0.15rem",
+                "fontSize": "0.85rem",
+                "fontWeight": "600",
+                "color": "var(--color-text-muted)"
+              },
+              "textContent": "${state.count}"
+            }
+          ]
+        },
+        {
+          "tagName": "span",
+          "attributes": { "class": "cat-go" },
+          "style": {
+            "position": "absolute",
+            "top": "1.35rem",
+            "right": "1.25rem",
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "width": "1.9rem",
+            "height": "1.9rem",
+            "borderRadius": "999px",
+            "backgroundColor": "var(--color-bg-cream)",
+            "color": "var(--color-text-primary)",
+            "fontSize": "0.9rem",
+            "fontWeight": "800",
+            "transition": "background-color 0.18s, color 0.18s"
+          },
+          "textContent": "→"
+        }
+      ]
+    }
+  ]
+}

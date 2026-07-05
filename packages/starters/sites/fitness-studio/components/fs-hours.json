@@ -9,19 +9,23 @@
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-cream)",
-    "border": "1px solid var(--color-border)",
+    "backgroundColor": "var(--color-ink)",
+    "color": "#ffffff",
     "borderRadius": "var(--radius)",
-    "padding": "2rem"
+    "padding": "2.2rem",
+    "overflow": "hidden"
   },
   "children": [
     {
       "tagName": "h3",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "1.4rem",
-        "fontWeight": "700",
-        "margin": "0 0 1.25rem"
+        "fontFamily": "var(--font-display)",
+        "fontSize": "1.7rem",
+        "fontWeight": "400",
+        "letterSpacing": "0.01em",
+        "textTransform": "uppercase",
+        "margin": "0 0 1.35rem",
+        "color": "#ffffff"
       },
       "textContent": "${state.heading}"
     },
@@ -30,14 +34,19 @@
       "style": {
         "display": "flex",
         "justifyContent": "space-between",
-        "padding": "0.6rem 0",
-        "borderBottom": "1px solid var(--color-border)"
+        "alignItems": "center",
+        "padding": "0.7rem 0",
+        "borderBottom": "1px solid rgba(255,255,255,0.12)"
       },
       "children": [
-        { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Monday – Friday" },
+        { "tagName": "span", "style": { "fontWeight": "600" }, "textContent": "Mon – Fri" },
         {
           "tagName": "span",
-          "style": { "color": "var(--color-text-muted)" },
+          "style": {
+            "color": "var(--color-ember)",
+            "fontWeight": "700",
+            "fontFamily": "var(--font-heading)"
+          },
           "textContent": "${state.weekdays}"
         }
       ]
@@ -47,14 +56,19 @@
       "style": {
         "display": "flex",
         "justifyContent": "space-between",
-        "padding": "0.6rem 0",
-        "borderBottom": "1px solid var(--color-border)"
+        "alignItems": "center",
+        "padding": "0.7rem 0",
+        "borderBottom": "1px solid rgba(255,255,255,0.12)"
       },
       "children": [
-        { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Saturday" },
+        { "tagName": "span", "style": { "fontWeight": "600" }, "textContent": "Saturday" },
         {
           "tagName": "span",
-          "style": { "color": "var(--color-text-muted)" },
+          "style": {
+            "color": "var(--color-ember)",
+            "fontWeight": "700",
+            "fontFamily": "var(--font-heading)"
+          },
           "textContent": "${state.saturday}"
         }
       ]
@@ -64,13 +78,18 @@
       "style": {
         "display": "flex",
         "justifyContent": "space-between",
-        "padding": "0.6rem 0"
+        "alignItems": "center",
+        "padding": "0.7rem 0"
       },
       "children": [
-        { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Sunday" },
+        { "tagName": "span", "style": { "fontWeight": "600" }, "textContent": "Sunday" },
         {
           "tagName": "span",
-          "style": { "color": "var(--color-text-muted)" },
+          "style": {
+            "color": "var(--color-ember)",
+            "fontWeight": "700",
+            "fontFamily": "var(--font-heading)"
+          },
           "textContent": "${state.sunday}"
         }
       ]
@@ -79,10 +98,10 @@
       "tagName": "p",
       "style": {
         "display": "${state.note ? 'block' : 'none'}",
-        "margin": "1.25rem 0 0",
+        "margin": "1.35rem 0 0",
         "fontSize": "0.85rem",
-        "color": "var(--color-text-muted)",
-        "fontStyle": "italic"
+        "color": "rgba(255,255,255,0.62)",
+        "lineHeight": "1.6"
       },
       "textContent": "${state.note}"
     }

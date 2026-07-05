@@ -5,8 +5,7 @@
     "label": ""
   },
   "style": {
-    "display": "block",
-    "textAlign": "center"
+    "display": "block"
   },
   "children": [
     {
@@ -14,10 +13,11 @@
       "style": {
         "fontFamily": "var(--font-heading)",
         "fontSize": "clamp(2.25rem, 5vw, 3rem)",
-        "fontWeight": "700",
+        "fontWeight": "800",
         "lineHeight": "1",
         "color": "var(--color-primary)",
-        "letterSpacing": "-0.02em"
+        "letterSpacing": "-0.03em",
+        "fontVariantNumeric": "tabular-nums"
       },
       "textContent": "${state.value}"
     },
@@ -25,11 +25,11 @@
       "tagName": "div",
       "style": {
         "marginTop": "0.5rem",
-        "fontSize": "0.9rem",
+        "fontSize": "0.85rem",
         "color": "var(--color-text-muted)",
         "textTransform": "uppercase",
         "letterSpacing": "0.08em",
-        "fontWeight": "500"
+        "fontWeight": "600"
       },
       "textContent": "${state.label}"
     }

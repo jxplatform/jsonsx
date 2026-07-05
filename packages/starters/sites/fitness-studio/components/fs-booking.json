@@ -1,0 +1,147 @@
+{
+  "tagName": "fs-booking",
+  "state": {
+    "heading": "Reserve your spot"
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "padding": "clamp(1.6rem, 4vw, 2.4rem)",
+    "boxShadow": "0 18px 44px -30px rgba(26,15,24,0.4)",
+    "& input": {
+      "width": "100%",
+      "padding": "0.85rem 1rem",
+      "border": "1px solid var(--color-border)",
+      "borderRadius": "var(--radius-sm)",
+      "fontSize": "1rem",
+      "fontFamily": "var(--font-body)",
+      "backgroundColor": "var(--color-bg-blush)",
+      "color": "var(--color-text-primary)",
+      "boxSizing": "border-box",
+      "transition": "border-color 0.15s, box-shadow 0.15s"
+    },
+    "& textarea": {
+      "width": "100%",
+      "padding": "0.85rem 1rem",
+      "border": "1px solid var(--color-border)",
+      "borderRadius": "var(--radius-sm)",
+      "fontSize": "1rem",
+      "fontFamily": "var(--font-body)",
+      "backgroundColor": "var(--color-bg-blush)",
+      "color": "var(--color-text-primary)",
+      "boxSizing": "border-box",
+      "resize": "vertical",
+      "transition": "border-color 0.15s, box-shadow 0.15s"
+    },
+    "& input:focus": {
+      "outline": "none",
+      "borderColor": "var(--color-primary)",
+      "boxShadow": "0 0 0 3px rgba(255,46,99,0.14)"
+    },
+    "& textarea:focus": {
+      "outline": "none",
+      "borderColor": "var(--color-primary)",
+      "boxShadow": "0 0 0 3px rgba(255,46,99,0.14)"
+    }
+  },
+  "children": [
+    {
+      "tagName": "form",
+      "attributes": { "action": "#", "method": "post" },
+      "style": { "display": "grid", "gap": "0.9rem" },
+      "children": [
+        {
+          "tagName": "h3",
+          "style": {
+            "fontFamily": "var(--font-display)",
+            "fontSize": "clamp(1.7rem, 3.5vw, 2.2rem)",
+            "fontWeight": "400",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.01em",
+            "margin": "0 0 0.4rem"
+          },
+          "textContent": "${state.heading}"
+        },
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "text",
+            "name": "name",
+            "placeholder": "Your name",
+            "required": "true",
+            "aria-label": "Your name"
+          }
+        },
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "email",
+            "name": "email",
+            "placeholder": "Email address",
+            "required": "true",
+            "aria-label": "Email address"
+          }
+        },
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "text",
+            "name": "class",
+            "placeholder": "Which class? e.g. Vinyasa Flow",
+            "aria-label": "Class you're interested in"
+          }
+        },
+        {
+          "tagName": "input",
+          "attributes": { "type": "date", "name": "date", "aria-label": "Preferred date" }
+        },
+        {
+          "tagName": "textarea",
+          "attributes": {
+            "name": "message",
+            "rows": "4",
+            "placeholder": "New to movement? Any injuries or goals we should know about?",
+            "aria-label": "Message"
+          }
+        },
+        {
+          "tagName": "button",
+          "attributes": { "type": "submit" },
+          "style": {
+            "justifySelf": "start",
+            "marginTop": "0.25rem",
+            "background": "var(--grad-hot)",
+            "color": "#ffffff",
+            "padding": "0.95rem 2.1rem",
+            "border": "none",
+            "borderRadius": "999px",
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "0.88rem",
+            "fontWeight": "800",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.06em",
+            "cursor": "pointer",
+            "boxShadow": "0 14px 32px -14px rgba(255,46,99,0.6)",
+            "transition": "transform 0.15s, box-shadow 0.15s",
+            ":hover": {
+              "transform": "translateY(-2px)",
+              "boxShadow": "0 20px 40px -14px rgba(255,46,99,0.7)"
+            }
+          },
+          "textContent": "Request a spot →"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.82rem",
+            "color": "var(--color-text-muted)",
+            "margin": "0.25rem 0 0"
+          },
+          "textContent": "This is a demo form. Wire it to your booking provider or email in pages/contact.md."
+        }
+      ]
+    }
+  ]
+}

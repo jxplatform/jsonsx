@@ -27,19 +27,46 @@
           "style": { "order": "${state.reverse ? '2' : '1'}" },
           "children": [
             {
-              "tagName": "img",
-              "attributes": {
-                "src": "${state.image}",
-                "alt": "${state.imageAlt}",
-                "loading": "lazy"
-              },
+              "tagName": "div",
               "style": {
-                "width": "100%",
-                "height": "auto",
-                "borderRadius": "var(--radius)",
-                "display": "block",
-                "boxShadow": "0 20px 55px rgba(23, 18, 43, 0.18)"
-              }
+                "position": "relative",
+                "borderRadius": "1.15rem",
+                "padding": "0.4rem",
+                "background": "linear-gradient(150deg, rgba(34,224,255,0.55), rgba(168,85,247,0.35) 45%, rgba(255,61,154,0.5))",
+                "boxShadow": "0 30px 70px -30px rgba(0,0,0,0.8), 0 0 80px -30px var(--glow-cyan)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "position": "relative",
+                    "borderRadius": "0.85rem",
+                    "overflow": "hidden",
+                    "aspectRatio": "3 / 2",
+                    "backgroundColor": "var(--color-bg-elev)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "img",
+                      "attributes": {
+                        "src": "${state.image}",
+                        "alt": "${state.imageAlt}",
+                        "width": "1600",
+                        "height": "1067",
+                        "loading": "lazy"
+                      },
+                      "style": {
+                        "position": "absolute",
+                        "inset": "0",
+                        "width": "100%",
+                        "height": "100%",
+                        "objectFit": "cover",
+                        "display": "block"
+                      }
+                    }
+                  ]
+                }
+              ]
             }
           ]
         },

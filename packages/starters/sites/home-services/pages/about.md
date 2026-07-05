@@ -2,8 +2,21 @@
 title: "About — Summit Heating & Cooling"
 ---
 
-:::::section{style.padding="clamp(3rem, 6vw, 4.5rem) 1.5rem" style.backgroundColor="var(--color-bg-cream)"}
-::hs-section-header{props.eyebrow="Our story" props.heading="Local, licensed, and here for the long haul" props.subheading="A family-run HVAC company keeping Northern Colorado comfortable since 2004."}
+:::::section{style.position="relative" style.overflow="hidden" style.backgroundColor="var(--color-bg-dark)" style.color="var(--color-text-white)" style.padding="clamp(3rem, 6vw, 4.5rem) 1.5rem"}
+::::div{style.position="absolute" style.top="0" style.left="0" style.right="0" style.height="6px" style.background="var(--hazard)"}
+::::
+
+::::div{style.maxWidth="var(--max-width-narrow)" style.margin="0 auto" style.textAlign="center" style.position="relative"}
+:::div{style.display="inline-flex" style.alignItems="center" style.gap="0.5rem" style.fontFamily="var(--font-heading)" style.textTransform="uppercase" style.letterSpacing="0.14em" style.fontSize="0.82rem" style.fontWeight="600" style.color="var(--color-primary)" style.marginBottom="1rem"}
+Our story
+:::
+
+# Local, licensed, here for the long haul
+
+:::div{style.fontSize="1.15rem" style.lineHeight="1.7" style.color="#cdd8e0" style.marginTop="1rem" style.maxWidth="52ch" style.marginLeft="auto" style.marginRight="auto"}
+A family-run HVAC company keeping Northern Colorado comfortable since 2004.
+:::
+::::
 :::::
 
 :::hs-intro{props.image="/images/about.jpg" props.imageAlt="A Summit Heating & Cooling technician and service van" props.reverse="true"}
@@ -14,6 +27,24 @@ Summit started with one van, one technician, and a simple promise: treat every h
 
 Our technicians are NATE-certified, background-checked, and trained on the equipment we install. We show up on time, protect your floors, explain what we find, and clean up before we leave. When we quote a price, that's the price.
 :::
+
+:::::section{style.padding="clamp(3.25rem, 7vw, 5rem) 1.5rem" style.backgroundColor="var(--color-bg-steel)"}
+::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
+:::div{style.display="inline-flex" style.alignItems="center" style.gap="0.5rem" style.fontFamily="var(--font-heading)" style.textTransform="uppercase" style.letterSpacing="0.14em" style.fontSize="0.82rem" style.fontWeight="600" style.color="var(--color-primary)" style.marginBottom="2rem"}
+Two decades of trust
+:::
+
+:::div{style.display="grid" style.gridTemplateColumns="repeat(4, 1fr)" style.gap="2rem" style.--md.gridTemplateColumns="repeat(2, 1fr)" style.--sm.gridTemplateColumns="1fr"}
+::hs-stat{props.icon="🏔️" props.value="20+" props.label="Years in business"}
+
+::hs-stat{props.icon="🔧" props.value="18,000+" props.label="Jobs completed"}
+
+::hs-stat{props.icon="👷" props.value="14" props.label="Certified technicians"}
+
+::hs-stat{props.icon="⭐" props.value="4.9" props.label="Average review rating"}
+:::
+::::
+:::::
 
 :::::section{style.padding="clamp(3.5rem, 8vw, 5rem) 1.5rem"}
 ::hs-section-header{props.eyebrow="What we stand for" props.heading="Three things we won't compromise on"}

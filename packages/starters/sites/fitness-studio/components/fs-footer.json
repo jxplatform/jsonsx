@@ -1,16 +1,16 @@
 {
   "tagName": "fs-footer",
   "state": {
-    "brand": "Ember Yoga & Fitness",
-    "tagline": "Yoga, pilates, and strength for every body — in a studio that feels like home.",
+    "brand": "EMBER",
+    "tagline": "Yoga, pilates, HIIT and strength for every body — small classes, big momentum.",
     "address": "412 Willow Avenue, Bridgewater",
     "phone": "(555) 240-7788"
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-dark)",
+    "backgroundColor": "var(--color-ink)",
     "color": "var(--color-text-white)",
-    "padding": "3.5rem 1.5rem 2rem"
+    "padding": "clamp(3rem, 6vw, 4.5rem) 1.5rem 2rem"
   },
   "children": [
     {
@@ -30,16 +30,42 @@
             {
               "tagName": "div",
               "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.35rem",
-                "fontWeight": "700",
-                "marginBottom": "0.75rem"
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.6rem",
+                "marginBottom": "1rem"
               },
-              "textContent": "${state.brand}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "1.5rem",
+                    "height": "1.5rem",
+                    "borderRadius": "50%",
+                    "background": "var(--grad)"
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.7rem",
+                    "letterSpacing": "0.02em",
+                    "color": "#ffffff",
+                    "lineHeight": "1"
+                  },
+                  "textContent": "${state.brand}"
+                }
+              ]
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.75", "maxWidth": "36ch" },
+              "style": {
+                "margin": "0",
+                "opacity": "0.72",
+                "maxWidth": "34ch",
+                "lineHeight": "1.7"
+              },
               "textContent": "${state.tagline}"
             }
           ]
@@ -50,11 +76,13 @@
             {
               "tagName": "div",
               "style": {
+                "fontFamily": "var(--font-heading)",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.12em",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "color": "var(--color-ember)",
+                "marginBottom": "0.9rem"
               },
               "textContent": "Visit"
             },
@@ -76,11 +104,13 @@
             {
               "tagName": "div",
               "style": {
+                "fontFamily": "var(--font-heading)",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.12em",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "color": "var(--color-ember)",
+                "marginBottom": "0.9rem"
               },
               "textContent": "Explore"
             },
@@ -89,22 +119,24 @@
               "attributes": { "href": "/classes/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
+                "color": "#ffffff",
                 "opacity": "0.85",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.4rem",
+                ":hover": { "opacity": "1", "color": "var(--color-ember)" }
               },
-              "textContent": "Classes"
+              "textContent": "Schedule"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/pricing/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
+                "color": "#ffffff",
                 "opacity": "0.85",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.4rem",
+                ":hover": { "opacity": "1", "color": "var(--color-ember)" }
               },
               "textContent": "Pricing"
             },
@@ -113,11 +145,12 @@
               "attributes": { "href": "/contact/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
+                "color": "#ffffff",
                 "opacity": "0.85",
-                "textDecoration": "none"
+                "textDecoration": "none",
+                ":hover": { "opacity": "1", "color": "var(--color-ember)" }
               },
-              "textContent": "Contact"
+              "textContent": "Book a Class"
             }
           ]
         }
@@ -127,11 +160,11 @@
       "tagName": "div",
       "style": {
         "maxWidth": "var(--max-width)",
-        "margin": "2.5rem auto 0",
+        "margin": "2.75rem auto 0",
         "paddingTop": "1.5rem",
-        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
+        "borderTop": "1px solid rgba(255,255,255,0.14)",
         "fontSize": "0.85rem",
-        "opacity": "0.6"
+        "opacity": "0.55"
       },
       "children": [
         {

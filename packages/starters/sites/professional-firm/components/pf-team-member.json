@@ -7,48 +7,53 @@
     "bio": ""
   },
   "style": {
-    "display": "block",
-    "backgroundColor": "var(--color-bg-white)",
-    "borderRadius": "var(--radius)",
-    "border": "1px solid var(--color-border)",
-    "overflow": "hidden",
-    "boxShadow": "0 4px 20px rgba(15,23,42,0.05)"
+    "display": "block"
   },
   "children": [
     {
-      "tagName": "img",
-      "attributes": {
-        "src": "${state.photo}",
-        "alt": "${state.name}",
-        "loading": "lazy"
-      },
-      "style": {
-        "width": "100%",
-        "aspectRatio": "4 / 5",
-        "objectFit": "cover",
-        "display": "block"
-      }
-    },
-    {
       "tagName": "div",
-      "style": { "padding": "1.5rem" },
+      "style": {
+        "position": "relative",
+        "borderTop": "1px solid var(--color-rule)",
+        "paddingTop": "1.25rem"
+      },
       "children": [
+        {
+          "tagName": "img",
+          "attributes": {
+            "src": "${state.photo}",
+            "alt": "${state.name}",
+            "loading": "lazy"
+          },
+          "style": {
+            "width": "100%",
+            "aspectRatio": "4 / 5",
+            "objectFit": "cover",
+            "display": "block",
+            "filter": "grayscale(1) contrast(1.02)",
+            "transition": "filter 0.3s"
+          }
+        },
         {
           "tagName": "h3",
           "style": {
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "1.25rem",
-            "fontWeight": "600",
-            "margin": "0 0 0.2rem"
+            "fontFamily": "var(--font-serif)",
+            "fontSize": "1.3rem",
+            "fontWeight": "500",
+            "margin": "1.1rem 0 0.15rem",
+            "color": "var(--color-ink)"
           },
           "textContent": "${state.name}"
         },
         {
           "tagName": "div",
           "style": {
-            "color": "var(--color-primary)",
+            "fontFamily": "var(--font-sans)",
+            "fontSize": "0.7rem",
             "fontWeight": "600",
-            "fontSize": "0.9rem",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.14em",
+            "color": "var(--color-accent)",
             "marginBottom": "0.75rem"
           },
           "textContent": "${state.role}"
@@ -58,9 +63,9 @@
           "style": {
             "display": "${state.bio ? 'block' : 'none'}",
             "margin": "0",
-            "color": "var(--color-text-muted)",
+            "color": "var(--color-muted)",
             "fontSize": "0.95rem",
-            "lineHeight": "1.65"
+            "lineHeight": "1.6"
           },
           "textContent": "${state.bio}"
         }

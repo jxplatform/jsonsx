@@ -8,32 +8,45 @@
   "$head": [
     {
       "tagName": "meta",
-      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+      "attributes": {
+        "name": "viewport",
+        "content": "width=device-width, initial-scale=1"
+      }
     },
     {
       "tagName": "meta",
       "attributes": {
         "name": "description",
-        "content": "A boutique yoga and fitness studio offering vinyasa, pilates, strength, and HIIT — small classes, all levels welcome."
+        "content": "Ember is a boutique yoga & fitness studio — vinyasa, pilates, HIIT and strength in small, all-levels classes. See the weekly schedule and book a class."
       }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+      "attributes": {
+        "rel": "icon",
+        "href": "/favicon.svg"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.googleapis.com"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.gstatic.com",
+        "crossorigin": ""
+      }
     },
     {
       "tagName": "link",
       "attributes": {
         "rel": "stylesheet",
-        "href": "https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap"
+        "href": "https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap"
       }
     }
   ],
@@ -44,27 +57,70 @@
     "--sm": "(max-width: 640px)"
   },
   "style": {
-    "--color-primary": "#db2777",
-    "--color-primary-hover": "#be185d",
-    "--color-ink": "#1f1729",
-    "--color-bg-dark": "#241a2b",
-    "--color-bg-cream": "#fdf2f8",
+    "--color-primary": "#ff2e63",
+    "--color-primary-hover": "#e01152",
+    "--color-ember": "#ff8c42",
+    "--color-magenta": "#d6157a",
+    "--color-ink": "#1a0f18",
+    "--color-ink-band": "#20111c",
+    "--color-bg-dark": "#20111c",
     "--color-bg-white": "#ffffff",
-    "--color-text-primary": "#1f1729",
+    "--color-bg-blush": "#fff4ef",
+    "--color-bg-peach": "#ffe7dc",
+    "--color-bg-cream": "#fff4ef",
+    "--color-text-primary": "#1a0f18",
     "--color-text-white": "#ffffff",
-    "--color-text-muted": "#6b6472",
-    "--color-border": "#f0e4ec",
-    "--color-accent": "#0d9488",
-    "--font-heading": "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--color-text-muted": "#7c6a74",
+    "--color-border": "#f3ded4",
+    "--color-border-dark": "rgba(255,255,255,0.14)",
+    "--color-accent": "#ff8c42",
+    "--color-yoga": "#ff2e63",
+    "--color-strength": "#7b2ff7",
+    "--color-pilates": "#ff8c42",
+    "--color-hiit": "#d6157a",
+    "--grad": "linear-gradient(103deg, #ff2e63 0%, #ff6a3d 52%, #ffb03a 100%)",
+    "--grad-hot": "linear-gradient(120deg, #d6157a 0%, #ff2e63 55%, #ff8c42 100%)",
+    "--duo-shadow": "#280a22",
+    "--font-display": "'Anton', 'Archivo', system-ui, -apple-system, sans-serif",
+    "--font-heading": "'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif",
+    "--font-body": "'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
     "--max-width": "1200px",
     "--max-width-narrow": "820px",
-    "--radius": "0.75rem",
+    "--radius": "1.1rem",
+    "--radius-sm": "0.7rem",
     "margin": "0",
     "padding": "0",
-    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "fontFamily": "var(--font-body)",
     "lineHeight": "1.6",
     "color": "var(--color-text-primary)",
-    "backgroundColor": "var(--color-bg-white)"
+    "backgroundColor": "var(--color-bg-white)",
+    "h1": {
+      "fontFamily": "var(--font-heading)",
+      "color": "var(--color-text-primary)"
+    },
+    "h2": {
+      "fontFamily": "var(--font-heading)",
+      "color": "var(--color-text-primary)"
+    },
+    "h3": {
+      "fontFamily": "var(--font-heading)",
+      "color": "var(--color-text-primary)"
+    },
+    "h4": {
+      "fontFamily": "var(--font-heading)",
+      "color": "var(--color-text-primary)"
+    },
+    "strong": {
+      "color": "var(--color-text-primary)",
+      "fontWeight": "700"
+    },
+    "a": {
+      "color": "var(--color-primary)"
+    },
+    "::selection": {
+      "backgroundColor": "var(--color-primary)",
+      "color": "#ffffff"
+    }
   },
   "imports": {
     "Markdown": "@jxsuite/parser/Markdown.class.json",
@@ -74,7 +130,12 @@
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
     "formats": ["webp", "avif"],
-    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "quality": {
+      "webp": 80,
+      "avif": 65,
+      "jpeg": 80,
+      "png": 80
+    },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
@@ -85,12 +146,24 @@
       "schema": {
         "type": "object",
         "properties": {
-          "name": { "type": "string" },
-          "level": { "type": "string" },
-          "time": { "type": "string" },
-          "instructor": { "type": "string" },
-          "focus": { "type": "string" },
-          "order": { "type": "number" }
+          "name": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string"
+          },
+          "instructor": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "string"
+          },
+          "order": {
+            "type": "number"
+          }
         },
         "required": ["name", "level", "time", "instructor"]
       }

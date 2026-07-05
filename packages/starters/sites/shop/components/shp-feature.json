@@ -11,8 +11,12 @@
     "backgroundColor": "var(--color-bg-white)",
     "borderRadius": "var(--radius)",
     "border": "1px solid var(--color-border)",
-    "transition": "border-color 0.15s, transform 0.15s",
-    ":hover": { "borderColor": "var(--color-primary)", "transform": "translateY(-3px)" }
+    "transition": "border-color 0.15s, transform 0.15s, box-shadow 0.15s",
+    ":hover": {
+      "borderColor": "var(--color-primary)",
+      "transform": "translateY(-4px)",
+      "boxShadow": "var(--shadow-card)"
+    }
   },
   "children": [
     {
@@ -23,10 +27,10 @@
         "display": "flex",
         "alignItems": "center",
         "justifyContent": "center",
-        "borderRadius": "0.6rem",
-        "backgroundColor": "rgba(22, 163, 74, 0.1)",
+        "borderRadius": "0.7rem",
+        "backgroundColor": "var(--color-brand-tint)",
         "fontSize": "1.5rem",
-        "marginBottom": "1rem",
+        "marginBottom": "1.1rem",
         "lineHeight": "1"
       },
       "textContent": "${state.icon}"
@@ -35,8 +39,9 @@
       "tagName": "h3",
       "style": {
         "fontFamily": "var(--font-heading)",
-        "fontSize": "1.25rem",
-        "fontWeight": "600",
+        "fontSize": "1.28rem",
+        "fontWeight": "800",
+        "letterSpacing": "-0.01em",
         "margin": "0 0 0.5rem"
       },
       "textContent": "${state.title}"

@@ -21,11 +21,11 @@
   },
   "children": [
     {
-      "tagName": "article",
+      "tagName": "div",
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "2.5rem 1.5rem clamp(3rem, 6vw, 4.5rem)"
+        "padding": "1.75rem 1.5rem clamp(3rem, 6vw, 4.5rem)"
       },
       "children": [
         {
@@ -35,11 +35,12 @@
             "display": "inline-flex",
             "alignItems": "center",
             "gap": "0.5rem",
-            "color": "var(--color-primary)",
+            "color": "var(--color-text-muted)",
             "textDecoration": "none",
-            "fontWeight": "700",
-            "marginBottom": "1.75rem",
-            ":hover": { "textDecoration": "underline" }
+            "fontWeight": "600",
+            "fontSize": "0.9rem",
+            "marginBottom": "1.5rem",
+            ":hover": { "color": "var(--color-primary)" }
           },
           "textContent": "← All listings"
         },
@@ -58,28 +59,68 @@
               "tagName": "div",
               "children": [
                 {
-                  "tagName": "p",
+                  "tagName": "div",
                   "style": {
                     "display": "flex",
                     "alignItems": "center",
-                    "gap": "0.4rem",
-                    "margin": "0 0 0.5rem",
-                    "color": "var(--color-text-muted)",
-                    "fontWeight": "600"
+                    "gap": "0.75rem",
+                    "marginBottom": "0.75rem"
                   },
                   "children": [
-                    { "tagName": "span", "textContent": "📍" },
-                    { "tagName": "span", "textContent": "${state.listing.data.city}" }
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "display": "inline-flex",
+                        "alignItems": "center",
+                        "gap": "0.4rem",
+                        "backgroundColor": "var(--color-teal-tint)",
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700",
+                        "fontSize": "0.74rem",
+                        "letterSpacing": "0.04em",
+                        "textTransform": "uppercase",
+                        "padding": "0.3rem 0.7rem",
+                        "borderRadius": "999px",
+                        "border": "1px solid var(--color-accent-soft)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "width": "0.4rem",
+                            "height": "0.4rem",
+                            "borderRadius": "999px",
+                            "backgroundColor": "var(--color-accent-bright)"
+                          }
+                        },
+                        { "tagName": "span", "textContent": "${state.listing.data.status}" }
+                      ]
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "display": "inline-flex",
+                        "alignItems": "center",
+                        "gap": "0.35rem",
+                        "color": "var(--color-text-muted)",
+                        "fontWeight": "600",
+                        "fontSize": "0.92rem"
+                      },
+                      "children": [
+                        { "tagName": "span", "textContent": "📍" },
+                        { "tagName": "span", "textContent": "${state.listing.data.city}" }
+                      ]
+                    }
                   ]
                 },
                 {
                   "tagName": "h1",
                   "style": {
-                    "fontFamily": "var(--font-heading)",
+                    "fontFamily": "var(--font-display)",
                     "fontSize": "clamp(2rem, 4vw, 3rem)",
-                    "fontWeight": "800",
-                    "letterSpacing": "-0.03em",
-                    "lineHeight": "1.1",
+                    "fontWeight": "500",
+                    "letterSpacing": "-0.02em",
+                    "lineHeight": "1.05",
                     "margin": "0",
                     "color": "var(--color-text-primary)"
                   },
@@ -89,14 +130,32 @@
             },
             {
               "tagName": "div",
-              "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "clamp(1.75rem, 3.5vw, 2.5rem)",
-                "fontWeight": "800",
-                "color": "var(--color-primary)",
-                "whiteSpace": "nowrap"
-              },
-              "textContent": "$${Number(state.listing.data.price).toLocaleString('en-US')}"
+              "style": { "textAlign": "right" },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "clamp(1.75rem, 3.5vw, 2.5rem)",
+                    "fontWeight": "800",
+                    "letterSpacing": "-0.02em",
+                    "color": "var(--color-text-primary)",
+                    "whiteSpace": "nowrap",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "$${Number(state.listing.data.price).toLocaleString('en-US')}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontSize": "0.85rem",
+                    "color": "var(--color-text-muted)",
+                    "fontWeight": "600",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "$${Math.round(Number(state.listing.data.price)/Number(state.listing.data.sqft)).toLocaleString('en-US')} / sqft"
+                }
+              ]
             }
           ]
         },
@@ -116,7 +175,7 @@
               "attributes": {
                 "src": "${state.listing.data.image}",
                 "alt": "${state.listing.data.Title}",
-                "loading": "lazy"
+                "loading": "eager"
               },
               "style": {
                 "width": "100%",
@@ -124,8 +183,8 @@
                 "gridRow": "span 2",
                 "objectFit": "cover",
                 "borderRadius": "var(--radius)",
-                "minHeight": "280px",
-                "@--sm": { "gridRow": "auto", "minHeight": "220px" }
+                "minHeight": "300px",
+                "@--sm": { "gridRow": "auto", "minHeight": "230px" }
               }
             },
             {
@@ -140,7 +199,7 @@
                 "height": "100%",
                 "objectFit": "cover",
                 "borderRadius": "var(--radius)",
-                "minHeight": "135px"
+                "minHeight": "145px"
               }
             },
             {
@@ -155,7 +214,7 @@
                 "height": "100%",
                 "objectFit": "cover",
                 "borderRadius": "var(--radius)",
-                "minHeight": "135px"
+                "minHeight": "145px"
               }
             }
           ]
@@ -164,151 +223,392 @@
           "tagName": "div",
           "style": {
             "display": "grid",
-            "gridTemplateColumns": "repeat(4, 1fr)",
-            "gap": "1rem",
-            "padding": "1.5rem",
-            "backgroundColor": "var(--color-bg-cream)",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "marginBottom": "2.5rem",
-            "@--sm": { "gridTemplateColumns": "repeat(2, 1fr)" }
+            "gridTemplateColumns": "1.6fr 1fr",
+            "gap": "clamp(2rem, 4vw, 3rem)",
+            "alignItems": "start",
+            "@--md": { "gridTemplateColumns": "1fr" }
           },
           "children": [
             {
               "tagName": "div",
-              "style": { "textAlign": "center" },
               "children": [
                 {
                   "tagName": "div",
                   "style": {
-                    "fontFamily": "var(--font-heading)",
-                    "fontSize": "1.6rem",
-                    "fontWeight": "800",
-                    "color": "var(--color-text-primary)"
+                    "display": "grid",
+                    "gridTemplateColumns": "repeat(3, 1fr)",
+                    "gap": "0",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)",
+                    "overflow": "hidden",
+                    "marginBottom": "2.5rem",
+                    "@--sm": { "gridTemplateColumns": "repeat(2, 1fr)" }
                   },
-                  "textContent": "${state.listing.data.beds}"
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "padding": "1.25rem",
+                        "borderRight": "1px solid var(--color-border)",
+                        "borderBottom": "1px solid var(--color-border)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontFamily": "var(--font-heading)",
+                            "fontSize": "1.4rem",
+                            "fontWeight": "800",
+                            "color": "var(--color-text-primary)",
+                            "fontVariantNumeric": "tabular-nums"
+                          },
+                          "textContent": "${state.listing.data.beds}"
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontSize": "0.8rem",
+                            "color": "var(--color-text-muted)",
+                            "fontWeight": "600",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.05em",
+                            "marginTop": "0.2rem"
+                          },
+                          "textContent": "Bedrooms"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "padding": "1.25rem",
+                        "borderRight": "1px solid var(--color-border)",
+                        "borderBottom": "1px solid var(--color-border)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontFamily": "var(--font-heading)",
+                            "fontSize": "1.4rem",
+                            "fontWeight": "800",
+                            "color": "var(--color-text-primary)",
+                            "fontVariantNumeric": "tabular-nums"
+                          },
+                          "textContent": "${state.listing.data.baths}"
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontSize": "0.8rem",
+                            "color": "var(--color-text-muted)",
+                            "fontWeight": "600",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.05em",
+                            "marginTop": "0.2rem"
+                          },
+                          "textContent": "Bathrooms"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "padding": "1.25rem",
+                        "borderBottom": "1px solid var(--color-border)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontFamily": "var(--font-heading)",
+                            "fontSize": "1.4rem",
+                            "fontWeight": "800",
+                            "color": "var(--color-text-primary)",
+                            "fontVariantNumeric": "tabular-nums"
+                          },
+                          "textContent": "${Number(state.listing.data.sqft).toLocaleString('en-US')}"
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontSize": "0.8rem",
+                            "color": "var(--color-text-muted)",
+                            "fontWeight": "600",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.05em",
+                            "marginTop": "0.2rem"
+                          },
+                          "textContent": "Sq ft"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "padding": "1.25rem",
+                        "borderRight": "1px solid var(--color-border)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontFamily": "var(--font-heading)",
+                            "fontSize": "1.4rem",
+                            "fontWeight": "800",
+                            "color": "var(--color-primary)",
+                            "fontVariantNumeric": "tabular-nums"
+                          },
+                          "textContent": "$${Math.round(Number(state.listing.data.price)/Number(state.listing.data.sqft)).toLocaleString('en-US')}"
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontSize": "0.8rem",
+                            "color": "var(--color-text-muted)",
+                            "fontWeight": "600",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.05em",
+                            "marginTop": "0.2rem"
+                          },
+                          "textContent": "Per sq ft"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "padding": "1.25rem",
+                        "borderRight": "1px solid var(--color-border)"
+                      },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontFamily": "var(--font-heading)",
+                            "fontSize": "1.4rem",
+                            "fontWeight": "800",
+                            "color": "var(--color-text-primary)"
+                          },
+                          "textContent": "Single-family"
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontSize": "0.8rem",
+                            "color": "var(--color-text-muted)",
+                            "fontWeight": "600",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.05em",
+                            "marginTop": "0.2rem"
+                          },
+                          "textContent": "Property type"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "padding": "1.25rem" },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontFamily": "var(--font-heading)",
+                            "fontSize": "1.4rem",
+                            "fontWeight": "800",
+                            "color": "var(--color-text-primary)"
+                          },
+                          "textContent": "${state.listing.data.city}"
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontSize": "0.8rem",
+                            "color": "var(--color-text-muted)",
+                            "fontWeight": "600",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.05em",
+                            "marginTop": "0.2rem"
+                          },
+                          "textContent": "Location"
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
-                  "tagName": "div",
+                  "tagName": "h2",
                   "style": {
-                    "fontSize": "0.85rem",
-                    "color": "var(--color-text-muted)",
-                    "fontWeight": "600"
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.6rem",
+                    "fontWeight": "500",
+                    "letterSpacing": "-0.01em",
+                    "margin": "0 0 1rem"
                   },
-                  "textContent": "Bedrooms"
+                  "textContent": "About this home"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "1.08rem",
+                    "lineHeight": "1.8",
+                    "color": "var(--color-text-secondary)",
+                    "margin": "0 0 1rem"
+                  },
+                  "textContent": "Set in the heart of ${state.listing.data.city}, ${state.listing.data.Title} offers ${state.listing.data.beds} bedrooms and ${state.listing.data.baths} bathrooms across ${Number(state.listing.data.sqft).toLocaleString('en-US')} thoughtfully finished square feet. Sunlit living spaces, an updated kitchen, and easy access to schools, parks, and the waterfront make this a home you can move right into."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "1.08rem",
+                    "lineHeight": "1.8",
+                    "color": "var(--color-text-muted)",
+                    "margin": "0"
+                  },
+                  "textContent": "Want to see it in person? Our team can arrange a private showing this week."
                 }
               ]
             },
             {
-              "tagName": "div",
-              "style": { "textAlign": "center" },
-              "children": [
-                {
-                  "tagName": "div",
-                  "style": {
-                    "fontFamily": "var(--font-heading)",
-                    "fontSize": "1.6rem",
-                    "fontWeight": "800",
-                    "color": "var(--color-text-primary)"
-                  },
-                  "textContent": "${state.listing.data.baths}"
-                },
-                {
-                  "tagName": "div",
-                  "style": {
-                    "fontSize": "0.85rem",
-                    "color": "var(--color-text-muted)",
-                    "fontWeight": "600"
-                  },
-                  "textContent": "Bathrooms"
-                }
-              ]
-            },
-            {
-              "tagName": "div",
-              "style": { "textAlign": "center" },
-              "children": [
-                {
-                  "tagName": "div",
-                  "style": {
-                    "fontFamily": "var(--font-heading)",
-                    "fontSize": "1.6rem",
-                    "fontWeight": "800",
-                    "color": "var(--color-text-primary)"
-                  },
-                  "textContent": "${Number(state.listing.data.sqft).toLocaleString('en-US')}"
-                },
-                {
-                  "tagName": "div",
-                  "style": {
-                    "fontSize": "0.85rem",
-                    "color": "var(--color-text-muted)",
-                    "fontWeight": "600"
-                  },
-                  "textContent": "Square feet"
-                }
-              ]
-            },
-            {
-              "tagName": "div",
-              "style": { "textAlign": "center" },
-              "children": [
-                {
-                  "tagName": "div",
-                  "style": {
-                    "fontFamily": "var(--font-heading)",
-                    "fontSize": "1.6rem",
-                    "fontWeight": "800",
-                    "color": "var(--color-text-primary)"
-                  },
-                  "textContent": "${state.listing.data.city}"
-                },
-                {
-                  "tagName": "div",
-                  "style": {
-                    "fontSize": "0.85rem",
-                    "color": "var(--color-text-muted)",
-                    "fontWeight": "600"
-                  },
-                  "textContent": "Location"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "tagName": "section",
-          "style": { "maxWidth": "var(--max-width-narrow)" },
-          "children": [
-            {
-              "tagName": "h2",
+              "tagName": "aside",
               "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.5rem",
-                "fontWeight": "700",
-                "margin": "0 0 1rem"
+                "position": "sticky",
+                "top": "5rem",
+                "backgroundColor": "var(--color-bg-white)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius-lg)",
+                "boxShadow": "var(--shadow-card)",
+                "padding": "1.5rem",
+                "@--md": { "position": "static" }
               },
-              "textContent": "About this home"
-            },
-            {
-              "tagName": "p",
-              "style": {
-                "fontSize": "1.08rem",
-                "lineHeight": "1.8",
-                "color": "var(--color-text-primary)",
-                "margin": "0 0 1rem"
-              },
-              "textContent": "Set in the heart of ${state.listing.data.city}, ${state.listing.data.Title} offers ${state.listing.data.beds} bedrooms and ${state.listing.data.baths} bathrooms across ${Number(state.listing.data.sqft).toLocaleString('en-US')} thoughtfully finished square feet. Sunlit living spaces, an updated kitchen, and easy access to schools, parks, and the waterfront make this a home you can move right into."
-            },
-            {
-              "tagName": "p",
-              "style": {
-                "fontSize": "1.08rem",
-                "lineHeight": "1.8",
-                "color": "var(--color-text-muted)",
-                "margin": "0"
-              },
-              "textContent": "Want to see it in person? Our team can arrange a private showing this week."
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.75rem",
+                    "fontWeight": "800",
+                    "letterSpacing": "-0.02em",
+                    "color": "var(--color-text-primary)",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "$${Number(state.listing.data.price).toLocaleString('en-US')}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "gap": "0.75rem",
+                    "margin": "0.75rem 0 1.25rem",
+                    "fontSize": "0.9rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-text-secondary)",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "children": [
+                    { "tagName": "span", "textContent": "${state.listing.data.beds} bd" },
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-border-strong)" },
+                      "textContent": "·"
+                    },
+                    { "tagName": "span", "textContent": "${state.listing.data.baths} ba" },
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-border-strong)" },
+                      "textContent": "·"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "${Number(state.listing.data.sqft).toLocaleString('en-US')} sqft"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/contact/" },
+                  "style": {
+                    "display": "block",
+                    "textAlign": "center",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.85rem 1.25rem",
+                    "borderRadius": "999px",
+                    "fontWeight": "700",
+                    "fontSize": "0.98rem",
+                    "textDecoration": "none",
+                    "transition": "background-color 0.15s",
+                    ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                  },
+                  "textContent": "Book a private showing"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "0.85rem",
+                    "marginTop": "1.5rem",
+                    "paddingTop": "1.5rem",
+                    "borderTop": "1px solid var(--color-border)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "img",
+                      "attributes": {
+                        "src": "/images/agent-1.jpg",
+                        "alt": "Priya Anand",
+                        "loading": "lazy",
+                        "width": "56",
+                        "height": "56"
+                      },
+                      "style": {
+                        "width": "3.25rem",
+                        "height": "3.25rem",
+                        "borderRadius": "999px",
+                        "objectFit": "cover"
+                      }
+                    },
+                    {
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": { "fontWeight": "700", "fontSize": "0.95rem" },
+                          "textContent": "Priya Anand"
+                        },
+                        {
+                          "tagName": "div",
+                          "style": { "fontSize": "0.82rem", "color": "var(--color-text-muted)" },
+                          "textContent": "Principal Broker"
+                        },
+                        {
+                          "tagName": "a",
+                          "attributes": { "href": "tel:+15552047781" },
+                          "style": {
+                            "fontSize": "0.85rem",
+                            "color": "var(--color-primary)",
+                            "fontWeight": "600",
+                            "textDecoration": "none",
+                            "fontVariantNumeric": "tabular-nums"
+                          },
+                          "textContent": "(555) 204-7781"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "marginTop": "1.25rem",
+                    "fontSize": "0.78rem",
+                    "color": "var(--color-text-muted)",
+                    "lineHeight": "1.5"
+                  },
+                  "textContent": "Listed by Northshore Realty · Equal Housing Opportunity"
+                }
+              ]
             }
           ]
         }
@@ -319,8 +619,10 @@
       "$props": {
         "heading": "Book a private showing",
         "text": "Reach out and we'll set up a walkthrough of this home at a time that works for you.",
-        "cta": "Contact an Agent",
-        "ctaHref": "/contact/"
+        "cta": "Contact an agent",
+        "ctaHref": "/contact/",
+        "cta2": "Back to listings",
+        "cta2Href": "/listings/"
       }
     }
   ]

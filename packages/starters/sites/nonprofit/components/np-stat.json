@@ -3,33 +3,53 @@
   "state": {
     "number": "",
     "label": "",
-    "note": ""
+    "note": "",
+    "icon": ""
   },
   "style": {
-    "display": "block",
-    "textAlign": "center",
-    "padding": "0.5rem"
+    "display": "flex",
+    "flexDirection": "column",
+    "alignItems": "flex-start",
+    "gap": "0.35rem",
+    "padding": "1.6rem 1.6rem 1.75rem",
+    "backgroundColor": "var(--color-bg-white)",
+    "borderRadius": "var(--radius)",
+    "boxShadow": "var(--shadow-card)"
   },
   "children": [
     {
+      "tagName": "span",
+      "style": {
+        "display": "${state.icon ? 'inline-flex' : 'none'}",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "width": "2.6rem",
+        "height": "2.6rem",
+        "borderRadius": "999px",
+        "backgroundColor": "var(--color-primary-soft)",
+        "fontSize": "1.3rem",
+        "marginBottom": "0.5rem"
+      },
+      "textContent": "${state.icon}"
+    },
+    {
       "tagName": "div",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "clamp(2.5rem, 6vw, 3.75rem)",
+        "fontFamily": "var(--font-display)",
+        "fontSize": "clamp(2.4rem, 5vw, 3.4rem)",
         "fontWeight": "700",
         "lineHeight": "1",
-        "color": "var(--color-accent)",
-        "letterSpacing": "-0.02em"
+        "letterSpacing": "-0.02em",
+        "color": "var(--color-primary)"
       },
       "textContent": "${state.number}"
     },
     {
       "tagName": "div",
       "style": {
-        "margin": "0.6rem 0 0",
-        "fontWeight": "600",
-        "fontSize": "1.05rem",
-        "color": "inherit"
+        "fontWeight": "800",
+        "fontSize": "1.02rem",
+        "color": "var(--color-text-primary)"
       },
       "textContent": "${state.label}"
     },
@@ -37,9 +57,10 @@
       "tagName": "p",
       "style": {
         "display": "${state.note ? 'block' : 'none'}",
-        "margin": "0.35rem 0 0",
-        "fontSize": "0.9rem",
-        "opacity": "0.75",
+        "margin": "0.15rem 0 0",
+        "fontSize": "0.92rem",
+        "fontWeight": "600",
+        "color": "var(--color-text-muted)",
         "lineHeight": "1.55"
       },
       "textContent": "${state.note}"

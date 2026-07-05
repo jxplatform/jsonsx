@@ -1,184 +1,366 @@
 {
   "tagName": "shp-product-filter",
   "state": {
-    "category": "all"
+    "category": "all",
+    "visibleCount": {
+      "$prototype": "Function",
+      "body": "return ({ all: 8, Road: 2, Mountain: 2, Gravel: 1, Kids: 1, Accessories: 2 })[state.category];"
+    },
+    "setAll": {
+      "$expression": { "operator": "=", "target": { "$ref": "#/state/category" }, "value": "all" }
+    },
+    "setRoad": {
+      "$expression": { "operator": "=", "target": { "$ref": "#/state/category" }, "value": "Road" }
+    },
+    "setMountain": {
+      "$expression": {
+        "operator": "=",
+        "target": { "$ref": "#/state/category" },
+        "value": "Mountain"
+      }
+    },
+    "setGravel": {
+      "$expression": {
+        "operator": "=",
+        "target": { "$ref": "#/state/category" },
+        "value": "Gravel"
+      }
+    },
+    "setKids": {
+      "$expression": { "operator": "=", "target": { "$ref": "#/state/category" }, "value": "Kids" }
+    },
+    "setAccessories": {
+      "$expression": {
+        "operator": "=",
+        "target": { "$ref": "#/state/category" },
+        "value": "Accessories"
+      }
+    }
   },
-  "style": {
-    "display": "block",
-    "maxWidth": "var(--max-width)",
-    "margin": "0 auto 2rem",
-    "padding": "0 1.5rem"
-  },
+  "style": { "display": "block", "minWidth": "0" },
   "children": [
     {
       "tagName": "style",
-      "textContent": "${state.category === 'all' ? '' : '#shop-grid > div[data-category]{display:none} #shop-grid > div[data-category=\"' + state.category + '\"]{display:block}'}"
+      "textContent": "${state.category === 'all' ? '' : '#shop-grid > shp-product-card[data-category]{display:none} #shop-grid > shp-product-card[data-category=\"' + state.category + '\"]{display:block}'}"
     },
     {
-      "tagName": "div",
+      "tagName": "aside",
       "style": {
-        "display": "flex",
-        "flexWrap": "wrap",
-        "gap": "0.6rem",
-        "alignItems": "center",
-        "justifyContent": "center"
+        "position": "sticky",
+        "top": "7rem",
+        "backgroundColor": "var(--color-bg-white)",
+        "border": "1px solid var(--color-border)",
+        "borderRadius": "var(--radius-lg)",
+        "boxShadow": "var(--shadow-card)",
+        "padding": "1.4rem",
+        "@--md": { "position": "static" }
       },
       "children": [
         {
-          "tagName": "button",
-          "textContent": "All bikes",
-          "onclick": {
-            "$expression": {
-              "operator": "=",
-              "target": { "$ref": "#/state/category" },
-              "value": "all"
-            }
-          },
+          "tagName": "div",
           "style": {
-            "cursor": "pointer",
-            "fontFamily": "inherit",
-            "fontSize": "0.92rem",
-            "fontWeight": "600",
-            "padding": "0.55rem 1.15rem",
-            "borderRadius": "999px",
-            "border": "1px solid var(--color-border)",
-            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
-            "backgroundColor": "${state.category === 'all' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-            "color": "${state.category === 'all' ? '#ffffff' : 'var(--color-text-primary)'}",
-            "borderColor": "${state.category === 'all' ? 'var(--color-primary)' : 'var(--color-border)'}"
-          }
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "paddingBottom": "1rem",
+            "marginBottom": "1.1rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.5rem",
+                "fontFamily": "var(--font-heading)",
+                "fontWeight": "800",
+                "fontSize": "1.05rem",
+                "letterSpacing": "-0.01em"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": { "color": "var(--color-primary)" },
+                  "textContent": "⚑"
+                },
+                { "tagName": "span", "textContent": "Filter" }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.35rem",
+                "padding": "0.28rem 0.65rem",
+                "borderRadius": "999px",
+                "backgroundColor": "var(--color-brand-tint)",
+                "color": "var(--color-primary)",
+                "fontWeight": "800",
+                "fontSize": "0.8rem",
+                "fontVariantNumeric": "tabular-nums"
+              },
+              "children": [
+                { "tagName": "span", "textContent": "${state.visibleCount}" },
+                {
+                  "tagName": "span",
+                  "style": { "fontWeight": "600", "color": "var(--color-text-muted)" },
+                  "textContent": "of 8"
+                }
+              ]
+            }
+          ]
         },
         {
-          "tagName": "button",
-          "textContent": "Road",
-          "onclick": {
-            "$expression": {
-              "operator": "=",
-              "target": { "$ref": "#/state/category" },
-              "value": "Road"
-            }
-          },
+          "tagName": "div",
           "style": {
-            "cursor": "pointer",
-            "fontFamily": "inherit",
-            "fontSize": "0.92rem",
-            "fontWeight": "600",
-            "padding": "0.55rem 1.15rem",
-            "borderRadius": "999px",
-            "border": "1px solid var(--color-border)",
-            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
-            "backgroundColor": "${state.category === 'Road' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-            "color": "${state.category === 'Road' ? '#ffffff' : 'var(--color-text-primary)'}",
-            "borderColor": "${state.category === 'Road' ? 'var(--color-primary)' : 'var(--color-border)'}"
-          }
+            "textTransform": "uppercase",
+            "letterSpacing": "0.1em",
+            "fontSize": "0.7rem",
+            "fontWeight": "700",
+            "color": "var(--color-text-muted)",
+            "marginBottom": "0.75rem"
+          },
+          "textContent": "Category"
         },
         {
-          "tagName": "button",
-          "textContent": "Mountain",
-          "onclick": {
-            "$expression": {
-              "operator": "=",
-              "target": { "$ref": "#/state/category" },
-              "value": "Mountain"
+          "tagName": "div",
+          "style": { "display": "grid", "gap": "0.4rem" },
+          "children": [
+            {
+              "tagName": "button",
+              "onclick": { "$ref": "#/state/setAll" },
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.5rem",
+                "width": "100%",
+                "padding": "0.6rem 0.85rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.category === 'all' ? 'var(--color-primary)' : 'var(--color-border)'}",
+                "cursor": "pointer",
+                "fontFamily": "inherit",
+                "fontWeight": "700",
+                "fontSize": "0.92rem",
+                "textAlign": "left",
+                "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+                "backgroundColor": "${state.category === 'all' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.category === 'all' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              },
+              "children": [
+                { "tagName": "span", "textContent": "All bikes & gear" },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontVariantNumeric": "tabular-nums",
+                    "opacity": "0.7",
+                    "fontWeight": "600"
+                  },
+                  "textContent": "8"
+                }
+              ]
+            },
+            {
+              "tagName": "button",
+              "onclick": { "$ref": "#/state/setRoad" },
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.5rem",
+                "width": "100%",
+                "padding": "0.6rem 0.85rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.category === 'Road' ? 'var(--color-primary)' : 'var(--color-border)'}",
+                "cursor": "pointer",
+                "fontFamily": "inherit",
+                "fontWeight": "700",
+                "fontSize": "0.92rem",
+                "textAlign": "left",
+                "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+                "backgroundColor": "${state.category === 'Road' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.category === 'Road' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              },
+              "children": [
+                { "tagName": "span", "textContent": "Road" },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontVariantNumeric": "tabular-nums",
+                    "opacity": "0.7",
+                    "fontWeight": "600"
+                  },
+                  "textContent": "2"
+                }
+              ]
+            },
+            {
+              "tagName": "button",
+              "onclick": { "$ref": "#/state/setMountain" },
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.5rem",
+                "width": "100%",
+                "padding": "0.6rem 0.85rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.category === 'Mountain' ? 'var(--color-primary)' : 'var(--color-border)'}",
+                "cursor": "pointer",
+                "fontFamily": "inherit",
+                "fontWeight": "700",
+                "fontSize": "0.92rem",
+                "textAlign": "left",
+                "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+                "backgroundColor": "${state.category === 'Mountain' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.category === 'Mountain' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              },
+              "children": [
+                { "tagName": "span", "textContent": "Mountain" },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontVariantNumeric": "tabular-nums",
+                    "opacity": "0.7",
+                    "fontWeight": "600"
+                  },
+                  "textContent": "2"
+                }
+              ]
+            },
+            {
+              "tagName": "button",
+              "onclick": { "$ref": "#/state/setGravel" },
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.5rem",
+                "width": "100%",
+                "padding": "0.6rem 0.85rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.category === 'Gravel' ? 'var(--color-primary)' : 'var(--color-border)'}",
+                "cursor": "pointer",
+                "fontFamily": "inherit",
+                "fontWeight": "700",
+                "fontSize": "0.92rem",
+                "textAlign": "left",
+                "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+                "backgroundColor": "${state.category === 'Gravel' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.category === 'Gravel' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              },
+              "children": [
+                { "tagName": "span", "textContent": "Gravel" },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontVariantNumeric": "tabular-nums",
+                    "opacity": "0.7",
+                    "fontWeight": "600"
+                  },
+                  "textContent": "1"
+                }
+              ]
+            },
+            {
+              "tagName": "button",
+              "onclick": { "$ref": "#/state/setKids" },
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.5rem",
+                "width": "100%",
+                "padding": "0.6rem 0.85rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.category === 'Kids' ? 'var(--color-primary)' : 'var(--color-border)'}",
+                "cursor": "pointer",
+                "fontFamily": "inherit",
+                "fontWeight": "700",
+                "fontSize": "0.92rem",
+                "textAlign": "left",
+                "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+                "backgroundColor": "${state.category === 'Kids' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.category === 'Kids' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              },
+              "children": [
+                { "tagName": "span", "textContent": "Kids" },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontVariantNumeric": "tabular-nums",
+                    "opacity": "0.7",
+                    "fontWeight": "600"
+                  },
+                  "textContent": "1"
+                }
+              ]
+            },
+            {
+              "tagName": "button",
+              "onclick": { "$ref": "#/state/setAccessories" },
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.5rem",
+                "width": "100%",
+                "padding": "0.6rem 0.85rem",
+                "borderRadius": "var(--radius-sm)",
+                "border": "1px solid ${state.category === 'Accessories' ? 'var(--color-primary)' : 'var(--color-border)'}",
+                "cursor": "pointer",
+                "fontFamily": "inherit",
+                "fontWeight": "700",
+                "fontSize": "0.92rem",
+                "textAlign": "left",
+                "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+                "backgroundColor": "${state.category === 'Accessories' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                "color": "${state.category === 'Accessories' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+              },
+              "children": [
+                { "tagName": "span", "textContent": "Accessories" },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontVariantNumeric": "tabular-nums",
+                    "opacity": "0.7",
+                    "fontWeight": "600"
+                  },
+                  "textContent": "2"
+                }
+              ]
             }
-          },
-          "style": {
-            "cursor": "pointer",
-            "fontFamily": "inherit",
-            "fontSize": "0.92rem",
-            "fontWeight": "600",
-            "padding": "0.55rem 1.15rem",
-            "borderRadius": "999px",
-            "border": "1px solid var(--color-border)",
-            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
-            "backgroundColor": "${state.category === 'Mountain' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-            "color": "${state.category === 'Mountain' ? '#ffffff' : 'var(--color-text-primary)'}",
-            "borderColor": "${state.category === 'Mountain' ? 'var(--color-primary)' : 'var(--color-border)'}"
-          }
+          ]
         },
         {
-          "tagName": "button",
-          "textContent": "Gravel",
-          "onclick": {
-            "$expression": {
-              "operator": "=",
-              "target": { "$ref": "#/state/category" },
-              "value": "Gravel"
-            }
-          },
+          "tagName": "div",
           "style": {
-            "cursor": "pointer",
-            "fontFamily": "inherit",
-            "fontSize": "0.92rem",
-            "fontWeight": "600",
-            "padding": "0.55rem 1.15rem",
-            "borderRadius": "999px",
-            "border": "1px solid var(--color-border)",
-            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
-            "backgroundColor": "${state.category === 'Gravel' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-            "color": "${state.category === 'Gravel' ? '#ffffff' : 'var(--color-text-primary)'}",
-            "borderColor": "${state.category === 'Gravel' ? 'var(--color-primary)' : 'var(--color-border)'}"
-          }
-        },
-        {
-          "tagName": "button",
-          "textContent": "Kids",
-          "onclick": {
-            "$expression": {
-              "operator": "=",
-              "target": { "$ref": "#/state/category" },
-              "value": "Kids"
-            }
+            "marginTop": "1.3rem",
+            "padding": "0.9rem 1rem",
+            "borderRadius": "var(--radius-sm)",
+            "backgroundColor": "var(--color-bg-cream)",
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "0.6rem"
           },
-          "style": {
-            "cursor": "pointer",
-            "fontFamily": "inherit",
-            "fontSize": "0.92rem",
-            "fontWeight": "600",
-            "padding": "0.55rem 1.15rem",
-            "borderRadius": "999px",
-            "border": "1px solid var(--color-border)",
-            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
-            "backgroundColor": "${state.category === 'Kids' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-            "color": "${state.category === 'Kids' ? '#ffffff' : 'var(--color-text-primary)'}",
-            "borderColor": "${state.category === 'Kids' ? 'var(--color-primary)' : 'var(--color-border)'}"
-          }
-        },
-        {
-          "tagName": "button",
-          "textContent": "Accessories",
-          "onclick": {
-            "$expression": {
-              "operator": "=",
-              "target": { "$ref": "#/state/category" },
-              "value": "Accessories"
+          "children": [
+            { "tagName": "span", "style": { "fontSize": "1.1rem" }, "textContent": "🔧" },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "fontSize": "0.8rem",
+                "lineHeight": "1.45",
+                "color": "var(--color-text-secondary)",
+                "fontWeight": "500"
+              },
+              "textContent": "Every bike ships fitted with a free first tune-up."
             }
-          },
-          "style": {
-            "cursor": "pointer",
-            "fontFamily": "inherit",
-            "fontSize": "0.92rem",
-            "fontWeight": "600",
-            "padding": "0.55rem 1.15rem",
-            "borderRadius": "999px",
-            "border": "1px solid var(--color-border)",
-            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
-            "backgroundColor": "${state.category === 'Accessories' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
-            "color": "${state.category === 'Accessories' ? '#ffffff' : 'var(--color-text-primary)'}",
-            "borderColor": "${state.category === 'Accessories' ? 'var(--color-primary)' : 'var(--color-border)'}"
-          }
+          ]
         }
       ]
-    },
-    {
-      "tagName": "p",
-      "style": {
-        "textAlign": "center",
-        "margin": "1rem 0 0",
-        "fontSize": "0.9rem",
-        "color": "var(--color-text-muted)"
-      },
-      "textContent": "${state.category === 'all' ? 'Showing every bike and accessory in the shop.' : 'Showing ' + state.category + ' — tap “All bikes” to reset.'}"
     }
   ]
 }

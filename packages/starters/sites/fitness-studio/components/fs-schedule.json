@@ -1,0 +1,1165 @@
+{
+  "tagName": "fs-schedule",
+  "state": {
+    "filter": "all"
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "var(--max-width)",
+    "margin": "0 auto",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "overflow": "hidden",
+    "boxShadow": "0 30px 70px -40px rgba(26,15,24,0.35)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "alignItems": "center",
+        "justifyContent": "space-between",
+        "gap": "1rem",
+        "padding": "1.15rem 1.35rem",
+        "borderBottom": "1px solid var(--color-border)",
+        "backgroundColor": "var(--color-bg-blush)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "flexWrap": "wrap",
+            "gap": "0.5rem"
+          },
+          "children": [
+            {
+              "tagName": "button",
+              "textContent": "All",
+              "onclick": {
+                "$expression": {
+                  "operator": "=",
+                  "target": {
+                    "$ref": "#/state/filter"
+                  },
+                  "value": "all"
+                }
+              },
+              "style": {
+                "padding": "0.5rem 1.15rem",
+                "borderRadius": "999px",
+                "cursor": "pointer",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "0.78rem",
+                "fontWeight": "700",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.06em",
+                "transition": "all 0.15s",
+                "border": "1px solid ${state.filter === 'all' ? 'transparent' : 'var(--color-border)'}",
+                "color": "${state.filter === 'all' ? '#ffffff' : 'var(--color-text-muted)'}",
+                "background": "${state.filter === 'all' ? 'var(--grad-hot)' : 'var(--color-bg-white)'}",
+                "boxShadow": "${state.filter === 'all' ? '0 8px 20px -8px rgba(255,46,99,0.55)' : 'none'}"
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "Yoga",
+              "onclick": {
+                "$expression": {
+                  "operator": "=",
+                  "target": {
+                    "$ref": "#/state/filter"
+                  },
+                  "value": "yoga"
+                }
+              },
+              "style": {
+                "padding": "0.5rem 1.15rem",
+                "borderRadius": "999px",
+                "cursor": "pointer",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "0.78rem",
+                "fontWeight": "700",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.06em",
+                "transition": "all 0.15s",
+                "border": "1px solid ${state.filter === 'yoga' ? 'transparent' : 'var(--color-border)'}",
+                "color": "${state.filter === 'yoga' ? '#ffffff' : 'var(--color-text-muted)'}",
+                "background": "${state.filter === 'yoga' ? 'var(--grad-hot)' : 'var(--color-bg-white)'}",
+                "boxShadow": "${state.filter === 'yoga' ? '0 8px 20px -8px rgba(255,46,99,0.55)' : 'none'}"
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "Pilates",
+              "onclick": {
+                "$expression": {
+                  "operator": "=",
+                  "target": {
+                    "$ref": "#/state/filter"
+                  },
+                  "value": "pilates"
+                }
+              },
+              "style": {
+                "padding": "0.5rem 1.15rem",
+                "borderRadius": "999px",
+                "cursor": "pointer",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "0.78rem",
+                "fontWeight": "700",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.06em",
+                "transition": "all 0.15s",
+                "border": "1px solid ${state.filter === 'pilates' ? 'transparent' : 'var(--color-border)'}",
+                "color": "${state.filter === 'pilates' ? '#ffffff' : 'var(--color-text-muted)'}",
+                "background": "${state.filter === 'pilates' ? 'var(--grad-hot)' : 'var(--color-bg-white)'}",
+                "boxShadow": "${state.filter === 'pilates' ? '0 8px 20px -8px rgba(255,46,99,0.55)' : 'none'}"
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "Strength & HIIT",
+              "onclick": {
+                "$expression": {
+                  "operator": "=",
+                  "target": {
+                    "$ref": "#/state/filter"
+                  },
+                  "value": "strength"
+                }
+              },
+              "style": {
+                "padding": "0.5rem 1.15rem",
+                "borderRadius": "999px",
+                "cursor": "pointer",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "0.78rem",
+                "fontWeight": "700",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.06em",
+                "transition": "all 0.15s",
+                "border": "1px solid ${state.filter === 'strength' ? 'transparent' : 'var(--color-border)'}",
+                "color": "${state.filter === 'strength' ? '#ffffff' : 'var(--color-text-muted)'}",
+                "background": "${state.filter === 'strength' ? 'var(--grad-hot)' : 'var(--color-bg-white)'}",
+                "boxShadow": "${state.filter === 'strength' ? '0 8px 20px -8px rgba(255,46,99,0.55)' : 'none'}"
+              }
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "flexWrap": "wrap",
+            "gap": "0.9rem",
+            "alignItems": "center"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.4rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.7rem",
+                    "height": "0.7rem",
+                    "borderRadius": "3px",
+                    "backgroundColor": "var(--color-yoga)"
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontSize": "0.74rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-text-muted)"
+                  },
+                  "textContent": "Yoga"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.4rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.7rem",
+                    "height": "0.7rem",
+                    "borderRadius": "3px",
+                    "backgroundColor": "var(--color-pilates)"
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontSize": "0.74rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-text-muted)"
+                  },
+                  "textContent": "Pilates"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.4rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.7rem",
+                    "height": "0.7rem",
+                    "borderRadius": "3px",
+                    "backgroundColor": "var(--color-hiit)"
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontSize": "0.74rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-text-muted)"
+                  },
+                  "textContent": "HIIT"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.4rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.7rem",
+                    "height": "0.7rem",
+                    "borderRadius": "3px",
+                    "backgroundColor": "var(--color-strength)"
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontSize": "0.74rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-text-muted)"
+                  },
+                  "textContent": "Strength"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "overflowX": "auto",
+        "padding": "1.35rem"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(7, minmax(132px, 1fr))",
+            "gap": "0.9rem",
+            "minWidth": "860px"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "0.7rem",
+                "minWidth": "0"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.05rem",
+                    "letterSpacing": "0.08em",
+                    "textTransform": "uppercase",
+                    "color": "var(--color-text-primary)",
+                    "paddingBottom": "0.6rem",
+                    "marginBottom": "0.3rem",
+                    "borderBottom": "2px solid var(--color-border)"
+                  },
+                  "textContent": "Mon"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem",
+                    "padding": "0.75rem 0.85rem",
+                    "borderRadius": "0.7rem",
+                    "backgroundColor": "rgba(214,21,122,0.09)",
+                    "borderLeft": "4px solid var(--color-hiit)",
+                    "opacity": "${state.filter === 'all' || state.filter === 'strength' ? '1' : '0.16'}",
+                    "filter": "${state.filter === 'all' || state.filter === 'strength' ? 'none' : 'saturate(0.15)'}",
+                    "transition": "opacity 0.25s, filter 0.25s, transform 0.15s",
+                    ":hover": {
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "800",
+                        "fontSize": "0.8rem",
+                        "letterSpacing": "0.02em",
+                        "color": "var(--color-hiit)",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "textContent": "12:00"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "fontSize": "0.62rem",
+                            "marginLeft": "0.15rem",
+                            "opacity": "0.8"
+                          },
+                          "textContent": "PM"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.96rem",
+                        "lineHeight": "1.15",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "HIIT Circuit"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.72rem",
+                        "color": "var(--color-text-muted)",
+                        "fontWeight": "500"
+                      },
+                      "textContent": "Priya · Int"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem",
+                    "padding": "0.75rem 0.85rem",
+                    "borderRadius": "0.7rem",
+                    "backgroundColor": "rgba(255,46,99,0.08)",
+                    "borderLeft": "4px solid var(--color-yoga)",
+                    "opacity": "${state.filter === 'all' || state.filter === 'yoga' ? '1' : '0.16'}",
+                    "filter": "${state.filter === 'all' || state.filter === 'yoga' ? 'none' : 'saturate(0.15)'}",
+                    "transition": "opacity 0.25s, filter 0.25s, transform 0.15s",
+                    ":hover": {
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "800",
+                        "fontSize": "0.8rem",
+                        "letterSpacing": "0.02em",
+                        "color": "var(--color-yoga)",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "textContent": "6:00"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "fontSize": "0.62rem",
+                            "marginLeft": "0.15rem",
+                            "opacity": "0.8"
+                          },
+                          "textContent": "PM"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.96rem",
+                        "lineHeight": "1.15",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "Vinyasa Flow"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.72rem",
+                        "color": "var(--color-text-muted)",
+                        "fontWeight": "500"
+                      },
+                      "textContent": "Maya · All"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "0.7rem",
+                "minWidth": "0"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.05rem",
+                    "letterSpacing": "0.08em",
+                    "textTransform": "uppercase",
+                    "color": "var(--color-text-primary)",
+                    "paddingBottom": "0.6rem",
+                    "marginBottom": "0.3rem",
+                    "borderBottom": "2px solid var(--color-border)"
+                  },
+                  "textContent": "Tue"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem",
+                    "padding": "0.75rem 0.85rem",
+                    "borderRadius": "0.7rem",
+                    "backgroundColor": "rgba(255,46,99,0.08)",
+                    "borderLeft": "4px solid var(--color-yoga)",
+                    "opacity": "${state.filter === 'all' || state.filter === 'yoga' ? '1' : '0.16'}",
+                    "filter": "${state.filter === 'all' || state.filter === 'yoga' ? 'none' : 'saturate(0.15)'}",
+                    "transition": "opacity 0.25s, filter 0.25s, transform 0.15s",
+                    ":hover": {
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "800",
+                        "fontSize": "0.8rem",
+                        "letterSpacing": "0.02em",
+                        "color": "var(--color-yoga)",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "textContent": "7:00"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "fontSize": "0.62rem",
+                            "marginLeft": "0.15rem",
+                            "opacity": "0.8"
+                          },
+                          "textContent": "AM"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.96rem",
+                        "lineHeight": "1.15",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "Power Yoga"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.72rem",
+                        "color": "var(--color-text-muted)",
+                        "fontWeight": "500"
+                      },
+                      "textContent": "Devon · Adv"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem",
+                    "padding": "0.75rem 0.85rem",
+                    "borderRadius": "0.7rem",
+                    "backgroundColor": "rgba(255,140,66,0.10)",
+                    "borderLeft": "4px solid var(--color-pilates)",
+                    "opacity": "${state.filter === 'all' || state.filter === 'pilates' ? '1' : '0.16'}",
+                    "filter": "${state.filter === 'all' || state.filter === 'pilates' ? 'none' : 'saturate(0.15)'}",
+                    "transition": "opacity 0.25s, filter 0.25s, transform 0.15s",
+                    ":hover": {
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "800",
+                        "fontSize": "0.8rem",
+                        "letterSpacing": "0.02em",
+                        "color": "var(--color-pilates)",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "textContent": "9:00"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "fontSize": "0.62rem",
+                            "marginLeft": "0.15rem",
+                            "opacity": "0.8"
+                          },
+                          "textContent": "AM"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.96rem",
+                        "lineHeight": "1.15",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "Pilates Core"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.72rem",
+                        "color": "var(--color-text-muted)",
+                        "fontWeight": "500"
+                      },
+                      "textContent": "Elena · Beg"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "0.7rem",
+                "minWidth": "0"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.05rem",
+                    "letterSpacing": "0.08em",
+                    "textTransform": "uppercase",
+                    "color": "var(--color-text-primary)",
+                    "paddingBottom": "0.6rem",
+                    "marginBottom": "0.3rem",
+                    "borderBottom": "2px solid var(--color-border)"
+                  },
+                  "textContent": "Wed"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem",
+                    "padding": "0.75rem 0.85rem",
+                    "borderRadius": "0.7rem",
+                    "backgroundColor": "rgba(214,21,122,0.09)",
+                    "borderLeft": "4px solid var(--color-hiit)",
+                    "opacity": "${state.filter === 'all' || state.filter === 'strength' ? '1' : '0.16'}",
+                    "filter": "${state.filter === 'all' || state.filter === 'strength' ? 'none' : 'saturate(0.15)'}",
+                    "transition": "opacity 0.25s, filter 0.25s, transform 0.15s",
+                    ":hover": {
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "800",
+                        "fontSize": "0.8rem",
+                        "letterSpacing": "0.02em",
+                        "color": "var(--color-hiit)",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "textContent": "12:00"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "fontSize": "0.62rem",
+                            "marginLeft": "0.15rem",
+                            "opacity": "0.8"
+                          },
+                          "textContent": "PM"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.96rem",
+                        "lineHeight": "1.15",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "HIIT Circuit"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.72rem",
+                        "color": "var(--color-text-muted)",
+                        "fontWeight": "500"
+                      },
+                      "textContent": "Priya · Int"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem",
+                    "padding": "0.75rem 0.85rem",
+                    "borderRadius": "0.7rem",
+                    "backgroundColor": "rgba(255,46,99,0.08)",
+                    "borderLeft": "4px solid var(--color-yoga)",
+                    "opacity": "${state.filter === 'all' || state.filter === 'yoga' ? '1' : '0.16'}",
+                    "filter": "${state.filter === 'all' || state.filter === 'yoga' ? 'none' : 'saturate(0.15)'}",
+                    "transition": "opacity 0.25s, filter 0.25s, transform 0.15s",
+                    ":hover": {
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "800",
+                        "fontSize": "0.8rem",
+                        "letterSpacing": "0.02em",
+                        "color": "var(--color-yoga)",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "textContent": "6:00"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "fontSize": "0.62rem",
+                            "marginLeft": "0.15rem",
+                            "opacity": "0.8"
+                          },
+                          "textContent": "PM"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.96rem",
+                        "lineHeight": "1.15",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "Vinyasa Flow"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.72rem",
+                        "color": "var(--color-text-muted)",
+                        "fontWeight": "500"
+                      },
+                      "textContent": "Maya · All"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "0.7rem",
+                "minWidth": "0"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.05rem",
+                    "letterSpacing": "0.08em",
+                    "textTransform": "uppercase",
+                    "color": "var(--color-text-primary)",
+                    "paddingBottom": "0.6rem",
+                    "marginBottom": "0.3rem",
+                    "borderBottom": "2px solid var(--color-border)"
+                  },
+                  "textContent": "Thu"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem",
+                    "padding": "0.75rem 0.85rem",
+                    "borderRadius": "0.7rem",
+                    "backgroundColor": "rgba(255,46,99,0.08)",
+                    "borderLeft": "4px solid var(--color-yoga)",
+                    "opacity": "${state.filter === 'all' || state.filter === 'yoga' ? '1' : '0.16'}",
+                    "filter": "${state.filter === 'all' || state.filter === 'yoga' ? 'none' : 'saturate(0.15)'}",
+                    "transition": "opacity 0.25s, filter 0.25s, transform 0.15s",
+                    ":hover": {
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "800",
+                        "fontSize": "0.8rem",
+                        "letterSpacing": "0.02em",
+                        "color": "var(--color-yoga)",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "textContent": "7:00"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "fontSize": "0.62rem",
+                            "marginLeft": "0.15rem",
+                            "opacity": "0.8"
+                          },
+                          "textContent": "AM"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.96rem",
+                        "lineHeight": "1.15",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "Power Yoga"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.72rem",
+                        "color": "var(--color-text-muted)",
+                        "fontWeight": "500"
+                      },
+                      "textContent": "Devon · Adv"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem",
+                    "padding": "0.75rem 0.85rem",
+                    "borderRadius": "0.7rem",
+                    "backgroundColor": "rgba(255,140,66,0.10)",
+                    "borderLeft": "4px solid var(--color-pilates)",
+                    "opacity": "${state.filter === 'all' || state.filter === 'pilates' ? '1' : '0.16'}",
+                    "filter": "${state.filter === 'all' || state.filter === 'pilates' ? 'none' : 'saturate(0.15)'}",
+                    "transition": "opacity 0.25s, filter 0.25s, transform 0.15s",
+                    ":hover": {
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "800",
+                        "fontSize": "0.8rem",
+                        "letterSpacing": "0.02em",
+                        "color": "var(--color-pilates)",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "textContent": "9:00"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "fontSize": "0.62rem",
+                            "marginLeft": "0.15rem",
+                            "opacity": "0.8"
+                          },
+                          "textContent": "AM"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.96rem",
+                        "lineHeight": "1.15",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "Pilates Core"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.72rem",
+                        "color": "var(--color-text-muted)",
+                        "fontWeight": "500"
+                      },
+                      "textContent": "Elena · Beg"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "0.7rem",
+                "minWidth": "0"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.05rem",
+                    "letterSpacing": "0.08em",
+                    "textTransform": "uppercase",
+                    "color": "var(--color-text-primary)",
+                    "paddingBottom": "0.6rem",
+                    "marginBottom": "0.3rem",
+                    "borderBottom": "2px solid var(--color-border)"
+                  },
+                  "textContent": "Fri"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem",
+                    "padding": "0.75rem 0.85rem",
+                    "borderRadius": "0.7rem",
+                    "backgroundColor": "rgba(255,46,99,0.08)",
+                    "borderLeft": "4px solid var(--color-yoga)",
+                    "opacity": "${state.filter === 'all' || state.filter === 'yoga' ? '1' : '0.16'}",
+                    "filter": "${state.filter === 'all' || state.filter === 'yoga' ? 'none' : 'saturate(0.15)'}",
+                    "transition": "opacity 0.25s, filter 0.25s, transform 0.15s",
+                    ":hover": {
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "800",
+                        "fontSize": "0.8rem",
+                        "letterSpacing": "0.02em",
+                        "color": "var(--color-yoga)",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "textContent": "6:30"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "fontSize": "0.62rem",
+                            "marginLeft": "0.15rem",
+                            "opacity": "0.8"
+                          },
+                          "textContent": "PM"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.96rem",
+                        "lineHeight": "1.15",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "Restorative"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.72rem",
+                        "color": "var(--color-text-muted)",
+                        "fontWeight": "500"
+                      },
+                      "textContent": "Maya · All"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "0.7rem",
+                "minWidth": "0"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.05rem",
+                    "letterSpacing": "0.08em",
+                    "textTransform": "uppercase",
+                    "color": "var(--color-text-primary)",
+                    "paddingBottom": "0.6rem",
+                    "marginBottom": "0.3rem",
+                    "borderBottom": "2px solid var(--color-border)"
+                  },
+                  "textContent": "Sat"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.15rem",
+                    "padding": "0.75rem 0.85rem",
+                    "borderRadius": "0.7rem",
+                    "backgroundColor": "rgba(123,47,247,0.09)",
+                    "borderLeft": "4px solid var(--color-strength)",
+                    "opacity": "${state.filter === 'all' || state.filter === 'strength' ? '1' : '0.16'}",
+                    "filter": "${state.filter === 'all' || state.filter === 'strength' ? 'none' : 'saturate(0.15)'}",
+                    "transition": "opacity 0.25s, filter 0.25s, transform 0.15s",
+                    ":hover": {
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "800",
+                        "fontSize": "0.8rem",
+                        "letterSpacing": "0.02em",
+                        "color": "var(--color-strength)",
+                        "fontVariantNumeric": "tabular-nums"
+                      },
+                      "children": [
+                        {
+                          "tagName": "span",
+                          "textContent": "10:00"
+                        },
+                        {
+                          "tagName": "span",
+                          "style": {
+                            "fontSize": "0.62rem",
+                            "marginLeft": "0.15rem",
+                            "opacity": "0.8"
+                          },
+                          "textContent": "AM"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "0.96rem",
+                        "lineHeight": "1.15",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "Strength & Tone"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.72rem",
+                        "color": "var(--color-text-muted)",
+                        "fontWeight": "500"
+                      },
+                      "textContent": "Devon · Int"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "0.7rem",
+                "minWidth": "0"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.05rem",
+                    "letterSpacing": "0.08em",
+                    "textTransform": "uppercase",
+                    "color": "var(--color-text-primary)",
+                    "paddingBottom": "0.6rem",
+                    "marginBottom": "0.3rem",
+                    "borderBottom": "2px solid var(--color-border)"
+                  },
+                  "textContent": "Sun"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.2rem",
+                    "padding": "0.85rem",
+                    "borderRadius": "0.7rem",
+                    "border": "1px dashed var(--color-border)",
+                    "backgroundColor": "transparent",
+                    "textAlign": "center",
+                    "color": "var(--color-text-muted)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "1.1rem"
+                      },
+                      "textContent": "🌙"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.78rem",
+                        "fontWeight": "600",
+                        "color": "var(--color-text-muted)"
+                      },
+                      "textContent": "Rest & recover"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "tagName": "pf-service-row",
+  "state": {
+    "number": "",
+    "tag": "",
+    "title": "",
+    "text": "",
+    "href": "/services/"
+  },
+  "style": { "display": "block" },
+  "children": [
+    {
+      "tagName": "a",
+      "attributes": { "href": "${state.href}" },
+      "style": {
+        "display": "grid",
+        "gridTemplateColumns": "minmax(2.75rem, 4.5rem) minmax(0, 22ch) minmax(0, 1fr) auto",
+        "gap": "clamp(1rem, 3vw, 2.5rem)",
+        "alignItems": "baseline",
+        "padding": "clamp(1.5rem, 3vw, 2rem) 0.5rem",
+        "textDecoration": "none",
+        "color": "var(--color-ink)",
+        "borderTop": "1px solid var(--color-hairline)",
+        "transition": "background-color 0.18s, color 0.18s",
+        "@--md": {
+          "gridTemplateColumns": "auto 1fr",
+          "gap": "0.75rem 1.25rem"
+        },
+        ":hover": {
+          "backgroundColor": "var(--color-paper-2)",
+          "color": "var(--color-accent-deep)"
+        }
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "fontFamily": "var(--font-sans)",
+            "fontWeight": "600",
+            "fontSize": "clamp(1.25rem, 2.6vw, 1.7rem)",
+            "lineHeight": "1",
+            "letterSpacing": "0.02em",
+            "color": "var(--color-accent)",
+            "fontVariantNumeric": "tabular-nums"
+          },
+          "textContent": "${state.number}"
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "display": "${state.tag ? 'block' : 'none'}",
+                "fontFamily": "var(--font-sans)",
+                "fontSize": "0.68rem",
+                "fontWeight": "600",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.16em",
+                "color": "var(--color-muted)",
+                "marginBottom": "0.5rem"
+              },
+              "textContent": "${state.tag}"
+            },
+            {
+              "tagName": "h3",
+              "style": {
+                "fontFamily": "var(--font-serif)",
+                "fontWeight": "500",
+                "fontSize": "clamp(1.35rem, 2.4vw, 1.85rem)",
+                "lineHeight": "1.15",
+                "letterSpacing": "-0.01em",
+                "margin": "0",
+                "color": "inherit"
+              },
+              "textContent": "${state.title}"
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0",
+            "fontSize": "1rem",
+            "lineHeight": "1.6",
+            "color": "var(--color-muted)",
+            "@--md": { "gridColumn": "2 / -1" }
+          },
+          "textContent": "${state.text}"
+        },
+        {
+          "tagName": "span",
+          "style": {
+            "fontFamily": "var(--font-sans)",
+            "fontSize": "1.1rem",
+            "color": "var(--color-accent)",
+            "@--md": { "display": "none" }
+          },
+          "textContent": "→"
+        }
+      ]
+    }
+  ]
+}

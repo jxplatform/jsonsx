@@ -2,6 +2,7 @@
   "tagName": "bit-hours",
   "state": {
     "heading": "Hours",
+    "status": "Open today",
     "weekdays": "7:00am – 3:00pm",
     "saturday": "8:00am – 4:00pm",
     "sunday": "8:00am – 2:00pm",
@@ -9,35 +10,94 @@
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-cream)",
-    "border": "1px solid var(--color-border)",
+    "backgroundColor": "var(--color-espresso)",
+    "color": "var(--color-text-white)",
     "borderRadius": "var(--radius)",
-    "padding": "2rem"
+    "padding": "clamp(1.75rem, 3vw, 2.5rem)"
   },
   "children": [
     {
-      "tagName": "h3",
+      "tagName": "div",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "1.4rem",
-        "fontWeight": "700",
-        "margin": "0 0 1.25rem"
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "space-between",
+        "gap": "1rem",
+        "marginBottom": "1.5rem"
       },
-      "textContent": "${state.heading}"
+      "children": [
+        {
+          "tagName": "h3",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.65rem",
+            "fontWeight": "700",
+            "margin": "0",
+            "color": "var(--color-text-white)"
+          },
+          "textContent": "${state.heading}"
+        },
+        {
+          "tagName": "span",
+          "style": {
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "0.5rem",
+            "padding": "0.35rem 0.85rem",
+            "borderRadius": "999px",
+            "border": "1px solid rgba(201,138,60,0.5)",
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.68rem",
+            "fontWeight": "700",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.14em",
+            "color": "var(--color-amber)"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "width": "0.45rem",
+                "height": "0.45rem",
+                "borderRadius": "999px",
+                "backgroundColor": "var(--color-amber)",
+                "boxShadow": "0 0 0 3px rgba(201,138,60,0.22)"
+              }
+            },
+            { "tagName": "span", "textContent": "${state.status}" }
+          ]
+        }
+      ]
     },
     {
       "tagName": "div",
       "style": {
         "display": "flex",
         "justifyContent": "space-between",
-        "padding": "0.6rem 0",
-        "borderBottom": "1px solid var(--color-border)"
+        "alignItems": "baseline",
+        "padding": "0.7rem 0",
+        "borderBottom": "1px solid rgba(246,236,219,0.14)"
       },
       "children": [
-        { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Monday – Friday" },
         {
           "tagName": "span",
-          "style": { "color": "var(--color-text-muted)" },
+          "style": {
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.78rem",
+            "fontWeight": "700",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.12em",
+            "opacity": "0.75"
+          },
+          "textContent": "Mon – Fri"
+        },
+        {
+          "tagName": "span",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.15rem",
+            "color": "var(--color-text-white)"
+          },
           "textContent": "${state.weekdays}"
         }
       ]
@@ -47,14 +107,30 @@
       "style": {
         "display": "flex",
         "justifyContent": "space-between",
-        "padding": "0.6rem 0",
-        "borderBottom": "1px solid var(--color-border)"
+        "alignItems": "baseline",
+        "padding": "0.7rem 0",
+        "borderBottom": "1px solid rgba(246,236,219,0.14)"
       },
       "children": [
-        { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Saturday" },
         {
           "tagName": "span",
-          "style": { "color": "var(--color-text-muted)" },
+          "style": {
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.78rem",
+            "fontWeight": "700",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.12em",
+            "opacity": "0.75"
+          },
+          "textContent": "Saturday"
+        },
+        {
+          "tagName": "span",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.15rem",
+            "color": "var(--color-text-white)"
+          },
           "textContent": "${state.saturday}"
         }
       ]
@@ -64,13 +140,29 @@
       "style": {
         "display": "flex",
         "justifyContent": "space-between",
-        "padding": "0.6rem 0"
+        "alignItems": "baseline",
+        "padding": "0.7rem 0"
       },
       "children": [
-        { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Sunday" },
         {
           "tagName": "span",
-          "style": { "color": "var(--color-text-muted)" },
+          "style": {
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.78rem",
+            "fontWeight": "700",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.12em",
+            "opacity": "0.75"
+          },
+          "textContent": "Sunday"
+        },
+        {
+          "tagName": "span",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.15rem",
+            "color": "var(--color-text-white)"
+          },
           "textContent": "${state.sunday}"
         }
       ]
@@ -79,10 +171,11 @@
       "tagName": "p",
       "style": {
         "display": "${state.note ? 'block' : 'none'}",
-        "margin": "1.25rem 0 0",
-        "fontSize": "0.85rem",
-        "color": "var(--color-text-muted)",
-        "fontStyle": "italic"
+        "margin": "1.5rem 0 0",
+        "fontFamily": "var(--font-heading)",
+        "fontStyle": "italic",
+        "fontSize": "0.95rem",
+        "opacity": "0.6"
       },
       "textContent": "${state.note}"
     }

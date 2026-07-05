@@ -1,41 +1,116 @@
 {
   "tagName": "bit-cta",
   "state": {
+    "eyebrow": "Reservations",
     "heading": "",
+    "headingAccent": "",
     "text": "",
     "cta": "Reserve a Table",
     "ctaHref": "/contact/"
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-dark)",
+    "position": "relative",
+    "overflow": "hidden",
+    "backgroundColor": "var(--color-espresso)",
     "color": "var(--color-text-white)",
-    "padding": "clamp(3.5rem, 8vw, 5.5rem) 1.5rem",
+    "padding": "clamp(3.5rem, 9vw, 6rem) 1.5rem",
     "textAlign": "center"
   },
   "children": [
     {
       "tagName": "div",
-      "style": { "maxWidth": "var(--max-width-narrow)", "margin": "0 auto" },
+      "style": {
+        "position": "absolute",
+        "inset": "0",
+        "background": "radial-gradient(ellipse 55% 70% at 50% 120%, rgba(189,90,52,0.34), transparent 65%)",
+        "pointerEvents": "none"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "relative",
+        "zIndex": "10",
+        "maxWidth": "var(--max-width-narrow)",
+        "margin": "0 auto"
+      },
       "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.eyebrow ? 'flex' : 'none'}",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "gap": "0.85rem",
+            "marginBottom": "1.25rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "width": "2.25rem",
+                "height": "1px",
+                "backgroundColor": "var(--color-amber)"
+              }
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "fontFamily": "var(--font-body)",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.24em",
+                "fontSize": "0.74rem",
+                "fontWeight": "700",
+                "color": "var(--color-amber)"
+              },
+              "textContent": "${state.eyebrow}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "width": "2.25rem",
+                "height": "1px",
+                "backgroundColor": "var(--color-amber)"
+              }
+            }
+          ]
+        },
         {
           "tagName": "h2",
           "style": {
             "fontFamily": "var(--font-heading)",
-            "fontSize": "clamp(1.9rem, 4vw, 2.75rem)",
+            "fontSize": "clamp(2.1rem, 5vw, 3.25rem)",
             "fontWeight": "700",
-            "lineHeight": "1.15",
-            "margin": "0 0 1rem"
+            "lineHeight": "1.1",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.1rem",
+            "color": "var(--color-text-white)"
           },
-          "textContent": "${state.heading}"
+          "children": [
+            { "tagName": "span", "textContent": "${state.heading}" },
+            {
+              "tagName": "span",
+              "style": {
+                "display": "${state.headingAccent ? 'inline' : 'none'}",
+                "fontStyle": "italic",
+                "fontWeight": "500",
+                "color": "var(--color-amber)"
+              },
+              "textContent": " ${state.headingAccent}"
+            }
+          ]
         },
         {
           "tagName": "p",
           "style": {
-            "fontSize": "1.1rem",
+            "fontFamily": "var(--font-body)",
+            "fontSize": "1.12rem",
             "lineHeight": "1.7",
-            "opacity": "0.85",
-            "margin": "0 0 2rem"
+            "opacity": "0.82",
+            "margin": "0 auto 2rem",
+            "maxWidth": "50ch"
           },
           "textContent": "${state.text}"
         },
@@ -46,10 +121,13 @@
             "display": "inline-block",
             "backgroundColor": "var(--color-primary)",
             "color": "var(--color-text-white)",
-            "padding": "0.9rem 2.25rem",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1.05rem",
-            "fontWeight": "600",
+            "padding": "0.95rem 2.4rem",
+            "borderRadius": "999px",
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.85rem",
+            "fontWeight": "700",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.14em",
             "textDecoration": "none",
             "transition": "background-color 0.15s",
             ":hover": { "backgroundColor": "var(--color-primary-hover)" }

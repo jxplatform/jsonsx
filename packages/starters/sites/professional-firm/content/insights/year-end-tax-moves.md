@@ -3,6 +3,7 @@ title: Five Year-End Tax Moves Owners Overlook
 excerpt: A short checklist of the deductions, deferrals, and elections that quietly save growing companies real money before December 31.
 date: December 3, 2025
 author: Priya Nair
+category: Tax
 order: 1
 ---
 

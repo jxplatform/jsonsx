@@ -7,6 +7,7 @@
     "baths": "0",
     "sqft": "0",
     "city": "",
+    "status": "For Sale",
     "image": { "type": "string", "format": "image", "default": "" },
     "href": "#"
   },
@@ -16,67 +17,145 @@
     "border": "1px solid var(--color-border)",
     "borderRadius": "var(--radius)",
     "overflow": "hidden",
-    "boxShadow": "0 4px 20px rgba(15,23,42,0.05)",
-    "transition": "transform 0.2s, box-shadow 0.2s",
+    "boxShadow": "var(--shadow-card)",
+    "transition": "transform 0.2s, box-shadow 0.2s, border-color 0.2s",
     ":hover": {
       "transform": "translateY(-4px)",
-      "boxShadow": "0 14px 34px rgba(15,23,42,0.14)"
-    }
+      "boxShadow": "0 18px 40px -18px rgba(15,23,42,0.28)",
+      "borderColor": "var(--color-border-strong)"
+    },
+    ":hover img": { "transform": "scale(1.05)" }
   },
   "children": [
     {
       "tagName": "a",
       "attributes": { "href": "${state.href}" },
-      "style": { "display": "block", "position": "relative", "textDecoration": "none" },
+      "style": {
+        "display": "block",
+        "position": "relative",
+        "overflow": "hidden",
+        "textDecoration": "none",
+        "aspectRatio": "3 / 2",
+        "backgroundColor": "var(--color-bg-tint)"
+      },
       "children": [
         {
           "tagName": "img",
           "attributes": { "src": "${state.image}", "alt": "${state.heading}", "loading": "lazy" },
           "style": {
+            "position": "absolute",
+            "inset": "0",
             "width": "100%",
-            "height": "230px",
+            "height": "100%",
             "objectFit": "cover",
-            "display": "block"
+            "display": "block",
+            "transition": "transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)"
           }
         },
         {
           "tagName": "span",
           "style": {
             "position": "absolute",
-            "top": "0.9rem",
-            "left": "0.9rem",
-            "backgroundColor": "var(--color-bg-white)",
-            "color": "var(--color-primary)",
-            "fontWeight": "800",
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "1.05rem",
-            "padding": "0.35rem 0.75rem",
+            "top": "0.85rem",
+            "left": "0.85rem",
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "0.35rem",
+            "backgroundColor": "${state.status === 'New' ? 'var(--color-status-new)' : 'rgba(11,18,32,0.82)'}",
+            "color": "var(--color-text-white)",
+            "fontWeight": "700",
+            "fontSize": "0.72rem",
+            "letterSpacing": "0.04em",
+            "textTransform": "uppercase",
+            "padding": "0.3rem 0.65rem",
             "borderRadius": "999px",
-            "boxShadow": "0 4px 12px rgba(15,23,42,0.18)"
+            "backdropFilter": "blur(4px)"
           },
-          "textContent": "$${Number(state.price).toLocaleString('en-US')}"
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "width": "0.4rem",
+                "height": "0.4rem",
+                "borderRadius": "999px",
+                "backgroundColor": "var(--color-accent-bright)"
+              }
+            },
+            { "tagName": "span", "textContent": "${state.status}" }
+          ]
+        },
+        {
+          "tagName": "span",
+          "style": {
+            "position": "absolute",
+            "top": "0.85rem",
+            "right": "0.85rem",
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "width": "2rem",
+            "height": "2rem",
+            "borderRadius": "999px",
+            "backgroundColor": "rgba(255,255,255,0.92)",
+            "color": "var(--color-text-secondary)",
+            "fontSize": "0.95rem",
+            "boxShadow": "0 2px 8px rgba(15,23,42,0.18)"
+          },
+          "textContent": "♡"
         }
       ]
     },
     {
       "tagName": "div",
-      "style": { "padding": "1.15rem 1.25rem 1.35rem" },
+      "style": { "padding": "1.1rem 1.25rem 1.3rem" },
       "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "alignItems": "baseline",
+            "justifyContent": "space-between",
+            "gap": "0.75rem",
+            "marginBottom": "0.35rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.5rem",
+                "fontWeight": "800",
+                "letterSpacing": "-0.02em",
+                "color": "var(--color-text-primary)",
+                "fontVariantNumeric": "tabular-nums"
+              },
+              "textContent": "$${Number(state.price).toLocaleString('en-US')}"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "fontSize": "0.78rem",
+                "fontWeight": "600",
+                "color": "var(--color-text-muted)",
+                "whiteSpace": "nowrap",
+                "fontVariantNumeric": "tabular-nums"
+              },
+              "textContent": "${state.sqft && Number(state.sqft) > 0 ? '$' + Math.round(Number(state.price)/Number(state.sqft)).toLocaleString('en-US') + '/sqft' : ''}"
+            }
+          ]
+        },
         {
           "tagName": "a",
           "attributes": { "href": "${state.href}" },
-          "style": {
-            "textDecoration": "none",
-            "color": "var(--color-text-primary)"
-          },
+          "style": { "textDecoration": "none", "color": "var(--color-text-primary)" },
           "children": [
             {
               "tagName": "h3",
               "style": {
                 "fontFamily": "var(--font-heading)",
-                "fontSize": "1.2rem",
+                "fontSize": "1.05rem",
                 "fontWeight": "700",
-                "margin": "0 0 0.35rem",
+                "margin": "0 0 0.25rem",
                 "letterSpacing": "-0.01em"
               },
               "textContent": "${state.heading}"
@@ -88,13 +167,14 @@
           "style": {
             "display": "flex",
             "alignItems": "center",
-            "gap": "0.4rem",
-            "margin": "0 0 0.85rem",
+            "gap": "0.3rem",
+            "margin": "0 0 0.9rem",
             "color": "var(--color-text-muted)",
-            "fontSize": "0.9rem"
+            "fontSize": "0.88rem",
+            "fontWeight": "500"
           },
           "children": [
-            { "tagName": "span", "textContent": "📍" },
+            { "tagName": "span", "style": { "fontSize": "0.8rem" }, "textContent": "📍" },
             { "tagName": "span", "textContent": "${state.city}" }
           ]
         },
@@ -102,21 +182,101 @@
           "tagName": "div",
           "style": {
             "display": "flex",
-            "gap": "1rem",
+            "alignItems": "center",
             "paddingTop": "0.85rem",
-            "borderTop": "1px solid var(--color-border)",
-            "fontSize": "0.9rem",
-            "color": "var(--color-text-primary)",
-            "fontWeight": "600"
+            "borderTop": "1px solid var(--color-border)"
           },
           "children": [
-            { "tagName": "span", "textContent": "${state.beds} bd" },
-            { "tagName": "span", "style": { "color": "var(--color-border)" }, "textContent": "|" },
-            { "tagName": "span", "textContent": "${state.baths} ba" },
-            { "tagName": "span", "style": { "color": "var(--color-border)" }, "textContent": "|" },
             {
-              "tagName": "span",
-              "textContent": "${Number(state.sqft).toLocaleString('en-US')} sqft"
+              "tagName": "div",
+              "style": { "flex": "1", "textAlign": "center" },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "800",
+                    "fontSize": "0.98rem",
+                    "color": "var(--color-text-primary)",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.beds}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontSize": "0.72rem",
+                    "color": "var(--color-text-muted)",
+                    "fontWeight": "600"
+                  },
+                  "textContent": "beds"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "width": "1px",
+                "alignSelf": "stretch",
+                "backgroundColor": "var(--color-border)"
+              }
+            },
+            {
+              "tagName": "div",
+              "style": { "flex": "1", "textAlign": "center" },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "800",
+                    "fontSize": "0.98rem",
+                    "color": "var(--color-text-primary)",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.baths}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontSize": "0.72rem",
+                    "color": "var(--color-text-muted)",
+                    "fontWeight": "600"
+                  },
+                  "textContent": "baths"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "width": "1px",
+                "alignSelf": "stretch",
+                "backgroundColor": "var(--color-border)"
+              }
+            },
+            {
+              "tagName": "div",
+              "style": { "flex": "1", "textAlign": "center" },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "800",
+                    "fontSize": "0.98rem",
+                    "color": "var(--color-text-primary)",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${Number(state.sqft).toLocaleString('en-US')}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontSize": "0.72rem",
+                    "color": "var(--color-text-muted)",
+                    "fontWeight": "600"
+                  },
+                  "textContent": "sqft"
+                }
+              ]
             }
           ]
         }

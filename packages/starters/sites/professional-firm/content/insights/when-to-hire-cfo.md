@@ -3,6 +3,7 @@ title: When Does a Growing Company Need a CFO?
 excerpt: You may not need a full-time finance chief yet, but you probably need the function. A look at the signals and the fractional middle ground.
 date: September 30, 2025
 author: Dana Whitfield
+category: Advisory
 order: 4
 ---
 

@@ -3,6 +3,7 @@ title: Backroad Gravel ADV
 sku: backroad-gravel-adv
 price: $2,649
 category: Gravel
+badge: Bestseller
 image: /images/product-3.jpg
 order: 5
 ---

@@ -11,25 +11,25 @@ state:
     limit: 4
 ---
 
-::sa-hero{props.eyebrow="✦ Now with automations & analytics" props.heading="The product platform for teams that ship." props.subheading="Flowlark brings planning, building, and shipping into one fast, delightful workspace — so your team spends less time on busywork and more time making things." props.cta="Get started free" props.ctaHref="/pricing/" props.cta2="See the features" props.cta2Href="/features/" props.note="Free forever plan · No credit card required" props.image="/images/hero.jpg" props.imageAlt="The Flowlark product dashboard showing projects, timelines, and analytics"}
+::sa-hero{props.eyebrow="Now with automations & analytics" props.heading="The product platform for teams that" props.headingAccent="ship." props.subheading="Flowlark brings planning, building, and shipping into one fast, delightful workspace — so your team spends less time on busywork and more time making things." props.cta="Get started free" props.ctaHref="/pricing/" props.cta2="See the features" props.cta2Href="/features/" props.note="Free forever plan · No credit card required" props.image="/images/hero.jpg" props.imageAlt="The Flowlark product dashboard showing projects, timelines, and analytics"}
 
 ::sa-logo-cloud{}
 
 :::::section{style.padding="clamp(4rem, 8vw, 6rem) 1.5rem"}
 ::sa-section-header{props.eyebrow="Why Flowlark" props.heading="Everything your team needs, nothing it doesn’t" props.subheading="One workspace that replaces the tangle of trackers, docs, and spreadsheets your team juggles today."}
 
-::::div{style.maxWidth="var(--max-width)" style.margin="0 auto" style.display="grid" style.gridTemplateColumns="repeat(3, 1fr)" style.gap="1.25rem" style.--md.gridTemplateColumns="1fr"}
-::sa-feature-card{props.icon="⚡" props.title="Ship faster" props.text="Plan work, track progress, and hand off cleanly — all in a workspace that keeps everyone in sync."}
+::::div{style.maxWidth="var(--max-width)" style.margin="0 auto" style.display="grid" style.gridTemplateColumns="repeat(6, 1fr)" style.gap="1rem" style.--md.gridTemplateColumns="1fr"}
+::sa-feature-card{props.col="3" props.icon="⚡" props.title="Ship faster" props.text="Plan work, track progress, and hand off cleanly — all in a workspace that keeps everyone in sync."}
 
-::sa-feature-card{props.icon="🤖" props.title="Automate the busywork" props.text="Trigger updates, assignments, and reminders automatically. Set a rule once and let it run."}
+::sa-feature-card{props.col="3" props.icon="🤖" props.title="Automate the busywork" props.text="Trigger updates, assignments, and reminders automatically. Set a rule once and let it run."}
 
-::sa-feature-card{props.icon="📊" props.title="See what matters" props.text="Live dashboards turn your team’s activity into insight — no exports, no stale slides."}
+::sa-feature-card{props.col="2" props.icon="📊" props.title="See what matters" props.text="Live dashboards turn your team’s activity into insight — no exports, no stale slides."}
 
-::sa-feature-card{props.icon="🧩" props.title="Fits your stack" props.text="Connect the tools you already use. Flowlark plays nicely with the rest of your workflow."}
+::sa-feature-card{props.col="2" props.icon="🧩" props.title="Fits your stack" props.text="Connect the tools you already use. Flowlark plays nicely with the rest of your workflow."}
 
-::sa-feature-card{props.icon="🔒" props.title="Secure by default" props.text="Encryption in transit and at rest, granular permissions, SSO, and audit logs when you need them."}
+::sa-feature-card{props.col="2" props.icon="🔒" props.title="Secure by default" props.text="Encryption in transit and at rest, granular permissions, SSO, and audit logs when you need them."}
 
-::sa-feature-card{props.icon="🌍" props.title="Built for teams" props.text="From two people to two thousand, Flowlark scales with you without slowing anyone down."}
+::sa-feature-card{props.col="6" props.icon="🌍" props.title="Built for teams, at any scale" props.text="From two people to two thousand, Flowlark scales with you without slowing anyone down — with the performance and controls larger teams need."}
 ::::
 :::::
 

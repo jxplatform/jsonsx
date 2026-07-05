@@ -13,91 +13,128 @@
   "style": {
     "display": "block",
     "position": "relative",
+    "overflow": "hidden",
     "backgroundColor": "var(--color-bg-dark)",
-    "backgroundImage": "url('${state.bg}')",
-    "backgroundSize": "cover",
-    "backgroundPosition": "center",
-    "color": "var(--color-text-white)",
-    "textAlign": "center"
+    "backgroundImage": "linear-gradient(105deg, rgba(14,26,35,0.97) 0%, rgba(14,26,35,0.9) 48%, rgba(14,26,35,0.62) 100%), url('${state.bg}')",
+    "backgroundSize": "cover, cover",
+    "backgroundPosition": "center, center",
+    "color": "var(--color-text-white)"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
         "position": "absolute",
-        "inset": "0",
-        "background": "linear-gradient(180deg, rgba(28,25,23,0.82) 0%, rgba(28,25,23,0.9) 100%)"
+        "top": "0",
+        "left": "0",
+        "right": "0",
+        "height": "6px",
+        "background": "var(--hazard)"
       }
     },
     {
       "tagName": "div",
       "style": {
         "position": "relative",
-        "zIndex": "10",
-        "maxWidth": "var(--max-width-narrow)",
+        "zIndex": "5",
+        "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "clamp(3.5rem, 8vw, 5.5rem) 1.5rem"
+        "padding": "clamp(3.25rem, 7vw, 5rem) 1.5rem",
+        "display": "grid",
+        "gridTemplateColumns": "1.35fr 1fr",
+        "gap": "clamp(2rem, 5vw, 4rem)",
+        "alignItems": "center",
+        "@--md": { "gridTemplateColumns": "1fr", "gap": "2rem" }
       },
       "children": [
         {
-          "tagName": "p",
-          "style": {
-            "display": "${state.eyebrow ? 'block' : 'none'}",
-            "textTransform": "uppercase",
-            "letterSpacing": "0.16em",
-            "fontSize": "0.8rem",
-            "fontWeight": "700",
-            "color": "#fed7aa",
-            "margin": "0 0 1rem"
-          },
-          "textContent": "${state.eyebrow}"
-        },
-        {
-          "tagName": "h2",
-          "style": {
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "clamp(1.9rem, 4vw, 2.75rem)",
-            "fontWeight": "800",
-            "lineHeight": "1.12",
-            "letterSpacing": "-0.03em",
-            "margin": "0 0 1rem"
-          },
-          "textContent": "${state.heading}"
-        },
-        {
-          "tagName": "p",
-          "style": {
-            "fontSize": "1.1rem",
-            "lineHeight": "1.7",
-            "opacity": "0.9",
-            "margin": "0 0 2rem"
-          },
-          "textContent": "${state.text}"
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "display": "${state.eyebrow ? 'inline-flex' : 'none'}",
+                "alignItems": "center",
+                "gap": "0.5rem",
+                "textTransform": "uppercase",
+                "fontFamily": "var(--font-heading)",
+                "letterSpacing": "0.14em",
+                "fontSize": "0.82rem",
+                "fontWeight": "600",
+                "color": "var(--color-primary)",
+                "margin": "0 0 1rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "1.6rem",
+                    "height": "0.2rem",
+                    "backgroundColor": "var(--color-primary)",
+                    "display": "inline-block"
+                  }
+                },
+                { "tagName": "span", "textContent": "${state.eyebrow}" }
+              ]
+            },
+            {
+              "tagName": "h2",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "clamp(2.1rem, 4.6vw, 3.2rem)",
+                "fontWeight": "700",
+                "textTransform": "uppercase",
+                "lineHeight": "1.02",
+                "letterSpacing": "0.01em",
+                "margin": "0 0 1rem",
+                "color": "var(--color-text-white)"
+              },
+              "textContent": "${state.heading}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "1.12rem",
+                "lineHeight": "1.65",
+                "color": "#cdd8e0",
+                "margin": "0",
+                "maxWidth": "52ch"
+              },
+              "textContent": "${state.text}"
+            }
+          ]
         },
         {
           "tagName": "div",
           "style": {
             "display": "flex",
-            "gap": "0.75rem",
-            "flexWrap": "wrap",
-            "alignItems": "center",
-            "justifyContent": "center"
+            "flexDirection": "column",
+            "gap": "1rem",
+            "alignItems": "stretch"
           },
           "children": [
             {
               "tagName": "a",
               "attributes": { "href": "${state.ctaHref}" },
               "style": {
-                "display": "inline-block",
+                "display": "block",
+                "textAlign": "center",
                 "backgroundColor": "var(--color-primary)",
                 "color": "var(--color-text-white)",
-                "padding": "0.9rem 2.25rem",
-                "borderRadius": "var(--radius)",
-                "fontSize": "1.05rem",
-                "fontWeight": "700",
+                "padding": "1.05rem 2rem",
+                "borderRadius": "var(--radius-sm)",
+                "fontFamily": "var(--font-heading)",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.05em",
+                "fontSize": "1.1rem",
+                "fontWeight": "600",
                 "textDecoration": "none",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                "boxShadow": "0 16px 34px -14px rgba(244,81,30,0.9)",
+                "transition": "background-color 0.15s, transform 0.15s",
+                ":hover": {
+                  "backgroundColor": "var(--color-primary-hover)",
+                  "transform": "translateY(-2px)"
+                }
               },
               "textContent": "${state.cta}"
             },
@@ -105,15 +142,39 @@
               "tagName": "a",
               "attributes": { "href": "${state.phoneHref}" },
               "style": {
-                "display": "${state.phone ? 'inline-block' : 'none'}",
+                "display": "${state.phone ? 'flex' : 'none'}",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "gap": "0.6rem",
+                "padding": "1rem 2rem",
+                "border": "1px solid rgba(255,255,255,0.28)",
+                "borderRadius": "var(--radius-sm)",
+                "backgroundColor": "rgba(255,255,255,0.04)",
                 "color": "var(--color-text-white)",
-                "fontSize": "1.05rem",
-                "fontWeight": "700",
                 "textDecoration": "none",
-                "opacity": "0.95",
-                ":hover": { "color": "#fed7aa" }
+                "transition": "background-color 0.15s, border-color 0.15s",
+                ":hover": {
+                  "backgroundColor": "rgba(255,255,255,0.09)",
+                  "borderColor": "rgba(255,255,255,0.5)"
+                }
               },
-              "textContent": "or call ${state.phone}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": { "color": "var(--color-primary)", "fontSize": "1.2rem" },
+                  "textContent": "☏"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "700",
+                    "fontSize": "1.3rem",
+                    "letterSpacing": "0.01em"
+                  },
+                  "textContent": "${state.phone}"
+                }
+              ]
             }
           ]
         }

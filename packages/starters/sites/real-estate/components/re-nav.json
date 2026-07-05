@@ -1,15 +1,15 @@
 {
   "tagName": "re-nav",
   "state": {
-    "brand": "Northshore Realty"
+    "brand": "Northshore"
   },
   "style": {
     "display": "block",
     "position": "sticky",
     "top": "0",
     "zIndex": "50",
-    "backgroundColor": "rgba(255, 255, 255, 0.9)",
-    "backdropFilter": "blur(8px)",
+    "backgroundColor": "rgba(255, 255, 255, 0.86)",
+    "backdropFilter": "blur(14px)",
     "borderBottom": "1px solid var(--color-border)"
   },
   "children": [
@@ -18,26 +18,21 @@
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "1rem 1.5rem",
+        "padding": "0.85rem 1.5rem",
         "display": "flex",
         "alignItems": "center",
-        "justifyContent": "space-between",
-        "gap": "1.5rem"
+        "gap": "1.25rem"
       },
       "children": [
         {
           "tagName": "a",
           "attributes": { "href": "/" },
           "style": {
-            "display": "flex",
+            "display": "inline-flex",
             "alignItems": "center",
-            "gap": "0.5rem",
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "1.35rem",
-            "fontWeight": "800",
-            "color": "var(--color-text-primary)",
+            "gap": "0.6rem",
             "textDecoration": "none",
-            "letterSpacing": "-0.02em"
+            "marginRight": "0.5rem"
           },
           "children": [
             {
@@ -46,16 +41,49 @@
                 "display": "inline-flex",
                 "alignItems": "center",
                 "justifyContent": "center",
-                "width": "1.75rem",
-                "height": "1.75rem",
-                "borderRadius": "0.4rem",
-                "backgroundColor": "var(--color-primary)",
+                "width": "2rem",
+                "height": "2rem",
+                "borderRadius": "0.55rem",
+                "background": "linear-gradient(150deg, var(--color-accent-bright), var(--color-primary))",
                 "color": "var(--color-text-white)",
-                "fontSize": "1rem"
+                "fontSize": "1.05rem",
+                "boxShadow": "0 6px 16px -6px rgba(15,118,110,0.6)"
               },
               "textContent": "⌂"
             },
-            { "tagName": "span", "textContent": "${state.brand}" }
+            {
+              "tagName": "span",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "lineHeight": "1"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.15rem",
+                    "fontWeight": "800",
+                    "letterSpacing": "-0.03em",
+                    "color": "var(--color-text-primary)"
+                  },
+                  "textContent": "${state.brand} Realty"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontSize": "0.62rem",
+                    "fontWeight": "700",
+                    "letterSpacing": "0.22em",
+                    "textTransform": "uppercase",
+                    "color": "var(--color-text-muted)",
+                    "marginTop": "0.2rem"
+                  },
+                  "textContent": "North Shore MLS"
+                }
+              ]
+            }
           ]
         },
         {
@@ -63,53 +91,124 @@
           "style": {
             "display": "flex",
             "alignItems": "center",
-            "gap": "1.75rem",
-            "@--sm": { "gap": "1rem" }
+            "gap": "1.4rem",
+            "marginLeft": "0.5rem",
+            "@--md": { "display": "none" }
           },
           "children": [
             {
               "tagName": "a",
               "attributes": { "href": "/listings/" },
               "style": {
-                "color": "var(--color-text-primary)",
+                "color": "var(--color-text-secondary)",
                 "textDecoration": "none",
                 "fontWeight": "600",
-                "fontSize": "0.95rem",
+                "fontSize": "0.92rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "Buy"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/listings/" },
+              "style": {
+                "color": "var(--color-text-secondary)",
+                "textDecoration": "none",
+                "fontWeight": "600",
+                "fontSize": "0.92rem",
+                "transition": "color 0.15s",
                 ":hover": { "color": "var(--color-primary)" }
               },
               "textContent": "Listings"
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/about/" },
+              "attributes": { "href": "/#neighborhoods" },
               "style": {
-                "color": "var(--color-text-primary)",
+                "color": "var(--color-text-secondary)",
                 "textDecoration": "none",
                 "fontWeight": "600",
-                "fontSize": "0.95rem",
-                "@--sm": { "display": "none" },
+                "fontSize": "0.92rem",
+                "transition": "color 0.15s",
                 ":hover": { "color": "var(--color-primary)" }
               },
-              "textContent": "About"
+              "textContent": "Neighborhoods"
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/contact/" },
+              "attributes": { "href": "/about/" },
               "style": {
-                "display": "inline-block",
-                "backgroundColor": "var(--color-primary)",
-                "color": "var(--color-text-white)",
-                "padding": "0.55rem 1.25rem",
-                "borderRadius": "var(--radius)",
+                "color": "var(--color-text-secondary)",
                 "textDecoration": "none",
-                "fontWeight": "700",
-                "fontSize": "0.95rem",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                "fontWeight": "600",
+                "fontSize": "0.92rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-primary)" }
               },
-              "textContent": "Contact"
+              "textContent": "About"
             }
           ]
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "/listings/", "aria-label": "Search homes" },
+          "style": {
+            "marginLeft": "auto",
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "0.55rem",
+            "padding": "0.5rem 0.9rem 0.5rem 0.75rem",
+            "borderRadius": "999px",
+            "border": "1px solid var(--color-border-strong)",
+            "backgroundColor": "var(--color-bg-white)",
+            "color": "var(--color-text-muted)",
+            "textDecoration": "none",
+            "fontSize": "0.88rem",
+            "fontWeight": "600",
+            "transition": "border-color 0.15s, color 0.15s",
+            "@--sm": { "display": "none" },
+            ":hover": { "borderColor": "var(--color-primary)", "color": "var(--color-primary)" }
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "width": "1.5rem",
+                "height": "1.5rem",
+                "borderRadius": "999px",
+                "backgroundColor": "var(--color-teal-tint)",
+                "color": "var(--color-primary)",
+                "fontSize": "0.85rem"
+              },
+              "textContent": "⌕"
+            },
+            { "tagName": "span", "textContent": "Search homes" }
+          ]
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "/contact/" },
+          "style": {
+            "display": "inline-flex",
+            "alignItems": "center",
+            "backgroundColor": "var(--color-primary)",
+            "color": "var(--color-text-white)",
+            "padding": "0.6rem 1.15rem",
+            "borderRadius": "999px",
+            "textDecoration": "none",
+            "fontWeight": "700",
+            "fontSize": "0.9rem",
+            "transition": "background-color 0.15s, transform 0.15s",
+            ":hover": {
+              "backgroundColor": "var(--color-primary-hover)",
+              "transform": "translateY(-1px)"
+            }
+          },
+          "textContent": "List with us"
         }
       ]
     }

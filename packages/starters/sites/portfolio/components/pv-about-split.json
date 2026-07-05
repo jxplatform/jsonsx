@@ -7,7 +7,7 @@
   },
   "style": {
     "display": "block",
-    "padding": "clamp(3.5rem, 8vw, 6rem) 1.5rem"
+    "padding": "clamp(4rem, 10vw, 8rem) clamp(1.5rem, 4vw, 4rem)"
   },
   "children": [
     {
@@ -16,15 +16,15 @@
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
         "display": "grid",
-        "gridTemplateColumns": "5fr 6fr",
-        "gap": "clamp(2rem, 5vw, 4.5rem)",
+        "gridTemplateColumns": "6fr 5fr",
+        "gap": "clamp(2.5rem, 6vw, 6rem)",
         "alignItems": "center",
-        "@--md": { "gridTemplateColumns": "1fr" }
+        "@--md": { "gridTemplateColumns": "1fr", "gap": "2.5rem" }
       },
       "children": [
         {
           "tagName": "div",
-          "style": { "order": "${state.reverse ? '2' : '1'}" },
+          "style": { "order": "${state.reverse ? '2' : '1'}", "position": "relative" },
           "children": [
             {
               "tagName": "img",
@@ -35,10 +35,22 @@
               },
               "style": {
                 "width": "100%",
-                "height": "auto",
-                "borderRadius": "var(--radius)",
+                "aspectRatio": "4 / 5",
+                "objectFit": "cover",
                 "display": "block",
-                "boxShadow": "0 18px 50px rgba(17,24,39,0.16)"
+                "filter": "grayscale(0.15)"
+              }
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "position": "absolute",
+                "top": "1rem",
+                "left": "1rem",
+                "right": "1rem",
+                "bottom": "1rem",
+                "border": "1px solid rgba(200, 164, 92, 0.4)",
+                "pointerEvents": "none"
               }
             }
           ]
@@ -49,7 +61,7 @@
             "order": "${state.reverse ? '1' : '2'}",
             "fontSize": "1.1rem",
             "lineHeight": "1.85",
-            "color": "var(--color-text-primary)"
+            "color": "var(--color-text-muted)"
           },
           "children": [{ "tagName": "slot" }]
         }

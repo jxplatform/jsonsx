@@ -1,5 +1,5 @@
 ---
-title: "Insights — Meridian Advisory"
+title: "The Quarterly — Meridian Advisory"
 state:
   articles:
     $prototype: ContentCollection
@@ -10,20 +10,16 @@ state:
       order: asc
 ---
 
-:::::section{style.padding="clamp(3rem, 6vw, 4.5rem) 1.5rem" style.backgroundColor="var(--color-bg-cream)"}
-::pf-section-header{props.eyebrow="Insights" props.heading="Practical guidance for owners and operators" props.subheading="Short, useful notes on tax, cash flow, and the financial decisions that shape a growing company."}
+:::::section{style.padding="clamp(3rem, 6vw, 4.5rem) 1.5rem" style.backgroundColor="var(--color-bg-cream)" style.borderBottom="1px solid var(--color-rule)"}
+::pf-section-header{props.eyebrow="The Quarterly" props.index="Vol. XVIII · Winter 2025" props.heading="Practical guidance for owners and operators" props.subheading="Short, useful notes on tax, cash flow, and the financial decisions that shape a growing company — a running index, newest at the top."}
 :::::
 
-:::div{style.maxWidth="var(--max-width)" style.margin="0 auto" style.padding="0 1.5rem" style.marginTop="clamp(2rem, 5vw, 3.5rem)"}
-::img{src="/images/insight-cover.jpg" alt="Financial charts and reports on a desk" loading="lazy" style.width="100%" style.height="clamp(220px, 32vw, 380px)" style.objectFit="cover" style.borderRadius="var(--radius)" style.display="block"}
-:::
-
-:::::section{style.maxWidth="var(--max-width)" style.margin="0 auto" style.padding="clamp(3.5rem, 8vw, 6rem) 1.5rem"}
-::::div{style.display="grid" style.gridTemplateColumns="repeat(3, 1fr)" style.gap="1.5rem" style.--md.gridTemplateColumns="1fr"}
+:::::section{style.padding="clamp(3.5rem, 7vw, 5.5rem) 1.5rem"}
+::::div{style.maxWidth="var(--max-width)" style.margin="0 auto" style.borderBottom="1px solid var(--color-hairline)"}
 :::Array{items.ref="#/state/articles"}
-::pf-insight-card{props.title="${item.data.title}" props.excerpt="${item.data.excerpt}" props.date="${item.data.date}" props.author="${item.data.author}" props.href="/insights/${item.id}/"}
+::pf-insight-row{props.number="0${item.data.order}" props.title="${item.data.title}" props.excerpt="${item.data.excerpt}" props.date="${item.data.date}" props.category="${item.data.category}" props.readingTime="${item.\_meta.readingTime}" props.href="/insights/${item.id}/"}
 :::
 ::::
 :::::
 
-::pf-cta{props.heading="Have a question these raised?" props.text="Every one of these notes started with a client conversation. Start yours with a free consultation." props.cta="Book a Consultation" props.ctaHref="/contact/"}
+::pf-cta{props.eyebrow="Consultation" props.heading="Have a question these raised?" props.text="Every one of these notes started with a client conversation. Start yours with a free consultation." props.cta="Book a consultation" props.ctaHref="/contact/"}

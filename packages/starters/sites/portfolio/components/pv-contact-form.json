@@ -4,16 +4,30 @@
     "heading": "Project inquiry"
   },
   "style": {
-    "display": "block"
+    "display": "block",
+    "& input": {
+      "width": "100%",
+      "padding": "0.85rem 1rem",
+      "border": "1px solid var(--color-line)",
+      "backgroundColor": "var(--color-bg-elev)",
+      "color": "var(--color-text-primary)",
+      "borderRadius": "0",
+      "fontSize": "1rem",
+      "fontFamily": "inherit",
+      "outline": "none"
+    },
+    "& input:focus": { "borderColor": "var(--color-primary)" },
+    "& textarea:focus": { "borderColor": "var(--color-primary)" }
   },
   "children": [
     {
       "tagName": "h3",
       "style": {
         "fontFamily": "var(--font-heading)",
-        "fontSize": "1.6rem",
-        "fontWeight": "600",
-        "margin": "0 0 1.25rem"
+        "fontSize": "1.9rem",
+        "fontWeight": "500",
+        "margin": "0 0 1.5rem",
+        "color": "var(--color-text-primary)"
       },
       "textContent": "${state.heading}"
     },
@@ -30,13 +44,6 @@
             "placeholder": "Your name",
             "required": "true",
             "aria-label": "Your name"
-          },
-          "style": {
-            "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem"
           }
         },
         {
@@ -47,13 +54,6 @@
             "placeholder": "Email address",
             "required": "true",
             "aria-label": "Email address"
-          },
-          "style": {
-            "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem"
           }
         },
         {
@@ -67,25 +67,11 @@
                 "name": "type",
                 "placeholder": "Type of project",
                 "aria-label": "Type of project"
-              },
-              "style": {
-                "width": "100%",
-                "padding": "0.75rem 0.9rem",
-                "border": "1px solid var(--color-border)",
-                "borderRadius": "var(--radius)",
-                "fontSize": "1rem"
               }
             },
             {
               "tagName": "input",
-              "attributes": { "type": "date", "name": "date", "aria-label": "Preferred date" },
-              "style": {
-                "width": "100%",
-                "padding": "0.75rem 0.9rem",
-                "border": "1px solid var(--color-border)",
-                "borderRadius": "var(--radius)",
-                "fontSize": "1rem"
-              }
+              "attributes": { "type": "date", "name": "date", "aria-label": "Preferred date" }
             }
           ]
         },
@@ -99,26 +85,29 @@
           },
           "style": {
             "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
+            "padding": "0.85rem 1rem",
+            "border": "1px solid var(--color-line)",
+            "backgroundColor": "var(--color-bg-elev)",
+            "color": "var(--color-text-primary)",
+            "borderRadius": "0",
             "fontSize": "1rem",
-            "fontFamily": "inherit"
+            "fontFamily": "inherit",
+            "outline": "none"
           }
         },
         {
           "tagName": "button",
           "attributes": { "type": "submit" },
-          "textContent": "Send Inquiry",
+          "textContent": "Send Inquiry →",
           "style": {
             "backgroundColor": "var(--color-primary)",
-            "color": "var(--color-text-white)",
-            "padding": "0.85rem 1.75rem",
+            "color": "var(--color-bg)",
+            "padding": "0.9rem 1.75rem",
             "border": "none",
-            "borderRadius": "var(--radius)",
-            "fontSize": "0.95rem",
-            "fontWeight": "600",
-            "letterSpacing": "0.04em",
+            "borderRadius": "0",
+            "fontSize": "0.8rem",
+            "fontWeight": "700",
+            "letterSpacing": "0.14em",
             "textTransform": "uppercase",
             "cursor": "pointer",
             "justifySelf": "start",
@@ -129,7 +118,7 @@
         {
           "tagName": "p",
           "style": { "fontSize": "0.85rem", "color": "var(--color-text-muted)", "margin": "0" },
-          "textContent": "This is a demo form. Wire it to your booking provider or email in pages/contact.md."
+          "textContent": "Demo form — wire it to your booking provider or email in pages/contact.md."
         }
       ]
     }

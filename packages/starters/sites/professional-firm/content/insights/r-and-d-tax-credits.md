@@ -3,6 +3,7 @@ title: The R&D Credit Is Not Just for Laboratories
 excerpt: Software teams, manufacturers, and product companies routinely qualify for research credits they never claim. Here is what actually counts.
 date: September 8, 2025
 author: Marcus Bell
+category: Tax
 order: 5
 ---
 

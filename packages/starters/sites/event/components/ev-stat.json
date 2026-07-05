@@ -7,33 +7,38 @@
   "style": {
     "display": "block",
     "textAlign": "center",
-    "padding": "0.5rem"
+    "padding": "1.4rem 0.75rem",
+    "borderRadius": "var(--radius)",
+    "border": "1px solid var(--color-border)",
+    "background": "linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))",
+    "transition": "border-color 0.18s, transform 0.18s",
+    ":hover": { "borderColor": "rgba(255,61,154,0.45)", "transform": "translateY(-2px)" }
   },
   "children": [
     {
       "tagName": "div",
       "style": {
         "fontFamily": "var(--font-heading)",
-        "fontSize": "clamp(2.25rem, 5vw, 3.25rem)",
-        "fontWeight": "700",
+        "fontSize": "clamp(2.4rem, 5vw, 3.4rem)",
+        "fontWeight": "800",
         "lineHeight": "1",
-        "letterSpacing": "-0.02em",
-        "background": "linear-gradient(135deg, var(--color-primary), var(--color-accent))",
-        "WebkitBackgroundClip": "text",
+        "letterSpacing": "-0.03em",
+        "background": "var(--grad)",
         "backgroundClip": "text",
-        "WebkitTextFillColor": "transparent",
-        "color": "var(--color-primary)"
+        "webkitBackgroundClip": "text",
+        "webkitTextFillColor": "transparent",
+        "color": "var(--color-accent)"
       },
       "textContent": "${state.value}"
     },
     {
       "tagName": "div",
       "style": {
-        "marginTop": "0.5rem",
-        "fontSize": "0.9rem",
-        "fontWeight": "500",
+        "marginTop": "0.55rem",
+        "fontSize": "0.82rem",
+        "fontWeight": "600",
         "textTransform": "uppercase",
-        "letterSpacing": "0.08em",
+        "letterSpacing": "0.1em",
         "color": "var(--color-text-muted)"
       },
       "textContent": "${state.label}"

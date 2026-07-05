@@ -1,16 +1,12 @@
 {
   "tagName": "bl-nav",
-  "state": {
-    "brand": "The Long Field"
-  },
   "style": {
-    "display": "block",
     "position": "sticky",
     "top": "0",
     "zIndex": "50",
-    "backgroundColor": "rgba(255, 255, 255, 0.9)",
-    "backdropFilter": "blur(8px)",
-    "borderBottom": "1px solid var(--color-border)"
+    "display": "block",
+    "backgroundColor": "var(--color-paper)",
+    "borderBottom": "1.5px solid var(--color-rule)"
   },
   "children": [
     {
@@ -18,11 +14,11 @@
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "1rem 1.5rem",
+        "padding": "0.55rem 1.5rem",
         "display": "flex",
         "alignItems": "center",
         "justifyContent": "space-between",
-        "gap": "1.5rem"
+        "gap": "1rem"
       },
       "children": [
         {
@@ -30,13 +26,14 @@
           "attributes": { "href": "/" },
           "style": {
             "fontFamily": "var(--font-heading)",
-            "fontSize": "1.4rem",
-            "fontWeight": "600",
+            "fontWeight": "700",
+            "fontSize": "1.05rem",
+            "letterSpacing": "0.01em",
             "color": "var(--color-text-primary)",
             "textDecoration": "none",
-            "letterSpacing": "-0.01em"
+            "whiteSpace": "nowrap"
           },
-          "textContent": "${state.brand}"
+          "textContent": "The Long Field"
         },
         {
           "tagName": "nav",
@@ -44,20 +41,24 @@
             "display": "flex",
             "alignItems": "center",
             "gap": "1.75rem",
-            "@--sm": { "gap": "1rem" }
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.72rem",
+            "fontWeight": "500",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.16em",
+            "@--sm": { "gap": "1.1rem" }
           },
           "children": [
             {
               "tagName": "a",
-              "attributes": { "href": "/" },
+              "attributes": { "href": "/#latest" },
               "style": {
                 "color": "var(--color-text-primary)",
                 "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "1rem",
+                "transition": "color 0.15s",
                 ":hover": { "color": "var(--color-primary)" }
               },
-              "textContent": "Writing"
+              "textContent": "Essays"
             },
             {
               "tagName": "a",
@@ -65,9 +66,7 @@
               "style": {
                 "color": "var(--color-text-primary)",
                 "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "1rem",
-                "@--sm": { "display": "none" },
+                "transition": "color 0.15s",
                 ":hover": { "color": "var(--color-primary)" }
               },
               "textContent": "About"
@@ -76,16 +75,10 @@
               "tagName": "a",
               "attributes": { "href": "/contact/" },
               "style": {
-                "display": "inline-block",
-                "backgroundColor": "var(--color-primary)",
-                "color": "var(--color-text-white)",
-                "padding": "0.55rem 1.25rem",
-                "borderRadius": "var(--radius)",
+                "color": "var(--color-primary)",
                 "textDecoration": "none",
-                "fontWeight": "600",
-                "fontSize": "0.95rem",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "0.65" }
               },
               "textContent": "Subscribe"
             }

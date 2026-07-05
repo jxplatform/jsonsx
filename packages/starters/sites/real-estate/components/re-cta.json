@@ -4,11 +4,15 @@
     "heading": "",
     "text": "",
     "cta": "Contact an Agent",
-    "ctaHref": "/contact/"
+    "ctaHref": "/contact/",
+    "cta2": "",
+    "cta2Href": "/listings/"
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-dark)",
+    "position": "relative",
+    "overflow": "hidden",
+    "background": "radial-gradient(ellipse 55% 80% at 50% 120%, rgba(20,184,166,0.22), transparent 65%), var(--color-bg-dark)",
     "color": "var(--color-text-white)",
     "padding": "clamp(3.5rem, 8vw, 5.5rem) 1.5rem",
     "textAlign": "center"
@@ -16,46 +20,107 @@
   "children": [
     {
       "tagName": "div",
-      "style": { "maxWidth": "var(--max-width-narrow)", "margin": "0 auto" },
+      "style": {
+        "maxWidth": "var(--max-width-narrow)",
+        "margin": "0 auto",
+        "position": "relative",
+        "zIndex": "2"
+      },
       "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "textTransform": "uppercase",
+            "letterSpacing": "0.18em",
+            "fontSize": "0.74rem",
+            "fontWeight": "700",
+            "color": "var(--color-accent-bright)",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "Northshore Realty"
+        },
         {
           "tagName": "h2",
           "style": {
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "clamp(1.9rem, 4vw, 2.75rem)",
-            "fontWeight": "800",
-            "lineHeight": "1.15",
-            "letterSpacing": "-0.02em",
-            "margin": "0 0 1rem"
+            "fontFamily": "var(--font-display)",
+            "fontSize": "clamp(2rem, 4.4vw, 3rem)",
+            "fontWeight": "500",
+            "lineHeight": "1.1",
+            "letterSpacing": "-0.015em",
+            "margin": "0 0 1rem",
+            "color": "var(--color-text-white)"
           },
           "textContent": "${state.heading}"
         },
         {
           "tagName": "p",
           "style": {
-            "fontSize": "1.1rem",
-            "lineHeight": "1.7",
-            "opacity": "0.85",
-            "margin": "0 0 2rem"
+            "fontSize": "1.12rem",
+            "lineHeight": "1.65",
+            "color": "rgba(255,255,255,0.74)",
+            "margin": "0 auto 2.25rem",
+            "maxWidth": "50ch"
           },
           "textContent": "${state.text}"
         },
         {
-          "tagName": "a",
-          "attributes": { "href": "${state.ctaHref}" },
+          "tagName": "div",
           "style": {
-            "display": "inline-block",
-            "backgroundColor": "var(--color-primary)",
-            "color": "var(--color-text-white)",
-            "padding": "0.9rem 2.25rem",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1.05rem",
-            "fontWeight": "700",
-            "textDecoration": "none",
-            "transition": "background-color 0.15s",
-            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+            "display": "flex",
+            "gap": "0.75rem",
+            "justifyContent": "center",
+            "flexWrap": "wrap"
           },
-          "textContent": "${state.cta}"
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "${state.ctaHref}" },
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.5rem",
+                "backgroundColor": "var(--color-accent-bright)",
+                "color": "var(--color-ink)",
+                "padding": "0.9rem 2rem",
+                "borderRadius": "999px",
+                "fontSize": "1.02rem",
+                "fontWeight": "700",
+                "textDecoration": "none",
+                "transition": "transform 0.15s, box-shadow 0.15s",
+                "boxShadow": "0 14px 34px -14px rgba(20,184,166,0.8)",
+                ":hover": {
+                  "transform": "translateY(-2px)",
+                  "boxShadow": "0 20px 44px -14px rgba(20,184,166,0.9)"
+                }
+              },
+              "children": [
+                { "tagName": "span", "textContent": "${state.cta}" },
+                { "tagName": "span", "textContent": "→" }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "${state.cta2Href}" },
+              "style": {
+                "display": "${state.cta2 ? 'inline-flex' : 'none'}",
+                "alignItems": "center",
+                "border": "1px solid rgba(255,255,255,0.22)",
+                "backgroundColor": "rgba(255,255,255,0.04)",
+                "color": "var(--color-text-white)",
+                "padding": "0.9rem 2rem",
+                "borderRadius": "999px",
+                "fontSize": "1.02rem",
+                "fontWeight": "600",
+                "textDecoration": "none",
+                "transition": "background-color 0.15s, border-color 0.15s",
+                ":hover": {
+                  "backgroundColor": "rgba(255,255,255,0.09)",
+                  "borderColor": "rgba(255,255,255,0.4)"
+                }
+              },
+              "textContent": "${state.cta2}"
+            }
+          ]
         }
       ]
     }

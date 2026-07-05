@@ -8,8 +8,9 @@
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-dark)",
+    "backgroundColor": "var(--color-ink)",
     "color": "var(--color-text-white)",
+    "borderTop": "1px solid var(--color-terminal-line)",
     "padding": "3.5rem 1.5rem 2rem"
   },
   "children": [
@@ -30,16 +31,49 @@
             {
               "tagName": "div",
               "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.4rem",
-                "fontWeight": "800",
-                "marginBottom": "0.75rem"
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.6rem",
+                "marginBottom": "0.9rem"
               },
-              "textContent": "${state.brand}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "1.9rem",
+                    "height": "1.9rem",
+                    "borderRadius": "0.5rem",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.8rem",
+                    "fontWeight": "700"
+                  },
+                  "textContent": "</>"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.3rem",
+                    "fontWeight": "800",
+                    "letterSpacing": "-0.02em"
+                  },
+                  "textContent": "${state.brand}"
+                }
+              ]
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.75", "maxWidth": "38ch" },
+              "style": {
+                "margin": "0",
+                "color": "rgba(255,255,255,0.6)",
+                "maxWidth": "40ch",
+                "lineHeight": "1.65"
+              },
               "textContent": "${state.tagline}"
             }
           ]
@@ -50,22 +84,35 @@
             {
               "tagName": "div",
               "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
+                "fontFamily": "var(--font-mono)",
                 "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "color": "var(--color-accent)",
+                "marginBottom": "0.9rem"
               },
-              "textContent": "Admissions"
+              "textContent": "// admissions"
             },
             {
-              "tagName": "p",
-              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "tagName": "a",
+              "attributes": { "href": "mailto:admissions@craftcode.academy" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "marginBottom": "0.4rem",
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.85rem",
+                ":hover": { "color": "var(--color-text-white)" }
+              },
               "textContent": "${state.email}"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.85" },
+              "style": {
+                "margin": "0",
+                "color": "rgba(255,255,255,0.82)",
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.85rem"
+              },
               "textContent": "${state.phone}"
             }
           ]
@@ -76,23 +123,22 @@
             {
               "tagName": "div",
               "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
+                "fontFamily": "var(--font-mono)",
                 "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "color": "var(--color-accent)",
+                "marginBottom": "0.9rem"
               },
-              "textContent": "Explore"
+              "textContent": "// explore"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/curriculum/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "color": "rgba(255,255,255,0.82)",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.4rem",
+                ":hover": { "color": "var(--color-text-white)" }
               },
               "textContent": "Curriculum"
             },
@@ -101,10 +147,10 @@
               "attributes": { "href": "/about/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "color": "rgba(255,255,255,0.82)",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.4rem",
+                ":hover": { "color": "var(--color-text-white)" }
               },
               "textContent": "About"
             },
@@ -113,9 +159,9 @@
               "attributes": { "href": "/enroll/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
-                "textDecoration": "none"
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                ":hover": { "color": "var(--color-text-white)" }
               },
               "textContent": "Enroll"
             }
@@ -129,15 +175,19 @@
         "maxWidth": "var(--max-width)",
         "margin": "2.5rem auto 0",
         "paddingTop": "1.5rem",
-        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
-        "fontSize": "0.85rem",
-        "opacity": "0.6"
+        "borderTop": "1px solid var(--color-terminal-line)",
+        "fontFamily": "var(--font-mono)",
+        "fontSize": "0.8rem",
+        "color": "rgba(255,255,255,0.5)"
       },
       "children": [
         {
           "tagName": "p",
           "style": { "margin": "0" },
-          "textContent": "© Craft & Code Academy. Built with Jx."
+          "children": [
+            { "tagName": "span", "style": { "color": "var(--color-accent)" }, "textContent": "$ " },
+            { "tagName": "span", "textContent": "echo \"© Craft & Code Academy — built with Jx\"" }
+          ]
         }
       ]
     }

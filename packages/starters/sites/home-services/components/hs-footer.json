@@ -1,24 +1,32 @@
 {
   "tagName": "hs-footer",
   "state": {
-    "brand": "Summit Heating & Cooling",
+    "brand": "SUMMIT",
+    "brandSub": "HEATING & COOLING",
     "tagline": "Reliable heating and cooling for Northern Colorado homes — repairs, installs, and 24/7 emergency service.",
     "address": "1420 Prospect Road, Fort Collins, CO 80525",
     "phone": "(970) 555-0148",
-    "license": "CO HVAC Lic. #C-48219"
+    "phoneHref": "tel:+19705550148",
+    "license": "CO HVAC Lic. #C-48219 · Bonded & Insured"
   },
   "style": {
     "display": "block",
+    "position": "relative",
     "backgroundColor": "var(--color-bg-dark)",
     "color": "var(--color-text-white)",
-    "padding": "3.5rem 1.5rem 2rem"
+    "paddingBottom": "2rem"
   },
   "children": [
+    {
+      "tagName": "div",
+      "style": { "height": "6px", "background": "var(--hazard)" }
+    },
     {
       "tagName": "div",
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
+        "padding": "3.25rem 1.5rem 0",
         "display": "grid",
         "gridTemplateColumns": "2fr 1fr 1fr",
         "gap": "2.5rem",
@@ -31,25 +39,78 @@
             {
               "tagName": "div",
               "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.35rem",
-                "fontWeight": "800",
-                "letterSpacing": "-0.02em",
-                "marginBottom": "0.75rem"
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.6rem",
+                "marginBottom": "0.9rem"
               },
-              "textContent": "${state.brand}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "2.3rem",
+                    "height": "2.3rem",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "borderRadius": "0.3rem",
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "700",
+                    "fontSize": "1.25rem",
+                    "clipPath": "polygon(0 0, 100% 0, 100% 78%, 50% 100%, 0 78%)"
+                  },
+                  "textContent": "▲"
+                },
+                {
+                  "tagName": "span",
+                  "style": { "display": "flex", "flexDirection": "column", "lineHeight": "1" },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "700",
+                        "fontSize": "1.25rem",
+                        "letterSpacing": "0.06em"
+                      },
+                      "textContent": "${state.brand}"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "500",
+                        "fontSize": "0.58rem",
+                        "letterSpacing": "0.24em",
+                        "color": "var(--color-primary)",
+                        "marginTop": "0.15rem"
+                      },
+                      "textContent": "${state.brandSub}"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "tagName": "p",
-              "style": { "margin": "0 0 0.9rem", "opacity": "0.75", "maxWidth": "40ch" },
+              "style": {
+                "margin": "0 0 1rem",
+                "opacity": "0.72",
+                "maxWidth": "42ch",
+                "lineHeight": "1.6"
+              },
               "textContent": "${state.tagline}"
             },
             {
               "tagName": "p",
               "style": {
                 "margin": "0",
-                "fontSize": "0.8rem",
-                "letterSpacing": "0.04em",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "0.78rem",
+                "letterSpacing": "0.05em",
+                "textTransform": "uppercase",
                 "opacity": "0.55"
               },
               "textContent": "${state.license}"
@@ -62,23 +123,35 @@
             {
               "tagName": "div",
               "style": {
+                "fontFamily": "var(--font-heading)",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.1em",
+                "fontSize": "0.78rem",
+                "color": "var(--color-primary)",
+                "marginBottom": "0.9rem",
+                "fontWeight": "600"
               },
               "textContent": "Contact"
             },
             {
-              "tagName": "p",
-              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
-              "textContent": "${state.address}"
+              "tagName": "a",
+              "attributes": { "href": "${state.phoneHref}" },
+              "style": {
+                "display": "block",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.35rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-white)",
+                "textDecoration": "none",
+                "marginBottom": "0.55rem",
+                "letterSpacing": "0.01em"
+              },
+              "textContent": "${state.phone}"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.85" },
-              "textContent": "${state.phone}"
+              "style": { "margin": "0", "opacity": "0.78", "lineHeight": "1.55" },
+              "textContent": "${state.address}"
             }
           ]
         },
@@ -88,11 +161,13 @@
             {
               "tagName": "div",
               "style": {
+                "fontFamily": "var(--font-heading)",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.1em",
+                "fontSize": "0.78rem",
+                "color": "var(--color-primary)",
+                "marginBottom": "0.9rem",
+                "fontWeight": "600"
               },
               "textContent": "Explore"
             },
@@ -102,9 +177,9 @@
               "style": {
                 "display": "block",
                 "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "opacity": "0.82",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.45rem"
               },
               "textContent": "Services"
             },
@@ -114,9 +189,9 @@
               "style": {
                 "display": "block",
                 "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "opacity": "0.82",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.45rem"
               },
               "textContent": "About"
             },
@@ -126,7 +201,7 @@
               "style": {
                 "display": "block",
                 "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "opacity": "0.82",
                 "textDecoration": "none"
               },
               "textContent": "Contact"
@@ -140,10 +215,10 @@
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "2.5rem auto 0",
-        "paddingTop": "1.5rem",
-        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
+        "padding": "1.5rem 1.5rem 0",
+        "borderTop": "1px solid var(--color-steel-line)",
         "fontSize": "0.85rem",
-        "opacity": "0.6"
+        "opacity": "0.55"
       },
       "children": [
         {

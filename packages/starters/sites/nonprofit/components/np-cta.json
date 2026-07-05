@@ -3,122 +3,197 @@
   "state": {
     "eyebrow": "",
     "heading": "",
+    "headingAccent": "",
     "text": "",
     "cta": "Donate Now",
     "ctaHref": "/get-involved/",
     "cta2": "",
     "cta2Href": "/get-involved/",
+    "reassurance": "Secure & tax-deductible · 94¢ of every dollar goes straight to programs",
     "bg": { "type": "string", "format": "image", "default": "" }
   },
   "style": {
     "display": "block",
-    "position": "relative",
-    "backgroundColor": "var(--color-bg-dark)",
-    "backgroundImage": "url('${state.bg}')",
-    "backgroundSize": "cover",
-    "backgroundPosition": "center",
-    "color": "var(--color-text-white)"
+    "padding": "clamp(3rem, 7vw, 5rem) 1.5rem",
+    "backgroundColor": "var(--color-bg-cream)"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
-        "position": "absolute",
-        "inset": "0",
-        "background": "linear-gradient(180deg, rgba(20,49,42,0.86) 0%, rgba(20,49,42,0.92) 100%)"
-      }
-    },
-    {
-      "tagName": "div",
-      "style": {
         "position": "relative",
-        "zIndex": "10",
-        "maxWidth": "var(--max-width-narrow)",
+        "overflow": "hidden",
+        "maxWidth": "var(--max-width-wide)",
         "margin": "0 auto",
-        "padding": "clamp(3.5rem, 8vw, 5.5rem) 1.5rem",
-        "textAlign": "center"
+        "borderRadius": "var(--radius-lg)",
+        "background": "linear-gradient(135deg, #21563c 0%, var(--color-primary-deep) 55%, #12301f 100%)",
+        "color": "var(--color-text-white)"
       },
       "children": [
         {
-          "tagName": "p",
+          "tagName": "div",
           "style": {
-            "display": "${state.eyebrow ? 'block' : 'none'}",
-            "textTransform": "uppercase",
-            "letterSpacing": "0.16em",
-            "fontSize": "0.8rem",
-            "fontWeight": "600",
-            "color": "#bbf7d0",
-            "margin": "0 0 0.9rem"
-          },
-          "textContent": "${state.eyebrow}"
-        },
-        {
-          "tagName": "h2",
-          "style": {
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "clamp(1.9rem, 4vw, 2.75rem)",
-            "fontWeight": "700",
-            "lineHeight": "1.15",
-            "margin": "0 0 1rem"
-          },
-          "textContent": "${state.heading}"
-        },
-        {
-          "tagName": "p",
-          "style": {
-            "fontSize": "1.1rem",
-            "lineHeight": "1.7",
-            "opacity": "0.9",
-            "margin": "0 0 2rem"
-          },
-          "textContent": "${state.text}"
+            "position": "absolute",
+            "top": "-8rem",
+            "right": "-6rem",
+            "width": "26rem",
+            "height": "26rem",
+            "borderRadius": "50%",
+            "background": "radial-gradient(circle at center, rgba(233,166,61,0.35) 0%, rgba(233,166,61,0) 70%)"
+          }
         },
         {
           "tagName": "div",
           "style": {
-            "display": "flex",
-            "gap": "0.75rem",
-            "flexWrap": "wrap",
-            "justifyContent": "center"
+            "position": "absolute",
+            "bottom": "-10rem",
+            "left": "-7rem",
+            "width": "24rem",
+            "height": "24rem",
+            "borderRadius": "50%",
+            "background": "radial-gradient(circle at center, rgba(242,106,61,0.3) 0%, rgba(242,106,61,0) 70%)"
+          }
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "position": "relative",
+            "zIndex": "2",
+            "maxWidth": "var(--max-width-narrow)",
+            "margin": "0 auto",
+            "padding": "clamp(3rem, 7vw, 4.75rem) 1.5rem",
+            "textAlign": "center"
           },
           "children": [
             {
-              "tagName": "a",
-              "attributes": { "href": "${state.ctaHref}" },
+              "tagName": "p",
               "style": {
-                "display": "inline-block",
-                "backgroundColor": "var(--color-accent)",
-                "color": "var(--color-text-white)",
-                "padding": "0.95rem 2.5rem",
+                "display": "${state.eyebrow ? 'inline-flex' : 'none'}",
+                "alignItems": "center",
+                "gap": "0.5rem",
+                "padding": "0.35rem 0.95rem",
                 "borderRadius": "999px",
-                "fontSize": "1.05rem",
-                "fontWeight": "600",
-                "textDecoration": "none",
-                "boxShadow": "0 8px 24px rgba(234,88,12,0.4)",
-                "transition": "background-color 0.15s, transform 0.15s",
-                ":hover": {
-                  "backgroundColor": "var(--color-accent-hover)",
-                  "transform": "translateY(-1px)"
-                }
+                "backgroundColor": "rgba(255,255,255,0.12)",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.14em",
+                "fontSize": "0.75rem",
+                "fontWeight": "800",
+                "color": "var(--color-gold)",
+                "margin": "0 0 1.25rem"
               },
-              "textContent": "${state.cta}"
+              "textContent": "${state.eyebrow}"
             },
             {
-              "tagName": "a",
-              "attributes": { "href": "${state.cta2Href}" },
+              "tagName": "h2",
               "style": {
-                "display": "${state.cta2 ? 'inline-block' : 'none'}",
-                "border": "1px solid rgba(255,255,255,0.6)",
-                "color": "var(--color-text-white)",
-                "padding": "0.95rem 2rem",
-                "borderRadius": "999px",
-                "fontSize": "1.05rem",
+                "fontFamily": "var(--font-display)",
+                "fontSize": "clamp(2.1rem, 4.6vw, 3.2rem)",
                 "fontWeight": "600",
-                "textDecoration": "none",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "rgba(255,255,255,0.14)" }
+                "lineHeight": "1.08",
+                "letterSpacing": "-0.015em",
+                "margin": "0 0 1.15rem"
               },
-              "textContent": "${state.cta2}"
+              "children": [
+                { "tagName": "span", "textContent": "${state.heading} " },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontStyle": "italic",
+                    "fontWeight": "500",
+                    "color": "var(--color-gold)"
+                  },
+                  "textContent": "${state.headingAccent}"
+                }
+              ]
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "1.14rem",
+                "fontWeight": "600",
+                "lineHeight": "1.65",
+                "color": "rgba(255,255,255,0.85)",
+                "margin": "0 auto 2rem",
+                "maxWidth": "52ch"
+              },
+              "textContent": "${state.text}"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "gap": "0.85rem",
+                "flexWrap": "wrap",
+                "justifyContent": "center"
+              },
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "${state.ctaHref}" },
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "backgroundColor": "var(--color-accent)",
+                    "color": "var(--color-text-white)",
+                    "padding": "1rem 2.5rem",
+                    "borderRadius": "999px",
+                    "fontSize": "1.05rem",
+                    "fontWeight": "800",
+                    "textDecoration": "none",
+                    "boxShadow": "0 18px 36px -14px rgba(242,106,61,0.85)",
+                    "transition": "background-color 0.15s, transform 0.15s",
+                    ":hover": {
+                      "backgroundColor": "var(--color-accent-hover)",
+                      "transform": "translateY(-2px)"
+                    }
+                  },
+                  "children": [
+                    { "tagName": "span", "style": { "fontSize": "0.95rem" }, "textContent": "❤" },
+                    { "tagName": "span", "textContent": "${state.cta}" }
+                  ]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "${state.cta2Href}" },
+                  "style": {
+                    "display": "${state.cta2 ? 'inline-flex' : 'none'}",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "border": "1px solid rgba(255,255,255,0.55)",
+                    "color": "var(--color-text-white)",
+                    "padding": "1rem 2rem",
+                    "borderRadius": "999px",
+                    "fontSize": "1.05rem",
+                    "fontWeight": "800",
+                    "textDecoration": "none",
+                    "transition": "background-color 0.15s",
+                    ":hover": { "backgroundColor": "rgba(255,255,255,0.14)" }
+                  },
+                  "textContent": "${state.cta2}"
+                }
+              ]
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "display": "${state.reassurance ? 'flex' : 'none'}",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "gap": "0.5rem",
+                "margin": "1.75rem 0 0",
+                "fontSize": "0.88rem",
+                "fontWeight": "700",
+                "color": "rgba(255,255,255,0.72)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": { "color": "var(--color-gold)" },
+                  "textContent": "🔒"
+                },
+                { "tagName": "span", "textContent": "${state.reassurance}" }
+              ]
             }
           ]
         }

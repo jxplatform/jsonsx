@@ -3,50 +3,165 @@
   "state": {
     "quote": "",
     "author": "",
-    "role": ""
+    "role": "",
+    "image": { "type": "string", "format": "image", "default": "" },
+    "imageAlt": "",
+    "stat": "",
+    "statLabel": ""
   },
   "style": {
     "display": "block",
-    "padding": "2rem",
-    "backgroundColor": "var(--color-bg-cream)",
-    "border": "1px solid var(--color-border)",
-    "borderRadius": "var(--radius)"
+    "position": "relative",
+    "overflow": "hidden",
+    "backgroundColor": "var(--color-bg-mint)",
+    "borderRadius": "var(--radius-lg)",
+    "border": "1px solid var(--color-border)"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "2.5rem",
-        "lineHeight": "1",
-        "color": "var(--color-primary)",
-        "marginBottom": "0.5rem"
+        "display": "grid",
+        "gridTemplateColumns": "0.82fr 1.18fr",
+        "gap": "clamp(1.75rem, 4vw, 3.5rem)",
+        "alignItems": "center",
+        "@--md": { "gridTemplateColumns": "1fr" }
       },
-      "textContent": "“"
-    },
-    {
-      "tagName": "p",
-      "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "1.2rem",
-        "lineHeight": "1.6",
-        "fontWeight": "500",
-        "margin": "0 0 1.25rem"
-      },
-      "textContent": "${state.quote}"
-    },
-    {
-      "tagName": "div",
       "children": [
         {
           "tagName": "div",
-          "style": { "fontWeight": "600" },
-          "textContent": "${state.author}"
+          "style": {
+            "position": "relative",
+            "alignSelf": "stretch",
+            "minHeight": "clamp(320px, 42vw, 460px)",
+            "@--md": { "minHeight": "300px" }
+          },
+          "children": [
+            {
+              "tagName": "img",
+              "attributes": {
+                "src": "${state.image}",
+                "alt": "${state.imageAlt}",
+                "loading": "lazy"
+              },
+              "style": {
+                "position": "absolute",
+                "inset": "0",
+                "width": "100%",
+                "height": "100%",
+                "objectFit": "cover",
+                "display": "block"
+              }
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "position": "absolute",
+                "display": "${state.stat ? 'flex' : 'none'}",
+                "flexDirection": "column",
+                "right": "1.1rem",
+                "bottom": "1.1rem",
+                "padding": "0.85rem 1.15rem",
+                "backgroundColor": "var(--color-bg-white)",
+                "borderRadius": "1rem",
+                "boxShadow": "var(--shadow-card)",
+                "lineHeight": "1.1"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.65rem",
+                    "fontWeight": "700",
+                    "color": "var(--color-primary)"
+                  },
+                  "textContent": "${state.stat}"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontSize": "0.76rem",
+                    "fontWeight": "700",
+                    "color": "var(--color-text-muted)",
+                    "maxWidth": "14ch"
+                  },
+                  "textContent": "${state.statLabel}"
+                }
+              ]
+            }
+          ]
         },
         {
           "tagName": "div",
-          "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
-          "textContent": "${state.role}"
+          "style": {
+            "padding": "clamp(2rem, 4vw, 3.25rem) clamp(1.75rem, 4vw, 3.25rem) clamp(2rem, 4vw, 3.25rem) 0",
+            "@--md": { "padding": "0 clamp(1.5rem, 5vw, 2.5rem) clamp(2rem, 6vw, 2.75rem)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-display)",
+                "fontSize": "3.5rem",
+                "lineHeight": "0.6",
+                "color": "var(--color-accent)",
+                "margin": "0 0 1rem"
+              },
+              "textContent": "“"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontFamily": "var(--font-display)",
+                "fontSize": "clamp(1.4rem, 2.6vw, 1.95rem)",
+                "lineHeight": "1.4",
+                "fontWeight": "500",
+                "letterSpacing": "-0.01em",
+                "color": "var(--color-primary-deep)",
+                "margin": "0 0 1.75rem"
+              },
+              "textContent": "${state.quote}"
+            },
+            {
+              "tagName": "div",
+              "style": { "display": "flex", "alignItems": "center", "gap": "0.9rem" },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "2.6rem",
+                    "height": "0.28rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-accent)"
+                  }
+                },
+                {
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "800",
+                        "fontSize": "1.05rem",
+                        "color": "var(--color-text-primary)"
+                      },
+                      "textContent": "${state.author}"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.92rem",
+                        "fontWeight": "700",
+                        "color": "var(--color-primary)"
+                      },
+                      "textContent": "${state.role}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
         }
       ]
     }

@@ -8,81 +8,186 @@
     "ctaHref": "/contact/",
     "cta2": "",
     "cta2Href": "/services/",
+    "phone": "(970) 555-0148",
+    "phoneHref": "tel:+19705550148",
     "bg": { "type": "string", "format": "image", "default": "" }
   },
   "style": {
     "display": "block",
     "position": "relative",
-    "minHeight": "80vh",
+    "overflow": "hidden",
     "color": "var(--color-text-white)",
-    "backgroundImage": "url('${state.bg}')",
-    "backgroundSize": "cover",
-    "backgroundPosition": "center"
+    "backgroundColor": "var(--color-bg-dark)",
+    "backgroundImage": "linear-gradient(104deg, rgba(14,26,35,0.97) 0%, rgba(14,26,35,0.92) 42%, rgba(14,26,35,0.72) 66%, rgba(14,26,35,0.55) 100%), url('${state.bg}')",
+    "backgroundSize": "cover, cover",
+    "backgroundPosition": "center, right center",
+    "backgroundRepeat": "no-repeat"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
         "position": "absolute",
-        "inset": "0",
-        "background": "linear-gradient(180deg, rgba(28,25,23,0.45) 0%, rgba(28,25,23,0.78) 100%)"
+        "top": "0",
+        "left": "0",
+        "right": "0",
+        "height": "6px",
+        "background": "var(--hazard)"
       }
     },
     {
       "tagName": "div",
       "style": {
         "position": "relative",
-        "zIndex": "10",
-        "display": "flex",
-        "alignItems": "center",
-        "minHeight": "80vh",
+        "zIndex": "5",
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "4rem 1.5rem"
+        "padding": "clamp(3rem, 6vw, 5rem) 1.5rem clamp(3.5rem, 7vw, 5.5rem)",
+        "display": "grid",
+        "gridTemplateColumns": "1.08fr 0.92fr",
+        "gap": "clamp(2rem, 5vw, 4rem)",
+        "alignItems": "center",
+        "@--md": { "gridTemplateColumns": "1fr", "gap": "2.5rem" }
       },
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "660px" },
           "children": [
             {
               "tagName": "p",
               "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.55rem",
+                "padding": "0.35rem 0.85rem 0.35rem 0.7rem",
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "fontFamily": "var(--font-heading)",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.18em",
-                "fontSize": "0.8rem",
-                "fontWeight": "700",
-                "marginBottom": "1rem",
-                "color": "#fed7aa"
+                "letterSpacing": "0.08em",
+                "fontSize": "0.78rem",
+                "fontWeight": "600",
+                "margin": "0 0 1.5rem",
+                "transform": "skewX(-8deg)"
               },
-              "textContent": "${state.eyebrow}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": { "transform": "skewX(8deg)", "display": "inline-block" },
+                  "textContent": "${state.eyebrow}"
+                }
+              ]
             },
             {
               "tagName": "h1",
               "style": {
                 "fontFamily": "var(--font-heading)",
-                "fontSize": "clamp(2.5rem, 6vw, 4.25rem)",
-                "fontWeight": "800",
-                "lineHeight": "1.05",
+                "fontSize": "clamp(2.7rem, 6.2vw, 4.9rem)",
+                "fontWeight": "700",
+                "textTransform": "uppercase",
+                "lineHeight": "0.98",
+                "letterSpacing": "0.005em",
                 "margin": "0 0 1.25rem",
-                "letterSpacing": "-0.03em"
+                "color": "var(--color-text-white)"
               },
               "textContent": "${state.heading}"
             },
             {
               "tagName": "p",
               "style": {
-                "fontSize": "clamp(1.1rem, 2vw, 1.35rem)",
+                "fontSize": "clamp(1.08rem, 1.9vw, 1.3rem)",
                 "lineHeight": "1.6",
-                "margin": "0 0 2rem",
-                "opacity": "0.92",
-                "maxWidth": "50ch"
+                "margin": "0 0 1.75rem",
+                "color": "#cdd8e0",
+                "maxWidth": "48ch"
               },
               "textContent": "${state.subheading}"
             },
             {
               "tagName": "div",
-              "style": { "display": "flex", "gap": "0.75rem", "flexWrap": "wrap" },
+              "style": {
+                "display": "flex",
+                "flexWrap": "wrap",
+                "gap": "1rem 1.5rem",
+                "marginBottom": "2rem"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "fontFamily": "var(--font-heading)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.05em",
+                    "fontSize": "0.85rem",
+                    "fontWeight": "600",
+                    "color": "#e6edf2"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-primary)", "fontSize": "1.05rem" },
+                      "textContent": "✓"
+                    },
+                    { "tagName": "span", "textContent": "Licensed & Insured" }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "fontFamily": "var(--font-heading)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.05em",
+                    "fontSize": "0.85rem",
+                    "fontWeight": "600",
+                    "color": "#e6edf2"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-primary)", "fontSize": "1.05rem" },
+                      "textContent": "★"
+                    },
+                    { "tagName": "span", "textContent": "4.9 · 600+ Reviews" }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "fontFamily": "var(--font-heading)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.05em",
+                    "fontSize": "0.85rem",
+                    "fontWeight": "600",
+                    "color": "#e6edf2"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-primary)", "fontSize": "1.05rem" },
+                      "textContent": "⚡"
+                    },
+                    { "tagName": "span", "textContent": "Same-Day Service" }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "gap": "1rem",
+                "flexWrap": "wrap",
+                "alignItems": "center"
+              },
               "children": [
                 {
                   "tagName": "a",
@@ -91,32 +196,245 @@
                     "display": "inline-block",
                     "backgroundColor": "var(--color-primary)",
                     "color": "var(--color-text-white)",
-                    "padding": "0.9rem 2rem",
-                    "borderRadius": "var(--radius)",
-                    "fontSize": "1.05rem",
-                    "fontWeight": "700",
+                    "padding": "0.95rem 2.1rem",
+                    "borderRadius": "var(--radius-sm)",
+                    "fontFamily": "var(--font-heading)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.05em",
+                    "fontSize": "1.02rem",
+                    "fontWeight": "600",
                     "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                    "boxShadow": "0 14px 30px -12px rgba(244,81,30,0.9)",
+                    "transition": "background-color 0.15s, transform 0.15s",
+                    ":hover": {
+                      "backgroundColor": "var(--color-primary-hover)",
+                      "transform": "translateY(-2px)"
+                    }
                   },
                   "textContent": "${state.cta}"
                 },
                 {
                   "tagName": "a",
-                  "attributes": { "href": "${state.cta2Href}" },
+                  "attributes": { "href": "${state.phoneHref}" },
                   "style": {
-                    "display": "${state.cta2 ? 'inline-block' : 'none'}",
-                    "border": "1px solid rgba(255,255,255,0.6)",
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
                     "color": "var(--color-text-white)",
-                    "padding": "0.9rem 2rem",
-                    "borderRadius": "var(--radius)",
-                    "fontSize": "1.05rem",
-                    "fontWeight": "700",
                     "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "rgba(255,255,255,0.12)" }
+                    "fontWeight": "600"
                   },
-                  "textContent": "${state.cta2}"
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-primary)", "fontSize": "1.15rem" },
+                      "textContent": "☏"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontSize": "1.2rem",
+                        "fontWeight": "700",
+                        "letterSpacing": "0.01em"
+                      },
+                      "textContent": "${state.phone}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "backgroundColor": "var(--color-bg-white)",
+            "color": "var(--color-text-primary)",
+            "borderRadius": "var(--radius)",
+            "boxShadow": "var(--shadow-float)",
+            "overflow": "hidden"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "backgroundColor": "var(--color-steel)",
+                "color": "var(--color-text-white)",
+                "padding": "1rem 1.4rem",
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.75rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.05em",
+                    "fontWeight": "600",
+                    "fontSize": "1.15rem"
+                  },
+                  "textContent": "Fast, Free Quote"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "0.68rem",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.1em",
+                    "color": "var(--color-primary)",
+                    "border": "1px solid var(--color-primary)",
+                    "borderRadius": "999px",
+                    "padding": "0.15rem 0.6rem"
+                  },
+                  "textContent": "No obligation"
+                }
+              ]
+            },
+            {
+              "tagName": "form",
+              "attributes": { "action": "/contact/", "method": "post" },
+              "style": { "display": "grid", "gap": "0.7rem", "padding": "1.4rem" },
+              "children": [
+                {
+                  "tagName": "input",
+                  "attributes": {
+                    "type": "text",
+                    "name": "name",
+                    "placeholder": "Full name",
+                    "aria-label": "Full name"
+                  },
+                  "style": {
+                    "width": "100%",
+                    "padding": "0.75rem 0.85rem",
+                    "border": "1px solid var(--color-border-strong)",
+                    "borderRadius": "var(--radius-sm)",
+                    "fontSize": "1rem",
+                    "fontFamily": "inherit",
+                    "backgroundColor": "var(--color-bg-cream)"
+                  }
+                },
+                {
+                  "tagName": "input",
+                  "attributes": {
+                    "type": "tel",
+                    "name": "phone",
+                    "placeholder": "Phone number",
+                    "aria-label": "Phone number"
+                  },
+                  "style": {
+                    "width": "100%",
+                    "padding": "0.75rem 0.85rem",
+                    "border": "1px solid var(--color-border-strong)",
+                    "borderRadius": "var(--radius-sm)",
+                    "fontSize": "1rem",
+                    "fontFamily": "inherit",
+                    "backgroundColor": "var(--color-bg-cream)"
+                  }
+                },
+                {
+                  "tagName": "select",
+                  "attributes": { "name": "service", "aria-label": "Service needed" },
+                  "style": {
+                    "width": "100%",
+                    "padding": "0.75rem 0.85rem",
+                    "border": "1px solid var(--color-border-strong)",
+                    "borderRadius": "var(--radius-sm)",
+                    "fontSize": "1rem",
+                    "fontFamily": "inherit",
+                    "fontWeight": "500",
+                    "color": "var(--color-text-primary)",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "cursor": "pointer"
+                  },
+                  "children": [
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "" },
+                      "textContent": "What do you need?"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "ac-repair" },
+                      "textContent": "AC Repair"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "ac-install" },
+                      "textContent": "AC Installation"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "furnace-repair" },
+                      "textContent": "Furnace Repair"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "furnace-install" },
+                      "textContent": "Furnace Installation"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "heat-pump" },
+                      "textContent": "Heat Pumps"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "maintenance" },
+                      "textContent": "Maintenance Plan"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "other" },
+                      "textContent": "Something else"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "button",
+                  "attributes": { "type": "submit" },
+                  "textContent": "Request Service →",
+                  "style": {
+                    "width": "100%",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.85rem 1.5rem",
+                    "border": "none",
+                    "borderRadius": "var(--radius-sm)",
+                    "fontFamily": "var(--font-heading)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.05em",
+                    "fontSize": "1.02rem",
+                    "fontWeight": "600",
+                    "cursor": "pointer",
+                    "transition": "background-color 0.15s",
+                    ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                  }
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0",
+                    "fontSize": "0.82rem",
+                    "color": "var(--color-text-muted)",
+                    "textAlign": "center",
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "gap": "0.4rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-primary)" },
+                      "textContent": "⏱"
+                    },
+                    { "tagName": "span", "textContent": "We reply within the hour, 7 days a week." }
+                  ]
                 }
               ]
             }

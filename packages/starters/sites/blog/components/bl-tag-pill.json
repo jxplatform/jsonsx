@@ -4,21 +4,24 @@
     "label": ""
   },
   "style": {
-    "display": "inline-block"
+    "display": "inline-flex",
+    "alignItems": "center",
+    "gap": "0.5rem"
   },
   "children": [
     {
       "tagName": "span",
+      "style": { "width": "1.6rem", "height": "1px", "backgroundColor": "var(--color-primary)" }
+    },
+    {
+      "tagName": "span",
       "style": {
-        "display": "inline-block",
-        "backgroundColor": "rgba(14, 165, 233, 0.1)",
-        "color": "var(--color-primary)",
-        "padding": "0.3rem 0.75rem",
-        "borderRadius": "999px",
-        "fontSize": "0.75rem",
+        "fontFamily": "var(--font-body)",
+        "fontSize": "0.74rem",
         "fontWeight": "600",
         "textTransform": "uppercase",
-        "letterSpacing": "0.08em"
+        "letterSpacing": "0.18em",
+        "color": "var(--color-primary)"
       },
       "textContent": "${state.label}"
     }

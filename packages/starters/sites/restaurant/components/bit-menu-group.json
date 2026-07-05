@@ -1,28 +1,73 @@
 {
   "tagName": "bit-menu-group",
   "state": {
-    "heading": ""
+    "heading": "",
+    "note": ""
   },
   "style": {
     "display": "block",
-    "marginBottom": "3rem"
+    "marginBottom": "2.75rem",
+    "breakInside": "avoid"
   },
   "children": [
     {
-      "tagName": "h2",
+      "tagName": "div",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "1.7rem",
-        "fontWeight": "700",
-        "color": "var(--color-primary)",
-        "margin": "0 0 1.25rem",
-        "paddingBottom": "0.5rem",
-        "borderBottom": "2px solid var(--color-primary)"
+        "display": "flex",
+        "alignItems": "baseline",
+        "gap": "1rem",
+        "marginBottom": "0.4rem"
       },
-      "textContent": "${state.heading}"
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "width": "0.5rem",
+            "height": "0.5rem",
+            "flex": "0 0 auto",
+            "transform": "rotate(45deg) translateY(-0.15rem)",
+            "backgroundColor": "var(--color-primary)"
+          }
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "clamp(1.5rem, 2.6vw, 1.9rem)",
+            "fontWeight": "700",
+            "letterSpacing": "-0.01em",
+            "margin": "0",
+            "color": "var(--color-text-primary)",
+            "whiteSpace": "nowrap"
+          },
+          "textContent": "${state.heading}"
+        },
+        {
+          "tagName": "span",
+          "style": {
+            "flex": "1 1 auto",
+            "borderBottom": "1px solid var(--color-border-strong)",
+            "transform": "translateY(-0.4em)"
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "display": "${state.note ? 'block' : 'none'}",
+        "margin": "0 0 1rem",
+        "paddingLeft": "1.5rem",
+        "fontFamily": "var(--font-heading)",
+        "fontStyle": "italic",
+        "fontSize": "1rem",
+        "color": "var(--color-text-muted)"
+      },
+      "textContent": "${state.note}"
     },
     {
       "tagName": "div",
+      "style": { "marginTop": "0.5rem" },
       "children": [{ "tagName": "slot" }]
     }
   ]

@@ -1,0 +1,147 @@
+{
+  "tagName": "pf-contact-info",
+  "state": {
+    "address": "410 Corniche Plaza, Suite 900 · Harborview, NY 10014",
+    "phone": "(555) 204-8830",
+    "phoneHref": "tel:+15552048830",
+    "email": "hello@meridianadvisory.com",
+    "emailHref": "mailto:hello@meridianadvisory.com",
+    "hours1": "Monday – Friday · 8:30am to 5:30pm",
+    "hours2": "Saturday – Sunday · by appointment"
+  },
+  "style": {
+    "display": "grid",
+    "gap": "1.25rem",
+    "alignContent": "start"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": { "border": "1px solid var(--color-rule)", "padding": "1.75rem" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "fontFamily": "var(--font-sans)",
+            "fontSize": "0.7rem",
+            "fontWeight": "600",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.16em",
+            "color": "var(--color-accent)",
+            "marginBottom": "0.9rem"
+          },
+          "textContent": "Office"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0 0 1rem",
+            "fontSize": "0.98rem",
+            "lineHeight": "1.6",
+            "color": "var(--color-ink)"
+          },
+          "textContent": "${state.address}"
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "${state.phoneHref}" },
+          "style": {
+            "display": "block",
+            "color": "var(--color-ink)",
+            "textDecoration": "none",
+            "fontSize": "0.98rem",
+            "marginBottom": "0.3rem",
+            ":hover": { "color": "var(--color-accent)" }
+          },
+          "textContent": "${state.phone}"
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "${state.emailHref}" },
+          "style": {
+            "display": "block",
+            "color": "var(--color-accent)",
+            "textDecoration": "none",
+            "fontSize": "0.98rem",
+            ":hover": { "color": "var(--color-accent-deep)" }
+          },
+          "textContent": "${state.email}"
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": { "border": "1px solid var(--color-rule)", "padding": "1.75rem" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "fontFamily": "var(--font-sans)",
+            "fontSize": "0.7rem",
+            "fontWeight": "600",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.16em",
+            "color": "var(--color-accent)",
+            "marginBottom": "0.9rem"
+          },
+          "textContent": "Hours"
+        },
+        {
+          "tagName": "p",
+          "style": { "margin": "0 0 0.35rem", "fontSize": "0.98rem", "color": "var(--color-ink)" },
+          "textContent": "${state.hours1}"
+        },
+        {
+          "tagName": "p",
+          "style": { "margin": "0", "fontSize": "0.98rem", "color": "var(--color-muted)" },
+          "textContent": "${state.hours2}"
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "backgroundColor": "var(--color-ink-deep)",
+        "color": "var(--color-text-white)",
+        "borderTop": "3px solid var(--color-accent)",
+        "padding": "1.75rem"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "fontFamily": "var(--font-serif)",
+            "fontSize": "1.3rem",
+            "fontWeight": "500",
+            "margin": "0 0 0.6rem"
+          },
+          "textContent": "Prefer to read first?"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0 0 1.1rem",
+            "fontSize": "0.95rem",
+            "lineHeight": "1.6",
+            "color": "rgba(244,241,233,0.78)"
+          },
+          "textContent": "Browse the Quarterly for our latest notes on tax, cash flow, and financial strategy."
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "/insights/" },
+          "style": {
+            "fontFamily": "var(--font-sans)",
+            "fontSize": "0.72rem",
+            "fontWeight": "600",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.14em",
+            "color": "var(--color-accent)",
+            "textDecoration": "none"
+          },
+          "textContent": "Read the Quarterly →"
+        }
+      ]
+    }
+  ]
+}

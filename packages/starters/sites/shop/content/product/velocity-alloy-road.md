@@ -2,7 +2,9 @@
 title: Velocity Alloy Road
 sku: velocity-alloy-road
 price: $1,499
+oldPrice: $1,699
 category: Road
+badge: Sale
 image: /images/product-1.jpg
 order: 2
 ---

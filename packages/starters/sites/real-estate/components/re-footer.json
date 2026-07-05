@@ -2,16 +2,16 @@
   "tagName": "re-footer",
   "state": {
     "brand": "Northshore Realty",
-    "tagline": "Helping buyers and sellers find their place on the north shore since 2004.",
+    "tagline": "The north shore's property index — helping neighbors buy and sell since 2004.",
     "address": "45 Lakeshore Drive, Bayport",
     "phone": "(555) 204-7788",
-    "license": "License #RE-0294187"
+    "license": "License #RE-0294187 · Equal Housing Opportunity"
   },
   "style": {
     "display": "block",
     "backgroundColor": "var(--color-bg-dark)",
     "color": "var(--color-text-white)",
-    "padding": "3.5rem 1.5rem 2rem"
+    "padding": "clamp(3rem, 6vw, 4.5rem) 1.5rem 2rem"
   },
   "children": [
     {
@@ -20,9 +20,10 @@
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
         "display": "grid",
-        "gridTemplateColumns": "2fr 1fr 1fr",
+        "gridTemplateColumns": "2fr 1fr 1fr 1fr",
         "gap": "2.5rem",
-        "@--md": { "gridTemplateColumns": "1fr" }
+        "@--md": { "gridTemplateColumns": "1fr 1fr" },
+        "@--sm": { "gridTemplateColumns": "1fr" }
       },
       "children": [
         {
@@ -31,22 +32,78 @@
             {
               "tagName": "div",
               "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.4rem",
-                "fontWeight": "800",
-                "marginBottom": "0.75rem"
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.55rem",
+                "marginBottom": "0.9rem"
               },
-              "textContent": "${state.brand}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "1.9rem",
+                    "height": "1.9rem",
+                    "borderRadius": "0.5rem",
+                    "background": "linear-gradient(150deg, var(--color-accent-bright), var(--color-primary))",
+                    "color": "var(--color-ink)",
+                    "fontSize": "1rem"
+                  },
+                  "textContent": "⌂"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.25rem",
+                    "fontWeight": "800",
+                    "letterSpacing": "-0.02em"
+                  },
+                  "textContent": "${state.brand}"
+                }
+              ]
             },
             {
               "tagName": "p",
-              "style": { "margin": "0 0 0.75rem", "opacity": "0.75", "maxWidth": "38ch" },
+              "style": {
+                "margin": "0 0 1.25rem",
+                "color": "rgba(255,255,255,0.6)",
+                "maxWidth": "36ch",
+                "fontSize": "0.95rem",
+                "lineHeight": "1.6"
+              },
               "textContent": "${state.tagline}"
             },
             {
-              "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.5", "fontSize": "0.8rem" },
-              "textContent": "${state.license}"
+              "tagName": "a",
+              "attributes": { "href": "/listings/" },
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.5rem",
+                "padding": "0.6rem 1.1rem",
+                "borderRadius": "999px",
+                "border": "1px solid rgba(255,255,255,0.2)",
+                "color": "var(--color-text-white)",
+                "textDecoration": "none",
+                "fontWeight": "700",
+                "fontSize": "0.9rem",
+                "transition": "border-color 0.15s, background-color 0.15s",
+                ":hover": {
+                  "borderColor": "var(--color-accent-bright)",
+                  "backgroundColor": "rgba(255,255,255,0.05)"
+                }
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": { "color": "var(--color-accent-bright)" },
+                  "textContent": "⌕"
+                },
+                { "tagName": "span", "textContent": "Search homes" }
+              ]
             }
           ]
         },
@@ -57,21 +114,92 @@
               "tagName": "div",
               "style": {
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.1em",
+                "fontSize": "0.72rem",
+                "color": "rgba(255,255,255,0.45)",
+                "fontWeight": "700",
+                "marginBottom": "0.9rem"
+              },
+              "textContent": "Explore"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/listings/" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "marginBottom": "0.5rem",
+                "fontSize": "0.92rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent-bright)" }
+              },
+              "textContent": "All listings"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/#neighborhoods" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "marginBottom": "0.5rem",
+                "fontSize": "0.92rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent-bright)" }
+              },
+              "textContent": "Neighborhoods"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/about/" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "fontSize": "0.92rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent-bright)" }
+              },
+              "textContent": "About us"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.1em",
+                "fontSize": "0.72rem",
+                "color": "rgba(255,255,255,0.45)",
+                "fontWeight": "700",
+                "marginBottom": "0.9rem"
               },
               "textContent": "Office"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "style": {
+                "margin": "0 0 0.4rem",
+                "color": "rgba(255,255,255,0.82)",
+                "fontSize": "0.92rem"
+              },
               "textContent": "${state.address}"
             },
             {
-              "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.85" },
+              "tagName": "a",
+              "attributes": { "href": "tel:+15552047788" },
+              "style": {
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "fontSize": "0.92rem",
+                "fontVariantNumeric": "tabular-nums",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent-bright)" }
+              },
               "textContent": "${state.phone}"
             }
           ]
@@ -83,47 +211,54 @@
               "tagName": "div",
               "style": {
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.1em",
+                "fontSize": "0.72rem",
+                "color": "rgba(255,255,255,0.45)",
+                "fontWeight": "700",
+                "marginBottom": "0.9rem"
               },
-              "textContent": "Explore"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/listings/" },
-              "style": {
-                "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
-                "textDecoration": "none",
-                "marginBottom": "0.35rem"
-              },
-              "textContent": "Listings"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/about/" },
-              "style": {
-                "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
-                "textDecoration": "none",
-                "marginBottom": "0.35rem"
-              },
-              "textContent": "About"
+              "textContent": "Get started"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/contact/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
-                "textDecoration": "none"
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "marginBottom": "0.5rem",
+                "fontSize": "0.92rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent-bright)" }
               },
-              "textContent": "Contact"
+              "textContent": "Book a call"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "marginBottom": "0.5rem",
+                "fontSize": "0.92rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent-bright)" }
+              },
+              "textContent": "Sell your home"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "fontSize": "0.92rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent-bright)" }
+              },
+              "textContent": "Set up alerts"
             }
           ]
         }
@@ -133,18 +268,23 @@
       "tagName": "div",
       "style": {
         "maxWidth": "var(--max-width)",
-        "margin": "2.5rem auto 0",
+        "margin": "2.75rem auto 0",
         "paddingTop": "1.5rem",
-        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
-        "fontSize": "0.85rem",
-        "opacity": "0.6"
+        "borderTop": "1px solid rgba(255,255,255,0.12)",
+        "display": "flex",
+        "justifyContent": "space-between",
+        "flexWrap": "wrap",
+        "gap": "0.75rem",
+        "fontSize": "0.82rem",
+        "color": "rgba(255,255,255,0.5)"
       },
       "children": [
         {
           "tagName": "p",
           "style": { "margin": "0" },
-          "textContent": "© Northshore Realty. Equal Housing Opportunity. Built with Jx."
-        }
+          "textContent": "© Northshore Realty. Built with Jx."
+        },
+        { "tagName": "p", "style": { "margin": "0" }, "textContent": "${state.license}" }
       ]
     }
   ]

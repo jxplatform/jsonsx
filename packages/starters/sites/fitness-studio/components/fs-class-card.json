@@ -11,56 +11,90 @@
     "display": "flex",
     "flexDirection": "column",
     "height": "100%",
-    "padding": "1.6rem",
+    "position": "relative",
+    "overflow": "hidden",
+    "padding": "1.7rem 1.7rem 1.5rem",
     "backgroundColor": "var(--color-bg-white)",
     "border": "1px solid var(--color-border)",
     "borderRadius": "var(--radius)",
-    "boxShadow": "0 4px 20px rgba(31,23,41,0.05)",
+    "boxShadow": "0 10px 30px -20px rgba(26,15,24,0.28)",
     "transition": "transform 0.15s, box-shadow 0.15s",
     ":hover": {
-      "transform": "translateY(-3px)",
-      "boxShadow": "0 12px 32px rgba(31,23,41,0.10)"
+      "transform": "translateY(-4px)",
+      "boxShadow": "0 22px 44px -22px rgba(26,15,24,0.4)"
     }
   },
   "children": [
     {
       "tagName": "div",
       "style": {
+        "position": "absolute",
+        "top": "0",
+        "left": "0",
+        "bottom": "0",
+        "width": "5px",
+        "background": "var(--grad-hot)"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
         "display": "flex",
         "justifyContent": "space-between",
-        "alignItems": "flex-start",
+        "alignItems": "center",
         "gap": "0.75rem",
-        "marginBottom": "0.75rem"
+        "marginBottom": "0.6rem"
       },
       "children": [
         {
-          "tagName": "h3",
+          "tagName": "div",
           "style": {
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "0.45rem",
             "fontFamily": "var(--font-heading)",
-            "fontSize": "1.3rem",
-            "fontWeight": "600",
-            "margin": "0"
+            "fontWeight": "800",
+            "fontSize": "0.86rem",
+            "color": "var(--color-primary)",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.03em"
           },
-          "textContent": "${state.name}"
+          "children": [
+            { "tagName": "span", "textContent": "🕑" },
+            { "tagName": "span", "textContent": "${state.time}" }
+          ]
         },
         {
           "tagName": "span",
           "style": {
             "display": "${state.level ? 'inline-block' : 'none'}",
             "flexShrink": "0",
-            "backgroundColor": "rgba(13,148,136,0.12)",
-            "color": "var(--color-accent)",
-            "fontSize": "0.72rem",
-            "fontWeight": "600",
+            "backgroundColor": "var(--color-bg-peach)",
+            "color": "var(--color-ember)",
+            "fontSize": "0.68rem",
+            "fontWeight": "800",
             "textTransform": "uppercase",
             "letterSpacing": "0.06em",
-            "padding": "0.3rem 0.65rem",
+            "padding": "0.3rem 0.7rem",
             "borderRadius": "999px",
             "whiteSpace": "nowrap"
           },
           "textContent": "${state.level}"
         }
       ]
+    },
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-display)",
+        "fontSize": "1.7rem",
+        "fontWeight": "400",
+        "lineHeight": "1",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.01em",
+        "margin": "0 0 0.75rem"
+      },
+      "textContent": "${state.name}"
     },
     {
       "tagName": "p",
@@ -80,29 +114,26 @@
         "paddingTop": "1rem",
         "borderTop": "1px solid var(--color-border)",
         "display": "flex",
-        "flexDirection": "column",
-        "gap": "0.4rem"
+        "alignItems": "center",
+        "gap": "0.6rem"
       },
       "children": [
         {
-          "tagName": "div",
+          "tagName": "span",
           "style": {
-            "display": "flex",
-            "alignItems": "center",
-            "gap": "0.5rem",
-            "fontWeight": "600",
-            "color": "var(--color-primary)"
-          },
-          "children": [
-            { "tagName": "span", "style": { "fontSize": "1rem" }, "textContent": "🕑" },
-            { "tagName": "span", "textContent": "${state.time}" }
-          ]
+            "width": "1.7rem",
+            "height": "1.7rem",
+            "borderRadius": "50%",
+            "background": "var(--grad)",
+            "flexShrink": "0"
+          }
         },
         {
-          "tagName": "div",
+          "tagName": "span",
           "style": {
             "fontSize": "0.9rem",
-            "color": "var(--color-text-muted)"
+            "fontWeight": "600",
+            "color": "var(--color-text-primary)"
           },
           "textContent": "with ${state.instructor}"
         }

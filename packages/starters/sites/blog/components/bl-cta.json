@@ -22,9 +22,10 @@
           "tagName": "h2",
           "style": {
             "fontFamily": "var(--font-heading)",
-            "fontSize": "clamp(1.9rem, 4vw, 2.75rem)",
-            "fontWeight": "600",
-            "lineHeight": "1.15",
+            "fontSize": "clamp(2rem, 5vw, 3.25rem)",
+            "fontWeight": "700",
+            "lineHeight": "1.05",
+            "letterSpacing": "-0.02em",
             "margin": "0 0 1rem"
           },
           "textContent": "${state.heading}"
@@ -32,10 +33,13 @@
         {
           "tagName": "p",
           "style": {
-            "fontSize": "1.15rem",
-            "lineHeight": "1.7",
-            "opacity": "0.85",
-            "margin": "0 0 2rem"
+            "fontFamily": "var(--font-heading)",
+            "fontStyle": "italic",
+            "fontSize": "1.2rem",
+            "lineHeight": "1.6",
+            "opacity": "0.8",
+            "margin": "0 auto 2rem",
+            "maxWidth": "46ch"
           },
           "textContent": "${state.text}"
         },
@@ -44,17 +48,19 @@
           "attributes": { "href": "${state.ctaHref}" },
           "style": {
             "display": "inline-block",
-            "backgroundColor": "var(--color-primary)",
             "color": "var(--color-text-white)",
-            "padding": "0.9rem 2.25rem",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1.05rem",
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.82rem",
             "fontWeight": "600",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.18em",
             "textDecoration": "none",
-            "transition": "background-color 0.15s",
-            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+            "borderBottom": "1.5px solid var(--color-primary)",
+            "paddingBottom": "0.35rem",
+            "transition": "opacity 0.15s",
+            ":hover": { "opacity": "0.65" }
           },
-          "textContent": "${state.cta}"
+          "textContent": "${state.cta} →"
         }
       ]
     }

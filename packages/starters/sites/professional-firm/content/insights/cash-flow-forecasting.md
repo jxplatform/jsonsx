@@ -3,6 +3,7 @@ title: Why Profitable Companies Still Run Out of Cash
 excerpt: Profit and cash are not the same thing. A thirteen-week forecast is the single most useful tool for a business that is growing faster than its bank balance.
 date: November 12, 2025
 author: Marcus Bell
+category: Cash Flow
 order: 2
 ---
 

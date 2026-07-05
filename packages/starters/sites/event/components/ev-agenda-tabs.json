@@ -7,11 +7,11 @@
     "display": "block",
     "maxWidth": "var(--max-width-narrow)",
     "margin": "0 auto",
-    "backgroundColor": "var(--color-bg-white)",
+    "backgroundColor": "var(--color-bg-elev)",
     "border": "1px solid var(--color-border)",
     "borderRadius": "var(--radius)",
     "overflow": "hidden",
-    "boxShadow": "0 10px 40px rgba(23, 18, 43, 0.06)"
+    "boxShadow": "0 30px 80px -40px rgba(0,0,0,0.9)"
   },
   "children": [
     {
@@ -19,10 +19,10 @@
       "style": {
         "display": "flex",
         "flexWrap": "wrap",
-        "gap": "0.6rem",
+        "gap": "0.55rem",
         "padding": "1.1rem 1.4rem",
         "borderBottom": "1px solid var(--color-border)",
-        "backgroundColor": "var(--color-bg-cream)"
+        "backgroundColor": "var(--color-bg-elev2)"
       },
       "children": [
         {
@@ -36,16 +36,17 @@
             }
           },
           "style": {
-            "padding": "0.5rem 1.15rem",
+            "padding": "0.55rem 1.2rem",
             "borderRadius": "999px",
             "cursor": "pointer",
-            "fontSize": "0.9rem",
-            "fontWeight": "600",
+            "fontSize": "0.88rem",
+            "fontWeight": "700",
             "fontFamily": "inherit",
             "transition": "all 0.15s",
             "border": "1px solid ${state.track === 'all' ? 'transparent' : 'var(--color-border)'}",
-            "color": "${state.track === 'all' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}",
-            "background": "${state.track === 'all' ? 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' : 'var(--color-bg-white)'}"
+            "color": "${state.track === 'all' ? '#ffffff' : 'var(--color-text-muted)'}",
+            "background": "${state.track === 'all' ? 'var(--grad-btn)' : 'rgba(255,255,255,0.02)'}",
+            "boxShadow": "${state.track === 'all' ? '0 8px 22px -8px var(--glow)' : 'none'}"
           }
         },
         {
@@ -59,16 +60,17 @@
             }
           },
           "style": {
-            "padding": "0.5rem 1.15rem",
+            "padding": "0.55rem 1.2rem",
             "borderRadius": "999px",
             "cursor": "pointer",
-            "fontSize": "0.9rem",
-            "fontWeight": "600",
+            "fontSize": "0.88rem",
+            "fontWeight": "700",
             "fontFamily": "inherit",
             "transition": "all 0.15s",
             "border": "1px solid ${state.track === 'main' ? 'transparent' : 'var(--color-border)'}",
-            "color": "${state.track === 'main' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}",
-            "background": "${state.track === 'main' ? 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' : 'var(--color-bg-white)'}"
+            "color": "${state.track === 'main' ? '#ffffff' : 'var(--color-text-muted)'}",
+            "background": "${state.track === 'main' ? 'var(--grad-btn)' : 'rgba(255,255,255,0.02)'}",
+            "boxShadow": "${state.track === 'main' ? '0 8px 22px -8px var(--glow)' : 'none'}"
           }
         },
         {
@@ -82,16 +84,17 @@
             }
           },
           "style": {
-            "padding": "0.5rem 1.15rem",
+            "padding": "0.55rem 1.2rem",
             "borderRadius": "999px",
             "cursor": "pointer",
-            "fontSize": "0.9rem",
-            "fontWeight": "600",
+            "fontSize": "0.88rem",
+            "fontWeight": "700",
             "fontFamily": "inherit",
             "transition": "all 0.15s",
             "border": "1px solid ${state.track === 'workshops' ? 'transparent' : 'var(--color-border)'}",
-            "color": "${state.track === 'workshops' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}",
-            "background": "${state.track === 'workshops' ? 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' : 'var(--color-bg-white)'}"
+            "color": "${state.track === 'workshops' ? '#ffffff' : 'var(--color-text-muted)'}",
+            "background": "${state.track === 'workshops' ? 'var(--grad-btn)' : 'rgba(255,255,255,0.02)'}",
+            "boxShadow": "${state.track === 'workshops' ? '0 8px 22px -8px var(--glow)' : 'none'}"
           }
         },
         {
@@ -105,434 +108,717 @@
             }
           },
           "style": {
-            "padding": "0.5rem 1.15rem",
+            "padding": "0.55rem 1.2rem",
             "borderRadius": "999px",
             "cursor": "pointer",
-            "fontSize": "0.9rem",
-            "fontWeight": "600",
+            "fontSize": "0.88rem",
+            "fontWeight": "700",
             "fontFamily": "inherit",
             "transition": "all 0.15s",
             "border": "1px solid ${state.track === 'design' ? 'transparent' : 'var(--color-border)'}",
-            "color": "${state.track === 'design' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}",
-            "background": "${state.track === 'design' ? 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' : 'var(--color-bg-white)'}"
+            "color": "${state.track === 'design' ? '#ffffff' : 'var(--color-text-muted)'}",
+            "background": "${state.track === 'design' ? 'var(--grad-btn)' : 'rgba(255,255,255,0.02)'}",
+            "boxShadow": "${state.track === 'design' ? '0 8px 22px -8px var(--glow)' : 'none'}"
           }
         }
       ]
     },
     {
       "tagName": "div",
-      "style": { "padding": "0.5rem 1.4rem 1.4rem" },
+      "style": { "padding": "1.6rem 1.4rem 1.2rem" },
       "children": [
         {
           "tagName": "div",
           "style": {
-            "display": "${state.track === 'all' || state.track === 'main' ? 'flex' : 'none'}",
-            "flexWrap": "wrap",
-            "alignItems": "center",
-            "justifyContent": "space-between",
-            "gap": "0.75rem",
-            "padding": "1.15rem 0",
-            "borderBottom": "1px solid var(--color-border)"
+            "display": "${state.track === 'all' || state.track === 'main' ? 'grid' : 'none'}",
+            "gridTemplateColumns": "4.2rem 1.6rem 1fr",
+            "marginBottom": "0.9rem",
+            "@--sm": { "gridTemplateColumns": "3.4rem 1.2rem 1fr" }
           },
           "children": [
             {
               "tagName": "div",
               "style": {
-                "display": "flex",
-                "alignItems": "baseline",
-                "gap": "1.1rem",
-                "flex": "1",
-                "minWidth": "16rem"
+                "paddingTop": "1.1rem",
+                "textAlign": "right",
+                "paddingRight": "0.15rem",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "0.96rem",
+                "fontWeight": "700",
+                "fontVariantNumeric": "tabular-nums",
+                "background": "var(--grad)",
+                "backgroundClip": "text",
+                "webkitBackgroundClip": "text",
+                "webkitTextFillColor": "transparent",
+                "color": "var(--color-accent)"
               },
+              "textContent": "09:00"
+            },
+            {
+              "tagName": "div",
+              "style": { "position": "relative" },
               "children": [
                 {
-                  "tagName": "span",
+                  "tagName": "div",
                   "style": {
-                    "fontFamily": "var(--font-heading)",
-                    "fontWeight": "600",
-                    "color": "var(--color-primary)",
-                    "fontVariantNumeric": "tabular-nums",
-                    "minWidth": "4rem"
-                  },
-                  "textContent": "09:00"
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "0",
+                    "bottom": "-0.9rem",
+                    "width": "2px",
+                    "transform": "translateX(-50%)",
+                    "background": "var(--grad)",
+                    "opacity": "0.4"
+                  }
                 },
                 {
                   "tagName": "div",
+                  "style": {
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "1.45rem",
+                    "width": "0.85rem",
+                    "height": "0.85rem",
+                    "borderRadius": "50%",
+                    "transform": "translate(-50%, -50%)",
+                    "border": "3px solid var(--color-bg-elev)",
+                    "background": "var(--color-accent)",
+                    "boxShadow": "0 0 12px rgba(34,224,255,0.7)"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexWrap": "wrap",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.75rem",
+                "padding": "0.9rem 1.15rem",
+                "borderRadius": "0.8rem",
+                "backgroundColor": "var(--color-bg-elev2)",
+                "border": "1px solid var(--color-border)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": { "flex": "1", "minWidth": "13rem" },
                   "children": [
                     {
                       "tagName": "div",
                       "style": {
                         "fontFamily": "var(--font-heading)",
-                        "fontWeight": "600",
-                        "fontSize": "1.08rem"
+                        "fontWeight": "700",
+                        "fontSize": "1.02rem",
+                        "color": "var(--color-text-primary)"
                       },
                       "textContent": "Opening Keynote: The Next Decade of the Web"
                     },
                     {
                       "tagName": "div",
-                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "style": { "fontSize": "0.88rem", "color": "var(--color-text-muted)" },
                       "textContent": "with Ada Okafor"
                     }
                   ]
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "whiteSpace": "nowrap",
+                    "fontSize": "0.72rem",
+                    "fontWeight": "700",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.03em",
+                    "padding": "0.3rem 0.75rem",
+                    "borderRadius": "999px",
+                    "color": "var(--color-accent)",
+                    "backgroundColor": "rgba(34,224,255,0.14)",
+                    "border": "1px solid rgba(34,224,255,0.35)"
+                  },
+                  "textContent": "Main Stage"
                 }
               ]
-            },
-            {
-              "tagName": "span",
-              "style": {
-                "whiteSpace": "nowrap",
-                "fontSize": "0.78rem",
-                "fontWeight": "600",
-                "padding": "0.3rem 0.75rem",
-                "borderRadius": "999px",
-                "color": "#6d28d9",
-                "backgroundColor": "rgba(124, 58, 237, 0.12)"
-              },
-              "textContent": "Main Stage"
             }
           ]
         },
         {
           "tagName": "div",
           "style": {
-            "display": "${state.track === 'all' || state.track === 'design' ? 'flex' : 'none'}",
-            "flexWrap": "wrap",
-            "alignItems": "center",
-            "justifyContent": "space-between",
-            "gap": "0.75rem",
-            "padding": "1.15rem 0",
-            "borderBottom": "1px solid var(--color-border)"
+            "display": "${state.track === 'all' || state.track === 'design' ? 'grid' : 'none'}",
+            "gridTemplateColumns": "4.2rem 1.6rem 1fr",
+            "marginBottom": "0.9rem",
+            "@--sm": { "gridTemplateColumns": "3.4rem 1.2rem 1fr" }
           },
           "children": [
             {
               "tagName": "div",
               "style": {
-                "display": "flex",
-                "alignItems": "baseline",
-                "gap": "1.1rem",
-                "flex": "1",
-                "minWidth": "16rem"
+                "paddingTop": "1.1rem",
+                "textAlign": "right",
+                "paddingRight": "0.15rem",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "0.96rem",
+                "fontWeight": "700",
+                "fontVariantNumeric": "tabular-nums",
+                "background": "var(--grad)",
+                "backgroundClip": "text",
+                "webkitBackgroundClip": "text",
+                "webkitTextFillColor": "transparent",
+                "color": "var(--color-accent)"
               },
+              "textContent": "10:30"
+            },
+            {
+              "tagName": "div",
+              "style": { "position": "relative" },
               "children": [
                 {
-                  "tagName": "span",
+                  "tagName": "div",
                   "style": {
-                    "fontFamily": "var(--font-heading)",
-                    "fontWeight": "600",
-                    "color": "var(--color-primary)",
-                    "fontVariantNumeric": "tabular-nums",
-                    "minWidth": "4rem"
-                  },
-                  "textContent": "10:30"
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "0",
+                    "bottom": "-0.9rem",
+                    "width": "2px",
+                    "transform": "translateX(-50%)",
+                    "background": "var(--grad)",
+                    "opacity": "0.4"
+                  }
                 },
                 {
                   "tagName": "div",
+                  "style": {
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "1.45rem",
+                    "width": "0.85rem",
+                    "height": "0.85rem",
+                    "borderRadius": "50%",
+                    "transform": "translate(-50%, -50%)",
+                    "border": "3px solid var(--color-bg-elev)",
+                    "background": "#ff6bb0",
+                    "boxShadow": "0 0 12px rgba(255,61,154,0.7)"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexWrap": "wrap",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.75rem",
+                "padding": "0.9rem 1.15rem",
+                "borderRadius": "0.8rem",
+                "backgroundColor": "var(--color-bg-elev2)",
+                "border": "1px solid var(--color-border)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": { "flex": "1", "minWidth": "13rem" },
                   "children": [
                     {
                       "tagName": "div",
                       "style": {
                         "fontFamily": "var(--font-heading)",
-                        "fontWeight": "600",
-                        "fontSize": "1.08rem"
+                        "fontWeight": "700",
+                        "fontSize": "1.02rem",
+                        "color": "var(--color-text-primary)"
                       },
                       "textContent": "Designing for Trust at Scale"
                     },
                     {
                       "tagName": "div",
-                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "style": { "fontSize": "0.88rem", "color": "var(--color-text-muted)" },
                       "textContent": "with Mateo Rivas"
                     }
                   ]
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "whiteSpace": "nowrap",
+                    "fontSize": "0.72rem",
+                    "fontWeight": "700",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.03em",
+                    "padding": "0.3rem 0.75rem",
+                    "borderRadius": "999px",
+                    "color": "#ff6bb0",
+                    "backgroundColor": "rgba(255,61,154,0.14)",
+                    "border": "1px solid rgba(255,61,154,0.35)"
+                  },
+                  "textContent": "Design"
                 }
               ]
-            },
-            {
-              "tagName": "span",
-              "style": {
-                "whiteSpace": "nowrap",
-                "fontSize": "0.78rem",
-                "fontWeight": "600",
-                "padding": "0.3rem 0.75rem",
-                "borderRadius": "999px",
-                "color": "#be185d",
-                "backgroundColor": "rgba(236, 72, 153, 0.12)"
-              },
-              "textContent": "Design"
             }
           ]
         },
         {
           "tagName": "div",
           "style": {
-            "display": "${state.track === 'all' || state.track === 'workshops' ? 'flex' : 'none'}",
-            "flexWrap": "wrap",
-            "alignItems": "center",
-            "justifyContent": "space-between",
-            "gap": "0.75rem",
-            "padding": "1.15rem 0",
-            "borderBottom": "1px solid var(--color-border)"
+            "display": "${state.track === 'all' || state.track === 'workshops' ? 'grid' : 'none'}",
+            "gridTemplateColumns": "4.2rem 1.6rem 1fr",
+            "marginBottom": "0.9rem",
+            "@--sm": { "gridTemplateColumns": "3.4rem 1.2rem 1fr" }
           },
           "children": [
             {
               "tagName": "div",
               "style": {
-                "display": "flex",
-                "alignItems": "baseline",
-                "gap": "1.1rem",
-                "flex": "1",
-                "minWidth": "16rem"
+                "paddingTop": "1.1rem",
+                "textAlign": "right",
+                "paddingRight": "0.15rem",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "0.96rem",
+                "fontWeight": "700",
+                "fontVariantNumeric": "tabular-nums",
+                "background": "var(--grad)",
+                "backgroundClip": "text",
+                "webkitBackgroundClip": "text",
+                "webkitTextFillColor": "transparent",
+                "color": "var(--color-accent)"
               },
+              "textContent": "11:45"
+            },
+            {
+              "tagName": "div",
+              "style": { "position": "relative" },
               "children": [
                 {
-                  "tagName": "span",
+                  "tagName": "div",
                   "style": {
-                    "fontFamily": "var(--font-heading)",
-                    "fontWeight": "600",
-                    "color": "var(--color-primary)",
-                    "fontVariantNumeric": "tabular-nums",
-                    "minWidth": "4rem"
-                  },
-                  "textContent": "11:45"
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "0",
+                    "bottom": "-0.9rem",
+                    "width": "2px",
+                    "transform": "translateX(-50%)",
+                    "background": "var(--grad)",
+                    "opacity": "0.4"
+                  }
                 },
                 {
                   "tagName": "div",
+                  "style": {
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "1.45rem",
+                    "width": "0.85rem",
+                    "height": "0.85rem",
+                    "borderRadius": "50%",
+                    "transform": "translate(-50%, -50%)",
+                    "border": "3px solid var(--color-bg-elev)",
+                    "background": "var(--color-lime)",
+                    "boxShadow": "0 0 12px rgba(198,255,77,0.7)"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexWrap": "wrap",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.75rem",
+                "padding": "0.9rem 1.15rem",
+                "borderRadius": "0.8rem",
+                "backgroundColor": "var(--color-bg-elev2)",
+                "border": "1px solid var(--color-border)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": { "flex": "1", "minWidth": "13rem" },
                   "children": [
                     {
                       "tagName": "div",
                       "style": {
                         "fontFamily": "var(--font-heading)",
-                        "fontWeight": "600",
-                        "fontSize": "1.08rem"
+                        "fontWeight": "700",
+                        "fontSize": "1.02rem",
+                        "color": "var(--color-text-primary)"
                       },
                       "textContent": "Hands-on: Building Reactive Islands"
                     },
                     {
                       "tagName": "div",
-                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "style": { "fontSize": "0.88rem", "color": "var(--color-text-muted)" },
                       "textContent": "with Priya Nair"
                     }
                   ]
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "whiteSpace": "nowrap",
+                    "fontSize": "0.72rem",
+                    "fontWeight": "700",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.03em",
+                    "padding": "0.3rem 0.75rem",
+                    "borderRadius": "999px",
+                    "color": "var(--color-lime)",
+                    "backgroundColor": "rgba(198,255,77,0.14)",
+                    "border": "1px solid rgba(198,255,77,0.35)"
+                  },
+                  "textContent": "Workshops"
                 }
               ]
-            },
-            {
-              "tagName": "span",
-              "style": {
-                "whiteSpace": "nowrap",
-                "fontSize": "0.78rem",
-                "fontWeight": "600",
-                "padding": "0.3rem 0.75rem",
-                "borderRadius": "999px",
-                "color": "#0e7490",
-                "backgroundColor": "rgba(6, 182, 212, 0.12)"
-              },
-              "textContent": "Workshops"
             }
           ]
         },
         {
           "tagName": "div",
           "style": {
-            "display": "${state.track === 'all' || state.track === 'main' ? 'flex' : 'none'}",
-            "flexWrap": "wrap",
-            "alignItems": "center",
-            "justifyContent": "space-between",
-            "gap": "0.75rem",
-            "padding": "1.15rem 0",
-            "borderBottom": "1px solid var(--color-border)"
+            "display": "${state.track === 'all' || state.track === 'main' ? 'grid' : 'none'}",
+            "gridTemplateColumns": "4.2rem 1.6rem 1fr",
+            "marginBottom": "0.9rem",
+            "@--sm": { "gridTemplateColumns": "3.4rem 1.2rem 1fr" }
           },
           "children": [
             {
               "tagName": "div",
               "style": {
-                "display": "flex",
-                "alignItems": "baseline",
-                "gap": "1.1rem",
-                "flex": "1",
-                "minWidth": "16rem"
+                "paddingTop": "1.1rem",
+                "textAlign": "right",
+                "paddingRight": "0.15rem",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "0.96rem",
+                "fontWeight": "700",
+                "fontVariantNumeric": "tabular-nums",
+                "background": "var(--grad)",
+                "backgroundClip": "text",
+                "webkitBackgroundClip": "text",
+                "webkitTextFillColor": "transparent",
+                "color": "var(--color-accent)"
               },
+              "textContent": "13:30"
+            },
+            {
+              "tagName": "div",
+              "style": { "position": "relative" },
               "children": [
                 {
-                  "tagName": "span",
+                  "tagName": "div",
                   "style": {
-                    "fontFamily": "var(--font-heading)",
-                    "fontWeight": "600",
-                    "color": "var(--color-primary)",
-                    "fontVariantNumeric": "tabular-nums",
-                    "minWidth": "4rem"
-                  },
-                  "textContent": "13:30"
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "0",
+                    "bottom": "-0.9rem",
+                    "width": "2px",
+                    "transform": "translateX(-50%)",
+                    "background": "var(--grad)",
+                    "opacity": "0.4"
+                  }
                 },
                 {
                   "tagName": "div",
+                  "style": {
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "1.45rem",
+                    "width": "0.85rem",
+                    "height": "0.85rem",
+                    "borderRadius": "50%",
+                    "transform": "translate(-50%, -50%)",
+                    "border": "3px solid var(--color-bg-elev)",
+                    "background": "var(--color-accent)",
+                    "boxShadow": "0 0 12px rgba(34,224,255,0.7)"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexWrap": "wrap",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.75rem",
+                "padding": "0.9rem 1.15rem",
+                "borderRadius": "0.8rem",
+                "backgroundColor": "var(--color-bg-elev2)",
+                "border": "1px solid var(--color-border)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": { "flex": "1", "minWidth": "13rem" },
                   "children": [
                     {
                       "tagName": "div",
                       "style": {
                         "fontFamily": "var(--font-heading)",
-                        "fontWeight": "600",
-                        "fontSize": "1.08rem"
+                        "fontWeight": "700",
+                        "fontSize": "1.02rem",
+                        "color": "var(--color-text-primary)"
                       },
                       "textContent": "Scaling Systems Without Scaling Teams"
                     },
                     {
                       "tagName": "div",
-                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "style": { "fontSize": "0.88rem", "color": "var(--color-text-muted)" },
                       "textContent": "with Jonas Berg"
                     }
                   ]
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "whiteSpace": "nowrap",
+                    "fontSize": "0.72rem",
+                    "fontWeight": "700",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.03em",
+                    "padding": "0.3rem 0.75rem",
+                    "borderRadius": "999px",
+                    "color": "var(--color-accent)",
+                    "backgroundColor": "rgba(34,224,255,0.14)",
+                    "border": "1px solid rgba(34,224,255,0.35)"
+                  },
+                  "textContent": "Main Stage"
                 }
               ]
-            },
-            {
-              "tagName": "span",
-              "style": {
-                "whiteSpace": "nowrap",
-                "fontSize": "0.78rem",
-                "fontWeight": "600",
-                "padding": "0.3rem 0.75rem",
-                "borderRadius": "999px",
-                "color": "#6d28d9",
-                "backgroundColor": "rgba(124, 58, 237, 0.12)"
-              },
-              "textContent": "Main Stage"
             }
           ]
         },
         {
           "tagName": "div",
           "style": {
-            "display": "${state.track === 'all' || state.track === 'design' ? 'flex' : 'none'}",
-            "flexWrap": "wrap",
-            "alignItems": "center",
-            "justifyContent": "space-between",
-            "gap": "0.75rem",
-            "padding": "1.15rem 0",
-            "borderBottom": "1px solid var(--color-border)"
+            "display": "${state.track === 'all' || state.track === 'design' ? 'grid' : 'none'}",
+            "gridTemplateColumns": "4.2rem 1.6rem 1fr",
+            "marginBottom": "0.9rem",
+            "@--sm": { "gridTemplateColumns": "3.4rem 1.2rem 1fr" }
           },
           "children": [
             {
               "tagName": "div",
               "style": {
-                "display": "flex",
-                "alignItems": "baseline",
-                "gap": "1.1rem",
-                "flex": "1",
-                "minWidth": "16rem"
+                "paddingTop": "1.1rem",
+                "textAlign": "right",
+                "paddingRight": "0.15rem",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "0.96rem",
+                "fontWeight": "700",
+                "fontVariantNumeric": "tabular-nums",
+                "background": "var(--grad)",
+                "backgroundClip": "text",
+                "webkitBackgroundClip": "text",
+                "webkitTextFillColor": "transparent",
+                "color": "var(--color-accent)"
               },
+              "textContent": "15:00"
+            },
+            {
+              "tagName": "div",
+              "style": { "position": "relative" },
               "children": [
                 {
-                  "tagName": "span",
+                  "tagName": "div",
                   "style": {
-                    "fontFamily": "var(--font-heading)",
-                    "fontWeight": "600",
-                    "color": "var(--color-primary)",
-                    "fontVariantNumeric": "tabular-nums",
-                    "minWidth": "4rem"
-                  },
-                  "textContent": "15:00"
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "0",
+                    "bottom": "-0.9rem",
+                    "width": "2px",
+                    "transform": "translateX(-50%)",
+                    "background": "var(--grad)",
+                    "opacity": "0.4"
+                  }
                 },
                 {
                   "tagName": "div",
+                  "style": {
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "1.45rem",
+                    "width": "0.85rem",
+                    "height": "0.85rem",
+                    "borderRadius": "50%",
+                    "transform": "translate(-50%, -50%)",
+                    "border": "3px solid var(--color-bg-elev)",
+                    "background": "#ff6bb0",
+                    "boxShadow": "0 0 12px rgba(255,61,154,0.7)"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexWrap": "wrap",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.75rem",
+                "padding": "0.9rem 1.15rem",
+                "borderRadius": "0.8rem",
+                "backgroundColor": "var(--color-bg-elev2)",
+                "border": "1px solid var(--color-border)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": { "flex": "1", "minWidth": "13rem" },
                   "children": [
                     {
                       "tagName": "div",
                       "style": {
                         "fontFamily": "var(--font-heading)",
-                        "fontWeight": "600",
-                        "fontSize": "1.08rem"
+                        "fontWeight": "700",
+                        "fontSize": "1.02rem",
+                        "color": "var(--color-text-primary)"
                       },
                       "textContent": "Motion, Meaning & Microinteractions"
                     },
                     {
                       "tagName": "div",
-                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "style": { "fontSize": "0.88rem", "color": "var(--color-text-muted)" },
                       "textContent": "with Lena Cho"
                     }
                   ]
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "whiteSpace": "nowrap",
+                    "fontSize": "0.72rem",
+                    "fontWeight": "700",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.03em",
+                    "padding": "0.3rem 0.75rem",
+                    "borderRadius": "999px",
+                    "color": "#ff6bb0",
+                    "backgroundColor": "rgba(255,61,154,0.14)",
+                    "border": "1px solid rgba(255,61,154,0.35)"
+                  },
+                  "textContent": "Design"
                 }
               ]
-            },
-            {
-              "tagName": "span",
-              "style": {
-                "whiteSpace": "nowrap",
-                "fontSize": "0.78rem",
-                "fontWeight": "600",
-                "padding": "0.3rem 0.75rem",
-                "borderRadius": "999px",
-                "color": "#be185d",
-                "backgroundColor": "rgba(236, 72, 153, 0.12)"
-              },
-              "textContent": "Design"
             }
           ]
         },
         {
           "tagName": "div",
           "style": {
-            "display": "${state.track === 'all' || state.track === 'workshops' ? 'flex' : 'none'}",
-            "flexWrap": "wrap",
-            "alignItems": "center",
-            "justifyContent": "space-between",
-            "gap": "0.75rem",
-            "padding": "1.15rem 0"
+            "display": "${state.track === 'all' || state.track === 'workshops' ? 'grid' : 'none'}",
+            "gridTemplateColumns": "4.2rem 1.6rem 1fr",
+            "@--sm": { "gridTemplateColumns": "3.4rem 1.2rem 1fr" }
           },
           "children": [
             {
               "tagName": "div",
               "style": {
-                "display": "flex",
-                "alignItems": "baseline",
-                "gap": "1.1rem",
-                "flex": "1",
-                "minWidth": "16rem"
+                "paddingTop": "1.1rem",
+                "textAlign": "right",
+                "paddingRight": "0.15rem",
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "0.96rem",
+                "fontWeight": "700",
+                "fontVariantNumeric": "tabular-nums",
+                "background": "var(--grad)",
+                "backgroundClip": "text",
+                "webkitBackgroundClip": "text",
+                "webkitTextFillColor": "transparent",
+                "color": "var(--color-accent)"
               },
+              "textContent": "16:15"
+            },
+            {
+              "tagName": "div",
+              "style": { "position": "relative" },
               "children": [
                 {
-                  "tagName": "span",
+                  "tagName": "div",
                   "style": {
-                    "fontFamily": "var(--font-heading)",
-                    "fontWeight": "600",
-                    "color": "var(--color-primary)",
-                    "fontVariantNumeric": "tabular-nums",
-                    "minWidth": "4rem"
-                  },
-                  "textContent": "16:15"
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "0",
+                    "bottom": "0",
+                    "width": "2px",
+                    "transform": "translateX(-50%)",
+                    "background": "var(--grad)",
+                    "opacity": "0.4"
+                  }
                 },
                 {
                   "tagName": "div",
+                  "style": {
+                    "position": "absolute",
+                    "left": "50%",
+                    "top": "1.45rem",
+                    "width": "0.85rem",
+                    "height": "0.85rem",
+                    "borderRadius": "50%",
+                    "transform": "translate(-50%, -50%)",
+                    "border": "3px solid var(--color-bg-elev)",
+                    "background": "var(--color-lime)",
+                    "boxShadow": "0 0 12px rgba(198,255,77,0.7)"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexWrap": "wrap",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "gap": "0.75rem",
+                "padding": "0.9rem 1.15rem",
+                "borderRadius": "0.8rem",
+                "backgroundColor": "var(--color-bg-elev2)",
+                "border": "1px solid var(--color-border)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": { "flex": "1", "minWidth": "13rem" },
                   "children": [
                     {
                       "tagName": "div",
                       "style": {
                         "fontFamily": "var(--font-heading)",
-                        "fontWeight": "600",
-                        "fontSize": "1.08rem"
+                        "fontWeight": "700",
+                        "fontSize": "1.02rem",
+                        "color": "var(--color-text-primary)"
                       },
                       "textContent": "Ship It: From Prototype to Production"
                     },
                     {
                       "tagName": "div",
-                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "style": { "fontSize": "0.88rem", "color": "var(--color-text-muted)" },
                       "textContent": "with Sam Whitfield"
                     }
                   ]
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "whiteSpace": "nowrap",
+                    "fontSize": "0.72rem",
+                    "fontWeight": "700",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.03em",
+                    "padding": "0.3rem 0.75rem",
+                    "borderRadius": "999px",
+                    "color": "var(--color-lime)",
+                    "backgroundColor": "rgba(198,255,77,0.14)",
+                    "border": "1px solid rgba(198,255,77,0.35)"
+                  },
+                  "textContent": "Workshops"
                 }
               ]
-            },
-            {
-              "tagName": "span",
-              "style": {
-                "whiteSpace": "nowrap",
-                "fontSize": "0.78rem",
-                "fontWeight": "600",
-                "padding": "0.3rem 0.75rem",
-                "borderRadius": "999px",
-                "color": "#0e7490",
-                "backgroundColor": "rgba(6, 182, 212, 0.12)"
-              },
-              "textContent": "Workshops"
             }
           ]
         }

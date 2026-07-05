@@ -2,7 +2,7 @@
 title: "Contact & Inquiries — Aperture Studio"
 ---
 
-::::::section{style.padding="clamp(3rem, 6vw, 5rem) 1.5rem" style.backgroundColor="var(--color-bg-cream)"}
+::::::section{style.padding="clamp(7rem, 12vw, 10rem) 0 clamp(1rem, 3vw, 2rem)"}
 ::pv-section-header{props.eyebrow="Inquire" props.heading="Start a project" props.subheading="Tell us a little about what you have in mind. We reply to every message personally, usually within two business days."}
 ::::::
 

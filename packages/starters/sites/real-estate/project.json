@@ -8,32 +8,45 @@
   "$head": [
     {
       "tagName": "meta",
-      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+      "attributes": {
+        "name": "viewport",
+        "content": "width=device-width, initial-scale=1"
+      }
     },
     {
       "tagName": "meta",
       "attributes": {
         "name": "description",
-        "content": "Northshore Realty helps buyers and sellers find their place on the north shore — browse current listings, filter by price and bedrooms, and work with agents who know the neighborhood."
+        "content": "Northshore Realty is the north shore's property index — search live listings by neighborhood, price, and bedrooms, then work with agents who actually live here."
       }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+      "attributes": {
+        "rel": "icon",
+        "href": "/favicon.svg"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.googleapis.com"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.gstatic.com",
+        "crossorigin": ""
+      }
     },
     {
       "tagName": "link",
       "attributes": {
         "rel": "stylesheet",
-        "href": "https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"
+        "href": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Spectral:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap"
       }
     }
   ],
@@ -44,27 +57,45 @@
     "--sm": "(max-width: 640px)"
   },
   "style": {
-    "--color-primary": "#0e7490",
-    "--color-primary-hover": "#155e75",
-    "--color-navy": "#1e3a8a",
-    "--color-bg-dark": "#0f172a",
-    "--color-bg-cream": "#f1f5f9",
+    "--color-primary": "#0f766e",
+    "--color-primary-hover": "#115e59",
+    "--color-accent": "#0d9488",
+    "--color-accent-bright": "#14b8a6",
+    "--color-accent-soft": "#ccfbf1",
+    "--color-teal-tint": "#f0fdfa",
+    "--color-ink": "#0b1220",
+    "--color-navy": "#0f172a",
+    "--color-bg-dark": "#0b1220",
+    "--color-bg-ink-soft": "#152238",
+    "--color-bg-cream": "#f6f8fb",
+    "--color-bg-tint": "#eef2f7",
     "--color-bg-white": "#ffffff",
     "--color-text-primary": "#0f172a",
-    "--color-text-white": "#ffffff",
+    "--color-text-secondary": "#334155",
     "--color-text-muted": "#64748b",
-    "--color-border": "#e2e8f0",
-    "--color-accent": "#0e7490",
-    "--font-heading": "'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-    "--max-width": "1200px",
-    "--max-width-narrow": "820px",
-    "--radius": "0.5rem",
+    "--color-text-white": "#ffffff",
+    "--color-border": "#e4e9f0",
+    "--color-border-strong": "#cbd5e1",
+    "--color-status-new": "#0d9488",
+    "--font-display": "'Spectral', Georgia, 'Times New Roman', serif",
+    "--font-heading": "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--font-ui": "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--font-body": "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--max-width": "1240px",
+    "--max-width-narrow": "760px",
+    "--radius": "0.75rem",
+    "--radius-sm": "0.5rem",
+    "--radius-lg": "1.25rem",
+    "--shadow-card": "0 1px 2px rgba(15,23,42,0.04), 0 10px 26px -14px rgba(15,23,42,0.18)",
+    "--shadow-float": "0 30px 70px -28px rgba(11,18,32,0.42)",
     "margin": "0",
     "padding": "0",
-    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "fontFamily": "var(--font-body)",
+    "fontSize": "17px",
     "lineHeight": "1.6",
     "color": "var(--color-text-primary)",
-    "backgroundColor": "var(--color-bg-white)"
+    "backgroundColor": "var(--color-bg-white)",
+    "WebkitFontSmoothing": "antialiased"
   },
   "imports": {
     "Markdown": "@jxsuite/parser/Markdown.class.json",
@@ -76,7 +107,12 @@
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
     "formats": ["webp", "avif"],
-    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "quality": {
+      "webp": 80,
+      "avif": 65,
+      "jpeg": 80,
+      "png": 80
+    },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
@@ -87,15 +123,37 @@
       "schema": {
         "type": "object",
         "properties": {
-          "Title": { "type": "string" },
-          "slug": { "type": "string" },
-          "price": { "type": "number" },
-          "beds": { "type": "number" },
-          "baths": { "type": "number" },
-          "sqft": { "type": "number" },
-          "city": { "type": "string" },
-          "image": { "type": "string", "format": "image" },
-          "order": { "type": "number" }
+          "Title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "beds": {
+            "type": "number"
+          },
+          "baths": {
+            "type": "number"
+          },
+          "sqft": {
+            "type": "number"
+          },
+          "city": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "format": "image"
+          },
+          "status": {
+            "type": "string"
+          },
+          "order": {
+            "type": "number"
+          }
         },
         "required": ["Title", "slug"]
       }

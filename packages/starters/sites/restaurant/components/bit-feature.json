@@ -1,40 +1,59 @@
 {
   "tagName": "bit-feature",
   "state": {
-    "icon": "",
+    "number": "",
     "title": "",
     "text": ""
   },
   "style": {
     "display": "block",
-    "padding": "1.75rem",
-    "backgroundColor": "var(--color-bg-cream)",
-    "borderRadius": "var(--radius)",
-    "border": "1px solid var(--color-border)"
+    "paddingTop": "1.5rem",
+    "borderTop": "1px solid var(--color-border-strong)"
   },
   "children": [
     {
       "tagName": "div",
-      "style": { "fontSize": "1.75rem", "marginBottom": "0.75rem", "lineHeight": "1" },
-      "textContent": "${state.icon}"
-    },
-    {
-      "tagName": "h3",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "1.25rem",
-        "fontWeight": "600",
-        "margin": "0 0 0.5rem"
+        "display": "flex",
+        "alignItems": "baseline",
+        "gap": "0.9rem",
+        "marginBottom": "1rem"
       },
-      "textContent": "${state.title}"
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.35rem",
+            "fontWeight": "600",
+            "fontStyle": "italic",
+            "color": "var(--color-primary)",
+            "fontVariantNumeric": "tabular-nums"
+          },
+          "textContent": "${state.number}"
+        },
+        {
+          "tagName": "h3",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.45rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.01em",
+            "margin": "0",
+            "color": "var(--color-text-primary)"
+          },
+          "textContent": "${state.title}"
+        }
+      ]
     },
     {
       "tagName": "p",
       "style": {
         "margin": "0",
+        "fontFamily": "var(--font-body)",
         "color": "var(--color-text-muted)",
-        "fontSize": "0.98rem",
-        "lineHeight": "1.65"
+        "fontSize": "1rem",
+        "lineHeight": "1.7"
       },
       "textContent": "${state.text}"
     }

@@ -7,85 +7,130 @@
     "duration": ""
   },
   "style": {
-    "display": "flex",
+    "display": "grid",
+    "gridTemplateColumns": "3rem 1fr",
     "gap": "1.25rem",
-    "alignItems": "flex-start",
-    "padding": "1.5rem",
-    "backgroundColor": "var(--color-bg-white)",
-    "border": "1px solid var(--color-border)",
-    "borderRadius": "var(--radius)"
+    "@--sm": { "gridTemplateColumns": "2.5rem 1fr", "gap": "0.9rem" }
   },
   "children": [
     {
       "tagName": "div",
       "style": {
-        "flex": "none",
         "display": "flex",
-        "alignItems": "center",
-        "justifyContent": "center",
-        "width": "2.75rem",
-        "height": "2.75rem",
-        "borderRadius": "0.6rem",
-        "backgroundColor": "var(--color-primary)",
-        "color": "var(--color-text-white)",
-        "fontFamily": "var(--font-heading)",
-        "fontWeight": "800",
-        "fontSize": "1.1rem"
+        "flexDirection": "column",
+        "alignItems": "center"
       },
-      "textContent": "${state.order}"
-    },
-    {
-      "tagName": "div",
-      "style": { "flex": "1" },
       "children": [
         {
           "tagName": "div",
           "style": {
+            "position": "relative",
+            "zIndex": "2",
+            "flex": "none",
             "display": "flex",
-            "justifyContent": "space-between",
-            "alignItems": "baseline",
-            "gap": "1rem",
-            "flexWrap": "wrap"
+            "alignItems": "center",
+            "justifyContent": "center",
+            "width": "3rem",
+            "height": "3rem",
+            "borderRadius": "0.7rem",
+            "backgroundColor": "var(--color-primary)",
+            "color": "var(--color-text-white)",
+            "fontFamily": "var(--font-mono)",
+            "fontWeight": "700",
+            "fontSize": "1.05rem",
+            "boxShadow": "0 8px 18px -8px rgba(79,70,229,0.8)",
+            "@--sm": { "width": "2.5rem", "height": "2.5rem", "fontSize": "0.95rem" }
           },
           "children": [
             {
-              "tagName": "h3",
-              "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.2rem",
-                "fontWeight": "700",
-                "margin": "0"
-              },
-              "textContent": "${state.title}"
-            },
-            {
               "tagName": "span",
-              "style": {
-                "display": "${state.duration ? 'inline-block' : 'none'}",
-                "flex": "none",
-                "fontSize": "0.75rem",
-                "fontWeight": "700",
-                "textTransform": "uppercase",
-                "letterSpacing": "0.06em",
-                "color": "var(--color-primary)",
-                "backgroundColor": "rgba(37,99,235,0.1)",
-                "padding": "0.25rem 0.65rem",
-                "borderRadius": "999px"
-              },
-              "textContent": "${state.duration}"
-            }
+              "style": { "opacity": "0.55", "fontSize": "0.7em" },
+              "textContent": "0"
+            },
+            { "tagName": "span", "textContent": "${state.order}" }
           ]
         },
         {
-          "tagName": "p",
+          "tagName": "div",
           "style": {
-            "display": "${state.summary ? 'block' : 'none'}",
-            "margin": "0.4rem 0 0",
-            "color": "var(--color-text-muted)",
-            "fontSize": "0.98rem",
-            "lineHeight": "1.65"
+            "width": "2px",
+            "flex": "1",
+            "marginTop": "0.35rem",
+            "backgroundColor": "var(--color-indigo-line)"
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": { "paddingBottom": "1.5rem" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "padding": "1.35rem 1.5rem",
+            "backgroundColor": "var(--color-bg-white)",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "transition": "border-color 0.15s, box-shadow 0.15s",
+            ":hover": {
+              "borderColor": "var(--color-primary-light)",
+              "boxShadow": "0 14px 34px -18px rgba(79,70,229,0.35)"
+            }
           },
-          "textContent": "${state.summary}"
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "justifyContent": "space-between",
+                "alignItems": "baseline",
+                "gap": "1rem",
+                "flexWrap": "wrap"
+              },
+              "children": [
+                {
+                  "tagName": "h3",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.22rem",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.01em",
+                    "margin": "0",
+                    "color": "var(--color-text-primary)"
+                  },
+                  "textContent": "${state.title}"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "${state.duration ? 'inline-block' : 'none'}",
+                    "flex": "none",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.74rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-primary)",
+                    "backgroundColor": "var(--color-indigo-050)",
+                    "border": "1px solid var(--color-indigo-line)",
+                    "padding": "0.25rem 0.65rem",
+                    "borderRadius": "999px"
+                  },
+                  "textContent": "${state.duration}"
+                }
+              ]
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "display": "${state.summary ? 'block' : 'none'}",
+                "margin": "0.55rem 0 0",
+                "color": "var(--color-text-muted)",
+                "fontSize": "0.98rem",
+                "lineHeight": "1.65"
+              },
+              "textContent": "${state.summary}"
+            }
+          ]
         }
       ]
     }

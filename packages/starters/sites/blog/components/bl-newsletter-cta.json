@@ -1,19 +1,18 @@
 {
   "tagName": "bl-newsletter-cta",
   "state": {
-    "eyebrow": "The Long Field Letter",
+    "eyebrow": "The Sunday Dispatch",
     "heading": "One essay, most Sundays.",
     "text": "Field notes on design, technology, and craft — sent when there's something worth saying. No noise, unsubscribe anytime.",
     "placeholder": "you@example.com",
     "cta": "Subscribe",
-    "note": "This is a demo form. Wire it to your email provider in components/bl-newsletter-cta.json."
+    "note": "Demo form — wire it to your email provider in components/bl-newsletter-cta.json."
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-cream)",
-    "border": "1px solid var(--color-border)",
-    "borderRadius": "var(--radius)",
-    "padding": "clamp(2rem, 5vw, 3rem)"
+    "backgroundColor": "var(--color-ink)",
+    "color": "var(--color-text-white)",
+    "padding": "clamp(2.5rem, 6vw, 4rem) clamp(1.5rem, 5vw, 3.5rem)"
   },
   "children": [
     {
@@ -24,12 +23,14 @@
           "tagName": "p",
           "style": {
             "display": "${state.eyebrow ? 'block' : 'none'}",
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.74rem",
+            "fontWeight": "500",
             "textTransform": "uppercase",
-            "letterSpacing": "0.16em",
-            "fontSize": "0.78rem",
-            "fontWeight": "600",
-            "color": "var(--color-primary)",
-            "margin": "0 0 0.75rem"
+            "letterSpacing": "0.24em",
+            "color": "var(--color-text-white)",
+            "opacity": "0.6",
+            "margin": "0 0 1.25rem"
           },
           "textContent": "${state.eyebrow}"
         },
@@ -37,21 +38,24 @@
           "tagName": "h2",
           "style": {
             "fontFamily": "var(--font-heading)",
-            "fontSize": "clamp(1.7rem, 3.5vw, 2.3rem)",
-            "fontWeight": "600",
-            "lineHeight": "1.15",
-            "margin": "0 0 0.85rem"
+            "fontWeight": "700",
+            "fontSize": "clamp(2rem, 5vw, 3.2rem)",
+            "lineHeight": "1.05",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem"
           },
           "textContent": "${state.heading}"
         },
         {
           "tagName": "p",
           "style": {
-            "fontSize": "1.08rem",
-            "lineHeight": "1.65",
-            "color": "var(--color-text-muted)",
-            "margin": "0 auto 1.75rem",
-            "maxWidth": "52ch"
+            "fontFamily": "var(--font-heading)",
+            "fontStyle": "italic",
+            "fontSize": "1.2rem",
+            "lineHeight": "1.6",
+            "opacity": "0.8",
+            "margin": "0 auto 2rem",
+            "maxWidth": "48ch"
           },
           "textContent": "${state.text}"
         },
@@ -60,10 +64,11 @@
           "attributes": { "action": "#", "method": "post" },
           "style": {
             "display": "flex",
-            "gap": "0.75rem",
-            "maxWidth": "460px",
+            "gap": "0",
+            "maxWidth": "440px",
             "margin": "0 auto",
-            "@--sm": { "flexDirection": "column" }
+            "borderBottom": "1.5px solid rgba(246, 241, 231, 0.5)",
+            "@--sm": { "flexDirection": "column", "gap": "1rem", "borderBottom": "none" }
           },
           "children": [
             {
@@ -77,30 +82,39 @@
               },
               "style": {
                 "flex": "1",
-                "padding": "0.8rem 1rem",
-                "border": "1px solid var(--color-border)",
-                "borderRadius": "var(--radius)",
-                "fontSize": "1rem",
-                "fontFamily": "inherit",
-                "backgroundColor": "var(--color-bg-white)"
+                "padding": "0.75rem 0.25rem",
+                "border": "none",
+                "borderBottom": "1.5px solid transparent",
+                "backgroundColor": "transparent",
+                "color": "var(--color-text-white)",
+                "fontSize": "1.05rem",
+                "fontFamily": "var(--font-heading)",
+                "outline": "none",
+                "@--sm": {
+                  "borderBottom": "1.5px solid rgba(246, 241, 231, 0.5)",
+                  "textAlign": "center"
+                }
               }
             },
             {
               "tagName": "button",
               "attributes": { "type": "submit" },
               "style": {
-                "backgroundColor": "var(--color-primary)",
+                "backgroundColor": "transparent",
                 "color": "var(--color-text-white)",
-                "padding": "0.8rem 1.75rem",
+                "padding": "0.75rem 0.5rem",
                 "border": "none",
-                "borderRadius": "var(--radius)",
-                "fontSize": "1rem",
+                "fontFamily": "var(--font-body)",
+                "fontSize": "0.8rem",
                 "fontWeight": "600",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.16em",
                 "cursor": "pointer",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                "whiteSpace": "nowrap",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "0.6" }
               },
-              "textContent": "${state.cta}"
+              "textContent": "${state.cta} →"
             }
           ]
         },
@@ -108,9 +122,9 @@
           "tagName": "p",
           "style": {
             "display": "${state.note ? 'block' : 'none'}",
-            "fontSize": "0.8rem",
-            "color": "var(--color-text-muted)",
-            "margin": "1rem 0 0"
+            "fontSize": "0.75rem",
+            "opacity": "0.5",
+            "margin": "1.5rem 0 0"
           },
           "textContent": "${state.note}"
         }

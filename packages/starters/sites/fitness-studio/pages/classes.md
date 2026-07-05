@@ -10,11 +10,17 @@ state:
       order: asc
 ---
 
-:::::section{style.padding="clamp(3rem, 6vw, 4.5rem) 1.5rem" style.backgroundColor="var(--color-bg-cream)"}
-::fs-section-header{props.eyebrow="Weekly schedule" props.heading="Find your class" props.subheading="From slow restorative flows to high-intensity circuits — here's everything on the mat this week."}
+:::::section{style.padding="clamp(3rem, 6vw, 4.5rem) 1.5rem" style.backgroundColor="var(--color-bg-blush)"}
+::fs-section-header{props.eyebrow="Weekly schedule" props.heading="Find your class" props.subheading="From slow restorative flows to high-intensity circuits — here's everything on the mat this week. Tap a style to filter."}
 :::::
 
-:::::section{style.padding="clamp(3rem, 6vw, 4.5rem) 1.5rem"}
+:::::section{style.padding="clamp(3rem, 7vw, 5rem) 1.5rem"}
+::fs-schedule
+:::::
+
+:::::section{style.padding="clamp(3rem, 7vw, 5rem) 1.5rem" style.backgroundColor="var(--color-bg-blush)"}
+::fs-section-header{props.eyebrow="The details" props.heading="Every class, up close" props.subheading="What to expect, who's teaching, and the level each session is built for."}
+
 ::::fs-class-grid
 :::Array{items.ref="#/state/schedule"}
 ::fs-class-card{props.name="${item.data.name}" props.level="${item.data.level}" props.time="${item.data.time}" props.instructor="${item.data.instructor}" props.focus="${item.data.focus}"}
@@ -22,7 +28,7 @@ state:
 ::::
 :::::
 
-:::::section{style.padding="clamp(1rem, 4vw, 3rem) 1.5rem clamp(3.5rem, 8vw, 6rem)" style.backgroundColor="var(--color-bg-cream)"}
+:::::section{style.padding="clamp(3rem, 7vw, 5rem) 1.5rem"}
 ::fs-section-header{props.eyebrow="Good to know" props.heading="Before your first class"}
 
 ::::div{style.maxWidth="var(--max-width)" style.margin="0 auto" style.display="grid" style.gridTemplateColumns="repeat(3, 1fr)" style.gap="1.25rem" style.--md.gridTemplateColumns="1fr"}
@@ -34,4 +40,4 @@ state:
 ::::
 :::::
 
-::fs-cta{props.heading="Ready to roll out your mat?" props.text="Book your spot online in under a minute. First-timers get a free intro session." props.cta="Book a Class" props.ctaHref="/contact/"}
+::fs-cta{props.eyebrow="Spots fill fast" props.heading="Ready to roll out your mat?" props.text="Book your spot online in under a minute. First-timers always get a free intro session." props.cta="Book a Class" props.ctaHref="/contact/"}

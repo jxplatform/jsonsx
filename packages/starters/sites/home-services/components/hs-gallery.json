@@ -1,52 +1,103 @@
 {
   "tagName": "hs-gallery",
   "state": {
-    "img1": { "type": "string", "format": "image", "default": "" },
-    "img2": { "type": "string", "format": "image", "default": "" },
-    "img3": { "type": "string", "format": "image", "default": "" },
+    "img1": {
+      "type": "string",
+      "format": "image",
+      "default": ""
+    },
+    "img2": {
+      "type": "string",
+      "format": "image",
+      "default": ""
+    },
+    "img3": {
+      "type": "string",
+      "format": "image",
+      "default": ""
+    },
     "alt": "Recent HVAC project by Summit Heating & Cooling"
   },
   "style": {
+    "boxSizing": "border-box",
     "display": "grid",
-    "gridTemplateColumns": "repeat(3, 1fr)",
-    "gap": "0.75rem",
+    "gridTemplateColumns": "minmax(0, 1.62fr) minmax(0, 1fr)",
+    "gridTemplateRows": "minmax(0, 1fr) minmax(0, 1fr)",
+    "gap": "0.9rem",
+    "height": "clamp(360px, 44vw, 540px)",
     "maxWidth": "var(--max-width)",
     "margin": "0 auto",
     "padding": "0 1.5rem",
-    "@--sm": { "gridTemplateColumns": "1fr" }
+    "@--sm": {
+      "gridTemplateColumns": "1fr",
+      "gridTemplateRows": "auto",
+      "height": "auto"
+    }
   },
   "children": [
     {
       "tagName": "img",
-      "attributes": { "src": "${state.img1}", "alt": "${state.alt}", "loading": "lazy" },
+      "attributes": {
+        "src": "${state.img1}",
+        "alt": "${state.alt}",
+        "loading": "lazy"
+      },
       "style": {
+        "gridColumn": "1",
+        "gridRow": "1 / span 2",
         "width": "100%",
-        "aspectRatio": "1 / 1",
+        "height": "100%",
         "objectFit": "cover",
         "borderRadius": "var(--radius)",
-        "display": "block"
+        "display": "block",
+        "borderBottom": "4px solid var(--color-primary)",
+        "@--sm": {
+          "gridColumn": "auto",
+          "gridRow": "auto",
+          "height": "240px"
+        },
+        "minHeight": "0",
+        "minWidth": "0"
       }
     },
     {
       "tagName": "img",
-      "attributes": { "src": "${state.img2}", "alt": "${state.alt}", "loading": "lazy" },
+      "attributes": {
+        "src": "${state.img2}",
+        "alt": "${state.alt}",
+        "loading": "lazy"
+      },
       "style": {
         "width": "100%",
-        "aspectRatio": "1 / 1",
+        "height": "100%",
         "objectFit": "cover",
         "borderRadius": "var(--radius)",
-        "display": "block"
+        "display": "block",
+        "@--sm": {
+          "height": "200px"
+        },
+        "minHeight": "0",
+        "minWidth": "0"
       }
     },
     {
       "tagName": "img",
-      "attributes": { "src": "${state.img3}", "alt": "${state.alt}", "loading": "lazy" },
+      "attributes": {
+        "src": "${state.img3}",
+        "alt": "${state.alt}",
+        "loading": "lazy"
+      },
       "style": {
         "width": "100%",
-        "aspectRatio": "1 / 1",
+        "height": "100%",
         "objectFit": "cover",
         "borderRadius": "var(--radius)",
-        "display": "block"
+        "display": "block",
+        "@--sm": {
+          "height": "200px"
+        },
+        "minHeight": "0",
+        "minWidth": "0"
       }
     }
   ]

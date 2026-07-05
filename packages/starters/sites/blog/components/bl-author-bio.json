@@ -8,17 +8,16 @@
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-cream)",
-    "border": "1px solid var(--color-border)",
-    "borderRadius": "var(--radius)",
-    "padding": "1.75rem"
+    "borderTop": "1.5px solid var(--color-rule)",
+    "borderBottom": "1.5px solid var(--color-rule)",
+    "padding": "1.75rem 0"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
         "display": "flex",
-        "gap": "1.25rem",
+        "gap": "1.5rem",
         "alignItems": "center",
         "@--sm": { "flexDirection": "column", "textAlign": "center" }
       },
@@ -32,11 +31,12 @@
           },
           "style": {
             "display": "${state.avatar ? 'block' : 'none'}",
-            "width": "72px",
-            "height": "72px",
+            "width": "84px",
+            "height": "84px",
             "borderRadius": "999px",
             "objectFit": "cover",
-            "flexShrink": "0"
+            "flexShrink": "0",
+            "filter": "grayscale(1)"
           }
         },
         {
@@ -45,21 +45,23 @@
             {
               "tagName": "div",
               "style": {
+                "fontFamily": "var(--font-body)",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.12em",
-                "fontSize": "0.72rem",
+                "letterSpacing": "0.16em",
+                "fontSize": "0.7rem",
                 "fontWeight": "600",
                 "color": "var(--color-primary)",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.4rem"
               },
-              "textContent": "${state.role}"
+              "textContent": "Written by · ${state.role}"
             },
             {
               "tagName": "div",
               "style": {
                 "fontFamily": "var(--font-heading)",
-                "fontSize": "1.3rem",
-                "fontWeight": "600",
+                "fontSize": "1.5rem",
+                "fontWeight": "700",
+                "letterSpacing": "-0.01em",
                 "margin": "0 0 0.4rem"
               },
               "textContent": "${state.name}"
@@ -68,8 +70,10 @@
               "tagName": "p",
               "style": {
                 "margin": "0",
+                "fontFamily": "var(--font-heading)",
+                "fontStyle": "italic",
                 "color": "var(--color-text-muted)",
-                "fontSize": "1rem",
+                "fontSize": "1.1rem",
                 "lineHeight": "1.6"
               },
               "textContent": "${state.bio}"

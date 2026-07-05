@@ -8,7 +8,10 @@
   "$head": [
     {
       "tagName": "meta",
-      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+      "attributes": {
+        "name": "viewport",
+        "content": "width=device-width, initial-scale=1"
+      }
     },
     {
       "tagName": "meta",
@@ -19,21 +22,31 @@
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+      "attributes": {
+        "rel": "icon",
+        "href": "/favicon.svg"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.googleapis.com"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.gstatic.com",
+        "crossorigin": ""
+      }
     },
     {
       "tagName": "link",
       "attributes": {
         "rel": "stylesheet",
-        "href": "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&display=swap"
+        "href": "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700&family=Mulish:wght@300;400;500;600;700;800&display=swap"
       }
     }
   ],
@@ -44,27 +57,39 @@
     "--sm": "(max-width: 640px)"
   },
   "style": {
-    "--color-primary": "#b45309",
-    "--color-primary-hover": "#92400e",
-    "--color-ink": "#1c1917",
-    "--color-bg-dark": "#1c1917",
-    "--color-bg-cream": "#faf6f0",
-    "--color-bg-white": "#ffffff",
-    "--color-text-primary": "#1c1917",
-    "--color-text-white": "#ffffff",
-    "--color-text-muted": "#78716c",
-    "--color-border": "#e7e5e4",
-    "--color-accent": "#b45309",
+    "--color-primary": "#bd5a34",
+    "--color-primary-hover": "#a44827",
+    "--color-amber": "#c98a3c",
+    "--color-ink": "#241b14",
+    "--color-espresso": "#1e150f",
+    "--color-bg-dark": "#1e150f",
+    "--color-bg-cream": "#efe3d1",
+    "--color-bg-paper": "#f6ecdb",
+    "--color-bg-white": "#fffaf2",
+    "--color-text-primary": "#2a1f17",
+    "--color-text-white": "#f6ecdb",
+    "--color-text-muted": "#7c6a58",
+    "--color-border": "#e2d5bf",
+    "--color-border-strong": "#cbb99d",
+    "--color-accent": "#bd5a34",
     "--font-heading": "'Playfair Display', Georgia, 'Times New Roman', serif",
+    "--font-body": "'Mulish', system-ui, -apple-system, 'Segoe UI', sans-serif",
     "--max-width": "1200px",
-    "--max-width-narrow": "820px",
-    "--radius": "0.5rem",
+    "--max-width-wide": "1320px",
+    "--max-width-narrow": "780px",
+    "--radius": "0.25rem",
     "margin": "0",
     "padding": "0",
-    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-    "lineHeight": "1.6",
+    "fontFamily": "var(--font-body)",
+    "fontSize": "17px",
+    "lineHeight": "1.7",
     "color": "var(--color-text-primary)",
-    "backgroundColor": "var(--color-bg-white)"
+    "backgroundColor": "var(--color-bg-paper)",
+    "& a": {
+      "color": "var(--color-primary)",
+      "textUnderlineOffset": "0.2em",
+      "textDecorationColor": "var(--color-border-strong)"
+    }
   },
   "imports": {
     "Markdown": "@jxsuite/parser/Markdown.class.json",
@@ -75,7 +100,12 @@
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
     "formats": ["webp", "avif"],
-    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "quality": {
+      "webp": 80,
+      "avif": 65,
+      "jpeg": 80,
+      "png": 80
+    },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
@@ -86,12 +116,25 @@
       "schema": {
         "type": "object",
         "properties": {
-          "name": { "type": "string" },
-          "course": { "type": "string" },
-          "price": { "type": "string" },
-          "description": { "type": "string" },
-          "image": { "type": "string", "format": "image" },
-          "order": { "type": "number" }
+          "name": {
+            "type": "string"
+          },
+          "course": {
+            "type": "string"
+          },
+          "price": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "format": "image"
+          },
+          "order": {
+            "type": "number"
+          }
         },
         "required": ["name", "course"]
       }

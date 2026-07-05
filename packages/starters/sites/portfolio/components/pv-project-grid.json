@@ -2,21 +2,29 @@
   "tagName": "pv-project-grid",
   "state": {},
   "style": {
-    "display": "block",
-    "maxWidth": "var(--max-width)",
-    "margin": "0 auto",
-    "padding": "0 1.5rem"
-  },
-  "children": [
-    {
-      "tagName": "div",
-      "style": {
-        "columns": "3",
-        "columnGap": "1.75rem",
-        "@--md": { "columns": "2" },
-        "@--sm": { "columns": "1" }
-      },
-      "children": [{ "tagName": "slot" }]
+    "display": "grid",
+    "gridTemplateColumns": "repeat(12, 1fr)",
+    "gridAutoRows": "clamp(230px, 32vw, 460px)",
+    "gap": "0.5rem",
+    "padding": "0 0.5rem",
+    "& pv-project-card": { "gridColumn": "span 6" },
+    "& pv-project-card:nth-of-type(6n + 1)": { "gridColumn": "span 7" },
+    "& pv-project-card:nth-of-type(6n + 2)": { "gridColumn": "span 5" },
+    "& pv-project-card:nth-of-type(6n + 3)": { "gridColumn": "span 5" },
+    "& pv-project-card:nth-of-type(6n + 4)": { "gridColumn": "span 7" },
+    "& pv-project-card:nth-of-type(6n + 5)": { "gridColumn": "span 6" },
+    "& pv-project-card:nth-of-type(6n + 6)": { "gridColumn": "span 6" },
+    "@--sm": {
+      "gridTemplateColumns": "1fr",
+      "gridAutoRows": "68vw",
+      "& pv-project-card": { "gridColumn": "span 1" },
+      "& pv-project-card:nth-of-type(6n + 1)": { "gridColumn": "span 1" },
+      "& pv-project-card:nth-of-type(6n + 2)": { "gridColumn": "span 1" },
+      "& pv-project-card:nth-of-type(6n + 3)": { "gridColumn": "span 1" },
+      "& pv-project-card:nth-of-type(6n + 4)": { "gridColumn": "span 1" },
+      "& pv-project-card:nth-of-type(6n + 5)": { "gridColumn": "span 1" },
+      "& pv-project-card:nth-of-type(6n + 6)": { "gridColumn": "span 1" }
     }
-  ]
+  },
+  "children": [{ "tagName": "slot" }]
 }

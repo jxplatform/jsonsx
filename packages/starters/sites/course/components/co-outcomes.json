@@ -1,0 +1,248 @@
+{
+  "tagName": "co-outcomes",
+  "state": {
+    "kicker": "outcomes",
+    "heading": "",
+    "n1": "",
+    "l1": "",
+    "n2": "",
+    "l2": "",
+    "n3": "",
+    "l3": "",
+    "n4": "",
+    "l4": ""
+  },
+  "style": {
+    "display": "block",
+    "position": "relative",
+    "overflow": "hidden",
+    "backgroundColor": "var(--color-ink)",
+    "color": "var(--color-text-white)",
+    "padding": "clamp(3rem, 6vw, 4.5rem) 1.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "position": "absolute",
+        "inset": "0",
+        "backgroundImage": "radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)",
+        "backgroundSize": "28px 28px",
+        "opacity": "0.5",
+        "pointerEvents": "none"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "absolute",
+        "inset": "0",
+        "background": "radial-gradient(ellipse 55% 90% at 50% -10%, rgba(79,70,229,0.35), transparent 60%)",
+        "pointerEvents": "none"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "relative",
+        "zIndex": "2",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "textAlign": "center", "marginBottom": "2.75rem" },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.8rem",
+                "fontWeight": "600",
+                "color": "var(--color-accent)",
+                "margin": "0 0 0.85rem",
+                "letterSpacing": "0.02em"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": { "color": "rgba(255,255,255,0.4)" },
+                  "textContent": "$ "
+                },
+                { "tagName": "span", "textContent": "${state.kicker}" }
+              ]
+            },
+            {
+              "tagName": "h2",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "clamp(1.7rem, 3.4vw, 2.4rem)",
+                "fontWeight": "800",
+                "letterSpacing": "-0.03em",
+                "lineHeight": "1.15",
+                "margin": "0 auto",
+                "maxWidth": "22ch"
+              },
+              "textContent": "${state.heading}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(4, 1fr)",
+            "border": "1px solid var(--color-terminal-line)",
+            "borderRadius": "0.9rem",
+            "backgroundColor": "rgba(20,28,57,0.5)",
+            "overflow": "hidden",
+            "@--sm": { "gridTemplateColumns": "repeat(2, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "clamp(1.5rem, 3vw, 2.25rem) 1.25rem",
+                "textAlign": "center",
+                "borderRight": "1px solid var(--color-terminal-line)",
+                "@--sm": { "borderBottom": "1px solid var(--color-terminal-line)" }
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "clamp(2.1rem, 4.5vw, 3rem)",
+                    "fontWeight": "800",
+                    "lineHeight": "1",
+                    "letterSpacing": "-0.03em",
+                    "color": "var(--color-text-white)",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.n1}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "marginTop": "0.65rem",
+                    "fontSize": "0.85rem",
+                    "fontWeight": "500",
+                    "color": "rgba(255,255,255,0.6)",
+                    "lineHeight": "1.4"
+                  },
+                  "textContent": "${state.l1}"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "clamp(1.5rem, 3vw, 2.25rem) 1.25rem",
+                "textAlign": "center",
+                "borderRight": "1px solid var(--color-terminal-line)",
+                "@--sm": {
+                  "borderRight": "none",
+                  "borderBottom": "1px solid var(--color-terminal-line)"
+                }
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "clamp(2.1rem, 4.5vw, 3rem)",
+                    "fontWeight": "800",
+                    "lineHeight": "1",
+                    "letterSpacing": "-0.03em",
+                    "color": "var(--color-accent)",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.n2}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "marginTop": "0.65rem",
+                    "fontSize": "0.85rem",
+                    "fontWeight": "500",
+                    "color": "rgba(255,255,255,0.6)",
+                    "lineHeight": "1.4"
+                  },
+                  "textContent": "${state.l2}"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "clamp(1.5rem, 3vw, 2.25rem) 1.25rem",
+                "textAlign": "center",
+                "borderRight": "1px solid var(--color-terminal-line)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "clamp(2.1rem, 4.5vw, 3rem)",
+                    "fontWeight": "800",
+                    "lineHeight": "1",
+                    "letterSpacing": "-0.03em",
+                    "color": "var(--color-text-white)",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.n3}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "marginTop": "0.65rem",
+                    "fontSize": "0.85rem",
+                    "fontWeight": "500",
+                    "color": "rgba(255,255,255,0.6)",
+                    "lineHeight": "1.4"
+                  },
+                  "textContent": "${state.l3}"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "clamp(1.5rem, 3vw, 2.25rem) 1.25rem",
+                "textAlign": "center"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "clamp(2.1rem, 4.5vw, 3rem)",
+                    "fontWeight": "800",
+                    "lineHeight": "1",
+                    "letterSpacing": "-0.03em",
+                    "color": "var(--color-accent-cyan)",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.n4}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "marginTop": "0.65rem",
+                    "fontSize": "0.85rem",
+                    "fontWeight": "500",
+                    "color": "rgba(255,255,255,0.6)",
+                    "lineHeight": "1.4"
+                  },
+                  "textContent": "${state.l4}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

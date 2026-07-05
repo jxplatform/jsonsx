@@ -1,7 +1,7 @@
 {
   "tagName": "pf-logo-bar",
   "state": {
-    "label": "Trusted by teams across the region",
+    "label": "Trusted by founders, operators, and boards",
     "logo1": "Northwind Labs",
     "logo2": "Harbor Freight Co.",
     "logo3": "Cedar & Vine",
@@ -10,29 +10,35 @@
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-cream)",
-    "borderTop": "1px solid var(--color-border)",
-    "borderBottom": "1px solid var(--color-border)",
-    "padding": "2.5rem 1.5rem"
+    "backgroundColor": "var(--color-paper)",
+    "borderBottom": "1px solid var(--color-rule)",
+    "padding": "clamp(1.75rem, 3vw, 2.5rem) 1.5rem"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
         "maxWidth": "var(--max-width)",
-        "margin": "0 auto"
+        "margin": "0 auto",
+        "display": "grid",
+        "gridTemplateColumns": "auto 1fr",
+        "gap": "clamp(1.5rem, 4vw, 3rem)",
+        "alignItems": "center",
+        "@--md": { "gridTemplateColumns": "1fr", "gap": "1.25rem" }
       },
       "children": [
         {
           "tagName": "p",
           "style": {
-            "textAlign": "center",
-            "textTransform": "uppercase",
-            "letterSpacing": "0.14em",
-            "fontSize": "0.75rem",
+            "margin": "0",
+            "maxWidth": "12ch",
+            "fontFamily": "var(--font-sans)",
+            "fontSize": "0.7rem",
             "fontWeight": "600",
-            "color": "var(--color-text-muted)",
-            "margin": "0 0 1.5rem"
+            "textTransform": "uppercase",
+            "letterSpacing": "0.16em",
+            "color": "var(--color-muted)",
+            "lineHeight": "1.5"
           },
           "textContent": "${state.label}"
         },
@@ -42,40 +48,37 @@
             "display": "flex",
             "flexWrap": "wrap",
             "alignItems": "center",
-            "justifyContent": "space-between",
-            "gap": "1.5rem 2.5rem"
+            "gap": "1rem 2.5rem",
+            "@--md": { "gap": "0.75rem 1.75rem" }
           },
           "children": [
             {
               "tagName": "span",
               "style": {
-                "fontFamily": "var(--font-heading)",
+                "fontFamily": "var(--font-serif)",
                 "fontSize": "1.2rem",
-                "fontWeight": "700",
-                "color": "var(--color-text-primary)",
-                "opacity": "0.6"
+                "fontWeight": "500",
+                "color": "var(--color-ink)"
               },
               "textContent": "${state.logo1}"
             },
             {
               "tagName": "span",
               "style": {
-                "fontFamily": "var(--font-heading)",
+                "fontFamily": "var(--font-serif)",
                 "fontSize": "1.2rem",
-                "fontWeight": "700",
-                "color": "var(--color-text-primary)",
-                "opacity": "0.6"
+                "fontWeight": "500",
+                "color": "var(--color-ink)"
               },
               "textContent": "${state.logo2}"
             },
             {
               "tagName": "span",
               "style": {
-                "fontFamily": "var(--font-heading)",
+                "fontFamily": "var(--font-serif)",
                 "fontSize": "1.2rem",
-                "fontWeight": "700",
-                "color": "var(--color-text-primary)",
-                "opacity": "0.6",
+                "fontWeight": "500",
+                "color": "var(--color-ink)",
                 "@--sm": { "display": "none" }
               },
               "textContent": "${state.logo3}"
@@ -83,11 +86,10 @@
             {
               "tagName": "span",
               "style": {
-                "fontFamily": "var(--font-heading)",
+                "fontFamily": "var(--font-serif)",
                 "fontSize": "1.2rem",
-                "fontWeight": "700",
-                "color": "var(--color-text-primary)",
-                "opacity": "0.6",
+                "fontWeight": "500",
+                "color": "var(--color-ink)",
                 "@--md": { "display": "none" }
               },
               "textContent": "${state.logo4}"
@@ -95,11 +97,10 @@
             {
               "tagName": "span",
               "style": {
-                "fontFamily": "var(--font-heading)",
+                "fontFamily": "var(--font-serif)",
                 "fontSize": "1.2rem",
-                "fontWeight": "700",
-                "color": "var(--color-text-primary)",
-                "opacity": "0.6",
+                "fontWeight": "500",
+                "color": "var(--color-ink)",
                 "@--md": { "display": "none" }
               },
               "textContent": "${state.logo5}"

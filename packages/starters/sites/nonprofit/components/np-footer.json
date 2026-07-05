@@ -2,25 +2,41 @@
   "tagName": "np-footer",
   "state": {
     "brand": "Rivertown Foundation",
-    "tagline": "Neighbors helping neighbors across Rivertown since 2007.",
+    "tagline": "Turning everyday generosity into food, mentorship, housing, and jobs for our neighbors — right here at home.",
     "address": "240 Riverside Avenue, Rivertown",
     "phone": "(555) 204-7788",
     "email": "hello@rivertownfoundation.org"
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-dark)",
+    "position": "relative",
+    "overflow": "hidden",
+    "backgroundColor": "var(--color-primary-deep)",
     "color": "var(--color-text-white)",
-    "padding": "3.5rem 1.5rem 2rem"
+    "padding": "clamp(3.5rem, 7vw, 5rem) 1.5rem 2.25rem"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
+        "position": "absolute",
+        "top": "-10rem",
+        "right": "-8rem",
+        "width": "28rem",
+        "height": "28rem",
+        "borderRadius": "50%",
+        "background": "radial-gradient(circle at center, rgba(47,125,85,0.5) 0%, rgba(47,125,85,0) 70%)"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "relative",
+        "zIndex": "2",
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
         "display": "grid",
-        "gridTemplateColumns": "2fr 1fr 1fr",
+        "gridTemplateColumns": "1.6fr 1fr 1fr",
         "gap": "2.5rem",
         "@--md": { "gridTemplateColumns": "1fr" }
       },
@@ -31,32 +47,69 @@
             {
               "tagName": "div",
               "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.35rem",
-                "fontWeight": "700",
-                "marginBottom": "0.75rem"
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.7rem",
+                "marginBottom": "1rem"
               },
-              "textContent": "${state.brand}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "2.4rem",
+                    "height": "2.4rem",
+                    "borderRadius": "999px 999px 999px 4px",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "fontSize": "1.15rem"
+                  },
+                  "textContent": "❤"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.4rem",
+                    "fontWeight": "600"
+                  },
+                  "textContent": "${state.brand}"
+                }
+              ]
             },
             {
               "tagName": "p",
-              "style": { "margin": "0 0 1.25rem", "opacity": "0.75", "maxWidth": "34ch" },
+              "style": {
+                "margin": "0 0 1.5rem",
+                "opacity": "0.78",
+                "fontWeight": "500",
+                "lineHeight": "1.65",
+                "maxWidth": "40ch"
+              },
               "textContent": "${state.tagline}"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/get-involved/" },
               "style": {
-                "display": "inline-block",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.45rem",
                 "backgroundColor": "var(--color-accent)",
                 "color": "var(--color-text-white)",
-                "padding": "0.6rem 1.5rem",
+                "padding": "0.7rem 1.75rem",
                 "borderRadius": "999px",
                 "textDecoration": "none",
-                "fontWeight": "600",
-                "fontSize": "0.95rem"
+                "fontWeight": "800",
+                "fontSize": "0.98rem",
+                "boxShadow": "0 12px 26px -12px rgba(242,106,61,0.8)"
               },
-              "textContent": "Donate"
+              "children": [
+                { "tagName": "span", "style": { "fontSize": "0.9rem" }, "textContent": "❤" },
+                { "tagName": "span", "textContent": "Donate today" }
+              ]
             }
           ]
         },
@@ -67,10 +120,11 @@
               "tagName": "div",
               "style": {
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.12em",
+                "fontSize": "0.74rem",
+                "fontWeight": "800",
+                "color": "var(--color-gold)",
+                "marginBottom": "1rem"
               },
               "textContent": "Explore"
             },
@@ -80,9 +134,12 @@
               "style": {
                 "display": "block",
                 "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "opacity": "0.82",
+                "fontWeight": "600",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.55rem",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "1" }
               },
               "textContent": "Programs"
             },
@@ -92,9 +149,12 @@
               "style": {
                 "display": "block",
                 "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "opacity": "0.82",
+                "fontWeight": "600",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.55rem",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "1" }
               },
               "textContent": "About"
             },
@@ -104,9 +164,12 @@
               "style": {
                 "display": "block",
                 "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "opacity": "0.82",
+                "fontWeight": "600",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.55rem",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "1" }
               },
               "textContent": "Get Involved"
             },
@@ -116,8 +179,11 @@
               "style": {
                 "display": "block",
                 "color": "var(--color-text-white)",
-                "opacity": "0.85",
-                "textDecoration": "none"
+                "opacity": "0.82",
+                "fontWeight": "600",
+                "textDecoration": "none",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "1" }
               },
               "textContent": "Contact"
             }
@@ -130,26 +196,27 @@
               "tagName": "div",
               "style": {
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.12em",
+                "fontSize": "0.74rem",
+                "fontWeight": "800",
+                "color": "var(--color-gold)",
+                "marginBottom": "1rem"
               },
               "textContent": "Visit"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "style": { "margin": "0 0 0.45rem", "opacity": "0.82", "fontWeight": "600" },
               "textContent": "${state.address}"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "style": { "margin": "0 0 0.45rem", "opacity": "0.82", "fontWeight": "600" },
               "textContent": "${state.phone}"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.85" },
+              "style": { "margin": "0", "opacity": "0.82", "fontWeight": "600" },
               "textContent": "${state.email}"
             }
           ]
@@ -159,12 +226,15 @@
     {
       "tagName": "div",
       "style": {
+        "position": "relative",
+        "zIndex": "2",
         "maxWidth": "var(--max-width)",
-        "margin": "2.5rem auto 0",
+        "margin": "2.75rem auto 0",
         "paddingTop": "1.5rem",
         "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
         "fontSize": "0.85rem",
-        "opacity": "0.6",
+        "fontWeight": "600",
+        "opacity": "0.62",
         "display": "flex",
         "justifyContent": "space-between",
         "flexWrap": "wrap",

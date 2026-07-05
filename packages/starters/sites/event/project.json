@@ -8,7 +8,10 @@
   "$head": [
     {
       "tagName": "meta",
-      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+      "attributes": {
+        "name": "viewport",
+        "content": "width=device-width, initial-scale=1"
+      }
     },
     {
       "tagName": "meta",
@@ -19,21 +22,31 @@
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+      "attributes": {
+        "rel": "icon",
+        "href": "/favicon.svg"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.googleapis.com"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.gstatic.com",
+        "crossorigin": ""
+      }
     },
     {
       "tagName": "link",
       "attributes": {
         "rel": "stylesheet",
-        "href": "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        "href": "https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap"
       }
     }
   ],
@@ -44,27 +57,61 @@
     "--sm": "(max-width: 640px)"
   },
   "style": {
-    "--color-primary": "#7c3aed",
-    "--color-primary-hover": "#6d28d9",
-    "--color-ink": "#17122b",
-    "--color-bg-dark": "#140b2e",
-    "--color-bg-cream": "#f5f3ff",
-    "--color-bg-white": "#ffffff",
-    "--color-text-primary": "#17122b",
+    "--color-primary": "#ff3d9a",
+    "--color-primary-hover": "#ff6bb4",
+    "--color-ink": "#050308",
+    "--color-bg": "#0a0711",
+    "--color-bg-dark": "#0a0711",
+    "--color-bg-cream": "#0f0b1c",
+    "--color-bg-white": "#150f28",
+    "--color-bg-elev": "#150f28",
+    "--color-bg-elev2": "#1e1638",
+    "--color-text-primary": "#f3eefe",
     "--color-text-white": "#ffffff",
-    "--color-text-muted": "#6b7280",
-    "--color-border": "#e5e0f5",
-    "--color-accent": "#ec4899",
-    "--font-heading": "'Space Grotesk', 'Segoe UI', system-ui, sans-serif",
+    "--color-text-muted": "#a99fc8",
+    "--color-border": "#2b2148",
+    "--color-accent": "#22e0ff",
+    "--color-cyan": "#22e0ff",
+    "--color-violet": "#a855f7",
+    "--color-lime": "#c6ff4d",
+    "--grad": "linear-gradient(115deg, #22e0ff 0%, #a855f7 50%, #ff3d9a 100%)",
+    "--grad-btn": "linear-gradient(120deg, #ff3d9a 0%, #a855f7 100%)",
+    "--grad-cyan": "linear-gradient(120deg, #22e0ff 0%, #7c74ff 100%)",
+    "--glow": "rgba(255, 61, 154, 0.5)",
+    "--glow-cyan": "rgba(34, 224, 255, 0.4)",
+    "--font-heading": "'Sora', 'Segoe UI', system-ui, -apple-system, sans-serif",
+    "--font-body": "'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
     "--max-width": "1200px",
-    "--max-width-narrow": "820px",
-    "--radius": "0.75rem",
+    "--max-width-narrow": "860px",
+    "--radius": "1rem",
     "margin": "0",
     "padding": "0",
-    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "fontFamily": "var(--font-body)",
     "lineHeight": "1.6",
     "color": "var(--color-text-primary)",
-    "backgroundColor": "var(--color-bg-white)"
+    "backgroundColor": "var(--color-bg)",
+    "h1": {
+      "fontFamily": "var(--font-heading)",
+      "color": "var(--color-text-primary)"
+    },
+    "h2": {
+      "fontFamily": "var(--font-heading)",
+      "color": "var(--color-text-primary)"
+    },
+    "h3": {
+      "fontFamily": "var(--font-heading)",
+      "color": "var(--color-text-primary)"
+    },
+    "h4": {
+      "fontFamily": "var(--font-heading)",
+      "color": "var(--color-text-primary)"
+    },
+    "strong": {
+      "color": "var(--color-text-primary)"
+    },
+    "a": {
+      "color": "var(--color-primary)"
+    }
   },
   "imports": {
     "Markdown": "@jxsuite/parser/Markdown.class.json",
@@ -74,7 +121,12 @@
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
     "formats": ["webp", "avif"],
-    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "quality": {
+      "webp": 80,
+      "avif": 65,
+      "jpeg": 80,
+      "png": 80
+    },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
@@ -85,11 +137,21 @@
       "schema": {
         "type": "object",
         "properties": {
-          "title": { "type": "string" },
-          "time": { "type": "string" },
-          "track": { "type": "string" },
-          "speaker": { "type": "string" },
-          "order": { "type": "number" }
+          "title": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string"
+          },
+          "track": {
+            "type": "string"
+          },
+          "speaker": {
+            "type": "string"
+          },
+          "order": {
+            "type": "number"
+          }
         },
         "required": ["title", "track"]
       }

@@ -6,29 +6,30 @@
   },
   "style": {
     "display": "block",
-    "textAlign": "center",
-    "padding": "1rem"
+    "padding": "0.5rem 0"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
         "fontFamily": "var(--font-heading)",
-        "fontSize": "clamp(2.25rem, 5vw, 3rem)",
+        "fontSize": "clamp(2.4rem, 5vw, 3.25rem)",
         "fontWeight": "800",
         "lineHeight": "1",
-        "color": "var(--color-primary)",
-        "letterSpacing": "-0.02em"
+        "letterSpacing": "-0.03em",
+        "color": "var(--color-text-white)",
+        "fontVariantNumeric": "tabular-nums"
       },
       "textContent": "${state.value}"
     },
     {
       "tagName": "div",
       "style": {
-        "marginTop": "0.5rem",
-        "fontSize": "0.95rem",
-        "color": "var(--color-text-muted)",
-        "fontWeight": "600"
+        "marginTop": "0.6rem",
+        "fontSize": "0.9rem",
+        "color": "rgba(255,255,255,0.62)",
+        "fontWeight": "600",
+        "lineHeight": "1.4"
       },
       "textContent": "${state.label}"
     }

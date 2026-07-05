@@ -8,32 +8,45 @@
   "$head": [
     {
       "tagName": "meta",
-      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+      "attributes": {
+        "name": "viewport",
+        "content": "width=device-width, initial-scale=1"
+      }
     },
     {
       "tagName": "meta",
       "attributes": {
         "name": "description",
-        "content": "Meridian Advisory is an accounting and advisory firm helping founders and growing companies with tax, audit, CFO services, and long-term financial strategy."
+        "content": "Meridian Advisory is a boutique CPA and advisory firm for founders and growing companies — tax, assurance, and fractional CFO counsel, published as a quarterly of practical financial thinking."
       }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+      "attributes": {
+        "rel": "icon",
+        "href": "/favicon.svg"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.googleapis.com"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.gstatic.com",
+        "crossorigin": ""
+      }
     },
     {
       "tagName": "link",
       "attributes": {
         "rel": "stylesheet",
-        "href": "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap"
+        "href": "https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=Archivo:wght@400;500;600;700&display=swap"
       }
     }
   ],
@@ -44,27 +57,40 @@
     "--sm": "(max-width: 640px)"
   },
   "style": {
-    "--color-primary": "#1e3a8a",
-    "--color-primary-hover": "#172554",
-    "--color-ink": "#0f172a",
-    "--color-bg-dark": "#0f172a",
-    "--color-bg-cream": "#f7f9fc",
-    "--color-bg-white": "#ffffff",
-    "--color-text-primary": "#0f172a",
-    "--color-text-white": "#ffffff",
-    "--color-text-muted": "#64748b",
-    "--color-border": "#e2e8f0",
-    "--color-accent": "#0f766e",
-    "--font-heading": "'Fraunces', Georgia, 'Times New Roman', serif",
-    "--max-width": "1200px",
-    "--max-width-narrow": "820px",
-    "--radius": "0.5rem",
+    "--color-ink": "#161a2c",
+    "--color-ink-deep": "#0d101d",
+    "--color-navy": "#1d2748",
+    "--color-paper": "#f4f1e9",
+    "--color-paper-2": "#ece7da",
+    "--color-surface": "#fbf9f3",
+    "--color-accent": "#9a7b3c",
+    "--color-accent-deep": "#7c6230",
+    "--color-muted": "#605e55",
+    "--color-rule": "#161a2c",
+    "--color-hairline": "#d5cdba",
+    "--color-primary": "#161a2c",
+    "--color-primary-hover": "#242c4a",
+    "--color-bg-dark": "#0d101d",
+    "--color-bg-cream": "#ece7da",
+    "--color-bg-white": "#fbf9f3",
+    "--color-text-primary": "#161a2c",
+    "--color-text-white": "#f4f1e9",
+    "--color-text-muted": "#605e55",
+    "--color-border": "#d5cdba",
+    "--font-serif": "'Spectral', Georgia, 'Times New Roman', serif",
+    "--font-sans": "'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--font-heading": "'Spectral', Georgia, 'Times New Roman', serif",
+    "--max-width": "1180px",
+    "--max-width-narrow": "720px",
+    "--measure": "660px",
+    "--radius": "0",
     "margin": "0",
     "padding": "0",
-    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "fontFamily": "var(--font-sans)",
+    "fontSize": "17px",
     "lineHeight": "1.6",
-    "color": "var(--color-text-primary)",
-    "backgroundColor": "var(--color-bg-white)"
+    "color": "var(--color-ink)",
+    "backgroundColor": "var(--color-paper)"
   },
   "imports": {
     "Markdown": "@jxsuite/parser/Markdown.class.json",
@@ -75,7 +101,12 @@
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
     "formats": ["webp", "avif"],
-    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "quality": {
+      "webp": 80,
+      "avif": 65,
+      "jpeg": 80,
+      "png": 80
+    },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
@@ -86,11 +117,24 @@
       "schema": {
         "type": "object",
         "properties": {
-          "title": { "type": "string" },
-          "excerpt": { "type": "string" },
-          "date": { "type": "string" },
-          "author": { "type": "string" },
-          "order": { "type": "number" }
+          "title": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "order": {
+            "type": "number"
+          }
         },
         "required": ["title", "excerpt", "date"]
       }

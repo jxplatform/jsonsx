@@ -1,23 +1,27 @@
 {
   "tagName": "shp-hero",
   "state": {
-    "eyebrow": "",
+    "eyebrow": "Featured build",
     "heading": "",
     "subheading": "",
-    "cta": "Shop Bikes",
+    "price": "",
+    "oldPrice": "",
+    "badge": "",
+    "rating": "4.9",
+    "cta": "Add to cart",
     "ctaHref": "/products/",
-    "cta2": "",
-    "cta2Href": "/about/",
-    "bg": { "type": "string", "format": "image", "default": "" }
+    "cta2": "Shop all bikes",
+    "cta2Href": "/products/",
+    "imageAlt": "Featured bike",
+    "image": { "type": "string", "format": "image", "default": "" }
   },
   "style": {
     "display": "block",
     "position": "relative",
-    "minHeight": "78vh",
-    "color": "var(--color-text-white)",
-    "backgroundImage": "url('${state.bg}')",
-    "backgroundSize": "cover",
-    "backgroundPosition": "center"
+    "overflow": "hidden",
+    "borderBottom": "1px solid var(--color-border)",
+    "backgroundColor": "var(--color-bg-cream)",
+    "backgroundImage": "radial-gradient(circle at 82% 12%, rgba(38,208,124,0.16), transparent 46%), radial-gradient(circle at 8% 90%, rgba(13,17,23,0.05), transparent 40%)"
   },
   "children": [
     {
@@ -25,60 +29,139 @@
       "style": {
         "position": "absolute",
         "inset": "0",
-        "background": "linear-gradient(180deg, rgba(15,23,42,0.45) 0%, rgba(15,23,42,0.82) 100%)"
+        "backgroundImage": "radial-gradient(circle, rgba(13,17,23,0.05) 1px, transparent 1px)",
+        "backgroundSize": "26px 26px",
+        "opacity": "0.5",
+        "pointerEvents": "none"
       }
     },
     {
       "tagName": "div",
       "style": {
         "position": "relative",
-        "zIndex": "10",
-        "display": "flex",
-        "alignItems": "center",
-        "minHeight": "78vh",
+        "zIndex": "2",
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "4rem 1.5rem"
+        "padding": "clamp(2.75rem, 6vw, 5rem) 1.5rem clamp(3rem, 6vw, 5.5rem)",
+        "display": "grid",
+        "gridTemplateColumns": "1.02fr 0.98fr",
+        "gap": "clamp(2rem, 5vw, 4rem)",
+        "alignItems": "center",
+        "@--md": { "gridTemplateColumns": "1fr", "gap": "2.5rem" }
       },
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "660px" },
           "children": [
             {
               "tagName": "p",
               "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.5rem",
+                "padding": "0.38rem 0.85rem 0.38rem 0.7rem",
+                "borderRadius": "999px",
+                "backgroundColor": "var(--color-ink)",
+                "color": "var(--color-text-white)",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.18em",
-                "fontSize": "0.8rem",
-                "fontWeight": "600",
-                "marginBottom": "1rem",
-                "color": "#86efac"
+                "letterSpacing": "0.12em",
+                "margin": "0 0 1.5rem"
               },
-              "textContent": "${state.eyebrow}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.45rem",
+                    "height": "0.45rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-brand-bright)"
+                  }
+                },
+                { "tagName": "span", "textContent": "${state.eyebrow}" }
+              ]
             },
             {
               "tagName": "h1",
               "style": {
                 "fontFamily": "var(--font-heading)",
-                "fontSize": "clamp(2.5rem, 6vw, 4.5rem)",
-                "fontWeight": "700",
-                "lineHeight": "1.05",
+                "fontSize": "clamp(2.7rem, 6vw, 4.6rem)",
+                "fontWeight": "800",
+                "lineHeight": "0.98",
+                "letterSpacing": "-0.035em",
                 "margin": "0 0 1.25rem",
-                "letterSpacing": "-0.03em"
+                "color": "var(--color-text-primary)",
+                "maxWidth": "13ch"
               },
               "textContent": "${state.heading}"
             },
             {
               "tagName": "p",
               "style": {
-                "fontSize": "clamp(1.1rem, 2vw, 1.35rem)",
+                "fontSize": "clamp(1.05rem, 1.6vw, 1.22rem)",
                 "lineHeight": "1.6",
-                "margin": "0 0 2rem",
-                "opacity": "0.92",
-                "maxWidth": "50ch"
+                "color": "var(--color-text-secondary)",
+                "margin": "0 0 1.85rem",
+                "maxWidth": "44ch"
               },
               "textContent": "${state.subheading}"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "baseline",
+                "gap": "0.85rem",
+                "marginBottom": "1.75rem",
+                "flexWrap": "wrap"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "clamp(2rem, 3.5vw, 2.7rem)",
+                    "fontWeight": "800",
+                    "letterSpacing": "-0.02em",
+                    "color": "var(--color-text-primary)",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.price}"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "${state.oldPrice ? 'inline' : 'none'}",
+                    "fontSize": "1.25rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-text-muted)",
+                    "textDecoration": "line-through",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.oldPrice}"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.35rem",
+                    "padding": "0.3rem 0.7rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-gold-tint)",
+                    "color": "var(--color-gold)",
+                    "fontSize": "0.75rem",
+                    "fontWeight": "800",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.05em"
+                  },
+                  "children": [
+                    { "tagName": "span", "textContent": "★ " },
+                    { "tagName": "span", "textContent": "${state.rating} rider rating" }
+                  ]
+                }
+              ]
             },
             {
               "tagName": "div",
@@ -88,35 +171,219 @@
                   "tagName": "a",
                   "attributes": { "href": "${state.ctaHref}" },
                   "style": {
-                    "display": "inline-block",
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
                     "backgroundColor": "var(--color-primary)",
                     "color": "var(--color-text-white)",
-                    "padding": "0.85rem 2rem",
+                    "padding": "0.95rem 2rem",
                     "borderRadius": "999px",
-                    "fontSize": "1.05rem",
-                    "fontWeight": "600",
+                    "fontSize": "1.02rem",
+                    "fontWeight": "700",
                     "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                    "boxShadow": "0 14px 30px -12px rgba(10,157,84,0.75)",
+                    "transition": "transform 0.15s, background-color 0.15s",
+                    ":hover": {
+                      "backgroundColor": "var(--color-primary-hover)",
+                      "transform": "translateY(-2px)"
+                    }
                   },
-                  "textContent": "${state.cta}"
+                  "children": [
+                    { "tagName": "span", "textContent": "${state.cta}" },
+                    { "tagName": "span", "textContent": "→" }
+                  ]
                 },
                 {
                   "tagName": "a",
                   "attributes": { "href": "${state.cta2Href}" },
                   "style": {
-                    "display": "${state.cta2 ? 'inline-block' : 'none'}",
-                    "border": "1px solid rgba(255,255,255,0.6)",
-                    "color": "var(--color-text-white)",
-                    "padding": "0.85rem 2rem",
+                    "display": "${state.cta2 ? 'inline-flex' : 'none'}",
+                    "alignItems": "center",
+                    "border": "1px solid var(--color-line-strong)",
+                    "backgroundColor": "var(--color-bg-white)",
+                    "color": "var(--color-text-primary)",
+                    "padding": "0.95rem 1.75rem",
                     "borderRadius": "999px",
-                    "fontSize": "1.05rem",
-                    "fontWeight": "600",
+                    "fontSize": "1.02rem",
+                    "fontWeight": "700",
                     "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "rgba(255,255,255,0.12)" }
+                    "transition": "border-color 0.15s",
+                    ":hover": { "borderColor": "var(--color-primary)" }
                   },
                   "textContent": "${state.cta2}"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "1.25rem",
+                "marginTop": "1.75rem",
+                "flexWrap": "wrap",
+                "fontSize": "0.86rem",
+                "fontWeight": "600",
+                "color": "var(--color-text-muted)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": { "display": "inline-flex", "alignItems": "center", "gap": "0.4rem" },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-primary)" },
+                      "textContent": "✓"
+                    },
+                    { "tagName": "span", "textContent": "Free shipping over $50" }
+                  ]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "display": "inline-flex", "alignItems": "center", "gap": "0.4rem" },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-primary)" },
+                      "textContent": "✓"
+                    },
+                    { "tagName": "span", "textContent": "Fitted in-store, ready to ride" }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": { "position": "relative" },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "position": "absolute",
+                "inset": "8% -4% -6% 10%",
+                "borderRadius": "var(--radius-lg)",
+                "background": "linear-gradient(150deg, var(--color-brand-bright), var(--color-primary))",
+                "opacity": "0.16",
+                "filter": "blur(6px)"
+              }
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "position": "relative",
+                "borderRadius": "var(--radius-lg)",
+                "overflow": "hidden",
+                "backgroundColor": "var(--color-bg-white)",
+                "border": "1px solid var(--color-border)",
+                "boxShadow": "var(--shadow-float)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "position": "relative",
+                    "aspectRatio": "4 / 3",
+                    "backgroundColor": "var(--color-panel)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "img",
+                      "attributes": {
+                        "src": "${state.image}",
+                        "alt": "${state.imageAlt}",
+                        "loading": "eager"
+                      },
+                      "style": {
+                        "position": "absolute",
+                        "inset": "0",
+                        "width": "100%",
+                        "height": "100%",
+                        "objectFit": "cover",
+                        "display": "block"
+                      }
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "display": "${state.badge ? 'inline-flex' : 'none'}",
+                        "position": "absolute",
+                        "top": "1rem",
+                        "left": "1rem",
+                        "alignItems": "center",
+                        "gap": "0.35rem",
+                        "padding": "0.4rem 0.8rem",
+                        "borderRadius": "999px",
+                        "backgroundColor": "var(--color-gold)",
+                        "color": "var(--color-text-white)",
+                        "fontSize": "0.74rem",
+                        "fontWeight": "800",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.06em",
+                        "boxShadow": "0 8px 20px -8px rgba(232,137,12,0.7)"
+                      },
+                      "children": [
+                        { "tagName": "span", "textContent": "★ " },
+                        { "tagName": "span", "textContent": "${state.badge}" }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "space-between",
+                    "gap": "1rem",
+                    "padding": "1.15rem 1.35rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontSize": "0.72rem",
+                            "fontWeight": "700",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.1em",
+                            "color": "var(--color-primary)"
+                          },
+                          "textContent": "In stock now"
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontFamily": "var(--font-heading)",
+                            "fontSize": "1.15rem",
+                            "fontWeight": "700",
+                            "color": "var(--color-text-primary)",
+                            "marginTop": "0.15rem"
+                          },
+                          "textContent": "Ships assembled"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "display": "inline-flex",
+                        "alignItems": "center",
+                        "justifyContent": "center",
+                        "width": "2.6rem",
+                        "height": "2.6rem",
+                        "borderRadius": "999px",
+                        "backgroundColor": "var(--color-brand-tint)",
+                        "color": "var(--color-primary)",
+                        "fontSize": "1.2rem"
+                      },
+                      "textContent": "🚲"
+                    }
+                  ]
                 }
               ]
             }

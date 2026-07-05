@@ -1,0 +1,131 @@
+{
+  "tagName": "ev-sponsors",
+  "state": {
+    "label": "Backed by the teams building the modern web",
+    "logo1": "◈ Northwind",
+    "logo2": "✦ Lumen",
+    "logo3": "▲ Apex",
+    "logo4": "❖ Corva",
+    "logo5": "⬡ Hivebase",
+    "logo6": "◐ Kestrel"
+  },
+  "style": {
+    "display": "block",
+    "padding": "clamp(2.5rem, 5vw, 3.5rem) 1.5rem",
+    "borderTop": "1px solid var(--color-border)",
+    "borderBottom": "1px solid var(--color-border)",
+    "backgroundColor": "var(--color-bg-cream)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": { "maxWidth": "var(--max-width)", "margin": "0 auto", "textAlign": "center" },
+      "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.78rem",
+            "fontWeight": "700",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.14em",
+            "color": "var(--color-text-muted)",
+            "margin": "0 0 1.85rem"
+          },
+          "textContent": "${state.label}"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "flexWrap": "wrap",
+            "justifyContent": "center",
+            "alignItems": "center",
+            "gap": "clamp(1.5rem, 5vw, 3.5rem)"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.25rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.7",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "1" }
+              },
+              "textContent": "${state.logo1}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.25rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.7",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "1" }
+              },
+              "textContent": "${state.logo2}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.25rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.7",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "1" }
+              },
+              "textContent": "${state.logo3}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.25rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.7",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "1" }
+              },
+              "textContent": "${state.logo4}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.25rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.7",
+                "transition": "opacity 0.15s",
+                "@--sm": { "display": "none" },
+                ":hover": { "opacity": "1" }
+              },
+              "textContent": "${state.logo5}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.25rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.7",
+                "transition": "opacity 0.15s",
+                "@--sm": { "display": "none" },
+                ":hover": { "opacity": "1" }
+              },
+              "textContent": "${state.logo6}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

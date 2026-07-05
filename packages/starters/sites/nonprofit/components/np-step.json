@@ -3,14 +3,22 @@
   "state": {
     "num": "",
     "title": "",
-    "text": ""
+    "text": "",
+    "badgeBg": "var(--color-primary-soft)",
+    "badgeColor": "var(--color-primary)",
+    "href": "",
+    "linkText": ""
   },
   "style": {
-    "display": "block",
-    "padding": "1.75rem",
+    "display": "flex",
+    "flexDirection": "column",
+    "padding": "2rem 1.9rem 2.1rem",
     "backgroundColor": "var(--color-bg-white)",
     "border": "1px solid var(--color-border)",
-    "borderRadius": "var(--radius)"
+    "borderRadius": "var(--radius-lg)",
+    "boxShadow": "var(--shadow-card)",
+    "transition": "transform 0.18s",
+    ":hover": { "transform": "translateY(-4px)" }
   },
   "children": [
     {
@@ -19,24 +27,23 @@
         "display": "inline-flex",
         "alignItems": "center",
         "justifyContent": "center",
-        "width": "2.75rem",
-        "height": "2.75rem",
-        "borderRadius": "999px",
-        "backgroundColor": "var(--color-primary)",
-        "color": "var(--color-text-white)",
-        "fontFamily": "var(--font-heading)",
-        "fontWeight": "700",
-        "fontSize": "1.25rem",
-        "marginBottom": "1rem"
+        "width": "3.5rem",
+        "height": "3.5rem",
+        "borderRadius": "999px 999px 999px 6px",
+        "backgroundColor": "${state.badgeBg}",
+        "color": "${state.badgeColor}",
+        "fontSize": "1.6rem",
+        "marginBottom": "1.25rem"
       },
       "textContent": "${state.num}"
     },
     {
       "tagName": "h3",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "1.2rem",
+        "fontFamily": "var(--font-display)",
+        "fontSize": "1.4rem",
         "fontWeight": "600",
+        "color": "var(--color-primary-deep)",
         "margin": "0 0 0.5rem"
       },
       "textContent": "${state.title}"
@@ -46,10 +53,32 @@
       "style": {
         "margin": "0",
         "color": "var(--color-text-muted)",
-        "fontSize": "0.98rem",
-        "lineHeight": "1.65"
+        "fontSize": "1rem",
+        "fontWeight": "600",
+        "lineHeight": "1.65",
+        "flex": "1"
       },
       "textContent": "${state.text}"
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "${state.href}" },
+      "style": {
+        "display": "${state.linkText ? 'inline-flex' : 'none'}",
+        "alignItems": "center",
+        "gap": "0.45rem",
+        "marginTop": "1.35rem",
+        "color": "${state.badgeColor}",
+        "fontWeight": "800",
+        "fontSize": "0.95rem",
+        "textDecoration": "none",
+        "transition": "gap 0.18s",
+        ":hover": { "gap": "0.85rem" }
+      },
+      "children": [
+        { "tagName": "span", "textContent": "${state.linkText}" },
+        { "tagName": "span", "textContent": "→" }
+      ]
     }
   ]
 }

@@ -2,7 +2,7 @@
   "tagName": "shp-footer",
   "state": {
     "brand": "Cadence Cycles",
-    "tagline": "Bikes, gear, and expert service for every rider on your street.",
+    "tagline": "Bikes, gear, and expert service for every rider on your street. On the corner of Spoke & 4th since 2009.",
     "address": "412 Spoke Avenue, Riverbend",
     "phone": "(555) 042-7100"
   },
@@ -10,7 +10,7 @@
     "display": "block",
     "backgroundColor": "var(--color-bg-dark)",
     "color": "var(--color-text-white)",
-    "padding": "3.5rem 1.5rem 2rem"
+    "padding": "clamp(3rem, 6vw, 4.5rem) 1.5rem 2rem"
   },
   "children": [
     {
@@ -19,28 +19,112 @@
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
         "display": "grid",
-        "gridTemplateColumns": "2fr 1fr 1fr",
+        "gridTemplateColumns": "1.6fr 1fr 1fr 1fr",
         "gap": "2.5rem",
-        "@--md": { "gridTemplateColumns": "1fr" }
+        "@--md": { "gridTemplateColumns": "1fr 1fr" },
+        "@--sm": { "gridTemplateColumns": "1fr" }
       },
       "children": [
         {
           "tagName": "div",
           "children": [
             {
-              "tagName": "div",
+              "tagName": "a",
+              "attributes": { "href": "/" },
               "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.4rem",
-                "fontWeight": "700",
-                "marginBottom": "0.75rem"
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.6rem",
+                "textDecoration": "none",
+                "marginBottom": "1rem"
               },
-              "textContent": "${state.brand}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "2rem",
+                    "height": "2rem",
+                    "borderRadius": "0.55rem",
+                    "background": "linear-gradient(150deg, var(--color-brand-bright), var(--color-primary))",
+                    "color": "var(--color-text-white)",
+                    "fontSize": "1.1rem",
+                    "fontWeight": "800"
+                  },
+                  "textContent": "◎"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.3rem",
+                    "fontWeight": "800",
+                    "letterSpacing": "-0.02em",
+                    "color": "var(--color-text-white)"
+                  },
+                  "textContent": "${state.brand}"
+                }
+              ]
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.75", "maxWidth": "34ch" },
+              "style": {
+                "margin": "0 0 1.25rem",
+                "color": "rgba(255,255,255,0.62)",
+                "maxWidth": "34ch",
+                "lineHeight": "1.6"
+              },
               "textContent": "${state.tagline}"
+            },
+            {
+              "tagName": "div",
+              "style": { "display": "flex", "gap": "0.5rem" },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "2.1rem",
+                    "height": "2.1rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "rgba(255,255,255,0.08)",
+                    "fontSize": "0.95rem"
+                  },
+                  "textContent": "📷"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "2.1rem",
+                    "height": "2.1rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "rgba(255,255,255,0.08)",
+                    "fontSize": "0.95rem"
+                  },
+                  "textContent": "🐦"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "2.1rem",
+                    "height": "2.1rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "rgba(255,255,255,0.08)",
+                    "fontSize": "0.95rem"
+                  },
+                  "textContent": "▶"
+                }
+              ]
             }
           ]
         },
@@ -51,73 +135,194 @@
               "tagName": "div",
               "style": {
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.1em",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "color": "rgba(255,255,255,0.5)",
+                "marginBottom": "0.9rem"
               },
-              "textContent": "Visit"
-            },
-            {
-              "tagName": "p",
-              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
-              "textContent": "${state.address}"
-            },
-            {
-              "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.85" },
-              "textContent": "${state.phone}"
-            }
-          ]
-        },
-        {
-          "tagName": "div",
-          "children": [
-            {
-              "tagName": "div",
-              "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
-              },
-              "textContent": "Explore"
+              "textContent": "Shop"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/products/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "color": "rgba(255,255,255,0.82)",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.55rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-brand-bright)" }
               },
-              "textContent": "Shop"
+              "textContent": "Road bikes"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/products/" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "marginBottom": "0.55rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-brand-bright)" }
+              },
+              "textContent": "Mountain bikes"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/products/" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "marginBottom": "0.55rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-brand-bright)" }
+              },
+              "textContent": "Gravel & adventure"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/products/" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "marginBottom": "0.55rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-brand-bright)" }
+              },
+              "textContent": "Kids' bikes"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/products/" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-brand-bright)" }
+              },
+              "textContent": "Gear & accessories"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.1em",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "color": "rgba(255,255,255,0.5)",
+                "marginBottom": "0.9rem"
+              },
+              "textContent": "Help"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/about/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "color": "rgba(255,255,255,0.82)",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.55rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-brand-bright)" }
               },
-              "textContent": "About"
+              "textContent": "Our story"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/contact/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
-                "textDecoration": "none"
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "marginBottom": "0.55rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-brand-bright)" }
               },
-              "textContent": "Contact"
+              "textContent": "Book a service"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "marginBottom": "0.55rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-brand-bright)" }
+              },
+              "textContent": "Shipping & returns"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "color": "rgba(255,255,255,0.82)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-brand-bright)" }
+              },
+              "textContent": "Contact us"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.1em",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "color": "rgba(255,255,255,0.5)",
+                "marginBottom": "0.9rem"
+              },
+              "textContent": "Visit"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0 0 0.4rem",
+                "color": "rgba(255,255,255,0.82)",
+                "lineHeight": "1.5"
+              },
+              "textContent": "${state.address}"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "tel:+15550427100" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-brand-bright)",
+                "textDecoration": "none",
+                "fontWeight": "700",
+                "marginBottom": "0.75rem",
+                "fontVariantNumeric": "tabular-nums"
+              },
+              "textContent": "${state.phone}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "color": "rgba(255,255,255,0.6)",
+                "fontSize": "0.9rem",
+                "lineHeight": "1.5"
+              },
+              "textContent": "Mon–Fri 9–6:30 · Sat 9–5 · Sun 10–4"
             }
           ]
         }
@@ -129,15 +334,76 @@
         "maxWidth": "var(--max-width)",
         "margin": "2.5rem auto 0",
         "paddingTop": "1.5rem",
-        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
-        "fontSize": "0.85rem",
-        "opacity": "0.6"
+        "borderTop": "1px solid rgba(255,255,255,0.12)",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "space-between",
+        "gap": "1rem",
+        "flexWrap": "wrap"
       },
       "children": [
         {
           "tagName": "p",
-          "style": { "margin": "0" },
-          "textContent": "© Cadence Cycles. Built with Jx."
+          "style": { "margin": "0", "fontSize": "0.85rem", "color": "rgba(255,255,255,0.5)" },
+          "textContent": "© 2026 Cadence Cycles. Built with Jx."
+        },
+        {
+          "tagName": "div",
+          "style": { "display": "flex", "gap": "0.5rem", "flexWrap": "wrap" },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "padding": "0.3rem 0.7rem",
+                "borderRadius": "0.4rem",
+                "backgroundColor": "rgba(255,255,255,0.08)",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "letterSpacing": "0.03em",
+                "color": "rgba(255,255,255,0.7)"
+              },
+              "textContent": "VISA"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "padding": "0.3rem 0.7rem",
+                "borderRadius": "0.4rem",
+                "backgroundColor": "rgba(255,255,255,0.08)",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "letterSpacing": "0.03em",
+                "color": "rgba(255,255,255,0.7)"
+              },
+              "textContent": "MASTERCARD"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "padding": "0.3rem 0.7rem",
+                "borderRadius": "0.4rem",
+                "backgroundColor": "rgba(255,255,255,0.08)",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "letterSpacing": "0.03em",
+                "color": "rgba(255,255,255,0.7)"
+              },
+              "textContent": "AMEX"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "padding": "0.3rem 0.7rem",
+                "borderRadius": "0.4rem",
+                "backgroundColor": "rgba(255,255,255,0.08)",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "letterSpacing": "0.03em",
+                "color": "rgba(255,255,255,0.7)"
+              },
+              "textContent": "APPLE PAY"
+            }
+          ]
         }
       ]
     }

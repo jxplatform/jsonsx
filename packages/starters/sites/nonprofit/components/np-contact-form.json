@@ -4,15 +4,22 @@
     "heading": "Send us a message"
   },
   "style": {
-    "display": "block"
+    "display": "block",
+    "padding": "clamp(1.75rem, 4vw, 2.5rem)",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius-lg)",
+    "boxShadow": "var(--shadow-card)"
   },
   "children": [
     {
       "tagName": "h3",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "1.6rem",
-        "margin": "0 0 1.25rem"
+        "fontFamily": "var(--font-display)",
+        "fontSize": "1.75rem",
+        "fontWeight": "600",
+        "color": "var(--color-primary-deep)",
+        "margin": "0 0 1.5rem"
       },
       "textContent": "${state.heading}"
     },
@@ -32,10 +39,12 @@
           },
           "style": {
             "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem"
+            "padding": "0.85rem 1rem",
+            "border": "1px solid var(--color-border-strong)",
+            "borderRadius": "var(--radius-sm)",
+            "fontSize": "1rem",
+            "fontFamily": "inherit",
+            "backgroundColor": "var(--color-bg-cream)"
           }
         },
         {
@@ -49,10 +58,12 @@
           },
           "style": {
             "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem"
+            "padding": "0.85rem 1rem",
+            "border": "1px solid var(--color-border-strong)",
+            "borderRadius": "var(--radius-sm)",
+            "fontSize": "1rem",
+            "fontFamily": "inherit",
+            "backgroundColor": "var(--color-bg-cream)"
           }
         },
         {
@@ -60,11 +71,11 @@
           "attributes": { "name": "interest", "aria-label": "I'm interested in" },
           "style": {
             "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
+            "padding": "0.85rem 1rem",
+            "border": "1px solid var(--color-border-strong)",
+            "borderRadius": "var(--radius-sm)",
             "fontSize": "1rem",
-            "backgroundColor": "var(--color-bg-white)",
+            "backgroundColor": "var(--color-bg-cream)",
             "fontFamily": "inherit"
           },
           "children": [
@@ -100,11 +111,12 @@
           },
           "style": {
             "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
+            "padding": "0.85rem 1rem",
+            "border": "1px solid var(--color-border-strong)",
+            "borderRadius": "var(--radius-sm)",
             "fontSize": "1rem",
-            "fontFamily": "inherit"
+            "fontFamily": "inherit",
+            "backgroundColor": "var(--color-bg-cream)"
           }
         },
         {
@@ -112,20 +124,36 @@
           "attributes": { "type": "submit" },
           "textContent": "Send message",
           "style": {
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "gap": "0.4rem",
             "backgroundColor": "var(--color-accent)",
             "color": "var(--color-text-white)",
-            "padding": "0.85rem 1.5rem",
+            "padding": "0.95rem 1.75rem",
             "border": "none",
             "borderRadius": "999px",
             "fontSize": "1rem",
-            "fontWeight": "600",
+            "fontFamily": "inherit",
+            "fontWeight": "800",
             "cursor": "pointer",
-            "justifySelf": "start"
+            "justifySelf": "start",
+            "boxShadow": "0 12px 26px -12px rgba(242,106,61,0.8)",
+            "transition": "background-color 0.15s, transform 0.15s",
+            ":hover": {
+              "backgroundColor": "var(--color-accent-hover)",
+              "transform": "translateY(-1px)"
+            }
           }
         },
         {
           "tagName": "p",
-          "style": { "fontSize": "0.85rem", "color": "var(--color-text-muted)", "margin": "0" },
+          "style": {
+            "fontSize": "0.85rem",
+            "fontWeight": "600",
+            "color": "var(--color-text-muted)",
+            "margin": "0"
+          },
           "textContent": "This is a demo form. Wire it to your email or CRM in pages/contact.md."
         }
       ]

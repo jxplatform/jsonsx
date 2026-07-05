@@ -1,0 +1,144 @@
+{
+  "tagName": "pf-insight-row",
+  "state": {
+    "number": "",
+    "title": "",
+    "excerpt": "",
+    "date": "",
+    "category": "",
+    "readingTime": "",
+    "author": "",
+    "href": "/insights/"
+  },
+  "style": { "display": "block" },
+  "children": [
+    {
+      "tagName": "a",
+      "attributes": { "href": "${state.href}" },
+      "style": {
+        "display": "grid",
+        "gridTemplateColumns": "minmax(2.5rem, 3.5rem) minmax(0, 1fr) minmax(0, 15rem)",
+        "gap": "clamp(1rem, 3vw, 2.5rem)",
+        "alignItems": "start",
+        "padding": "clamp(1.5rem, 3vw, 2rem) 0.5rem",
+        "textDecoration": "none",
+        "color": "var(--color-ink)",
+        "borderTop": "1px solid var(--color-hairline)",
+        "transition": "background-color 0.18s, color 0.18s",
+        "@--md": {
+          "gridTemplateColumns": "auto 1fr",
+          "gap": "0.6rem 1.25rem"
+        },
+        ":hover": {
+          "backgroundColor": "var(--color-paper-2)",
+          "color": "var(--color-accent-deep)"
+        }
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "fontFamily": "var(--font-sans)",
+            "fontWeight": "600",
+            "fontSize": "clamp(1.1rem, 2.2vw, 1.5rem)",
+            "lineHeight": "1.1",
+            "color": "var(--color-accent)",
+            "fontVariantNumeric": "tabular-nums"
+          },
+          "textContent": "${state.number}"
+        },
+        {
+          "tagName": "div",
+          "style": { "minWidth": "0" },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "display": "${state.category ? 'inline-block' : 'none'}",
+                "fontFamily": "var(--font-sans)",
+                "fontSize": "0.68rem",
+                "fontWeight": "600",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.16em",
+                "color": "var(--color-muted)",
+                "marginBottom": "0.6rem"
+              },
+              "textContent": "${state.category}"
+            },
+            {
+              "tagName": "h3",
+              "style": {
+                "fontFamily": "var(--font-serif)",
+                "fontWeight": "500",
+                "fontSize": "clamp(1.4rem, 2.6vw, 2rem)",
+                "lineHeight": "1.14",
+                "letterSpacing": "-0.015em",
+                "margin": "0 0 0.55rem",
+                "color": "inherit"
+              },
+              "textContent": "${state.title}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "fontFamily": "var(--font-serif)",
+                "fontSize": "1.08rem",
+                "lineHeight": "1.55",
+                "color": "var(--color-muted)",
+                "maxWidth": "60ch"
+              },
+              "textContent": "${state.excerpt}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "textAlign": "right",
+            "fontFamily": "var(--font-sans)",
+            "@--md": { "textAlign": "left", "gridColumn": "2 / -1" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontSize": "0.72rem",
+                "fontWeight": "600",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.12em",
+                "color": "var(--color-ink)",
+                "fontVariantNumeric": "tabular-nums",
+                "marginBottom": "0.4rem"
+              },
+              "textContent": "${state.date}"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "${state.readingTime ? 'block' : 'none'}",
+                "fontSize": "0.72rem",
+                "letterSpacing": "0.06em",
+                "color": "var(--color-muted)",
+                "fontVariantNumeric": "tabular-nums",
+                "marginBottom": "0.65rem"
+              },
+              "textContent": "${state.readingTime} min read"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontSize": "0.72rem",
+                "fontWeight": "600",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.12em",
+                "color": "var(--color-accent)"
+              },
+              "textContent": "Read →"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

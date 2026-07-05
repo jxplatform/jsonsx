@@ -1,0 +1,58 @@
+{
+  "tagName": "shp-trust",
+  "state": {
+    "icon": "",
+    "title": "",
+    "text": ""
+  },
+  "style": {
+    "display": "flex",
+    "alignItems": "flex-start",
+    "gap": "0.9rem",
+    "padding": "0.25rem 0"
+  },
+  "children": [
+    {
+      "tagName": "span",
+      "style": {
+        "flex": "0 0 auto",
+        "display": "inline-flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "width": "2.85rem",
+        "height": "2.85rem",
+        "borderRadius": "999px",
+        "backgroundColor": "rgba(255,255,255,0.08)",
+        "border": "1px solid rgba(255,255,255,0.14)",
+        "fontSize": "1.35rem",
+        "lineHeight": "1"
+      },
+      "textContent": "${state.icon}"
+    },
+    {
+      "tagName": "div",
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.02rem",
+            "fontWeight": "700",
+            "color": "var(--color-text-white)"
+          },
+          "textContent": "${state.title}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0.25rem 0 0",
+            "fontSize": "0.9rem",
+            "lineHeight": "1.55",
+            "color": "rgba(255,255,255,0.68)"
+          },
+          "textContent": "${state.text}"
+        }
+      ]
+    }
+  ]
+}

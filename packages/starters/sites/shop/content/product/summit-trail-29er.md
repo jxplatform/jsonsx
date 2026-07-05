@@ -3,6 +3,7 @@ title: Summit Trail 29er
 sku: summit-trail-29er
 price: $2,199
 category: Mountain
+badge: ""
 image: /images/product-2.jpg
 order: 3
 ---

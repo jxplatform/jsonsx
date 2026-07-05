@@ -1,0 +1,240 @@
+{
+  "tagName": "re-agent-band",
+  "state": {
+    "eyebrow": "Your north shore team",
+    "heading": "",
+    "text": "",
+    "phone": "(555) 204-7788",
+    "cta": "Book a call",
+    "ctaHref": "/contact/",
+    "cta2": "Meet the team",
+    "cta2Href": "/about/",
+    "img1": { "type": "string", "format": "image", "default": "/images/agent-1.jpg" },
+    "img2": { "type": "string", "format": "image", "default": "/images/agent-2.jpg" },
+    "img3": { "type": "string", "format": "image", "default": "/images/agent-3.jpg" }
+  },
+  "style": {
+    "display": "block",
+    "padding": "clamp(2.5rem, 6vw, 4rem) 1.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "position": "relative",
+        "overflow": "hidden",
+        "borderRadius": "var(--radius-lg)",
+        "background": "radial-gradient(ellipse 60% 90% at 8% 0%, rgba(20,184,166,0.28), transparent 60%), radial-gradient(ellipse 50% 80% at 100% 100%, rgba(13,148,136,0.22), transparent 60%), var(--color-bg-dark)",
+        "border": "1px solid var(--color-bg-ink-soft)",
+        "padding": "clamp(2rem, 4vw, 3.25rem)",
+        "display": "grid",
+        "gridTemplateColumns": "auto 1fr",
+        "gap": "clamp(1.5rem, 4vw, 3.5rem)",
+        "alignItems": "center",
+        "@--md": { "gridTemplateColumns": "1fr", "gap": "1.75rem" }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "display": "flex", "flexDirection": "column", "gap": "1rem" },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "display": "flex", "alignItems": "center" },
+              "children": [
+                {
+                  "tagName": "img",
+                  "attributes": {
+                    "src": "${state.img1}",
+                    "alt": "Northshore Realty agent",
+                    "loading": "lazy",
+                    "width": "72",
+                    "height": "72"
+                  },
+                  "style": {
+                    "width": "4.5rem",
+                    "height": "4.5rem",
+                    "borderRadius": "999px",
+                    "objectFit": "cover",
+                    "border": "3px solid var(--color-bg-dark)",
+                    "boxShadow": "0 6px 18px rgba(0,0,0,0.4)"
+                  }
+                },
+                {
+                  "tagName": "img",
+                  "attributes": {
+                    "src": "${state.img2}",
+                    "alt": "Northshore Realty agent",
+                    "loading": "lazy",
+                    "width": "72",
+                    "height": "72"
+                  },
+                  "style": {
+                    "width": "4.5rem",
+                    "height": "4.5rem",
+                    "borderRadius": "999px",
+                    "objectFit": "cover",
+                    "border": "3px solid var(--color-bg-dark)",
+                    "marginLeft": "-1.1rem",
+                    "boxShadow": "0 6px 18px rgba(0,0,0,0.4)"
+                  }
+                },
+                {
+                  "tagName": "img",
+                  "attributes": {
+                    "src": "${state.img3}",
+                    "alt": "Northshore Realty agent",
+                    "loading": "lazy",
+                    "width": "72",
+                    "height": "72"
+                  },
+                  "style": {
+                    "width": "4.5rem",
+                    "height": "4.5rem",
+                    "borderRadius": "999px",
+                    "objectFit": "cover",
+                    "border": "3px solid var(--color-bg-dark)",
+                    "marginLeft": "-1.1rem",
+                    "boxShadow": "0 6px 18px rgba(0,0,0,0.4)"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.4rem",
+                "color": "var(--color-accent-bright)",
+                "fontWeight": "700",
+                "fontSize": "0.9rem"
+              },
+              "children": [
+                { "tagName": "span", "textContent": "★★★★★" },
+                {
+                  "tagName": "span",
+                  "style": { "color": "rgba(255,255,255,0.6)", "fontWeight": "600" },
+                  "textContent": "4.9 · 220 reviews"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.16em",
+                "fontSize": "0.74rem",
+                "fontWeight": "700",
+                "color": "var(--color-accent-bright)",
+                "margin": "0 0 0.8rem"
+              },
+              "textContent": "${state.eyebrow}"
+            },
+            {
+              "tagName": "h2",
+              "style": {
+                "fontFamily": "var(--font-display)",
+                "fontSize": "clamp(1.75rem, 3.4vw, 2.6rem)",
+                "fontWeight": "500",
+                "lineHeight": "1.1",
+                "letterSpacing": "-0.015em",
+                "margin": "0 0 0.9rem",
+                "color": "var(--color-text-white)"
+              },
+              "textContent": "${state.heading}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "1.05rem",
+                "lineHeight": "1.65",
+                "color": "rgba(255,255,255,0.72)",
+                "margin": "0 0 1.75rem",
+                "maxWidth": "48ch"
+              },
+              "textContent": "${state.text}"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "1.25rem",
+                "flexWrap": "wrap"
+              },
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "${state.ctaHref}" },
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "backgroundColor": "var(--color-accent-bright)",
+                    "color": "var(--color-ink)",
+                    "padding": "0.85rem 1.6rem",
+                    "borderRadius": "999px",
+                    "fontSize": "1rem",
+                    "fontWeight": "700",
+                    "textDecoration": "none",
+                    "transition": "transform 0.15s, box-shadow 0.15s",
+                    "boxShadow": "0 12px 30px -12px rgba(20,184,166,0.7)",
+                    ":hover": {
+                      "transform": "translateY(-2px)",
+                      "boxShadow": "0 18px 40px -12px rgba(20,184,166,0.8)"
+                    }
+                  },
+                  "children": [
+                    { "tagName": "span", "textContent": "${state.cta}" },
+                    { "tagName": "span", "textContent": "→" }
+                  ]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "tel:+15552047788" },
+                  "style": {
+                    "display": "inline-flex",
+                    "flexDirection": "column",
+                    "textDecoration": "none"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontSize": "0.72rem",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.12em",
+                        "color": "rgba(255,255,255,0.5)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "Call us"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontSize": "1.2rem",
+                        "fontWeight": "800",
+                        "color": "var(--color-text-white)",
+                        "fontVariantNumeric": "tabular-nums",
+                        "letterSpacing": "-0.01em"
+                      },
+                      "textContent": "${state.phone}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

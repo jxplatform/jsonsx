@@ -1,133 +1,212 @@
 {
   "tagName": "np-nav",
   "state": {
-    "brand": "Rivertown Foundation"
+    "brand": "Rivertown Foundation",
+    "notice": "Every gift is matched 2× this month — until it's gone."
   },
   "style": {
     "display": "block",
     "position": "sticky",
     "top": "0",
-    "zIndex": "50",
-    "backgroundColor": "rgba(255, 255, 255, 0.92)",
-    "backdropFilter": "blur(8px)",
-    "borderBottom": "1px solid var(--color-border)"
+    "zIndex": "50"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
-        "maxWidth": "var(--max-width)",
-        "margin": "0 auto",
-        "padding": "0.9rem 1.5rem",
-        "display": "flex",
-        "alignItems": "center",
-        "justifyContent": "space-between",
-        "gap": "1.5rem"
+        "backgroundColor": "var(--color-primary-deep)",
+        "color": "var(--color-text-white)"
       },
       "children": [
         {
-          "tagName": "a",
-          "attributes": { "href": "/" },
+          "tagName": "div",
           "style": {
+            "maxWidth": "var(--max-width-wide)",
+            "margin": "0 auto",
+            "padding": "0.5rem 1.5rem",
             "display": "flex",
             "alignItems": "center",
+            "justifyContent": "center",
             "gap": "0.6rem",
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "1.3rem",
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.82rem",
             "fontWeight": "700",
-            "color": "var(--color-text-primary)",
-            "textDecoration": "none",
-            "letterSpacing": "-0.01em"
+            "textAlign": "center"
           },
           "children": [
             {
               "tagName": "span",
               "style": {
-                "display": "inline-flex",
-                "alignItems": "center",
-                "justifyContent": "center",
-                "width": "2rem",
-                "height": "2rem",
-                "borderRadius": "0.5rem",
-                "backgroundColor": "var(--color-primary)",
-                "color": "var(--color-text-white)",
-                "fontSize": "1.1rem"
+                "flex": "none",
+                "fontSize": "0.95rem",
+                "lineHeight": "1"
               },
-              "textContent": "♥"
+              "textContent": "✦"
             },
             {
               "tagName": "span",
-              "textContent": "${state.brand}"
+              "style": { "color": "var(--color-gold-soft)" },
+              "textContent": "${state.notice}"
             }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "backgroundColor": "rgba(251,245,236,0.88)",
+        "backdropFilter": "blur(10px)",
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
         {
-          "tagName": "nav",
+          "tagName": "div",
           "style": {
+            "maxWidth": "var(--max-width-wide)",
+            "margin": "0 auto",
+            "padding": "0.85rem 1.5rem",
             "display": "flex",
             "alignItems": "center",
-            "gap": "1.6rem",
-            "@--sm": { "gap": "0.9rem" }
+            "justifyContent": "space-between",
+            "gap": "1.5rem"
           },
           "children": [
             {
               "tagName": "a",
-              "attributes": { "href": "/programs/" },
+              "attributes": { "href": "/" },
               "style": {
-                "color": "var(--color-text-primary)",
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.7rem",
                 "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
-                ":hover": { "color": "var(--color-primary)" }
+                "color": "var(--color-text-primary)"
               },
-              "textContent": "Programs"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/about/" },
-              "style": {
-                "color": "var(--color-text-primary)",
-                "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
-                "@--sm": { "display": "none" },
-                ":hover": { "color": "var(--color-primary)" }
-              },
-              "textContent": "About"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/get-involved/" },
-              "style": {
-                "color": "var(--color-text-primary)",
-                "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
-                "@--sm": { "display": "none" },
-                ":hover": { "color": "var(--color-primary)" }
-              },
-              "textContent": "Get Involved"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/get-involved/" },
-              "style": {
-                "display": "inline-block",
-                "backgroundColor": "var(--color-accent)",
-                "color": "var(--color-text-white)",
-                "padding": "0.55rem 1.35rem",
-                "borderRadius": "999px",
-                "textDecoration": "none",
-                "fontWeight": "600",
-                "fontSize": "0.95rem",
-                "boxShadow": "0 4px 14px rgba(234,88,12,0.28)",
-                "transition": "background-color 0.15s, transform 0.15s",
-                ":hover": {
-                  "backgroundColor": "var(--color-accent-hover)",
-                  "transform": "translateY(-1px)"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "2.5rem",
+                    "height": "2.5rem",
+                    "borderRadius": "999px 999px 999px 4px",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "fontSize": "1.2rem",
+                    "boxShadow": "0 8px 18px -8px rgba(47,125,85,0.8)"
+                  },
+                  "textContent": "❤"
+                },
+                {
+                  "tagName": "span",
+                  "style": { "display": "flex", "flexDirection": "column", "lineHeight": "1.05" },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-display)",
+                        "fontSize": "1.32rem",
+                        "fontWeight": "600",
+                        "letterSpacing": "-0.01em"
+                      },
+                      "textContent": "${state.brand}"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-body)",
+                        "fontSize": "0.68rem",
+                        "fontWeight": "700",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.18em",
+                        "color": "var(--color-primary)",
+                        "@--sm": { "display": "none" }
+                      },
+                      "textContent": "Neighbors helping neighbors"
+                    }
+                  ]
                 }
+              ]
+            },
+            {
+              "tagName": "nav",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "1.7rem",
+                "@--sm": { "gap": "0.9rem" }
               },
-              "textContent": "Donate"
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/programs/" },
+                  "style": {
+                    "color": "var(--color-text-primary)",
+                    "textDecoration": "none",
+                    "fontWeight": "700",
+                    "fontSize": "0.96rem",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "Programs"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/about/" },
+                  "style": {
+                    "color": "var(--color-text-primary)",
+                    "textDecoration": "none",
+                    "fontWeight": "700",
+                    "fontSize": "0.96rem",
+                    "transition": "color 0.15s",
+                    "@--md": { "display": "none" },
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "About"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/get-involved/" },
+                  "style": {
+                    "color": "var(--color-text-primary)",
+                    "textDecoration": "none",
+                    "fontWeight": "700",
+                    "fontSize": "0.96rem",
+                    "transition": "color 0.15s",
+                    "@--sm": { "display": "none" },
+                    ":hover": { "color": "var(--color-primary)" }
+                  },
+                  "textContent": "Get Involved"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/get-involved/" },
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.4rem",
+                    "backgroundColor": "var(--color-accent)",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.6rem 1.5rem",
+                    "borderRadius": "999px",
+                    "textDecoration": "none",
+                    "fontWeight": "800",
+                    "fontSize": "0.96rem",
+                    "boxShadow": "0 10px 22px -8px rgba(242,106,61,0.75)",
+                    "transition": "background-color 0.15s, transform 0.15s",
+                    ":hover": {
+                      "backgroundColor": "var(--color-accent-hover)",
+                      "transform": "translateY(-1px)"
+                    }
+                  },
+                  "children": [
+                    { "tagName": "span", "style": { "fontSize": "0.9rem" }, "textContent": "❤" },
+                    { "tagName": "span", "textContent": "Donate" }
+                  ]
+                }
+              ]
             }
           ]
         }

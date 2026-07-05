@@ -2,15 +2,16 @@
   "tagName": "bit-footer",
   "state": {
     "brand": "Bistro & Café",
-    "tagline": "Seasonal plates, house pastries, and small-batch coffee.",
-    "address": "128 Market Street, Riverbend",
+    "tagline": "Seasonal plates, house pastries, and small-batch coffee — served in a warm room just off Market Street.",
+    "address1": "128 Market Street",
+    "address2": "Riverbend, CA 90210",
     "phone": "(555) 018-2340"
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-dark)",
+    "backgroundColor": "var(--color-espresso)",
     "color": "var(--color-text-white)",
-    "padding": "3.5rem 1.5rem 2rem"
+    "padding": "clamp(3.5rem, 7vw, 5rem) 1.5rem 2.25rem"
   },
   "children": [
     {
@@ -19,9 +20,9 @@
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
         "display": "grid",
-        "gridTemplateColumns": "2fr 1fr 1fr",
-        "gap": "2.5rem",
-        "@--md": { "gridTemplateColumns": "1fr" }
+        "gridTemplateColumns": "1.6fr 1fr 1fr",
+        "gap": "clamp(2rem, 5vw, 3.5rem)",
+        "@--md": { "gridTemplateColumns": "1fr", "gap": "2.25rem" }
       },
       "children": [
         {
@@ -31,15 +32,22 @@
               "tagName": "div",
               "style": {
                 "fontFamily": "var(--font-heading)",
-                "fontSize": "1.4rem",
+                "fontSize": "2rem",
                 "fontWeight": "700",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "-0.01em",
+                "marginBottom": "1rem"
               },
               "textContent": "${state.brand}"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.75", "maxWidth": "32ch" },
+              "style": {
+                "margin": "0",
+                "fontFamily": "var(--font-body)",
+                "opacity": "0.68",
+                "maxWidth": "38ch",
+                "lineHeight": "1.7"
+              },
               "textContent": "${state.tagline}"
             }
           ]
@@ -50,22 +58,36 @@
             {
               "tagName": "div",
               "style": {
+                "fontFamily": "var(--font-body)",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.16em",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "color": "var(--color-amber)",
+                "marginBottom": "1rem"
               },
               "textContent": "Visit"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
-              "textContent": "${state.address}"
+              "style": { "margin": "0 0 0.35rem", "opacity": "0.82" },
+              "textContent": "${state.address1}"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.85" },
+              "style": { "margin": "0 0 0.75rem", "opacity": "0.82" },
+              "textContent": "${state.address2}"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "tel:+15550182340" },
+              "style": {
+                "color": "var(--color-text-white)",
+                "opacity": "0.82",
+                "textDecoration": "none",
+                "borderBottom": "1px solid rgba(246,236,219,0.25)",
+                "paddingBottom": "0.1rem"
+              },
               "textContent": "${state.phone}"
             }
           ]
@@ -76,11 +98,13 @@
             {
               "tagName": "div",
               "style": {
+                "fontFamily": "var(--font-body)",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.16em",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "color": "var(--color-amber)",
+                "marginBottom": "1rem"
               },
               "textContent": "Explore"
             },
@@ -90,11 +114,13 @@
               "style": {
                 "display": "block",
                 "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "opacity": "0.82",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.5rem",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "1" }
               },
-              "textContent": "Menu"
+              "textContent": "The Menu"
             },
             {
               "tagName": "a",
@@ -102,11 +128,13 @@
               "style": {
                 "display": "block",
                 "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "opacity": "0.82",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "marginBottom": "0.5rem",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "1" }
               },
-              "textContent": "About"
+              "textContent": "Our Story"
             },
             {
               "tagName": "a",
@@ -114,10 +142,12 @@
               "style": {
                 "display": "block",
                 "color": "var(--color-text-white)",
-                "opacity": "0.85",
-                "textDecoration": "none"
+                "opacity": "0.82",
+                "textDecoration": "none",
+                "transition": "opacity 0.15s",
+                ":hover": { "opacity": "1" }
               },
-              "textContent": "Contact"
+              "textContent": "Reservations"
             }
           ]
         }
@@ -127,17 +157,33 @@
       "tagName": "div",
       "style": {
         "maxWidth": "var(--max-width)",
-        "margin": "2.5rem auto 0",
+        "margin": "clamp(2.5rem, 5vw, 3.5rem) auto 0",
         "paddingTop": "1.5rem",
-        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
-        "fontSize": "0.85rem",
-        "opacity": "0.6"
+        "borderTop": "1px solid rgba(246,236,219,0.15)",
+        "display": "flex",
+        "justifyContent": "space-between",
+        "alignItems": "center",
+        "gap": "1rem",
+        "flexWrap": "wrap",
+        "fontFamily": "var(--font-body)",
+        "fontSize": "0.8rem",
+        "opacity": "0.55"
       },
       "children": [
         {
           "tagName": "p",
           "style": { "margin": "0" },
           "textContent": "© Bistro & Café. Built with Jx."
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.14em",
+            "fontSize": "0.7rem"
+          },
+          "textContent": "Set in Playfair Display & Mulish"
         }
       ]
     }

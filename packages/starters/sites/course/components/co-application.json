@@ -10,159 +10,214 @@
     {
       "tagName": "form",
       "attributes": { "action": "#", "method": "post" },
-      "style": { "display": "grid", "gap": "1rem", "alignContent": "start", "marginTop": "1.5rem" },
+      "style": {
+        "display": "grid",
+        "gap": "1.1rem",
+        "alignContent": "start",
+        "marginTop": "1.5rem",
+        "padding": "clamp(1.5rem, 4vw, 2.25rem)",
+        "backgroundColor": "var(--color-bg-white)",
+        "border": "1px solid var(--color-border)",
+        "borderRadius": "var(--radius)",
+        "boxShadow": "0 16px 44px -28px rgba(15,20,36,0.4)",
+        "& label": {
+          "display": "block",
+          "fontFamily": "var(--font-mono)",
+          "fontSize": "0.74rem",
+          "fontWeight": "600",
+          "textTransform": "uppercase",
+          "letterSpacing": "0.06em",
+          "color": "var(--color-text-muted)",
+          "marginBottom": "0.4rem"
+        },
+        "& input, & select, & textarea": {
+          "width": "100%",
+          "padding": "0.8rem 0.95rem",
+          "border": "1px solid var(--color-border-strong)",
+          "borderRadius": "var(--radius-sm)",
+          "fontSize": "1rem",
+          "fontFamily": "var(--font-body)",
+          "backgroundColor": "var(--color-bg-white)",
+          "color": "var(--color-text-primary)"
+        },
+        "& input:focus, & select:focus, & textarea:focus": {
+          "outline": "none",
+          "borderColor": "var(--color-primary)",
+          "boxShadow": "0 0 0 3px rgba(79,70,229,0.15)"
+        }
+      },
       "children": [
         {
-          "tagName": "input",
-          "attributes": {
-            "type": "text",
-            "name": "name",
-            "placeholder": "Your name",
-            "required": "true",
-            "aria-label": "Your name"
-          },
-          "style": {
-            "width": "100%",
-            "padding": "0.8rem 0.95rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem"
-          }
+          "tagName": "div",
+          "children": [
+            { "tagName": "label", "attributes": { "for": "app-name" }, "textContent": "Your name" },
+            {
+              "tagName": "input",
+              "attributes": {
+                "id": "app-name",
+                "type": "text",
+                "name": "name",
+                "placeholder": "Ada Lovelace",
+                "required": "true"
+              }
+            }
+          ]
         },
         {
-          "tagName": "input",
-          "attributes": {
-            "type": "email",
-            "name": "email",
-            "placeholder": "Email address",
-            "required": "true",
-            "aria-label": "Email address"
-          },
-          "style": {
-            "width": "100%",
-            "padding": "0.8rem 0.95rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem"
-          }
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "label",
+              "attributes": { "for": "app-email" },
+              "textContent": "Email address"
+            },
+            {
+              "tagName": "input",
+              "attributes": {
+                "id": "app-email",
+                "type": "email",
+                "name": "email",
+                "placeholder": "you@example.com",
+                "required": "true"
+              }
+            }
+          ]
         },
         {
           "tagName": "div",
           "style": {
             "display": "grid",
             "gridTemplateColumns": "1fr 1fr",
-            "gap": "1rem",
+            "gap": "1.1rem",
             "@--sm": { "gridTemplateColumns": "1fr" }
           },
           "children": [
             {
-              "tagName": "select",
-              "attributes": { "name": "cohort", "aria-label": "Preferred cohort" },
-              "style": {
-                "width": "100%",
-                "padding": "0.8rem 0.95rem",
-                "border": "1px solid var(--color-border)",
-                "borderRadius": "var(--radius)",
-                "fontSize": "1rem",
-                "backgroundColor": "var(--color-bg-white)"
-              },
+              "tagName": "div",
               "children": [
                 {
-                  "tagName": "option",
-                  "attributes": { "value": "", "disabled": "true", "selected": "true" },
+                  "tagName": "label",
+                  "attributes": { "for": "app-cohort" },
                   "textContent": "Preferred cohort"
                 },
                 {
-                  "tagName": "option",
-                  "attributes": { "value": "fall" },
-                  "textContent": "Fall 2026 · Sept 8"
-                },
-                {
-                  "tagName": "option",
-                  "attributes": { "value": "winter" },
-                  "textContent": "Winter 2027 · Jan 12"
-                },
-                {
-                  "tagName": "option",
-                  "attributes": { "value": "unsure" },
-                  "textContent": "Not sure yet"
+                  "tagName": "select",
+                  "attributes": { "id": "app-cohort", "name": "cohort" },
+                  "children": [
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "", "disabled": "true", "selected": "true" },
+                      "textContent": "Choose a cohort"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "fall" },
+                      "textContent": "Fall 2026 · Sept 8"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "winter" },
+                      "textContent": "Winter 2027 · Jan 12"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "unsure" },
+                      "textContent": "Not sure yet"
+                    }
+                  ]
                 }
               ]
             },
             {
-              "tagName": "select",
-              "attributes": { "name": "experience", "aria-label": "Coding experience" },
-              "style": {
-                "width": "100%",
-                "padding": "0.8rem 0.95rem",
-                "border": "1px solid var(--color-border)",
-                "borderRadius": "var(--radius)",
-                "fontSize": "1rem",
-                "backgroundColor": "var(--color-bg-white)"
-              },
+              "tagName": "div",
               "children": [
                 {
-                  "tagName": "option",
-                  "attributes": { "value": "", "disabled": "true", "selected": "true" },
+                  "tagName": "label",
+                  "attributes": { "for": "app-exp" },
                   "textContent": "Coding experience"
                 },
                 {
-                  "tagName": "option",
-                  "attributes": { "value": "none" },
-                  "textContent": "Complete beginner"
-                },
-                {
-                  "tagName": "option",
-                  "attributes": { "value": "some" },
-                  "textContent": "Some self-taught"
-                },
-                {
-                  "tagName": "option",
-                  "attributes": { "value": "cs" },
-                  "textContent": "CS / bootcamp background"
+                  "tagName": "select",
+                  "attributes": { "id": "app-exp", "name": "experience" },
+                  "children": [
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "", "disabled": "true", "selected": "true" },
+                      "textContent": "Choose one"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "none" },
+                      "textContent": "Complete beginner"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "some" },
+                      "textContent": "Some self-taught"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "cs" },
+                      "textContent": "CS / bootcamp background"
+                    }
+                  ]
                 }
               ]
             }
           ]
         },
         {
-          "tagName": "textarea",
-          "attributes": {
-            "name": "goals",
-            "rows": "3",
-            "placeholder": "What are you hoping to build or become?",
-            "aria-label": "Your goals"
-          },
-          "style": {
-            "width": "100%",
-            "padding": "0.8rem 0.95rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem",
-            "fontFamily": "inherit"
-          }
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "label",
+              "attributes": { "for": "app-goals" },
+              "textContent": "What do you want to build?"
+            },
+            {
+              "tagName": "textarea",
+              "attributes": {
+                "id": "app-goals",
+                "name": "goals",
+                "rows": "3",
+                "placeholder": "Tell us what you're hoping to build or become..."
+              },
+              "style": { "fontFamily": "var(--font-body)", "resize": "vertical" }
+            }
+          ]
         },
         {
           "tagName": "button",
           "attributes": { "type": "submit" },
-          "textContent": "Submit Application",
+          "textContent": "Submit Application →",
           "style": {
             "backgroundColor": "var(--color-primary)",
             "color": "var(--color-text-white)",
             "padding": "0.9rem 1.75rem",
             "border": "none",
-            "borderRadius": "var(--radius)",
+            "borderRadius": "999px",
             "fontSize": "1rem",
-            "fontWeight": "700",
+            "fontWeight": "600",
+            "fontFamily": "var(--font-body)",
             "cursor": "pointer",
             "justifySelf": "start",
-            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+            "boxShadow": "0 14px 30px -14px rgba(79,70,229,0.9)",
+            "transition": "background-color 0.15s, transform 0.15s",
+            ":hover": {
+              "backgroundColor": "var(--color-primary-hover)",
+              "transform": "translateY(-1px)"
+            }
           }
         },
         {
           "tagName": "p",
-          "style": { "fontSize": "0.85rem", "color": "var(--color-text-muted)", "margin": "0" },
-          "textContent": "This is a demo form. Wire it to your CRM or email in pages/enroll.md."
+          "style": {
+            "fontFamily": "var(--font-mono)",
+            "fontSize": "0.78rem",
+            "color": "var(--color-text-faint)",
+            "margin": "0"
+          },
+          "textContent": "// demo form — wire it to your CRM or email in pages/enroll.md"
         }
       ]
     }

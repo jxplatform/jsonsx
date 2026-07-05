@@ -1,16 +1,17 @@
 {
   "tagName": "pf-nav",
   "state": {
-    "brand": "Meridian Advisory"
+    "brand": "Meridian",
+    "sub": "Advisory"
   },
   "style": {
     "display": "block",
     "position": "sticky",
     "top": "0",
     "zIndex": "50",
-    "backgroundColor": "rgba(255, 255, 255, 0.9)",
-    "backdropFilter": "blur(8px)",
-    "borderBottom": "1px solid var(--color-border)"
+    "backgroundColor": "var(--color-paper)",
+    "borderTop": "3px solid var(--color-accent)",
+    "borderBottom": "1px solid var(--color-rule)"
   },
   "children": [
     {
@@ -18,9 +19,9 @@
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "1rem 1.5rem",
+        "padding": "0.9rem 1.5rem",
         "display": "flex",
-        "alignItems": "center",
+        "alignItems": "baseline",
         "justifyContent": "space-between",
         "gap": "1.5rem"
       },
@@ -29,78 +30,102 @@
           "tagName": "a",
           "attributes": { "href": "/" },
           "style": {
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "1.4rem",
-            "fontWeight": "700",
-            "color": "var(--color-text-primary)",
+            "display": "inline-flex",
+            "alignItems": "baseline",
+            "gap": "0.6rem",
             "textDecoration": "none",
-            "letterSpacing": "-0.01em"
+            "color": "var(--color-ink)"
           },
-          "textContent": "${state.brand}"
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-serif)",
+                "fontSize": "1.5rem",
+                "fontWeight": "600",
+                "letterSpacing": "-0.01em",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.brand}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-sans)",
+                "fontSize": "0.68rem",
+                "fontWeight": "600",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.28em",
+                "color": "var(--color-accent)"
+              },
+              "textContent": "${state.sub}"
+            }
+          ]
         },
         {
           "tagName": "nav",
           "style": {
             "display": "flex",
-            "alignItems": "center",
-            "gap": "1.75rem",
-            "@--sm": { "gap": "1rem" }
+            "alignItems": "baseline",
+            "gap": "2rem",
+            "fontFamily": "var(--font-sans)",
+            "fontSize": "0.72rem",
+            "fontWeight": "600",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.16em",
+            "@--sm": { "gap": "1.15rem" }
           },
           "children": [
             {
               "tagName": "a",
               "attributes": { "href": "/services/" },
               "style": {
-                "color": "var(--color-text-primary)",
+                "color": "var(--color-ink)",
                 "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
-                ":hover": { "color": "var(--color-primary)" }
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent)" }
               },
-              "textContent": "Services"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/team/" },
-              "style": {
-                "color": "var(--color-text-primary)",
-                "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
-                "@--sm": { "display": "none" },
-                ":hover": { "color": "var(--color-primary)" }
-              },
-              "textContent": "Team"
+              "textContent": "Practice"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/insights/" },
               "style": {
-                "color": "var(--color-text-primary)",
+                "color": "var(--color-ink)",
                 "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
+                "transition": "color 0.15s",
                 "@--sm": { "display": "none" },
-                ":hover": { "color": "var(--color-primary)" }
+                ":hover": { "color": "var(--color-accent)" }
               },
               "textContent": "Insights"
             },
             {
               "tagName": "a",
+              "attributes": { "href": "/team/" },
+              "style": {
+                "color": "var(--color-ink)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                "@--sm": { "display": "none" },
+                ":hover": { "color": "var(--color-accent)" }
+              },
+              "textContent": "People"
+            },
+            {
+              "tagName": "a",
               "attributes": { "href": "/contact/" },
               "style": {
-                "display": "inline-block",
-                "backgroundColor": "var(--color-primary)",
-                "color": "var(--color-text-white)",
-                "padding": "0.55rem 1.25rem",
-                "borderRadius": "var(--radius)",
+                "color": "var(--color-ink)",
                 "textDecoration": "none",
-                "fontWeight": "600",
-                "fontSize": "0.95rem",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                "border": "1px solid var(--color-rule)",
+                "padding": "0.5rem 0.9rem",
+                "transition": "background-color 0.15s, color 0.15s",
+                ":hover": {
+                  "backgroundColor": "var(--color-ink)",
+                  "color": "var(--color-paper)"
+                }
               },
-              "textContent": "Book a Consultation"
+              "textContent": "Consult"
             }
           ]
         }

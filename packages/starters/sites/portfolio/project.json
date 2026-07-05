@@ -33,7 +33,7 @@
       "tagName": "link",
       "attributes": {
         "rel": "stylesheet",
-        "href": "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap"
+        "href": "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap"
       }
     }
   ],
@@ -44,27 +44,31 @@
     "--sm": "(max-width: 640px)"
   },
   "style": {
-    "--color-primary": "#d97706",
-    "--color-primary-hover": "#b45309",
-    "--color-ink": "#111827",
-    "--color-bg-dark": "#111827",
-    "--color-bg-cream": "#f8f7f4",
-    "--color-bg-white": "#ffffff",
-    "--color-text-primary": "#111827",
-    "--color-text-white": "#ffffff",
-    "--color-text-muted": "#6b7280",
-    "--color-border": "#e5e7eb",
-    "--color-accent": "#d97706",
+    "--color-primary": "#c8a45c",
+    "--color-primary-hover": "#dcbd77",
+    "--color-ink": "#ece9e3",
+    "--color-bg-dark": "#161619",
+    "--color-bg-cream": "#161619",
+    "--color-bg-white": "#0c0c0d",
+    "--color-bg": "#0c0c0d",
+    "--color-bg-elev": "#161619",
+    "--color-text-primary": "#ece9e3",
+    "--color-text-white": "#ece9e3",
+    "--color-text-muted": "#8f8b82",
+    "--color-border": "#2a2a2e",
+    "--color-line": "#2a2a2e",
+    "--color-accent": "#c8a45c",
     "--font-heading": "'Cormorant Garamond', Georgia, 'Times New Roman', serif",
-    "--max-width": "1200px",
-    "--max-width-narrow": "820px",
-    "--radius": "0.25rem",
+    "--font-label": "'Fraunces', Georgia, serif",
+    "--max-width": "1400px",
+    "--max-width-narrow": "760px",
+    "--radius": "0",
     "margin": "0",
     "padding": "0",
     "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
     "lineHeight": "1.6",
     "color": "var(--color-text-primary)",
-    "backgroundColor": "var(--color-bg-white)"
+    "backgroundColor": "var(--color-bg)"
   },
   "imports": {
     "Markdown": "@jxsuite/parser/Markdown.class.json",

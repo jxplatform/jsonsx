@@ -7,49 +7,55 @@
     "bio": ""
   },
   "style": {
-    "display": "block",
-    "padding": "1.75rem",
+    "display": "flex",
+    "flexDirection": "column",
+    "alignItems": "center",
+    "textAlign": "center",
+    "padding": "2rem 1.75rem 2.1rem",
     "backgroundColor": "var(--color-bg-cream)",
     "border": "1px solid var(--color-border)",
-    "borderRadius": "var(--radius)",
-    "textAlign": "center"
+    "borderRadius": "var(--radius-lg)"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
-        "width": "4.5rem",
-        "height": "4.5rem",
-        "margin": "0 auto 1rem",
-        "borderRadius": "999px",
+        "width": "4.75rem",
+        "height": "4.75rem",
+        "margin": "0 0 1.15rem",
+        "borderRadius": "58% 42% 47% 53% / 55% 50% 50% 45%",
         "backgroundColor": "var(--color-primary)",
         "color": "var(--color-text-white)",
         "display": "flex",
         "alignItems": "center",
         "justifyContent": "center",
-        "fontFamily": "var(--font-heading)",
+        "fontFamily": "var(--font-display)",
         "fontWeight": "700",
-        "fontSize": "1.4rem"
+        "fontSize": "1.55rem",
+        "boxShadow": "0 14px 26px -14px rgba(23,58,43,0.8)"
       },
       "textContent": "${state.initials}"
     },
     {
       "tagName": "h3",
       "style": {
-        "fontFamily": "var(--font-heading)",
-        "fontSize": "1.2rem",
+        "fontFamily": "var(--font-display)",
+        "fontSize": "1.32rem",
         "fontWeight": "600",
-        "margin": "0 0 0.2rem"
+        "color": "var(--color-primary-deep)",
+        "margin": "0 0 0.15rem"
       },
       "textContent": "${state.name}"
     },
     {
       "tagName": "p",
       "style": {
-        "margin": "0 0 0.75rem",
-        "color": "var(--color-primary)",
-        "fontWeight": "600",
-        "fontSize": "0.9rem"
+        "margin": "0 0 0.85rem",
+        "color": "var(--color-accent)",
+        "fontWeight": "800",
+        "fontSize": "0.85rem",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.06em"
       },
       "textContent": "${state.role}"
     },
@@ -58,8 +64,9 @@
       "style": {
         "margin": "0",
         "color": "var(--color-text-muted)",
-        "fontSize": "0.95rem",
-        "lineHeight": "1.6"
+        "fontSize": "0.98rem",
+        "fontWeight": "600",
+        "lineHeight": "1.65"
       },
       "textContent": "${state.bio}"
     }

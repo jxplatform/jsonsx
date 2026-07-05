@@ -16,41 +16,42 @@
       "tagName": "div",
       "style": {
         "padding": "2rem",
-        "backgroundColor": "var(--color-bg-cream)",
-        "border": "1px solid var(--color-border)",
-        "borderRadius": "var(--radius)"
+        "backgroundColor": "var(--color-primary-deep)",
+        "color": "var(--color-text-white)",
+        "borderRadius": "var(--radius-lg)"
       },
       "children": [
         {
           "tagName": "h3",
           "style": {
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "1.4rem",
+            "fontFamily": "var(--font-display)",
+            "fontSize": "1.5rem",
+            "fontWeight": "600",
             "margin": "0 0 1rem"
           },
           "textContent": "Visit us"
         },
         {
           "tagName": "p",
-          "style": { "margin": "0 0 0.35rem" },
+          "style": { "margin": "0 0 0.35rem", "opacity": "0.85", "fontWeight": "600" },
           "textContent": "${state.line1}"
         },
         {
           "tagName": "p",
-          "style": { "margin": "0 0 0.35rem" },
+          "style": { "margin": "0 0 0.35rem", "opacity": "0.85", "fontWeight": "600" },
           "textContent": "${state.line2}"
         },
         {
           "tagName": "p",
-          "style": { "margin": "0.75rem 0 0.35rem" },
+          "style": { "margin": "0.85rem 0 0.35rem" },
           "children": [
             {
               "tagName": "a",
               "attributes": { "href": "${state.phoneHref}" },
               "style": {
-                "color": "var(--color-primary)",
+                "color": "var(--color-gold)",
                 "textDecoration": "none",
-                "fontWeight": "600"
+                "fontWeight": "800"
               },
               "textContent": "${state.phone}"
             }
@@ -64,9 +65,9 @@
               "tagName": "a",
               "attributes": { "href": "${state.emailHref}" },
               "style": {
-                "color": "var(--color-primary)",
+                "color": "var(--color-gold)",
                 "textDecoration": "none",
-                "fontWeight": "600"
+                "fontWeight": "800"
               },
               "textContent": "${state.email}"
             }
@@ -81,14 +82,16 @@
         "padding": "2rem",
         "backgroundColor": "var(--color-bg-cream)",
         "border": "1px solid var(--color-border)",
-        "borderRadius": "var(--radius)"
+        "borderRadius": "var(--radius-lg)"
       },
       "children": [
         {
           "tagName": "h3",
           "style": {
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "1.4rem",
+            "fontFamily": "var(--font-display)",
+            "fontSize": "1.5rem",
+            "fontWeight": "600",
+            "color": "var(--color-primary-deep)",
             "margin": "0 0 1.25rem"
           },
           "textContent": "Office hours"
@@ -99,12 +102,13 @@
             "display": "flex",
             "justifyContent": "space-between",
             "padding": "0.6rem 0",
-            "borderBottom": "1px solid var(--color-border)"
+            "borderBottom": "1px solid var(--color-border)",
+            "fontWeight": "600"
           },
           "children": [
             {
               "tagName": "span",
-              "style": { "fontWeight": "500" },
+              "style": { "fontWeight": "700" },
               "textContent": "Monday – Friday"
             },
             {
@@ -120,10 +124,11 @@
             "display": "flex",
             "justifyContent": "space-between",
             "padding": "0.6rem 0",
-            "borderBottom": "1px solid var(--color-border)"
+            "borderBottom": "1px solid var(--color-border)",
+            "fontWeight": "600"
           },
           "children": [
-            { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Saturday" },
+            { "tagName": "span", "style": { "fontWeight": "700" }, "textContent": "Saturday" },
             {
               "tagName": "span",
               "style": { "color": "var(--color-text-muted)" },
@@ -136,10 +141,11 @@
           "style": {
             "display": "flex",
             "justifyContent": "space-between",
-            "padding": "0.6rem 0"
+            "padding": "0.6rem 0",
+            "fontWeight": "600"
           },
           "children": [
-            { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Sunday" },
+            { "tagName": "span", "style": { "fontWeight": "700" }, "textContent": "Sunday" },
             {
               "tagName": "span",
               "style": { "color": "var(--color-text-muted)" },

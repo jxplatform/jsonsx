@@ -1,6 +1,7 @@
 {
   "tagName": "pv-project-card",
   "state": {
+    "number": "",
     "title": "",
     "category": "",
     "year": "",
@@ -8,94 +9,150 @@
     "cover": { "type": "string", "format": "image", "default": "" },
     "alt": ""
   },
-  "style": {
-    "display": "block",
-    "breakInside": "avoid",
-    "marginBottom": "1.75rem"
-  },
+  "style": { "display": "block", "minWidth": "0" },
   "children": [
     {
       "tagName": "a",
       "attributes": { "href": "${state.href}" },
       "style": {
+        "position": "relative",
         "display": "block",
+        "height": "100%",
+        "overflow": "hidden",
         "textDecoration": "none",
-        "color": "var(--color-text-primary)",
-        ":hover img": { "transform": "scale(1.05)" },
-        ":hover h3": { "color": "var(--color-primary)" }
+        "color": "var(--color-text-white)",
+        "backgroundColor": "var(--color-bg-elev)",
+        ":hover img": { "transform": "scale(1.06)" },
+        ":hover figcaption": { "transform": "translateY(0)", "opacity": "1" }
       },
       "children": [
         {
-          "tagName": "div",
-          "style": {
-            "overflow": "hidden",
-            "borderRadius": "var(--radius)",
-            "backgroundColor": "var(--color-bg-cream)"
+          "tagName": "img",
+          "attributes": {
+            "src": "${state.cover}",
+            "alt": "${state.alt}",
+            "loading": "lazy"
           },
-          "children": [
-            {
-              "tagName": "img",
-              "attributes": {
-                "src": "${state.cover}",
-                "alt": "${state.alt}",
-                "loading": "lazy"
-              },
-              "style": {
-                "width": "100%",
-                "height": "auto",
-                "display": "block",
-                "objectFit": "cover",
-                "transition": "transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)"
-              }
-            }
-          ]
+          "style": {
+            "position": "absolute",
+            "inset": "0",
+            "width": "100%",
+            "height": "100%",
+            "objectFit": "cover",
+            "display": "block",
+            "transition": "transform 0.8s cubic-bezier(0.22, 1, 0.36, 1)"
+          }
         },
         {
           "tagName": "div",
           "style": {
-            "display": "flex",
-            "justifyContent": "space-between",
-            "alignItems": "baseline",
-            "gap": "1rem",
-            "margin": "1rem 0 0"
+            "position": "absolute",
+            "inset": "0",
+            "background": "linear-gradient(to top, rgba(10,10,11,0.82) 0%, rgba(10,10,11,0.25) 40%, transparent 68%)"
+          }
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "position": "absolute",
+            "left": "0",
+            "right": "0",
+            "bottom": "0",
+            "padding": "clamp(1.25rem, 2.5vw, 2rem)"
           },
           "children": [
             {
-              "tagName": "h3",
+              "tagName": "div",
               "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.5rem",
-                "fontWeight": "600",
-                "margin": "0",
-                "lineHeight": "1.2",
-                "transition": "color 0.15s"
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.7rem",
+                "marginBottom": "0.6rem"
               },
-              "textContent": "${state.title}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-label)",
+                    "fontSize": "0.72rem",
+                    "letterSpacing": "0.1em",
+                    "color": "var(--color-primary)"
+                  },
+                  "textContent": "${state.number}"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "1.5rem",
+                    "height": "1px",
+                    "backgroundColor": "var(--color-primary)",
+                    "opacity": "0.7"
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "${state.category ? 'inline' : 'none'}",
+                    "fontSize": "0.66rem",
+                    "fontWeight": "600",
+                    "letterSpacing": "0.2em",
+                    "textTransform": "uppercase",
+                    "color": "var(--color-text-white)",
+                    "opacity": "0.75"
+                  },
+                  "textContent": "${state.category}"
+                }
+              ]
             },
             {
-              "tagName": "span",
+              "tagName": "div",
               "style": {
-                "display": "${state.year ? 'inline' : 'none'}",
-                "fontSize": "0.85rem",
-                "color": "var(--color-text-muted)",
-                "whiteSpace": "nowrap"
+                "display": "flex",
+                "alignItems": "baseline",
+                "justifyContent": "space-between",
+                "gap": "1rem"
               },
-              "textContent": "${state.year}"
+              "children": [
+                {
+                  "tagName": "h3",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "500",
+                    "fontSize": "clamp(1.6rem, 2.8vw, 2.4rem)",
+                    "lineHeight": "1.05",
+                    "margin": "0"
+                  },
+                  "textContent": "${state.title}"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "${state.year ? 'inline' : 'none'}",
+                    "fontSize": "0.8rem",
+                    "color": "var(--color-text-white)",
+                    "opacity": "0.6",
+                    "whiteSpace": "nowrap"
+                  },
+                  "textContent": "${state.year}"
+                }
+              ]
+            },
+            {
+              "tagName": "figcaption",
+              "style": {
+                "marginTop": "0.75rem",
+                "fontSize": "0.72rem",
+                "fontWeight": "600",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.18em",
+                "color": "var(--color-primary)",
+                "transform": "translateY(0.75rem)",
+                "opacity": "0",
+                "transition": "transform 0.3s, opacity 0.3s"
+              },
+              "textContent": "View project →"
             }
           ]
-        },
-        {
-          "tagName": "p",
-          "style": {
-            "display": "${state.category ? 'block' : 'none'}",
-            "margin": "0.3rem 0 0",
-            "fontSize": "0.75rem",
-            "fontWeight": "600",
-            "letterSpacing": "0.14em",
-            "textTransform": "uppercase",
-            "color": "var(--color-primary)"
-          },
-          "textContent": "${state.category}"
         }
       ]
     }

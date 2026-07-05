@@ -3,6 +3,7 @@ title: Boulder Enduro
 sku: boulder-enduro
 price: $3,899
 category: Mountain
+badge: New
 image: /images/product-2.jpg
 order: 4
 ---

@@ -3,124 +3,352 @@
   "state": {
     "eyebrow": "",
     "heading": "",
+    "headingAccent": "",
+    "headingTail": "",
     "subheading": "",
     "cta": "Donate Now",
     "ctaHref": "/get-involved/",
     "cta2": "",
     "cta2Href": "/programs/",
+    "badgeNumber": "640",
+    "badgeLabel": "neighbors volunteering this month",
     "bg": { "type": "string", "format": "image", "default": "" }
   },
   "style": {
     "display": "block",
     "position": "relative",
-    "minHeight": "76vh",
-    "color": "var(--color-text-white)",
-    "backgroundImage": "url('${state.bg}')",
-    "backgroundSize": "cover",
-    "backgroundPosition": "center"
+    "overflow": "hidden",
+    "backgroundColor": "var(--color-bg-cream)"
   },
   "children": [
     {
       "tagName": "div",
       "style": {
         "position": "absolute",
-        "inset": "0",
-        "background": "linear-gradient(180deg, rgba(20,49,42,0.45) 0%, rgba(20,49,42,0.82) 100%)"
+        "top": "-14rem",
+        "right": "-10rem",
+        "width": "34rem",
+        "height": "34rem",
+        "borderRadius": "48% 52% 58% 42% / 52% 44% 56% 48%",
+        "backgroundColor": "var(--color-primary-soft)",
+        "opacity": "0.7"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "absolute",
+        "bottom": "-12rem",
+        "left": "-9rem",
+        "width": "26rem",
+        "height": "26rem",
+        "borderRadius": "42% 58% 46% 54% / 55% 48% 52% 45%",
+        "backgroundColor": "var(--color-gold-soft)",
+        "opacity": "0.55"
       }
     },
     {
       "tagName": "div",
       "style": {
         "position": "relative",
-        "zIndex": "10",
-        "display": "flex",
-        "alignItems": "center",
-        "minHeight": "76vh",
+        "zIndex": "2",
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "4rem 1.5rem"
+        "padding": "clamp(2.75rem, 6vw, 5rem) 1.5rem clamp(3rem, 7vw, 5.5rem)",
+        "display": "grid",
+        "gridTemplateColumns": "1.05fr 0.95fr",
+        "gap": "clamp(2rem, 5vw, 4.5rem)",
+        "alignItems": "center",
+        "@--md": { "gridTemplateColumns": "1fr", "gap": "2.75rem" }
       },
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "660px" },
           "children": [
             {
               "tagName": "p",
               "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.18em",
-                "fontSize": "0.8rem",
-                "fontWeight": "600",
-                "marginBottom": "1rem",
-                "color": "#bbf7d0"
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.55rem",
+                "padding": "0.42rem 1rem 0.42rem 0.6rem",
+                "borderRadius": "999px",
+                "backgroundColor": "var(--color-bg-white)",
+                "border": "1px solid var(--color-border)",
+                "boxShadow": "0 6px 16px -12px rgba(23,58,43,0.5)",
+                "fontFamily": "var(--font-body)",
+                "fontSize": "0.82rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-secondary)",
+                "margin": "0 0 1.6rem"
               },
-              "textContent": "${state.eyebrow}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "1.4rem",
+                    "height": "1.4rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-primary-soft)",
+                    "color": "var(--color-primary)",
+                    "fontSize": "0.8rem"
+                  },
+                  "textContent": "🌱"
+                },
+                { "tagName": "span", "textContent": "${state.eyebrow}" }
+              ]
             },
             {
               "tagName": "h1",
               "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "clamp(2.5rem, 6vw, 4.25rem)",
-                "fontWeight": "700",
-                "lineHeight": "1.08",
-                "margin": "0 0 1.25rem",
-                "letterSpacing": "-0.02em"
+                "fontFamily": "var(--font-display)",
+                "fontSize": "clamp(2.6rem, 6vw, 4.6rem)",
+                "fontWeight": "600",
+                "lineHeight": "1.02",
+                "letterSpacing": "-0.02em",
+                "margin": "0 0 1.4rem",
+                "color": "var(--color-primary-deep)"
               },
-              "textContent": "${state.heading}"
+              "children": [
+                { "tagName": "span", "textContent": "${state.heading} " },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontStyle": "italic",
+                    "fontWeight": "500",
+                    "color": "var(--color-accent)"
+                  },
+                  "textContent": "${state.headingAccent}"
+                },
+                { "tagName": "span", "textContent": "${state.headingTail}" }
+              ]
             },
             {
               "tagName": "p",
               "style": {
-                "fontSize": "clamp(1.1rem, 2vw, 1.35rem)",
-                "lineHeight": "1.6",
+                "fontSize": "clamp(1.08rem, 1.6vw, 1.28rem)",
+                "lineHeight": "1.65",
+                "color": "var(--color-text-secondary)",
                 "margin": "0 0 2rem",
-                "opacity": "0.94",
-                "maxWidth": "50ch"
+                "maxWidth": "46ch"
               },
               "textContent": "${state.subheading}"
             },
             {
               "tagName": "div",
-              "style": { "display": "flex", "gap": "0.75rem", "flexWrap": "wrap" },
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.9rem",
+                "flexWrap": "wrap"
+              },
               "children": [
                 {
                   "tagName": "a",
                   "attributes": { "href": "${state.ctaHref}" },
                   "style": {
-                    "display": "inline-block",
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
                     "backgroundColor": "var(--color-accent)",
                     "color": "var(--color-text-white)",
-                    "padding": "0.9rem 2.25rem",
+                    "padding": "1rem 2.25rem",
                     "borderRadius": "999px",
                     "fontSize": "1.05rem",
-                    "fontWeight": "600",
+                    "fontWeight": "800",
                     "textDecoration": "none",
-                    "boxShadow": "0 8px 24px rgba(234,88,12,0.35)",
+                    "boxShadow": "0 16px 34px -14px rgba(242,106,61,0.8)",
                     "transition": "background-color 0.15s, transform 0.15s",
                     ":hover": {
                       "backgroundColor": "var(--color-accent-hover)",
-                      "transform": "translateY(-1px)"
+                      "transform": "translateY(-2px)"
                     }
                   },
-                  "textContent": "${state.cta}"
+                  "children": [
+                    { "tagName": "span", "style": { "fontSize": "0.95rem" }, "textContent": "❤" },
+                    { "tagName": "span", "textContent": "${state.cta}" }
+                  ]
                 },
                 {
                   "tagName": "a",
                   "attributes": { "href": "${state.cta2Href}" },
                   "style": {
-                    "display": "${state.cta2 ? 'inline-block' : 'none'}",
-                    "border": "1px solid rgba(255,255,255,0.6)",
-                    "color": "var(--color-text-white)",
-                    "padding": "0.9rem 2rem",
+                    "display": "${state.cta2 ? 'inline-flex' : 'none'}",
+                    "alignItems": "center",
+                    "gap": "0.5rem",
+                    "backgroundColor": "var(--color-bg-white)",
+                    "border": "1px solid var(--color-border-strong)",
+                    "color": "var(--color-primary-deep)",
+                    "padding": "1rem 1.75rem",
                     "borderRadius": "999px",
                     "fontSize": "1.05rem",
-                    "fontWeight": "600",
+                    "fontWeight": "800",
                     "textDecoration": "none",
-                    "transition": "background-color 0.15s",
-                    ":hover": { "backgroundColor": "rgba(255,255,255,0.14)" }
+                    "transition": "border-color 0.15s, transform 0.15s",
+                    ":hover": {
+                      "borderColor": "var(--color-primary)",
+                      "transform": "translateY(-2px)"
+                    }
                   },
-                  "textContent": "${state.cta2}"
+                  "textContent": "${state.cta2} →"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "1.25rem",
+                "flexWrap": "wrap",
+                "marginTop": "2rem",
+                "fontFamily": "var(--font-body)",
+                "fontSize": "0.9rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-secondary)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": { "display": "inline-flex", "alignItems": "center", "gap": "0.45rem" },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-primary)", "fontSize": "1rem" },
+                      "textContent": "✔"
+                    },
+                    { "tagName": "span", "textContent": "94¢ of every $1 to programs" }
+                  ]
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.35rem",
+                    "height": "0.35rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-border-strong)",
+                    "@--sm": { "display": "none" }
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": { "display": "inline-flex", "alignItems": "center", "gap": "0.45rem" },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": { "color": "var(--color-primary)", "fontSize": "1rem" },
+                      "textContent": "✔"
+                    },
+                    { "tagName": "span", "textContent": "501(c)(3) since 2007" }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "position": "relative",
+            "@--md": { "maxWidth": "460px", "margin": "0 auto", "width": "100%" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "position": "absolute",
+                "inset": "1.25rem -1rem -1.25rem 1.25rem",
+                "borderRadius": "58% 42% 46% 54% / 55% 52% 48% 45%",
+                "backgroundColor": "var(--color-primary)",
+                "opacity": "0.14"
+              }
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "position": "relative",
+                "aspectRatio": "1 / 1",
+                "borderRadius": "56% 44% 47% 53% / 55% 50% 50% 45%",
+                "overflow": "hidden",
+                "boxShadow": "var(--shadow-float)",
+                "border": "6px solid var(--color-bg-white)"
+              },
+              "children": [
+                {
+                  "tagName": "img",
+                  "attributes": {
+                    "src": "${state.bg}",
+                    "alt": "Rivertown Foundation volunteers helping neighbors"
+                  },
+                  "style": {
+                    "position": "absolute",
+                    "inset": "0",
+                    "width": "100%",
+                    "height": "100%",
+                    "objectFit": "cover",
+                    "display": "block"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "position": "absolute",
+                "left": "-0.5rem",
+                "bottom": "1.5rem",
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "0.85rem",
+                "padding": "0.85rem 1.25rem 0.85rem 0.9rem",
+                "backgroundColor": "var(--color-bg-white)",
+                "borderRadius": "1.25rem",
+                "boxShadow": "var(--shadow-card)",
+                "@--sm": { "left": "0.5rem", "bottom": "0.75rem" }
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "width": "2.9rem",
+                    "height": "2.9rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-gold-soft)",
+                    "fontSize": "1.35rem"
+                  },
+                  "textContent": "🤝"
+                },
+                {
+                  "tagName": "span",
+                  "style": { "display": "flex", "flexDirection": "column", "lineHeight": "1.1" },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontFamily": "var(--font-display)",
+                        "fontSize": "1.5rem",
+                        "fontWeight": "700",
+                        "color": "var(--color-primary-deep)"
+                      },
+                      "textContent": "${state.badgeNumber}"
+                    },
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "fontSize": "0.78rem",
+                        "fontWeight": "700",
+                        "color": "var(--color-text-muted)",
+                        "maxWidth": "12ch"
+                      },
+                      "textContent": "${state.badgeLabel}"
+                    }
+                  ]
                 }
               ]
             }

@@ -2,15 +2,15 @@
   "tagName": "bl-footer",
   "state": {
     "brand": "The Long Field",
-    "tagline": "Essays and field notes on design, technology, and the craft of making things well.",
+    "tagline": "Slow essays on design, technology, and the craft of making things well.",
     "email": "hello@thelongfield.co",
     "cadence": "A new essay most Sundays."
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-dark)",
-    "color": "var(--color-text-white)",
-    "padding": "3.5rem 1.5rem 2rem"
+    "backgroundColor": "var(--color-paper)",
+    "borderTop": "1.5px solid var(--color-rule)",
+    "padding": "clamp(3rem, 6vw, 4.5rem) 1.5rem 2.5rem"
   },
   "children": [
     {
@@ -18,67 +18,67 @@
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "display": "grid",
-        "gridTemplateColumns": "2fr 1fr 1fr",
-        "gap": "2.5rem",
-        "@--md": { "gridTemplateColumns": "1fr" }
+        "textAlign": "center"
       },
       "children": [
         {
           "tagName": "div",
-          "children": [
-            {
-              "tagName": "div",
-              "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.4rem",
-                "fontWeight": "600",
-                "marginBottom": "0.75rem"
-              },
-              "textContent": "${state.brand}"
-            },
-            {
-              "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.75", "maxWidth": "40ch" },
-              "textContent": "${state.tagline}"
-            }
-          ]
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontWeight": "900",
+            "fontSize": "clamp(2rem, 6vw, 3.25rem)",
+            "letterSpacing": "-0.03em",
+            "lineHeight": "1",
+            "margin": "0 0 1rem",
+            "color": "var(--color-text-primary)"
+          },
+          "textContent": "${state.brand}"
         },
         {
-          "tagName": "div",
+          "tagName": "p",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontStyle": "italic",
+            "fontSize": "1.15rem",
+            "color": "var(--color-text-muted)",
+            "margin": "0 auto 1.75rem",
+            "maxWidth": "42ch"
+          },
+          "textContent": "${state.tagline}"
+        },
+        {
+          "tagName": "nav",
+          "style": {
+            "display": "flex",
+            "justifyContent": "center",
+            "flexWrap": "wrap",
+            "gap": "1.75rem",
+            "paddingTop": "1.75rem",
+            "borderTop": "1px solid var(--color-border)",
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.74rem",
+            "fontWeight": "500",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.16em"
+          },
           "children": [
             {
-              "tagName": "div",
-              "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
-              },
-              "textContent": "Read"
-            },
-            {
               "tagName": "a",
-              "attributes": { "href": "/" },
+              "attributes": { "href": "/#latest" },
               "style": {
-                "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "color": "var(--color-text-primary)",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                ":hover": { "color": "var(--color-primary)" }
               },
-              "textContent": "Writing"
+              "textContent": "Essays"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/about/" },
               "style": {
-                "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "color": "var(--color-text-primary)",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                ":hover": { "color": "var(--color-primary)" }
               },
               "textContent": "About"
             },
@@ -86,58 +86,35 @@
               "tagName": "a",
               "attributes": { "href": "/contact/" },
               "style": {
-                "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
-                "textDecoration": "none"
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                ":hover": { "color": "var(--color-primary)" }
               },
-              "textContent": "Subscribe"
+              "textContent": "Contact"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "mailto:${state.email}" },
+              "style": {
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "${state.email}"
             }
           ]
         },
         {
-          "tagName": "div",
-          "children": [
-            {
-              "tagName": "div",
-              "style": {
-                "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
-              },
-              "textContent": "Elsewhere"
-            },
-            {
-              "tagName": "p",
-              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
-              "textContent": "${state.email}"
-            },
-            {
-              "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.85" },
-              "textContent": "${state.cadence}"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "tagName": "div",
-      "style": {
-        "maxWidth": "var(--max-width)",
-        "margin": "2.5rem auto 0",
-        "paddingTop": "1.5rem",
-        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
-        "fontSize": "0.85rem",
-        "opacity": "0.6"
-      },
-      "children": [
-        {
           "tagName": "p",
-          "style": { "margin": "0" },
-          "textContent": "© The Long Field. Built with Jx."
+          "style": {
+            "margin": "1.75rem 0 0",
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.72rem",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.14em",
+            "color": "var(--color-text-muted)"
+          },
+          "textContent": "© The Long Field · Set in Fraunces & Newsreader · Built with Jx"
         }
       ]
     }

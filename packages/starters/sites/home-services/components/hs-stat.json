@@ -1,0 +1,54 @@
+{
+  "tagName": "hs-stat",
+  "state": {
+    "value": "",
+    "label": "",
+    "icon": ""
+  },
+  "style": {
+    "display": "block",
+    "position": "relative",
+    "padding": "0.5rem 1.5rem 0.5rem 0",
+    "@--sm": { "padding": "0.5rem 0" }
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "${state.icon ? 'block' : 'none'}",
+        "fontSize": "1.4rem",
+        "lineHeight": "1",
+        "marginBottom": "0.6rem",
+        "opacity": "0.85"
+      },
+      "textContent": "${state.icon}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "clamp(2.6rem, 5.2vw, 3.7rem)",
+        "fontWeight": "700",
+        "lineHeight": "0.95",
+        "letterSpacing": "0.01em",
+        "color": "var(--color-primary)",
+        "fontVariantNumeric": "tabular-nums"
+      },
+      "textContent": "${state.value}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "marginTop": "0.6rem",
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "0.86rem",
+        "fontWeight": "500",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.08em",
+        "color": "var(--color-text-steel-muted)",
+        "lineHeight": "1.35"
+      },
+      "textContent": "${state.label}"
+    }
+  ]
+}

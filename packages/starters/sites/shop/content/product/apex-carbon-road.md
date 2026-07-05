@@ -3,6 +3,7 @@ title: Apex Carbon Road
 sku: apex-carbon-road
 price: $3,299
 category: Road
+badge: Bestseller
 image: /images/product-1.jpg
 order: 1
 ---

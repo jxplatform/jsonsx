@@ -1,17 +1,18 @@
 {
   "tagName": "pf-footer",
   "state": {
-    "brand": "Meridian Advisory",
-    "tagline": "Accounting, tax, and advisory for founders and growing companies.",
-    "address": "410 Corniche Plaza, Suite 900, Harborview",
+    "brand": "Meridian",
+    "sub": "Advisory",
+    "tagline": "Tax, assurance, and CFO counsel for founders and growing companies — since 2007.",
+    "address": "410 Corniche Plaza, Suite 900 · Harborview, NY 10014",
     "phone": "(555) 204-8830",
     "email": "hello@meridianadvisory.com"
   },
   "style": {
     "display": "block",
-    "backgroundColor": "var(--color-bg-dark)",
+    "backgroundColor": "var(--color-ink-deep)",
     "color": "var(--color-text-white)",
-    "padding": "3.5rem 1.5rem 2rem"
+    "borderTop": "3px solid var(--color-accent)"
   },
   "children": [
     {
@@ -19,10 +20,11 @@
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
+        "padding": "clamp(3rem, 6vw, 4.5rem) 1.5rem 2rem",
         "display": "grid",
-        "gridTemplateColumns": "2fr 1fr 1fr",
+        "gridTemplateColumns": "1.6fr 1fr 1fr",
         "gap": "2.5rem",
-        "@--md": { "gridTemplateColumns": "1fr" }
+        "@--md": { "gridTemplateColumns": "1fr", "gap": "2rem" }
       },
       "children": [
         {
@@ -31,16 +33,45 @@
             {
               "tagName": "div",
               "style": {
-                "fontFamily": "var(--font-heading)",
-                "fontSize": "1.4rem",
-                "fontWeight": "700",
-                "marginBottom": "0.75rem"
+                "display": "flex",
+                "alignItems": "baseline",
+                "gap": "0.55rem",
+                "marginBottom": "1rem"
               },
-              "textContent": "${state.brand}"
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-serif)",
+                    "fontSize": "1.7rem",
+                    "fontWeight": "600",
+                    "letterSpacing": "-0.01em"
+                  },
+                  "textContent": "${state.brand}"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-sans)",
+                    "fontSize": "0.68rem",
+                    "fontWeight": "600",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.28em",
+                    "color": "var(--color-accent)"
+                  },
+                  "textContent": "${state.sub}"
+                }
+              ]
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.75", "maxWidth": "36ch" },
+              "style": {
+                "margin": "0",
+                "maxWidth": "34ch",
+                "color": "rgba(244,241,233,0.7)",
+                "fontSize": "0.95rem",
+                "lineHeight": "1.65"
+              },
               "textContent": "${state.tagline}"
             }
           ]
@@ -51,27 +82,40 @@
             {
               "tagName": "div",
               "style": {
+                "fontFamily": "var(--font-sans)",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.18em",
+                "fontSize": "0.68rem",
+                "fontWeight": "600",
+                "color": "var(--color-accent)",
+                "paddingBottom": "0.75rem",
+                "marginBottom": "0.9rem",
+                "borderBottom": "1px solid rgba(244,241,233,0.16)"
               },
               "textContent": "Office"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "style": {
+                "margin": "0 0 0.4rem",
+                "color": "rgba(244,241,233,0.82)",
+                "fontSize": "0.9rem",
+                "lineHeight": "1.6"
+              },
               "textContent": "${state.address}"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "style": {
+                "margin": "0 0 0.25rem",
+                "color": "rgba(244,241,233,0.82)",
+                "fontSize": "0.9rem"
+              },
               "textContent": "${state.phone}"
             },
             {
               "tagName": "p",
-              "style": { "margin": "0", "opacity": "0.85" },
+              "style": { "margin": "0", "color": "rgba(244,241,233,0.82)", "fontSize": "0.9rem" },
               "textContent": "${state.email}"
             }
           ]
@@ -82,11 +126,15 @@
             {
               "tagName": "div",
               "style": {
+                "fontFamily": "var(--font-sans)",
                 "textTransform": "uppercase",
-                "letterSpacing": "0.08em",
-                "fontSize": "0.75rem",
-                "opacity": "0.6",
-                "marginBottom": "0.75rem"
+                "letterSpacing": "0.18em",
+                "fontSize": "0.68rem",
+                "fontWeight": "600",
+                "color": "var(--color-accent)",
+                "paddingBottom": "0.75rem",
+                "marginBottom": "0.9rem",
+                "borderBottom": "1px solid rgba(244,241,233,0.16)"
               },
               "textContent": "Firm"
             },
@@ -95,45 +143,53 @@
               "attributes": { "href": "/services/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "color": "rgba(244,241,233,0.82)",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "fontSize": "0.9rem",
+                "marginBottom": "0.5rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent)" }
               },
-              "textContent": "Services"
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/team/" },
-              "style": {
-                "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
-                "textDecoration": "none",
-                "marginBottom": "0.35rem"
-              },
-              "textContent": "Team"
+              "textContent": "Practice areas"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/insights/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
+                "color": "rgba(244,241,233,0.82)",
                 "textDecoration": "none",
-                "marginBottom": "0.35rem"
+                "fontSize": "0.9rem",
+                "marginBottom": "0.5rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent)" }
               },
-              "textContent": "Insights"
+              "textContent": "The Quarterly"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/team/" },
+              "style": {
+                "display": "block",
+                "color": "rgba(244,241,233,0.82)",
+                "textDecoration": "none",
+                "fontSize": "0.9rem",
+                "marginBottom": "0.5rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent)" }
+              },
+              "textContent": "People"
             },
             {
               "tagName": "a",
               "attributes": { "href": "/contact/" },
               "style": {
                 "display": "block",
-                "color": "var(--color-text-white)",
-                "opacity": "0.85",
-                "textDecoration": "none"
+                "color": "rgba(244,241,233,0.82)",
+                "textDecoration": "none",
+                "fontSize": "0.9rem",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-accent)" }
               },
               "textContent": "Contact"
             }
@@ -145,11 +201,14 @@
       "tagName": "div",
       "style": {
         "maxWidth": "var(--max-width)",
-        "margin": "2.5rem auto 0",
-        "paddingTop": "1.5rem",
-        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
-        "fontSize": "0.85rem",
-        "opacity": "0.6",
+        "margin": "0 auto",
+        "padding": "1.5rem",
+        "borderTop": "1px solid rgba(244,241,233,0.16)",
+        "fontFamily": "var(--font-sans)",
+        "fontSize": "0.72rem",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.12em",
+        "color": "rgba(244,241,233,0.5)",
         "display": "flex",
         "justifyContent": "space-between",
         "gap": "1rem",
@@ -159,12 +218,12 @@
         {
           "tagName": "p",
           "style": { "margin": "0" },
-          "textContent": "© Meridian Advisory. Built with Jx."
+          "textContent": "© Meridian Advisory · Registered CPAs"
         },
         {
           "tagName": "p",
           "style": { "margin": "0" },
-          "textContent": "Registered CPAs · Member, State Society of Accountants"
+          "textContent": "Member, State Society of Accountants"
         }
       ]
     }

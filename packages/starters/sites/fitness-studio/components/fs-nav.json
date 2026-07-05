@@ -1,15 +1,15 @@
 {
   "tagName": "fs-nav",
   "state": {
-    "brand": "Ember Yoga & Fitness"
+    "brand": "EMBER"
   },
   "style": {
     "display": "block",
     "position": "sticky",
     "top": "0",
     "zIndex": "50",
-    "backgroundColor": "rgba(255, 255, 255, 0.9)",
-    "backdropFilter": "blur(8px)",
+    "backgroundColor": "rgba(255,255,255,0.82)",
+    "backdropFilter": "blur(12px)",
     "borderBottom": "1px solid var(--color-border)"
   },
   "children": [
@@ -18,7 +18,7 @@
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "padding": "1rem 1.5rem",
+        "padding": "0.85rem 1.5rem",
         "display": "flex",
         "alignItems": "center",
         "justifyContent": "space-between",
@@ -29,21 +29,42 @@
           "tagName": "a",
           "attributes": { "href": "/" },
           "style": {
-            "fontFamily": "var(--font-heading)",
-            "fontSize": "1.35rem",
-            "fontWeight": "700",
-            "color": "var(--color-text-primary)",
-            "textDecoration": "none",
-            "letterSpacing": "-0.01em"
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "0.6rem",
+            "textDecoration": "none"
           },
-          "textContent": "${state.brand}"
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "width": "1.6rem",
+                "height": "1.6rem",
+                "borderRadius": "50%",
+                "background": "var(--grad)",
+                "boxShadow": "0 0 0 4px rgba(255,46,99,0.14)",
+                "flexShrink": "0"
+              }
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-display)",
+                "fontSize": "1.5rem",
+                "letterSpacing": "0.02em",
+                "color": "var(--color-text-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.brand}"
+            }
+          ]
         },
         {
           "tagName": "nav",
           "style": {
             "display": "flex",
             "alignItems": "center",
-            "gap": "1.75rem",
+            "gap": "1.9rem",
             "@--sm": { "gap": "1rem" }
           },
           "children": [
@@ -53,11 +74,13 @@
               "style": {
                 "color": "var(--color-text-primary)",
                 "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
+                "fontWeight": "600",
+                "fontSize": "0.82rem",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.1em",
                 ":hover": { "color": "var(--color-primary)" }
               },
-              "textContent": "Classes"
+              "textContent": "Schedule"
             },
             {
               "tagName": "a",
@@ -65,8 +88,10 @@
               "style": {
                 "color": "var(--color-text-primary)",
                 "textDecoration": "none",
-                "fontWeight": "500",
-                "fontSize": "0.95rem",
+                "fontWeight": "600",
+                "fontSize": "0.82rem",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.1em",
                 "@--sm": { "display": "none" },
                 ":hover": { "color": "var(--color-primary)" }
               },
@@ -77,15 +102,21 @@
               "attributes": { "href": "/contact/" },
               "style": {
                 "display": "inline-block",
-                "backgroundColor": "var(--color-primary)",
+                "background": "var(--grad-hot)",
                 "color": "var(--color-text-white)",
-                "padding": "0.55rem 1.25rem",
-                "borderRadius": "var(--radius)",
+                "padding": "0.6rem 1.4rem",
+                "borderRadius": "999px",
                 "textDecoration": "none",
-                "fontWeight": "600",
-                "fontSize": "0.95rem",
-                "transition": "background-color 0.15s",
-                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                "fontWeight": "700",
+                "fontSize": "0.82rem",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "boxShadow": "0 8px 22px -8px rgba(255,46,99,0.6)",
+                "transition": "transform 0.15s, box-shadow 0.15s",
+                ":hover": {
+                  "transform": "translateY(-2px)",
+                  "boxShadow": "0 14px 30px -8px rgba(255,46,99,0.7)"
+                }
               },
               "textContent": "Book a Class"
             }

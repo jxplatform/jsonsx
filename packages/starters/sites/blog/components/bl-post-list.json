@@ -1,17 +1,10 @@
 {
   "tagName": "bl-post-list",
-  "state": {
-    "columns": "3"
-  },
   "style": {
-    "display": "grid",
-    "gridTemplateColumns": "repeat(3, 1fr)",
-    "gap": "1.75rem",
+    "display": "block",
     "maxWidth": "var(--max-width)",
     "margin": "0 auto",
-    "padding": "0 1.5rem",
-    "@--md": { "gridTemplateColumns": "repeat(2, 1fr)" },
-    "@--sm": { "gridTemplateColumns": "1fr" }
+    "borderTop": "1.5px solid var(--color-rule)"
   },
   "children": [{ "tagName": "slot" }]
 }

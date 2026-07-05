@@ -1,20 +1,58 @@
 {
   "tagName": "bit-reservation",
   "state": {
-    "heading": "Request a table"
+    "heading": "Request a table",
+    "intro": "Tell us when you'd like to come in and we'll confirm by email within a day."
   },
   "style": {
-    "display": "block"
+    "display": "block",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "padding": "clamp(1.75rem, 3.5vw, 2.75rem)",
+    "boxShadow": "0 24px 60px -40px rgba(30,21,15,0.5)",
+    "& input": {
+      "width": "100%",
+      "padding": "0.8rem 0.95rem",
+      "border": "1px solid var(--color-border-strong)",
+      "borderRadius": "var(--radius)",
+      "fontSize": "1rem",
+      "fontFamily": "var(--font-body)",
+      "backgroundColor": "var(--color-bg-paper)",
+      "color": "var(--color-text-primary)"
+    },
+    "& input:focus": {
+      "outline": "none",
+      "borderColor": "var(--color-primary)"
+    },
+    "& textarea:focus": {
+      "outline": "none",
+      "borderColor": "var(--color-primary)"
+    }
   },
   "children": [
     {
       "tagName": "h3",
       "style": {
         "fontFamily": "var(--font-heading)",
-        "fontSize": "1.6rem",
-        "margin": "0 0 1.25rem"
+        "fontSize": "clamp(1.65rem, 3vw, 2rem)",
+        "fontWeight": "700",
+        "letterSpacing": "-0.01em",
+        "margin": "0 0 0.5rem",
+        "color": "var(--color-text-primary)"
       },
       "textContent": "${state.heading}"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "margin": "0 0 1.5rem",
+        "fontFamily": "var(--font-heading)",
+        "fontStyle": "italic",
+        "fontSize": "1.05rem",
+        "color": "var(--color-text-muted)"
+      },
+      "textContent": "${state.intro}"
     },
     {
       "tagName": "form",
@@ -29,13 +67,6 @@
             "placeholder": "Your name",
             "required": "true",
             "aria-label": "Your name"
-          },
-          "style": {
-            "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem"
           }
         },
         {
@@ -46,13 +77,6 @@
             "placeholder": "Email address",
             "required": "true",
             "aria-label": "Email address"
-          },
-          "style": {
-            "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem"
           }
         },
         {
@@ -61,14 +85,7 @@
           "children": [
             {
               "tagName": "input",
-              "attributes": { "type": "date", "name": "date", "aria-label": "Preferred date" },
-              "style": {
-                "width": "100%",
-                "padding": "0.75rem 0.9rem",
-                "border": "1px solid var(--color-border)",
-                "borderRadius": "var(--radius)",
-                "fontSize": "1rem"
-              }
+              "attributes": { "type": "date", "name": "date", "aria-label": "Preferred date" }
             },
             {
               "tagName": "input",
@@ -79,13 +96,6 @@
                 "max": "20",
                 "placeholder": "Party size",
                 "aria-label": "Party size"
-              },
-              "style": {
-                "width": "100%",
-                "padding": "0.75rem 0.9rem",
-                "border": "1px solid var(--color-border)",
-                "borderRadius": "var(--radius)",
-                "fontSize": "1rem"
               }
             }
           ]
@@ -100,11 +110,13 @@
           },
           "style": {
             "width": "100%",
-            "padding": "0.75rem 0.9rem",
-            "border": "1px solid var(--color-border)",
+            "padding": "0.8rem 0.95rem",
+            "border": "1px solid var(--color-border-strong)",
             "borderRadius": "var(--radius)",
             "fontSize": "1rem",
-            "fontFamily": "inherit"
+            "fontFamily": "var(--font-body)",
+            "backgroundColor": "var(--color-bg-paper)",
+            "color": "var(--color-text-primary)"
           }
         },
         {
@@ -114,18 +126,27 @@
           "style": {
             "backgroundColor": "var(--color-primary)",
             "color": "var(--color-text-white)",
-            "padding": "0.85rem 1.5rem",
+            "padding": "0.9rem 1.75rem",
             "border": "none",
-            "borderRadius": "var(--radius)",
-            "fontSize": "1rem",
-            "fontWeight": "600",
+            "borderRadius": "999px",
+            "fontFamily": "var(--font-body)",
+            "fontSize": "0.85rem",
+            "fontWeight": "700",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.14em",
             "cursor": "pointer",
-            "justifySelf": "start"
+            "justifySelf": "start",
+            "transition": "background-color 0.15s",
+            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
           }
         },
         {
           "tagName": "p",
-          "style": { "fontSize": "0.85rem", "color": "var(--color-text-muted)", "margin": "0" },
+          "style": {
+            "fontSize": "0.85rem",
+            "color": "var(--color-text-muted)",
+            "margin": "0"
+          },
           "textContent": "This is a demo form. Wire it to your booking provider or email in pages/contact.md."
         }
       ]

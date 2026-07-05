@@ -9,7 +9,7 @@
   "style": {
     "display": "grid",
     "gridTemplateColumns": "auto 1fr",
-    "gap": "clamp(1.5rem, 4vw, 2.5rem)",
+    "gap": "clamp(1.75rem, 4vw, 2.75rem)",
     "alignItems": "center",
     "maxWidth": "var(--max-width-narrow)",
     "margin": "0 auto",
@@ -17,25 +17,54 @@
     "backgroundColor": "var(--color-bg-white)",
     "border": "1px solid var(--color-border)",
     "borderRadius": "var(--radius)",
-    "boxShadow": "0 12px 40px rgba(15,23,42,0.06)",
+    "boxShadow": "0 24px 60px -32px rgba(15,20,36,0.35)",
     "@--sm": { "gridTemplateColumns": "1fr", "textAlign": "center", "justifyItems": "center" }
   },
   "children": [
     {
-      "tagName": "img",
-      "attributes": {
-        "src": "${state.image}",
-        "alt": "${state.name}",
-        "loading": "lazy"
-      },
-      "style": {
-        "width": "140px",
-        "height": "140px",
-        "objectFit": "cover",
-        "borderRadius": "50%",
-        "border": "4px solid rgba(37,99,235,0.15)",
-        "display": "block"
-      }
+      "tagName": "div",
+      "style": { "position": "relative", "flex": "none" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "position": "absolute",
+            "inset": "-0.6rem -0.6rem 0.4rem 0.4rem",
+            "borderRadius": "0.9rem",
+            "backgroundColor": "var(--color-indigo-050)",
+            "border": "1px solid var(--color-indigo-line)"
+          }
+        },
+        {
+          "tagName": "img",
+          "attributes": {
+            "src": "${state.image}",
+            "alt": "${state.name}",
+            "loading": "lazy"
+          },
+          "style": {
+            "position": "relative",
+            "width": "155px",
+            "height": "185px",
+            "objectFit": "cover",
+            "borderRadius": "0.7rem",
+            "display": "block",
+            "border": "1px solid var(--color-border)"
+          }
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "position": "relative",
+            "marginTop": "0.65rem",
+            "textAlign": "center",
+            "fontFamily": "var(--font-mono)",
+            "fontSize": "0.72rem",
+            "color": "var(--color-text-faint)"
+          },
+          "textContent": "// lead instructor"
+        }
+      ]
     },
     {
       "tagName": "div",
@@ -44,31 +73,85 @@
           "tagName": "h3",
           "style": {
             "fontFamily": "var(--font-heading)",
-            "fontSize": "1.5rem",
+            "fontSize": "1.55rem",
             "fontWeight": "800",
-            "margin": "0 0 0.25rem"
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 0.3rem",
+            "color": "var(--color-text-primary)"
           },
           "textContent": "${state.name}"
         },
         {
           "tagName": "div",
           "style": {
+            "fontFamily": "var(--font-mono)",
             "color": "var(--color-primary)",
-            "fontWeight": "600",
-            "fontSize": "0.95rem",
-            "marginBottom": "0.85rem"
+            "fontWeight": "500",
+            "fontSize": "0.85rem",
+            "marginBottom": "0.95rem"
           },
           "textContent": "${state.role}"
         },
         {
           "tagName": "p",
           "style": {
-            "margin": "0",
+            "margin": "0 0 1.25rem",
             "color": "var(--color-text-muted)",
             "fontSize": "1rem",
             "lineHeight": "1.7"
           },
           "textContent": "${state.bio}"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "flexWrap": "wrap",
+            "gap": "0.5rem",
+            "justifyContent": "${state.name ? 'flex-start' : 'flex-start'}",
+            "@--sm": { "justifyContent": "center" }
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.75rem",
+                "color": "var(--color-text-primary)",
+                "backgroundColor": "var(--color-bg-cream)",
+                "border": "1px solid var(--color-border)",
+                "padding": "0.3rem 0.7rem",
+                "borderRadius": "0.5rem"
+              },
+              "textContent": "10+ yrs shipping"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.75rem",
+                "color": "var(--color-text-primary)",
+                "backgroundColor": "var(--color-bg-cream)",
+                "border": "1px solid var(--color-border)",
+                "padding": "0.3rem 0.7rem",
+                "borderRadius": "0.5rem"
+              },
+              "textContent": "mentored 500+ devs"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.75rem",
+                "color": "var(--color-text-primary)",
+                "backgroundColor": "var(--color-bg-cream)",
+                "border": "1px solid var(--color-border)",
+                "padding": "0.3rem 0.7rem",
+                "borderRadius": "0.5rem"
+              },
+              "textContent": "ex-Staff Engineer"
+            }
+          ]
         }
       ]
     }

@@ -10,7 +10,9 @@
     "padding": "1.75rem",
     "backgroundColor": "var(--color-bg-white)",
     "borderRadius": "var(--radius)",
-    "border": "1px solid var(--color-border)"
+    "border": "1px solid var(--color-border)",
+    "transition": "transform 0.2s, box-shadow 0.2s",
+    ":hover": { "transform": "translateY(-3px)", "boxShadow": "var(--shadow-card)" }
   },
   "children": [
     {
@@ -21,10 +23,11 @@
         "justifyContent": "center",
         "width": "3rem",
         "height": "3rem",
-        "borderRadius": "0.75rem",
-        "backgroundColor": "var(--color-bg-cream)",
-        "fontSize": "1.5rem",
-        "marginBottom": "1rem",
+        "borderRadius": "0.7rem",
+        "backgroundColor": "var(--color-teal-tint)",
+        "border": "1px solid var(--color-accent-soft)",
+        "fontSize": "1.4rem",
+        "marginBottom": "1.1rem",
         "lineHeight": "1"
       },
       "textContent": "${state.icon}"
@@ -33,8 +36,9 @@
       "tagName": "h3",
       "style": {
         "fontFamily": "var(--font-heading)",
-        "fontSize": "1.2rem",
+        "fontSize": "1.15rem",
         "fontWeight": "700",
+        "letterSpacing": "-0.01em",
         "margin": "0 0 0.5rem"
       },
       "textContent": "${state.title}"

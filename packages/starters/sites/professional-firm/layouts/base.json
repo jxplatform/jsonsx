@@ -8,7 +8,7 @@
     "minHeight": "100vh",
     "display": "flex",
     "flexDirection": "column",
-    "backgroundColor": "var(--color-bg-white)"
+    "backgroundColor": "var(--color-paper)"
   },
   "children": [
     { "tagName": "pf-nav" },
