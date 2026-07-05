@@ -195,6 +195,7 @@ console.log(`[chromium] Launching: ${chromiumBin}`);
 
 const chromiumArgs = [
   `--app=${serverUrl}/__studio__/index.html?token=${rpcToken}`,
+  "--class=jx-studio",
   "--no-first-run",
   "--no-default-browser-check",
   "--window-size=1400,900",
