@@ -5,7 +5,7 @@ import type { CapturedStyle } from "../src/style-capture.ts";
 const captureWidths: number[] = [];
 let capturesByWidth = new Map<number, CapturedStyle[]>();
 
-mock.module("../src/style-capture.ts", () => ({
+void mock.module("../src/style-capture.ts", () => ({
   captureStylesAtWidth: (_page: Page, width: number): Promise<CapturedStyle[]> => {
     captureWidths.push(width);
     return Promise.resolve(capturesByWidth.get(width) ?? []);
