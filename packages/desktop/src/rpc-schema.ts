@@ -418,6 +418,15 @@ export interface StudioRPC {
         params: { projects: RecentProjectEntry[] };
         response: void;
       };
+      // User settings (process-shared, user-level store)
+      getSettings: {
+        params: void;
+        response: Record<string, string>;
+      };
+      saveSettings: {
+        params: { settings: Record<string, string> };
+        response: void;
+      };
     };
     messages: Record<string, never>;
   }>;

@@ -9,6 +9,8 @@
  * @license MIT
  */
 
+import { persistSettings } from "./settings-store";
+
 const KEY_STORAGE = "jx.ai.openaiKey";
 const BASE_URL_STORAGE = "jx.ai.baseUrl";
 const MODEL_STORAGE = "jx.ai.model";
@@ -36,6 +38,7 @@ export function setOpenAiKey(key: string) {
     } else {
       globalThis.localStorage?.removeItem(KEY_STORAGE);
     }
+    persistSettings();
   } catch {
     /* LocalStorage unavailable — settings are not persisted. */
   }
@@ -71,6 +74,7 @@ export function setBaseUrl(url: string) {
     } else {
       globalThis.localStorage?.removeItem(BASE_URL_STORAGE);
     }
+    persistSettings();
   } catch {
     /* LocalStorage unavailable — settings are not persisted. */
   }
@@ -101,6 +105,7 @@ export function setModel(modelId: string) {
     } else {
       globalThis.localStorage?.removeItem(MODEL_STORAGE);
     }
+    persistSettings();
   } catch {
     /* LocalStorage unavailable — settings are not persisted. */
   }

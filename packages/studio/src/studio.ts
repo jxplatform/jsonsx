@@ -127,6 +127,7 @@ import {
 import { initCssData } from "./panels/style-utils";
 import { initQuickSearch } from "./panels/quick-search";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
+import { hydrateSettings } from "./services/settings-store";
 import { initWelcome } from "./panels/welcome-screen";
 import { openNewProjectModal } from "./new-project/new-project-modal";
 import type { DocumentStackEntry, GitDiffState } from "./types";
@@ -740,6 +741,13 @@ if (_projectParam) {
 // oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: hydration must not block initial render
 void hydrateRecentProjects().then(() => {
   toolbarPanel.render();
+  render();
+});
+
+// Hydrate user settings (AI connection parameters) from the backend store, then re-render so
+// Key-gated surfaces (assistant gate, New Project Import/Agent tabs) see the stored key.
+// oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: hydration must not block initial render
+void hydrateSettings().then(() => {
   render();
 });
 

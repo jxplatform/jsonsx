@@ -138,6 +138,15 @@ const createPackageOps = mock(() => {
 });
 void mock.module("../src/packages", () => ({ createPackageOps }));
 
+// ─── Mock the user-level settings store ──────────────────────────────────────
+
+const readSettingsMock = mock(async () => ({ aiApiKey: "sk-abc" }));
+const writeSettingsMock = mock(async (_settings: Record<string, string>) => {});
+void mock.module("../src/settings-store", () => ({
+  readSettings: readSettingsMock,
+  writeSettings: writeSettingsMock,
+}));
+
 // ─── Mock updater ────────────────────────────────────────────────────────────
 
 void mock.module("../src/updater", () => ({
@@ -338,6 +347,19 @@ describe("per-window RPC", () => {
     expect(reqs.updaterGetStatus()).toBe("status");
     const open = reqs.listOpenWindows() as { id: number; projectRoot: string | null }[];
     expect(open.some((w) => w.projectRoot === "/proj/sweep")).toBe(true);
+  });
+
+  test("settings handlers pass through to the user-level settings store", async () => {
+    openProjectWindow("/proj/settings");
+    const reqs = lastRequests();
+
+    const readsBefore = readSettingsMock.mock.calls.length;
+    expect(await reqs.getSettings()).toEqual({ aiApiKey: "sk-abc" });
+    expect(readSettingsMock.mock.calls.length).toBe(readsBefore + 1);
+
+    const settings = { aiApiKey: "sk-new", theme: "dark" };
+    await reqs.saveSettings({ settings } as never);
+    expect(writeSettingsMock).toHaveBeenLastCalledWith(settings);
   });
 
   test("window controls target this window and maximize toggles", () => {

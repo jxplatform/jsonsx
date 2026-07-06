@@ -1,6 +1,6 @@
 // oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 // In-process import of src/chromium/index.ts, a launcher with import-time side effects.
@@ -133,6 +133,13 @@ void mock.module("../src/recent-store", () => ({
   writeRecents: writeRecentsMock,
 }));
 
+const readSettingsMock = mock(() => Promise.resolve({ aiApiKey: "sk-abc" }));
+const writeSettingsMock = mock(() => Promise.resolve());
+void mock.module("../src/settings-store", () => ({
+  readSettings: readSettingsMock,
+  writeSettings: writeSettingsMock,
+}));
+
 // The import pipeline itself is exercised in @jxsuite/import; here only the route wiring matters.
 const importSiteMock = mock((options: Record<string, unknown>) => {
   const outDir = options.outDir as string;
@@ -204,7 +211,7 @@ console.log = (...args: unknown[]) => {
   logs.push(args.map(String).join(" "));
 };
 
-await import("../src/chromium/index");
+const chromiumIndex = await import("../src/chromium/index");
 
 console.log = realLog;
 (Bun as unknown as { serve: typeof Bun.serve }).serve = realServe;
@@ -303,6 +310,81 @@ describe("chromium launcher startup", () => {
     expect(args).toContain("--ozone-platform=wayland");
     expect(args).toContain("--enable-features=UseOzonePlatform");
   });
+
+  test("seeds the profile Preferences before spawn so Chromium never offers to save the API key", () => {
+    // The credentials form's API-key field is a password input; without these profile prefs
+    // Chromium offers to save it to the OS password manager on every save.
+    const prefsFile = join(FIXTURES, ".jx", "chromium-profile", "Default", "Preferences");
+    const prefs = JSON.parse(readFileSync(prefsFile, "utf8")) as {
+      credentials_enable_service: boolean;
+      profile: { password_manager_enabled: boolean; password_manager_leak_detection: boolean };
+    };
+    expect(prefs.credentials_enable_service).toBe(false);
+    expect(prefs.profile.password_manager_enabled).toBe(false);
+    expect(prefs.profile.password_manager_leak_detection).toBe(false);
+  });
+});
+
+// ─── Chromium profile Preferences seeding ───────────────────────────────────
+
+describe("seedChromiumPreferences", () => {
+  test("merges into an existing Preferences file without clobbering unrelated keys", () => {
+    const dir = join(FIXTURES, "_prefs_merge");
+    mkdirSync(join(dir, "Default"), { recursive: true });
+    writeFileSync(
+      join(dir, "Default", "Preferences"),
+      JSON.stringify({
+        browser: { theme: "dark" },
+        credentials_enable_service: true,
+        profile: { exit_type: "Normal", password_manager_enabled: true },
+      }),
+    );
+    chromiumIndex.seedChromiumPreferences(dir);
+    const prefs = JSON.parse(readFileSync(join(dir, "Default", "Preferences"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    expect(prefs.credentials_enable_service).toBe(false);
+    expect(prefs.browser).toEqual({ theme: "dark" });
+    expect(prefs.profile).toEqual({
+      exit_type: "Normal",
+      password_manager_enabled: false,
+      password_manager_leak_detection: false,
+    });
+  });
+
+  test("recovers from a corrupt Preferences file with a fresh object", () => {
+    const dir = join(FIXTURES, "_prefs_corrupt");
+    mkdirSync(join(dir, "Default"), { recursive: true });
+    writeFileSync(join(dir, "Default", "Preferences"), "{not json");
+    chromiumIndex.seedChromiumPreferences(dir);
+    const prefs = JSON.parse(readFileSync(join(dir, "Default", "Preferences"), "utf8"));
+    expect(prefs).toEqual({
+      credentials_enable_service: false,
+      profile: { password_manager_enabled: false, password_manager_leak_detection: false },
+    });
+  });
+
+  test("replaces a non-object profile value and creates the Default dir when missing", () => {
+    const dir = join(FIXTURES, "_prefs_fresh");
+    mkdirSync(join(dir, "Default"), { recursive: true });
+    writeFileSync(join(dir, "Default", "Preferences"), JSON.stringify({ profile: "bogus" }));
+    chromiumIndex.seedChromiumPreferences(dir);
+    const prefs = JSON.parse(readFileSync(join(dir, "Default", "Preferences"), "utf8")) as {
+      profile: Record<string, unknown>;
+    };
+    expect(prefs.profile).toEqual({
+      password_manager_enabled: false,
+      password_manager_leak_detection: false,
+    });
+
+    const bare = join(FIXTURES, "_prefs_bare");
+    chromiumIndex.seedChromiumPreferences(bare);
+    const seeded = JSON.parse(readFileSync(join(bare, "Default", "Preferences"), "utf8")) as {
+      credentials_enable_service: boolean;
+    };
+    expect(seeded.credentials_enable_service).toBe(false);
+  });
 });
 
 // ─── WebSocket RPC dispatch ─────────────────────────────────────────────────
@@ -390,6 +472,14 @@ describe("chromium launcher RPC dispatch", () => {
     const projects = [{ name: "Saved", root: "/abs/saved", timestamp: 2 }];
     await rpc("saveRecentProjects", { projects });
     expect(writeRecentsMock).toHaveBeenCalledWith(projects);
+  });
+
+  test("settings handlers read from and write to the store", async () => {
+    expect(await rpc("getSettings")).toEqual({ aiApiKey: "sk-abc" });
+    expect(readSettingsMock).toHaveBeenCalled();
+    const settings = { aiApiKey: "sk-new", theme: "dark" };
+    expect(await rpc("saveSettings", { settings })).toBeNull();
+    expect(writeSettingsMock).toHaveBeenCalledWith(settings);
   });
 
   test("git query methods return results", async () => {

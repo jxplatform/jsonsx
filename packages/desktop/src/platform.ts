@@ -259,6 +259,16 @@ export function createDesktopPlatform() {
       await rpc.request.saveRecentProjects({ projects });
     },
 
+    // ─── User settings (process-shared, user-level store) ───────────────────────
+
+    async getSettings() {
+      return rpc.request.getSettings();
+    },
+
+    async saveSettings(settings: Record<string, string>) {
+      await rpc.request.saveSettings({ settings });
+    },
+
     async probeRootProject() {
       // A fresh welcome window owns a session with no project root. Report "no project" (null) so the
       // Studio shows the welcome screen — returning a phantom non-site project instead would suppress

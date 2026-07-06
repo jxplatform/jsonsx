@@ -326,6 +326,15 @@ export interface StudioPlatform {
   getRecentProjects?: () => Promise<RecentProjectEntry[]>;
   /** Persist the full recent-projects list to the backend store. */
   saveRecentProjects?: (projects: RecentProjectEntry[]) => Promise<void>;
+  // ─── User settings (backend-persisted; undefined on dev-server) ─────────────
+  /**
+   * Read the user-level settings map (e.g. the AI connection parameters) from a backend store
+   * shared across all projects/windows. Platforms without a native backend (dev server) omit it and
+   * settings live in localStorage only.
+   */
+  getSettings?: () => Promise<Record<string, string>>;
+  /** Persist the full user-level settings map to the backend store. */
+  saveSettings?: (settings: Record<string, string>) => Promise<void>;
 }
 
 /** A recently-opened project, keyed by its re-openable `root` (platform-specific). */

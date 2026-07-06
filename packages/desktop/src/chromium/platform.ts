@@ -135,6 +135,16 @@ export function createDesktopPlatform(): StudioPlatform {
       await request("saveRecentProjects", { projects });
     },
 
+    // ─── User settings (user-level store, shared across per-project profiles) ──
+
+    async getSettings() {
+      return request("getSettings") as Promise<Record<string, string>>;
+    },
+
+    async saveSettings(settings: Record<string, string>) {
+      await request("saveSettings", { settings });
+    },
+
     async resolveSiteContext(filePath: string) {
       return request("resolveSiteContext", { filePath }) as Promise<{
         sitePath: string | null;

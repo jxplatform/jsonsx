@@ -1,5 +1,6 @@
 // oxlint-disable unicorn/no-process-exit -- standalone launcher CLI; exit codes are its interface
 import { isAbsolute, resolve } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
   codeService,
@@ -55,6 +56,7 @@ import { openDirectoryDialog, openFileDialog } from "./utils";
 import { createProjectServer } from "@jxsuite/server/project-server";
 import { listStarters } from "@jxsuite/starters";
 import { readRecents, writeRecents } from "../recent-store";
+import { readSettings, writeSettings } from "../settings-store";
 import type { RecentProjectEntry } from "../rpc-schema";
 
 // ─── Project root ────────────────────────────────────────────────────────────
@@ -142,6 +144,9 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   getRecentProjects: () => readRecents(),
   saveRecentProjects: (params) =>
     writeRecents((params as { projects: RecentProjectEntry[] }).projects),
+  getSettings: () => readSettings(),
+  saveSettings: (params) =>
+    writeSettings((params as { settings: Record<string, string> }).settings),
   jxResolve: (params) => jxResolve(params as { body: string }),
   jxServerFunction: (params) => jxServerFunction(params as { body: string }),
   readFile: (params) => handleReadFile(params as { path: string }),
@@ -214,7 +219,42 @@ console.log(`[chromium] Project root: ${projectRoot}`);
 
 // ─── Launch Chromium ─────────────────────────────────────────────────────────
 
+/**
+ * Seed the profile's Preferences so Chromium never offers to save credentials: the credentials
+ * form's API-key field is a password input, and without these prefs Chromium offers to save it to
+ * the OS password manager on every save. Chrome only honors these as profile preferences (there is
+ * no flag), so they are merged into `<user-data-dir>/Default/Preferences` before every launch —
+ * preserving whatever else Chromium has written there. A missing or corrupt file is replaced with a
+ * fresh object holding just these keys.
+ */
+export function seedChromiumPreferences(userDataDir: string): void {
+  const defaultDir = resolve(userDataDir, "Default");
+  const prefsFile = resolve(defaultDir, "Preferences");
+  let prefs: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(readFileSync(prefsFile, "utf8")) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      prefs = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Missing or corrupt Preferences: start from a fresh object.
+  }
+  prefs.credentials_enable_service = false;
+  const profile =
+    prefs.profile && typeof prefs.profile === "object" && !Array.isArray(prefs.profile)
+      ? (prefs.profile as Record<string, unknown>)
+      : {};
+  profile.password_manager_enabled = false;
+  profile.password_manager_leak_detection = false;
+  prefs.profile = profile;
+  mkdirSync(defaultDir, { recursive: true });
+  writeFileSync(prefsFile, JSON.stringify(prefs), "utf8");
+}
+
 console.log(`[chromium] Launching: ${chromiumBin}`);
+
+const userDataDir = resolve(projectRoot, ".jx/chromium-profile");
+seedChromiumPreferences(userDataDir);
 
 const chromiumArgs = [
   `--app=${serverUrl}/__studio__/index.html?token=${rpcToken}`,
@@ -222,7 +262,7 @@ const chromiumArgs = [
   "--no-first-run",
   "--no-default-browser-check",
   "--window-size=1400,900",
-  `--user-data-dir=${resolve(projectRoot, ".jx/chromium-profile")}`,
+  `--user-data-dir=${userDataDir}`,
 ];
 
 if (process.env.WAYLAND_DISPLAY) {

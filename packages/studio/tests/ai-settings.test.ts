@@ -5,6 +5,7 @@
  * branches taken when localStorage is unavailable or throws.
  */
 import "./with-dom.ts";
+import { installMockPlatform } from "./harness";
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   getBaseUrl,
@@ -73,6 +74,25 @@ describe("ai-settings — happy path", () => {
     expect(getModel()).toBe("claude-sonnet-4-20250514");
     setModel("");
     expect(getModel()).toBe("gpt-4o"); // Cleared → default
+  });
+});
+
+describe("ai-settings — platform write-through", () => {
+  afterEach(() => {
+    delete (globalThis as { __jxPlatform?: unknown }).__jxPlatform;
+  });
+
+  test("setOpenAiKey writes the key through to the platform settings store", () => {
+    const saves: Record<string, string>[] = [];
+    installMockPlatform({
+      getSettings: async () => ({}),
+      saveSettings: async (settings) => {
+        saves.push({ ...settings });
+      },
+    });
+    setOpenAiKey("sk-x");
+    expect(saves.length).toBe(1);
+    expect(saves[0]).toMatchObject({ "jx.ai.openaiKey": "sk-x" });
   });
 });
 

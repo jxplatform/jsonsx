@@ -1,3 +1,4 @@
+// oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
@@ -454,6 +455,7 @@ describe("platform methods", () => {
     ["setWindowProject", ["/proj/x"], "setWindowProject", { root: "/proj/x" }],
     ["getProjectRoot", [], "getProjectRoot", undefined],
     ["getRecentProjects", [], "getRecentProjects", undefined],
+    ["getSettings", [], "getSettings", undefined],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of delegations) {
@@ -491,6 +493,12 @@ describe("platform methods", () => {
       [[{ name: "x", root: "/x", timestamp: 1 }]],
       "saveRecentProjects",
       { projects: [{ name: "x", root: "/x", timestamp: 1 }] },
+    ],
+    [
+      "saveSettings",
+      [{ aiApiKey: "sk-abc" }],
+      "saveSettings",
+      { settings: { aiApiKey: "sk-abc" } },
     ],
   ];
 

@@ -15,6 +15,7 @@ import { createProjectServer } from "@jxsuite/server/project-server";
 import { listStarters } from "@jxsuite/starters";
 import { createProjectSession } from "./project-session";
 import { readRecents, writeRecents } from "./recent-store";
+import { readSettings, writeSettings } from "./settings-store";
 import { studioDir } from "./canvas-runtime";
 import type { ProjectServerHandle } from "@jxsuite/server/project-server";
 import type { ProjectSession } from "./project-session";
@@ -303,6 +304,10 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         // Recent projects (process-shared, user-level store)
         getRecentProjects: () => readRecents(),
         saveRecentProjects: (params) => writeRecents(params.projects),
+
+        // User settings (process-shared, user-level store)
+        getSettings: () => readSettings(),
+        saveSettings: (params) => writeSettings(params.settings),
 
         // Updater (process-shared)
         updaterApplyUpdate: () => applyUpdate(),

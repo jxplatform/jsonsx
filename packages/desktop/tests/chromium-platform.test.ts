@@ -27,8 +27,10 @@ const responses: Record<string, unknown> = {
   getProjectRoot: { root: "/abs/proj" },
   setWindowProject: { config: { name: "Test" }, deduped: false },
   getRecentProjects: [{ name: "Recent", root: "/abs/recent", timestamp: 7 }],
+  getSettings: { aiApiKey: "sk-abc" },
   pickDirectory: { path: "/picked/parent" },
   saveRecentProjects: null,
+  saveSettings: null,
   listDirectory: [
     {
       modified: "2025-01-01",
@@ -327,6 +329,12 @@ describe("chromium desktop platform", () => {
     const list = await platform.getRecentProjects!();
     expect(list.map((p) => p.root)).toEqual(["/abs/recent"]);
     await expect(platform.saveRecentProjects!(list)).resolves.toBeUndefined();
+  });
+
+  test("settings round-trip through the backend store", async () => {
+    const settings = await platform.getSettings!();
+    expect(settings).toEqual({ aiApiKey: "sk-abc" });
+    await expect(platform.saveSettings!(settings)).resolves.toBeUndefined();
   });
 
   test("probeRootProject returns null when readFile fails (no project → welcome screen)", async () => {
