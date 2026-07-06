@@ -22,20 +22,16 @@ import { getBaseUrl, getModel, getOpenAiKey } from "./ai-settings";
 import { trimContext } from "./context-manager";
 import { renderCheck } from "./render-critic";
 import { openFileInTab } from "../files/files";
-
-const PERSIST_KEY_PREFIX = "jx-ai-chat-history";
-const MAX_PERSIST_MESSAGES = 50;
+import * as sessionStore from "./ai-session-store";
 
 /**
- * Project-scoped localStorage key (uses the project root) so conversations don't bleed across
- * projects (ADR §11.5 / §14.2). Falls back to a shared key when no project is open.
+ * Project root scoping the session store (ADR §11.5 / §14.2 — conversations don't bleed across
+ * projects). Falls back to a shared unscoped store when no project is open.
  *
  * @returns {string}
  */
-function persistKey() {
-  return workspace.projectRoot
-    ? `${PERSIST_KEY_PREFIX}:${workspace.projectRoot}`
-    : PERSIST_KEY_PREFIX;
+function projectRoot() {
+  return workspace.projectRoot || "";
 }
 
 /**
@@ -46,6 +42,10 @@ function persistKey() {
  *   sendMessage: (text: string) => Promise<void>;
  *   stop: () => void;
  *   newChat: () => void;
+ *   listSessions: () => import("./ai-session-store").SessionMeta[];
+ *   openSession: (id: string) => void;
+ *   deleteSession: (id: string) => void;
+ *   activeSessionId: () => string | null;
  * }}
  */
 export function createDocumentAssistant() {
@@ -69,6 +69,9 @@ export function createDocumentAssistant() {
 
   let controller: AbortController | null = null;
 
+  /** The persisted session backing the live chat; null = fresh unsaved chat. */
+  let sessionId: string | null = null;
+
   function buildPrompt() {
     const tab = activeTab.value;
     return buildSystemPrompt({
@@ -84,6 +87,12 @@ export function createDocumentAssistant() {
       return;
     }
 
+    // Lazily create the backing session on the first message so empty "New Chat"
+    // Clicks never pollute the session list.
+    if (!sessionId) {
+      sessionId = sessionStore.createSession(projectRoot(), text).id;
+    }
+
     chatState.sendMessage(text);
 
     // Trim context before streaming to keep the conversation within token limits.
@@ -93,7 +102,7 @@ export function createDocumentAssistant() {
     }
 
     // Persist after trimming so the saved history reflects what's actually sent.
-    persistChat(chatState);
+    persistChat();
 
     try {
       const plat = getPlatform();
@@ -127,6 +136,9 @@ export function createDocumentAssistant() {
       chatState.setError(error instanceof Error ? error.message : String(error));
     } finally {
       controller = null;
+      // Persist again once the stream settled so the completed reply (or the state
+      // After an error/abort cleanup) survives a reload without another send.
+      persistChat();
     }
   }
 
@@ -138,46 +150,94 @@ export function createDocumentAssistant() {
   function newChat() {
     stop();
     chatState.clearChat();
-    persistChat(chatState);
+    sessionId = null;
+    sessionStore.setActiveSession(projectRoot(), null);
+  }
+
+  // ── Sessions ──────────────────────────────────────────────────────────
+
+  /** The project's persisted sessions, most recently updated first. */
+  function listSessions() {
+    return sessionStore.listSessions(projectRoot());
+  }
+
+  /** Replace the live chat with a persisted session's messages. */
+  function openSession(id: string) {
+    const msgs = sessionStore.loadSession(projectRoot(), id);
+    if (!msgs) {
+      return;
+    }
+    stop();
+    chatState.clearChat();
+    pushRestoredMessages(msgs);
+    sessionId = id;
+    sessionStore.setActiveSession(projectRoot(), id);
+  }
+
+  /** Delete a persisted session; deleting the open one leaves a fresh unsaved chat. */
+  function deleteSession(id: string) {
+    sessionStore.deleteSession(projectRoot(), id);
+    if (sessionId === id) {
+      stop();
+      chatState.clearChat();
+      sessionId = null;
+    }
+  }
+
+  function activeSessionId() {
+    return sessionId;
   }
 
   // ── Persistence ───────────────────────────────────────────────────────
 
-  /** Persist recent messages to localStorage (non-blocking). */
-  function persistChat(cs: ReturnType<typeof createChatState>) {
-    try {
-      const msgs = cs.messages.slice(-MAX_PERSIST_MESSAGES);
-      localStorage.setItem(persistKey(), JSON.stringify(msgs));
-    } catch {
-      // Storage full or unavailable — not critical.
+  /** Persist the live conversation into its backing session (non-blocking). */
+  function persistChat() {
+    if (!sessionId) {
+      return;
+    }
+    // Skip a still-empty streaming placeholder so reloads don't restore blank bubbles.
+    const msgs = chatState.messages.filter(
+      (m) => m.role !== "assistant" || m.content || (m.toolCalls?.length ?? 0) > 0,
+    );
+    sessionStore.saveSession(projectRoot(), sessionId, msgs);
+  }
+
+  /** Push persisted messages into chat state, synthesizing ids where missing. */
+  function pushRestoredMessages(msgs: sessionStore.PersistedMessage[]) {
+    for (const m of msgs) {
+      chatState.messages.push({
+        ...m,
+        id: m.id || `restored_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      } as (typeof chatState.messages)[number]);
     }
   }
 
-  /** Restore messages from a previous session, if any. */
+  /** Restore the last-active session once on creation, if any. */
   function restoreChat() {
-    try {
-      const raw = localStorage.getItem(persistKey());
-      if (!raw) {
-        return;
-      }
-      const msgs = JSON.parse(raw) as typeof chatState.messages;
-      if (!Array.isArray(msgs) || msgs.length === 0) {
-        return;
-      }
-      // Push into chat state (skips streaming state)
-      for (const m of msgs) {
-        chatState.messages.push({
-          ...m,
-          id: m.id || `restored_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-        });
-      }
-    } catch {
-      // Corrupt or empty — ignore.
+    const root = projectRoot();
+    const activeId = sessionStore.getActiveSessionId(root);
+    if (!activeId) {
+      return;
     }
+    const msgs = sessionStore.loadSession(root, activeId);
+    if (!msgs || msgs.length === 0) {
+      return;
+    }
+    pushRestoredMessages(msgs);
+    sessionId = activeId;
   }
 
   // Restore once on creation.
   restoreChat();
 
-  return { chatState, sendMessage, stop, newChat };
+  return {
+    chatState,
+    sendMessage,
+    stop,
+    newChat,
+    listSessions,
+    openSession,
+    deleteSession,
+    activeSessionId,
+  };
 }

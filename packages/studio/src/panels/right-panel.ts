@@ -23,9 +23,8 @@ import { renderPropertiesPanelTemplate } from "./properties-panel";
 import type { EffectScope } from "@vue/reactivity";
 import {
   renderAiPanelTemplate,
+  bindAiPanelHost,
   mountAiPanel,
-  mountQuikChat,
-  registerRightPanelRender,
   seedAssistantPrompt,
 } from "./ai-panel";
 
@@ -49,7 +48,6 @@ let _scheduler: PanelScheduler | null = null;
 export function mount(ctx: RightPanelCtx) {
   _ctx = ctx;
   mountAiPanel();
-  registerRightPanelRender(render);
   _scheduler = createPanelScheduler({
     blockWhile: isColorPopoverOpen,
     render: _doRender,
@@ -118,6 +116,9 @@ function _ensureContainers() {
   _assistantContainer = document.createElement("div");
   _assistantContainer.className = "panel-body";
   _assistantContainer.style.cssText = "display:flex;flex-direction:column;overflow:hidden";
+  // The AI panel owns a focus-guard-free rAF render loop into this container so
+  // Streaming repaints while the composer is focused (see ai-panel.ts).
+  bindAiPanelHost(_assistantContainer);
 }
 
 function _doRender() {
@@ -237,5 +238,4 @@ function _doRender() {
   } catch (error) {
     console.error("right-panel render error:", error);
   }
-  requestAnimationFrame(() => mountQuikChat());
 }

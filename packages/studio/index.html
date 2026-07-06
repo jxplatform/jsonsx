@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jx Studio</title>
     <link rel="stylesheet" href="./dist/studio.css" />
-    <link rel="stylesheet" href="./node_modules/quikchat/dist/quikchat.css" />
     <style>
       /* Jx brand mono font, vendored in ./fonts (SIL OFL 1.1, see fonts/OFL.txt).
          Latin subset only; the stack falls back to SF Mono / Fira Code for
@@ -438,99 +437,287 @@
         min-height: 0;
         overflow: hidden;
       }
-      .ai-toolbar {
-        display: flex;
-        gap: 6px;
-        padding: 4px 8px;
-        justify-content: flex-end;
+      .ai-chat-header {
         flex-shrink: 0;
-      }
-      #ai-quikchat {
-        flex: 1;
-        min-height: 0;
-        overflow: hidden;
-      }
-      #ai-quikchat .quikchat-base {
-        height: 100%;
-        background: transparent;
-        border: none;
-        border-radius: 0;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 6px;
+        min-width: 0;
+        border-bottom: 1px solid var(--border);
         font-size: var(--spectrum-font-size-75, 12px);
-        font-family: inherit;
       }
-      #ai-quikchat .quikchat-messages-area {
-        background: transparent;
-        color: var(--fg);
+      .ai-chat-title {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 600;
       }
-      #ai-quikchat .quikchat-message-content {
+      .ai-header-spacer {
+        flex: 1;
+      }
+      /* THE chat scroller — bounded by min-height:0 at every flex level above. */
+      .ai-chat-messages {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
         font-size: var(--spectrum-font-size-75, 12px);
         line-height: 1.5;
       }
-      #ai-quikchat .quikchat-message[data-role="user"] .quikchat-message-content {
-        background: var(--accent-15);
-        border-radius: 6px;
-        padding: 6px 10px;
-      }
-      #ai-quikchat .quikchat-message[data-role="assistant"] .quikchat-message-content {
-        background: var(--bg-input);
-        border-radius: 6px;
-        padding: 6px 10px;
-      }
-      #ai-quikchat .quikchat-message[data-role="tool"] .quikchat-message-content {
-        font-size: var(--spectrum-font-size-50, 11px);
-        background: var(--hover-bg);
-        border-left: 2px solid var(--accent);
-        border-radius: var(--radius);
-        padding: 4px 8px;
+      .ai-chat-empty {
         color: var(--fg-dim);
+        text-align: center;
+        padding: 24px 12px;
       }
-      #ai-quikchat .quikchat-message-content code {
+      .ai-msg-user {
+        align-self: flex-end;
+        max-width: 85%;
+        background: var(--accent-15);
+        border-radius: 8px 8px 2px 8px;
+        padding: 6px 10px;
+      }
+      .ai-msg-user-body {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .ai-msg-assistant {
+        align-self: stretch;
+        min-width: 0;
+      }
+      .ai-msg-md {
+        overflow-wrap: anywhere;
+      }
+      .ai-msg-md > *:first-child {
+        margin-top: 0;
+      }
+      .ai-msg-md > *:last-child {
+        margin-bottom: 0;
+      }
+      .ai-msg-md code {
         background: rgba(0, 0, 0, 0.3);
         padding: 1px 4px;
         border-radius: var(--radius);
         font-size: var(--spectrum-font-size-50, 11px);
+        font-family: var(--font-mono);
       }
-      #ai-quikchat .quikchat-message-content pre {
+      .ai-msg-md pre {
         background: rgba(0, 0, 0, 0.3);
         padding: 8px;
         border-radius: var(--radius);
         overflow-x: auto;
         margin: 6px 0;
       }
-      #ai-quikchat .quikchat-message-content pre code {
+      .ai-msg-md pre code {
         background: none;
         padding: 0;
       }
-      #ai-quikchat .quikchat-input-area {
-        border-top: 1px solid var(--border);
-        background: transparent;
-        padding: 8px;
+      .ai-msg-md table {
+        border-collapse: collapse;
+        margin: 6px 0;
       }
-      #ai-quikchat .quikchat-input-textbox {
+      .ai-msg-md th,
+      .ai-msg-md td {
+        border: 1px solid var(--border);
+        padding: 2px 6px;
+      }
+      .ai-msg-streaming {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .ai-msg-streaming::after {
+        content: "▋";
+        color: var(--accent);
+        animation: ai-cursor-blink 1s steps(2) infinite;
+      }
+      @keyframes ai-cursor-blink {
+        50% {
+          opacity: 0;
+        }
+      }
+      .ai-msg-typing {
+        display: flex;
+        gap: 4px;
+        padding: 4px 2px;
+      }
+      .ai-msg-typing span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--fg-dim);
+        animation: ai-typing-bounce 1.2s infinite;
+      }
+      .ai-msg-typing span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .ai-msg-typing span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes ai-typing-bounce {
+        0%,
+        60%,
+        100% {
+          opacity: 0.3;
+        }
+        30% {
+          opacity: 1;
+        }
+      }
+      .ai-msg-tools {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-top: 6px;
+      }
+      .ai-tool-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        align-self: flex-start;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        background: var(--hover-bg);
+        border-left: 2px solid var(--accent);
+        border-radius: var(--radius);
+        padding: 3px 8px;
+        font-size: var(--spectrum-font-size-50, 11px);
+        color: var(--fg-dim);
+        font-family: var(--font-mono);
+      }
+      .ai-msg-tool-error {
+        background: var(--hover-bg);
+        border-left: 2px solid var(--danger);
+        border-radius: var(--radius);
+        padding: 4px 8px;
+        font-size: var(--spectrum-font-size-50, 11px);
+        color: var(--fg-dim);
+      }
+      .ai-msg-error {
+        border-left: 2px solid var(--danger);
+        border-radius: var(--radius);
+        background: var(--hover-bg);
+        padding: 6px 8px;
+        color: var(--danger);
+      }
+      .ai-msg-error-advice {
+        margin-top: 4px;
+        color: var(--fg-dim);
+      }
+      .ai-msg-context-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 6px;
+      }
+      .ai-context-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        background: var(--bg-input);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1px 6px;
+        font-size: var(--spectrum-font-size-50, 11px);
+        color: var(--fg-dim);
+      }
+      /* Sticky composer */
+      .ai-composer {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px;
+        border-top: 1px solid var(--border);
+      }
+      .ai-composer-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .ai-composer-input {
+        width: 100%;
+        box-sizing: border-box;
+        resize: none;
+        min-height: 30px;
+        max-height: 120px;
+        overflow-y: auto;
         background: var(--bg-input);
         color: var(--fg);
         border: 1px solid var(--border);
         border-radius: var(--radius);
+        padding: 6px 8px;
         font-size: var(--spectrum-font-size-75, 12px);
         font-family: inherit;
+        line-height: 1.4;
       }
-      #ai-quikchat .quikchat-input-textbox:focus {
+      .ai-composer-input:focus {
         border-color: var(--accent);
         outline: none;
       }
-      #ai-quikchat .quikchat-input-send-btn {
-        background: var(--accent);
-        color: var(--accent-fg);
-        border: none;
-        border-radius: var(--radius);
+      .ai-composer-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-width: 0;
+      }
+      .ai-model-picker {
+        max-width: 140px;
+        min-width: 0;
+      }
+      /* Sessions list */
+      .ai-sessions {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow-y: auto;
         font-size: var(--spectrum-font-size-75, 12px);
+      }
+      .ai-sessions-empty {
+        color: var(--fg-dim);
+        text-align: center;
+        padding: 24px 12px;
+      }
+      .ai-session-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 8px;
         cursor: pointer;
+        border-bottom: 1px solid var(--border);
+        min-width: 0;
       }
-      #ai-quikchat .quikchat-input-send-btn:hover {
-        opacity: 0.9;
+      .ai-session-row:hover {
+        background: var(--hover-bg);
       }
-      #ai-quikchat .quikchat-message-user-string {
-        display: none;
+      .ai-session-text {
+        flex: 1;
+        min-width: 0;
+      }
+      .ai-session-title {
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .ai-session-meta {
+        color: var(--fg-dim);
+        font-size: var(--spectrum-font-size-50, 11px);
+      }
+      .ai-session-delete {
+        visibility: hidden;
+      }
+      .ai-session-row:hover .ai-session-delete {
+        visibility: visible;
       }
       .ai-status-center {
         display: flex;

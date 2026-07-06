@@ -127,6 +127,10 @@ import { IconVisibility } from "@spectrum-web-components/icons-workflow/src/elem
 import { IconVisibilityOff } from "@spectrum-web-components/icons-workflow/src/elements/IconVisibilityOff.js";
 import { IconArtboard } from "@spectrum-web-components/icons-workflow/src/elements/IconArtboard.js";
 import { IconChat } from "@spectrum-web-components/icons-workflow/src/elements/IconChat.js";
+import { IconSend } from "@spectrum-web-components/icons-workflow/src/elements/IconSend.js";
+import { IconStop } from "@spectrum-web-components/icons-workflow/src/elements/IconStop.js";
+import { IconHistory } from "@spectrum-web-components/icons-workflow/src/elements/IconHistory.js";
+import { IconAttach } from "@spectrum-web-components/icons-workflow/src/elements/IconAttach.js";
 import { IconViewList } from "@spectrum-web-components/icons-workflow/src/elements/IconViewList.js";
 import { IconRailRightClose } from "@spectrum-web-components/icons-workflow/src/elements/IconRailRightClose.js";
 import { IconRailRightOpen } from "@spectrum-web-components/icons-workflow/src/elements/IconRailRightOpen.js";
@@ -272,6 +276,10 @@ const components = [
   ["sp-icon-visibility-off", IconVisibilityOff],
   ["sp-icon-artboard", IconArtboard],
   ["sp-icon-chat", IconChat],
+  ["sp-icon-send", IconSend],
+  ["sp-icon-stop", IconStop],
+  ["sp-icon-history", IconHistory],
+  ["sp-icon-attach", IconAttach],
   ["sp-icon-view-list", IconViewList],
   ["sp-icon-text-bold", IconTextBold],
   ["sp-icon-text-italic", IconTextItalic],

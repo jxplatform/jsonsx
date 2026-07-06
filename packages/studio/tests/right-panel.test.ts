@@ -21,8 +21,12 @@ const assistantChatState = reactive({
 const assistantSend = mock(async (_text: string) => {});
 void mock.module("../src/services/document-assistant", () => ({
   createDocumentAssistant: () => ({
+    activeSessionId: () => null,
     chatState: assistantChatState,
+    deleteSession: () => {},
+    listSessions: () => [],
     newChat: () => {},
+    openSession: () => {},
     sendMessage: assistantSend,
     stop: () => {},
   }),

@@ -11,7 +11,7 @@
 
 import { html, nothing } from "lit-html";
 import type { TemplateResult } from "lit-html";
-import { getPlatform } from "../platform";
+import { fetchAvailableModels, invalidateModelCache } from "../services/ai-models";
 import {
   getBaseUrl,
   getModel,
@@ -77,6 +77,7 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
     modelDraft = "";
     // Clear fetched models so they're re-fetched with the new credentials next time.
     availableModels = [];
+    invalidateModelCache();
     opts.onSaved?.();
     opts.requestRender();
   }
@@ -91,39 +92,20 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
   }
 
   /**
-   * Fetch available models from the proxy's /models endpoint (the chat endpoint's sibling). Sends
-   * the stored API key as X-Api-Key so the proxy can forward to the upstream provider, and the
-   * chosen endpoint as X-Api-Base-URL so the proxy lists models from THAT provider rather than the
-   * default OpenAI host.
+   * Fetch available models via src/services/ai-models.ts, preferring the in-form drafts over the
+   * stored settings so the list reflects the credentials being edited. Always forces past the
+   * module cache — this runs on explicit user action (or first open) with possibly-new drafts.
    */
   async function fetchModels() {
     modelsLoading = true;
     modelsError = "";
     opts.requestRender();
     try {
-      const plat = getPlatform();
-      const chatUrl = await Promise.resolve(plat.aiChatUrl());
-      const modelsUrl = chatUrl.replace(/\/chat$/, "/models");
-
-      const headers: Record<string, string> = {};
-      const storedKey = getOpenAiKey() || keyDraft;
-      if (storedKey) {
-        headers["X-Api-Key"] = storedKey;
-      }
-      const baseUrl = baseUrlDraft || getBaseUrl();
-      if (baseUrl) {
-        headers["X-Api-Base-URL"] = baseUrl;
-      }
-
-      const resp = await fetch(modelsUrl, { headers });
-      if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}`);
-      }
-      const data = (await resp.json()) as { models?: { id: string; name?: string }[] };
-      availableModels = (data.models || []).map((m: { id: string; name?: string }) => ({
-        id: m.id,
-        name: m.name || m.id,
-      }));
+      availableModels = await fetchAvailableModels({
+        apiKey: getOpenAiKey() || keyDraft,
+        baseUrl: baseUrlDraft || getBaseUrl(),
+        force: true,
+      });
     } catch (error: unknown) {
       modelsError = (error as Error).message || "Failed to fetch models";
     } finally {

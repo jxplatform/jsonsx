@@ -83,7 +83,6 @@
     "lit": "^3.3.3",
     "lit-html": "^3.3.3",
     "monaco-editor": "^0.55.1",
-    "quikchat": "^1.2.7",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
