@@ -26,7 +26,7 @@ function ensureGhost(doc: Document): HTMLElement {
   el.style.cssText =
     "position:fixed;left:0;top:0;z-index:9999;pointer-events:none;display:none;" +
     "padding:2px 8px;border-radius:4px;font-size:12px;line-height:1.4;white-space:nowrap;" +
-    "background:var(--accent,#3b82f6);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);" +
+    "background:var(--accent,#3b82f6);color:var(--accent-fg,#fff);box-shadow:0 2px 8px rgba(0,0,0,0.25);" +
     "transform:translate(8px,8px)";
   doc.body.append(el);
   ghostEl = el;

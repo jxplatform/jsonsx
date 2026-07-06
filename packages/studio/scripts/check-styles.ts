@@ -29,6 +29,12 @@ const ALLOWED_HEX = new Set([
   "#ff5f57", // Close (macOS traffic-light)
   "#febc2e", // Minimize (macOS traffic-light)
   "#28c840", // Maximize (macOS traffic-light)
+  /* Iframe-render.ts / iframe-host.ts: CSS injected into the canvas iframe document, a
+     separate document context where the parent's --fg-dim/--radius/--accent custom
+     properties don't exist — self-contained neutral-gray + white fallbacks, not a
+     theme-responsive chrome colour. */
+  "#808080",
+  "#fff",
 ]);
 
 /** Files where a hex is a colour _value_ (user data), not chrome styling. */
@@ -38,6 +44,11 @@ const DATA_FILES = [
   /* Brand ramp source of truth: defines the Jx palette as Spectrum `-rgb`
      triplets; hexes appear only in the annotation comments. */
   "src/ui/jx-theme.ts",
+  /* <input type="color"> needs a real hex default; same category as color-selector.ts. */
+  "src/new-project/design-fields.ts",
+  /* Example project.json style block shown to the LLM as prompt content, not actual
+     chrome CSS — the hexes are illustrative data, like a colour picker's default. */
+  "src/services/ai-system-prompt.ts",
 ];
 
 /** Px values that have an exact Spectrum token and should be tokenized in new code. */
