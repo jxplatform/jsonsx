@@ -11,7 +11,9 @@ import { basename, resolve } from "node:path";
 import { listStarters } from "@jxsuite/starters";
 import { parseCliArgs } from "./cli-args";
 import { generateProject } from "./generate";
+import { isTemplateId, listTemplates } from "./templates";
 import type { ProjectOptions } from "./generate";
+import type { TemplateId } from "./templates";
 
 // The first non-flag arg is the destination; --template <id> selects a starter (skips the prompt).
 const { dest, template: templateFlag } = parseCliArgs(process.argv.slice(2));
@@ -36,20 +38,31 @@ async function main() {
   const url = await rl.question("Production URL (https://example.com): ");
 
   const starters = listStarters();
+  const templates = listTemplates();
   let starter = "blank";
+  let template: TemplateId = "blank";
   if (templateFlag !== undefined) {
-    // Non-interactive: honor --template, falling back to blank for an unknown id.
-    starter = starters.some((s) => s.id === templateFlag) ? templateFlag : "blank";
-  } else if (starters.length > 0) {
+    // Non-interactive: honor --template — built-in template ids win over starter ids, and an
+    // Unknown id falls back to blank.
+    if (isTemplateId(templateFlag)) {
+      template = templateFlag;
+    } else if (starters.some((s) => s.id === templateFlag)) {
+      starter = templateFlag;
+    }
+  } else {
     console.log("\nStart from a template:");
-    console.log("  1) Blank (default)");
+    for (const [i, t] of templates.entries()) {
+      console.log(`  ${i + 1}) ${t.name}${i === 0 ? " (default)" : ""}`);
+    }
     for (const [i, s] of starters.entries()) {
-      console.log(`  ${i + 2}) ${s.name} — ${s.tagline}`);
+      console.log(`  ${i + templates.length + 1}) ${s.name} — ${s.tagline}`);
     }
     const templateChoice = await rl.question("Template [1]: ");
     const idx = Math.trunc(Number(templateChoice));
-    if (idx >= 2 && idx <= starters.length + 1) {
-      starter = starters[idx - 2]?.id ?? "blank";
+    if (idx >= 2 && idx <= templates.length) {
+      template = templates[idx - 1]?.id ?? "blank";
+    } else if (idx > templates.length && idx <= templates.length + starters.length) {
+      starter = starters[idx - templates.length - 1]?.id ?? "blank";
     }
   }
 
@@ -73,7 +86,7 @@ Deployment adapter:
   };
   const adapter = adapterMap[adapterChoice] || "static";
 
-  await generateProject(destPath, { adapter, description, name, starter, url });
+  await generateProject(destPath, { adapter, description, name, starter, template, url });
 
   console.log(`
 Project created at ${destPath}

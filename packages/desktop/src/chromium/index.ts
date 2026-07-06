@@ -1,5 +1,5 @@
 // oxlint-disable unicorn/no-process-exit -- standalone launcher CLI; exit codes are its interface
-import { resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import {
   codeService,
@@ -118,9 +118,20 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
         adapter?: string;
         directory: string;
         starter?: string;
+        template?: string;
+        design?: {
+          accent?: string;
+          background?: string;
+          text?: string;
+          bodyFont?: string;
+          headingFont?: string;
+          media?: Record<string, string>;
+          logo?: { name: string; base64: string };
+        };
       },
     ),
   listStarters: () => Promise.resolve(listStarters()),
+  pickDirectory: async () => ({ path: await openDirectoryDialog() }),
   getProjectRoot: () => Promise.resolve({ root: getProjectRoot() }),
   setWindowProject: (params) => {
     // Single-window launcher: rebind the process-global root in place. Studio re-reads the
@@ -154,17 +165,8 @@ const defaultSession = {
   handlers,
 };
 
-const { url: serverUrl, rpcToken } = createProjectServer({
-  resolveSession: () => defaultSession,
-  studioDir,
-});
-
-console.log(`[chromium] Studio server at ${serverUrl}`);
-console.log(`[chromium] WebSocket RPC at ${serverUrl.replace(/^http/, "ws")}`);
-console.log(`[chromium] Project root: ${projectRoot}`);
-
-// ─── Launch Chromium ─────────────────────────────────────────────────────────
-
+// The launcher's Chromium binary doubles as puppeteer's browser for the import pipeline, so it is
+// Discovered before the server starts (NixOS-safe: no google-chrome-stable assumption).
 function findChromium(): string | null {
   const candidates = [
     process.env.CHROMIUM_BIN,
@@ -190,6 +192,27 @@ if (!chromiumBin) {
   console.error("[chromium] No chromium/chrome found. Install chromium or set CHROMIUM_BIN.");
   process.exit(1);
 }
+
+const { url: serverUrl, rpcToken } = createProjectServer({
+  importApi: {
+    chromePath: chromiumBin,
+    resolveDest: (dir) => {
+      // The webview resolves the destination under a natively-picked parent before posting.
+      if (!isAbsolute(dir)) {
+        throw new Error("directory must be an absolute path");
+      }
+      return dir;
+    },
+  },
+  resolveSession: () => defaultSession,
+  studioDir,
+});
+
+console.log(`[chromium] Studio server at ${serverUrl}`);
+console.log(`[chromium] WebSocket RPC at ${serverUrl.replace(/^http/, "ws")}`);
+console.log(`[chromium] Project root: ${projectRoot}`);
+
+// ─── Launch Chromium ─────────────────────────────────────────────────────────
 
 console.log(`[chromium] Launching: ${chromiumBin}`);
 

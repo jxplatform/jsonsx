@@ -1029,6 +1029,41 @@ describe("createProject", () => {
       cleanup();
     }
   });
+
+  test("forwards a built-in template id to the generator", async () => {
+    setup();
+    setDirectoryDialog(async () => FIXTURES);
+    try {
+      const result = await createProject({
+        directory: "my-app",
+        name: "My App",
+        template: "mobile-first",
+      });
+      const media = (result.config as { $media?: Record<string, string> }).$media;
+      expect(media?.["--"]).toBe("375px");
+      expect(media?.["--lg"]).toBe("(min-width: 1024px)");
+    } finally {
+      clearDialog();
+      cleanup();
+    }
+  });
+
+  test("forwards design quickstart options to the generator", async () => {
+    setup();
+    setDirectoryDialog(async () => FIXTURES);
+    try {
+      const result = await createProject({
+        design: { accent: "#ff5500" },
+        directory: "my-designed-site",
+        name: "My Designed Site",
+      });
+      const { style } = result.config as { style?: Record<string, string> };
+      expect(style?.["--color-primary"]).toBe("#ff5500");
+    } finally {
+      clearDialog();
+      cleanup();
+    }
+  });
 });
 
 process.on("exit", () => {

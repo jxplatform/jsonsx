@@ -474,6 +474,14 @@ export function createProjectSession(initialRoot: string | null) {
    * }} opts
    * @returns {Promise<{ root: string; config: SiteConfig }>}
    */
+  /** Open the native directory picker (used by the New Project modal's Import tab). */
+  async function pickDirectory(): Promise<{ path: string | null }> {
+    if (!directoryDialogFn) {
+      throw new Error("No directory dialog configured");
+    }
+    return { path: await directoryDialogFn() };
+  }
+
   async function createProject(opts: {
     name: string;
     description?: string;
@@ -481,6 +489,16 @@ export function createProjectSession(initialRoot: string | null) {
     adapter?: string;
     directory: string;
     starter?: string;
+    template?: string;
+    design?: {
+      accent?: string;
+      background?: string;
+      text?: string;
+      bodyFont?: string;
+      headingFont?: string;
+      media?: Record<string, string>;
+      logo?: { name: string; base64: string };
+    };
   }): Promise<{ root: string; config: SiteConfig }> {
     if (!directoryDialogFn) {
       throw new Error("No directory dialog configured");
@@ -503,6 +521,10 @@ export function createProjectSession(initialRoot: string | null) {
       ...(opts.description === undefined ? {} : { description: opts.description }),
       ...(opts.url === undefined ? {} : { url: opts.url }),
       ...(opts.starter === undefined ? {} : { starter: opts.starter }),
+      ...(opts.template === undefined
+        ? {}
+        : { template: opts.template as Parameters<typeof generateProject>[1]["template"] }),
+      ...(opts.design === undefined ? {} : { design: opts.design }),
     });
 
     const config = JSON.parse(
@@ -836,6 +858,7 @@ export function createProjectSession(initialRoot: string | null) {
     formatAction,
     openProject,
     createProject,
+    pickDirectory,
     listDirectory,
     handleReadFile: readFileHandler,
     handleWriteFile: writeFileHandler,

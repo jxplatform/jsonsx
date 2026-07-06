@@ -9,18 +9,10 @@
 import { html, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import quikchat from "quikchat/md";
-import { getPlatform } from "../platform";
 import { effect, effectScope } from "../reactivity";
 import { createDocumentAssistant } from "../services/document-assistant";
-import {
-  getBaseUrl,
-  getModel,
-  getOpenAiKey,
-  hasOpenAiKey,
-  setBaseUrl,
-  setModel,
-  setOpenAiKey,
-} from "../services/ai-settings";
+import { hasOpenAiKey } from "../services/ai-settings";
+import { createAiCredentialsForm } from "../ui/ai-credentials-form";
 
 import type { ChatState } from "@jxsuite/ai/chat-state";
 import type { EffectScope } from "@vue/reactivity";
@@ -53,14 +45,6 @@ let _quikChatEl: HTMLElement | null = null;
 
 /** Whether the OpenAI key form is showing (gate when no key, or re-edit via the toolbar). */
 let keyEditing = false;
-let keyDraft = "";
-let baseUrlDraft = "";
-let modelDraft = "";
-
-/** Fetched from /__studio/ai/models (proxied to the upstream provider). */
-let availableModels: { id: string; name: string }[] = [];
-let modelsLoading = false;
-let modelsError = "";
 
 /** Document AST assistant session — created lazily, persists across tab switches. */
 const assistant = createDocumentAssistant();
@@ -132,165 +116,28 @@ export function mountQuikChat() {
 
 // ─── OpenAI key settings ─────────────────────────────────────────────────────
 
+/** The panel's shared credentials form (draft/model state lives inside the form's closure). */
+const credsForm = createAiCredentialsForm({
+  onCancel: () => {
+    keyEditing = false;
+  },
+  onSaved: () => {
+    keyEditing = false;
+  },
+  requestRender: rerenderPanel,
+});
+
 /** Open the key form, pre-filled with the current settings. */
 function startEditApiKey() {
-  keyDraft = getOpenAiKey();
-  baseUrlDraft = getBaseUrl();
-  modelDraft = getModel();
   keyEditing = true;
-  rerenderPanel();
-  // Auto-fetch available models if not already loaded.
-  if (availableModels.length === 0 && !modelsLoading) {
-    void fetchModels();
-  }
-}
-
-/** Persist the drafted key + endpoint and return to the chat. */
-function saveApiKey() {
-  setOpenAiKey(keyDraft);
-  setBaseUrl(baseUrlDraft);
-  setModel(modelDraft);
-  keyDraft = "";
-  baseUrlDraft = "";
-  modelDraft = "";
-  keyEditing = false;
-  // Clear fetched models so they're re-fetched with the new credentials next time.
-  availableModels = [];
-  rerenderPanel();
-}
-
-/** Dismiss the key form without saving (only offered when a key already exists). */
-function cancelEditApiKey() {
-  keyDraft = "";
-  baseUrlDraft = "";
-  modelDraft = "";
-  keyEditing = false;
-  rerenderPanel();
-}
-
-/**
- * Fetch available models from the proxy's /__studio/ai/models endpoint. Sends the stored API key as
- * X-Api-Key so the proxy can forward to the upstream provider. Falls back to the proxy's hardcoded
- * default list when no key is configured.
- */
-async function fetchModels() {
-  modelsLoading = true;
-  modelsError = "";
-  rerenderPanel();
-  try {
-    const plat = getPlatform();
-    const chatUrl = await Promise.resolve(plat.aiChatUrl());
-    const modelsUrl = chatUrl.replace(/\/chat$/, "/models");
-
-    const headers: Record<string, string> = {};
-    const storedKey = getOpenAiKey() || keyDraft;
-    if (storedKey) {
-      headers["X-Api-Key"] = storedKey;
-    }
-    // Forward the chosen endpoint so the proxy lists models from THAT provider, not the
-    // Default OpenAI host — otherwise a non-OpenAI key only ever gets the hardcoded fallback.
-    const baseUrl = baseUrlDraft || getBaseUrl();
-    if (baseUrl) {
-      headers["X-Api-Base-URL"] = baseUrl;
-    }
-
-    const resp = await fetch(modelsUrl, { headers });
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status}`);
-    }
-    const data = (await resp.json()) as { models?: { id: string; name?: string }[] };
-    availableModels = (data.models || []).map((m: { id: string; name?: string }) => ({
-      id: m.id,
-      name: m.name || m.id,
-    }));
-  } catch (error: unknown) {
-    modelsError = (error as Error).message || "Failed to fetch models";
-  } finally {
-    modelsLoading = false;
-    rerenderPanel();
-  }
+  credsForm.startEdit();
 }
 
 /** The OpenAI (or compatible) key + endpoint settings form, shown as a gate when no key is set. */
 function renderKeyGate() {
-  const haveKey = hasOpenAiKey();
   return html`
     <div class="ai-tab-body">
-      <div class="ai-status-center" style="gap:10px;max-width:320px;text-align:left">
-        <div style="font-weight:600;align-self:center">AI provider key</div>
-        <div style="font-size:11px;color:var(--fg-dim)">
-          Any OpenAI-compatible key works. Stored locally in this browser; sent only to the Studio
-          proxy (never to a third party except your chosen endpoint).
-        </div>
-        <input
-          type="password"
-          style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
-          placeholder="sk-… or any compatible key"
-          .value=${keyDraft}
-          @input=${(e: Event) => {
-            keyDraft = (e.target as HTMLInputElement).value;
-          }}
-        />
-        <div style="font-weight:500;font-size:11px;margin-top:4px">Model</div>
-        ${availableModels.length > 0
-          ? html`
-              <sp-combobox
-                size="s"
-                allows-custom-value
-                .value=${modelDraft}
-                @change=${(e: Event) => {
-                  modelDraft = (e.target as HTMLInputElement).value;
-                }}
-                @input=${(e: Event) => {
-                  modelDraft = (e.target as HTMLInputElement).value;
-                }}
-              >
-                ${availableModels.map(
-                  (m) => html`<sp-menu-item value=${m.id}>${m.name}</sp-menu-item>`,
-                )}
-              </sp-combobox>
-            `
-          : html`
-              <input
-                type="text"
-                style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
-                placeholder="Model ID (e.g. gpt-4o, claude-sonnet-4-20250514, etc.)"
-                .value=${modelDraft}
-                @input=${(e: Event) => {
-                  modelDraft = (e.target as HTMLInputElement).value;
-                }}
-              />
-            `}
-        <div style="display:flex;gap:8px;align-items:center">
-          <sp-button size="s" variant="secondary" ?disabled=${modelsLoading} @click=${fetchModels}>
-            ${modelsLoading
-              ? "Fetching…"
-              : availableModels.length > 0
-                ? "Refresh models"
-                : "Fetch models"}
-          </sp-button>
-          ${modelsError
-            ? html`<span style="font-size:10px;color:var(--danger)">${modelsError}</span>`
-            : nothing}
-        </div>
-        <input
-          type="text"
-          style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
-          placeholder="Endpoint (optional, e.g. http://localhost:11434/v1)"
-          .value=${baseUrlDraft}
-          @input=${(e: Event) => {
-            baseUrlDraft = (e.target as HTMLInputElement).value;
-          }}
-        />
-        <div style="display:flex;gap:8px;align-self:flex-end">
-          ${haveKey
-            ? html`<sp-button size="s" variant="secondary" @click=${cancelEditApiKey}
-                >Cancel</sp-button
-              >`
-            : nothing}
-          <sp-button size="s" variant="primary" @click=${saveApiKey}>Save</sp-button>
-        </div>
-      </div>
+      <div class="ai-status-center">${credsForm.render()}</div>
     </div>
   `;
 }
@@ -316,6 +163,16 @@ async function handleAssistantSend(text: string) {
   if ((assistant.chatState.status as ChatState) !== "streaming") {
     chatInstance?.inputAreaSetEnabled(true);
   }
+}
+
+/**
+ * Seed the assistant with a prompt programmatically (e.g. the New Project flow handing off a
+ * project brief). Delegates to the same send path as the chat input. Safe to call right after the
+ * Assistant tab renders, before the chat widget mounts: every chatInstance call is
+ * optional-chained, and the reactive watcher replays chat-state into a later mount.
+ */
+export async function seedAssistantPrompt(text: string): Promise<void> {
+  await handleAssistantSend(text);
 }
 
 /** Render a single finalized chat-state message into QuikChat. */

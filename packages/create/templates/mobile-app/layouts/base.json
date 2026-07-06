@@ -1,0 +1,96 @@
+{
+  "tagName": "div",
+  "style": {
+    "margin": "0",
+    "padding": "0",
+    "height": "100dvh",
+    "display": "flex",
+    "flexDirection": "column",
+    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "lineHeight": "1.6",
+    "color": "#1a1a1a",
+    "backgroundColor": "#ffffff"
+  },
+  "children": [
+    {
+      "tagName": "header",
+      "style": {
+        "padding": "0.75rem 1rem",
+        "paddingTop": "calc(0.75rem + env(safe-area-inset-top))",
+        "borderBottom": "1px solid #e5e5e5",
+        "textAlign": "center"
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "fontSize": "1.05rem",
+            "fontWeight": "700"
+          },
+          "children": ["My App"]
+        }
+      ]
+    },
+    {
+      "tagName": "main",
+      "style": {
+        "flex": "1",
+        "overflowY": "auto",
+        "padding": "1rem",
+        "width": "100%"
+      },
+      "children": [{ "tagName": "slot" }]
+    },
+    {
+      "tagName": "nav",
+      "style": {
+        "display": "flex",
+        "borderTop": "1px solid #e5e5e5",
+        "paddingBottom": "env(safe-area-inset-bottom)",
+        "backgroundColor": "#ffffff"
+      },
+      "children": [
+        {
+          "tagName": "a",
+          "attributes": { "href": "/" },
+          "style": {
+            "flex": "1",
+            "padding": "0.75rem 0",
+            "textAlign": "center",
+            "textDecoration": "none",
+            "fontSize": "0.8rem",
+            "fontWeight": "600",
+            "color": "#1a1a1a"
+          },
+          "children": ["Home"]
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "/explore/" },
+          "style": {
+            "flex": "1",
+            "padding": "0.75rem 0",
+            "textAlign": "center",
+            "textDecoration": "none",
+            "fontSize": "0.8rem",
+            "color": "#666"
+          },
+          "children": ["Explore"]
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "/profile/" },
+          "style": {
+            "flex": "1",
+            "padding": "0.75rem 0",
+            "textAlign": "center",
+            "textDecoration": "none",
+            "fontSize": "0.8rem",
+            "color": "#666"
+          },
+          "children": ["Profile"]
+        }
+      ]
+    }
+  ]
+}

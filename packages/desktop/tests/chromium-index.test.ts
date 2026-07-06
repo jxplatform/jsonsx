@@ -133,6 +133,15 @@ void mock.module("../src/recent-store", () => ({
   writeRecents: writeRecentsMock,
 }));
 
+// The import pipeline itself is exercised in @jxsuite/import; here only the route wiring matters.
+const importSiteMock = mock((options: Record<string, unknown>) => {
+  const outDir = options.outDir as string;
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(join(outDir, "project.json"), JSON.stringify({ name: "Imported" }));
+  return Promise.resolve({ outDir, pages: [], fileCount: 1, verify: null, warnings: [] });
+});
+void mock.module("@jxsuite/import/run", () => ({ importSite: importSiteMock }));
+
 // ─── Fake chromium child process ────────────────────────────────────────────
 
 class FakeChrome {
@@ -450,6 +459,47 @@ describe("chromium launcher RPC dispatch", () => {
       ws.send("{{{not json");
     });
     expect(response.error).toBe("Invalid JSON");
+  });
+});
+
+// ─── AI-guided site import route ─────────────────────────────────────────────
+
+describe("chromium launcher import route", () => {
+  test("pickDirectory RPC opens the native directory dialog", async () => {
+    const result = await rpc("pickDirectory");
+    expect(result).toEqual({ path: null });
+    expect(openDirectoryDialogMock).toHaveBeenCalled();
+  });
+
+  test("rejects a relative destination directory", async () => {
+    const res = await fetch(`${baseUrl}/__studio__/import-site?token=${rpcToken}`, {
+      body: JSON.stringify({ directory: "relative/dest", url: "https://clone.example/" }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("absolute");
+  });
+
+  test("imports into an absolute destination with the launcher's browser binary", async () => {
+    const dest = join(FIXTURES, "imported-site");
+    const res = await fetch(`${baseUrl}/__studio__/import-site?token=${rpcToken}`, {
+      body: JSON.stringify({ directory: dest, url: "https://clone.example/" }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    const lines = text
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(lines.at(-1)?.type).toBe("done");
+    expect(lines.at(-1)?.root).toBe(dest);
+    // The chromium binary the launcher discovered doubles as puppeteer's browser.
+    const opts = importSiteMock.mock.calls.at(-1)?.[0] as { chromePath?: string };
+    expect(opts.chromePath).toBe("/usr/bin/sh");
   });
 });
 

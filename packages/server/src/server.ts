@@ -13,13 +13,14 @@
  *   proxying, and studio filesystem integration as a single createDevServer() call.
  */
 
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { buildAll } from "./build.ts";
 import { createWatcher, injectSSE } from "./watch.ts";
 import { handleResolve, handleServerFunction } from "./resolve.ts";
-import { handleStudioApi } from "./studio-api.ts";
+import { assertAccessible, handleStudioApi } from "./studio-api.ts";
 import { handleCodeApi } from "./code-api.ts";
 import { handleAiApi } from "./ai-api.ts";
+import { handleImportApi } from "./import-api.ts";
 import { existsSync, readFileSync } from "node:fs";
 
 /**
@@ -265,6 +266,19 @@ export async function createDevServer(options: {
         const aiRes = await handleAiApi(req, url);
         if (aiRes) {
           return aiRes;
+        }
+
+        // AI-guided site import (/__studio/import-site) — NDJSON progress stream
+        const importRes = await handleImportApi(req, url, {
+          resolveDest: (dir) => {
+            const dest = resolve(absRoot, dir);
+            assertAccessible(dest, absRoot, activeProjectRoot);
+            return dest;
+          },
+          toRoot: (dest) => relative(absRoot, dest).replaceAll("\\", "/"),
+        });
+        if (importRes) {
+          return importRes;
         }
 
         const codeRes = await handleCodeApi(req, url);

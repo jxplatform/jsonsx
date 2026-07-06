@@ -1,14 +1,17 @@
 import Electrobun from "electrobun/bun";
+import { isAbsolute } from "node:path";
 import { setDirectoryDialog, setFileDialog } from "./project-session";
 import { setNotifyWebview, startBackgroundChecks } from "./updater";
 import { init as initUtils, openDirectoryDialog, openFileDialog } from "./utils";
 import { handleAiApi } from "@jxsuite/server/ai-api";
+import { handleImportApi } from "@jxsuite/server/import-api";
 import { installApplicationMenu } from "./menu";
 import {
   broadcastUpdateReady,
   openProjectWindow,
   parseProjectDirFromUrl,
   setAiServerUrl,
+  setImportServiceUrl,
 } from "./window-manager";
 
 // ─── App-level services (shared across all windows) ──────────────────────────
@@ -22,15 +25,38 @@ async function main() {
   setFileDialog(openFileDialog);
   setDirectoryDialog(openDirectoryDialog);
 
-  // AI HTTP server (SSE streaming requires HTTP). A single shared server: AI sessions are id-keyed
-  // And process-global, so the server resolves requests by id and needs no fixed project root
-  // (session creation flows through per-window RPC, which supplies the window's own root).
+  // Shared services HTTP server (SSE/NDJSON streaming requires HTTP), loopback-bound. AI sessions
+  // Are id-keyed and process-global, so the server resolves requests by id and needs no fixed
+  // Project root (session creation flows through per-window RPC, which supplies the window's own
+  // Root). The import route writes to the filesystem, so it is additionally gated by a per-process
+  // Random token handed to webviews over RPC.
+  const importToken = crypto.randomUUID();
   const aiServer = Bun.serve({
+    hostname: "127.0.0.1",
+    // Imports stream for minutes with heartbeats every 15s; match the dev server's generous timeout.
+    idleTimeout: 120,
     async fetch(req) {
       const url = new URL(req.url);
       const aiResponse = await handleAiApi(req, url);
       if (aiResponse) {
         return aiResponse;
+      }
+      if (url.pathname === "/__studio/import-site") {
+        if (url.searchParams.get("token") !== importToken) {
+          return new Response("Forbidden", { status: 403 });
+        }
+        const importResponse = await handleImportApi(req, url, {
+          resolveDest: (dir) => {
+            // The webview resolves the destination under a natively-picked parent before posting.
+            if (!isAbsolute(dir)) {
+              throw new Error("directory must be an absolute path");
+            }
+            return dir;
+          },
+        });
+        if (importResponse) {
+          return importResponse;
+        }
       }
       return new Response("Not Found", { status: 404 });
     },
@@ -38,6 +64,9 @@ async function main() {
   });
 
   setAiServerUrl(`http://localhost:${aiServer.port}`);
+  setImportServiceUrl(
+    `http://127.0.0.1:${aiServer.port}/__studio/import-site?token=${importToken}`,
+  );
 
   installApplicationMenu();
 

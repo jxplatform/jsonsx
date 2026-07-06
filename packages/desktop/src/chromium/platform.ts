@@ -1,6 +1,9 @@
 /// <reference lib="dom" />
+import { streamImport } from "@jxsuite/studio/import-client";
 import type {
   ComponentMeta,
+  ImportProgressEvent,
+  ImportSiteOptions,
   RecentProjectEntry,
   RenameResult,
   StarterInfo,
@@ -321,6 +324,16 @@ export function createDesktopPlatform(): StudioPlatform {
       adapter?: string;
       directory: string;
       starter?: string;
+      template?: string;
+      design?: {
+        accent?: string;
+        background?: string;
+        text?: string;
+        bodyFont?: string;
+        headingFont?: string;
+        media?: Record<string, string>;
+        logo?: { name: string; base64: string };
+      };
     }) {
       return request("createProject", opts) as Promise<{
         root: string;
@@ -330,6 +343,34 @@ export function createDesktopPlatform(): StudioPlatform {
 
     async listStarters() {
       return request("listStarters") as Promise<StarterInfo[]>;
+    },
+
+    async pickDirectory() {
+      const result = (await request("pickDirectory")) as { path: string | null };
+      return result.path;
+    },
+
+    // AI-guided site import: streams NDJSON progress from the token-gated loopback endpoint. A
+    // Relative directory (the modal's slug) is resolved under a natively-picked parent folder.
+    async importSite(
+      opts: ImportSiteOptions,
+      onProgress: (evt: ImportProgressEvent) => void,
+      signal?: AbortSignal,
+    ) {
+      let { directory } = opts;
+      if (!/^(?:[a-zA-Z]:[\\/]|\/)/.test(directory)) {
+        const parentResult = (await request("pickDirectory")) as { path: string | null };
+        if (!parentResult.path) {
+          throw new Error("No destination folder was selected.");
+        }
+        directory = `${parentResult.path}/${directory}`;
+      }
+      return streamImport(
+        `/__studio__/import-site?token=${encodeURIComponent(token)}`,
+        { ...opts, directory },
+        onProgress,
+        signal,
+      );
     },
 
     // AI Assistant (Stack B: OpenAI-compatible SSE proxy on the local chromium server)

@@ -305,6 +305,48 @@ describe("create-project", () => {
     // The starter's menu content collection came along with the clone.
     expect(existsSync(join(ROOT, "from-starter", "content", "menu"))).toBe(true);
   });
+
+  test("applies a built-in template variant", async () => {
+    const { req, url } = jsonReq("/__studio/create-project", "POST", {
+      directory: "from-template",
+      name: "My App",
+      template: "mobile-first",
+    });
+    const res = await callApi(req, url);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.config.$media["--"]).toBe("375px");
+    expect(body.config.$media["--lg"]).toBe("(min-width: 1024px)");
+  });
+
+  test("applies design quickstart options to the generated project", async () => {
+    const { req, url } = jsonReq("/__studio/create-project", "POST", {
+      design: {
+        accent: "#ff5500",
+        media: { "--": "1440px", "--sm": "(max-width: 600px)" },
+      },
+      directory: "designed-site",
+      name: "Designed Site",
+    });
+    const res = await callApi(req, url);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.config.style["--color-primary"]).toBe("#ff5500");
+    expect(body.config.$media).toEqual({ "--": "1440px", "--sm": "(max-width: 600px)" });
+  });
+
+  test("rejects an unknown template id", async () => {
+    const { req, url } = jsonReq("/__studio/create-project", "POST", {
+      directory: "bad-template",
+      name: "Bad",
+      template: "spaceship",
+    });
+    const res = await callApi(req, url);
+    expect(res.status).toBe(400);
+    const payload = await res.json();
+    expect(payload.error).toContain("Unknown template");
+    expect(existsSync(join(ROOT, "bad-template"))).toBe(false);
+  });
 });
 
 describe("starters", () => {

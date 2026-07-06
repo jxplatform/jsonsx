@@ -136,6 +136,34 @@ export interface StarterInfo {
   thumbnail: string;
 }
 
+/** A progress line from the AI-guided site import (mirrors @jxsuite/import ImportProgressEvent). */
+export interface ImportProgressEvent {
+  phase: string;
+  message: string;
+  current?: number;
+  total?: number;
+}
+
+/** Options for {@link StudioPlatform.importSite}. */
+export interface ImportSiteOptions {
+  /** The live site to clone; must be http(s). */
+  url: string;
+  /** Display name for the new project. */
+  name: string;
+  /** Destination directory (platform-interpreted: project-relative on the dev server). */
+  directory: string;
+  /** Max crawl depth; 0 = single page. */
+  depth: number;
+  /** Max pages to capture. */
+  maxPages: number;
+  /** Refine component/prop names with the LLM (requires a key). */
+  aiComponents: boolean;
+  /** OpenAI-compatible credentials, from the user's AI settings. */
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+}
+
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
@@ -242,12 +270,39 @@ export interface StudioPlatform {
     directory: string;
     /** Id of a starter template to clone, or "blank"/undefined for the minimal template. */
     starter?: string;
+    /** Id of a built-in template variant (from `@jxsuite/create/templates`); undefined = blank. */
+    template?: string;
+    /** Design quickstart (colors, fonts, logo, breakpoints) applied on top of the scaffold. */
+    design?: {
+      accent?: string;
+      background?: string;
+      text?: string;
+      bodyFont?: string;
+      headingFont?: string;
+      media?: Record<string, string>;
+      logo?: { name: string; base64: string };
+    };
   }) => Promise<{ root: string; config: ProjectConfig }>;
   /**
    * List the starter templates available in the New Project picker. Absent on platforms that don't
    * ship starters (the picker then offers only a blank project).
    */
   listStarters?: () => Promise<StarterInfo[]>;
+  /**
+   * AI-guided import of an existing site into a new project. Runs in the backend (headless Chrome +
+   * fs), streaming progress until the project is written. Absent on platforms without a backend
+   * import pipeline — the New Project modal hides its Import tab then.
+   */
+  importSite?: (
+    opts: ImportSiteOptions,
+    onProgress: (evt: ImportProgressEvent) => void,
+    signal?: AbortSignal,
+  ) => Promise<{ root: string; config: ProjectConfig }>;
+  /**
+   * Open a native directory picker and return the chosen absolute path (null when cancelled).
+   * Desktop only; the dev server interprets directories relative to its root instead.
+   */
+  pickDirectory?: () => Promise<string | null>;
   /** Stack B AI assistant: URL of the OpenAI-compatible SSE chat proxy (`/__studio/ai/chat`). */
   aiChatUrl: () => string | Promise<string>;
   // ─── Multi-window (desktop only; undefined on dev-server) ───────────────────

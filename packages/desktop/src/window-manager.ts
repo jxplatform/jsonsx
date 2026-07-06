@@ -47,6 +47,13 @@ export function setAiServerUrl(url: string) {
   aiServerUrl = url;
 }
 
+// The token-gated import-site endpoint on the same shared server (full URL incl. its token).
+let importServiceUrl = "";
+
+export function setImportServiceUrl(url: string) {
+  importServiceUrl = url;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function normalizeRoot(root: string): string {
@@ -234,6 +241,10 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
 
         // AI (Stack B: hand the webview the absolute SSE proxy URL on the shared local server)
         aiChatUrl: () => `${aiServerUrl}/__studio/ai/chat`,
+
+        // Import (the token-gated NDJSON endpoint on the shared local server) + directory picker
+        importSiteUrl: () => importServiceUrl,
+        pickDirectory: () => session.pickDirectory(),
 
         // Files / project (bound to this window's session)
         codeService: (params) => session.codeService(params),

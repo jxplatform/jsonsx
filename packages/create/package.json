@@ -15,12 +15,15 @@
     "index.ts",
     "generate.ts",
     "cli-args.ts",
-    "template/"
+    "templates.ts",
+    "template/",
+    "templates/"
   ],
   "type": "module",
   "exports": {
     ".": "./index.ts",
-    "./generate": "./generate.ts"
+    "./generate": "./generate.ts",
+    "./templates": "./templates.ts"
   },
   "publishConfig": {
     "provenance": true

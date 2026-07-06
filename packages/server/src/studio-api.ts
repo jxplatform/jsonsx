@@ -22,6 +22,7 @@ import {
 } from "./packages.ts";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ClassJsonDef } from "./types.ts";
+import type { DesignOptions } from "@jxsuite/create/generate";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
 /** Normalise a path to forward slashes (Windows `path` module returns backslashes). */
@@ -150,7 +151,7 @@ async function getFormatRegistry(projectRoot: string): Promise<FormatRegistry> {
  * @param {string} root
  * @param {string | null} activeProjectRoot
  */
-function assertAccessible(filePath: string, root: string, activeProjectRoot: string | null) {
+export function assertAccessible(filePath: string, root: string, activeProjectRoot: string | null) {
   const rel = relative(root, filePath);
   if (!rel.startsWith("..") && !rel.startsWith("/")) {
     return;
@@ -437,10 +438,25 @@ export async function handleStudioApi(
         adapter?: "static" | "cloudflare-pages" | "cloudflare-workers" | "node" | "bun";
         directory?: string;
         starter?: string;
+        template?: string;
+        design?: DesignOptions;
       };
-      const { name, description, url: siteUrl, adapter, directory, starter } = body;
+      const {
+        name,
+        description,
+        url: siteUrl,
+        adapter,
+        directory,
+        starter,
+        template,
+        design,
+      } = body;
       if (!name || !directory) {
         return Response.json({ error: "name and directory are required" }, { status: 400 });
+      }
+      const { isTemplateId } = await import("@jxsuite/create/templates");
+      if (template !== undefined && !isTemplateId(template)) {
+        return Response.json({ error: `Unknown template: "${template}"` }, { status: 400 });
       }
       const destPath = resolve(root, directory);
       assertAccessible(destPath, root, activeProjectRoot);
@@ -452,6 +468,8 @@ export async function handleStudioApi(
         ...(description !== undefined ? { description } : {}),
         ...(siteUrl !== undefined ? { url: siteUrl } : {}),
         ...(starter !== undefined ? { starter } : {}),
+        ...(template !== undefined && isTemplateId(template) ? { template } : {}),
+        ...(design !== undefined ? { design } : {}),
       });
 
       const config = JSON.parse(

@@ -21,6 +21,7 @@ void mock.module("electrobun/bun", () => ({
 
 const openProjectWindow = mock((_root: string | null) => ({}) as unknown);
 const setAiServerUrl = mock((_url: string) => {});
+const setImportServiceUrl = mock((_url: string) => {});
 const broadcastUpdateReady = mock((_version: string) => {});
 const parseProjectDirFromUrl = mock((url: string) =>
   url.includes("project.json") ? "/parsed/dir" : null,
@@ -30,6 +31,7 @@ void mock.module("../src/window-manager", () => ({
   openProjectWindow,
   parseProjectDirFromUrl,
   setAiServerUrl,
+  setImportServiceUrl,
 }));
 
 const installApplicationMenu = mock(() => {});
@@ -64,6 +66,11 @@ const handleAiApi = mock(async (_req: Request, url: URL) => {
   return null;
 });
 void mock.module("@jxsuite/server/ai-api", () => ({ handleAiApi }));
+
+const handleImportApi = mock(
+  async (_req: Request, _url: URL, _opts: unknown) => new Response("import-ok", { status: 200 }),
+);
+void mock.module("@jxsuite/server/import-api", () => ({ handleImportApi }));
 
 // ─── Stub Bun.serve, then import the module under test ───────────────────────
 
@@ -132,6 +139,35 @@ describe("AI server fetch handler", () => {
     const res = await serveOpts!.fetch(new Request("http://localhost/nope"));
     expect(res.status).toBe(404);
     expect(await res.text()).toBe("Not Found");
+  });
+});
+
+// ─── Import route (token-gated) ─────────────────────────────────────────────
+
+describe("import-site route", () => {
+  const publishedUrl = () => setImportServiceUrl.mock.calls[0]?.[0] as string;
+
+  test("publishes the tokened endpoint on the shared server", () => {
+    expect(publishedUrl()).toStartWith("http://127.0.0.1:43210/__studio/import-site?token=");
+  });
+
+  test("rejects requests without the token", async () => {
+    const res = await serveOpts!.fetch(
+      new Request("http://127.0.0.1:43210/__studio/import-site", { method: "POST" }),
+    );
+    expect(res.status).toBe(403);
+    expect(handleImportApi).not.toHaveBeenCalled();
+  });
+
+  test("delegates tokened requests to handleImportApi with an absolute-dir guard", async () => {
+    const res = await serveOpts!.fetch(new Request(publishedUrl(), { method: "POST" }));
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("import-ok");
+    const opts = handleImportApi.mock.calls.at(-1)?.[2] as {
+      resolveDest: (dir: string) => string;
+    };
+    expect(opts.resolveDest("/abs/dir")).toBe("/abs/dir");
+    expect(() => opts.resolveDest("relative/dir")).toThrow("absolute");
   });
 });
 

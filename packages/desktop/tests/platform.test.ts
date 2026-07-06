@@ -68,6 +68,16 @@ async function flush(ms = 25): Promise<void> {
   });
 }
 
+// The NDJSON stream client is exercised by studio's import-client tests; here only the plumbing
+// (endpoint lookup, directory resolution, callback threading) matters.
+const streamImportCalls: unknown[][] = [];
+void mock.module("@jxsuite/studio/import-client", () => ({
+  streamImport: (...args: unknown[]) => {
+    streamImportCalls.push(args);
+    return Promise.resolve({ config: { name: "Imported" }, root: "/imported" });
+  },
+}));
+
 // ─── Import module under test (after mocks + DOM) ──────────────────────────
 
 const { createDesktopPlatform } = await import("../src/platform");
@@ -740,5 +750,74 @@ describe("getAppInfo", () => {
     const info = await platform.getAppInfo!();
     expect(info.updateStatus).toBeUndefined();
     expect(info.version).toBe("1.0.0");
+  });
+});
+
+// ─── AI-guided site import ───────────────────────────────────────────────────
+
+describe("importSite / pickDirectory", () => {
+  test("pickDirectory returns the natively picked path", async () => {
+    impls.set("pickDirectory", () => ({ path: "/picked/parent" }));
+    await expect(platform.pickDirectory!()).resolves.toBe("/picked/parent");
+  });
+
+  test("a relative directory is resolved under a picked parent and streamed to the RPC endpoint", async () => {
+    streamImportCalls.length = 0;
+    impls.set("pickDirectory", () => ({ path: "/picked/parent" }));
+    impls.set("importSiteUrl", () => "http://127.0.0.1:9/__studio/import-site?token=T");
+    const onProgress = () => {};
+    const result = await platform.importSite!(
+      {
+        aiComponents: false,
+        depth: 1,
+        directory: "my-slug",
+        maxPages: 5,
+        name: "X",
+        url: "https://x.example",
+      },
+      onProgress,
+    );
+    expect(result).toEqual({ config: { name: "Imported" }, root: "/imported" } as never);
+    const [endpoint, opts, cb] = streamImportCalls[0]!;
+    expect(endpoint).toBe("http://127.0.0.1:9/__studio/import-site?token=T");
+    expect((opts as { directory: string }).directory).toBe("/picked/parent/my-slug");
+    expect(cb).toBe(onProgress);
+  });
+
+  test("an absolute directory skips the directory dialog", async () => {
+    streamImportCalls.length = 0;
+    impls.set("pickDirectory", () => {
+      throw new Error("dialog must not open");
+    });
+    impls.set("importSiteUrl", () => "http://127.0.0.1:9/__studio/import-site?token=T");
+    await platform.importSite!(
+      {
+        aiComponents: false,
+        depth: 0,
+        directory: "/abs/dest",
+        maxPages: 1,
+        name: "X",
+        url: "https://x.example",
+      },
+      () => {},
+    );
+    expect((streamImportCalls[0]![1] as { directory: string }).directory).toBe("/abs/dest");
+  });
+
+  test("rejects when the directory picker is cancelled", async () => {
+    impls.set("pickDirectory", () => ({ path: null }));
+    await expect(
+      platform.importSite!(
+        {
+          aiComponents: false,
+          depth: 0,
+          directory: "slug",
+          maxPages: 1,
+          name: "X",
+          url: "https://x.example",
+        },
+        () => {},
+      ),
+    ).rejects.toThrow("No destination folder was selected.");
   });
 });

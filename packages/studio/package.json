@@ -17,7 +17,8 @@
   "exports": {
     ".": "./src/studio.ts",
     "./platform": "./src/platform.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./import-client": "./src/services/import-client.ts"
   },
   "publishConfig": {
     "provenance": true

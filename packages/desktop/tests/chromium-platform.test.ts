@@ -1,5 +1,5 @@
 // oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
 
 // ─── Embedded mock RPC server ──────────────────────────────────────────────
 
@@ -27,6 +27,7 @@ const responses: Record<string, unknown> = {
   getProjectRoot: { root: "/abs/proj" },
   setWindowProject: { config: { name: "Test" }, deduped: false },
   getRecentProjects: [{ name: "Recent", root: "/abs/recent", timestamp: 7 }],
+  pickDirectory: { path: "/picked/parent" },
   saveRecentProjects: null,
   listDirectory: [
     {
@@ -139,6 +140,15 @@ if (wsStr.includes("WebSocketImplementation") || wsStr.includes("DOMException"))
 
 // ─── Import after globals are set ──────────────────────────────────────────
 
+// The NDJSON stream client is exercised by studio's import-client tests; here only the plumbing
+// (endpoint token, directory resolution, callback threading) matters.
+const streamImportCalls: unknown[][] = [];
+const streamImport = mock((...args: unknown[]) => {
+  streamImportCalls.push(args);
+  return Promise.resolve({ config: { name: "Imported" }, root: "/imported" });
+});
+void mock.module("@jxsuite/studio/import-client", () => ({ streamImport }));
+
 const { createDesktopPlatform } = await import("../src/chromium/platform");
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
@@ -189,6 +199,70 @@ describe("chromium desktop platform", () => {
 
   test("activate is a no-op", async () => {
     await expect(platform.activate()).resolves.toBeUndefined();
+  });
+
+  // ─── AI-guided site import ─────────────────────────────────────────────
+
+  test("pickDirectory returns the natively picked path", async () => {
+    await expect(platform.pickDirectory!()).resolves.toBe("/picked/parent");
+  });
+
+  test("importSite resolves a relative directory under a picked parent and streams via the tokened endpoint", async () => {
+    streamImportCalls.length = 0;
+    const onProgress = () => {};
+    const result = await platform.importSite!(
+      {
+        aiComponents: false,
+        depth: 1,
+        directory: "my-slug",
+        maxPages: 5,
+        name: "X",
+        url: "https://x.example",
+      },
+      onProgress,
+    );
+    expect(result).toEqual({ config: { name: "Imported" }, root: "/imported" } as never);
+    const [endpoint, opts, cb] = streamImportCalls[0]!;
+    expect(endpoint).toBe("/__studio__/import-site?token=CHROMIUM_TOK");
+    expect((opts as { directory: string }).directory).toBe("/picked/parent/my-slug");
+    expect(cb).toBe(onProgress);
+  });
+
+  test("importSite passes an absolute directory through without a dialog", async () => {
+    streamImportCalls.length = 0;
+    await platform.importSite!(
+      {
+        aiComponents: false,
+        depth: 0,
+        directory: "/abs/dest",
+        maxPages: 1,
+        name: "X",
+        url: "https://x.example",
+      },
+      () => {},
+    );
+    expect((streamImportCalls[0]![1] as { directory: string }).directory).toBe("/abs/dest");
+  });
+
+  test("importSite rejects when the directory picker is cancelled", async () => {
+    responses.pickDirectory = { path: null };
+    try {
+      await expect(
+        platform.importSite!(
+          {
+            aiComponents: false,
+            depth: 0,
+            directory: "slug",
+            maxPages: 1,
+            name: "X",
+            url: "https://x.example",
+          },
+          () => {},
+        ),
+      ).rejects.toThrow("No destination folder was selected.");
+    } finally {
+      responses.pickDirectory = { path: "/picked/parent" };
+    }
   });
 
   // ─── Class resolution ──────────────────────────────────────────────────

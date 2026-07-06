@@ -48,6 +48,7 @@ describe("create-jxsuite CLI — --template flag", () => {
       description: "Flag site",
       name: basename(destPath),
       starter: "restaurant",
+      template: "blank",
       url: "https://flag.example",
     });
   });

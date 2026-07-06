@@ -2,7 +2,9 @@
 /// <reference lib="dom.iterable" />
 import { Electroview } from "electrobun/view";
 import { html, render as litRender } from "lit-html";
+import { streamImport } from "@jxsuite/studio/import-client";
 import type { RecentProjectEntry, StudioRPC } from "./rpc-schema";
+import type { ImportProgressEvent, ImportSiteOptions } from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload } from "@jxsuite/server/refactor";
 
@@ -508,6 +510,16 @@ export function createDesktopPlatform() {
       adapter?: string;
       directory: string;
       starter?: string;
+      template?: string;
+      design?: {
+        accent?: string;
+        background?: string;
+        text?: string;
+        bodyFont?: string;
+        headingFont?: string;
+        media?: Record<string, string>;
+        logo?: { name: string; base64: string };
+      };
     }) {
       return rpc.request.createProject(opts) as Promise<{
         root: string;
@@ -517,6 +529,30 @@ export function createDesktopPlatform() {
 
     async listStarters() {
       return rpc.request.listStarters();
+    },
+
+    async pickDirectory() {
+      const result = await rpc.request.pickDirectory();
+      return result.path;
+    },
+
+    // AI-guided site import: streams NDJSON progress from the token-gated shared local server. A
+    // Relative directory (the modal's slug) is resolved under a natively-picked parent folder.
+    async importSite(
+      opts: ImportSiteOptions,
+      onProgress: (evt: ImportProgressEvent) => void,
+      signal?: AbortSignal,
+    ) {
+      let { directory } = opts;
+      if (!/^(?:[a-zA-Z]:[\\/]|\/)/.test(directory)) {
+        const parent = await rpc.request.pickDirectory();
+        if (!parent.path) {
+          throw new Error("No destination folder was selected.");
+        }
+        directory = `${parent.path}/${directory}`;
+      }
+      const endpoint = (await rpc.request.importSiteUrl()) as string;
+      return streamImport(endpoint, { ...opts, directory }, onProgress, signal);
     },
 
     updater: {

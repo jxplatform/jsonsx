@@ -1,12 +1,34 @@
 /** Shared project generation logic. Used by both the CLI scaffolder and the Studio server endpoint. */
 
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { basename, join, relative, sep } from "node:path";
+
+import { Buffer } from "node:buffer";
 
 import { existsSync } from "node:fs";
+import { mediaForTemplate } from "./templates";
+import type { TemplateId } from "./templates";
 
 const __dirname = import.meta.dirname;
 const TEMPLATE_DIR = join(__dirname, "template");
+const TEMPLATE_OVERLAYS_DIR = join(__dirname, "templates");
+
+export interface DesignOptions {
+  /** Accent / primary brand color (hex). */
+  accent?: string;
+  /** Page background color (hex). */
+  background?: string;
+  /** Body text color (hex). */
+  text?: string;
+  /** Body font stack. */
+  bodyFont?: string;
+  /** Heading font stack. */
+  headingFont?: string;
+  /** Replaces project.json $media entirely when provided (name → query/width map). */
+  media?: Record<string, string>;
+  /** Logo image written to public/<name>. base64 is the raw file content, no data: prefix. */
+  logo?: { name: string; base64: string };
+}
 
 export interface ProjectOptions {
   name: string;
@@ -18,6 +40,13 @@ export interface ProjectOptions {
    * built-in minimal template.
    */
   starter?: string;
+  /**
+   * Id of a built-in template variant (from ./templates). Ignored when a non-blank starter is
+   * given; undefined means "blank".
+   */
+  template?: TemplateId;
+  /** Design quickstart (colors, fonts, logo, breakpoints) applied on top of the scaffold. */
+  design?: DesignOptions;
 }
 
 const CF_ADAPTERS = new Set(["cloudflare-pages", "cloudflare-workers"]);
@@ -40,7 +69,15 @@ const STARTER_EXCLUDE = new Set([
  * @param {ProjectOptions} opts
  */
 export async function generateProject(destPath: string, opts: ProjectOptions) {
-  const { name, description = "", url = "", adapter = "static", starter } = opts;
+  const {
+    name,
+    description = "",
+    url = "",
+    adapter = "static",
+    starter,
+    template = "blank",
+    design,
+  } = opts;
 
   if (existsSync(destPath)) {
     const { readdirSync } = await import("node:fs");
@@ -52,7 +89,13 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
   await mkdir(destPath, { recursive: true });
 
   if (starter && starter !== "blank") {
-    await scaffoldFromStarter(destPath, starter, { adapter, description, name, url });
+    await scaffoldFromStarter(destPath, starter, {
+      adapter,
+      description,
+      name,
+      url,
+      ...(design !== undefined ? { design } : {}),
+    });
     return;
   }
 
@@ -60,7 +103,10 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
   await mkdir(join(destPath, "public"), { recursive: true });
   await mkdir(join(destPath, "content"), { recursive: true });
 
-  const projectJson = buildProjectJson({ adapter, description, name, url });
+  const projectJson = buildProjectJson({ adapter, description, name, template, url });
+  if (design) {
+    applyDesign(projectJson as unknown as Record<string, unknown>, design, { starter: false });
+  }
   const packageJson = buildPackageJson({ adapter, description, name });
 
   const writes = [
@@ -77,6 +123,19 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
   }
 
   await Promise.all(writes);
+
+  // The mobile-app variant overlays the shared skeleton with its app-shell layout and home page.
+  // Sequenced after the base copies so the overlay files win.
+  if (template === "mobile-app") {
+    await cp(join(TEMPLATE_OVERLAYS_DIR, "mobile-app"), destPath, {
+      force: true,
+      recursive: true,
+    });
+  }
+
+  if (design?.logo) {
+    await writeLogo(destPath, design.logo);
+  }
 }
 
 /**
@@ -93,9 +152,15 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
 async function scaffoldFromStarter(
   destPath: string,
   starter: string,
-  opts: { name: string; description?: string; url?: string; adapter?: ProjectOptions["adapter"] },
+  opts: {
+    name: string;
+    description?: string;
+    url?: string;
+    adapter?: ProjectOptions["adapter"];
+    design?: DesignOptions;
+  },
 ) {
-  const { name, description = "", url = "", adapter = "static" } = opts;
+  const { name, description = "", url = "", adapter = "static", design } = opts;
 
   // Resolved lazily so blank projects never load the (large) starters package.
   const { getStarterDir } = await import("@jxsuite/starters");
@@ -123,6 +188,9 @@ async function scaffoldFromStarter(
     build.adapter = adapter;
     project.build = build;
   }
+  if (design) {
+    applyDesign(project, design, { starter: true });
+  }
   await writeFile(projectPath, `${JSON.stringify(project, null, "\t")}\n`);
 
   // Rebuild package.json so scaffolded projects get current dep ranges and scripts regardless of
@@ -134,6 +202,90 @@ async function scaffoldFromStarter(
     const wranglerJsonc = buildWranglerJsonc({ adapter, slug: packageJson.name });
     await writeFile(join(destPath, "wrangler.jsonc"), wranglerJsonc);
   }
+
+  if (design?.logo) {
+    await writeLogo(destPath, design.logo);
+  }
+}
+
+/**
+ * Apply the design quickstart (colors, fonts, breakpoints) to a project.json object, in place.
+ *
+ * Blank projects own their style block, so values are written directly. Starters are re-themed
+ * best-effort against the conventions the in-repo starters share (`--color-primary`,
+ * `--color-text-primary`, `--font-body`, `--font-heading`, top-level `fontFamily` /
+ * `backgroundColor`): an override only lands on a token key the starter's style already declares
+ * (falling back to the plain CSS property where noted), and is otherwise skipped silently rather
+ * than fighting the starter's layered styles. `--color-primary-hover` is intentionally left alone.
+ *
+ * @param {Record<string, unknown>} project — parsed project.json, mutated in place
+ * @param {DesignOptions} design
+ * @param {{ starter: boolean }} mode — starter clone vs. blank/template scaffold
+ */
+function applyDesign(
+  project: Record<string, unknown>,
+  design: DesignOptions,
+  { starter }: { starter: boolean },
+) {
+  const { accent, background, text, bodyFont, headingFont, media } = design;
+  const style = project.style as Record<string, unknown> | undefined;
+
+  if (style) {
+    if (accent && (!starter || "--color-primary" in style)) {
+      style["--color-primary"] = accent;
+    }
+    if (text) {
+      if (!starter) {
+        style.color = text;
+      } else if ("--color-text-primary" in style) {
+        style["--color-text-primary"] = text;
+      } else if ("color" in style) {
+        style.color = text;
+      }
+    }
+    if (background && (!starter || "backgroundColor" in style)) {
+      style.backgroundColor = background;
+    }
+    if (bodyFont) {
+      if (!starter) {
+        style.fontFamily = bodyFont;
+      } else if ("--font-body" in style) {
+        style["--font-body"] = bodyFont;
+      } else if ("fontFamily" in style) {
+        style.fontFamily = bodyFont;
+      }
+    }
+    if (headingFont && (!starter || "--font-heading" in style)) {
+      style["--font-heading"] = headingFont;
+    }
+  }
+
+  if (media && Object.keys(media).length > 0) {
+    project.$media = media;
+  }
+}
+
+/** File types accepted for the quickstart logo. */
+const LOGO_EXTENSION = /\.(svg|png|jpe?g|webp|gif|ico)$/i;
+
+/**
+ * Write the design-quickstart logo into the project's public/ directory. The provided name is
+ * flattened to its basename (no path segments can escape public/) and must carry an image extension
+ * — this is the only guard between UI input and the filesystem.
+ *
+ * @param {string} destPath — absolute path to the project directory
+ * @param {{ name: string; base64: string }} logo
+ */
+async function writeLogo(destPath: string, logo: { name: string; base64: string }) {
+  const fileName = basename(logo.name);
+  if (!LOGO_EXTENSION.test(fileName)) {
+    throw new Error(
+      `Logo file type not allowed: "${logo.name}" (expected .svg, .png, .jpg, .jpeg, .webp, .gif, or .ico)`,
+    );
+  }
+  const publicDir = join(destPath, "public");
+  await mkdir(publicDir, { recursive: true });
+  await writeFile(join(publicDir, fileName), Buffer.from(logo.base64, "base64"));
 }
 
 /**
@@ -183,13 +335,27 @@ function buildWranglerJsonc({ slug, adapter }: { slug: string; adapter: string }
 }
 
 /** @param {ProjectOptions} opts */
-function buildProjectJson({ name, description, url, adapter }: ProjectOptions) {
+function buildProjectJson({ name, description, url, adapter, template = "blank" }: ProjectOptions) {
+  // Mobile-app shells draw under device notches/home bars; viewport-fit=cover makes the safe-area
+  // Insets used by the app-shell layout take effect.
+  const viewport =
+    template === "mobile-app"
+      ? "width=device-width, initial-scale=1, viewport-fit=cover"
+      : "width=device-width, initial-scale=1";
+
   const $head = [
     {
-      attributes: { content: "width=device-width, initial-scale=1", name: "viewport" },
+      attributes: { content: viewport, name: "viewport" },
       tagName: "meta",
     },
   ];
+
+  if (template === "mobile-app") {
+    $head.push({
+      attributes: { content: "#ffffff", name: "theme-color" },
+      tagName: "meta",
+    });
+  }
 
   if (description) {
     $head.push({
@@ -210,12 +376,7 @@ function buildProjectJson({ name, description, url, adapter }: ProjectOptions) {
 
   return {
     $head,
-    $media: {
-      "--": "1280px",
-      "--lg": "(max-width: 1024px)",
-      "--md": "(max-width: 768px)",
-      "--sm": "(max-width: 640px)",
-    },
+    $media: mediaForTemplate(template),
     build,
     defaults: {
       lang: "en",

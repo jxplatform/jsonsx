@@ -1,0 +1,47 @@
+{
+  "name": "@jxsuite/import",
+  "version": "0.34.0",
+  "description": "Clone a live website into a Jx project",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "packages/import"
+  },
+  "bin": {
+    "jx-import": "./src/cli.ts"
+  },
+  "files": [
+    "src/"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./capture": "./src/capture.ts",
+    "./to-jx": "./src/to-jx.ts",
+    "./emit": "./src/emit.ts",
+    "./run": "./src/run.ts"
+  },
+  "publishConfig": {
+    "provenance": true
+  },
+  "scripts": {
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage",
+    "import": "bun run src/cli.ts"
+  },
+  "dependencies": {
+    "@jxsuite/parser": "workspace:^",
+    "@jxsuite/schema": "workspace:^",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^24.9.0"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5",
+    "happy-dom": "^20.10.6"
+  },
+  "optionalDependencies": {
+    "@jxsuite/compiler": "workspace:^"
+  }
+}

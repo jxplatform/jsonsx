@@ -4,6 +4,7 @@
   "packages/runtime": "0.34.0",
   "packages/parser": "0.34.0",
   "packages/compiler": "0.34.0",
+  "packages/import": "0.34.0",
   "packages/starters": "0.34.0",
   "packages/create": "0.34.0",
   "packages/server": "0.34.0",

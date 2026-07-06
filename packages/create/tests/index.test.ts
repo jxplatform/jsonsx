@@ -6,8 +6,9 @@ import { describe, expect, mock, test } from "bun:test";
 import { basename, resolve } from "node:path";
 
 const prompts: string[] = [];
-// Answers in prompt order: name, description, url, template (2 = first starter), adapter (2 = cf).
-const answers = ["", "A test site", "https://test.example", "2", "2"];
+// Answers in prompt order: name, description, url, template (5 = first starter, after the four
+// Built-in templates), adapter (2 = cf).
+const answers = ["", "A test site", "https://test.example", "5", "2"];
 
 void mock.module("node:readline/promises", () => ({
   createInterface: () => ({
@@ -59,14 +60,17 @@ describe("create-jxsuite CLI", () => {
       description: "A test site",
       name: basename(destPath),
       starter: "restaurant",
+      template: "blank",
       url: "https://test.example",
     });
   });
 
-  test("lists the available starter templates", () => {
+  test("lists the built-in templates and the available starters", () => {
     const output = logs.join("\n");
     expect(output).toContain("Start from a template:");
-    expect(output).toContain("Bistro & Café");
+    expect(output).toContain("1) Blank (default)");
+    expect(output).toContain("4) Mobile App");
+    expect(output).toContain("5) Bistro & Café");
   });
 
   test("resolves the destination relative to the working directory", () => {

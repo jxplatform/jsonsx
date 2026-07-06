@@ -419,4 +419,14 @@ describe("ai-panel (Stack B sequential scenario)", () => {
     expect(state.calls.some((c) => c[0] === "aiChatUrl")).toBe(true);
     chatState.status = "idle";
   });
+
+  test("seedAssistantPrompt drives the same send path as the chat input", async () => {
+    sendMessage.mockClear();
+    await ai.seedAssistantPrompt("seeded from the new-project flow");
+    expect(sendMessage).toHaveBeenCalledWith("seeded from the new-project flow");
+    // Blank prompts are ignored by the shared send guard.
+    sendMessage.mockClear();
+    await ai.seedAssistantPrompt("   ");
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
 });

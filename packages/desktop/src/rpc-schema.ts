@@ -309,6 +309,16 @@ export interface StudioRPC {
           adapter?: string;
           directory: string;
           starter?: string;
+          template?: string;
+          design?: {
+            accent?: string;
+            background?: string;
+            text?: string;
+            bodyFont?: string;
+            headingFont?: string;
+            media?: Record<string, string>;
+            logo?: { name: string; base64: string };
+          };
         };
         response: { root: string; config: ProjectConfig };
       };
@@ -362,6 +372,16 @@ export interface StudioRPC {
       aiChatUrl: {
         params: void;
         response: string;
+      };
+      // AI-guided site import: the token-gated NDJSON endpoint on the shared services server.
+      importSiteUrl: {
+        params: void;
+        response: string;
+      };
+      // Native directory picker (New Project import destination).
+      pickDirectory: {
+        params: void;
+        response: { path: string | null };
       };
       // Window management (multi-window)
       newWindow: {

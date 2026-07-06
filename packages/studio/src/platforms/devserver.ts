@@ -8,8 +8,16 @@
  * See spec/desktop.md §8 for the full specification.
  */
 
+import { streamImport } from "../services/import-client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
-import type { DirEntry, FsEvent, RenameResult, StarterInfo } from "../types";
+import type {
+  DirEntry,
+  FsEvent,
+  ImportProgressEvent,
+  ImportSiteOptions,
+  RenameResult,
+  StarterInfo,
+} from "../types";
 
 /** A directory entry from the server, tolerating extra wire fields. */
 type WireDirEntry = DirEntry & Record<string, unknown>;
@@ -216,6 +224,8 @@ export function createDevServerPlatform() {
       adapter?: string;
       directory: string;
       starter?: string;
+      template?: string;
+      design?: Record<string, unknown>;
     }) {
       const res = await fetch("/__studio/create-project", {
         body: JSON.stringify(opts),
@@ -236,6 +246,15 @@ export function createDevServerPlatform() {
         throw new Error("Failed to load starters");
       }
       return await readJson<StarterInfo[]>(res);
+    },
+
+    /** AI-guided site import: NDJSON progress stream from the dev server's import endpoint. */
+    async importSite(
+      opts: ImportSiteOptions,
+      onProgress: (evt: ImportProgressEvent) => void,
+      signal?: AbortSignal,
+    ) {
+      return await streamImport("/__studio/import-site", opts, onProgress, signal);
     },
 
     // ─── File operations ──────────────────────────────────────────────────

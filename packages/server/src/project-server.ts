@@ -29,7 +29,9 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { realpathSync } from "node:fs";
 import { handleResolve, handleServerFunction } from "./resolve.ts";
 import { handleAiApi } from "./ai-api.ts";
+import { handleImportApi } from "./import-api.ts";
 import { resolveNpmPath } from "./server.ts";
+import type { ImportApiOptions } from "./import-api.ts";
 
 /** A resolved per-window session: its project root plus its RPC handler map. */
 export interface ProjectServerSession {
@@ -52,6 +54,11 @@ export interface CreateProjectServerOptions {
   hostname?: string;
   /** Bind port. Defaults to 0 (ephemeral). */
   port?: number;
+  /**
+   * Enable the AI-guided site-import endpoint (POST `/__studio__/import-site`). Absent disables the
+   * route. It writes to the filesystem, so it is gated with the rpcToken like `/__jx_resolve__`.
+   */
+  importApi?: ImportApiOptions;
 }
 
 export interface ProjectServerHandle {
@@ -270,6 +277,25 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         const aiResponse = await handleAiApi(req, aiUrl);
         if (aiResponse) {
           return aiResponse;
+        }
+      }
+
+      // 2b. AI-guided site import — writes to the filesystem and drives a browser, so token +
+      //     Loopback Origin/Host are the hard gate (same as the RCE-capable routes below).
+      if (normPath === "/__studio__/import-site" && req.method === "POST") {
+        const { importApi } = options;
+        if (!importApi) {
+          return new Response("Not found", { status: 404 });
+        }
+        const token = url.searchParams.get("token");
+        if (token !== rpcToken || !originIsLoopbackOrAbsent(req) || !hostIsLoopbackOrAbsent(req)) {
+          return new Response("Forbidden", { status: 403 });
+        }
+        const importUrl = new URL(req.url);
+        importUrl.pathname = "/__studio/import-site";
+        const importRes = await handleImportApi(req, importUrl, importApi);
+        if (importRes) {
+          return importRes;
         }
       }
 

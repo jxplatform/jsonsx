@@ -19,6 +19,7 @@ jobs:
           - compiler
           - create
           - desktop
+          - import
           - parser
           - runtime
           - schema

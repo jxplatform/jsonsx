@@ -10,7 +10,8 @@ import { rightPanel, updateUi } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { createPanelScheduler } from "./panel-scheduler";
 import type { PanelScheduler } from "./panel-scheduler";
-import { activeTab } from "../workspace/workspace";
+import { activeTab, workspace } from "../workspace/workspace";
+import { consumePendingAgentPrompt, hasPendingAgentPrompt } from "../services/agent-seed";
 import { tabIcon } from "./activity-bar";
 import { eventsSidebarTemplate } from "./events-panel";
 import { isCustomElementDoc } from "./signals-panel";
@@ -25,6 +26,7 @@ import {
   mountAiPanel,
   mountQuikChat,
   registerRightPanelRender,
+  seedAssistantPrompt,
 } from "./ai-panel";
 
 interface RightPanelCtx {
@@ -135,6 +137,12 @@ function _doRender() {
       selection: aTab.session.selection,
       ui: aTab.session.ui,
     };
+    // A pending agent prompt (stored by the New Project flow, possibly from another window)
+    // Forces the Assistant tab open — same updateUi mechanism the automation hook uses.
+    const root = workspace.projectRoot;
+    if (root && S.ui.rightTab !== "assistant" && hasPendingAgentPrompt(root)) {
+      updateUi("rightTab", "assistant");
+    }
     const tab = S.ui.rightTab;
 
     // Render tabs header
@@ -217,6 +225,14 @@ function _doRender() {
       }
     } else if (tab === "assistant") {
       litRender(renderAiPanelTemplate(), _assistantContainer!);
+      if (root) {
+        // Consume-on-read keeps repeated renders idempotent; seed after the panel template
+        // Has rendered so the assistant machinery is in place.
+        const prompt = consumePendingAgentPrompt(root);
+        if (prompt) {
+          requestAnimationFrame(() => void seedAssistantPrompt(prompt));
+        }
+      }
     }
   } catch (error) {
     console.error("right-panel render error:", error);

@@ -11,6 +11,7 @@
     "packages/runtime": { "release-type": "node", "component": "runtime" },
     "packages/parser": { "release-type": "node", "component": "parser" },
     "packages/compiler": { "release-type": "node", "component": "compiler" },
+    "packages/import": { "release-type": "node", "component": "import" },
     "packages/starters": { "release-type": "node", "component": "starters" },
     "packages/create": { "release-type": "node", "component": "create" },
     "packages/server": { "release-type": "node", "component": "server" },
