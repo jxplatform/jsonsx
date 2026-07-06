@@ -24,7 +24,12 @@ const INDEX_KEY = `jx-ai-chat-sessions:${ROOT}`;
 const LEGACY_KEY = `jx-ai-chat-history:${ROOT}`;
 
 function msg(role: string, content: string, timestamp?: number): PersistedMessage {
-  return { id: `m_${role}_${content.length}`, role, content, timestamp };
+  return {
+    id: `m_${role}_${content.length}`,
+    role,
+    content,
+    ...(timestamp !== undefined && { timestamp }),
+  };
 }
 
 beforeEach(() => {
