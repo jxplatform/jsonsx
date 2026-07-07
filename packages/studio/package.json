@@ -40,6 +40,7 @@
     "@jxsuite/ai": "workspace:^",
     "@jxsuite/create": "workspace:^",
     "@jxsuite/parser": "workspace:^",
+    "@jxsuite/protocol": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
     "@spectrum-web-components/accordion": "^1.12.1",

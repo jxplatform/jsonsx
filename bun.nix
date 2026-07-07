@@ -752,6 +752,7 @@
   "@jxsuite/examples" = copyPathToStore ./examples;
   "@jxsuite/import" = copyPathToStore ./packages/import;
   "@jxsuite/parser" = copyPathToStore ./packages/parser;
+  "@jxsuite/protocol" = copyPathToStore ./packages/protocol;
   "@jxsuite/runtime" = copyPathToStore ./packages/runtime;
   "@jxsuite/schema" = copyPathToStore ./packages/schema;
   "@jxsuite/server" = copyPathToStore ./packages/server;

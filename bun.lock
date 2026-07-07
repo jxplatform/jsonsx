@@ -151,6 +151,13 @@
         "@types/mdast": "^4.0.4",
       },
     },
+    "packages/protocol": {
+      "name": "@jxsuite/protocol",
+      "version": "0.1.0",
+      "dependencies": {
+        "@jxsuite/schema": "workspace:^",
+      },
+    },
     "packages/runtime": {
       "name": "@jxsuite/runtime",
       "version": "0.34.1",
@@ -207,6 +214,7 @@
         "@jxsuite/ai": "workspace:^",
         "@jxsuite/create": "workspace:^",
         "@jxsuite/parser": "workspace:^",
+        "@jxsuite/protocol": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
         "@spectrum-web-components/accordion": "^1.12.1",
@@ -643,6 +651,8 @@
     "@jxsuite/import": ["@jxsuite/import@workspace:packages/import"],
 
     "@jxsuite/parser": ["@jxsuite/parser@workspace:packages/parser"],
+
+    "@jxsuite/protocol": ["@jxsuite/protocol@workspace:packages/protocol"],
 
     "@jxsuite/runtime": ["@jxsuite/runtime@workspace:packages/runtime"],
 

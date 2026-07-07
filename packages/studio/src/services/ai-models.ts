@@ -11,6 +11,7 @@
  * @license MIT
  */
 
+import type { AiModelsResponse } from "@jxsuite/protocol";
 import { getPlatform } from "../platform";
 import { getBaseUrl, getOpenAiKey } from "./ai-settings";
 
@@ -83,12 +84,7 @@ export async function fetchAvailableModels(
   if (!resp.ok) {
     throw new Error(`HTTP ${resp.status}`);
   }
-  const data = (await resp.json()) as {
-    models?: { id: string; name?: string }[];
-    configured?: boolean;
-    managed?: boolean;
-    defaultModel?: string;
-  };
+  const data = (await resp.json()) as Partial<AiModelsResponse>;
   proxyConfigured = data.configured === true;
   proxyManaged = data.managed === true;
   proxyDefaultModel = data.defaultModel ?? "";
