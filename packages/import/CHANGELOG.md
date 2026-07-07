@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.35.1](https://github.com/jxsuite/jx/compare/import-v0.35.0...import-v0.35.1) (2026-07-07)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/parser bumped to 0.35.1
+    * @jxsuite/schema bumped to 0.35.0
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 0.35.0
+
 ## [0.35.0](https://github.com/jxsuite/jx/compare/import-v0.34.0...import-v0.35.0) (2026-07-06)
 
 

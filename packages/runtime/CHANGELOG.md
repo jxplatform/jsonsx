@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.34.2](https://github.com/jxsuite/jx/compare/runtime-v0.34.1...runtime-v0.34.2) (2026-07-07)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 0.35.0
+
 ## [0.34.1](https://github.com/jxsuite/jx/compare/runtime-v0.34.0...runtime-v0.34.1) (2026-07-06)
 
 

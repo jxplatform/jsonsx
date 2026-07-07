@@ -1,14 +1,14 @@
 {
   "packages/ai": "0.33.0",
-  "packages/schema": "0.34.0",
-  "packages/runtime": "0.34.1",
-  "packages/parser": "0.35.0",
-  "packages/compiler": "0.34.1",
-  "packages/import": "0.35.0",
-  "packages/starters": "0.35.0",
-  "packages/create": "0.35.0",
-  "packages/server": "0.35.0",
-  "packages/studio": "0.35.0",
-  "packages/desktop": "0.35.0",
-  "packages/protocol": "0.1.0"
+  "packages/schema": "0.35.0",
+  "packages/runtime": "0.34.2",
+  "packages/parser": "0.35.1",
+  "packages/compiler": "0.35.0",
+  "packages/import": "0.35.1",
+  "packages/starters": "0.35.1",
+  "packages/create": "0.36.0",
+  "packages/server": "0.36.0",
+  "packages/studio": "0.36.0",
+  "packages/desktop": "0.35.1",
+  "packages/protocol": "0.2.0"
 }

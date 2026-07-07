@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.35.1](https://github.com/jxsuite/jx/compare/starters-v0.35.0...starters-v0.35.1) (2026-07-07)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @jxsuite/schema bumped to 0.35.0
+
 ## [0.35.0](https://github.com/jxsuite/jx/compare/starters-v0.34.0...starters-v0.35.0) (2026-07-06)
 
 

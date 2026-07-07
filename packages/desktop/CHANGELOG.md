@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.35.1](https://github.com/jxsuite/jx/compare/desktop-v0.35.0...desktop-v0.35.1) (2026-07-07)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 0.35.0
+    * @jxsuite/create bumped to 0.36.0
+    * @jxsuite/parser bumped to 0.35.1
+    * @jxsuite/schema bumped to 0.35.0
+    * @jxsuite/server bumped to 0.36.0
+    * @jxsuite/starters bumped to 0.35.1
+    * @jxsuite/studio bumped to 0.36.0
+  * devDependencies
+    * @jxsuite/server bumped to 0.36.0
+
 ## [0.35.0](https://github.com/jxsuite/jx/compare/desktop-v0.34.0...desktop-v0.35.0) (2026-07-06)
 
 
