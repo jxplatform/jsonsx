@@ -192,11 +192,45 @@
         "adapter": {
           "description": "Platform adapter for deployment-specific output.",
           "enum": [
-            "netlify",
-            "vercel",
-            "cloudflare"
+            "static",
+            "cloudflare-pages",
+            "cloudflare-workers",
+            "node",
+            "bun"
           ],
           "type": "string"
+        },
+        "deploy": {
+          "additionalProperties": false,
+          "description": "Deployment tracking: the hosting project this repo publishes to. Identifiers only (no secrets) — safe to commit; Studio uses it to tell whether the publish workflow already exists. `adapter` says how the build is packaged; `deploy` says where it ships.",
+          "properties": {
+            "accountId": {
+              "description": "Hosting account id (e.g. the Cloudflare account id).",
+              "type": "string"
+            },
+            "productionUrl": {
+              "description": "Production URL of the connected hosting project.",
+              "type": "string"
+            },
+            "projectName": {
+              "description": "Hosting project name (e.g. the Cloudflare Pages project).",
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "type": "string"
+            },
+            "provider": {
+              "description": "Hosting provider the project is connected to.",
+              "enum": [
+                "cloudflare-pages"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "provider",
+            "accountId",
+            "projectName"
+          ],
+          "type": "object"
         },
         "format": {
           "default": "directory",

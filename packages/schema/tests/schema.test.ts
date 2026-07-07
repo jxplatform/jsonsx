@@ -42,9 +42,30 @@ describe("generateProjectSchema", () => {
     expect(format.enum).toEqual(["directory", "single"]);
   });
 
-  test("build.adapter restricts to known platforms", () => {
+  test("build.adapter restricts to the adapters the compiler implements", () => {
     const { adapter } = schema.properties.build.properties;
-    expect(adapter.enum).toEqual(["netlify", "vercel", "cloudflare"]);
+    expect(adapter.enum).toEqual([
+      "static",
+      "cloudflare-pages",
+      "cloudflare-workers",
+      "node",
+      "bun",
+    ]);
+  });
+
+  test("build.deploy tracks the connected hosting project (identifiers only)", () => {
+    const { deploy } = schema.properties.build.properties;
+    expect(deploy.type).toBe("object");
+    expect(deploy.additionalProperties).toBe(false);
+    expect(deploy.required).toEqual(["provider", "accountId", "projectName"]);
+    expect(deploy.properties.provider.enum).toEqual(["cloudflare-pages"]);
+    expect(deploy.properties.projectName.pattern).toBe("^[a-z0-9][a-z0-9-]*$");
+    expect(Object.keys(deploy.properties).toSorted()).toEqual([
+      "accountId",
+      "productionUrl",
+      "projectName",
+      "provider",
+    ]);
   });
 
   test("disallows additional properties", () => {

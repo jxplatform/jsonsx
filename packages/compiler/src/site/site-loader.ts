@@ -117,6 +117,10 @@ export function loadProjectConfig(projectRoot: string) {
 
   // Validate adapter
   const VALID_ADAPTERS = ["cloudflare-workers", "cloudflare-pages", "node", "bun"];
+  // "static" is the Settings UI's explicit no-adapter choice; normalize it away.
+  if (config.build.adapter === "static") {
+    delete config.build.adapter;
+  }
   if (config.build.adapter && !VALID_ADAPTERS.includes(config.build.adapter)) {
     throw new Error(
       `Unknown build adapter "${config.build.adapter}" in project.json. ` +

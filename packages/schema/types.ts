@@ -429,6 +429,21 @@ export interface JxClassDef {
   [key: string]: unknown;
 }
 
+/** The adapters the compiler actually implements (site-loader VALID_ADAPTERS + "static"). */
+export type AdapterId = "static" | "cloudflare-pages" | "cloudflare-workers" | "node" | "bun";
+
+/**
+ * Deployment tracking (project.json `build.deploy`): the hosting project this repo publishes to.
+ * Identifiers only — no secrets — so it travels with the repo and any Studio (local or cloud) can
+ * tell whether publishing is set up.
+ */
+export interface DeployConfig {
+  provider: "cloudflare-pages";
+  accountId: string;
+  projectName: string;
+  productionUrl?: string | undefined;
+}
+
 export interface ProjectConfig {
   name?: string;
   url?: string;
@@ -437,7 +452,12 @@ export interface ProjectConfig {
   $elements?: (string | JxElement)[];
   $head?: JxHeadEntry[];
   $defs?: Record<string, unknown>;
-  build?: { adapter?: string; sitemap?: boolean; [key: string]: unknown };
+  build?: {
+    adapter?: AdapterId | (string & Record<never, never>);
+    deploy?: DeployConfig;
+    sitemap?: boolean;
+    [key: string]: unknown;
+  };
   images?: ImageConfig;
   imports?: Record<string, string>;
   contentTypes?: Record<string, ContentTypeDef>;

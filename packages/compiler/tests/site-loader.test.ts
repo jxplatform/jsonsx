@@ -135,4 +135,19 @@ describe("loadProjectConfig", () => {
       cleanup();
     }
   });
+
+  test('normalizes adapter "static" (the Settings no-adapter choice) away', () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "project.json"),
+        JSON.stringify({ build: { adapter: "static" }, name: "Test" }),
+        "utf8",
+      );
+      const config = loadProjectConfig(FIXTURES);
+      expect(config.build?.adapter).toBeUndefined();
+    } finally {
+      cleanup();
+    }
+  });
 });
