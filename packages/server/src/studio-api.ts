@@ -1072,6 +1072,46 @@ export async function handleStudioApi(
   }
 
   // Discover a plugin module's schema for studio form rendering
+  /* Cloudflare API passthrough — the backend of the publish surface's `cfApi`.
+     Stateless: the credential arrives per-request in X-CF-Token (the user's
+     pasted API token, kept client-side) and is never stored. Only account
+     listing and Pages project/deployment paths are reachable. */
+  if (path === "/__studio/cf/proxy" && req.method === "POST") {
+    const CF_PROXY_ALLOWLIST = [
+      /^\/accounts$/,
+      /^\/accounts\/[0-9a-f]{32}\/pages\/projects(?:\/[\w-]+)?$/,
+      /^\/accounts\/[0-9a-f]{32}\/pages\/projects\/[\w-]+\/deployments(?:\/[\w-]+)?$/,
+      /^\/accounts\/[0-9a-f]{32}\/pages\/projects\/[\w-]+\/deployments\/[\w-]+\/retry$/,
+    ];
+    const cfToken = req.headers.get("X-CF-Token");
+    if (!cfToken) {
+      return Response.json({ error: "Missing X-CF-Token header" }, { status: 401 });
+    }
+    let payload: { path?: string; method?: string; body?: unknown };
+    try {
+      payload = (await req.json()) as typeof payload;
+    } catch {
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    const apiPath = payload.path ?? "";
+    if (!CF_PROXY_ALLOWLIST.some((re) => re.test(apiPath))) {
+      return Response.json({ error: `Path not allowed: ${apiPath}` }, { status: 403 });
+    }
+    const method = payload.method ?? "GET";
+    const upstream = await fetch(`https://api.cloudflare.com/client/v4${apiPath}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${cfToken}`,
+        ...(payload.body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(payload.body === undefined ? {} : { body: JSON.stringify(payload.body) }),
+    });
+    return new Response(upstream.body, {
+      headers: { "Content-Type": upstream.headers.get("Content-Type") ?? "application/json" },
+      status: upstream.status,
+    });
+  }
+
   // Format capability proxy — studio fallback for capabilities whose timing excludes "client".
   // Dispatches parse/serialize through the project's format registry by import name.
   if (path === "/__studio/format" && req.method === "POST") {

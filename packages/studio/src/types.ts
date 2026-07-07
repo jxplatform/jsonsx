@@ -334,6 +334,34 @@ export interface StudioPlatform {
    * projects are found via the native picker instead.
    */
   listProjects?: () => Promise<ProjectListEntry[]>;
+  // ─── Identity & hosting connections (publish surface) ───────────────────────
+  /** The signed-in user's identity, when the platform has one (cloud). */
+  getUser?: () => Promise<{ login: string; name?: string; avatarUrl?: string } | null>;
+  /**
+   * Open a pull request for the current branch. Cloud platforms implement it against their session;
+   * local platforms omit it and Studio falls back to a direct GitHub API call with the user's
+   * stored token.
+   */
+  createPullRequest?: (opts: {
+    title: string;
+    body?: string;
+    head?: string;
+    base?: string;
+  }) => Promise<{ url: string; number: number }>;
+  /** Current Cloudflare connection state, when the platform can broker one. */
+  cfConnection?: () => Promise<CfConnection | null>;
+  /**
+   * Interactively connect a Cloudflare account (hosted OAuth on the cloud platform). Local
+   * platforms omit it — the publish UI collects an API token instead and verifies via
+   * cfConnection.
+   */
+  cfConnect?: () => Promise<CfConnection | null>;
+  /**
+   * Allowlisted Cloudflare API passthrough (accounts, Pages projects and deployments). The backend
+   * injects credentials — an OAuth token on the cloud platform, the user's pasted API token locally
+   * — so no secret ever rides in the request body.
+   */
+  cfApi?: (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown>;
   // ─── User settings (backend-persisted; undefined on dev-server) ─────────────
   /**
    * Read the user-level settings map (e.g. the AI connection parameters) from a backend store
@@ -350,6 +378,13 @@ export interface RecentProjectEntry {
   name: string;
   root: string;
   timestamp: number;
+}
+
+/** Cloudflare connection state (see StudioPlatform.cfConnection). */
+export interface CfConnection {
+  connected: boolean;
+  accountId?: string | undefined;
+  accountName?: string | undefined;
 }
 
 /** One entry in the platform's project catalogue (see StudioPlatform.listProjects). */

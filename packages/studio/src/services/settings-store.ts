@@ -14,7 +14,13 @@
 import { getPlatform, hasPlatform } from "../platform";
 
 /** The localStorage keys mirrored into the platform's user-settings store. */
-export const PERSISTED_SETTINGS_KEYS = ["jx.ai.openaiKey", "jx.ai.baseUrl", "jx.ai.model"] as const;
+export const PERSISTED_SETTINGS_KEYS = [
+  "jx.ai.openaiKey",
+  "jx.ai.baseUrl",
+  "jx.ai.model",
+  "jx.cf.token",
+  "jx.cf.accountId",
+] as const;
 
 /** Read a localStorage value defensively, treating unavailable/throwing storage as empty. */
 function readLocal(key: string): string {

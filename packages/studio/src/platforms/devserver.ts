@@ -837,6 +837,57 @@ export function createDevServerPlatform() {
       }
     },
 
+    // ─── Cloudflare publish surface (token-backed; see services/cf-settings) ─
+
+    /**
+     * Allowlisted Cloudflare API passthrough. The token comes from the client's cf-settings store
+     * and rides in a header to the same-origin proxy (api.cloudflare.com is not CORS-enabled).
+     */
+    async cfApi(apiPath: string, init?: { method?: string; body?: unknown }) {
+      const { getCfToken } = await import("../services/cf-settings");
+      const token = getCfToken();
+      if (!token) {
+        throw new Error("No Cloudflare API token configured");
+      }
+      const res = await fetch("/__studio/cf/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CF-Token": token },
+        body: JSON.stringify({ path: apiPath, method: init?.method ?? "GET", body: init?.body }),
+      });
+      const envelope = (await res.json()) as {
+        success?: boolean;
+        result?: unknown;
+        errors?: { message: string }[];
+        error?: string;
+      };
+      if (!res.ok || envelope.success === false) {
+        const message =
+          envelope.errors?.map((e) => e.message).join("; ") ?? envelope.error ?? res.statusText;
+        throw new Error(`Cloudflare API: ${message}`);
+      }
+      return envelope.result ?? envelope;
+    },
+
+    /** Verify the stored token by listing accounts; null when none/invalid. */
+    async cfConnection() {
+      const { getCfAccountId, getCfToken, setCfAccountId } =
+        await import("../services/cf-settings");
+      if (!getCfToken()) {
+        return null;
+      }
+      try {
+        const accounts = (await this.cfApi?.("/accounts")) as { id: string; name: string }[];
+        if (!accounts?.length) {
+          return { connected: false };
+        }
+        const chosen = accounts.find((a) => a.id === getCfAccountId()) ?? accounts[0]!;
+        setCfAccountId(chosen.id);
+        return { connected: true, accountId: chosen.id, accountName: chosen.name };
+      } catch {
+        return { connected: false };
+      }
+    },
+
     // ─── Project catalogue ──────────────────────────────────────────────────
 
     /** Every site under the server root, from the /__studio/sites glob. */

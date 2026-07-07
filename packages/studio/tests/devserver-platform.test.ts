@@ -1009,3 +1009,54 @@ describe("listProjects", () => {
     expect(await p.listProjects?.()).toEqual([]);
   });
 });
+
+describe("cloudflare publish surface", () => {
+  test("cfApi forwards through the proxy with the stored token and unwraps result", async () => {
+    localStorage.setItem("jx.cf.token", "cf_tok");
+    route("/__studio/cf/proxy", () =>
+      json({ success: true, result: [{ id: "acct", name: "Acme" }] }, 200),
+    );
+    const p = createDevServerPlatform();
+    const accounts = await p.cfApi?.("/accounts");
+    expect(accounts).toEqual([{ id: "acct", name: "Acme" }]);
+    const call = callsTo("/__studio/cf/proxy")[0]!;
+    expect((call.body as { path: string }).path).toBe("/accounts");
+    localStorage.removeItem("jx.cf.token");
+  });
+
+  test("cfApi throws without a token and surfaces Cloudflare errors", async () => {
+    localStorage.removeItem("jx.cf.token");
+    const p = createDevServerPlatform();
+    expect(p.cfApi?.("/accounts")).rejects.toThrow(/No Cloudflare API token/);
+
+    localStorage.setItem("jx.cf.token", "cf_tok");
+    route("/__studio/cf/proxy", () =>
+      json({ success: false, errors: [{ message: "denied" }] }, 403),
+    );
+    expect(p.cfApi?.("/accounts")).rejects.toThrow(/denied/);
+    localStorage.removeItem("jx.cf.token");
+  });
+
+  test("cfConnection is null without a token, verified with one", async () => {
+    localStorage.removeItem("jx.cf.token");
+    localStorage.removeItem("jx.cf.accountId");
+    const p = createDevServerPlatform();
+    expect(await p.cfConnection?.()).toBeNull();
+
+    localStorage.setItem("jx.cf.token", "cf_tok");
+    route("/__studio/cf/proxy", () =>
+      json({ success: true, result: [{ id: "acct1", name: "Acme" }] }, 200),
+    );
+    expect(await p.cfConnection?.()).toEqual({
+      connected: true,
+      accountId: "acct1",
+      accountName: "Acme",
+    });
+    expect(localStorage.getItem("jx.cf.accountId")).toBe("acct1");
+
+    route("/__studio/cf/proxy", () => json({ success: false, errors: [] }, 401));
+    expect(await p.cfConnection?.()).toEqual({ connected: false });
+    localStorage.removeItem("jx.cf.token");
+    localStorage.removeItem("jx.cf.accountId");
+  });
+});

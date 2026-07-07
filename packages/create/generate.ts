@@ -1,6 +1,7 @@
 /** Shared project generation logic. Used by both the CLI scaffolder and the Studio server endpoint. */
 
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { adapterNeedsWrangler, buildWranglerJsonc } from "./scaffold";
 import { basename, join, relative, sep } from "node:path";
 
 import { Buffer } from "node:buffer";
@@ -48,8 +49,6 @@ export interface ProjectOptions {
   /** Design quickstart (colors, fonts, logo, breakpoints) applied on top of the scaffold. */
   design?: DesignOptions;
 }
-
-const CF_ADAPTERS = new Set(["cloudflare-pages", "cloudflare-workers"]);
 
 // Paths never copied out of a starter tree into a fresh project: build artifacts and the
 // Authoring-only Pexels fetch manifest.
@@ -117,7 +116,7 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
     cp(join(TEMPLATE_DIR, "pages"), join(destPath, "pages"), { recursive: true }),
   ];
 
-  if (adapter && CF_ADAPTERS.has(adapter)) {
+  if (adapterNeedsWrangler(adapter)) {
     const wranglerJsonc = buildWranglerJsonc({ adapter, slug: packageJson.name });
     writes.push(writeFile(join(destPath, "wrangler.jsonc"), wranglerJsonc));
   }
@@ -198,7 +197,7 @@ async function scaffoldFromStarter(
   const packageJson = buildPackageJson({ adapter, description, name });
   await writeFile(join(destPath, "package.json"), `${JSON.stringify(packageJson, null, "  ")}\n`);
 
-  if (adapter && CF_ADAPTERS.has(adapter)) {
+  if (adapterNeedsWrangler(adapter)) {
     const wranglerJsonc = buildWranglerJsonc({ adapter, slug: packageJson.name });
     await writeFile(join(destPath, "wrangler.jsonc"), wranglerJsonc);
   }
@@ -311,28 +310,6 @@ function applyDescription(project: Record<string, unknown>, description: string)
  *
  * @param {{ slug: string; adapter: string }} opts
  */
-function buildWranglerJsonc({ slug, adapter }: { slug: string; adapter: string }) {
-  const compatibilityDate = new Date().toISOString().slice(0, 10);
-
-  // Nodejs_compat: server functions routinely pull in Node-flavored npm packages
-  const config =
-    adapter === "cloudflare-workers"
-      ? {
-          assets: { binding: "ASSETS", directory: "./dist" },
-          compatibility_date: compatibilityDate,
-          compatibility_flags: ["nodejs_compat"],
-          main: "./dist/worker.js",
-          name: slug,
-        }
-      : {
-          compatibility_date: compatibilityDate,
-          compatibility_flags: ["nodejs_compat"],
-          name: slug,
-          pages_build_output_dir: "./dist",
-        };
-
-  return `${JSON.stringify(config, null, "\t")}\n`;
-}
 
 /** @param {ProjectOptions} opts */
 function buildProjectJson({ name, description, url, adapter, template = "blank" }: ProjectOptions) {
@@ -425,7 +402,7 @@ function buildPackageJson({
     dependencies["hono"] = "^4";
   }
 
-  if (adapter && CF_ADAPTERS.has(adapter)) {
+  if (adapterNeedsWrangler(adapter)) {
     devDependencies["wrangler"] = "^4";
     scripts.deploy =
       adapter === "cloudflare-workers" ? "wrangler deploy" : "wrangler pages deploy dist";

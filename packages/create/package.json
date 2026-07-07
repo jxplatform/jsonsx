@@ -23,7 +23,8 @@
   "exports": {
     ".": "./index.ts",
     "./generate": "./generate.ts",
-    "./templates": "./templates.ts"
+    "./templates": "./templates.ts",
+    "./scaffold": "./scaffold.ts"
   },
   "publishConfig": {
     "provenance": true

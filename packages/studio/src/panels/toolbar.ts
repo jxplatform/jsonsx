@@ -5,6 +5,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { openPublishPanel } from "../publish/publish-panel";
 import { updateSession } from "../store";
 import { redo as tabRedo, undo as tabUndo } from "../tabs/transact";
 import { effect, effectScope } from "../reactivity";
@@ -472,6 +473,7 @@ function toolbarTemplate() {
       ${recentProjectsTpl}
     </div>
     ${tbBtnTpl("Manage", openBrowseModal, "sp-icon-view-list")}
+    ${tbBtnTpl("Publish", openPublishPanel)}
     <sp-action-button size="s" title="Save" ?disabled=${!canSave} @click=${ctx.saveFile}>
       ${toolbarIconMap["sp-icon-save-floppy"]}<span class="tb-label">Save</span>
     </sp-action-button>
