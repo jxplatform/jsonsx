@@ -18,7 +18,8 @@
     ".": "./src/studio.ts",
     "./platform": "./src/platform.ts",
     "./types": "./src/types.ts",
-    "./import-client": "./src/services/import-client.ts"
+    "./import-client": "./src/services/import-client.ts",
+    "./platforms/cloud": "./src/platforms/cloud.ts"
   },
   "publishConfig": {
     "provenance": true
