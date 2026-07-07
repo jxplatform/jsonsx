@@ -20,10 +20,35 @@ export interface AiModel {
 }
 
 let cache: AiModel[] | null = null;
+let proxyConfigured = false;
+let proxyManaged = false;
+let proxyDefaultModel = "";
 
 /** Drop the cached model list (call after credentials/endpoint changes). */
 export function invalidateModelCache() {
   cache = null;
+  proxyConfigured = false;
+  proxyManaged = false;
+  proxyDefaultModel = "";
+}
+
+/**
+ * Whether the proxy reported itself configured on the last fetch — true when the backend holds
+ * credentials (managed platforms, OPENAI_API_KEY env), so the assistant works without a locally
+ * stored key.
+ */
+export function isProxyConfigured(): boolean {
+  return proxyConfigured;
+}
+
+/** Whether the platform manages AI credentials itself (cloud Workers AI). */
+export function isManagedProxy(): boolean {
+  return proxyManaged;
+}
+
+/** The proxy's preferred model id ("" when it does not declare one). */
+export function getProxyDefaultModel(): string {
+  return proxyDefaultModel;
 }
 
 /**
@@ -58,7 +83,15 @@ export async function fetchAvailableModels(
   if (!resp.ok) {
     throw new Error(`HTTP ${resp.status}`);
   }
-  const data = (await resp.json()) as { models?: { id: string; name?: string }[] };
+  const data = (await resp.json()) as {
+    models?: { id: string; name?: string }[];
+    configured?: boolean;
+    managed?: boolean;
+    defaultModel?: string;
+  };
+  proxyConfigured = data.configured === true;
+  proxyManaged = data.managed === true;
+  proxyDefaultModel = data.defaultModel ?? "";
   cache = (data.models || []).map((m) => ({ id: m.id, name: m.name || m.id }));
   return cache;
 }

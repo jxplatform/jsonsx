@@ -21,6 +21,7 @@ import type { TemplateResult } from "lit-html";
 import { effect, effectScope } from "../reactivity";
 import { createDocumentAssistant } from "../services/document-assistant";
 import { hasOpenAiKey } from "../services/ai-settings";
+import { fetchAvailableModels, isProxyConfigured } from "../services/ai-models";
 import { createAiCredentialsForm } from "../ui/ai-credentials-form";
 import { clearMarkdownCache } from "./ai-chat/chat-markdown";
 import { renderChatHeader, renderMessageList } from "./ai-chat/chat-view";
@@ -35,6 +36,23 @@ let mounted = false;
 
 /** Whether the OpenAI key form is showing (gate when no key, or re-edit via the gear). */
 let keyEditing = false;
+
+/**
+ * One-time proxy probe: managed platforms (cloud Workers AI) and env-keyed dev servers report
+ * `configured` from /models, unlocking the assistant without a locally stored key. Fired lazily on
+ * the first gated render.
+ */
+let proxyProbe: Promise<void> | null = null;
+
+function ensureProxyProbe() {
+  proxyProbe ??= fetchAvailableModels({ force: true })
+    .catch(() => {
+      // Unreachable proxy — the key gate stays up.
+    })
+    .then(() => {
+      scheduleAiRender();
+    });
+}
 
 /** Which pane the panel shows once the key gate is passed. */
 let view: "chat" | "sessions" = "chat";
@@ -245,9 +263,13 @@ const composer = createComposer({
 
 /** @returns {TemplateResult} */
 export function renderAiPanelTemplate(): TemplateResult {
-  // The document assistant authenticates via the AI proxy (an OpenAI-compatible key). Gate the chat
-  // Behind the key form until one is stored locally.
-  if (!hasOpenAiKey() || keyEditing) {
+  /* The document assistant authenticates via the AI proxy. Gate the chat
+     behind the key form until a key is stored locally OR the proxy reports
+     itself configured (managed platforms, env-keyed dev servers). */
+  if ((!hasOpenAiKey() && !isProxyConfigured()) || keyEditing) {
+    if (!keyEditing) {
+      ensureProxyProbe();
+    }
     return renderKeyGate();
   }
 

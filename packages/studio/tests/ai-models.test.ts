@@ -5,7 +5,13 @@
  */
 import { installMockPlatform } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { fetchAvailableModels, invalidateModelCache } from "../src/services/ai-models";
+import {
+  fetchAvailableModels,
+  getProxyDefaultModel,
+  invalidateModelCache,
+  isManagedProxy,
+  isProxyConfigured,
+} from "../src/services/ai-models";
 
 installMockPlatform();
 
@@ -82,5 +88,38 @@ describe("fetchAvailableModels", () => {
   test("tolerates a payload without a models array", async () => {
     fetchImpl = async () => Response.json({}, { status: 200 });
     expect(await fetchAvailableModels()).toEqual([]);
+  });
+});
+
+describe("proxy state flags", () => {
+  test("captures configured/managed/defaultModel from the response", async () => {
+    fetchImpl = async () =>
+      Response.json(
+        {
+          models: [{ id: "@cf/meta/llama-4" }],
+          configured: true,
+          managed: true,
+          defaultModel: "@cf/meta/llama-4",
+        },
+        { status: 200 },
+      );
+    await fetchAvailableModels();
+    expect(isProxyConfigured()).toBe(true);
+    expect(isManagedProxy()).toBe(true);
+    expect(getProxyDefaultModel()).toBe("@cf/meta/llama-4");
+  });
+
+  test("defaults to unconfigured and resets on invalidation", async () => {
+    fetchImpl = async () => Response.json({ models: [] }, { status: 200 });
+    await fetchAvailableModels();
+    expect(isProxyConfigured()).toBe(false);
+    expect(isManagedProxy()).toBe(false);
+
+    fetchImpl = async () => Response.json({ models: [], configured: true }, { status: 200 });
+    await fetchAvailableModels({ force: true });
+    expect(isProxyConfigured()).toBe(true);
+    invalidateModelCache();
+    expect(isProxyConfigured()).toBe(false);
+    expect(getProxyDefaultModel()).toBe("");
   });
 });

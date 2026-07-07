@@ -385,7 +385,7 @@ export async function handleModels(req: Request): Promise<Response> {
       { id: "gpt-4o-mini", name: "GPT-4o Mini", contextWindow: 128_000 },
     ];
     return Response.json(
-      { models: defaults, configured: false },
+      { models: defaults, configured: false, managed: false },
       {
         headers: { "Content-Type": "application/json" },
       },
@@ -403,7 +403,7 @@ export async function handleModels(req: Request): Promise<Response> {
       // Upstream failed — return defaults with configured flag so user can still try.
       const defaults = [{ id: "gpt-4o", name: "GPT-4o", contextWindow: 128_000 }];
       return Response.json(
-        { models: defaults, configured: true, upstreamError: upstreamResp.status },
+        { models: defaults, configured: true, managed: false, upstreamError: upstreamResp.status },
         {
           headers: { "Content-Type": "application/json" },
         },
@@ -426,7 +426,7 @@ export async function handleModels(req: Request): Promise<Response> {
     }));
 
     return Response.json(
-      { models, configured: true },
+      { models, configured: true, managed: false },
       {
         headers: { "Content-Type": "application/json" },
       },
@@ -435,7 +435,7 @@ export async function handleModels(req: Request): Promise<Response> {
     // Network error → return defaults.
     const defaults = [{ id: "gpt-4o", name: "GPT-4o", contextWindow: 128_000 }];
     return Response.json(
-      { models: defaults, configured: true, upstreamError: "network" },
+      { models: defaults, configured: true, managed: false, upstreamError: "network" },
       {
         headers: { "Content-Type": "application/json" },
       },

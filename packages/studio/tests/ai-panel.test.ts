@@ -18,6 +18,7 @@ import { reactive } from "@vue/reactivity";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Message } from "@jxsuite/ai/chat-state";
 import type { SessionMeta } from "../src/services/ai-session-store";
+import { fetchAvailableModels, invalidateModelCache } from "../src/services/ai-models";
 
 installMockPlatform();
 
@@ -110,6 +111,25 @@ describe("ai-panel", () => {
     expect(q(".ai-creds-form")).not.toBeNull();
     expect(q(".ai-chat-messages")).toBeNull();
     chatState.messages.length = 0;
+  });
+
+  test("unlocks without a key when the proxy reports itself configured (managed platforms)", async () => {
+    globalThis.localStorage.clear();
+    const realFetch = globalThis.fetch;
+    (globalThis as Record<string, unknown>).fetch = async () =>
+      Response.json(
+        { models: [{ id: "@cf/meta/llama-4" }], configured: true, managed: true },
+        { status: 200 },
+      );
+    await fetchAvailableModels({ force: true });
+    pushMessage("user", "cloud hello");
+    await flush(3);
+    expect(q(".ai-creds-form")).toBeNull();
+    expect(q(".ai-composer textarea")).not.toBeNull();
+    chatState.messages.length = 0;
+    invalidateModelCache();
+    (globalThis as Record<string, unknown>).fetch = realFetch;
+    await flush(3);
   });
 
   test("shows the chat view once a key exists, and streams reactively into it", async () => {
