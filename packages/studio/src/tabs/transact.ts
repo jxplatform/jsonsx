@@ -80,17 +80,42 @@ export type JxNodeValue =
 // ─── Transactional layer ─────────────────────────────────────────────────────
 
 /**
+ * Where a transaction came from: a direct user/tool edit, the undo/redo machinery replaying
+ * recorded ops, or a remote collaborator's ops applied locally. Observers use this to avoid
+ * republishing what they themselves applied.
+ */
+export type TransactOrigin = "user" | "history" | "remote";
+
+/**
+ * Module-level hook invoked at the end of every transactDoc (after the canvas patch apply and the
+ * dirty mark). Registered by the collab layer to mirror local edits into a shared document; at most
+ * one observer exists. `record.docOps` may be empty for un-instrumented mutations — observers must
+ * handle that (e.g. by diffing).
+ */
+export type TransactObserver = (
+  tab: Tab,
+  record: TransactionRecord,
+  origin: TransactOrigin,
+) => void;
+
+let _transactObserver: TransactObserver | null = null;
+
+export function setTransactObserver(fn: TransactObserver | null) {
+  _transactObserver = fn;
+}
+
+/**
  * Apply a document mutation transactionally: push to history and mark dirty. The mutationFn
  * receives the tab and should mutate tab.doc.document in place.
  *
  * @param {Tab | null} tab
  * @param {(tab: Tab) => void} mutationFn
- * @param {{ skipHistory?: boolean }} [opts]
+ * @param {{ skipHistory?: boolean; origin?: TransactOrigin }} [opts]
  */
 export function transactDoc(
   tab: Tab | null,
   mutationFn: (tab: Tab) => void,
-  { skipHistory = false }: { skipHistory?: boolean } = {},
+  { skipHistory = false, origin = "user" }: { skipHistory?: boolean; origin?: TransactOrigin } = {},
 ) {
   if (!tab) {
     return;
@@ -141,6 +166,8 @@ export function transactDoc(
   }
 
   tab.doc.dirty = true;
+
+  _transactObserver?.(tab, record, origin);
 }
 
 /**
@@ -215,14 +242,36 @@ function materializeState(
  *
  * @param {Tab | null} tab
  * @param {(doc: JxMutableNode) => void} fn
- * @param {{ skipHistory?: boolean }} [opts]
+ * @param {{ skipHistory?: boolean; origin?: TransactOrigin }} [opts]
  */
 export function transact(
   tab: Tab | null,
   fn: (doc: JxMutableNode) => void,
-  opts?: { skipHistory?: boolean },
+  opts?: { skipHistory?: boolean; origin?: TransactOrigin },
 ) {
   transactDoc(tab, (t) => fn(t.doc.document), opts);
+}
+
+/**
+ * Apply externally-produced doc ops (a remote collaborator's edits) through the normal transaction
+ * pipeline: the canvas patches surgically exactly as it does for undo/redo replay, panels' effects
+ * fire, and — because the origin is "remote" — the transact observer will not republish them.
+ * History is skipped; while a collab session is attached, undo is delegated (see
+ * setHistoryDelegate) and local-only.
+ *
+ * @param {Tab} tab
+ * @param {JxDocOp[]} ops
+ */
+export function applyExternalDocOps(tab: Tab, ops: JxDocOp[]) {
+  transactDoc(
+    tab,
+    (t) => {
+      for (const op of ops) {
+        applyDocOp(t, op);
+      }
+    },
+    { origin: "remote", skipHistory: true },
+  );
 }
 
 // ─── Document-op application ─────────────────────────────────────────────────
@@ -289,26 +338,40 @@ function applyDocOp(tab: Tab, op: JxDocOp) {
 
 let _batchTab: Tab | null = null;
 
+/** Module-level hook invoked when a batch closes (collab flushes its buffered ops as one step). */
+export type BatchEndNotifier = (tab: Tab) => void;
+
+let _batchEndNotifier: BatchEndNotifier | null = null;
+
+export function setBatchEndNotifier(fn: BatchEndNotifier | null) {
+  _batchEndNotifier = fn;
+}
+
 export function beginBatch(tab: Tab | null) {
   _batchTab = tab;
 }
 
 export function endBatch() {
-  if (_batchTab) {
-    const raw = toRaw(_batchTab.doc.document);
+  const tab = _batchTab;
+  // A history delegate owns undo grouping while registered; the snapshot push would be dead weight.
+  if (tab && !_historyDelegates.has(tab)) {
+    const raw = toRaw(tab.doc.document);
     const snapshot = {
       document: jsonClone(raw),
-      selection: _batchTab.session.selection ? [..._batchTab.session.selection] : null,
+      selection: tab.session.selection ? [...tab.session.selection] : null,
     };
-    const truncated = _batchTab.history.snapshots.slice(0, _batchTab.history.index + 1);
+    const truncated = tab.history.snapshots.slice(0, tab.history.index + 1);
     truncated.push(snapshot);
     if (truncated.length > HISTORY_LIMIT) {
       truncated.shift();
     }
-    _batchTab.history.snapshots = truncated;
-    _batchTab.history.index = truncated.length - 1;
+    tab.history.snapshots = truncated;
+    tab.history.index = truncated.length - 1;
   }
   _batchTab = null;
+  if (tab) {
+    _batchEndNotifier?.(tab);
+  }
 }
 
 export function isBatching(): boolean {
@@ -316,6 +379,42 @@ export function isBatching(): boolean {
 }
 
 // ─── Undo / Redo ─────────────────────────────────────────────────────────────
+
+/**
+ * Per-tab replacement for the built-in op-log history. While a delegate is registered (a collab
+ * session's Y.UndoManager), undo/redo route to it and the snapshot history is bypassed — keeping
+ * this module free of any yjs knowledge.
+ */
+export interface HistoryDelegate {
+  undo: (tab: Tab) => void;
+  redo: (tab: Tab) => void;
+  canUndo: (tab: Tab) => boolean;
+  canRedo: (tab: Tab) => boolean;
+}
+
+const _historyDelegates = new WeakMap<Tab, HistoryDelegate>();
+
+export function setHistoryDelegate(tab: Tab, delegate: HistoryDelegate | null) {
+  if (delegate) {
+    _historyDelegates.set(tab, delegate);
+  } else {
+    _historyDelegates.delete(tab);
+  }
+}
+
+export function getHistoryDelegate(tab: Tab): HistoryDelegate | null {
+  return _historyDelegates.get(tab) ?? null;
+}
+
+export function canUndo(tab: Tab): boolean {
+  const delegate = _historyDelegates.get(tab);
+  return delegate ? delegate.canUndo(tab) : tab.history.index > 0;
+}
+
+export function canRedo(tab: Tab): boolean {
+  const delegate = _historyDelegates.get(tab);
+  return delegate ? delegate.canRedo(tab) : tab.history.index < tab.history.snapshots.length - 1;
+}
 
 /** Restore a materialized snapshot state (full-render path). */
 function restoreState(tab: Tab, index: number) {
@@ -345,6 +444,11 @@ function assertHistoryConsistency(tab: Tab, index: number) {
 
 /** @param {Tab} tab */
 export function undo(tab: Tab) {
+  const delegate = _historyDelegates.get(tab);
+  if (delegate) {
+    delegate.undo(tab);
+    return;
+  }
   if (tab.history.index <= 0) {
     return;
   }
@@ -360,7 +464,7 @@ export function undo(tab: Tab) {
           applyDocOp(t, toRaw(inverseOps[i]) as JxDocOp);
         }
       },
-      { skipHistory: true },
+      { origin: "history", skipHistory: true },
     );
     tab.session.selection = entry.selectionBefore ? [...toRaw(entry.selectionBefore)] : null;
     tab.history.index -= 1;
@@ -374,6 +478,11 @@ export function undo(tab: Tab) {
 
 /** @param {Tab} tab */
 export function redo(tab: Tab) {
+  const delegate = _historyDelegates.get(tab);
+  if (delegate) {
+    delegate.redo(tab);
+    return;
+  }
   if (tab.history.index >= tab.history.snapshots.length - 1) {
     return;
   }
@@ -387,7 +496,7 @@ export function redo(tab: Tab) {
           applyDocOp(t, toRaw(op) as JxDocOp);
         }
       },
-      { skipHistory: true },
+      { origin: "history", skipHistory: true },
     );
     tab.session.selection = entry.selection ? [...toRaw(entry.selection)] : null;
     tab.history.index += 1;

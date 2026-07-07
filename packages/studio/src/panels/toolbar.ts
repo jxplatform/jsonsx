@@ -7,7 +7,12 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { openPublishPanel } from "../publish/publish-panel";
 import { updateSession } from "../store";
-import { redo as tabRedo, undo as tabUndo } from "../tabs/transact";
+import {
+  canRedo as tabCanRedo,
+  canUndo as tabCanUndo,
+  redo as tabRedo,
+  undo as tabUndo,
+} from "../tabs/transact";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import { applyPanelCollapse, view } from "../view";
@@ -322,8 +327,8 @@ function toolbarTemplate() {
   }
 
   const allowedModes = new Set(tab.capabilities.modes);
-  const canUndo = tab.history.index > 0;
-  const canRedo = tab.history.index < tab.history.snapshots.length - 1;
+  const canUndo = tabCanUndo(tab);
+  const canRedo = tabCanRedo(tab);
   const canSave = tab.doc.dirty;
 
   const S = {
