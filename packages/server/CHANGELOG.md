@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.36.0](https://github.com/jxsuite/jx/compare/server-v0.35.0...server-v0.36.0) (2026-07-07)
+
+
+### Features
+
+* **studio:** AI managed mode — unlock the assistant from proxy state ([9af169f](https://github.com/jxsuite/jx/commit/9af169f2eba24c067ef713184371a3abcd55819c))
+* **studio:** one-click Cloudflare Pages publish surface ([4b84d21](https://github.com/jxsuite/jx/commit/4b84d21da4e5bcc991593caf533565ec6419146c))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 0.35.0
+    * @jxsuite/create bumped to 0.36.0
+    * @jxsuite/import bumped to 0.35.1
+    * @jxsuite/parser bumped to 0.35.1
+    * @jxsuite/runtime bumped to 0.34.2
+    * @jxsuite/schema bumped to 0.35.0
+    * @jxsuite/starters bumped to 0.35.1
+
 ## [0.35.0](https://github.com/jxsuite/jx/compare/server-v0.34.0...server-v0.35.0) (2026-07-06)
 
 
