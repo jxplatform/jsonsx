@@ -20,7 +20,7 @@ afterEach(() => {
 
 interface Call {
   url: string;
-  init?: RequestInit;
+  init?: RequestInit | undefined;
 }
 
 /** Route fetches by URL substring; unmatched calls get an empty 200. */

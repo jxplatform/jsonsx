@@ -35,7 +35,7 @@ function bodyText(): string {
 
 function button(label: string): HTMLElement | null {
   return (
-    [...document.querySelectorAll("#layer-modal sp-button")].find((b) =>
+    [...document.querySelectorAll<HTMLElement>("#layer-modal sp-button")].find((b) =>
       b.textContent?.includes(label),
     ) ?? null
   );

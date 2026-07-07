@@ -144,8 +144,8 @@ describe("loadProjectConfig", () => {
         JSON.stringify({ build: { adapter: "static" }, name: "Test" }),
         "utf8",
       );
-      const config = loadProjectConfig(FIXTURES);
-      expect(config.build?.adapter).toBeUndefined();
+      const { config } = loadProjectConfig(FIXTURES);
+      expect(config.build.adapter).toBeUndefined();
     } finally {
       cleanup();
     }
