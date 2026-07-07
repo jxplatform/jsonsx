@@ -5,6 +5,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { getProjectList } from "../project-list";
 import { clearRecentProjects, getRecentProjects, removeRecentProject } from "../recent-projects";
 import { renderOnly } from "../store";
 import { platformSupportsClone } from "./git-panel";
@@ -27,6 +28,8 @@ export function initWelcome(ctx: WelcomeCtx) {
 export function renderWelcome(host: HTMLElement) {
   const ctx = _ctx as WelcomeCtx;
   const recent = getRecentProjects();
+  // Catalogue entries already in Recent stay in that section only.
+  const catalogue = getProjectList().filter((p) => !recent.some((r) => r.root === p.root));
   const showClone = platformSupportsClone();
 
   litRender(
@@ -84,6 +87,29 @@ export function renderWelcome(host: HTMLElement) {
               : nothing}
           </div>
 
+          ${catalogue.length > 0
+            ? html`
+                <div class="welcome-section">
+                  <h2 class="welcome-section-title">Projects</h2>
+                  ${catalogue.map(
+                    (p) => html`
+                      <div class="welcome-recent-row">
+                        <button
+                          class="welcome-recent welcome-catalogue"
+                          @click=${() => ctx.openRecentProject(p.root)}
+                          title=${p.root}
+                        >
+                          <span class="welcome-recent-name">${p.name}</span>
+                          <span class="welcome-recent-path">
+                            ${p.description ?? shortenPath(p.root)}
+                          </span>
+                        </button>
+                      </div>
+                    `,
+                  )}
+                </div>
+              `
+            : nothing}
           ${recent.length > 0
             ? html`
                 <div class="welcome-section">

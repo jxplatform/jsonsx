@@ -837,6 +837,25 @@ export function createDevServerPlatform() {
       }
     },
 
+    // ─── Project catalogue ──────────────────────────────────────────────────
+
+    /** Every site under the server root, from the /__studio/sites glob. */
+    async listProjects() {
+      const res = await fetch("/__studio/sites");
+      if (!res.ok) {
+        return [];
+      }
+      const sites = await readJson<SiteEntry[]>(res);
+      return sites.map((site) => {
+        const config = site.config as { name?: string } | null;
+        return {
+          name: config?.name || site.path.split("/").at(-1) || site.path,
+          root: site.path,
+          description: site.path,
+        };
+      });
+    },
+
     // ─── AI Assistant (Stack B: OpenAI-compatible SSE proxy) ───────────────────
 
     aiChatUrl() {

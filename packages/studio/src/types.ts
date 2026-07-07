@@ -326,6 +326,14 @@ export interface StudioPlatform {
   getRecentProjects?: () => Promise<RecentProjectEntry[]>;
   /** Persist the full recent-projects list to the backend store. */
   saveRecentProjects?: (projects: RecentProjectEntry[]) => Promise<void>;
+  // ─── Project catalogue (platforms that can enumerate openable projects) ─────
+  /**
+   * Enumerate every project this platform can open — the dev server's sites under its root, a cloud
+   * platform's remote projects. Entry `root` values re-open through the same paths as recent
+   * projects (openRecentProject). Absent on desktop, where the OS file system is the catalogue and
+   * projects are found via the native picker instead.
+   */
+  listProjects?: () => Promise<ProjectListEntry[]>;
   // ─── User settings (backend-persisted; undefined on dev-server) ─────────────
   /**
    * Read the user-level settings map (e.g. the AI connection parameters) from a backend store
@@ -342,6 +350,16 @@ export interface RecentProjectEntry {
   name: string;
   root: string;
   timestamp: number;
+}
+
+/** One entry in the platform's project catalogue (see StudioPlatform.listProjects). */
+export interface ProjectListEntry {
+  /** Display name (project.json name, repository name, ...). */
+  name: string;
+  /** Re-openable root key (server-relative path, owner/repo, absolute path). */
+  root: string;
+  /** Optional one-line descriptor shown under the name (path, permission, ...). */
+  description?: string | undefined;
 }
 
 // ─── Studio Types ───────────────────────────────────────────────────────────

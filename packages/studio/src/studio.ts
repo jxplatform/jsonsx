@@ -126,6 +126,7 @@ import {
 } from "./panels/block-action-bar";
 import { initCssData } from "./panels/style-utils";
 import { initQuickSearch } from "./panels/quick-search";
+import { hydrateProjectList } from "./project-list";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
 import { hydrateSettings } from "./services/settings-store";
 import { initWelcome } from "./panels/welcome-screen";
@@ -741,6 +742,13 @@ if (_projectParam) {
 // oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: hydration must not block initial render
 void hydrateRecentProjects().then(() => {
   toolbarPanel.render();
+  render();
+});
+
+// Hydrate the platform's project catalogue (dev server sites, cloud projects), then refresh the
+// Welcome screen, which reads it synchronously. No-op on platforms without listProjects.
+// oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: hydration must not block initial render
+void hydrateProjectList().then(() => {
   render();
 });
 

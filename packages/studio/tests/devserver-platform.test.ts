@@ -987,3 +987,25 @@ describe("AI assistant", () => {
     expect(calls.length).toBe(0);
   });
 });
+
+describe("listProjects", () => {
+  test("maps /__studio/sites entries to catalogue entries", async () => {
+    route("/__studio/sites", () =>
+      json([
+        { config: { name: "Named Site" }, path: "sites/named" },
+        { config: {}, path: "sites/anon" },
+      ]),
+    );
+    const p = createDevServerPlatform();
+    expect(await p.listProjects?.()).toEqual([
+      { name: "Named Site", root: "sites/named", description: "sites/named" },
+      { name: "anon", root: "sites/anon", description: "sites/anon" },
+    ]);
+  });
+
+  test("returns [] when the sites endpoint fails", async () => {
+    route("/__studio/sites", () => json({ error: "nope" }, 500));
+    const p = createDevServerPlatform();
+    expect(await p.listProjects?.()).toEqual([]);
+  });
+});
