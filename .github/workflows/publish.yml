@@ -15,6 +15,21 @@ on:
         required: false
         type: string
         default: ""
+  # Manual entry point for backfilling a publish that release-please released but
+  # never pushed to npm (e.g. a package missing from the old hardcoded allowlist).
+  # Point `sha` at the release commit so package.json carries the released versions;
+  # the step is idempotent, so already-published packages are skipped.
+  workflow_dispatch:
+    inputs:
+      paths_released:
+        description: 'JSON array of package paths to publish, e.g. ["packages/collab","packages/protocol"].'
+        required: true
+        type: string
+      sha:
+        description: Commit or tag to check out and publish from (defaults to the branch head).
+        required: false
+        type: string
+        default: ""
 
 jobs:
   publish:
@@ -36,13 +51,19 @@ jobs:
           PATHS_RELEASED: ${{ inputs.paths_released }}
         run: |
           set -euo pipefail
-          # npm-publishable packages in dependency order. `desktop` is intentionally
-          # excluded — it ships as installers via the desktop bundlers, never to npm.
-          order=(schema ai runtime parser compiler import starters create server studio)
-          mapfile -t released < <(printf '%s' "$PATHS_RELEASED" | jq -r '.[]' | sed 's#^packages/##')
-          is_released () { local x; for x in "${released[@]}"; do [ "$x" = "$1" ] && return 0; done; return 1; }
+          # The publish set is derived from the released paths (not a hand-maintained
+          # list): scripts/publish-order.ts emits the package dirs to publish this run —
+          # those release-please released AND that are npm-publishable (not `private`,
+          # with a `publishConfig`; `desktop` ships as installers and is excluded because
+          # it has none) — in topological order so deps publish before dependents. The old
+          # hardcoded array silently dropped newly-added packages (protocol, collab).
+          order_out="$(bun scripts/publish-order.ts)"
+          mapfile -t order < <(printf '%s' "$order_out")
+          if [ "${#order[@]}" -eq 0 ]; then
+            echo "No npm packages released this run; nothing to publish."
+            exit 0
+          fi
           for pkg in "${order[@]}"; do
-            is_released "$pkg" || continue
             name="$(node -p "require('./packages/$pkg/package.json').name")"
             ver="$(node -p "require('./packages/$pkg/package.json').version")"
             echo "::group::@jxsuite/$pkg -> $name@$ver"
