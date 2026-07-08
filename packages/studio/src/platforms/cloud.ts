@@ -16,6 +16,7 @@
 import { transpileJxMarkdown } from "@jxsuite/parser/transpile";
 import { serializeJxMarkdown } from "@jxsuite/parser/serialize";
 import markdownClassDef from "@jxsuite/parser/Markdown.class.json";
+import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { JxDocument, ProjectConfig } from "@jxsuite/schema/types";
 import type {
   DirEntry,
@@ -197,6 +198,11 @@ export function parseRootKey(root: string): CloudProject | null {
 export function createCloudPlatform(project: CloudProject | null): StudioPlatform {
   const base = project ? sessionBase(project) : "";
   const root = project ? `${project.owner}/${project.repo}` : "";
+  /**
+   * One multiplexed collab socket per session; per-doc handles come from openDoc. Memoized as a
+   * promise so concurrent first opens share the connection instead of racing two sockets.
+   */
+  let collabConnection: Promise<WsCollabConnection> | null = null;
 
   function api(path: string, init?: RequestInit): Promise<Response> {
     if (!project) {
@@ -346,6 +352,31 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
      * pushes {kind:"fs"} batches for file mutations (including those from other tabs) and
      * {kind:"git"} notices this handler ignores.
      */
+    /**
+     * Realtime co-editing over the gateway's /collab WebSocket (rooms keyed by project-relative
+     * path, per the shared ProjectSession working tree). Backends without the endpoint (or with the
+     * flag off) refuse the upgrade and Studio degrades to solo editing. The wire client loads on
+     * demand so yjs stays out of the base bundle.
+     */
+    async collab(docPath: string) {
+      if (!project || typeof WebSocket === "undefined" || typeof location === "undefined") {
+        return null;
+      }
+      collabConnection ??= (async () => {
+        const { createWsCollabConnection } = await import("@jxsuite/collab/client");
+        const scheme = location.protocol === "https:" ? "wss" : "ws";
+        return createWsCollabConnection({
+          hydratePath: async (path) => {
+            // The DO has no GitHub token on a WS message; a plain read hydrates + caches the row.
+            await api(`/file?path=${encodeURIComponent(path)}`);
+          },
+          url: `${scheme}://${location.host}${base}/collab`,
+        });
+      })();
+      const connection = await collabConnection;
+      return connection.openDoc(docPath);
+    },
+
     subscribeFileEvents(handler: (events: FsEvent[]) => void) {
       if (typeof WebSocket === "undefined" || typeof location === "undefined") {
         return () => {};

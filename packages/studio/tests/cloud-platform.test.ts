@@ -660,3 +660,49 @@ describe("navigation members under a DOM", () => {
     expect(await p.getUser?.()).toEqual({ login: "octo" });
   });
 });
+
+describe("collab capability", () => {
+  test("project-less sessions have no co-editing", async () => {
+    expect(await createCloudPlatform(null).collab!("pages/index.md")).toBeNull();
+  });
+
+  test("opens ONE multiplexed socket at the gateway's /collab path", async () => {
+    const seen: string[] = [];
+    class RecordingWebSocket {
+      binaryType = "";
+      readyState = 0;
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((ev: unknown) => void) | null = null;
+      sent = 0;
+      constructor(url: string) {
+        seen.push(url);
+      }
+      send(): void {
+        this.sent += 1;
+      }
+      close(): void {
+        this.sent = -1;
+      }
+    }
+    const realWs = (globalThis as Record<string, unknown>)["WebSocket"];
+    (globalThis as Record<string, unknown>)["WebSocket"] = RecordingWebSocket;
+    try {
+      const p = createCloudPlatform(PROJECT);
+      // Two opens share the connection; neither resolves (the socket never answers) — the
+      // Session-level timeout owns fallback. Only the URL/multiplexing contract is under test.
+      void p.collab!("pages/a.md");
+      void p.collab!("pages/b.md");
+      const deadline = Date.now() + 3000;
+      while (seen.length === 0 && Date.now() < deadline) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 10);
+        });
+      }
+      expect(seen).toEqual([`ws://${location.host}${BASE}/collab`]);
+    } finally {
+      (globalThis as Record<string, unknown>)["WebSocket"] = realWs;
+    }
+  });
+});

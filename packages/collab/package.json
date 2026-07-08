@@ -20,7 +20,9 @@
     "./diff": "./src/diff.ts",
     "./envelope": "./src/envelope.ts",
     "./awareness-types": "./src/awareness-types.ts",
-    "./provider": "./src/provider.ts"
+    "./provider": "./src/provider.ts",
+    "./client": "./src/ws-client.ts",
+    "./room": "./src/ws-room.ts"
   },
   "publishConfig": {
     "provenance": true

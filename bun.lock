@@ -197,6 +197,7 @@
       "name": "@jxsuite/server",
       "version": "0.36.0",
       "dependencies": {
+        "@jxsuite/collab": "workspace:^",
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
         "@jxsuite/import": "workspace:^",

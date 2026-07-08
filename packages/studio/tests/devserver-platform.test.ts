@@ -1060,3 +1060,51 @@ describe("cloudflare publish surface", () => {
     localStorage.removeItem("jx.cf.accountId");
   });
 });
+
+describe("collab capability", () => {
+  test("a server without the endpoint degrades to solo, probing once", async () => {
+    const platform = createDevServerPlatform();
+    expect(await platform.collab?.("pages/index.md")).toBeNull();
+    expect(await platform.collab?.("pages/index.md")).toBeNull();
+    expect(callsTo("/__studio/collab")).toHaveLength(1);
+  });
+
+  test("a capable server opens the multiplexed socket at /__studio/collab", async () => {
+    route("/__studio/collab", () => json({ collab: true, version: 1 }));
+    const seen: string[] = [];
+    class RecordingWebSocket {
+      binaryType = "";
+      readyState = 0;
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((ev: unknown) => void) | null = null;
+      sent = 0;
+      constructor(url: string) {
+        seen.push(url);
+      }
+      send(): void {
+        this.sent += 1;
+      }
+      close(): void {
+        this.sent = -1;
+      }
+    }
+    const realWs = (globalThis as Record<string, unknown>)["WebSocket"];
+    (globalThis as Record<string, unknown>)["WebSocket"] = RecordingWebSocket;
+    try {
+      const platform = createDevServerPlatform();
+      // The open never resolves (the socket never answers); only the URL contract is under test.
+      void platform.collab?.("pages/index.md");
+      const deadline = Date.now() + 3000;
+      while (seen.length === 0 && Date.now() < deadline) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 10);
+        });
+      }
+      expect(seen).toEqual([`ws://${location.host}/__studio/collab`]);
+    } finally {
+      (globalThis as Record<string, unknown>)["WebSocket"] = realWs;
+    }
+  });
+});

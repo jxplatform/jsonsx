@@ -9,6 +9,7 @@
  */
 
 import { streamImport } from "../services/import-client";
+import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
   DirEntry,
@@ -46,6 +47,13 @@ interface SiteEntry {
  */
 export function createDevServerPlatform() {
   let _projectRoot = "";
+  /** Lazy /__studio/collab capability probe (null = not asked yet). */
+  let _collabProbe: Promise<boolean> | null = null;
+  /**
+   * One multiplexed collab socket per page; per-doc handles come from openDoc. Memoized as a
+   * promise so concurrent first opens share the connection instead of racing two sockets.
+   */
+  let _collabConnection: Promise<WsCollabConnection> | null = null;
 
   /**
    * Prefix a project-relative path with the active project root for server API calls.
@@ -388,6 +396,35 @@ export function createDevServerPlatform() {
       return () => {
         es.close();
       };
+    },
+
+    /**
+     * Realtime co-editing over the dev server's /__studio/collab endpoint (rooms keyed by
+     * server-root-relative path). Probes capability once — older servers without the endpoint
+     * degrade to solo editing; the wire client loads on demand so yjs stays out of the base
+     * bundle.
+     */
+    async collab(docPath: string) {
+      if (typeof WebSocket === "undefined" || typeof location === "undefined") {
+        return null;
+      }
+      if (_collabProbe === null) {
+        _collabProbe = fetch("/__studio/collab")
+          .then((res) => res.ok)
+          .catch(() => false);
+      }
+      if (!(await _collabProbe)) {
+        return null;
+      }
+      _collabConnection ??= (async () => {
+        const { createWsCollabConnection } = await import("@jxsuite/collab/client");
+        const scheme = location.protocol === "https:" ? "wss" : "ws";
+        return createWsCollabConnection({
+          url: `${scheme}://${location.host}/__studio/collab`,
+        });
+      })();
+      const connection = await _collabConnection;
+      return connection.openDoc(serverPath(docPath));
     },
 
     /** @param {string} _path */

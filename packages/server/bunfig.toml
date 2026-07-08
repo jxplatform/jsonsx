@@ -4,6 +4,7 @@ coverageSkipTestFiles = true
 coveragePathIgnorePatterns = [
   "**/tests/**",
   "./result/**",
+  "../collab/**",
   "../compiler/**",
   "../create/**",
   "../desktop/**",

@@ -84,6 +84,16 @@ export const STUDIO_ROUTES = {
   fileUpload: route("POST", "/__studio/file/upload", "Upload binary content to a path"),
   fileRename: route("POST", "/__studio/file/rename", "Rename/move (+ refactor report)"),
   locate: route("POST", "/__studio/locate", "Find a file by name → {path | null}"),
+  collab: route(
+    "GET",
+    "/__studio/collab",
+    "Realtime co-editing: a WebSocket upgrade speaking the @jxsuite/collab wire envelope (one " +
+      "socket per project, documents multiplexed by path; y-protocols sync + project-level " +
+      "awareness in lib0 binary frames — see @jxsuite/collab/envelope for the frame layout and " +
+      "the docEpoch/doc-reset lifecycle). A plain GET (no Upgrade) answers {collab: true, " +
+      "version} as the capability probe.",
+    "Realtime co-editing is unavailable; Studio edits solo with file-level saves",
+  ),
 
   // ─── Documents / components / formats ─────────────────────────────────────
   components: route("GET", "/__studio/components", "Discover components (ComponentMeta[])"),

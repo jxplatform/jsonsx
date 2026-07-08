@@ -15,6 +15,7 @@
 
 import { join, relative, resolve } from "node:path";
 import { buildAll } from "./build.ts";
+import { createCollabRegistry } from "./collab.ts";
 import { createWatcher, injectSSE } from "./watch.ts";
 import { handleResolve, handleServerFunction } from "./resolve.ts";
 import { assertAccessible, handleStudioApi } from "./studio-api.ts";
@@ -204,10 +205,12 @@ export async function createDevServer(options: {
   // ─── File watcher + SSE ─────────────────────────────────────────────────────
 
   let handleSSE = null;
+  let fsWatcher: ReturnType<typeof createWatcher>["watcher"] | null = null;
   if (watch !== false) {
     const watchOpts = typeof watch === "object" ? watch : {};
     const watcher = createWatcher(absRoot, builds, watchOpts);
     ({ handleSSE } = watcher);
+    fsWatcher = watcher.watcher;
   }
 
   // Bundle cache for npm packages (bare specifier → bundled JS)
@@ -224,10 +227,24 @@ export async function createDevServer(options: {
   // Active studio project root (set via /__studio/activate, used for static file fallback)
   let activeProjectRoot: string | null = null;
 
+  // ─── Realtime co-editing (/__studio/collab) ─────────────────────────────────
+
+  // Created unconditionally (it is inert until an upgrade) so Bun.serve always has real
+  // Websocket handlers; the route below is what gates the capability on enableStudio.
+  const collabRegistry = createCollabRegistry({
+    absRoot,
+    activeProjectRoot: () => activeProjectRoot,
+  });
+  if (enableStudio && fsWatcher) {
+    fsWatcher.on("change", (changedPath: string) => {
+      collabRegistry.handleExternalChange(resolve(absRoot, changedPath));
+    });
+  }
+
   // ─── HTTP server ────────────────────────────────────────────────────────────
 
   const server = Bun.serve({
-    async fetch(req) {
+    async fetch(req, bunServer) {
       const url = new URL(req.url);
       let path = decodeURIComponent(url.pathname);
       if (path.endsWith("/")) {
@@ -253,6 +270,11 @@ export async function createDevServer(options: {
 
       // Studio filesystem API
       if (enableStudio && path.startsWith("/__studio/")) {
+        // Realtime co-editing: WebSocket upgrade or capability probe
+        if (path === "/__studio/collab") {
+          return collabRegistry.handleRequest(req, bunServer);
+        }
+
         // Activate project — tells the server which project root to use for static file fallback
         if (path === "/__studio/activate" && req.method === "POST") {
           const body = (await req.json()) as { root?: string };
@@ -380,6 +402,7 @@ export async function createDevServer(options: {
     // Keep SSE connections alive — heartbeats are every 15 s, and AI streaming can take
     // 30+ s. The default 10 s idleTimeout kills them prematurely.
     idleTimeout: 120,
+    websocket: collabRegistry.websocket,
   });
 
   console.log(`\n@jxsuite/server listening on http://localhost:${server.port}`);
