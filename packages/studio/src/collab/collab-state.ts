@@ -22,6 +22,11 @@ export interface TabCollabState {
   readOnly: boolean;
   /** Other clients' awareness states (this project connection, all docs). */
   peers: PeerPresence[];
+  /**
+   * True while source holds the canonical lock (someone is co-editing the code view): structural
+   * surfaces soft-freeze and the canvas previews the source reconciler's parses.
+   */
+  sourceCanonical: boolean;
 }
 
 const states = new WeakMap<Tab, TabCollabState>();
@@ -34,6 +39,7 @@ export function collabState(tab: Tab): TabCollabState {
       active: false,
       peers: [],
       readOnly: false,
+      sourceCanonical: false,
       status: "detached",
     }) as TabCollabState;
     states.set(tab, state);

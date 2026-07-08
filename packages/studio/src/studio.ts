@@ -77,7 +77,11 @@ import {
   setupTreeKeyboard,
 } from "./files/files";
 import { startFsSync } from "./files/fs-events";
-import { configureCollabSerializer } from "./collab/collab-session";
+import {
+  configureCollabNotifier,
+  configureCollabParser,
+  configureCollabSerializer,
+} from "./collab/collab-session";
 import { renderImportsTemplate } from "./panels/imports-panel";
 import { renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
@@ -572,8 +576,17 @@ function safeRenderRightPanel() {
 // Now that renderers are registered, bootstrap
 registerFunctionCompletions();
 
-// Collab sessions serialize through the format host when mirroring structure into source text.
-configureCollabSerializer((tab) => serializeDocument(tab));
+// Collab sessions serialize/parse through the format host when mirroring between the structure
+// Tree and the shared source text, and surface freezes via the status bar.
+configureCollabSerializer(serializeDocument);
+configureCollabParser(async (tab, text) => {
+  if (tab.documentPath && formatForPath(tab.documentPath)) {
+    const parsed = await parseSourceForPath(tab.documentPath, text);
+    return { document: parsed.document as JxMutableNode, frontmatter: parsed.frontmatter };
+  }
+  return { document: JSON.parse(text) as JxMutableNode };
+});
+configureCollabNotifier(statusMessage);
 
 let fsUnsub: (() => void) | null = null;
 /** (Re)subscribe the sidebar to backend filesystem events for the active project. */

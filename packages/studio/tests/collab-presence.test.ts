@@ -1,4 +1,5 @@
 import { installMockPlatform, renderInto } from "./harness";
+import type { TemplateResult } from "lit-html";
 import { createMockCollabHub, settleCollab } from "./collab-mock";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
 import { resetCollabForTests } from "../src/collab/collab-session";
@@ -21,7 +22,7 @@ describe("presence chips", () => {
     installMockPlatform();
     const tab = openTab({ document: structuredClone(DOC), documentPath: PATH, id: PATH });
     const el = document.createElement("div");
-    await renderInto(presenceChipsTemplate(tab), el);
+    await renderInto(presenceChipsTemplate(tab) as TemplateResult, el);
     expect(el.querySelector(".jx-presence")).toBeNull();
   });
 
@@ -50,7 +51,7 @@ describe("presence chips", () => {
       },
     ];
     const el = document.createElement("div");
-    await renderInto(presenceChipsTemplate(tab), el);
+    await renderInto(presenceChipsTemplate(tab) as TemplateResult, el);
     expect(el.querySelector(".jx-presence-status")?.textContent).toBe("Live");
     const chips = [...el.querySelectorAll(".jx-presence-chip")];
     expect(chips).toHaveLength(2);
@@ -66,7 +67,7 @@ describe("presence chips", () => {
     const state = collabState(tab);
     state.status = "offline";
     const el = document.createElement("div");
-    await renderInto(presenceChipsTemplate(tab), el);
+    await renderInto(presenceChipsTemplate(tab) as TemplateResult, el);
     const pill = el.querySelector<HTMLElement>(".jx-presence-status");
     expect(pill?.dataset["status"]).toBe("offline");
   });

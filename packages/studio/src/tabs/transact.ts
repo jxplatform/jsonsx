@@ -105,6 +105,20 @@ export function setTransactObserver(fn: TransactObserver | null) {
 }
 
 /**
+ * Module-level gate consulted at transactDoc entry: return a refusal reason to block the mutation
+ * (the collab layer soft-freezes structural editing while a peer holds source-canonical), or null
+ * to proceed. Remote-origin transactions always pass — they ARE the frozen representation's
+ * mirror.
+ */
+export type TransactGate = (tab: Tab, origin: TransactOrigin) => string | null;
+
+let _transactGate: TransactGate | null = null;
+
+export function setTransactGate(fn: TransactGate | null) {
+  _transactGate = fn;
+}
+
+/**
  * Apply a document mutation transactionally: push to history and mark dirty. The mutationFn
  * receives the tab and should mutate tab.doc.document in place.
  *
@@ -118,6 +132,9 @@ export function transactDoc(
   { skipHistory = false, origin = "user" }: { skipHistory?: boolean; origin?: TransactOrigin } = {},
 ) {
   if (!tab) {
+    return;
+  }
+  if (origin !== "remote" && _transactGate?.(tab, origin)) {
     return;
   }
   const selectionBefore = tab.session.selection ? [...tab.session.selection] : null;

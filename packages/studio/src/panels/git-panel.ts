@@ -6,6 +6,7 @@
 
 import { html, nothing } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
+import { flushAllCollab } from "../collab/collab-session";
 import type {
   GitBranchesResult,
   GitDiffState,
@@ -263,6 +264,9 @@ export function renderGitPanel(
       return;
     }
     updateUi("gitCommitMessage", "");
+    // Fold co-editing sessions into the backend's tree first so the commit never misses
+    // Trailing keystrokes (the mirror is debounced).
+    await flushAllCollab();
     await gitAction("gitCommit", msg);
   };
 
@@ -275,6 +279,7 @@ export function renderGitPanel(
     updateUi("gitCommitMessage", "");
     updateUi("gitLoading", true);
     updateUi("gitError", null);
+    await flushAllCollab();
     const plat = getPlatform();
     try {
       await plat.gitCommit(msg);

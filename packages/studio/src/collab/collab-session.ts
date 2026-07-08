@@ -21,6 +21,7 @@ import {
   isBatching,
   setBatchEndNotifier,
   setHistoryDelegate,
+  setTransactGate,
   setTransactObserver,
   transactDoc,
 } from "../tabs/transact";
@@ -63,6 +64,25 @@ export function configureCollabSerializer(fn: ((tab: Tab) => Promise<string>) | 
   _serialize = fn;
 }
 
+/** Parser injected at studio init (file-ops' parseSourceForPath) for the source reconciler. */
+export type CollabParser = (
+  tab: Tab,
+  text: string,
+) => Promise<{ document: JxMutableNode; frontmatter?: Record<string, unknown> }>;
+
+let _parse: CollabParser | null = null;
+
+export function configureCollabParser(fn: CollabParser | null): void {
+  _parse = fn;
+}
+
+/** Status-message sink injected at studio init (a direct statusbar import would cycle). */
+let _notify: (message: string) => void = () => {};
+
+export function configureCollabNotifier(fn: ((message: string) => void) | null): void {
+  _notify = fn ?? (() => {});
+}
+
 interface ActiveSession {
   tab: Tab;
   path: string;
@@ -78,7 +98,11 @@ interface ActiveSession {
   applyingRemoteFrontmatter: boolean;
   synced: boolean;
   canWrite: boolean;
+  /** True while THIS client is in the code view (its structural freeze exempts itself). */
+  inSourceMode: boolean;
   mirrorTimer: ReturnType<typeof setTimeout> | null;
+  /** Debounce for the source reconciler's Y.Text → structure parse mirror. */
+  sourceParseTimer: ReturnType<typeof setTimeout> | null;
   disposers: (() => void)[];
 }
 
@@ -122,6 +146,16 @@ function installGlobalHooks(): void {
   hooksInstalled = true;
   setTransactObserver(onTransact);
   setBatchEndNotifier(onBatchEnd);
+  // Soft-freeze structural editing while a peer holds source-canonical (remote origins pass —
+  // They ARE the reconciler's mirror of the frozen representation).
+  setTransactGate((tab) => {
+    const session = runtimeOf(tab)?.session;
+    if (session?.synced && collabState(tab).sourceCanonical && !session.inSourceMode) {
+      _notify("Source editing in progress — structural edits are paused");
+      return "source-canonical";
+    }
+    return null;
+  });
 }
 
 /** Test hook: uninstall global observers and forget module state. */
@@ -129,7 +163,10 @@ export function resetCollabForTests(): void {
   hooksInstalled = false;
   setTransactObserver(null);
   setBatchEndNotifier(null);
+  setTransactGate(null);
   _serialize = null;
+  _parse = null;
+  _notify = () => {};
 }
 
 function onTransact(tab: Tab, record: TransactionRecord, origin: TransactOrigin): void {
@@ -257,6 +294,10 @@ function scheduleMirror(session: ActiveSession): void {
   if (!_serialize || !isReconciler(session)) {
     return;
   }
+  // While source holds the canonical lock, mirroring runs the OTHER way (parse, not serialize).
+  if (session.collab.canonicalOf(session.handle.doc) === "source") {
+    return;
+  }
   if (session.mirrorTimer) {
     clearTimeout(session.mirrorTimer);
   }
@@ -280,6 +321,121 @@ async function mirrorNow(session: ActiveSession): Promise<void> {
 }
 
 // ─── Save ─────────────────────────────────────────────────────────────────────
+
+/** Parse the shared source text back into the structure tree (the source reconciler's duty). */
+async function sourceParseNow(session: ActiveSession): Promise<void> {
+  if (!_parse || !session.synced || !session.canWrite) {
+    return;
+  }
+  const { collab, handle, tab } = session;
+  const rev = collab.canonicalRevOf(handle.doc);
+  const text = collab.sourceText(handle.doc).toString();
+  let parsed: Awaited<ReturnType<CollabParser>>;
+  try {
+    parsed = await _parse(tab, text);
+  } catch {
+    // Unparseable source: keep the last good structure (the preview goes stale, not wrong).
+    return;
+  }
+  if (!session.synced || collab.canonicalRevOf(handle.doc) !== rev) {
+    // The lock flipped while parsing; this mirror was computed against a dead representation.
+    return;
+  }
+  const ops = collab.diffDocs(collab.yDocToJson(handle.doc), parsed.document);
+  if (ops === null) {
+    collab.replaceYStructure(handle.doc, parsed.document, collab.MIRROR_ORIGIN);
+  } else if (ops.length > 0) {
+    try {
+      collab.applyDocOpsToY(handle.doc, ops, collab.MIRROR_ORIGIN);
+    } catch {
+      collab.replaceYStructure(handle.doc, parsed.document, collab.MIRROR_ORIGIN);
+    }
+  }
+  const frontmatter = collab.frontmatterMap(handle.doc);
+  const next = parsed.frontmatter ?? {};
+  handle.doc.transact(() => {
+    // Detached copy: keys are deleted while iterating.
+    const sharedKeys = [...frontmatter.keys()];
+    for (const key of sharedKeys) {
+      if (!(key in next)) {
+        frontmatter.delete(key);
+      }
+    }
+    for (const [key, value] of Object.entries(next)) {
+      if (!collab.deepEqual(frontmatter.get(key), value)) {
+        frontmatter.set(key, value);
+      }
+    }
+  }, collab.MIRROR_ORIGIN);
+}
+
+/**
+ * The code view's co-editing surface for a tab, or null when the tab isn't in a synced session.
+ * `enter()` flips the canonical lock to source (seeding the text from the flipper's serialization);
+ * `leave()` reverts to structure-canonical when the last source editor departs.
+ */
+export function collabSourceContext(tab: Tab): {
+  text: unknown;
+  localOrigin: unknown;
+  readOnly: boolean;
+  enter: () => Promise<void>;
+  leave: () => void;
+} | null {
+  const session = runtimeOf(tab)?.session;
+  if (!session?.synced) {
+    return null;
+  }
+  const { collab, handle } = session;
+  return {
+    enter: async () => {
+      session.inSourceMode = true;
+      const local = handle.awareness.getLocalState();
+      if (local) {
+        handle.awareness.setLocalState({ ...local, mode: "source" });
+      }
+      if (!session.canWrite) {
+        return;
+      }
+      let serialized: string | null = null;
+      if (_serialize) {
+        try {
+          serialized = await _serialize(tab);
+        } catch {
+          serialized = null;
+        }
+      }
+      collab.acquireSourceCanonical(
+        handle.doc,
+        serialized ?? collab.sourceText(handle.doc).toString(),
+        collab.LOCAL_ORIGIN,
+      );
+    },
+    leave: () => {
+      session.inSourceMode = false;
+      const local = handle.awareness.getLocalState();
+      if (local) {
+        handle.awareness.setLocalState({ ...local, mode: "structure" });
+      }
+      if (!session.canWrite) {
+        return;
+      }
+      const others = collab.otherSourceEditors(
+        handle.awareness,
+        session.path,
+        handle.awareness.clientID,
+      );
+      if (others.length === 0) {
+        // Freshen the structure mirror once more, then hand the lock back.
+        void sourceParseNow(session).then(() => {
+          collab.releaseSourceCanonical(handle.doc, collab.LOCAL_ORIGIN);
+        });
+      }
+    },
+    localOrigin: collab.LOCAL_ORIGIN,
+    readOnly: !session.canWrite,
+    text: collab.sourceText(handle.doc),
+  };
+}
 
 /**
  * Cmd+S for a collab tab: refresh the source mirror and ask the provider to persist now. Returns
@@ -434,6 +590,9 @@ function detachSession(tab: Tab): void {
   if (session.mirrorTimer) {
     clearTimeout(session.mirrorTimer);
   }
+  if (session.sourceParseTimer) {
+    clearTimeout(session.sourceParseTimer);
+  }
   for (const dispose of session.disposers) {
     try {
       dispose();
@@ -469,9 +628,11 @@ function createSession(
     collab,
     disposers: [],
     handle,
+    inSourceMode: false,
     lastSeenRef: toRaw(tab.doc.document) as object,
     mirrorTimer: null,
     path,
+    sourceParseTimer: null,
     synced: false,
     tab,
     undoManager: null,
@@ -579,6 +740,41 @@ function createSession(
   };
   structure.observeDeep(structureObserver);
   session.disposers.push(() => structure.unobserveDeep(structureObserver));
+
+  // The canonical-representation lock: while source holds it, structural surfaces soft-freeze
+  // (Transact gate) and the source reconciler's parses arrive as MIRROR-origin structure changes.
+  const tabState = collabState(tab);
+  tabState.sourceCanonical = collab.canonicalOf(handle.doc) === "source";
+  const lockMeta = collab.metaMap(handle.doc);
+  const lockObserver = () => {
+    tabState.sourceCanonical = collab.canonicalOf(handle.doc) === "source";
+  };
+  lockMeta.observe(lockObserver);
+  session.disposers.push(() => lockMeta.unobserve(lockObserver));
+
+  // The source reconciler (lowest write clientID in source mode) parses Y.Text back into the
+  // Structure tree on a debounce, so every client's canvas previews source edits live.
+  const source = collab.sourceText(handle.doc);
+  const sourceObserver = (_event: unknown, transaction: { origin: unknown }) => {
+    if (transaction.origin === collab.MIRROR_ORIGIN || !session.synced) {
+      return;
+    }
+    if (collab.canonicalOf(handle.doc) !== "source") {
+      return;
+    }
+    if (!collab.isSourceReconciler(handle.awareness, session.path)) {
+      return;
+    }
+    if (session.sourceParseTimer) {
+      clearTimeout(session.sourceParseTimer);
+    }
+    session.sourceParseTimer = setTimeout(() => {
+      session.sourceParseTimer = null;
+      void sourceParseNow(session);
+    }, 600);
+  };
+  source.observe(sourceObserver as never);
+  session.disposers.push(() => source.unobserve(sourceObserver as never));
 
   // Inbound frontmatter (per-field).
   const frontmatter = collab.frontmatterMap(handle.doc);

@@ -10,6 +10,9 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 
 import { canvasPanels, canvasWrap, updateCanvas } from "../store";
 import { activeTab } from "../workspace/workspace";
+import { collabSourceContext } from "../collab/collab-session";
+import { bindMonacoToSharedText } from "../collab/monaco-binding";
+import type { MonacoModelLike, MonacoRangeFactory, SharedTextLike } from "../collab/monaco-binding";
 import { view } from "../view";
 import { parseSourceForPath, serializeDocument } from "../files/file-ops";
 import { formatByName, formatForPath } from "../format/format-host";
@@ -130,11 +133,37 @@ function hardClearCanvasWrap() {
  * the very next render is treated as a fresh mode transition and rebuilds the surface from
  * scratch.
  */
+/** Live source-mode collab binding teardown (unbind + release the canonical lock). */
+let sourceCollabCleanup: (() => void) | null = null;
+
+function disposeSourceCollab(): void {
+  sourceCollabCleanup?.();
+  sourceCollabCleanup = null;
+}
+
+/** Bind the Monaco model to the shared source text; returns the teardown. */
+function createSourceCollabBinding(
+  model: monaco.editor.ITextModel,
+  ctx: NonNullable<ReturnType<typeof collabSourceContext>>,
+): () => void {
+  const binding = bindMonacoToSharedText({
+    localOrigin: ctx.localOrigin,
+    model: model as unknown as MonacoModelLike,
+    rangeFactory: monaco.Range as unknown as MonacoRangeFactory,
+    text: ctx.text as SharedTextLike,
+  });
+  return () => {
+    binding.dispose();
+    ctx.leave();
+  };
+}
+
 function resetCanvasView() {
   if (view.functionEditor) {
     view.functionEditor.dispose();
     view.functionEditor = null;
   }
+  disposeSourceCollab();
   if (view.monacoEditor) {
     view.monacoEditor.getModel()?.dispose();
     view.monacoEditor.dispose();
@@ -305,6 +334,7 @@ export function renderCanvas() {
     }
 
     // Dispose Monaco editor if switching away from source mode
+    disposeSourceCollab();
     if (view.monacoEditor) {
       view.monacoEditor.getModel()?.dispose();
       view.monacoEditor.dispose();
@@ -368,17 +398,34 @@ export function renderCanvas() {
     const lang = sourceLang(tab);
     const modelUri = monaco.Uri.parse(`file:///${filePath}`);
     const model = monaco.editor.createModel("", lang, modelUri);
-    sourceContent(tab, lang)
-      .then((content) => {
+    // Co-edited tabs bind the buffer to the shared Y.Text instead of a local serialization: the
+    // Canonical lock flips to "source", peers co-type character-level, and the source reconciler
+    // Parses back into the structure tree for everyone's canvas.
+    const collabCtx = collabSourceContext(tab);
+    if (collabCtx) {
+      void collabCtx.enter().then(() => {
         const editor = view.monacoEditor;
-        if (editor && editor.getModel() === model) {
-          editor._ignoreNextChange = true;
-          model.setValue(content);
+        if (!editor || editor.getModel() !== model) {
+          return;
         }
-      })
-      .catch(() => {
-        // Serialization unavailable — leave the buffer empty rather than crash the render
+        sourceCollabCleanup = createSourceCollabBinding(model, collabCtx);
+        if (collabCtx.readOnly) {
+          editor.updateOptions({ readOnly: true });
+        }
       });
+    } else {
+      sourceContent(tab, lang)
+        .then((content) => {
+          const editor = view.monacoEditor;
+          if (editor && editor.getModel() === model) {
+            editor._ignoreNextChange = true;
+            model.setValue(content);
+          }
+        })
+        .catch(() => {
+          // Serialization unavailable — leave the buffer empty rather than crash the render
+        });
+    }
     view.monacoEditor = monaco.editor.create(editorContainer as unknown as HTMLElement, {
       automaticLayout: true,
       fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace",
@@ -392,7 +439,11 @@ export function renderCanvas() {
       wordWrap: "on",
     });
 
-    // Debounced sync back to state
+    // Debounced sync back to state (solo tabs only: co-edited buffers flow through the shared
+    // Y.Text and the source reconciler's parse mirror instead of a whole-doc replace).
+    if (collabCtx) {
+      return;
+    }
     let debounce: ReturnType<typeof setTimeout> | undefined;
     view.monacoEditor.onDidChangeModelContent(() => {
       const editor = view.monacoEditor;

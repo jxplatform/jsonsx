@@ -29,6 +29,15 @@ export {
   yEventsToDocOps,
 } from "./op-bridge.ts";
 export { deepEqual, diffDocs, replaceYStructure } from "./diff.ts";
+export {
+  acquireSourceCanonical,
+  canonicalOf,
+  canonicalRevOf,
+  isSourceReconciler,
+  otherSourceEditors,
+  releaseSourceCanonical,
+} from "./source-lock.ts";
+export type { CanonicalRepresentation } from "./source-lock.ts";
 export type { DiffOptions } from "./diff.ts";
 export {
   decodeFrame,
