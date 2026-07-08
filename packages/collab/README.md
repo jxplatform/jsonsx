@@ -78,3 +78,9 @@ and per-document cursor overlays both filter the same states. Identity comes fro
 `StudioPlatform.collab?: (docPath) => Promise<CollabHandle | null>` where a handle carries
 `{doc, awareness, whenSynced, identity(), flush(), onStatus(), onReset(), destroy()}`. `onReset`
 fires on a `doc-reset`: the handle is dead — destroy it and re-acquire.
+
+## Versioning
+
+Published to npm as `@jxsuite/collab` — TypeScript source, like every `@jxsuite`
+package, following the monorepo's release train. Within the monorepo, other
+packages (`@jxsuite/server`, `@jxsuite/studio`) depend on it via `workspace:^`.
