@@ -7,9 +7,9 @@
   "packages/import": "0.35.1",
   "packages/starters": "0.35.1",
   "packages/create": "0.36.0",
-  "packages/server": "0.37.0",
-  "packages/studio": "0.37.0",
-  "packages/desktop": "0.35.2",
-  "packages/protocol": "0.3.0",
-  "packages/collab": "0.2.0"
+  "packages/server": "0.37.1",
+  "packages/studio": "0.37.1",
+  "packages/desktop": "0.35.3",
+  "packages/protocol": "0.3.1",
+  "packages/collab": "0.2.1"
 }

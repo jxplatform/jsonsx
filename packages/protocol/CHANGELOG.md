@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/jxsuite/jx/compare/protocol-v0.3.0...protocol-v0.3.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **protocol:** clarify npm coordinates and dependency in README ([92abaa0](https://github.com/jxsuite/jx/commit/92abaa048a042126639c3393f27feadd4858a607))
+
 ## [0.3.0](https://github.com/jxsuite/jx/compare/protocol-v0.2.0...protocol-v0.3.0) (2026-07-08)
 
 

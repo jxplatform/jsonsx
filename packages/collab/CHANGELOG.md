@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/jxsuite/jx/compare/collab-v0.2.0...collab-v0.2.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **collab:** add npm/versioning note to README ([427f092](https://github.com/jxsuite/jx/commit/427f09238db59453cffed54604ee22ba2c8a4533))
+
 ## [0.2.0](https://github.com/jxsuite/jx/compare/collab-v0.1.0...collab-v0.2.0) (2026-07-08)
 
 
