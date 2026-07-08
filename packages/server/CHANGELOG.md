@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.37.0](https://github.com/jxsuite/jx/compare/server-v0.36.0...server-v0.37.0) (2026-07-08)
+
+
+### Features
+
+* **collab:** the wire — ws client/room core, devserver endpoint, adapter members ([d9f4b42](https://github.com/jxsuite/jx/commit/d9f4b425ac1d31cd3d7f9b2892e05321de08a09d))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.2.0
+
 ## [0.36.0](https://github.com/jxsuite/jx/compare/server-v0.35.0...server-v0.36.0) (2026-07-07)
 
 
