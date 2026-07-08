@@ -14,20 +14,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # dir = workspace path (packages/* core, extensions/* extensions);
+        # flag = codecov flag / artifact name (flags cannot contain "/").
         package:
-          - ai
-          - collab
-          - compiler
-          - create
-          - desktop
-          - import
-          - parser
-          - protocol
-          - runtime
-          - schema
-          - server
-          - starters
-          - studio
+          - { dir: packages/ai, flag: ai }
+          - { dir: packages/collab, flag: collab }
+          - { dir: packages/compiler, flag: compiler }
+          - { dir: packages/create, flag: create }
+          - { dir: packages/desktop, flag: desktop }
+          - { dir: packages/import, flag: import }
+          - { dir: packages/parser, flag: parser }
+          - { dir: packages/protocol, flag: protocol }
+          - { dir: packages/runtime, flag: runtime }
+          - { dir: packages/schema, flag: schema }
+          - { dir: packages/server, flag: server }
+          - { dir: packages/starters, flag: starters }
+          - { dir: packages/studio, flag: studio }
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -44,16 +46,16 @@ jobs:
           bun test --isolate --coverage \
             --reporter=junit --reporter-outfile=junit.xml \
             2>&1 | tee /tmp/test-output.txt
-        working-directory: packages/${{ matrix.package }}
-      - run: bun scripts/check-coverage-manifest.ts packages/${{ matrix.package }}
+        working-directory: ${{ matrix.package.dir }}
+      - run: bun scripts/check-coverage-manifest.ts ${{ matrix.package.dir }}
       - name: Upload coverage reports to Codecov
         if: always()
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: jxsuite/jx
-          files: packages/${{ matrix.package }}/coverage/lcov.info
-          flags: ${{ matrix.package }}
+          files: ${{ matrix.package.dir }}/coverage/lcov.info
+          flags: ${{ matrix.package.flag }}
       - name: Upload test results to Codecov
         # Test Analytics: Bun's JUnit reporter (written above) feeds Codecov's
         # flaky-test / failure tracking. Runs even when tests fail so failures
@@ -63,8 +65,8 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: jxsuite/jx
-          files: packages/${{ matrix.package }}/junit.xml
-          flags: ${{ matrix.package }}
+          files: ${{ matrix.package.dir }}/junit.xml
+          flags: ${{ matrix.package.flag }}
       - name: Extract coverage report
         if: always()
         shell: bash
@@ -73,18 +75,18 @@ jobs:
           # The coverage table is delimited by three dashed lines:
           # dashes / header / dashes / rows / dashes.
           awk '/^-+\|/ { n++; print; if (n == 3) exit; next } n >= 1' /tmp/test-output.txt \
-            > /tmp/coverage-report/${{ matrix.package }}.txt
+            > /tmp/coverage-report/${{ matrix.package.flag }}.txt
           tests=$(grep -E '^ [0-9]+ (pass|fail)' /tmp/test-output.txt | sed 's/^ *//' | awk '{printf "%s%s", sep, $0; sep=", "}')
-          all=$(grep '^All files' /tmp/coverage-report/${{ matrix.package }}.txt || echo 'no coverage data')
+          all=$(grep '^All files' /tmp/coverage-report/${{ matrix.package.flag }}.txt || echo 'no coverage data')
           {
-            echo "### \`${{ matrix.package }}\` coverage"
+            echo "### \`${{ matrix.package.flag }}\` coverage"
             echo ""
             echo "\`$all\` — $tests"
             echo ""
             echo "<details><summary>Per-file coverage</summary>"
             echo ""
             echo '```'
-            cat /tmp/coverage-report/${{ matrix.package }}.txt
+            cat /tmp/coverage-report/${{ matrix.package.flag }}.txt
             echo '```'
             echo ""
             echo "</details>"
@@ -93,8 +95,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-${{ matrix.package }}
-          path: /tmp/coverage-report/${{ matrix.package }}.txt
+          name: coverage-${{ matrix.package.flag }}
+          path: /tmp/coverage-report/${{ matrix.package.flag }}.txt
           retention-days: 7
 
   coverage-comment:
@@ -171,6 +173,9 @@ jobs:
           bun-version: 1.3.13
       - run: bun install --frozen-lockfile
       - run: bun run lint
+      # Core packages must never depend on extension packages — see
+      # specs/extensions.md §2 and scripts/check-dep-rules.ts.
+      - run: bun scripts/check-dep-rules.ts
       - run: bun run typecheck
       # Type-aware (tsgolint) pass — Flow-soundness rules in .oxlintrc.strict.json.
       # The tsgolint binary ships with the oxlint-tsgolint dev dep (installed above).

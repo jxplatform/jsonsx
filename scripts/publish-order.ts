@@ -1,4 +1,5 @@
-// Emits, one per line to stdout, the package directories to publish for a
+// Emits, one per line to stdout, the workspace directories (full repo-relative
+// Paths — packages/* core and extensions/* extensions) to publish for a
 // Release run, in topological order (a dependency always precedes its
 // Dependents). Consumed by .github/workflows/publish.yml.
 //
@@ -15,40 +16,45 @@
 // Publish even when release-please released them, leaving already-published
 // Dependents (server, studio) pointing at versions that never reached npm.
 //
-// Usage: PATHS_RELEASED='["packages/server","packages/collab"]' bun scripts/publish-order.ts
+// Usage: PATHS_RELEASED='["packages/server","extensions/parser"]' bun scripts/publish-order.ts
 
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-const PACKAGES_DIR = "packages";
+const WORKSPACE_ROOTS = ["packages", "extensions"];
 
 interface Pkg {
-  dir: string;
+  dir: string; // Full repo-relative path, e.g. "packages/server"
   name: string;
   publishable: boolean;
   deps: string[]; // @jxsuite/* runtime dependency package names (deduped)
 }
 
 const pkgs: Pkg[] = [];
-for (const dir of readdirSync(PACKAGES_DIR)) {
-  const file = Bun.file(join(PACKAGES_DIR, dir, "package.json"));
-  if (!(await file.exists())) {
+for (const root of WORKSPACE_ROOTS) {
+  if (!existsSync(root)) {
     continue;
   }
-  const j = await file.json();
-  const deps = new Set(
-    [
-      ...Object.keys(j.dependencies ?? {}),
-      ...Object.keys(j.peerDependencies ?? {}),
-      ...Object.keys(j.optionalDependencies ?? {}),
-    ].filter((d) => d.startsWith("@jxsuite/")),
-  );
-  pkgs.push({
-    dir,
-    name: j.name,
-    publishable: j.private !== true && j.publishConfig != null,
-    deps: [...deps],
-  });
+  for (const entry of readdirSync(root)) {
+    const file = Bun.file(join(root, entry, "package.json"));
+    if (!(await file.exists())) {
+      continue;
+    }
+    const j = await file.json();
+    const deps = new Set(
+      [
+        ...Object.keys(j.dependencies ?? {}),
+        ...Object.keys(j.peerDependencies ?? {}),
+        ...Object.keys(j.optionalDependencies ?? {}),
+      ].filter((d) => d.startsWith("@jxsuite/")),
+    );
+    pkgs.push({
+      dir: `${root}/${entry}`,
+      name: j.name,
+      publishable: j.private !== true && j.publishConfig != null,
+      deps: [...deps],
+    });
+  }
 }
 
 const byName = new Map(pkgs.map((p) => [p.name, p]));
@@ -107,7 +113,7 @@ if (releasedRaw.trim()) {
     process.exit(1);
   }
 }
-const released = new Set(releasedPaths.map((p) => p.replace(/^packages\//, "")));
+const released = new Set(releasedPaths);
 
 // Surface released paths we are NOT publishing, so a legitimate skip (desktop)
 // Or a mistake (a released package that lost its publishConfig) is visible in
@@ -115,7 +121,7 @@ const released = new Set(releasedPaths.map((p) => p.replace(/^packages\//, "")))
 for (const relDir of released) {
   const p = pkgs.find((x) => x.dir === relDir);
   if (!p) {
-    console.error(`released path 'packages/${relDir}' has no package.json — not publishing`);
+    console.error(`released path '${relDir}' has no package.json — not publishing`);
   } else if (!p.publishable) {
     console.error(`skipping ${p.name} — not an npm package (private or no publishConfig)`);
   }

@@ -63,14 +63,16 @@ jobs:
             echo "No npm packages released this run; nothing to publish."
             exit 0
           fi
+          # publish-order.ts emits full repo-relative workspace paths
+          # (packages/* and extensions/*).
           for pkg in "${order[@]}"; do
-            name="$(node -p "require('./packages/$pkg/package.json').name")"
-            ver="$(node -p "require('./packages/$pkg/package.json').version")"
-            echo "::group::@jxsuite/$pkg -> $name@$ver"
+            name="$(node -p "require('./$pkg/package.json').name")"
+            ver="$(node -p "require('./$pkg/package.json').version")"
+            echo "::group::$pkg -> $name@$ver"
             if npm view "$name@$ver" version >/dev/null 2>&1; then
               echo "already published, skipping"
             else
-              ( cd "packages/$pkg" && bun pm pack && npm publish --provenance *.tgz )
+              ( cd "$pkg" && bun pm pack && npm publish --provenance *.tgz )
             fi
             echo "::endgroup::"
           done

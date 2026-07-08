@@ -29,6 +29,8 @@
     "packages/**/src/**/*",
     "packages/**/tests/**/*",
     "packages/schema/types.ts",
-    "packages/schema/defs/**/*"
+    "packages/schema/defs/**/*",
+    "extensions/**/src/**/*",
+    "extensions/**/tests/**/*"
   ]
 }
