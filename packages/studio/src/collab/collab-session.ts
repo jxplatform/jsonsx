@@ -635,6 +635,16 @@ function createSession(
       scheduleMirror(session);
     });
 
+    // Publish the local structural selection for remote cursor overlays (peers filter by
+    // FocusedPath, so per-doc boxes come free from the one project-level awareness state).
+    effect(() => {
+      const selection = tab.session.selection ? [...tab.session.selection] : null;
+      const local = handle.awareness.getLocalState();
+      if (local) {
+        handle.awareness.setLocalState({ ...local, selection });
+      }
+    });
+
     // Bypass-write net: any doc root swap that did not come through transactDoc (Monaco parse
     // Flush) reconciles by diff. Deferred one microtask so the transact observer marks its own
     // Refs first (the assignment happens mid-transaction, before the observer runs).

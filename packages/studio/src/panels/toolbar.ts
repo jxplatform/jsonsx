@@ -13,6 +13,8 @@ import {
   redo as tabRedo,
   undo as tabUndo,
 } from "../tabs/transact";
+import { collabState } from "../collab/collab-state";
+import { presenceChipsTemplate } from "../collab/presence-chips";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import { applyPanelCollapse, view } from "../view";
@@ -106,6 +108,8 @@ export function mount(rootEl: HTMLElement, ctx: ToolbarCtx) {
         void tab.session.ui.gitStatus;
         void tab.history.index;
         void tab.history.snapshots.length;
+        void collabState(tab).status;
+        void collabState(tab).peers.length;
       }
       render();
     });
@@ -500,6 +504,7 @@ function toolbarTemplate() {
         ${toolbarIconMap["sp-icon-redo"]}<span class="tb-label">Redo</span>
       </sp-action-button>
     </sp-action-group>
+    ${presenceChipsTemplate(tab)}
     <div class="tb-spacer"></div>
     <sp-action-button
       class="tb-search-trigger"

@@ -25,6 +25,7 @@ import { rectOf } from "../utils/geometry";
 import { effect, effectScope } from "../reactivity";
 import { canvasPanels, canvasWrap, pathsEqual, renderOnly, updateCanvas, updateUi } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
+import { collabState } from "../collab/collab-state";
 import { getPlatform, hasPlatform } from "../platform";
 import type {
   ApplyFormatIntent,
@@ -63,6 +64,10 @@ interface HostState {
   selectionPath: (string | number)[] | null;
   /** Id of the most recent selection `measure` request, so stale `geometry` replies are dropped. */
   selReqId: number;
+  /** Id of the most recent presence `measure` request (allocated from the selReqId counter). */
+  presenceReqId: number;
+  /** Serialized peer path → presence box meta for the in-flight presence measure. */
+  presenceMeta: Map<string, { color: string; label: string }>;
   /** Whether an inline-edit session is live in this host's iframe (drives the format toolbar). */
   editing: boolean;
   /** The latest selection snapshot from this host's iframe (active tags + caret rect + link). */
@@ -478,6 +483,69 @@ function ensureSelectionWatch(): void {
   selectionWatch = { stop: () => scope.stop() };
 }
 
+/** Lazily start one reactive watcher that re-measures remote peers' selections in every host. */
+let presenceWatchStarted = false;
+let presenceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function ensurePresenceWatch(): void {
+  if (presenceWatchStarted) {
+    return;
+  }
+  presenceWatchStarted = true;
+  const scope = effectScope(true);
+  scope.run(() => {
+    effect(() => {
+      const tab = activeTab.value;
+      if (tab) {
+        // Track the roster deeply enough that selection moves re-trigger.
+        const { peers } = collabState(tab);
+        void peers.map((peer) => JSON.stringify(peer.state.selection ?? null)).join("|");
+      }
+      if (presenceTimer) {
+        clearTimeout(presenceTimer);
+      }
+      // Debounced: awareness updates arrive per cursor move.
+      presenceTimer = setTimeout(() => {
+        presenceTimer = null;
+        for (const host of liveHosts) {
+          requestPresence(host);
+        }
+      }, 100);
+    });
+  });
+}
+
+/** Measure remote peers' selections in this host's iframe and draw colored boxes from the reply. */
+function requestPresence(host: HostState): void {
+  if (host.stylebook || !host.ready || !host.iframe.isConnected) {
+    return;
+  }
+  const tab = activeTab.value;
+  const peers = tab ? collabState(tab).peers : [];
+  host.presenceMeta.clear();
+  const paths: (string | number)[][] = [];
+  for (const peer of peers) {
+    const { selection } = peer.state;
+    if (!selection || peer.state.focusedPath !== tab?.documentPath) {
+      continue;
+    }
+    const path = [...selection];
+    paths.push(path);
+    host.presenceMeta.set(JSON.stringify(path), {
+      color: peer.state.user.color,
+      label: peer.state.user.name ?? peer.state.user.login,
+    });
+  }
+  if (paths.length === 0) {
+    host.presenceReqId = -1;
+    host.overlay.setPresence([]);
+    return;
+  }
+  host.selReqId += 1;
+  host.presenceReqId = host.selReqId;
+  host.channel.post({ kind: "measure", paths, reqId: host.presenceReqId });
+}
+
 /** Track the selection on a host and ask its iframe to measure it (or clear the box when null). */
 function requestSelection(host: HostState, sel: (string | number)[] | null): void {
   if (host.stylebook) {
@@ -608,6 +676,8 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     pending: null,
     pendingEnterEdit: null,
     pendingTabIds: new Map(),
+    presenceMeta: new Map(),
+    presenceReqId: -1,
     ready: false,
     selectionPath: null,
     selReqId: 0,
@@ -625,6 +695,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
   hosts.set(canvasEl, state);
   liveHosts.add(state);
   ensureSelectionWatch();
+  ensurePresenceWatch();
   return state;
 }
 
@@ -767,6 +838,19 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "geometry": {
+      // Remote-presence reply: draw one colored box per measured peer selection.
+      if (msg.reqId === state.presenceReqId) {
+        state.presenceReqId = -1;
+        const items: { placement: OverlayPlacement; color: string; label: string }[] = [];
+        for (const hit of msg.hits) {
+          const meta = state.presenceMeta.get(JSON.stringify(hit.path));
+          if (meta) {
+            items.push({ ...meta, placement: canvasRectToParent(hit.rect) });
+          }
+        }
+        state.overlay.setPresence(items);
+        return;
+      }
       // Pan-to-card reply (stylebook): convert the card's iframe rect to parent-viewport space by
       // The empirical zoom + iframe offset and center it.
       if (msg.reqId === state.panReqId) {
@@ -1047,6 +1131,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
 function onDomUpdated(state: HostState, gen: number): void {
   state.lastRenderedGen = gen;
   requestSelection(state, state.selectionPath);
+  requestPresence(state);
   hideInsertZoneNow(state);
   if (state.pendingEnterEdit && gen >= state.pendingEnterEdit.minGen) {
     const { path } = state.pendingEnterEdit;

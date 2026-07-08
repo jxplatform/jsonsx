@@ -65,6 +65,11 @@ export interface OverlayLayer {
    * omitted/null hides it.
    */
   setSelection: (placement: OverlayPlacement | null, label?: string | null) => void;
+  /**
+   * Draw remote collaborators' selection boxes (colored outline + name tag). Replaces the whole set
+   * each call; pass [] to clear. Placements are overlay-local coords like setSelection's.
+   */
+  setPresence: (items: { placement: OverlayPlacement; color: string; label: string }[]) => void;
   /** Position the hover box (or hide it when `placement` is null). */
   setHover: (placement: OverlayPlacement | null) => void;
   /**
@@ -143,7 +148,11 @@ export function createOverlayLayer(doc: Document = document): OverlayLayer {
   insertButton.style.pointerEvents = "auto";
   insertButton.style.display = "none";
 
-  root.append(hoverBox, selectionBox, dropBox, insertButton);
+  // Remote collaborators' selection boxes live in their own container, replaced wholesale.
+  const presenceGroup = doc.createElement("div");
+  presenceGroup.className = "overlay-presence-group";
+
+  root.append(hoverBox, selectionBox, dropBox, insertButton, presenceGroup);
 
   return {
     dispose: () => root.remove(),
@@ -152,6 +161,26 @@ export function createOverlayLayer(doc: Document = document): OverlayLayer {
     setDropIndicator: (placement, edge = "inside") => placeDropIndicator(dropBox, placement, edge),
     setHover: (placement) => place(hoverBox, placement),
     setInsertZone: (placement, edge = "center") => placeInsertButton(insertButton, placement, edge),
+    setPresence: (items) => {
+      presenceGroup.replaceChildren();
+      for (const item of items) {
+        const box = doc.createElement("div");
+        box.className = "overlay-box overlay-presence";
+        box.style.cssText =
+          `position:absolute;display:block;pointer-events:none;` +
+          `outline:1.5px solid ${item.color};outline-offset:1px;` +
+          `left:${item.placement.left}px;top:${item.placement.top}px;` +
+          `width:${item.placement.width}px;height:${item.placement.height}px`;
+        const tag = doc.createElement("div");
+        tag.className = "overlay-presence-tag";
+        tag.textContent = item.label;
+        tag.style.cssText =
+          `position:absolute;top:-18px;left:-2px;padding:1px 5px;border-radius:3px;` +
+          `font:10px/1.4 sans-serif;color:#fff;white-space:nowrap;background:${item.color}`;
+        box.append(tag);
+        presenceGroup.append(box);
+      }
+    },
     setSelection: (placement, label = null) => {
       place(selectionBox, placement);
       if (placement && label) {
