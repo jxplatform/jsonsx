@@ -127,6 +127,38 @@ export function resolveYPath(doc: Y.Doc, path: JxPath): unknown {
 }
 
 /**
+ * Update the source Y.Text to `next` with a minimal edit (common prefix/suffix trimmed), so mirror
+ * refreshes don't ship the whole document over the wire. Returns false when already identical.
+ */
+export function updateSourceText(doc: Y.Doc, next: string, origin?: unknown): boolean {
+  const text = sourceText(doc);
+  const current = text.toString();
+  if (current === next) {
+    return false;
+  }
+  let start = 0;
+  const minLen = Math.min(current.length, next.length);
+  while (start < minLen && current[start] === next[start]) {
+    start += 1;
+  }
+  let endCurrent = current.length;
+  let endNext = next.length;
+  while (endCurrent > start && endNext > start && current[endCurrent - 1] === next[endNext - 1]) {
+    endCurrent -= 1;
+    endNext -= 1;
+  }
+  doc.transact(() => {
+    if (endCurrent > start) {
+      text.delete(start, endCurrent - start);
+    }
+    if (endNext > start) {
+      text.insert(start, next.slice(start, endNext));
+    }
+  }, origin);
+  return true;
+}
+
+/**
  * Populate the structure tree (and frontmatter/meta) from a parsed document — the client-side
  * first-sync step. Safe under concurrent seeders: every write is a whole-key Y.Map set, so two
  * racing seeds converge to one seeder's subtrees via per-key LWW with no duplication. No-op when

@@ -77,6 +77,7 @@ import {
   setupTreeKeyboard,
 } from "./files/files";
 import { startFsSync } from "./files/fs-events";
+import { configureCollabSerializer } from "./collab/collab-session";
 import { renderImportsTemplate } from "./panels/imports-panel";
 import { renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
@@ -570,6 +571,9 @@ function safeRenderRightPanel() {
 
 // Now that renderers are registered, bootstrap
 registerFunctionCompletions();
+
+// Collab sessions serialize through the format host when mirroring structure into source text.
+configureCollabSerializer((tab) => serializeDocument(tab));
 
 let fsUnsub: (() => void) | null = null;
 /** (Re)subscribe the sidebar to backend filesystem events for the active project. */

@@ -14,9 +14,12 @@ export {
   structureMap,
   toYChildren,
   toYNode,
+  updateSourceText,
   yDocToJson,
   yValueToJson,
 } from "./schema.ts";
+// Re-exported so consumers keep a single yjs import point (avoids dual-instance hazards).
+export { Doc as YDoc, UndoManager } from "yjs";
 export {
   applyDocOpsToY,
   CollabPathError,

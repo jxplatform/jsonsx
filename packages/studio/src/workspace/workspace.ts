@@ -1,4 +1,5 @@
 import { computed, reactive, toRaw } from "../reactivity";
+import { ensureCollab, rekeyCollab } from "../collab/collab-session";
 import { createTab, disposeTab } from "../tabs/tab";
 import type { Tab } from "../tabs/tab";
 
@@ -96,6 +97,7 @@ export function openTab(opts: {
   workspace.tabs.set(tab.id, tab);
   workspace.tabOrder.push(tab.id);
   workspace.activeTabId = tab.id;
+  ensureCollab(tab);
   return tab;
 }
 
@@ -155,6 +157,7 @@ export function replaceAllTabs(newTabOpts: {
   workspace.tabs.set(newTab.id, newTab);
   workspace.activeTabId = newTab.id;
   workspace.tabOrder = [newTab.id];
+  ensureCollab(newTab);
 
   for (const id of oldIds) {
     if (id === newTab.id) {
@@ -201,4 +204,5 @@ export function renameTab(oldId: string, newId: string, newDocumentPath: string)
   if (workspace.activeTabId === oldId) {
     workspace.activeTabId = newId;
   }
+  rekeyCollab(tab);
 }

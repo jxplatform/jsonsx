@@ -13,6 +13,7 @@ import { statusMessage } from "../panels/statusbar";
 import { validateComponentSlots } from "../services/cem-export";
 import { getPlatform } from "../platform";
 import { activeTab, openTab } from "../workspace/workspace";
+import { collabSave } from "../collab/collab-session";
 import { isEditing, stopEditing } from "../editor/inline-edit";
 import {
   defaultContentFormat,
@@ -162,6 +163,11 @@ export async function saveFile() {
     return;
   }
   try {
+    // A co-edited tab persists through its provider (a direct file write would reset the room).
+    if (await collabSave(tab)) {
+      savedMessage(tab, "Synced");
+      return;
+    }
     const output = await serializeDocument(tab);
 
     if (tab.documentPath) {

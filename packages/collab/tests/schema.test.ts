@@ -9,6 +9,7 @@ import {
   sourceText,
   structureMap,
   toYNode,
+  updateSourceText,
   yDocToJson,
   yValueToJson,
 } from "../src/schema.ts";
@@ -124,5 +125,48 @@ describe("sourceText", () => {
     expect(sourceText(ydoc).toString()).toBe("");
     sourceText(ydoc).insert(0, "# Hello");
     expect(sourceText(ydoc).toString()).toBe("# Hello");
+  });
+});
+
+describe("updateSourceText", () => {
+  test("applies a minimal middle edit, not a whole replace", () => {
+    const ydoc = new Y.Doc();
+    updateSourceText(ydoc, "# Title\n\nHello world\n");
+    let deleted = 0;
+    let inserted = "";
+    sourceText(ydoc).observe((event) => {
+      for (const delta of event.changes.delta) {
+        if (delta.delete !== undefined) {
+          deleted += delta.delete;
+        }
+        if (typeof delta.insert === "string") {
+          inserted += delta.insert;
+        }
+      }
+    });
+    const changed = updateSourceText(ydoc, "# Title\n\nGoodbye world\n", "test-origin");
+    expect(changed).toBe(true);
+    expect(sourceText(ydoc).toString()).toBe("# Title\n\nGoodbye world\n");
+    expect(deleted).toBe("Hello".length);
+    expect(inserted).toBe("Goodbye");
+  });
+
+  test("no-ops on identical content", () => {
+    const ydoc = new Y.Doc();
+    updateSourceText(ydoc, "same");
+    expect(updateSourceText(ydoc, "same")).toBe(false);
+  });
+
+  test("handles pure append, pure truncation, and empty transitions", () => {
+    const ydoc = new Y.Doc();
+    updateSourceText(ydoc, "abc");
+    updateSourceText(ydoc, "abcdef");
+    expect(sourceText(ydoc).toString()).toBe("abcdef");
+    updateSourceText(ydoc, "abc");
+    expect(sourceText(ydoc).toString()).toBe("abc");
+    updateSourceText(ydoc, "");
+    expect(sourceText(ydoc).toString()).toBe("");
+    updateSourceText(ydoc, "fresh");
+    expect(sourceText(ydoc).toString()).toBe("fresh");
   });
 });

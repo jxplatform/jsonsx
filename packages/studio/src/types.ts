@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+import type { CollabHandle } from "@jxsuite/collab/provider";
 import type { JxMutableNode, JxPath, ProjectConfig } from "@jxsuite/schema/types";
 
 // ─── Wire types (the Studio Backend Protocol) ───────────────────────────────
@@ -224,6 +225,13 @@ export interface StudioPlatform {
    * projects are found via the native picker instead.
    */
   listProjects?: () => Promise<ProjectListEntry[]>;
+  /**
+   * Open a realtime co-editing session for a project-relative document path. Optional: platforms
+   * without a collab backend omit it and Studio edits solo with file-level saves. Resolves null
+   * when the backend refuses a room for this doc (binary, oversized). The returned handle's Y.Doc
+   * starts empty and fills from the provider — see `@jxsuite/collab/provider` for the contract.
+   */
+  collab?: (docPath: string) => Promise<CollabHandle | null>;
   // ─── Identity & hosting connections (publish surface) ───────────────────────
   /** The signed-in user's identity, when the platform has one (cloud). */
   getUser?: () => Promise<{ login: string; name?: string; avatarUrl?: string } | null>;

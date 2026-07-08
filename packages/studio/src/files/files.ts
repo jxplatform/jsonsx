@@ -20,6 +20,7 @@ import { ensureDependenciesInstalled } from "../packages/ensure-deps";
 import { maybePromptJxsuiteUpdate } from "../packages/jxsuite-update";
 import { autoSyncProjectOnOpen } from "../packages/pull-package-sync";
 import { markLocalMutation } from "./fs-events";
+import { isCollabPath } from "../collab/collab-state";
 import {
   draggable,
   dropTargetForElements,
@@ -1078,6 +1079,11 @@ export async function openFileInTab(path: string) {
  */
 /** Reload an open tab from disk when an external change arrives — but only if it is not dirty. */
 export function reloadCleanTab(path: string): void {
+  // Co-edited docs never reload from disk: the shared Y.Doc is ahead of the provider's write-back
+  // (Which is what produced this event), and genuine external changes arrive as a collab reset.
+  if (isCollabPath(path)) {
+    return;
+  }
   for (const [, tab] of workspace.tabs.entries()) {
     if (tab.documentPath === path && !tab.doc.dirty) {
       void reloadFileInTab(path);

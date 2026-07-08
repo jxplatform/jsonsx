@@ -23,6 +23,12 @@ export interface CollabAwarenessState {
   mode?: "structure" | "source";
   /** The client's structural selection in the focused document. */
   selection?: JxPath | null;
+  /**
+   * Whether this client may write (from the server hello). Drives reconciler election — the lowest
+   * write-capable clientID mirrors derived representations. Advisory only: the server drops updates
+   * from read-only sockets regardless.
+   */
+  canWrite?: boolean;
 }
 
 /** Eight distinguishable presence hues (dark-theme friendly). */
