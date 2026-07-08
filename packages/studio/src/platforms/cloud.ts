@@ -348,15 +348,10 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
     },
 
     /**
-     * Live session events over the gateway WebSocket. Reconnects with a small backoff; the DO
-     * pushes {kind:"fs"} batches for file mutations (including those from other tabs) and
-     * {kind:"git"} notices this handler ignores.
-     */
-    /**
      * Realtime co-editing over the gateway's /collab WebSocket (rooms keyed by project-relative
      * path, per the shared ProjectSession working tree). Backends without the endpoint (or with the
-     * flag off) refuse the upgrade and Studio degrades to solo editing. The wire client loads on
-     * demand so yjs stays out of the base bundle.
+     * flag off) refuse the upgrade and Studio degrades to solo editing. The wire client's
+     * evaluation defers behind the dynamic import until a doc opens.
      */
     async collab(docPath: string) {
       if (!project || typeof WebSocket === "undefined" || typeof location === "undefined") {
@@ -377,6 +372,11 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
       return connection.openDoc(docPath);
     },
 
+    /**
+     * Live session events over the gateway WebSocket. Reconnects with a small backoff; the DO
+     * pushes {kind:"fs"} batches for file mutations (including those from other tabs) and
+     * {kind:"git"} notices this handler ignores.
+     */
     subscribeFileEvents(handler: (events: FsEvent[]) => void) {
       if (typeof WebSocket === "undefined" || typeof location === "undefined") {
         return () => {};

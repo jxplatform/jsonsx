@@ -21,8 +21,14 @@ export interface CollabAwarenessState {
   focusedPath: string | null;
   /** Which representation the client is editing (drives the Phase-B canonical lock). */
   mode?: "structure" | "source";
-  /** The client's structural selection in the focused document. */
-  selection?: JxPath | null;
+  /** The client's structural (canvas) selection in the focused document. */
+  structuralSelection?: JxPath | null;
+  /**
+   * RESERVED for y-monaco: the in-buffer text cursor as {anchor, head} Y.RelativePosition JSON.
+   * MonacoBinding owns this field via setLocalStateField("selection", …) while a code view is
+   * bound; nothing else may write it.
+   */
+  selection?: { anchor: unknown; head: unknown } | null;
   /**
    * Whether this client may write (from the server hello). Drives reconciler election — the lowest
    * write-capable clientID mirrors derived representations. Advisory only: the server drops updates

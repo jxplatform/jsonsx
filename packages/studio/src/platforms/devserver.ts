@@ -401,8 +401,8 @@ export function createDevServerPlatform() {
     /**
      * Realtime co-editing over the dev server's /__studio/collab endpoint (rooms keyed by
      * server-root-relative path). Probes capability once — older servers without the endpoint
-     * degrade to solo editing; the wire client loads on demand so yjs stays out of the base
-     * bundle.
+     * degrade to solo editing; the wire client's evaluation defers behind the dynamic import until
+     * a doc opens.
      */
     async collab(docPath: string) {
       if (typeof WebSocket === "undefined" || typeof location === "undefined") {

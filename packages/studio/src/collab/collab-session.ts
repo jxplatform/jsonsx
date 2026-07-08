@@ -10,7 +10,8 @@
  * history delegate. While attached, the shared session persists automatically: `dirty` stays false
  * and Cmd+S becomes a serialize→flush.
  *
- * All yjs code loads behind a dynamic import so the base Studio bundle stays yjs-free.
+ * All yjs code sits behind a dynamic import: the unsplit bundle inlines the bytes, but module
+ * evaluation defers until a collab session actually attaches.
  */
 
 import { effect, onScopeDispose, toRaw } from "../reactivity";
@@ -372,10 +373,13 @@ async function sourceParseNow(session: ActiveSession): Promise<void> {
 /**
  * The code view's co-editing surface for a tab, or null when the tab isn't in a synced session.
  * `enter()` flips the canonical lock to source (seeding the text from the flipper's serialization);
- * `leave()` reverts to structure-canonical when the last source editor departs.
+ * `leave()` reverts to structure-canonical when the last source editor departs. `text` is the real
+ * Y.Text and `awareness` the connection's Awareness — exactly what y-monaco's MonacoBinding
+ * consumes (it owns the awareness `selection` field while bound).
  */
 export function collabSourceContext(tab: Tab): {
   text: unknown;
+  awareness: CollabHandle["awareness"];
   localOrigin: unknown;
   readOnly: boolean;
   enter: () => Promise<void>;
@@ -387,6 +391,7 @@ export function collabSourceContext(tab: Tab): {
   }
   const { collab, handle } = session;
   return {
+    awareness: handle.awareness,
     enter: async () => {
       session.inSourceMode = true;
       const local = handle.awareness.getLocalState();
@@ -674,7 +679,7 @@ function createSession(
   handle.awareness.setLocalState({
     canWrite: session.canWrite,
     focusedPath: path,
-    selection: null,
+    structuralSelection: null,
     user: identity
       ? {
           avatarUrl: identity.avatarUrl,
@@ -831,13 +836,14 @@ function createSession(
       scheduleMirror(session);
     });
 
-    // Publish the local structural selection for remote cursor overlays (peers filter by
-    // FocusedPath, so per-doc boxes come free from the one project-level awareness state).
+    // Publish the local structural selection for remote canvas overlays (peers filter by
+    // FocusedPath, so per-doc boxes come free from the one project-level awareness state). The
+    // Plain `selection` field is y-monaco's (in-buffer text cursors) — never write it here.
     effect(() => {
-      const selection = tab.session.selection ? [...tab.session.selection] : null;
+      const structuralSelection = tab.session.selection ? [...tab.session.selection] : null;
       const local = handle.awareness.getLocalState();
       if (local) {
-        handle.awareness.setLocalState({ ...local, selection });
+        handle.awareness.setLocalState({ ...local, structuralSelection });
       }
     });
 

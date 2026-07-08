@@ -499,7 +499,7 @@ function ensurePresenceWatch(): void {
       if (tab) {
         // Track the roster deeply enough that selection moves re-trigger.
         const { peers } = collabState(tab);
-        void peers.map((peer) => JSON.stringify(peer.state.selection ?? null)).join("|");
+        void peers.map((peer) => JSON.stringify(peer.state.structuralSelection ?? null)).join("|");
       }
       if (presenceTimer) {
         clearTimeout(presenceTimer);
@@ -525,11 +525,11 @@ function requestPresence(host: HostState): void {
   host.presenceMeta.clear();
   const paths: (string | number)[][] = [];
   for (const peer of peers) {
-    const { selection } = peer.state;
-    if (!selection || peer.state.focusedPath !== tab?.documentPath) {
+    const { structuralSelection } = peer.state;
+    if (!structuralSelection || peer.state.focusedPath !== tab?.documentPath) {
       continue;
     }
-    const path = [...selection];
+    const path = [...structuralSelection];
     paths.push(path);
     host.presenceMeta.set(JSON.stringify(path), {
       color: peer.state.user.color,

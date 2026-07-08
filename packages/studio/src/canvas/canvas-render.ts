@@ -11,8 +11,8 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import { canvasPanels, canvasWrap, updateCanvas } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { collabSourceContext } from "../collab/collab-session";
-import { bindMonacoToSharedText } from "../collab/monaco-binding";
-import type { MonacoModelLike, MonacoRangeFactory, SharedTextLike } from "../collab/monaco-binding";
+import { attachCursorStyles } from "../collab/monaco-cursors";
+import type { AwarenessLike } from "../collab/monaco-cursors";
 import { view } from "../view";
 import { parseSourceForPath, serializeDocument } from "../files/file-ops";
 import { formatByName, formatForPath } from "../format/format-host";
@@ -141,19 +141,30 @@ function disposeSourceCollab(): void {
   sourceCollabCleanup = null;
 }
 
-/** Bind the Monaco model to the shared source text; returns the teardown. */
-function createSourceCollabBinding(
+/**
+ * Bind the Monaco editor to the shared source text via y-monaco: two-way character-level sync plus
+ * remote in-buffer cursors/selections (decorated per-client; colors injected from the presence
+ * palette by {@link attachCursorStyles}). y-monaco/yjs evaluation defers behind the dynamic import
+ * until a code view actually binds. Returns the teardown.
+ */
+async function createSourceCollabBinding(
   model: monaco.editor.ITextModel,
+  editor: monaco.editor.IStandaloneCodeEditor,
   ctx: NonNullable<ReturnType<typeof collabSourceContext>>,
-): () => void {
-  const binding = bindMonacoToSharedText({
-    localOrigin: ctx.localOrigin,
-    model: model as unknown as MonacoModelLike,
-    rangeFactory: monaco.Range as unknown as MonacoRangeFactory,
-    text: ctx.text as SharedTextLike,
-  });
+): Promise<() => void> {
+  const { MonacoBinding } = await import("y-monaco");
+  type YText = ConstructorParameters<typeof MonacoBinding>[0];
+  type BindingAwareness = ConstructorParameters<typeof MonacoBinding>[3];
+  const binding = new MonacoBinding(
+    ctx.text as YText,
+    model,
+    new Set([editor]),
+    ctx.awareness as BindingAwareness,
+  );
+  const detachStyles = attachCursorStyles(ctx.awareness as unknown as AwarenessLike, document);
   return () => {
-    binding.dispose();
+    detachStyles();
+    binding.destroy();
     ctx.leave();
   };
 }
@@ -403,16 +414,27 @@ export function renderCanvas() {
     // Parses back into the structure tree for everyone's canvas.
     const collabCtx = collabSourceContext(tab);
     if (collabCtx) {
-      void collabCtx.enter().then(() => {
-        const editor = view.monacoEditor;
-        if (!editor || editor.getModel() !== model) {
-          return;
-        }
-        sourceCollabCleanup = createSourceCollabBinding(model, collabCtx);
-        if (collabCtx.readOnly) {
-          editor.updateOptions({ readOnly: true });
-        }
-      });
+      void collabCtx
+        .enter()
+        .then(async () => {
+          const editor = view.monacoEditor;
+          if (!editor || editor.getModel() !== model) {
+            return;
+          }
+          const cleanup = await createSourceCollabBinding(model, editor, collabCtx);
+          // The editor may have been torn down while y-monaco loaded — unbind immediately.
+          if (view.monacoEditor !== editor || editor.getModel() !== model) {
+            cleanup();
+            return;
+          }
+          sourceCollabCleanup = cleanup;
+          if (collabCtx.readOnly) {
+            editor.updateOptions({ readOnly: true });
+          }
+        })
+        .catch(() => {
+          // Binding failures degrade to a read-only-ish local buffer; the session stays live.
+        });
     } else {
       sourceContent(tab, lang)
         .then((content) => {

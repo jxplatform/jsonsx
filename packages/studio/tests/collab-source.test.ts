@@ -12,8 +12,8 @@ import {
 } from "../src/collab/collab-session";
 import { collabState } from "../src/collab/collab-state";
 import { mutateUpdateProperty, transactDoc } from "../src/tabs/transact";
-import { bindMonacoToSharedText } from "../src/collab/monaco-binding";
-import type { MonacoModelLike, SharedTextLike } from "../src/collab/monaco-binding";
+import { attachCursorStyles, cursorRulesFor, cursorStylesheet } from "../src/collab/monaco-cursors";
+import type { AwarenessLike } from "../src/collab/monaco-cursors";
 import {
   acquireSourceCanonical,
   canonicalOf,
@@ -107,114 +107,65 @@ describe("the canonical source lock", () => {
   });
 });
 
-describe("the Monaco ↔ shared-text binding", () => {
-  function fakeModel(initial: string) {
-    let value = initial;
-    const listeners: ((event: {
-      changes: { rangeOffset: number; rangeLength: number; text: string }[];
-    }) => void)[] = [];
-    const applied: { start: number; end: number; text: string }[] = [];
-    const model: MonacoModelLike = {
-      applyEdits: (edits) => {
-        for (const edit of edits) {
-          const range = edit.range as { start: number; end: number };
-          applied.push({ end: range.end, start: range.start, text: edit.text });
-          value = value.slice(0, range.start) + edit.text + value.slice(range.end);
-        }
-        return null;
-      },
-      getPositionAt: (offset) => offset,
-      getValue: () => value,
-      onDidChangeContent: (cb) => {
-        listeners.push(cb);
-        return { dispose: () => listeners.splice(listeners.indexOf(cb), 1) };
-      },
-    };
-    const emitLocalEdit = (offset: number, length: number, text: string) => {
-      value = value.slice(0, offset) + text + value.slice(offset + length);
-      for (const cb of listeners) {
-        cb({ changes: [{ rangeLength: length, rangeOffset: offset, text }] });
-      }
-    };
-    return {
-      applied,
-      emitLocalEdit,
-      model,
-      rangeFactory: { fromPositions: (start: unknown, end: unknown) => ({ end, start }) },
-      value: () => value,
-    };
-  }
-
-  test("adopts the shared text, sends local edits, applies remote deltas, and mutes echoes", async () => {
+describe("y-monaco integration surface", () => {
+  test("collabSourceContext exposes the real Y.Text and the connection awareness", async () => {
     const hub = createMockCollabHub();
-    installMockPlatform({ collab: hub.capability });
-    const handle = (await hub.capability(PATH))!;
-    updateSourceText(handle.doc, "hello world", "seed");
-
-    const fake = fakeModel("stale");
-    const binding = bindMonacoToSharedText({
-      localOrigin: LOCAL_ORIGIN,
-      model: fake.model,
-      rangeFactory: fake.rangeFactory,
-      text: sourceText(handle.doc) as unknown as SharedTextLike,
-    });
-    expect(fake.value()).toBe("hello world");
-
-    // Local typing reaches the shared text (and, via the hub, the server doc).
-    fake.emitLocalEdit(5, 0, ",");
-    expect(sourceText(handle.doc).toString()).toBe("hello, world");
+    const tab = await openAttached(hub);
+    const ctx = collabSourceContext(tab)!;
+    expect(ctx.awareness).toBeDefined();
+    expect(typeof (ctx.text as { toString: () => string }).toString).toBe("function");
+    // The text IS the session doc's shared source (same instance the provider persists).
+    updateSourceText(hub.serverDoc(PATH), "shared!", LOCAL_ORIGIN);
     await settleCollab();
-    expect(sourceText(hub.serverDoc(PATH)).toString()).toBe("hello, world");
-
-    // A remote edit lands in the buffer without echoing back.
-    const appliedBefore = fake.applied.length;
-    updateSourceText(handle.doc, "hello, brave world", "remote-peer");
-    expect(fake.value()).toBe("hello, brave world");
-    expect(fake.applied.length).toBeGreaterThan(appliedBefore);
-    expect(sourceText(handle.doc).toString()).toBe("hello, brave world");
-
-    // A remote deletion maps back into the buffer too.
-    updateSourceText(handle.doc, "hello, world", "remote-peer");
-    expect(fake.value()).toBe("hello, world");
-
-    binding.dispose();
-    fake.emitLocalEdit(0, 0, "x");
-    expect(sourceText(handle.doc).toString()).toBe("hello, world");
-    handle.destroy();
+    expect(String(ctx.text)).toBe("shared!");
   });
 
-  test("a matching buffer needs no initial adopt edit, and doc-less texts apply directly", () => {
-    const events: ((event: unknown, transaction: { origin: unknown }) => void)[] = [];
-    let stored = "same";
-    const bareText: SharedTextLike = {
-      delete: (index, length) => {
-        stored = stored.slice(0, index) + stored.slice(index + length);
-      },
-      doc: null,
-      insert: (index, text) => {
-        stored = stored.slice(0, index) + text + stored.slice(index);
-      },
-      observe: (cb) => events.push(cb as never),
-      toString: () => stored,
-      unobserve: () => {},
+  test("cursor styles render one colored rule set per remote client and track the roster", () => {
+    const states = new Map<number, unknown>([
+      [1, { user: { color: "#e5484d", login: "octocat", name: "Octo Cat" } }],
+      [2, { user: { color: "#30a46c", login: "viewer" } }],
+      [3, { user: {} }],
+      [9, { user: { color: "#4f9cf9", login: "self" } }],
+    ]);
+    const listeners: (() => void)[] = [];
+    const awareness: AwarenessLike = {
+      clientID: 9,
+      getStates: () => states,
+      off: (_event, cb) => listeners.splice(listeners.indexOf(cb), 1),
+      on: (_event, cb) => listeners.push(cb),
     };
-    const fake = fakeModel("same");
-    const binding = bindMonacoToSharedText({
-      localOrigin: "local",
-      model: fake.model,
-      rangeFactory: fake.rangeFactory,
-      text: bareText,
-    });
-    // Identical content: no adopt edit was applied.
-    expect(fake.applied).toHaveLength(0);
-    // Local edits apply without a doc transaction wrapper.
-    fake.emitLocalEdit(4, 0, "!");
-    expect(stored).toBe("same!");
-    // Same-origin remote events are muted echoes.
-    for (const cb of events) {
-      cb({ delta: [{ insert: "zzz" }] }, { origin: "local" });
+    const detach = attachCursorStyles(awareness, document);
+    const style = document.head.querySelector<HTMLStyleElement>("style[data-jx-collab-cursors]");
+    expect(style).not.toBeNull();
+    expect(style!.textContent).toContain(".yRemoteSelection-1{background-color:#e5484d44;}");
+    expect(style!.textContent).toContain(".yRemoteSelectionHead-2");
+    // Self (9) and identity-less peers (3) get no rules.
+    expect(style!.textContent).not.toContain("yRemoteSelection-9");
+    expect(style!.textContent).not.toContain("yRemoteSelection-3");
+    // The name flag carries the display name, CSS-escaped.
+    expect(style!.textContent).toContain('content:"Octo Cat"');
+
+    // Roster changes re-render through the awareness listener.
+    states.set(1, { user: { color: "#f5a524", login: "octocat" } });
+    for (const cb of listeners) {
+      cb();
     }
-    expect(fake.value()).toBe("same!");
-    binding.dispose();
+    expect(style!.textContent).toContain("#f5a52444");
+
+    detach();
+    expect(document.head.querySelector("style[data-jx-collab-cursors]")).toBeNull();
+    expect(listeners).toHaveLength(0);
+  });
+
+  test("cursor rules escape hostile display names", () => {
+    const rules = cursorRulesFor(5, "#fff", String.raw`a"b\c`);
+    expect(rules).toContain(String.raw`content:"a\"b\\c"`);
+    const sheet = cursorStylesheet({
+      clientID: 1,
+      getStates: () => new Map([[2, { user: { color: "#000", login: "x" } }]]),
+      off: () => {},
+      on: () => {},
+    });
+    expect(sheet).toContain("yRemoteSelection-2");
   });
 });

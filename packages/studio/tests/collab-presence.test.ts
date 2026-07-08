@@ -37,7 +37,7 @@ describe("presence chips", () => {
         clientId: 1,
         state: {
           focusedPath: PATH,
-          selection: ["children", 0],
+          structuralSelection: ["children", 0],
           user: { color: "#e5484d", login: "octocat", name: "Octo Cat" },
         },
       },
@@ -45,7 +45,7 @@ describe("presence chips", () => {
         clientId: 2,
         state: {
           focusedPath: "pages/other.json",
-          selection: null,
+          structuralSelection: null,
           user: { color: "#30a46c", login: "viewer" },
         },
       },
@@ -109,16 +109,18 @@ describe("selection publishing", () => {
     await settleCollab();
 
     const states = [...peer.awareness.getStates().values()] as {
-      selection?: (string | number)[] | null;
+      structuralSelection?: (string | number)[] | null;
       focusedPath?: string | null;
     }[];
     const published = states.find((s) => s.focusedPath === PATH);
-    expect(published?.selection).toEqual(["children", 0]);
+    expect(published?.structuralSelection).toEqual(["children", 0]);
 
     tab.session.selection = null;
     await settleCollab();
-    const cleared = [...peer.awareness.getStates().values()] as { selection?: unknown }[];
-    expect(cleared.some((s) => s.selection === null)).toBe(true);
+    const cleared = [...peer.awareness.getStates().values()] as {
+      structuralSelection?: unknown;
+    }[];
+    expect(cleared.some((s) => s.structuralSelection === null)).toBe(true);
     peer.destroy();
   });
 });

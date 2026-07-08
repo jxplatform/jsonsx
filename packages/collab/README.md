@@ -68,7 +68,8 @@ one `error{read-only}`.
 ## Awareness (`./awareness-types`)
 
 One project-level `Awareness` per connection. State shape:
-`{ user: {login, name?, avatarUrl?, color}, focusedPath, mode?, selection? }` — file-tree presence
+`{ user: {login, name?, avatarUrl?, color}, focusedPath, mode?, structuralSelection?, selection? }` —
+file-tree presence (the plain `selection` field is y-monaco's in-buffer cursor)
 and per-document cursor overlays both filter the same states. Identity comes from the server
 `hello`; colors are deterministic (`colorForKey`).
 

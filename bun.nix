@@ -4012,6 +4012,10 @@
     url = "https://registry.npmjs.org/xpath/-/xpath-0.0.34.tgz";
     hash = "sha512-FxF6+rkr1rNSQrhUNYrAFJpRXNzlDoMxeXN5qI84939ylEv3qqPFKa85Oxr6tDaJKqwW6KKyo2v26TSv3k6LeA==";
   };
+  "y-monaco@0.1.6" = fetchurl {
+    url = "https://registry.npmjs.org/y-monaco/-/y-monaco-0.1.6.tgz";
+    hash = "sha512-sYRywMmcylt+Nupl+11AvizD2am06ST8lkVbUXuaEmrtV6Tf+TD4rsEm6u9YGGowYue+Vfg1IJ97SUP2J+PVXg==";
+  };
   "y-protocols@1.0.7" = fetchurl {
     url = "https://registry.npmjs.org/y-protocols/-/y-protocols-1.0.7.tgz";
     hash = "sha512-YSVsLoXxO67J6eE/nV4AtFtT3QEotZf5sK5BHxFBXso7VDUT3Tx07IfA6hsu5Q5OmBdMkQVmFZ9QOA7fikWvnw==";
