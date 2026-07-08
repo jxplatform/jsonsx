@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.35.2](https://github.com/jxsuite/jx/compare/desktop-v0.35.1...desktop-v0.35.2) (2026-07-08)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/server bumped to 0.37.0
+    * @jxsuite/studio bumped to 0.37.0
+  * devDependencies
+    * @jxsuite/server bumped to 0.37.0
+
 ## [0.35.1](https://github.com/jxsuite/jx/compare/desktop-v0.35.0...desktop-v0.35.1) (2026-07-07)
 
 

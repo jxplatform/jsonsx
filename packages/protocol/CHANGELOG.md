@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/jxsuite/jx/compare/protocol-v0.2.0...protocol-v0.3.0) (2026-07-08)
+
+
+### Features
+
+* **collab:** the wire — ws client/room core, devserver endpoint, adapter members ([d9f4b42](https://github.com/jxsuite/jx/commit/d9f4b425ac1d31cd3d7f9b2892e05321de08a09d))
+
 ## [0.2.0](https://github.com/jxsuite/jx/compare/protocol-v0.1.0...protocol-v0.2.0) (2026-07-07)
 
 

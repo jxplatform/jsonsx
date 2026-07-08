@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.37.0](https://github.com/jxsuite/jx/compare/studio-v0.36.0...studio-v0.37.0) (2026-07-08)
+
+
+### Features
+
+* **collab:** @jxsuite/collab — Y.Doc schema, op bridge, differ, wire envelope ([0166c38](https://github.com/jxsuite/jx/commit/0166c38f05b87bb96595a30ee1cbc31781e8cc82))
+* **collab:** the wire — ws client/room core, devserver endpoint, adapter members ([d9f4b42](https://github.com/jxsuite/jx/commit/d9f4b425ac1d31cd3d7f9b2892e05321de08a09d))
+* **studio:** adopt y-monaco for source co-editing ([63c2557](https://github.com/jxsuite/jx/commit/63c2557a1adab984b09bbc3e8f164b88b8dd0c68))
+* **studio:** collab seams in the transact pipeline ([f9b6db6](https://github.com/jxsuite/jx/commit/f9b6db6e2ca01bbeaea2b461a27591f2fdd3965c))
+* **studio:** CollabSession — realtime co-editing behind platform.collab ([6e56521](https://github.com/jxsuite/jx/commit/6e56521e06e871057762d19936d9832bdfbe9c67))
+* **studio:** presence UX — chips, remote selection overlays, sync status ([d458d72](https://github.com/jxsuite/jx/commit/d458d7249c5de0424fe73c4e5090448de6526cd7))
+* **studio:** source-mode co-editing under the canonical lock ([478d148](https://github.com/jxsuite/jx/commit/478d148105a8e7545197b83626876d85e5218019))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.2.0
+    * @jxsuite/protocol bumped to 0.3.0
+
 ## [0.36.0](https://github.com/jxsuite/jx/compare/studio-v0.35.0...studio-v0.36.0) (2026-07-07)
 
 
