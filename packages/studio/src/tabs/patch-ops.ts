@@ -5,6 +5,8 @@
  * document as the single source of truth.
  */
 
+// oxlint-disable-next-line unicorn/prefer-export-from -- JxDocOpPair is also used locally (TransactionRecord)
+import type { JxDocOpPair } from "@jxsuite/collab/ops";
 import type { JxPath } from "../state";
 import type { Tab } from "./tab.js";
 
@@ -31,30 +33,12 @@ export type JxPatchOp =
 /**
  * Value-carrying document mutation, replayable in either direction. Mutators record a
  * forward/inverse pair per change; history applies them for surgical undo/redo and for
- * materializing states from checkpoints — without whole-document snapshots per edit.
+ * materializing states from checkpoints — without whole-document snapshots per edit. The definition
+ * is canonical in `@jxsuite/collab/ops` (the collab bridge mirrors the same ops into a shared
+ * Y.Doc); re-exported here so studio call sites keep their import path.
  */
-export type JxDocOp =
-  /** Set (or delete, when value is undefined) a key on the node at path. */
-  | { op: "set-key"; path: JxPath; key: string; value?: unknown }
-  /** Insert a node at parentPath.children[index]. */
-  | { op: "insert-child"; parentPath: JxPath; index: number; node: unknown }
-  /** Remove parentPath.children[index]. */
-  | { op: "remove-child"; parentPath: JxPath; index: number }
-  /** Replace parentPath.children[index] with node. */
-  | { op: "set-child"; parentPath: JxPath; index: number; node: unknown }
-  /** Raw two-splice move: remove fromParent.children[fromIndex], insert at toParent[toIndex]. */
-  | {
-      op: "move-child";
-      fromParentPath: JxPath;
-      fromIndex: number;
-      toParentPath: JxPath;
-      toIndex: number;
-    };
-
-export interface JxDocOpPair {
-  forward: JxDocOp;
-  inverse: JxDocOp;
-}
+export type { JxDocOp } from "@jxsuite/collab/ops";
+export type { JxDocOpPair };
 
 /** Everything recorded during one transaction. */
 export interface TransactionRecord {

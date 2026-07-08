@@ -49,9 +49,19 @@
         "@happy-dom/global-registrator": "^20.10.6",
       },
     },
+    "packages/collab": {
+      "name": "@jxsuite/collab",
+      "version": "0.1.0",
+      "dependencies": {
+        "@jxsuite/schema": "workspace:^",
+        "lib0": "^0.2.99",
+        "y-protocols": "^1.0.6",
+        "yjs": "13.6.27",
+      },
+    },
     "packages/compiler": {
       "name": "@jxsuite/compiler",
-      "version": "0.34.1",
+      "version": "0.35.0",
       "bin": {
         "jx": "./bin/jx.js",
       },
@@ -69,7 +79,7 @@
     },
     "packages/create": {
       "name": "@jxsuite/create",
-      "version": "0.35.0",
+      "version": "0.36.0",
       "bin": {
         "create-jxsuite": "./index.ts",
       },
@@ -79,7 +89,7 @@
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
-      "version": "0.35.0",
+      "version": "0.35.1",
       "dependencies": {
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
@@ -102,7 +112,7 @@
     },
     "packages/import": {
       "name": "@jxsuite/import",
-      "version": "0.35.0",
+      "version": "0.35.1",
       "bin": {
         "jx-import": "./src/cli.ts",
       },
@@ -123,7 +133,7 @@
     },
     "packages/parser": {
       "name": "@jxsuite/parser",
-      "version": "0.35.0",
+      "version": "0.35.1",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "glob": "^13.0.6",
@@ -153,14 +163,14 @@
     },
     "packages/protocol": {
       "name": "@jxsuite/protocol",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
     },
     "packages/runtime": {
       "name": "@jxsuite/runtime",
-      "version": "0.34.1",
+      "version": "0.34.2",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "@vue/reactivity": "^3.5.39",
@@ -171,7 +181,7 @@
     },
     "packages/schema": {
       "name": "@jxsuite/schema",
-      "version": "0.34.0",
+      "version": "0.35.0",
       "dependencies": {
         "@webref/css": "^8.6.1",
         "@webref/elements": "^2.7.1",
@@ -185,7 +195,7 @@
     },
     "packages/server": {
       "name": "@jxsuite/server",
-      "version": "0.35.0",
+      "version": "0.36.0",
       "dependencies": {
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
@@ -200,18 +210,19 @@
     },
     "packages/starters": {
       "name": "@jxsuite/starters",
-      "version": "0.35.0",
+      "version": "0.35.1",
       "devDependencies": {
         "@jxsuite/schema": "workspace:^",
       },
     },
     "packages/studio": {
       "name": "@jxsuite/studio",
-      "version": "0.35.0",
+      "version": "0.36.0",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.0.0",
         "@jxsuite/ai": "workspace:^",
+        "@jxsuite/collab": "workspace:^",
         "@jxsuite/create": "workspace:^",
         "@jxsuite/parser": "workspace:^",
         "@jxsuite/protocol": "workspace:^",
@@ -639,6 +650,8 @@
     "@jsep-plugin/regex": ["@jsep-plugin/regex@1.0.4", "", { "peerDependencies": { "jsep": "^0.4.0||^1.0.0" } }, "sha512-q7qL4Mgjs1vByCaTnDFcBnV9HS7GVPJX5vyVoCgZHNSC9rjwIlmbXG5sUuorR5ndfHAIlJ8pVStxvjXHbNvtUg=="],
 
     "@jxsuite/ai": ["@jxsuite/ai@workspace:packages/ai"],
+
+    "@jxsuite/collab": ["@jxsuite/collab@workspace:packages/collab"],
 
     "@jxsuite/compiler": ["@jxsuite/compiler@workspace:packages/compiler"],
 
@@ -1456,6 +1469,8 @@
 
     "isobject": ["isobject@3.0.1", "", {}, "sha512-WhB9zCku7EGTj/HQQRz5aUQEUeoQZH2bWcltRErOpymJ4boYE6wL9Tbr23krRPSZ+C5zqNSrSw+Cc7sZZ4b7vg=="],
 
+    "isomorphic.js": ["isomorphic.js@0.2.5", "", {}, "sha512-PIeMbHqMt4DnUP3MA/Flc0HElYjMXArsw1qwJZcm9sqR8mq3l8NYizFMty0pWwE/tzIGH3EKK5+jes5mAr85yw=="],
+
     "jest-worker": ["jest-worker@24.9.0", "", { "dependencies": { "merge-stream": "^2.0.0", "supports-color": "^6.1.0" } }, "sha512-51PE4haMSXcHohnSMdM42anbvZANYTqMrr52tVKPqqsPJMzoP6FYYDVqahX/HrAoKEKz3uUPzSvKs9A3qR4iVw=="],
 
     "jiti": ["jiti@2.6.1", "", { "bin": { "jiti": "lib/jiti-cli.mjs" } }, "sha512-ekilCSN1jwRvIbgeg/57YFh8qQDNbwDb9xT/qu2DAHbFFZUicIl4ygVaAvzveMhMVr3LnpSKTNnwt8PoOfmKhQ=="],
@@ -1495,6 +1510,8 @@
     "kind-of": ["kind-of@6.0.3", "", {}, "sha512-dcS1ul+9tmeD95T+x28/ehLgd9mENa3LsvDTtzm3vyBEO7RPptvAD+t44WVXaUjTBRcrpFeFlC8WCruUR456hw=="],
 
     "levn": ["levn@0.4.1", "", { "dependencies": { "prelude-ls": "^1.2.1", "type-check": "~0.4.0" } }, "sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ=="],
+
+    "lib0": ["lib0@0.2.117", "", { "dependencies": { "isomorphic.js": "^0.2.4" }, "bin": { "0serve": "bin/0serve.js", "0gentesthtml": "bin/gentesthtml.js", "0ecdsa-generate-keypair": "bin/0ecdsa-generate-keypair.js" } }, "sha512-DeXj9X5xDCjgKLU/7RR+/HQEVzuuEUiwldwOGsHK/sfAfELGWEyTcf0x+uOvCvK3O2zPmZePXWL85vtia6GyZw=="],
 
     "lines-and-columns": ["lines-and-columns@1.2.4", "", {}, "sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg=="],
 
@@ -2078,6 +2095,8 @@
 
     "xpath": ["xpath@0.0.34", "", {}, "sha512-FxF6+rkr1rNSQrhUNYrAFJpRXNzlDoMxeXN5qI84939ylEv3qqPFKa85Oxr6tDaJKqwW6KKyo2v26TSv3k6LeA=="],
 
+    "y-protocols": ["y-protocols@1.0.7", "", { "dependencies": { "lib0": "^0.2.85" }, "peerDependencies": { "yjs": "^13.0.0" } }, "sha512-YSVsLoXxO67J6eE/nV4AtFtT3QEotZf5sK5BHxFBXso7VDUT3Tx07IfA6hsu5Q5OmBdMkQVmFZ9QOA7fikWvnw=="],
+
     "y18n": ["y18n@5.0.8", "", {}, "sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA=="],
 
     "yallist": ["yallist@3.1.1", "", {}, "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="],
@@ -2089,6 +2108,8 @@
     "yargs-parser": ["yargs-parser@22.0.0", "", {}, "sha512-rwu/ClNdSMpkSrUb+d6BRsSkLUq1fmfsY6TOpYzTwvwkg1/NRG85KBy3kq++A8LKQwX6lsu+aWad+2khvuXrqw=="],
 
     "yauzl": ["yauzl@2.10.0", "", { "dependencies": { "buffer-crc32": "~0.2.3", "fd-slicer": "~1.1.0" } }, "sha512-p4a9I6X6nu6IhoGmBqAcbJy1mlC4j27vEPZX9F4L4/vZT3Lyq1VkFHw/V/PUcB9Buo+DG3iHkT0x3Qya58zc3g=="],
+
+    "yjs": ["yjs@13.6.27", "", { "dependencies": { "lib0": "^0.2.99" } }, "sha512-OIDwaflOaq4wC6YlPBy2L6ceKeKuF7DeTxx+jPzv1FHn9tCZ0ZwSRnUBxD05E3yed46fv/FWJbvR+Ud7x0L7zw=="],
 
     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 

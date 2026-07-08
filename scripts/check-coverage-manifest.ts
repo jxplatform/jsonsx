@@ -17,6 +17,8 @@ const ALLOWLIST = new Set([
   "src/chromium/init.ts",
   // Desktop RPC schema: interfaces/type aliases only, no runtime exports.
   "src/rpc-schema.ts",
+  // Collab provider contract: interfaces/type aliases only, no runtime exports.
+  "src/provider.ts",
 ]);
 
 const pkgArg = process.argv.at(2);

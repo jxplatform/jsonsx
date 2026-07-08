@@ -53,6 +53,10 @@
     "packages/protocol": {
       "release-type": "node",
       "component": "protocol"
+    },
+    "packages/collab": {
+      "release-type": "node",
+      "component": "collab"
     }
   }
 }

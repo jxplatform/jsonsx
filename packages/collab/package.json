@@ -1,0 +1,38 @@
+{
+  "name": "@jxsuite/collab",
+  "version": "0.1.0",
+  "description": "Realtime co-editing for Jx Studio — Y.Doc schema, op bridge, structural differ, wire envelope, and provider contracts shared by every collab backend",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "packages/collab"
+  },
+  "files": [
+    "src/"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ops": "./src/ops.ts",
+    "./schema": "./src/schema.ts",
+    "./op-bridge": "./src/op-bridge.ts",
+    "./diff": "./src/diff.ts",
+    "./envelope": "./src/envelope.ts",
+    "./awareness-types": "./src/awareness-types.ts",
+    "./provider": "./src/provider.ts"
+  },
+  "publishConfig": {
+    "provenance": true
+  },
+  "scripts": {
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage"
+  },
+  "dependencies": {
+    "@jxsuite/schema": "workspace:^",
+    "lib0": "^0.2.99",
+    "y-protocols": "^1.0.6",
+    "yjs": "13.6.27"
+  }
+}
