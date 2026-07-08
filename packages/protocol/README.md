@@ -62,4 +62,6 @@ doc?, options? }` through the project's format registry; without it only
 
 The types are published as TypeScript source (like every `@jxsuite` package)
 and follow the monorepo's release train. Within the monorepo, packages depend
-on it via `workspace:^`.
+on it via `workspace:^`. Consumers install `@jxsuite/protocol` and import its
+`/types` and `/routes` entrypoints; its only runtime dependency is
+`@jxsuite/schema`.
