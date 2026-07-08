@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/protocol",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "The Studio Backend Protocol — wire types and the canonical route table every Jx Studio backend implements",
   "license": "MIT",
   "repository": {
