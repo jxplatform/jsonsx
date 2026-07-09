@@ -19,6 +19,34 @@ export const FORMAT_CAPABILITIES: readonly FormatCapability[] = [
   "load",
 ];
 
+/**
+ * All well-known static capability roles across admission blocks (specs/extensions.md §8): format
+ * roles plus project-section (`projectData`, `resolvePaths`), compile-away (`lower`), server-mount
+ * (`mount`), and connector (`dialect`, `deploySchema`, `bindings`, `testConnection`) roles.
+ */
+export type ExtensionCapability =
+  | FormatCapability
+  | "projectData"
+  | "resolvePaths"
+  | "lower"
+  | "mount"
+  | "dialect"
+  | "deploySchema"
+  | "bindings"
+  | "testConnection";
+
+export const EXTENSION_CAPABILITIES: readonly ExtensionCapability[] = [
+  ...FORMAT_CAPABILITIES,
+  "projectData",
+  "resolvePaths",
+  "lower",
+  "mount",
+  "dialect",
+  "deploySchema",
+  "bindings",
+  "testConnection",
+];
+
 export type FormatTiming = "compiler" | "server" | "client";
 
 export type FormatDocumentKind = "page" | "component" | "content";
@@ -62,6 +90,32 @@ export interface CapabilityInfo {
   identifier: string;
   /** Environments allowed to call directly; others round-trip via the dev server. */
   timing: FormatTiming[];
+  /** For `resolvePaths`: the `$paths` key that routes to this class. */
+  discriminator?: string;
+}
+
+/** A class owns a project.json section iff its descriptor carries a `project` block. */
+export interface ProjectBlock {
+  key: string;
+  title?: string;
+  description?: string;
+  referenceable?: boolean;
+}
+
+/** A class mounts routes in the site worker/dev server iff it carries a `server` block. */
+export interface ServerBlock {
+  basePath: string;
+  order?: number;
+  module?: string;
+}
+
+/** A class provides database connections iff it carries a `connector` block. */
+export interface ConnectorBlock {
+  provider: string;
+  kind: "sqlite" | "postgres";
+  local?: string;
+  serve?: string;
+  [key: string]: unknown;
 }
 
 export interface FormatHostIO {
@@ -78,12 +132,16 @@ interface ClassMethodLike {
   identifier?: string;
   scope?: string;
   timing?: string[];
+  discriminator?: string;
 }
 
 interface ClassDefLike {
   title?: string;
   $implementation?: string;
   format?: FormatBlock;
+  project?: ProjectBlock;
+  server?: ServerBlock;
+  connector?: ConnectorBlock;
   $studio?: StudioHints;
   $defs?: { methods?: Record<string, ClassMethodLike> };
   [key: string]: unknown;
@@ -101,7 +159,10 @@ export class FormatEntry {
   readonly exportTarget: boolean;
   readonly remote: boolean;
   readonly studio: StudioHints | null;
-  readonly capabilities: Partial<Record<FormatCapability, CapabilityInfo>>;
+  readonly project: ProjectBlock | null;
+  readonly server: ServerBlock | null;
+  readonly connector: ConnectorBlock | null;
+  readonly capabilities: Partial<Record<ExtensionCapability, CapabilityInfo>>;
 
   #io: FormatHostIO;
   #implementation: Promise<Record<string, unknown>> | null = null;
@@ -112,13 +173,18 @@ export class FormatEntry {
     this.classDef = classDef;
     this.#io = io;
 
-    const format = classDef.format as FormatBlock;
-    this.extensions = (format.extensions ?? []).map((e) => e.toLowerCase());
-    this.mediaType = format.mediaType ?? null;
-    this.documentKinds = format.documentKinds ?? [];
-    this.exportTarget = format.exportTarget === true;
-    this.remote = format.remote === true;
+    // The format block is optional: entries also represent project/server/connector classes
+    // (specs/extensions.md §6). Absent block → no extensions claimed.
+    const { format } = classDef;
+    this.extensions = (format?.extensions ?? []).map((e) => e.toLowerCase());
+    this.mediaType = format?.mediaType ?? null;
+    this.documentKinds = format?.documentKinds ?? [];
+    this.exportTarget = format?.exportTarget === true;
+    this.remote = format?.remote === true;
     this.studio = classDef.$studio ?? null;
+    this.project = classDef.project ?? null;
+    this.server = classDef.server ?? null;
+    this.connector = classDef.connector ?? null;
     this.capabilities = extractCapabilities(classDef);
   }
 
@@ -137,7 +203,7 @@ export class FormatEntry {
   }
 
   /** Invoke a capability's static method on the implementation class. */
-  async call(capability: FormatCapability, ...args: unknown[]): Promise<unknown> {
+  async call(capability: ExtensionCapability, ...args: unknown[]): Promise<unknown> {
     const cap = this.capabilities[capability];
     if (!cap) {
       throw new Error(`Format class "${this.name}" does not declare a "${capability}" capability`);
@@ -264,18 +330,22 @@ export async function buildFormatRegistry(
 
 function extractCapabilities(
   classDef: ClassDefLike,
-): Partial<Record<FormatCapability, CapabilityInfo>> {
-  const out: Partial<Record<FormatCapability, CapabilityInfo>> = {};
+): Partial<Record<ExtensionCapability, CapabilityInfo>> {
+  const out: Partial<Record<ExtensionCapability, CapabilityInfo>> = {};
   const methods = classDef.$defs?.methods ?? {};
   for (const [key, method] of Object.entries(methods)) {
-    const role = method.role as FormatCapability | undefined;
-    if (!role || !FORMAT_CAPABILITIES.includes(role)) {
+    const role = method.role as ExtensionCapability | undefined;
+    if (!role || !EXTENSION_CAPABILITIES.includes(role)) {
       continue;
     }
-    out[role] = {
+    const info: CapabilityInfo = {
       identifier: method.identifier ?? key,
       timing: (method.timing as FormatTiming[] | undefined) ?? DEFAULT_TIMING,
     };
+    if (typeof method.discriminator === "string") {
+      info.discriminator = method.discriminator;
+    }
+    out[role] = info;
   }
   return out;
 }
