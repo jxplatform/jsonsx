@@ -91,6 +91,13 @@ import {
   studioHintsSchema,
 } from "../defs/class-def.schema";
 import { contentTypeDefSchema } from "../defs/content-type-def.schema";
+import { extensionManifestSchema } from "../defs/extension-manifest.schema";
+import {
+  DOCUMENT_PATHS_SCHEMA_ID,
+  PROJECT_FIELDS_SCHEMA_ID,
+  jxFieldSchemaDef,
+  relationshipRefSchema,
+} from "../defs/field-schema.schema";
 import { imageConfigSchema } from "../defs/image-config.schema";
 import { projectConfigSchema } from "../defs/project-config.schema";
 
@@ -412,6 +419,97 @@ export function generateProjectSchema() {
   };
 }
 
+// ─── Project Core Fragment Generator ─────────────────────────────────────────
+
+/**
+ * The core fragment of the composed per-project schema (specs/extensions.md §5.1): core
+ * project.json properties only — no extension sections — and deliberately open, because closure
+ * (`unevaluatedProperties: false`) happens in the generated entry document. Publishes the
+ * `JxFieldSchema` and `RelationshipRef` defs the entry document unions into the `jxFieldSchema`
+ * dynamic anchor.
+ */
+export function generateProjectCoreSchema() {
+  const { contentTypes: _contentTypes, ...coreProperties } = projectConfigSchema.properties;
+  return {
+    $defs: {
+      ImageConfig: imageConfigSchema,
+      JxFieldSchema: jxFieldSchemaDef,
+      RelationshipRef: relationshipRefSchema,
+    },
+    $id: "https://jxsuite.com/schema/project/core/v2",
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    description:
+      "Core fragment of the Jx project.json schema. Open by design: extension fragments " +
+      "contribute their own top-level sections and the generated per-project entry document " +
+      "(project.schema.json) closes the composition. See specs/extensions.md §5.",
+    properties: {
+      ...coreProperties,
+      $schema: {
+        description:
+          "Relative path to the generated per-project schema (conventionally " +
+          "./project.schema.json, written by `jx schema`).",
+        type: "string",
+      },
+      extensions: {
+        description:
+          "Extension packages: bare package names (resolved project-first through the package " +
+          "exports map) or relative paths. Each must export jx-extension.json.",
+        examples: [["@jxsuite/parser"]],
+        items: { type: "string" },
+        type: "array",
+      },
+    },
+    title: "Jx Project Core",
+    type: "object",
+  };
+}
+
+// ─── Union Resource Generators ───────────────────────────────────────────────
+
+/**
+ * The shipped DEFAULT field-union resource. The generated per-project entry document re-embeds a
+ * resource under the same $id with the effective union (adding extension extras); by standard
+ * compound-document $id resolution the embed shadows this default wherever both are in play.
+ */
+export function generateProjectFieldsSchema() {
+  return {
+    $id: PROJECT_FIELDS_SCHEMA_ID,
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    anyOf: [
+      { $ref: "https://jxsuite.com/schema/project/core/v2#/$defs/JxFieldSchema" },
+      { $ref: "https://jxsuite.com/schema/project/core/v2#/$defs/RelationshipRef" },
+    ],
+    description:
+      "Default field-schema union for section entry schemas: the core field shape plus " +
+      "relationship references. Per-project entry documents override this resource with the " +
+      "effective union. See specs/extensions.md §5.3.",
+    title: "Jx Project Field Union",
+  };
+}
+
+/** The shipped DEFAULT $paths-value resource: permissive until extensions contribute shapes. */
+export function generateDocumentPathsSchema() {
+  return {
+    $id: DOCUMENT_PATHS_SCHEMA_ID,
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    description:
+      "Default $paths-value union for documents. Per-project entry documents override this " +
+      "resource with the union of extension-contributed paths shapes.",
+    title: "Jx Document Paths Union",
+  };
+}
+
+// ─── Extension Manifest Schema Generator ─────────────────────────────────────
+
+export function generateExtensionManifestSchema() {
+  return {
+    $id: "https://jxsuite.com/schema/extension-manifest/v1",
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    title: "Jx Extension Manifest",
+    ...extensionManifestSchema,
+  };
+}
+
 // ─── Class Schema Generator ─────────────────────────────────────────────────
 
 export function generateClassSchema() {
@@ -545,7 +643,7 @@ export async function validateDocument(doc: Record<string, unknown>) {
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
 async function runSchemaCli() {
-  const { writeFileSync } = await import("node:fs");
+  const { mkdirSync, writeFileSync } = await import("node:fs");
   const { resolve, dirname } = await import("node:path");
 
   const schemaDir = dirname(resolve(process.argv[1] as string, ".."));
@@ -553,10 +651,18 @@ async function runSchemaCli() {
   const componentSchema = await generateSchema();
   const projectSchema = generateProjectSchema();
   const classSchema = generateClassSchema();
+  const projectCoreSchema = generateProjectCoreSchema();
+  const manifestSchema = generateExtensionManifestSchema();
+  const fieldsSchema = generateProjectFieldsSchema();
+  const pathsSchema = generateDocumentPathsSchema();
 
   const componentStr = JSON.stringify(componentSchema, null, 2);
   const projectStr = JSON.stringify(projectSchema, null, 2);
   const classStr = JSON.stringify(classSchema, null, 2);
+  const projectCoreStr = JSON.stringify(projectCoreSchema, null, 2);
+  const manifestStr = JSON.stringify(manifestSchema, null, 2);
+  const fieldsStr = JSON.stringify(fieldsSchema, null, 2);
+  const pathsStr = JSON.stringify(pathsSchema, null, 2);
 
   const [out] = process.argv.slice(2);
 
@@ -567,10 +673,23 @@ async function runSchemaCli() {
     writeFileSync(resolve(schemaDir, "schema.json"), componentStr, "utf8");
     writeFileSync(resolve(schemaDir, "project-schema.json"), projectStr, "utf8");
     writeFileSync(resolve(schemaDir, "class-schema.json"), classStr, "utf8");
+    mkdirSync(resolve(schemaDir, "schemas"), { recursive: true });
+    writeFileSync(
+      resolve(schemaDir, "schemas", "project.core.schema.json"),
+      projectCoreStr,
+      "utf8",
+    );
+    writeFileSync(resolve(schemaDir, "schemas", "project.fields.schema.json"), fieldsStr, "utf8");
+    writeFileSync(resolve(schemaDir, "schemas", "document.paths.schema.json"), pathsStr, "utf8");
+    writeFileSync(resolve(schemaDir, "extension-manifest.schema.json"), manifestStr, "utf8");
     console.error("Generated:");
     console.error("  schema.json (component)");
     console.error("  project-schema.json");
     console.error("  class-schema.json");
+    console.error("  schemas/project.core.schema.json");
+    console.error("  schemas/project.fields.schema.json");
+    console.error("  schemas/document.paths.schema.json");
+    console.error("  extension-manifest.schema.json");
   }
 }
 

@@ -206,15 +206,11 @@ studio on settings save) writes two committed files into the project root:
   ],
   "unevaluatedProperties": false,
   "$defs": {
-    "FieldSchema": {
-      "$dynamicAnchor": "jxFieldSchema",
+    "Fields": {
+      "$id": "https://jxsuite.com/schema/project/fields/v2",
       "anyOf": [
-        {
-          "$ref": "./node_modules/@jxsuite/schema/schemas/project.core.schema.json#/$defs/JxFieldSchema"
-        },
-        {
-          "$ref": "./node_modules/@jxsuite/schema/schemas/project.core.schema.json#/$defs/RelationshipRef"
-        }
+        { "$ref": "https://jxsuite.com/schema/project/core/v2#/$defs/JxFieldSchema" },
+        { "$ref": "https://jxsuite.com/schema/project/core/v2#/$defs/RelationshipRef" }
       ]
     }
   }
@@ -222,33 +218,43 @@ studio on settings save) writes two committed files into the project root:
 ```
 
 **`<project>/document.schema.json`** — a thin wrapper around the core document
-schema (`@jxsuite/schema/schema.json`), declaring the `jxPathsValue` anchor as
-the union of extension-contributed `$paths` shapes.
+schema (`@jxsuite/schema/schema.json`), re-embedding the paths union resource
+(`https://jxsuite.com/schema/document/paths/v2`) as the union of
+extension-contributed `$paths` shapes.
 
 `project.json` binds via `"$schema": "./project.schema.json"`.
 
-### 5.3 The two dynamic anchors
+### 5.3 The two union resources ($id shadowing)
 
-`$dynamicRef`/`$dynamicAnchor` are **single-point override** keywords: a
-`$dynamicRef` resolves lexically first (the referenced resource must itself
-contain the anchor — "bookending"), then rebinds to the **outermost** resource
-in the dynamic scope declaring that anchor. Exactly one anchor wins; two
-extensions cannot both "add to" an anchor. They are therefore used in exactly
-two recursive positions, where fragments must reference the _effective_ union
-without knowing it:
+Two positions are **open recursion points** where fragments must reference the
+_effective_ union without knowing it. Each is a well-known schema resource
+that core ships as a default and the generated entry document **re-embeds
+under the same `$id` with the effective union** — standard compound-document
+`$id` resolution then lands every reference on the entry document's embed
+instead of the shipped default. Inside an embed, all refs are canonical URIs
+(a `$ref` inside a resource with an absolute `$id` resolves against that
+`$id`, never the file location).
 
-| Anchor          | Position                                                                                                                               | Entry-document union                                                                         |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `jxFieldSchema` | Field-schema values inside section entry schemas (content frontmatter fields, table columns) — recursive through `properties`/`items`. | Core `JxFieldSchema` + `RelationshipRef` + any extension field extras.                       |
-| `jxPathsValue`  | Values of `$paths` in documents.                                                                                                       | Each extension's paths shape (e.g. parser's `ContentPathsSource`, connector's table source). |
+| Resource $id                                   | Position                                                                                                                               | Shipped default → entry-document union                                                                                    |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `https://jxsuite.com/schema/project/fields/v2` | Field-schema values inside section entry schemas (content frontmatter fields, table columns) — recursive through `properties`/`items`. | Default: core `JxFieldSchema` + `RelationshipRef`. Entry adds extension field extras (e.g. connector column shapes).      |
+| `https://jxsuite.com/schema/document/paths/v2` | Values of `$paths` in documents.                                                                                                       | Default: permissive. Entry unions each extension's paths shape (parser's `ContentPathsSource`, connector's table source). |
 
-Fragments write `{ "$dynamicRef": "#jxFieldSchema" }` at those positions and
-carry a **local fallback** `$defs` entry with `"$dynamicAnchor":
-"jxFieldSchema"` containing the core field shape (embedded, so the fragment
-stays standalone-valid and useful offline). Only the generated entry document
-declares the anchor intended to win; because the entry document is the
-outermost resource in scope, its union overrides every fragment fallback
-through arbitrary recursion depth.
+Fragments write `{ "$ref": "https://jxsuite.com/schema/project/fields/v2" }`
+at field positions — no local fallbacks needed. Standalone validation
+registers the shipped defaults (`@jxsuite/schema/schemas/project.fields.schema.json`,
+`schemas/document.paths.schema.json`); composed validation gets the entry
+embeds. Because `RelationshipRef` is part of the shipped default, a validator
+that only sees the defaults never reports false errors on relationship
+fields — extension extras are the only entry-exclusive shapes.
+
+> **Why not `$dynamicRef`?** The 2020-12 dynamic-anchor keywords are the
+> textbook fit on paper, but ajv (8.x) supports `$dynamicAnchor` only at
+> schema-resource roots — and our recursion unit (a field schema) is not the
+> document root, so the entry document cannot legally host the override
+> anchor. `$id` shadowing achieves the identical outermost-wins override with
+> plain `$ref`s and first-class validator support (verified against ajv 8.20;
+> see `packages/schema/tests/project-schemas.test.ts`).
 
 **Everything else is plain composition.** Top-level section keys combine via
 `allOf` + `unevaluatedProperties: false` at the entry document (2020-12
@@ -258,21 +264,21 @@ names) are emitted by the generator, which is the single aggregation party.
 
 ### 5.4 Validation
 
-- Any compliant validator resolves the entry documents offline: every `$ref`
-  is a relative file path into the project's `node_modules` (workspace
-  symlinks resolve transparently).
+- Any compliant validator resolves the entry documents offline: `allOf` refs
+  are relative file paths into the project's `node_modules` (workspace
+  symlinks resolve transparently); canonical-URI refs resolve from the `$id`s
+  of the already-loaded fragments and embeds.
 - `jx validate` (compiler CLI) validates `project.json` against
   `./project.schema.json` using ajv-2020 with a file loader restricted to the
-  project root and `node_modules`. CI validates every starter.
+  project root and `node_modules` (injecting the entry file's URL as `$id` at
+  load time so relative refs resolve). CI validates every starter.
 - Editor support matrix: VS Code's JSON language service follows relative
-  `$schema`/`$ref` natively. ajv-2020 implements `$dynamicRef` fully. Monaco /
-  `vscode-json-languageservice` 2020-12 support is partial: `$dynamicRef` may
-  resolve only lexically. Because fragment fallback anchors contain the real
-  core field shape, editor degradation is _under-suggestion_ (relationship
-  refs not offered inside field schemas) — never false errors. A generic
-  bundler (embed fragments under `$defs` keyed by `$id`, preserving resource
-  boundaries and anchors) is the escape hatch for hosts that cannot fetch
-  files (cloud studio) or need a lexically-rewritten editor copy.
+  `$schema`/`$ref` natively and indexes embedded `$id`s. Where an editor
+  fetches the canonical URLs instead (they are served from jxsuite.com),
+  it gets the shipped defaults — degradation is _under-suggestion_ of
+  extension field extras, never false errors. A generic bundler (embed
+  fragments under `$defs` keyed by `$id`, preserving resource boundaries) is
+  the escape hatch for hosts that cannot fetch files (cloud studio).
 
 ---
 

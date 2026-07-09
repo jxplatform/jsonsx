@@ -1,0 +1,14 @@
+{
+  "$id": "https://jxsuite.com/schema/project/fields/v2",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "https://jxsuite.com/schema/project/core/v2#/$defs/JxFieldSchema"
+    },
+    {
+      "$ref": "https://jxsuite.com/schema/project/core/v2#/$defs/RelationshipRef"
+    }
+  ],
+  "description": "Default field-schema union for section entry schemas: the core field shape plus relationship references. Per-project entry documents override this resource with the effective union. See specs/extensions.md §5.3.",
+  "title": "Jx Project Field Union"
+}

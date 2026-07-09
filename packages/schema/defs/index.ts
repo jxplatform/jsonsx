@@ -76,3 +76,7 @@ export {
 // Content & project
 export { contentTypeDefSchema } from "./content-type-def.schema";
 export { projectConfigSchema } from "./project-config.schema";
+
+// Extensions (specs/extensions.md)
+export { extensionManifestSchema } from "./extension-manifest.schema";
+export { jxFieldSchemaDef, relationshipRefSchema } from "./field-schema.schema";

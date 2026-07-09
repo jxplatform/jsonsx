@@ -1,0 +1,6 @@
+{
+  "$id": "https://jxsuite.com/schema/document/paths/v2",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Default $paths-value union for documents. Per-project entry documents override this resource with the union of extension-contributed paths shapes.",
+  "title": "Jx Document Paths Union"
+}

@@ -11,16 +11,22 @@
     ".": "./src/schema.ts",
     "./extension-registry": "./src/extension-registry.ts",
     "./format-registry": "./src/format-registry.ts",
+    "./project-schemas": "./src/project-schemas.ts",
     "./types": "./types.ts",
     "./guards": "./src/guards.ts",
     "./parse": "./src/parse.ts",
     "./defs": "./defs/index.ts",
     "./schema.json": "./schema.json",
-    "./project-schema.json": "./project-schema.json"
+    "./project-schema.json": "./project-schema.json",
+    "./extension-manifest.schema.json": "./extension-manifest.schema.json",
+    "./schemas/project.core.schema.json": "./schemas/project.core.schema.json",
+    "./schemas/project.fields.schema.json": "./schemas/project.fields.schema.json",
+    "./schemas/document.paths.schema.json": "./schemas/document.paths.schema.json"
   },
   "files": [
     "src/",
     "defs/",
+    "schemas/",
     "types.ts",
     "*.json",
     "!package.json"

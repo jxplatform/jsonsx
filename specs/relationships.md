@@ -35,11 +35,13 @@ Cardinality is expressed JSON-Schema-natively: a bare `$ref` is to-one; an
 array of refs is to-many. There is no separate relationship DSL.
 
 The core schema publishes the shape as `$defs.RelationshipRef`
-(`@jxsuite/schema/schemas/project.core.schema.json`), and the generated
-per-project entry schema unions it into the `jxFieldSchema` dynamic anchor —
-which is how relationship fields become valid everywhere field schemas recurse
-(content frontmatter schemas, table column schemas) without any fragment
-knowing the full union.
+(`@jxsuite/schema/schemas/project.core.schema.json`) and includes it in the
+default field-union resource
+(`https://jxsuite.com/schema/project/fields/v2`); the generated per-project
+entry schema re-embeds that resource with the effective union — which is how
+relationship fields become valid everywhere field schemas recurse (content
+frontmatter schemas, table column schemas) without any fragment knowing the
+full union (extensions.md §5.3).
 
 **Stored values** are entry identifiers: the target section's entry `id`
 (string) for to-one, an array of ids for to-many.
