@@ -7,9 +7,7 @@
 
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
-import { ifDefined } from "lit-html/directives/if-defined.js";
 import { live } from "lit-html/directives/live.js";
-import { styleMap } from "lit-html/directives/style-map.js";
 import { isRef } from "@jxsuite/schema/guards";
 import { dynamicRouteParams } from "../page-params";
 import { projectState } from "../state";
@@ -26,6 +24,9 @@ import { renderFieldRow } from "../ui/field-row";
 import { rawTextArea, spTextField } from "../ui/field-input";
 import { expressionHint, renderExpressionEditor } from "../ui/expression-editor";
 import { renderMediaPicker } from "../ui/media-picker";
+import { registerFormControl, renderForm } from "../ui/schema-form";
+import { resolveContextPointer } from "../services/context-resolver";
+import type { JsonSchema } from "../ui/schema-form";
 import type { TabUi } from "../tabs/tab";
 import type {
   CemEvent,
@@ -50,30 +51,6 @@ interface SignalsPanelCtx {
   renderLeftPanel: () => void;
   renderCanvas: () => void;
   updateSession: (patch: Record<string, unknown>) => void;
-}
-
-interface JsonSchema {
-  type?: string;
-  properties?: Record<string, SchemaProperty>;
-  required?: string[];
-  description?: string;
-}
-
-interface SchemaProperty {
-  type?: string;
-  enum?: string[];
-  default?: unknown;
-  format?: string;
-  minimum?: number;
-  maximum?: number;
-  description?: string;
-  examples?: string[];
-  name?: string;
-  items?: {
-    type?: string;
-    properties?: Record<string, Record<string, unknown>>;
-    required?: string[];
-  };
 }
 
 export interface SignalDef {
@@ -1234,137 +1211,23 @@ function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: Sign
 // ─── Plugin schema-driven form rendering ────────────────────────────────────
 
 /**
- * Resolve a schema enum value. Handles: - Plain arrays (pass through) - `$ref` objects pointing to
- * `#/$context/contentTypes` (resolves to project content type keys) - `$ref` objects pointing to
- * `#/$context/contentTypes/{@param}/schema/properties` (dependent enum) - Legacy `"$contentTypes"`
- * string sentinel (deprecated)
+ * Resolve a schema context pointer for signal config forms — a thin wrapper over the generic
+ * `resolveContextPointer` preserving the legacy enum-ref forms bit-for-bit: the deprecated
+ * `"$contentTypes"` string sentinel and the always-present `#/$context/contentTypes` root (a
+ * missing section resolves to `{}` → empty choices rather than a plain textfield).
  *
- * @param {unknown} enumDef
- * @param {Record<string, unknown>} [parentDef] - Parent def for resolving dependent refs
- * @returns {string[] | undefined}
+ * @param {string} pointer
+ * @param {Record<string, unknown>} [scope] - Parent def for `{@param}` substitution
+ * @returns {unknown}
  */
-function resolveSchemaEnum(
-  enumDef: unknown,
-  parentDef?: Record<string, unknown>,
-): string[] | undefined {
-  if (Array.isArray(enumDef)) {
-    return enumDef;
+function resolveSignalsContextPointer(pointer: string, scope?: Record<string, unknown>): unknown {
+  if (pointer === "$contentTypes" || pointer === "#/$context/contentTypes") {
+    return projectState?.projectConfig?.contentTypes ?? {};
   }
-  if (enumDef && typeof enumDef === "object") {
-    const ref = (enumDef as Record<string, unknown>).$ref;
-    if (ref === "#/$context/contentTypes") {
-      return Object.keys(projectState?.projectConfig?.contentTypes ?? {});
-    }
-    if (typeof ref === "string" && ref.startsWith("#/$context/contentTypes/{@")) {
-      const match = ref.match(/#\/\$context\/contentTypes\/\{@(\w+)\}\/schema\/properties/);
-      if (match && parentDef) {
-        const [, paramName] = match;
-        const typeName = parentDef[paramName!] as string | undefined;
-        if (typeName) {
-          const ct = projectState?.projectConfig?.contentTypes?.[typeName] as
-            | Record<string, unknown>
-            | undefined;
-          const schema = ct?.schema as Record<string, unknown> | undefined;
-          const props = schema?.properties as Record<string, unknown> | undefined;
-          if (props) {
-            return Object.keys(props);
-          }
-        }
-      }
-      return undefined;
-    }
-  }
-  if (enumDef === "$contentTypes") {
-    return Object.keys(projectState?.projectConfig?.contentTypes ?? {});
-  }
-  return undefined;
-}
-
-/**
- * Render a single inline field within an array-of-objects row. Dispatches by schema type: enum →
- * picker, boolean → switch, number → number-field, else → textfield.
- *
- * @param {string} key
- * @param {Record<string, unknown>} schema
- * @param {unknown} value
- * @param {(val: unknown) => void} onChange
- * @param {Record<string, unknown>} [parentDef] - Parent def for resolving dependent enum refs
- */
-/** Parse a numeric field value, returning NaN for blank input (so callers can treat it as unset). */
-function parseNumericField(raw: string, integer: boolean): number {
-  if (raw.trim() === "") {
-    return Number.NaN;
-  }
-  return integer ? Math.trunc(Number(raw)) : Number(raw);
-}
-
-function renderInlineField(
-  key: string,
-  schema: Record<string, unknown>,
-  value: unknown,
-  onChange: (val: unknown) => void,
-  parentDef?: Record<string, unknown>,
-) {
-  if (isRef(value)) {
-    return html`<sp-textfield
-      size="s"
-      label=${key}
-      placeholder=${key}
-      .value=${live(value.$ref)}
-      @change=${(e: Event) => {
-        const v = (e.target as HTMLInputElement).value.trim();
-        onChange(v ? { $ref: v } : undefined);
-      }}
-    ></sp-textfield>`;
-  }
-  const enumValues = resolveSchemaEnum(schema.enum, parentDef);
-
-  if (enumValues) {
-    return html`<sp-picker
-      size="s"
-      label=${key}
-      value=${value !== undefined ? String(value) : "__none__"}
-      @change=${(e: Event) =>
-        onChange(
-          (e.target as HTMLInputElement).value === "__none__"
-            ? undefined
-            : (e.target as HTMLInputElement).value,
-        )}
-    >
-      <sp-menu-item value="__none__">—</sp-menu-item>
-      ${enumValues.map((v: string) => html`<sp-menu-item value=${v}>${v}</sp-menu-item>`)}
-    </sp-picker>`;
-  }
-  if (schema.type === "boolean") {
-    return html`<sp-switch
-      size="s"
-      ?checked=${Boolean(value)}
-      @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
-      >${key}</sp-switch
-    >`;
-  }
-  if (schema.type === "integer" || schema.type === "number") {
-    return html`<sp-number-field
-      size="s"
-      label=${key}
-      .value=${value !== undefined ? value : nothing}
-      step=${schema.type === "integer" ? "1" : nothing}
-      @change=${(e: Event) => {
-        const parsed = parseNumericField(
-          (e.target as HTMLInputElement).value,
-          schema.type === "integer",
-        );
-        onChange(Number.isNaN(parsed) ? undefined : parsed);
-      }}
-    ></sp-number-field>`;
-  }
-  return html`<sp-textfield
-    size="s"
-    label=${key}
-    placeholder=${key}
-    .value=${value ?? ""}
-    @input=${(e: Event) => onChange((e.target as HTMLInputElement).value || undefined)}
-  ></sp-textfield>`;
+  return resolveContextPointer(pointer, {
+    projectConfig: (projectState?.projectConfig ?? {}) as Record<string, unknown>,
+    ...(scope !== undefined && { scope }),
+  });
 }
 
 /**
@@ -1424,39 +1287,22 @@ function renderBindingControl(opts: {
   `;
 }
 
-/** Render a debounced multiline JSON text field for array/object schema properties. */
-function renderJsonTextField(
-  currentValue: unknown,
-  ps: SchemaProperty,
-  name: string,
-  prop: string,
-) {
-  /** @type {ReturnType<typeof setTimeout> | undefined} */
-  let debounce: ReturnType<typeof setTimeout> | undefined;
-  return html`<sp-textfield
-    multiline
-    size="s"
-    style="min-height:40px"
-    .value=${currentValue !== undefined ? JSON.stringify(currentValue, null, 2) : ""}
-    placeholder=${ps.default !== undefined ? JSON.stringify(ps.default) : nothing}
-    @input=${(e: Event) => {
-      clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        try {
-          transactDoc(activeTab.value, (t) =>
-            mutateUpdateDef(t, name, {
-              [prop]: JSON.parse((e.target as HTMLInputElement).value) as unknown,
-            }),
-          );
-        } catch {}
-      }, 500);
-    }}
-  ></sp-textfield>`;
-}
+// The "binding" control registers here rather than in ui/form-controls.ts because it owns
+// Panel-local ephemeral UI state (bindingCustomOpen) and the route-param picker semantics.
+registerFormControl("binding", ({ key, value, onChange, ctx, rerender }) =>
+  renderBindingControl({
+    commit: onChange,
+    fieldKey: `${ctx.fieldKeyPrefix ?? ""}.${key}`,
+    params: ctx.params ?? [],
+    refVal: isRef(value) ? value.$ref : "",
+    rerender,
+  }),
+);
 
 /**
- * Render config form fields from a JSON Schema `properties` object. Maps schema types to
- * appropriate form controls.
+ * Render config form fields from a JSON Schema `properties` object — a thin wrapper over the shared
+ * schema-form engine. Skips studio-reserved keys, resolves enum/context refs against the project
+ * config, and commits every patch through transactDoc/mutateUpdateDef.
  */
 export function renderSchemaFieldsTemplate(
   schema: JsonSchema | null | undefined,
@@ -1469,260 +1315,19 @@ export function renderSchemaFieldsTemplate(
     return nothing;
   }
 
-  const required = new Set(schema.required);
-  const params = dynamicRouteParams(S.documentPath);
+  const properties = Object.fromEntries(
+    Object.entries(schema.properties).filter(([prop]) => !STUDIO_RESERVED_KEYS.has(prop)),
+  );
 
-  const propertyFields = Object.entries(schema.properties)
-    .filter(([prop]) => !STUDIO_RESERVED_KEYS.has(prop))
-    .map(([prop, ps]) => {
-      const currentValue = def[prop];
-      const labelText = prop + (required.has(prop) ? " *" : "");
-
-      let control;
-      const enumValues = resolveSchemaEnum(ps.enum, def);
-      if (
-        isRef(currentValue) &&
-        ps.format !== "json-schema" &&
-        ps.type !== "object" &&
-        ps.type !== "array"
-      ) {
-        control = renderBindingControl({
-          refVal: currentValue.$ref,
-          params,
-          fieldKey: `${name}.${prop}`,
-          commit: (next) =>
-            transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { [prop]: next })),
-          rerender: ctx ? () => ctx.renderLeftPanel() : undefined,
-        });
-      } else if (enumValues) {
-        control = html`
-          <sp-picker
-            size="s"
-            value=${currentValue !== undefined
-              ? String(currentValue)
-              : ps.default !== undefined
-                ? String(ps.default)
-                : "__none__"}
-            @change=${(e: Event) =>
-              transactDoc(activeTab.value, (t) =>
-                mutateUpdateDef(t, name, {
-                  [prop]:
-                    (e.target as HTMLInputElement).value === "__none__"
-                      ? undefined
-                      : (e.target as HTMLInputElement).value,
-                }),
-              )}
-          >
-            ${!required.has(prop) ? html`<sp-menu-item value="__none__">—</sp-menu-item>` : nothing}
-            ${enumValues.map(
-              (val: string) => html`<sp-menu-item value=${val}>${val}</sp-menu-item>`,
-            )}
-          </sp-picker>
-        `;
-      } else if (ps.type === "boolean") {
-        control = html`<sp-checkbox
-          ?checked=${currentValue ?? ps.default ?? false}
-          @change=${(e: Event) =>
-            transactDoc(activeTab.value, (t) =>
-              mutateUpdateDef(t, name, {
-                [prop]: (e.target as HTMLInputElement).checked,
-              }),
-            )}
-        ></sp-checkbox>`;
-      } else if (ps.type === "integer" || ps.type === "number") {
-        /** @type {ReturnType<typeof setTimeout> | undefined} */
-        let debounce: ReturnType<typeof setTimeout> | undefined;
-        control = html`<sp-number-field
-          size="s"
-          min=${ifDefined(ps.minimum)}
-          max=${ifDefined(ps.maximum)}
-          step=${ps.type === "integer" ? "1" : nothing}
-          .value=${currentValue !== undefined ? currentValue : nothing}
-          placeholder=${ps.default != null ? String(ps.default) : nothing}
-          @change=${(e: Event) => {
-            clearTimeout(debounce);
-            debounce = setTimeout(() => {
-              const parsed = parseNumericField(
-                (e.target as HTMLInputElement).value,
-                ps.type === "integer",
-              );
-              transactDoc(activeTab.value, (t) =>
-                mutateUpdateDef(t, name, {
-                  [prop]: Number.isNaN(parsed) ? undefined : parsed,
-                }),
-              );
-            }, 400);
-          }}
-        ></sp-number-field>`;
-      } else if (ps.format === "json-schema") {
-        const hasValue =
-          currentValue && typeof currentValue === "object" && Object.keys(currentValue).length > 0;
-        const cv = currentValue as Record<string, unknown>;
-        const isSchemaRef = hasValue && cv.$ref;
-        /** @type {ReturnType<typeof setTimeout> | undefined} */
-        let debounce: ReturnType<typeof setTimeout> | undefined;
-        control = html`
-          <div class="schema-param-editor">
-            ${hasValue && !isSchemaRef && cv.properties
-              ? html`
-                  <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px">
-                    ${Object.entries(cv.properties as Record<string, Record<string, unknown>>).map(
-                      ([k, v]) => html`
-                        <span
-                          style="background:var(--bg);padding:1px 6px;border-radius:var(--radius);font-size:10px;color:var(--fg-dim)"
-                          >${k}: ${v.type ?? "any"}</span
-                        >
-                      `,
-                    )}
-                  </div>
-                `
-              : nothing}
-            <sp-textfield
-              multiline
-              size="s"
-              style=${styleMap({
-                fontFamily: "monospace",
-                fontSize: "11px",
-                minHeight: hasValue ? "80px" : "40px",
-              })}
-              .value=${currentValue !== undefined ? JSON.stringify(currentValue, null, 2) : ""}
-              placeholder=${ps.description ?? "JSON Schema defining the data shape\u2026"}
-              @input=${(e: Event) => {
-                clearTimeout(debounce);
-                debounce = setTimeout(() => {
-                  try {
-                    transactDoc(activeTab.value, (t) =>
-                      mutateUpdateDef(t, name, {
-                        [prop]: JSON.parse((e.target as HTMLInputElement).value) as unknown,
-                      }),
-                    );
-                  } catch {}
-                }, 500);
-              }}
-            ></sp-textfield>
-          </div>
-        `;
-      } else if (ps.type === "array" && ps.items?.type === "object" && ps.items?.properties) {
-        // Array of objects with defined schema → multi-row inline form
-        const rows: Record<string, unknown>[] = Array.isArray(currentValue)
-          ? (currentValue as Record<string, unknown>[])
-          : [];
-        const itemProps = ps.items.properties as Record<string, Record<string, unknown>>;
-        control = html`
-          <div class="array-object-field">
-            ${rows.map(
-              (row: Record<string, unknown>, idx: number) => html`
-                <div
-                  class="array-object-row"
-                  style="display:flex;gap:4px;align-items:center;margin-bottom:4px"
-                >
-                  ${Object.entries(itemProps).map(([propKey, propSchema]) =>
-                    renderInlineField(
-                      propKey,
-                      propSchema,
-                      row[propKey],
-                      (val) => {
-                        const updated = [...rows];
-                        updated[idx] = { ...updated[idx], [propKey]: val };
-                        transactDoc(activeTab.value, (t) =>
-                          mutateUpdateDef(t, name, { [prop]: updated }),
-                        );
-                      },
-                      def,
-                    ),
-                  )}
-                  <sp-action-button
-                    quiet
-                    size="s"
-                    @click=${() => {
-                      const updated = rows.filter((_: unknown, i: number) => i !== idx);
-                      transactDoc(activeTab.value, (t) =>
-                        mutateUpdateDef(t, name, {
-                          [prop]: updated.length > 0 ? updated : undefined,
-                        }),
-                      );
-                      ctx?.renderLeftPanel();
-                    }}
-                  >
-                    <sp-icon-delete slot="icon"></sp-icon-delete>
-                  </sp-action-button>
-                </div>
-              `,
-            )}
-            <sp-action-button
-              quiet
-              size="s"
-              @click=${(e: Event) => {
-                e.stopPropagation();
-                const newRow: Record<string, unknown> = {};
-                for (const [k, v] of Object.entries(itemProps)) {
-                  if ((v as Record<string, unknown>).default !== undefined) {
-                    newRow[k] = (v as Record<string, unknown>).default;
-                  }
-                }
-                transactDoc(activeTab.value, (t) =>
-                  mutateUpdateDef(t, name, { [prop]: [...rows, newRow] }),
-                );
-                ctx?.renderLeftPanel();
-              }}
-              >+ Add</sp-action-button
-            >
-          </div>
-        `;
-      } else if (ps.type === "array" || ps.type === "object") {
-        control = renderJsonTextField(currentValue, ps, name, prop);
-      } else {
-        /** @type {ReturnType<typeof setTimeout> | undefined} */
-        let debounce: ReturnType<typeof setTimeout> | undefined;
-        const ph = ps.default !== undefined ? String(ps.default) : (ps.examples?.[0] ?? "");
-        control = html`<div style="display:flex;gap:4px;align-items:center">
-          <sp-textfield
-            size="s"
-            style="flex:1"
-            .value=${currentValue ?? ""}
-            placeholder=${ph || nothing}
-            title=${ps.description || nothing}
-            @input=${(e: Event) => {
-              clearTimeout(debounce);
-              debounce = setTimeout(
-                () =>
-                  transactDoc(activeTab.value, (t) =>
-                    mutateUpdateDef(t, name, {
-                      [prop]: (e.target as HTMLInputElement).value || undefined,
-                    }),
-                  ),
-                400,
-              );
-            }}
-          ></sp-textfield>
-          ${params.length > 0
-            ? html`<sp-action-button
-                quiet
-                size="s"
-                title="Bind to route param"
-                @click=${() => {
-                  transactDoc(activeTab.value, (t) =>
-                    mutateUpdateDef(t, name, {
-                      [prop]: { $ref: `#/$params/${params[0]}` },
-                    }),
-                  );
-                  ctx?.renderLeftPanel();
-                }}
-                ><sp-icon-link slot="icon"></sp-icon-link
-              ></sp-action-button>`
-            : nothing}
-        </div>`;
-      }
-
-      return renderFieldRow({
-        hasValue: false,
-        label: labelText,
-        prop: ps.name || prop,
-        widget: control,
-      });
-    });
-
-  return html`${propertyFields}`;
+  return renderForm({ ...schema, properties }, def as Record<string, unknown>, {
+    context: {
+      fieldKeyPrefix: name,
+      params: dynamicRouteParams(S.documentPath),
+      resolvePointer: resolveSignalsContextPointer,
+    },
+    onChange: (patch) => transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, patch)),
+    ...(ctx && { rerender: () => ctx.renderLeftPanel() }),
+  });
 }
 
 /**

@@ -110,6 +110,8 @@ import { cloneRepository, renderGitPanel } from "./panels/git-panel";
 // By Bun's bundler despite sideEffects declarations in Spectrum's package.json.
 import { components as _swc } from "./ui/spectrum";
 import "./ui/panel-resize.js";
+// Built-in schema-form controls (schema-builder, secret) register on import
+import "./ui/form-controls.js";
 import { initLayers } from "./ui/layers";
 import { initShortcuts } from "./editor/shortcuts";
 import { renderActivityBar, mount as mountActivityBar } from "./panels/activity-bar";
