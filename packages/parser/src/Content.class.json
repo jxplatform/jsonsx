@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/Content.class.json",
+  "title": "Content",
+  "description": "Content-collections project section for Jx: loads the project.json `content` section into _project.content and expands content-type $paths into route params",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./content-loader.js",
+
+  "project": {
+    "key": "content",
+    "title": "Content Types",
+    "description": "File-based content collections loaded at build and dev-serve time",
+    "referenceable": true
+  },
+
+  "$studio": {
+    "settings": {
+      "icon": "sp-icon-view-grid",
+      "label": "Content Types",
+      "order": 50,
+      "layout": "map",
+      "entry": {
+        "ui": { "schema": { "control": "schema-builder" } },
+        "newEntry": {
+          "source": "./content/${key}/",
+          "schema": { "type": "object", "properties": {}, "required": [] }
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "returnTypes": {
+      "SectionData": {
+        "type": "object",
+        "description": "Map of content type name → ContentLoaderEntry[], with relationship references resolved"
+      },
+      "PathEntries": {
+        "type": "array",
+        "description": "Route-param objects, one per content entry: { [param]: value }",
+        "items": { "type": "object" }
+      }
+    },
+
+    "methods": {
+      "projectData": {
+        "role": "projectData",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "projectData",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "sectionValue",
+            "type": { "type": "object" },
+            "description": "The project.json `content` section value (content type name → definition)"
+          },
+          {
+            "identifier": "ctx",
+            "type": {
+              "type": "object",
+              "properties": {
+                "projectConfig": { "type": "object" },
+                "root": { "type": "string" },
+                "registry": { "type": "object" },
+                "io": { "type": "object" }
+              }
+            },
+            "description": "Host context: { projectConfig, root, registry, io }"
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/SectionData" },
+        "description": "Load every content type in the section through the format registry, resolving relationship references"
+      },
+      "resolvePaths": {
+        "role": "resolvePaths",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "resolvePaths",
+        "discriminator": "contentType",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "pathsDef",
+            "type": {
+              "type": "object",
+              "properties": {
+                "contentType": { "type": "string" },
+                "param": { "type": "string", "default": "slug" },
+                "field": { "type": "string", "default": "id" }
+              },
+              "required": ["contentType"]
+            },
+            "description": "The $paths value carrying the contentType discriminator"
+          },
+          {
+            "identifier": "ctx",
+            "type": {
+              "type": "object",
+              "properties": {
+                "data": { "type": "object" },
+                "projectConfig": { "type": "object" },
+                "root": { "type": "string" }
+              }
+            },
+            "description": "Host context: { data, projectConfig, root } where data is the projectData result"
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/PathEntries" },
+        "description": "Expand a content-type $paths source into one route-param object per entry (param defaults to \"slug\", field to \"id\")"
+      }
+    }
+  }
+}

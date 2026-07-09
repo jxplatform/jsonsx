@@ -51,7 +51,7 @@
     },
     "packages/collab": {
       "name": "@jxsuite/collab",
-      "version": "0.1.0",
+      "version": "0.2.1",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "lib0": "^0.2.99",
@@ -89,7 +89,7 @@
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
-      "version": "0.35.1",
+      "version": "0.35.3",
       "dependencies": {
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
@@ -159,11 +159,12 @@
         "@jxsuite/runtime": "workspace:^",
         "@types/hast": "^3.0.4",
         "@types/mdast": "^4.0.4",
+        "ajv": "^8.20.0",
       },
     },
     "packages/protocol": {
       "name": "@jxsuite/protocol",
-      "version": "0.2.0",
+      "version": "0.3.1",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
@@ -195,7 +196,7 @@
     },
     "packages/server": {
       "name": "@jxsuite/server",
-      "version": "0.36.0",
+      "version": "0.37.1",
       "dependencies": {
         "@jxsuite/collab": "workspace:^",
         "@jxsuite/compiler": "workspace:^",
@@ -218,7 +219,7 @@
     },
     "packages/studio": {
       "name": "@jxsuite/studio",
-      "version": "0.36.0",
+      "version": "0.37.1",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.0.0",

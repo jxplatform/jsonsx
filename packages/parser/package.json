@@ -10,16 +10,23 @@
   },
   "files": [
     "src/",
-    "dist"
+    "dist",
+    "jx-extension.json",
+    "schemas/"
   ],
   "type": "module",
   "exports": {
     ".": "./src/md.ts",
     "./content": "./src/content.ts",
+    "./content-loader": "./src/content-loader.ts",
     "./markdown": "./src/markdown.ts",
     "./md-html": "./src/md-html.ts",
     "./csv": "./src/csv.ts",
     "./serialize": "./src/serialize.ts",
+    "./jx-extension.json": "./jx-extension.json",
+    "./schemas/project.fragment.schema.json": "./schemas/project.fragment.schema.json",
+    "./schemas/document.fragment.schema.json": "./schemas/document.fragment.schema.json",
+    "./Content.class.json": "./src/Content.class.json",
     "./ContentCollection.class.json": "./src/ContentCollection.class.json",
     "./ContentEntry.class.json": "./src/ContentEntry.class.json",
     "./MarkdownCollection.class.json": "./src/MarkdownCollection.class.json",
@@ -33,9 +40,9 @@
     "provenance": true
   },
   "scripts": {
-    "prepare": "bun build src/content.ts src/markdown.ts src/csv.ts src/serialize.ts --outdir=dist --format=esm --target=node",
+    "prepare": "bun build src/content.ts src/content-loader.ts src/markdown.ts src/csv.ts src/serialize.ts --outdir=dist --format=esm --target=node",
     "build": "bun run prepare",
-    "build:metafile": "bun build src/content.ts src/markdown.ts src/csv.ts src/serialize.ts --outdir=dist --format=esm --target=node --metafile=metafile.json",
+    "build:metafile": "bun build src/content.ts src/content-loader.ts src/markdown.ts src/csv.ts src/serialize.ts --outdir=dist --format=esm --target=node --metafile=metafile.json",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
@@ -64,6 +71,8 @@
     "@happy-dom/global-registrator": "^20.10.6",
     "@jxsuite/runtime": "workspace:^",
     "@types/hast": "^3.0.4",
-    "@types/mdast": "^4.0.4"
-  }
+    "@types/mdast": "^4.0.4",
+    "ajv": "^8.20.0"
+  },
+  "jx": "./jx-extension.json"
 }

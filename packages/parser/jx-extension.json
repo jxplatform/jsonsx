@@ -1,0 +1,17 @@
+{
+  "name": "@jxsuite/parser",
+  "title": "Content & Markdown",
+  "description": "File-based content collections with Markdown and CSV formats",
+  "classes": {
+    "Markdown": "./src/Markdown.class.json",
+    "Csv": "./src/Csv.class.json",
+    "MarkdownCollection": "./src/MarkdownCollection.class.json",
+    "ContentCollection": "./src/ContentCollection.class.json",
+    "ContentEntry": "./src/ContentEntry.class.json",
+    "Content": "./src/Content.class.json"
+  },
+  "schemas": {
+    "project": "./schemas/project.fragment.schema.json",
+    "document": "./schemas/document.fragment.schema.json"
+  }
+}

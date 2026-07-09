@@ -1,0 +1,59 @@
+{
+  "$id": "https://jxsuite.com/schema/ext/parser/project/v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Parser project fragment",
+  "description": "Project-schema fragment contributed by @jxsuite/parser: the `content` section declaring file-based content collections.",
+  "type": "object",
+  "properties": {
+    "content": {
+      "description": "File-based content collections. Each key names a content type; entries are loaded from the named source through the format registry.",
+      "type": "object",
+      "additionalProperties": {
+        "description": "Content type definition. Defines the source directory, frontmatter schema, and element dependencies.",
+        "type": "object",
+        "properties": {
+          "$elements": {
+            "description": "Custom elements available in markdown directives for this content type.",
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": { "$ref": { "type": "string" } },
+                  "required": ["$ref"]
+                },
+                { "type": "string" }
+              ]
+            }
+          },
+          "format": {
+            "description": "Name of a format class provided by an enabled extension (e.g. \"Markdown\", \"Csv\"). When omitted, the format is derived from the source file extension via the format registry. \"json\" is the only built-in.",
+            "type": "string"
+          },
+          "schema": {
+            "description": "JSON Schema for validating frontmatter of content type entries.",
+            "type": "object",
+            "properties": {
+              "type": { "const": "object" },
+              "properties": {
+                "description": "Field definitions; values are field schemas from the effective project field union.",
+                "type": "object",
+                "additionalProperties": { "$ref": "https://jxsuite.com/schema/project/fields/v2" }
+              },
+              "required": {
+                "description": "Frontmatter fields every entry must provide.",
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "source": {
+            "description": "Path to the content directory relative to the project root.",
+            "examples": ["./content/blog/", "./content/docs/"],
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

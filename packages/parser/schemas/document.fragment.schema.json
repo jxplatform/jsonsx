@@ -1,0 +1,27 @@
+{
+  "$id": "https://jxsuite.com/schema/ext/parser/document/v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Parser document fragment",
+  "description": "Document-schema fragment contributed by @jxsuite/parser: the content-type `$paths` source shape unioned into the document paths resource.",
+  "$defs": {
+    "ContentPathsSource": {
+      "description": "Content-type $paths source: expands a dynamic route from the entries of a loaded content type.",
+      "type": "object",
+      "properties": {
+        "contentType": {
+          "description": "Name of the content type (a key of the project.json `content` section).",
+          "type": "string"
+        },
+        "param": {
+          "description": "Route parameter to fill from each entry (default \"slug\").",
+          "type": "string"
+        },
+        "field": {
+          "description": "Entry field providing the parameter value; \"id\" (the default) uses the entry id.",
+          "type": "string"
+        }
+      },
+      "required": ["contentType"]
+    }
+  }
+}
