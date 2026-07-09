@@ -1,4 +1,8 @@
-import type { JxElement } from "@jxsuite/schema/types";
+import type { JxElement, TocEntry } from "@jxsuite/schema/types";
+
+// The content wire types are core (extensions implement them, hosts thread them); re-exported here
+// So parser-internal modules and downstream consumers keep their historical import path.
+export type { ContentLoaderEntry, TocEntry } from "@jxsuite/schema/types";
 
 export interface MarkdownFileResult {
   slug: string;
@@ -12,25 +16,18 @@ export interface MarkdownFileResult {
   [key: string]: unknown;
 }
 
-export interface TocEntry {
-  depth: number;
-  text: string;
-  id: string;
-}
-
 export type ContentEntry = MarkdownFileResult & Record<string, unknown>;
 
-export interface ContentLoaderEntry {
-  id: string;
-  data: Record<string, unknown>;
-  body: string | null;
-  $children?: (JxElement | string)[];
-  _meta?: {
-    excerpt?: string;
-    toc?: TocEntry[];
-    readingTime?: number;
-    wordCount?: number;
-  };
+/**
+ * A content-type definition in the project.json `content` section — the parser extension owns this
+ * shape (its project fragment schema is the validation source of truth).
+ */
+export interface ContentTypeDef {
+  source?: string;
+  format?: string;
+  schema?: Record<string, unknown>;
+  $elements?: (string | { $ref: string })[];
+  [key: string]: unknown;
 }
 
 export interface MdastNode {

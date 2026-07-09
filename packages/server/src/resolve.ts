@@ -2,9 +2,10 @@
 
 import { dirname, relative, resolve } from "node:path";
 import { errorMessage, parseClassDef } from "@jxsuite/schema/parse";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { loadContentTypes } from "@jxsuite/compiler/content-loader";
+import { buildProjectExtensionRegistry } from "@jxsuite/compiler/format-host";
+import { loadProjectSections } from "@jxsuite/compiler/project-sections";
 import type { DynamicClass } from "@jxsuite/runtime/types";
 import type { JxClassDef, ProjectConfig } from "@jxsuite/schema/types";
 
@@ -35,15 +36,16 @@ interface ServerFunctionBody {
   [key: string]: unknown;
 }
 
+/** Per-project context cache, invalidated when project.json changes on disk. */
+const projectContextCache = new Map<string, { mtime: number; context: Record<string, unknown> }>();
+
 /**
- * Lazy-load project context (project.json + content types) for class instantiation.
+ * Lazy-load project context (project.json + extension-loaded sections) for class instantiation.
+ * Sections land under their section keys (e.g. `content` for the parser), matching the compiler's
+ * `_project` shape.
  *
  * @param {string} projectRoot
- * @returns {Promise<{
- *   config: Record<string, unknown>;
- *   contentTypes: Map<string, unknown[]>;
- *   root: string;
- * } | null>}
+ * @returns {Promise<Record<string, unknown> | null>} `{ config, root, ...sections }` or null
  */
 async function loadProjectContext(projectRoot: string) {
   const projectJsonPath = resolve(projectRoot, "project.json");
@@ -51,11 +53,17 @@ async function loadProjectContext(projectRoot: string) {
     return null;
   }
   try {
+    const { mtimeMs } = statSync(projectJsonPath);
+    const cached = projectContextCache.get(projectRoot);
+    if (cached && cached.mtime === mtimeMs) {
+      return cached.context;
+    }
     const config = JSON.parse(readFileSync(projectJsonPath, "utf8")) as ProjectConfig;
-    const contentTypes = config.contentTypes
-      ? await loadContentTypes(projectRoot, config)
-      : new Map();
-    return { config, contentTypes, root: projectRoot };
+    const registry = await buildProjectExtensionRegistry(projectRoot, config);
+    const sections = await loadProjectSections(projectRoot, config, registry);
+    const context = { config, root: projectRoot, ...sections };
+    projectContextCache.set(projectRoot, { context, mtime: mtimeMs });
+    return context;
   } catch {
     return null;
   }

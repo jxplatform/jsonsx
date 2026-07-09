@@ -1,1 +1,1 @@
-{"imports":{"Csv":"@jxsuite/parser/Csv.class.json","Markdown":"@jxsuite/parser/Markdown.class.json"},"name":"Format Project"}
+{"extensions":["@jxsuite/parser"],"name":"Format Project"}

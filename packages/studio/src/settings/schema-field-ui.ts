@@ -87,7 +87,9 @@ export function fieldCardTpl(
   const isRef = type === "reference";
   const nestedProps = fieldSchema.properties || {};
   const nestedRequired = fieldSchema.required || [];
-  const refTarget = fieldSchema.$ref ? fieldSchema.$ref.replace("#/contentTypes/", "") : "";
+  // Reference targets live under a referenceable project section (e.g. `#/content/<type>`); strip
+  // The section prefix generically so any section's targets round-trip.
+  const refTarget = fieldSchema.$ref ? fieldSchema.$ref.replace(/^#\/[^/]+\//, "") : "";
 
   return html`
     <div class="schema-field-card">
@@ -452,7 +454,7 @@ export function schemaForType(type: string, format?: string) {
       return { properties: {}, required: [], type: "object" };
     }
     case "reference": {
-      return { $ref: "#/contentTypes/" };
+      return { $ref: "#/content/" };
     }
     default: {
       return format ? { format, type: "string" } : { type: "string" };

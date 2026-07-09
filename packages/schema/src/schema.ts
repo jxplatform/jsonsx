@@ -90,7 +90,6 @@ import {
   formatDefSchema,
   studioHintsSchema,
 } from "../defs/class-def.schema";
-import { contentTypeDefSchema } from "../defs/content-type-def.schema";
 import { extensionManifestSchema } from "../defs/extension-manifest.schema";
 import {
   DOCUMENT_PATHS_SCHEMA_ID,
@@ -268,7 +267,6 @@ export async function generateSchema() {
       JsonSchemaType: jsonSchemaTypeSchema,
       HeadEntry: headEntrySchema,
       ImageConfig: imageConfigSchema,
-      ContentTypeDef: contentTypeDefSchema,
     },
     $id: "https://jxsuite.com/schema/v1",
     $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -402,17 +400,17 @@ export async function generateSchema() {
 export function generateProjectSchema() {
   return {
     $defs: {
-      ContentTypeDef: contentTypeDefSchema,
       ImageConfig: imageConfigSchema,
     },
     $id: "https://jxsuite.com/schema/project/v1",
     $schema: "https://json-schema.org/draft/2020-12/schema",
-    additionalProperties: false,
     description:
       "Schema for Jx project.json files. " +
       "A project.json file is the root anchor file for a Jx project, " +
-      "declaring site metadata, default settings, global styles, content types, " +
-      "and build configuration.",
+      "declaring site metadata, default settings, global styles, extensions, " +
+      "and build configuration. Open by design: extension-contributed sections " +
+      "are opaque top-level keys; the generated per-project entry document " +
+      "(project.schema.json) closes the composition.",
     properties: projectConfigSchema.properties,
     title: "Jx Project",
     type: "object",
@@ -429,7 +427,6 @@ export function generateProjectSchema() {
  * dynamic anchor.
  */
 export function generateProjectCoreSchema() {
-  const { contentTypes: _contentTypes, ...coreProperties } = projectConfigSchema.properties;
   return {
     $defs: {
       ImageConfig: imageConfigSchema,
@@ -442,23 +439,7 @@ export function generateProjectCoreSchema() {
       "Core fragment of the Jx project.json schema. Open by design: extension fragments " +
       "contribute their own top-level sections and the generated per-project entry document " +
       "(project.schema.json) closes the composition. See specs/extensions.md §5.",
-    properties: {
-      ...coreProperties,
-      $schema: {
-        description:
-          "Relative path to the generated per-project schema (conventionally " +
-          "./project.schema.json, written by `jx schema`).",
-        type: "string",
-      },
-      extensions: {
-        description:
-          "Extension packages: bare package names (resolved project-first through the package " +
-          "exports map) or relative paths. Each must export jx-extension.json.",
-        examples: [["@jxsuite/parser"]],
-        items: { type: "string" },
-        type: "array",
-      },
-    },
+    properties: projectConfigSchema.properties,
     title: "Jx Project Core",
     type: "object",
   };

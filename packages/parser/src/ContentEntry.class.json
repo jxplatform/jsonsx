@@ -10,7 +10,7 @@
     "parameters": {
       "contentType": {
         "identifier": "contentType",
-        "type": { "type": "string", "enum": { "$ref": "#/$context/contentTypes" } },
+        "type": { "type": "string", "enum": { "$ref": "#/$context/content" } },
         "description": "Content type to query"
       },
       "id": {

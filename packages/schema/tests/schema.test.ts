@@ -22,7 +22,8 @@ describe("generateProjectSchema", () => {
     expect(props).toContain("imports");
     expect(props).toContain("$media");
     expect(props).toContain("style");
-    expect(props).toContain("contentTypes");
+    expect(props).toContain("extensions");
+    expect(props).toContain("$schema");
     expect(props).toContain("build");
     expect(props).toContain("i18n");
     expect(props).toContain("redirects");
@@ -68,18 +69,10 @@ describe("generateProjectSchema", () => {
     ]);
   });
 
-  test("disallows additional properties", () => {
-    expect(schema.additionalProperties).toBe(false);
-  });
-
-  test("contentTypes entries reference ContentTypeDef", () => {
-    const collectionEntry = schema.properties.contentTypes.additionalProperties;
-    expect(collectionEntry.$ref).toBe("#/$defs/ContentTypeDef");
-    const contentTypeDef = schema.$defs.ContentTypeDef;
-    const collProps = Object.keys(contentTypeDef.properties);
-    expect(collProps).toContain("source");
-    expect(collProps).toContain("schema");
-    expect(collProps).toContain("$elements");
+  test("is open — extension sections are opaque top-level keys", () => {
+    expect("additionalProperties" in schema).toBe(false);
+    expect("contentTypes" in schema.properties).toBe(false);
+    expect("ContentTypeDef" in schema.$defs).toBe(false);
   });
 });
 

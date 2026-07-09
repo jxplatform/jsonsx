@@ -72,7 +72,7 @@ describe("resolveRepeaterItemFields", () => {
     const arr = repeater({ $ref: "#/state/$docs" });
     const state = { $docs: { $prototype: "ContentCollection", contentType: "docs" } };
     const projectConfig = {
-      contentTypes: {
+      content: {
         docs: { schema: { properties: { order: { type: "number" }, title: { type: "string" } } } },
       },
     } as unknown as ProjectConfig;
@@ -93,7 +93,7 @@ describe("resolveRepeaterItemFields", () => {
     // Import-aliased prototype name — detection is on the `contentType` string, not `$prototype`.
     const state = { $posts: { $prototype: "Coll", contentType: "blog" } };
     const projectConfig = {
-      contentTypes: { blog: { schema: { properties: { slug: { type: "string" } } } } },
+      content: { blog: { schema: { properties: { slug: { type: "string" } } } } },
     } as unknown as ProjectConfig;
 
     expect(resolveRepeaterItemFields(arr, state, projectConfig)).toEqual([
@@ -164,7 +164,7 @@ describe("resolveRepeaterItemFields", () => {
       resolveRepeaterItemFields(
         repeater({ $ref: "#/state/c" }),
         { c: { contentType: "missing" } },
-        { contentTypes: {} } as unknown as ProjectConfig,
+        { content: {} } as unknown as ProjectConfig,
       ),
     ).toEqual(["item", "index", "item.id", "item.body"]);
     // Inline array of primitives → no fields.

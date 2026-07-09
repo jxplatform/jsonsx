@@ -39,7 +39,6 @@ const DEFAULTS = {
     provider: null,
     trailingSlash: "always",
   },
-  contentTypes: {},
   defaults: {
     charset: "utf8",
     lang: "en",
@@ -83,7 +82,9 @@ export function loadProjectConfig(projectRoot: string) {
     throw new Error(`Invalid project.json: ${errorMessage(error)}`, { cause: error });
   }
 
-  // Deep merge with defaults
+  // Deep merge with defaults. The `...raw` spread carries every author-declared key through
+  // Untouched — including `extensions` and extension-contributed sections (`content`, ...), which
+  // Are opaque to the loader (specs/extensions.md §3.1).
   const config: ResolvedProjectConfig = {
     ...DEFAULTS,
     ...raw,
@@ -110,9 +111,6 @@ export function loadProjectConfig(projectRoot: string) {
   }
   if (raw.imports) {
     config.imports = raw.imports;
-  }
-  if (raw.contentTypes) {
-    config.contentTypes = raw.contentTypes;
   }
 
   // Validate adapter

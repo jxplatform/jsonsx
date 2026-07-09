@@ -1,19 +1,21 @@
 /**
  * Format-host — node-side FormatHostIO and project registry construction
  *
- * Provides the filesystem/module I/O the shared format registry needs to run inside the compiler
- * (and dev server). Format classes are auto-discovered from the project-level imports map; see
- * specs/extensions.md.
+ * Provides the filesystem/module I/O the shared extension registry needs to run inside the compiler
+ * (and dev server). Extensions are declared explicitly in project.json's `extensions` array and
+ * discovered through their jx-extension.json manifests; see specs/extensions.md.
  */
 
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
-import { buildFormatRegistry } from "@jxsuite/schema/format-registry";
+import { buildExtensionRegistry } from "@jxsuite/schema/extension-registry";
+import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FormatHostIO, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
+export type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 export type { FormatRegistry, FormatEntry } from "@jxsuite/schema/format-registry";
 
 /**
@@ -73,23 +75,37 @@ export function createNodeFormatIO(projectRoot: string): FormatHostIO {
   };
 }
 
-/** Build the format registry for a project from its project.json imports map. */
-export async function buildProjectFormatRegistry(
+/** Build the extension registry for a project from its project.json `extensions` array. */
+export async function buildProjectExtensionRegistry(
   projectRoot: string,
   projectConfig?: ProjectConfig,
-): Promise<FormatRegistry> {
-  return buildFormatRegistry(
-    projectConfig?.imports as Record<string, string> | undefined,
+): Promise<ExtensionRegistry> {
+  return buildExtensionRegistry(
+    projectConfig?.extensions,
     createNodeFormatIO(projectRoot),
     resolve(projectRoot, "project.json"),
   );
 }
 
+/**
+ * Format-dispatch view of the project's extension registry.
+ *
+ * @deprecated Part-3 cleanup: the desktop app still imports this; use
+ *   `buildProjectExtensionRegistry(...).then((r) => r.formats)` instead.
+ */
+export async function buildProjectFormatRegistry(
+  projectRoot: string,
+  projectConfig?: ProjectConfig,
+): Promise<FormatRegistry> {
+  const registry = await buildProjectExtensionRegistry(projectRoot, projectConfig);
+  return registry.formats;
+}
+
 /** Error message for an unregistered non-JSON extension, naming the fix. */
 export function unknownFormatError(path: string, ext: string): Error {
   return new Error(
-    `No format class imported for "${ext}" (${path}). ` +
-      `Add a format class to project.json imports, e.g. ` +
-      `"Markdown": "@jxsuite/parser/Markdown.class.json".`,
+    `No format class registered for "${ext}" (${path}). ` +
+      `Enable an extension providing this format in project.json "extensions", ` +
+      `e.g. "@jxsuite/parser".`,
   );
 }

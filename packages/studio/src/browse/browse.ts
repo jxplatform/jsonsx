@@ -34,7 +34,8 @@ import {
 } from "../format/format-host";
 
 import type { ComponentEntry } from "../files/components";
-import type { ContentTypeDef, JxDocument } from "@jxsuite/schema/types";
+import type { ContentTypeDef } from "@jxsuite/parser/types";
+import type { JxDocument } from "@jxsuite/schema/types";
 
 // ─── Category definitions ────────────────────────────────────────────────────
 
@@ -184,19 +185,16 @@ async function collectFiles(
 }
 
 /**
- * Match a file path against project contentTypes source directories to find its content type name.
- * Returns the content type name (capitalized) or null if no match.
+ * Match a file path against the project `content` section's source directories to find its content
+ * type name. Returns the content type name (capitalized) or null if no match.
  *
  * @param {string} filePath
  * @returns {string | null}
  */
 function contentTypeFor(filePath: string) {
   const config = projectState?.projectConfig;
-  if (!config?.contentTypes) {
-    return null;
-  }
-  for (const [name, def] of Object.entries(config.contentTypes)) {
-    const d = def as ContentTypeDef;
+  const content = (config?.content ?? {}) as Record<string, ContentTypeDef>;
+  for (const [name, d] of Object.entries(content)) {
     if (!d.source) {
       continue;
     }
@@ -264,7 +262,8 @@ function getEntityTypes() {
  */
 function buildFrontmatterYaml(contentTypeName: string) {
   const config = projectState?.projectConfig;
-  const col = config?.contentTypes?.[contentTypeName];
+  const content = (config?.content ?? {}) as Record<string, ContentTypeDef>;
+  const col = content[contentTypeName];
   if (!col?.schema?.properties) {
     return "title: Untitled\n";
   }
@@ -284,11 +283,8 @@ function buildFrontmatterYaml(contentTypeName: string) {
  */
 function getContentTypeTypes() {
   const config = projectState?.projectConfig;
-  if (!config?.contentTypes) {
-    return [];
-  }
-  return Object.entries(config.contentTypes).map(([name, def]) => {
-    const d = def as ContentTypeDef;
+  const content = (config?.content ?? {}) as Record<string, ContentTypeDef>;
+  return Object.entries(content).map(([name, d]) => {
     const dir = d.source ? d.source.replace(/^\.\//, "").replace(/\/$/, "") : name;
     return {
       contentTypeName: name,

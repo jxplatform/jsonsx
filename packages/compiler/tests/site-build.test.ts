@@ -979,7 +979,7 @@ describe("buildSite — markdown pages", () => {
       resolve(MD_TMP, "project.json"),
       JSON.stringify({
         build: { outDir: "./dist" },
-        imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
+        extensions: ["@jxsuite/parser"],
         name: "MD Test",
       }),
       "utf8",
@@ -1329,7 +1329,8 @@ describe("buildSite — dynamic routes with content types", () => {
       resolve(DYN_TMP, "project.json"),
       JSON.stringify({
         build: { outDir: "./dist" },
-        contentTypes: { posts: { format: "json", source: "./content/posts/" } },
+        content: { posts: { format: "json", source: "./content/posts/" } },
+        extensions: ["@jxsuite/parser"],
         name: "Dynamic Test",
       }),
       "utf8",

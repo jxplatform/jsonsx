@@ -1,7 +1,7 @@
 /**
  * Tests for src/services/context-resolver.ts — generic `#/$context/` pointer resolution: plain
  * walks, `{@param}` substitution, the `$formats` virtual root, and a regression suite pinning the
- * legacy contentTypes enum refs shipped in the real ContentCollection.class.json.
+ * `content` enum refs shipped in the real ContentCollection.class.json.
  */
 import { describe, expect, test } from "bun:test";
 import { resolveContextPointer } from "../src/services/context-resolver";
@@ -10,7 +10,7 @@ import contentCollectionClass from "@jxsuite/parser/ContentCollection.class.json
 const projectConfig = {
   auth: { roles: ["admin", "editor"] },
   connections: { main: { provider: "d1" }, replica: { provider: "sqlite" } },
-  contentTypes: {
+  content: {
     page: { schema: { properties: { body: {}, title: {} } }, source: "./content/page/" },
     post: {
       schema: { properties: { date: {}, slug: {}, title: {} } },
@@ -21,7 +21,7 @@ const projectConfig = {
 
 describe("resolveContextPointer basics", () => {
   test("non-context pointers resolve to undefined", () => {
-    expect(resolveContextPointer("#/contentTypes", { projectConfig })).toBeUndefined();
+    expect(resolveContextPointer("#/content", { projectConfig })).toBeUndefined();
     expect(resolveContextPointer("$contentTypes", { projectConfig })).toBeUndefined();
     expect(resolveContextPointer("", { projectConfig })).toBeUndefined();
   });
@@ -35,13 +35,15 @@ describe("resolveContextPointer basics", () => {
       "editor",
     ]);
     expect(
-      resolveContextPointer("#/$context/contentTypes/post/schema/properties", { projectConfig }),
+      resolveContextPointer("#/$context/content/post/schema/properties", { projectConfig }),
     ).toEqual({ date: {}, slug: {}, title: {} });
   });
 
-  test("follows any section name without special-casing (content vs contentTypes)", () => {
-    const config = { content: { doc: { schema: {} } } } as Record<string, unknown>;
-    expect(resolveContextPointer("#/$context/content", { projectConfig: config })).toEqual({
+  // Legacy-form coverage: old class descriptors point at `contentTypes`; the walker is key-agnostic
+  // So a contentTypes-keyed config keeps resolving.
+  test("follows any section name without special-casing (legacy contentTypes vs content)", () => {
+    const config = { contentTypes: { doc: { schema: {} } } } as Record<string, unknown>;
+    expect(resolveContextPointer("#/$context/contentTypes", { projectConfig: config })).toEqual({
       doc: { schema: {} },
     });
   });
@@ -49,7 +51,7 @@ describe("resolveContextPointer basics", () => {
   test("missing segments resolve to undefined", () => {
     expect(resolveContextPointer("#/$context/nope", { projectConfig })).toBeUndefined();
     expect(
-      resolveContextPointer("#/$context/contentTypes/missing/schema", { projectConfig }),
+      resolveContextPointer("#/$context/content/missing/schema", { projectConfig }),
     ).toBeUndefined();
     expect(
       resolveContextPointer("#/$context/auth/roles/0/deeper", { projectConfig }),
@@ -71,7 +73,7 @@ describe("resolveContextPointer basics", () => {
 describe("{@param} substitution", () => {
   test("substitutes string scope values into the walk", () => {
     expect(
-      resolveContextPointer("#/$context/contentTypes/{@contentType}/schema/properties", {
+      resolveContextPointer("#/$context/content/{@contentType}/schema/properties", {
         projectConfig,
         scope: { contentType: "post" },
       }),
@@ -88,7 +90,7 @@ describe("{@param} substitution", () => {
   });
 
   test("missing scope, missing param, or empty value resolve to undefined", () => {
-    const pointer = "#/$context/contentTypes/{@contentType}/schema/properties";
+    const pointer = "#/$context/content/{@contentType}/schema/properties";
     expect(resolveContextPointer(pointer, { projectConfig })).toBeUndefined();
     expect(resolveContextPointer(pointer, { projectConfig, scope: {} })).toBeUndefined();
     expect(
@@ -124,7 +126,7 @@ describe("$formats virtual root", () => {
   });
 });
 
-// ─── Legacy regression: ContentCollection.class.json enum refs ────────────────
+// ─── Regression: ContentCollection.class.json enum refs ──────────────────────
 
 interface ClassParameter {
   type: {
@@ -136,10 +138,10 @@ interface ClassParameter {
 const classParams = (contentCollectionClass as unknown as { $defs: Record<string, unknown> }).$defs
   .parameters as Record<string, ClassParameter>;
 
-describe("ContentCollection.class.json enum refs (legacy regression)", () => {
+describe("ContentCollection.class.json enum refs (descriptor regression)", () => {
   test("contentType enum ref resolves to the project content type keys", () => {
     const ref = classParams.contentType!.type.enum!.$ref!;
-    expect(ref).toBe("#/$context/contentTypes");
+    expect(ref).toBe("#/$context/content");
     const resolved = resolveContextPointer(ref, { projectConfig });
     // Enum consumers apply Object.keys to object results — same choices as before
     expect(Object.keys(resolved as Record<string, unknown>)).toEqual(["page", "post"]);
@@ -148,7 +150,7 @@ describe("ContentCollection.class.json enum refs (legacy regression)", () => {
   test("filter/sort field enum refs resolve the selected content type's properties", () => {
     for (const param of ["filter", "sort"]) {
       const ref = classParams[param]!.type.items!.properties.field!.enum!.$ref!;
-      expect(ref).toBe("#/$context/contentTypes/{@contentType}/schema/properties");
+      expect(ref).toBe("#/$context/content/{@contentType}/schema/properties");
       const resolved = resolveContextPointer(ref, {
         projectConfig,
         scope: { contentType: "post" },

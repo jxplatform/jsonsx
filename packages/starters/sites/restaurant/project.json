@@ -1,4 +1,5 @@
 {
+  "$schema": "./project.schema.json",
   "name": "Bistro & Café",
   "url": "https://example.com",
   "defaults": {
@@ -91,11 +92,6 @@
       "textDecorationColor": "var(--color-border-strong)"
     }
   },
-  "imports": {
-    "Markdown": "@jxsuite/parser/Markdown.class.json",
-    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json",
-    "ContentEntry": "@jxsuite/parser/ContentEntry.class.json"
-  },
   "images": {
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
@@ -109,7 +105,7 @@
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
-  "contentTypes": {
+  "content": {
     "menu": {
       "source": "./content/menu/",
       "format": "Markdown",
@@ -144,5 +140,6 @@
     "outDir": "./dist",
     "format": "directory",
     "trailingSlash": "always"
-  }
+  },
+  "extensions": ["@jxsuite/parser"]
 }

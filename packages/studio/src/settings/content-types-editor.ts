@@ -14,6 +14,7 @@ import { addFieldFormTpl, detectFieldFormat, fieldCardTpl, schemaForType } from 
 import { toCamelCase } from "../utils/studio-utils";
 
 import type { FieldHandlers } from "./schema-field-ui.js";
+import type { ContentTypeDef } from "@jxsuite/parser/types";
 import type {
   ContentTypeSchema,
   ContentTypeSchemaField,
@@ -41,9 +42,8 @@ async function saveProjectConfig() {
 /** Get the schema object for the selected content type. */
 function getSelectedSchema(): ContentTypeSchema | undefined {
   const config = projectState?.projectConfig;
-  return config?.contentTypes?.[selectedContentType as string]?.schema as
-    | ContentTypeSchema
-    | undefined;
+  const content = (config?.content ?? {}) as Record<string, ContentTypeDef>;
+  return content[selectedContentType as string]?.schema as ContentTypeSchema | undefined;
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -62,14 +62,15 @@ function handleNewContentType(rerender: () => void) {
   if (!config) {
     return;
   }
-  if (!config.contentTypes) {
-    config.contentTypes = {};
+  if (!config.content) {
+    config.content = {};
   }
-  if (config.contentTypes[slug]) {
+  const content = config.content as Record<string, ContentTypeDef>;
+  if (content[slug]) {
     return;
   } // Already exists
 
-  config.contentTypes[slug] = {
+  content[slug] = {
     schema: { properties: {}, required: [], type: "object" },
     source: `./content/${slug}/`,
   };
@@ -237,7 +238,7 @@ function handleChangeRefTarget(fieldName: string, target: string, rerender: () =
     return;
   }
 
-  schema.properties[fieldName] = { $ref: `#/contentTypes/${target}` };
+  schema.properties[fieldName] = { $ref: `#/content/${target}` };
   rerender();
   void saveProjectConfig();
 }
@@ -421,11 +422,12 @@ function handleDeleteContentType(rerender: () => void) {
     return;
   }
   const config = projectState?.projectConfig;
-  if (!config?.contentTypes?.[selectedContentType]) {
+  const content = (config?.content ?? {}) as Record<string, ContentTypeDef>;
+  if (!content[selectedContentType]) {
     return;
   }
 
-  delete config.contentTypes[selectedContentType];
+  delete content[selectedContentType];
   selectedContentType = null;
 
   rerender();
@@ -442,7 +444,7 @@ function handleDeleteContentType(rerender: () => void) {
 export function renderContentTypesEditor(container: HTMLElement) {
   const rerender = () => renderContentTypesEditor(container);
   const config = projectState?.projectConfig;
-  const contentTypes = config?.contentTypes || {};
+  const contentTypes = (config?.content ?? {}) as Record<string, ContentTypeDef>;
   const contentTypeNames = Object.keys(contentTypes);
 
   // Left column — content type list

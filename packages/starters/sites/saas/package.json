@@ -8,6 +8,9 @@
     "build": "jx build",
     "dev": "jx dev"
   },
+  "dependencies": {
+    "@jxsuite/parser": "^0.35.1"
+  },
   "devDependencies": {
     "@jxsuite/compiler": "^0.34.0",
     "@jxsuite/runtime": "^0.34.0"

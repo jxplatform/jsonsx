@@ -99,14 +99,14 @@ describe("parseNumericField", () => {
 });
 
 describe("resolveFormEnum", () => {
-  const ctx = ctxOver({ contentTypes: { page: {}, post: {} } });
+  const ctx = ctxOver({ content: { page: {}, post: {} } });
 
   test("plain arrays pass through", () => {
     expect(resolveFormEnum(["a", "b"], ctx)).toEqual(["a", "b"]);
   });
 
   test("$ref objects resolve through the context (object → keys)", () => {
-    expect(resolveFormEnum({ $ref: "#/$context/contentTypes" }, ctx)).toEqual(["page", "post"]);
+    expect(resolveFormEnum({ $ref: "#/$context/content" }, ctx)).toEqual(["page", "post"]);
   });
 
   test("string-array resolutions map to strings", () => {
@@ -447,7 +447,7 @@ describe("array-of-objects fields", () => {
 
   test("inline enums resolve dependent refs against the whole form value", () => {
     const ctx = ctxOver({
-      contentTypes: { post: { schema: { properties: { slug: {}, title: {} } } } },
+      content: { post: { schema: { properties: { slug: {}, title: {} } } } },
     });
     const m = mountForm(
       {
@@ -455,7 +455,7 @@ describe("array-of-objects fields", () => {
           fields: {
             items: {
               properties: {
-                name: { enum: { $ref: "#/$context/contentTypes/{@type}/schema/properties" } },
+                name: { enum: { $ref: "#/$context/content/{@type}/schema/properties" } },
               },
               type: "object",
             },
@@ -518,7 +518,7 @@ describe("renderInlineField", () => {
 
 describe("ContentCollection enum refs render the same choices as before", () => {
   const projectConfig = {
-    contentTypes: {
+    content: {
       page: { schema: { properties: { body: {}, title: {} } } },
       post: { schema: { properties: { date: {}, slug: {}, title: {} } } },
     },

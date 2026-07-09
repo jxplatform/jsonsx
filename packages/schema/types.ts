@@ -3,7 +3,6 @@ import type { FromSchema } from "json-schema-to-ts";
 import type { headEntrySchema } from "./defs/head-entry.schema";
 import type { imageConfigSchema } from "./defs/image-config.schema";
 import type { cemEventSchema, cemParameterSchema } from "./defs/cem.schema";
-import type { contentTypeDefSchema } from "./defs/content-type-def.schema";
 import type { projectConfigSchema } from "./defs/project-config.schema";
 import type { refObjectSchema } from "./defs/ref-object.schema";
 import type { styleObjectSchema } from "./defs/style-object.schema";
@@ -32,7 +31,6 @@ export namespace Strict {
   export type ImageConfig = FromSchema<typeof imageConfigSchema>;
   export type CemParameter = FromSchema<typeof cemParameterSchema>;
   export type CemEvent = FromSchema<typeof cemEventSchema>;
-  export type ContentTypeDef = FromSchema<typeof contentTypeDefSchema>;
   export type RefObject = FromSchema<typeof refObjectSchema>;
   export type Style = FromSchema<typeof styleObjectSchema>;
   export type Element = FromSchema<typeof elementDefSchema>;
@@ -185,8 +183,6 @@ export interface CemEvent {
   description?: string;
   deprecated?: boolean | string;
 }
-
-export type ContentTypeDef = FromSchema<typeof contentTypeDefSchema>;
 
 export type RefObject = FromSchema<typeof refObjectSchema>;
 
@@ -445,6 +441,8 @@ export interface DeployConfig {
 }
 
 export interface ProjectConfig {
+  /** Relative path to the generated per-project schema (written by `jx schema`). */
+  $schema?: string;
   name?: string;
   url?: string;
   state?: Record<string, unknown>;
@@ -460,7 +458,12 @@ export interface ProjectConfig {
   };
   images?: ImageConfig;
   imports?: Record<string, string>;
-  contentTypes?: Record<string, ContentTypeDef>;
+  /**
+   * Extension packages: bare package names (resolved project-first) or relative paths. Each must
+   * export jx-extension.json. Extension-contributed sections (e.g. `content`) are opaque top-level
+   * keys absorbed by the index signature.
+   */
+  extensions?: string[];
   /** Redirect map: source path → destination (or destination with HTTP status). */
   redirects?: Record<string, string | { destination: string; status?: number }>;
   defaults?: {
@@ -480,13 +483,15 @@ export interface ProjectConfig {
 export type JxAttributeValue = Bindable<string | number | boolean>;
 
 /**
- * A dynamic-route path source (spec §4.3): content-type based, explicit values, data-file ref, or a
- * legacy array of param objects.
+ * A dynamic-route path source (spec §4.3): explicit values, data-file ref, a legacy array of param
+ * objects, or an extension-discriminated source (an object carrying a `resolvePaths` discriminator
+ * key registered by an enabled extension, e.g. the parser's `contentType` — the extension owns the
+ * narrow shape).
  */
 export type JxPathsDef =
-  | { contentType: string; param?: string; field?: string }
   | { values: JsonValue[]; param?: string }
   | { $ref: string; param?: string; field?: string }
+  | { param?: string; field?: string; [discriminator: string]: unknown }
   | Record<string, JsonValue>[];
 
 /**
@@ -541,6 +546,8 @@ export interface JxMutableNode {
 export type JxPath = (string | number)[];
 
 // ─── Content Type Schema ────────────────────────────────────────────────────────
+// Part-3 cleanup: move to parser — the parser extension owns the content-section shapes now; these
+// Stay here only while the studio still imports them from @jxsuite/schema/types.
 
 /** One field within a content-type JSON schema; recursive for nested objects. */
 export interface ContentTypeSchemaField {
@@ -557,4 +564,30 @@ export interface ContentTypeSchema {
   properties?: Record<string, ContentTypeSchemaField>;
   required?: string[];
   [key: string]: unknown;
+}
+
+// ─── Content Wire Types ─────────────────────────────────────────────────────────
+// Core wire shapes for content loading (specs/extensions.md §8): format classes' `load`
+// Capabilities return ContentLoaderEntry[], and hosts pass the entries through untouched.
+// Extensions implement them; core only threads them.
+
+/** A table-of-contents entry extracted from a loaded content document. */
+export interface TocEntry {
+  depth: number;
+  text: string;
+  id: string;
+}
+
+/** One loaded content entry, as produced by a format class's `load` capability. */
+export interface ContentLoaderEntry {
+  id: string;
+  data: Record<string, unknown>;
+  body: string | null;
+  $children?: (JxElement | string)[];
+  _meta?: {
+    excerpt?: string;
+    toc?: TocEntry[];
+    readingTime?: number;
+    wordCount?: number;
+  };
 }

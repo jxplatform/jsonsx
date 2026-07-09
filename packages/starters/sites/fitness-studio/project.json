@@ -1,4 +1,5 @@
 {
+  "$schema": "./project.schema.json",
   "name": "Ember Yoga & Fitness",
   "url": "https://example.com",
   "defaults": {
@@ -122,10 +123,6 @@
       "color": "#ffffff"
     }
   },
-  "imports": {
-    "Markdown": "@jxsuite/parser/Markdown.class.json",
-    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json"
-  },
   "images": {
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
@@ -139,7 +136,7 @@
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
-  "contentTypes": {
+  "content": {
     "classes": {
       "source": "./content/classes/",
       "format": "Markdown",
@@ -173,5 +170,6 @@
     "outDir": "./dist",
     "format": "directory",
     "trailingSlash": "always"
-  }
+  },
+  "extensions": ["@jxsuite/parser"]
 }

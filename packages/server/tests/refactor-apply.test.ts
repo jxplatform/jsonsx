@@ -102,7 +102,11 @@ describe("applyRename", () => {
     rmSync(root, { force: true, recursive: true });
     tmpRoots.push(root);
     write(
-      "Toy.class.json",
+      "toy-ext/jx-extension.json",
+      JSON.stringify({ classes: { Toy: "./Toy.class.json" }, name: "toy-ext" }),
+    );
+    write(
+      "toy-ext/Toy.class.json",
       JSON.stringify({
         $defs: {
           methods: {
@@ -132,7 +136,7 @@ describe("applyRename", () => {
       }),
     );
     write(
-      "toy-impl.js",
+      "toy-ext/toy-impl.js",
       [
         "export class Toy {",
         "  static parse(source) { return { children: [{ src: source.trim(), tagName: 'img' }] }; }",
@@ -144,7 +148,7 @@ describe("applyRename", () => {
     write("img/old.png", "binary");
     write("content/banner.toy", "../img/old.png");
 
-    const config = { imports: { Toy: "./Toy.class.json" } } as ProjectConfig;
+    const config = { extensions: ["./toy-ext"] } as ProjectConfig;
     renameSync(join(root, "img/old.png"), join(root, "img/new.png"));
     const registry = await buildProjectFormatRegistry(root, config);
     const report = await applyRename({

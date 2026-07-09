@@ -421,7 +421,7 @@ Paragraph content
     try {
       const { buildProjectFormatRegistry } = await import("../src/site/format-host");
       const formats = await buildProjectFormatRegistry(tmpDir, {
-        imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
+        extensions: ["@jxsuite/parser"],
       });
       const result = await compileElementPage(mdPath, {
         formats,

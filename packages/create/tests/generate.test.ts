@@ -53,4 +53,21 @@ describe("generateProject — wrangler.jsonc", () => {
     const project = JSON.parse(readFileSync(join(TMP, "project.json"), "utf8"));
     expect(project.build.adapter).toBe("cloudflare-workers");
   });
+
+  test("scaffolded project.json uses the extension model", async () => {
+    await generateProject(TMP, { adapter: "static", name: "My Site" });
+
+    const project = JSON.parse(readFileSync(join(TMP, "project.json"), "utf8"));
+    // $schema binds the generated per-project schema and leads the file by convention.
+    expect(Object.keys(project)[0]).toBe("$schema");
+    expect(project.$schema).toBe("./project.schema.json");
+    expect(project.extensions).toEqual(["@jxsuite/parser"]);
+    expect(project.content).toEqual({});
+    expect(project.imports).toBeUndefined();
+    expect(project.contentTypes).toBeUndefined();
+
+    // Projects own their extension dependencies.
+    const pkg = JSON.parse(readFileSync(join(TMP, "package.json"), "utf8"));
+    expect(pkg.dependencies["@jxsuite/parser"]).toMatch(/^\^\d+\.\d+\.\d+$/);
+  });
 });

@@ -3,10 +3,20 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  buildProjectExtensionRegistry,
   buildProjectFormatRegistry,
   createNodeFormatIO,
   importImplementation,
+  unknownFormatError,
 } from "../src/site/format-host";
+
+describe("unknownFormatError", () => {
+  test("names the extensions-based fix", () => {
+    const error = unknownFormatError("/site/pages/page.toml", ".toml");
+    expect(error.message).toContain('No format class registered for ".toml"');
+    expect(error.message).toContain('project.json "extensions"');
+  });
+});
 
 describe("importImplementation", () => {
   test("falls back from a .js path to its .ts sibling", async () => {
@@ -43,34 +53,55 @@ describe("createNodeFormatIO", () => {
   });
 });
 
-describe("buildProjectFormatRegistry", () => {
-  test("builds the registry for a project without node_modules", async () => {
-    const root = mkdtempSync(join(tmpdir(), "jx-format-reg-"));
+describe("buildProjectExtensionRegistry", () => {
+  test("builds the registry for a project without node_modules (host fallback)", async () => {
+    const root = mkdtempSync(join(tmpdir(), "jx-ext-reg-"));
     try {
-      const registry = await buildProjectFormatRegistry(root, {
-        imports: {
-          Csv: "@jxsuite/parser/Csv.class.json",
-          Markdown: "@jxsuite/parser/Markdown.class.json",
-        },
-      } as never);
-      expect(registry.byExtension(".md")?.name).toBe("Markdown");
-      expect(registry.byExtension(".csv")?.name).toBe("Csv");
+      const registry = await buildProjectExtensionRegistry(root, {
+        extensions: ["@jxsuite/parser"],
+      });
+      expect(registry.formats.byExtension(".md")?.name).toBe("Markdown");
+      expect(registry.formats.byExtension(".csv")?.name).toBe("Csv");
+      expect(registry.byProjectKey("content")?.name).toBe("Content");
+      expect(registry.byPathsDiscriminator("contentType")?.name).toBe("Content");
     } finally {
       rmSync(root, { force: true, recursive: true });
     }
   });
 
-  test("skips unresolvable imports instead of failing the whole registry", async () => {
-    const root = mkdtempSync(join(tmpdir(), "jx-format-skip-"));
+  test("an empty extensions list yields an empty registry", async () => {
+    const root = mkdtempSync(join(tmpdir(), "jx-ext-empty-"));
+    try {
+      const registry = await buildProjectExtensionRegistry(root, {});
+      expect(registry.extensions).toHaveLength(0);
+      expect(registry.formats.entries).toHaveLength(0);
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("an unresolvable extension is an explicit error, not a silent skip", async () => {
+    const root = mkdtempSync(join(tmpdir(), "jx-ext-broken-"));
+    try {
+      // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
+      await expect(
+        buildProjectExtensionRegistry(root, { extensions: ["@jxsuite/does-not-exist"] }),
+      ).rejects.toThrow("is not resolvable");
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+});
+
+describe("buildProjectFormatRegistry (deprecated formats view)", () => {
+  test("returns the extension registry's format-dispatch view", async () => {
+    const root = mkdtempSync(join(tmpdir(), "jx-format-view-"));
     try {
       const registry = await buildProjectFormatRegistry(root, {
-        imports: {
-          Broken: "@jxsuite/does-not-exist/Broken.class.json",
-          Markdown: "@jxsuite/parser/Markdown.class.json",
-        },
-      } as never);
+        extensions: ["@jxsuite/parser"],
+      });
       expect(registry.byExtension(".md")?.name).toBe("Markdown");
-      expect(registry.byName("Broken")).toBeUndefined();
+      expect(registry.byName("Content")).toBeUndefined(); // No format block → not in the view
     } finally {
       rmSync(root, { force: true, recursive: true });
     }

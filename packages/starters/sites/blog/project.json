@@ -1,4 +1,5 @@
 {
+  "$schema": "./project.schema.json",
   "name": "The Long Field",
   "url": "https://example.com",
   "defaults": {
@@ -8,7 +9,10 @@
   "$head": [
     {
       "tagName": "meta",
-      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+      "attributes": {
+        "name": "viewport",
+        "content": "width=device-width, initial-scale=1"
+      }
     },
     {
       "tagName": "meta",
@@ -19,15 +23,25 @@
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+      "attributes": {
+        "rel": "icon",
+        "href": "/favicon.svg"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.googleapis.com"
+      }
     },
     {
       "tagName": "link",
-      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.gstatic.com",
+        "crossorigin": ""
+      }
     },
     {
       "tagName": "link",
@@ -70,33 +84,48 @@
     "color": "var(--color-text-primary)",
     "backgroundColor": "var(--color-paper)"
   },
-  "imports": {
-    "Markdown": "@jxsuite/parser/Markdown.class.json",
-    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json",
-    "ContentEntry": "@jxsuite/parser/ContentEntry.class.json"
-  },
   "images": {
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
     "formats": ["webp", "avif"],
-    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "quality": {
+      "webp": 80,
+      "avif": 65,
+      "jpeg": 80,
+      "png": 80
+    },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
-  "contentTypes": {
+  "content": {
     "posts": {
       "source": "./content/posts/",
       "format": "Markdown",
       "schema": {
         "type": "object",
         "properties": {
-          "title": { "type": "string" },
-          "excerpt": { "type": "string" },
-          "date": { "type": "string" },
-          "author": { "type": "string" },
-          "tag": { "type": "string" },
-          "cover": { "type": "string", "format": "image" },
-          "order": { "type": "number" }
+          "title": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "cover": {
+            "type": "string",
+            "format": "image"
+          },
+          "order": {
+            "type": "number"
+          }
         },
         "required": ["title", "excerpt", "date"]
       }
@@ -106,5 +135,6 @@
     "outDir": "./dist",
     "format": "directory",
     "trailingSlash": "always"
-  }
+  },
+  "extensions": ["@jxsuite/parser"]
 }

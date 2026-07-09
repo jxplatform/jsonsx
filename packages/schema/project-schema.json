@@ -1,49 +1,5 @@
 {
   "$defs": {
-    "ContentTypeDef": {
-      "description": "Content type definition. Defines the source directory, frontmatter schema, and element dependencies.",
-      "properties": {
-        "$elements": {
-          "description": "Custom elements available in markdown directives for this content type.",
-          "items": {
-            "oneOf": [
-              {
-                "properties": {
-                  "$ref": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "$ref"
-                ],
-                "type": "object"
-              },
-              {
-                "type": "string"
-              }
-            ]
-          },
-          "type": "array"
-        },
-        "format": {
-          "description": "Import name of a format class declared in the project imports map (e.g. \"Markdown\", \"Csv\"). When omitted, the format is derived from the source file extension via the format registry. \"json\" is the only built-in.",
-          "type": "string"
-        },
-        "schema": {
-          "description": "JSON Schema for validating frontmatter of content type entries.",
-          "type": "object"
-        },
-        "source": {
-          "description": "Path to the content directory relative to the project root.",
-          "examples": [
-            "./content/blog/",
-            "./content/docs/"
-          ],
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
     "ImageConfig": {
       "description": "Image optimization configuration for the project.",
       "properties": {
@@ -106,8 +62,7 @@
   },
   "$id": "https://jxsuite.com/schema/project/v1",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "description": "Schema for Jx project.json files. A project.json file is the root anchor file for a Jx project, declaring site metadata, default settings, global styles, content types, and build configuration.",
+  "description": "Schema for Jx project.json files. A project.json file is the root anchor file for a Jx project, declaring site metadata, default settings, global styles, extensions, and build configuration. Open by design: extension-contributed sections are opaque top-level keys; the generated per-project entry document (project.schema.json) closes the composition.",
   "properties": {
     "$defs": {
       "description": "Global type definitions available to all pages.",
@@ -185,6 +140,10 @@
         }
       ],
       "type": "object"
+    },
+    "$schema": {
+      "description": "Relative path to the generated per-project schema (conventionally ./project.schema.json, written by `jx schema`).",
+      "type": "string"
     },
     "build": {
       "description": "Build configuration.",
@@ -264,13 +223,6 @@
       },
       "type": "object"
     },
-    "contentTypes": {
-      "additionalProperties": {
-        "$ref": "#/$defs/ContentTypeDef"
-      },
-      "description": "Content type definitions. Each key is a content type name; the value defines the source directory, frontmatter schema, and element dependencies.",
-      "type": "object"
-    },
     "copy": {
       "additionalProperties": {
         "type": "string"
@@ -308,6 +260,18 @@
         }
       },
       "type": "object"
+    },
+    "extensions": {
+      "description": "Extension packages: bare package names (resolved project-first through the package exports map) or relative paths. Each must export jx-extension.json.",
+      "examples": [
+        [
+          "@jxsuite/parser"
+        ]
+      ],
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
     },
     "i18n": {
       "description": "Internationalization configuration.",

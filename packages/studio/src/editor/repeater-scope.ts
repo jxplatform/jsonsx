@@ -16,6 +16,7 @@ import { isRef } from "@jxsuite/schema/guards";
 import { getNodeAtPath } from "../state";
 
 import type { JxPath } from "../state";
+import type { ContentTypeDef } from "@jxsuite/parser/types";
 import type {
   JxMappedArray,
   JxMutableNode,
@@ -73,10 +74,9 @@ function safeFields(names: string[]): string[] {
  * `index`; appends field tokens resolved from the repeater's binding:
  *
  * - **Content collection** — `items` refs a `{ contentType }` state def. Item shape is `{ id, data: {
- *   …fields }, body }`, so fields come from
- *   `projectConfig.contentTypes[contentType].schema.properties` and emit as `item.data.<f>` (the
- *   `.data.` nesting is LOAD-BEARING — runtime templates use `${item.data.title}`), plus `item.id`
- *   / `item.body`.
+ *   …fields }, body }`, so fields come from `projectConfig.content[contentType].schema.properties`
+ *   and emit as `item.data.<f>` (the `.data.` nesting is LOAD-BEARING — runtime templates use
+ *   `${item.data.title}`), plus `item.id` / `item.body`.
  * - **State array** — `items` refs a state def that is an array of objects. Fields come from a
  *   declared `items.properties`, else are inferred from a sample `default[0]`. Emitted FLAT
  *   (`item.<f>`, no `.data.`).
@@ -104,7 +104,8 @@ export function resolveRepeaterItemFields(
       // (a) Content collection — `{ contentType: "<name>" }`. Import-aliased `$prototype` still
       // Matches because we detect on the `contentType` string, not the prototype name.
       if (typeof def.contentType === "string") {
-        const ct = projectConfig?.contentTypes?.[def.contentType];
+        const content = (projectConfig?.content ?? {}) as Record<string, ContentTypeDef>;
+        const ct = content[def.contentType];
         const schema = ct?.schema as ContentTypeSchema | undefined;
         const props = schema?.properties;
         const out = [...base, "item.id", "item.body"];

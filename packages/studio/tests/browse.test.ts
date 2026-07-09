@@ -85,7 +85,7 @@ const SEEDS: Record<string, string> = {
 };
 
 const BASE_CONFIG = {
-  contentTypes: {
+  content: {
     draft: {},
     note: { source: "./content/note.md" },
     posts: {
@@ -523,7 +523,7 @@ describe("loading and reload", () => {
     setup();
   });
 
-  test("works without a contentTypes config; non-media public files are Media", async () => {
+  test("works without a content config; non-media public files are Media", async () => {
     const tree: Record<string, DirEntry[]> = {
       content: [fileEntry("note.md", "content/note.md")],
       public: [fileEntry("robots.txt", "public/robots.txt")],
@@ -638,7 +638,7 @@ describe("new entity menu", () => {
   test("content type without schema falls back to title: Untitled", async () => {
     setFormats([MD_FORMAT]);
     setup({
-      config: { contentTypes: { plain: { format: "Markdown", source: "./stuff" } } },
+      config: { content: { plain: { format: "Markdown", source: "./stuff" } } },
     });
     invalidateBrowseCache();
     const container = await mountWithDefaults();
@@ -658,7 +658,7 @@ describe("new entity menu", () => {
 
   test('content type with format "json" gets a .json extension', async () => {
     setup({
-      config: { contentTypes: { records: { format: "json", source: "./data" } } },
+      config: { content: { records: { format: "json", source: "./data" } } },
     });
     invalidateBrowseCache();
     const container = await mountWithDefaults();

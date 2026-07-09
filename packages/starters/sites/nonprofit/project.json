@@ -1,4 +1,5 @@
 {
+  "$schema": "./project.schema.json",
   "name": "Rivertown Foundation",
   "url": "https://example.com",
   "defaults": {
@@ -99,10 +100,6 @@
     "backgroundColor": "var(--color-bg-white)",
     "WebkitFontSmoothing": "antialiased"
   },
-  "imports": {
-    "Markdown": "@jxsuite/parser/Markdown.class.json",
-    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json"
-  },
   "images": {
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
@@ -116,7 +113,7 @@
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
-  "contentTypes": {
+  "content": {
     "programs": {
       "source": "./content/programs/",
       "format": "Markdown",
@@ -145,5 +142,6 @@
     "outDir": "./dist",
     "format": "directory",
     "trailingSlash": "always"
-  }
+  },
+  "extensions": ["@jxsuite/parser"]
 }

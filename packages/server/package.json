@@ -35,11 +35,13 @@
     "@jxsuite/compiler": "workspace:^",
     "@jxsuite/create": "workspace:^",
     "@jxsuite/import": "workspace:^",
-    "@jxsuite/parser": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
     "@jxsuite/starters": "workspace:^",
     "chokidar": "^5.0.0",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@jxsuite/parser": "workspace:^"
   }
 }

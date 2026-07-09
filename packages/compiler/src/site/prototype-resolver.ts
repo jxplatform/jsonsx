@@ -60,8 +60,9 @@ const RESERVED_KEYS = new Set([
  * @param {JxMutableNode | JxDocument} doc - The page document (mutated in place)
  * @param {{ sourcePath?: string; _pathParams?: Record<string, string> }} route - Route info
  * @param {string} projectRoot - Absolute path to the project root
- * @param {{ config?: Record<string, unknown>; contentTypes?: Map<string, unknown[]> }} [projectContext] -
- *   Project-level context injected into all classes
+ * @param {{ config?: Record<string, unknown>; sections?: Record<string, unknown> }} [projectContext] -
+ *   Project-level context injected into all classes; `sections` holds the extension-loaded project
+ *   sections keyed by section key (spread into `_project`)
  */
 export async function resolvePrototypes(
   doc: JxMutableNode | JxDocument,
@@ -69,7 +70,7 @@ export async function resolvePrototypes(
   projectRoot: string,
   projectContext: {
     config?: Record<string, unknown>;
-    contentTypes?: Map<string, unknown[]>;
+    sections?: Record<string, unknown>;
   } = {},
 ) {
   const imports = doc.imports ?? {};
@@ -123,7 +124,7 @@ export async function resolvePrototypes(
  * @param {{ sourcePath?: string; _pathParams?: Record<string, string> }} route
  * @param {string} projectRoot
  * @param {Record<string, unknown>} state - The full page state object
- * @param {{ config?: Record<string, unknown>; contentTypes?: Map<string, unknown[]> }} projectContext
+ * @param {{ config?: Record<string, unknown>; sections?: Record<string, unknown> }} projectContext
  * @returns {Promise<JsonValue>} The resolved value
  */
 async function resolveClassPrototype(
@@ -133,7 +134,7 @@ async function resolveClassPrototype(
   state: Record<string, unknown>,
   projectContext: {
     config?: Record<string, unknown>;
-    contentTypes?: Map<string, unknown[]>;
+    sections?: Record<string, unknown>;
   },
 ) {
   const src = def.$src;
@@ -191,11 +192,12 @@ async function resolveClassPrototype(
     config.basePath = dirname(route.sourcePath);
   }
 
-  // Inject universal context — available to all classes
+  // Inject universal context — available to all classes. Extension-loaded sections land under
+  // Their section keys (e.g. _project.content for the parser's content collections).
   config._project = {
     config: projectContext.config ?? null,
-    contentTypes: projectContext.contentTypes ?? null,
     root: projectRoot,
+    ...projectContext.sections,
   };
   config._document = { route, state };
 

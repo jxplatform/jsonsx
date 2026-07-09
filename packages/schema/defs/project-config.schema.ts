@@ -1,10 +1,11 @@
 export const projectConfigSchema = {
-  additionalProperties: false,
   description:
     "Schema for Jx project.json files. " +
     "A project.json file is the root anchor file for a Jx project, " +
-    "declaring site metadata, default settings, global styles, content types, " +
-    "and build configuration.",
+    "declaring site metadata, default settings, global styles, extensions, " +
+    "and build configuration. Open by design: extension-contributed sections " +
+    "(e.g. `content`) are opaque top-level keys; the generated per-project " +
+    "entry document (project.schema.json) closes the composition.",
   properties: {
     $defs: {
       description: "Global type definitions available to all pages.",
@@ -62,6 +63,12 @@ export const projectConfigSchema = {
         },
       ],
       type: "object",
+    },
+    $schema: {
+      description:
+        "Relative path to the generated per-project schema (conventionally " +
+        "./project.schema.json, written by `jx schema`).",
+      type: "string",
     },
     build: {
       description: "Build configuration.",
@@ -127,13 +134,6 @@ export const projectConfigSchema = {
       },
       type: "object",
     },
-    contentTypes: {
-      additionalProperties: { $ref: "#/$defs/ContentTypeDef" },
-      description:
-        "Content type definitions. Each key is a content type name; " +
-        "the value defines the source directory, frontmatter schema, and element dependencies.",
-      type: "object",
-    },
     copy: {
       additionalProperties: { type: "string" },
       description:
@@ -163,6 +163,14 @@ export const projectConfigSchema = {
         },
       },
       type: "object",
+    },
+    extensions: {
+      description:
+        "Extension packages: bare package names (resolved project-first through the package " +
+        "exports map) or relative paths. Each must export jx-extension.json.",
+      examples: [["@jxsuite/parser"]],
+      items: { type: "string" },
+      type: "array",
     },
     i18n: {
       description: "Internationalization configuration.",

@@ -12,6 +12,7 @@
     "./extension-registry": "./src/extension-registry.ts",
     "./format-registry": "./src/format-registry.ts",
     "./project-schemas": "./src/project-schemas.ts",
+    "./validate-project": "./src/validate-project.ts",
     "./types": "./types.ts",
     "./guards": "./src/guards.ts",
     "./parse": "./src/parse.ts",

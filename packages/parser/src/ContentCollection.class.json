@@ -10,7 +10,7 @@
     "parameters": {
       "contentType": {
         "identifier": "contentType",
-        "type": { "type": "string", "enum": { "$ref": "#/$context/contentTypes" } },
+        "type": { "type": "string", "enum": { "$ref": "#/$context/content" } },
         "description": "Content type to query"
       },
       "filter": {
@@ -23,7 +23,7 @@
             "properties": {
               "field": {
                 "type": "string",
-                "enum": { "$ref": "#/$context/contentTypes/{@contentType}/schema/properties" }
+                "enum": { "$ref": "#/$context/content/{@contentType}/schema/properties" }
               },
               "op": {
                 "type": "string",
@@ -57,7 +57,7 @@
             "properties": {
               "field": {
                 "type": "string",
-                "enum": { "$ref": "#/$context/contentTypes/{@contentType}/schema/properties" }
+                "enum": { "$ref": "#/$context/content/{@contentType}/schema/properties" }
               },
               "order": { "type": "string", "enum": ["asc", "desc"], "default": "asc" }
             },

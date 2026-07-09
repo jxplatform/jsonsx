@@ -60,7 +60,7 @@ beforeEach(() => {
     projectConfig: {
       $defs: { Author: { properties: {}, required: [], type: "object" } },
       $media: { "--": "1280px", "--sm": "(max-width: 600px)" },
-      contentTypes: {},
+      content: {},
       style: { "--color-primary": "#007acc" },
     } as unknown,
   });

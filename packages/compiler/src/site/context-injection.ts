@@ -4,9 +4,6 @@
  * Injects project-level and page-level context variables into a page's state before compilation.
  * These are available as $site.* and $page.* in template expressions.
  *
- * Also resolves ContentCollection and ContentEntry $prototype entries against loaded content types
- * (Phase 2, spec §6.4).
- *
  * Per site-architecture spec §10: $site.name — from project.json name $site.url — from project.json
  * url $site.state.* — site-wide reactive state $page.url — current page URL path $page.title — page
  * title $page.params — dynamic route parameters (if any)
@@ -19,7 +16,6 @@ import type {
   JxStateDefinition,
   ProjectConfig,
 } from "@jxsuite/schema/types";
-import type { ContentLoaderEntry } from "@jxsuite/parser/types";
 import type { SiteRoute } from "../types.ts";
 
 /**
@@ -28,7 +24,6 @@ import type { SiteRoute } from "../types.ts";
  * @param {JxDocument} doc - The page document (mutated)
  * @param {ProjectConfig} projectConfig - Loaded project configuration
  * @param {SiteRoute} route - The resolved route for this page
- * @param {Map<string, ContentLoaderEntry[]>} [contentTypes] - Loaded content types
  * @param {string | null} [projectRoot] - Absolute path to the project root (for import rebasing)
  * @returns {JxDocument} The mutated document
  */
@@ -36,7 +31,6 @@ export function injectContext(
   doc: JxDocument,
   projectConfig: ProjectConfig,
   route: SiteRoute,
-  _contentTypes = new Map<string, ContentLoaderEntry[]>(),
   projectRoot: string | null = null,
 ) {
   if (!doc.state) {

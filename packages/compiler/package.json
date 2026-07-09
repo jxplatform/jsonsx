@@ -19,8 +19,8 @@
   "type": "module",
   "exports": {
     ".": "./src/compiler.ts",
-    "./content-loader": "./src/site/content-loader.ts",
     "./format-host": "./src/site/format-host.ts",
+    "./project-sections": "./src/site/project-sections.ts",
     "./context-injection": "./src/site/context-injection.ts",
     "./head-merger": "./src/site/head-merger.ts",
     "./layout-resolver": "./src/site/layout-resolver.ts",
@@ -43,13 +43,13 @@
   },
   "dependencies": {
     "@apidevtools/json-schema-ref-parser": "^15.4.0",
-    "@jxsuite/parser": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
     "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.10.6",
+    "@jxsuite/parser": "workspace:^",
     "@types/mdast": "^4.0.4"
   }
 }

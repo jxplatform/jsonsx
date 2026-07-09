@@ -1,1 +1,1 @@
-{"imports":{"Markdown":"@jxsuite/parser/Markdown.class.json"},"name":"MD Components"}
+{"extensions":["@jxsuite/parser"],"name":"MD Components"}

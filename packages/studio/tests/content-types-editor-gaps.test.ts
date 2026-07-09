@@ -38,7 +38,7 @@ function setup() {
   const { state } = installMockPlatform();
   resetStudioState({
     projectConfig: {
-      contentTypes: {
+      content: {
         posts: {
           schema: {
             properties: { meta: { properties: {}, type: "object" } },
@@ -63,8 +63,7 @@ function setup() {
 }
 
 function metaSchema(): Record<string, any> {
-  return (projectState as Record<string, any>).projectConfig.contentTypes.posts.schema.properties
-    .meta;
+  return (projectState as Record<string, any>).projectConfig.content.posts.schema.properties.meta;
 }
 
 test("add nested field with required: true initializes and appends to parent.required", async () => {

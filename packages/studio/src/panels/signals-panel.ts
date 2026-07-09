@@ -1212,15 +1212,19 @@ function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: Sign
 
 /**
  * Resolve a schema context pointer for signal config forms — a thin wrapper over the generic
- * `resolveContextPointer` preserving the legacy enum-ref forms bit-for-bit: the deprecated
- * `"$contentTypes"` string sentinel and the always-present `#/$context/contentTypes` root (a
- * missing section resolves to `{}` → empty choices rather than a plain textfield).
+ * `resolveContextPointer` making the content-type roots always-present (a missing section resolves
+ * to `{}` → empty choices rather than a plain textfield): the parser's real descriptors point at
+ * the `#/$context/content` root, while the deprecated `"$contentTypes"` string sentinel and the
+ * legacy `#/$context/contentTypes` root keep resolving bit-for-bit for old class descriptors.
  *
  * @param {string} pointer
  * @param {Record<string, unknown>} [scope] - Parent def for `{@param}` substitution
  * @returns {unknown}
  */
 function resolveSignalsContextPointer(pointer: string, scope?: Record<string, unknown>): unknown {
+  if (pointer === "#/$context/content") {
+    return projectState?.projectConfig?.content ?? {};
+  }
   if (pointer === "$contentTypes" || pointer === "#/$context/contentTypes") {
     return projectState?.projectConfig?.contentTypes ?? {};
   }

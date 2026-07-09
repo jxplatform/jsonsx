@@ -3,8 +3,7 @@
  *
  * Scans the pages/ directory and builds a route table mapping URL paths to their source files,
  * layouts, and metadata. `.json` pages are native; any other extension must be claimed by a format
- * class (with the `parse` capability and a "page" document kind) registered from the project's
- * imports map.
+ * class (with the `parse` capability and a "page" document kind) provided by an enabled extension.
  *
  * Conventions (per site-architecture spec §4): pages/index.json → / pages/about.json → /about
  * pages/about/index.json → /about pages/blog/[slug].json → /blog/:slug (dynamic)
@@ -15,9 +14,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { parseJxDocument } from "@jxsuite/schema/parse";
 import { extname, join, relative, resolve } from "node:path";
+import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
-import type { JxDocument, JxPathsDef } from "@jxsuite/schema/types";
-import type { ContentLoaderEntry } from "@jxsuite/parser/types";
+import type { JxDocument, JxPathsDef, ProjectConfig } from "@jxsuite/schema/types";
 
 interface Route {
   urlPattern: string; // URL pattern (e.g. "/blog/:slug")
@@ -50,9 +49,9 @@ export async function readPageDocument(
   const entry = registry?.byExtension(ext, "parse");
   if (!entry) {
     throw new Error(
-      `No format class imported for "${ext}" (${filePath}). ` +
-        `Add a format class to project.json imports, e.g. ` +
-        `"Markdown": "@jxsuite/parser/Markdown.class.json".`,
+      `No format class registered for "${ext}" (${filePath}). ` +
+        `Enable an extension providing this format in project.json "extensions", ` +
+        `e.g. "@jxsuite/parser".`,
     );
   }
   return (await entry.call("parse", source)) as JxDocument;
@@ -208,23 +207,25 @@ async function fileToRoute(relativePath: string, absolutePath: string, registry?
 /**
  * Expand dynamic routes by resolving $paths from each dynamic page.
  *
- * Supports three $paths shapes (per spec §4.3): 1. Content type-based: { contentType: "blog",
- * param: "slug", field: "id" } 2. Explicit values: { values: ["en", "fr"], param: "lang" } 3. Data
- * file ref: { "$ref": "./data/products.json", param: "id", field: "sku" } 4. Legacy array: [{ slug:
- * "hello" }, { slug: "world" }]
+ * Supports these $paths shapes (per spec §4.3): 1. Explicit values: { values: ["en", "fr"], param:
+ * "lang" } 2. Data file ref: { "$ref": "./data/products.json", param: "id", field: "sku" } 3.
+ * Legacy array: [{ slug: "hello" }, { slug: "world" }] 4. Extension-discriminated: any object
+ * carrying a key an enabled extension registered as its `resolvePaths` discriminator (e.g. the
+ * parser's { contentType: "blog", param: "slug" }).
  *
  * @param {Route[]} routes - Discovered route table
  * @param {string} projectRoot - Project root for resolving $ref paths
- * @param {Map<string, ContentLoaderEntry[]>} [contentTypes] - Loaded content types (from
- *   content-loader)
- * @param {FormatRegistry} [registry] - Format registry for reading non-JSON dynamic pages
+ * @param {Record<string, unknown>} [sections] - Loaded project sections (projectData results)
+ * @param {ExtensionRegistry} [registry] - Extension registry (formats view reads non-JSON pages)
+ * @param {ProjectConfig} [projectConfig] - Already-loaded project config
  * @returns {Promise<Route[]>} Expanded routes with concrete paths
  */
 export async function expandDynamicRoutes(
   routes: Route[],
   projectRoot: string,
-  contentTypes = new Map<string, ContentLoaderEntry[]>(),
-  registry?: FormatRegistry,
+  sections: Record<string, unknown> = {},
+  registry?: ExtensionRegistry,
+  projectConfig?: ProjectConfig,
 ) {
   const expanded: Route[] = [];
 
@@ -238,7 +239,7 @@ export async function expandDynamicRoutes(
     /** @type {Record<string, unknown>} */
     let raw;
     try {
-      raw = await readPageDocument(route.sourcePath, registry);
+      raw = await readPageDocument(route.sourcePath, registry?.formats);
     } catch {
       expanded.push(route);
       continue;
@@ -249,7 +250,13 @@ export async function expandDynamicRoutes(
       continue;
     }
 
-    const pathEntries = resolvePathEntries(raw.$paths, projectRoot, contentTypes);
+    const pathEntries = await resolvePathEntries(
+      raw.$paths,
+      projectRoot,
+      sections,
+      registry,
+      projectConfig,
+    );
 
     for (const pathEntry of pathEntries) {
       let concreteUrl = route.urlPattern;
@@ -277,65 +284,70 @@ export async function expandDynamicRoutes(
 /**
  * Resolve $paths into an array of param objects.
  *
+ * Core shapes (array / `values` / `$ref`) are handled inline; any other object dispatches through
+ * the extension registry — the first key with a registered `resolvePaths` discriminator routes the
+ * whole $paths value to the owning class, with its section's loaded data as context.
+ *
  * @param {import("@jxsuite/schema/types").JxPathsDef} $paths - The $paths declaration
  * @param {string} projectRoot
- * @param {Map<string, ContentLoaderEntry[]>} contentTypes
- * @returns {Record<string, unknown>[]} Array of { paramName: value } objects
+ * @param {Record<string, unknown>} sections - Loaded project sections keyed by section key
+ * @param {ExtensionRegistry} [registry]
+ * @param {ProjectConfig} [projectConfig]
+ * @returns {Promise<Record<string, unknown>[]>} Array of { paramName: value } objects
  */
-function resolvePathEntries(
+async function resolvePathEntries(
   $paths: JxPathsDef,
   projectRoot: string,
-  contentTypes: Map<string, ContentLoaderEntry[]>,
-): Record<string, unknown>[] {
+  sections: Record<string, unknown>,
+  registry?: ExtensionRegistry,
+  projectConfig?: ProjectConfig,
+): Promise<Record<string, unknown>[]> {
   // Legacy: array of param objects
   if (Array.isArray($paths)) {
     return $paths;
   }
 
-  // Content type-based: { contentType: "blog", param: "slug", field: "id" }
-  if ("contentType" in $paths && $paths.contentType) {
-    const entries = contentTypes.get($paths.contentType);
-    if (!entries || entries.length === 0) {
-      console.warn(
-        `Warning: $paths references content type "${$paths.contentType}" but it has no entries`,
-      );
-      return [];
-    }
-    const param = $paths.param ?? "slug";
-    const field = $paths.field ?? "id";
-    return entries
-      .map((entry: ContentLoaderEntry) => ({
-        [param]: field === "id" ? entry.id : (entry.data[field] ?? entry.id),
-      }))
-      .filter((p: Record<string, unknown>) => p[param]);
-  }
-
   // Explicit values: { values: ["en", "fr"], param: "lang" }
   if ("values" in $paths && Array.isArray($paths.values)) {
-    const param = $paths.param ?? "value";
-    return $paths.values.map((v) => ({ [param]: v }));
+    const param = typeof $paths.param === "string" ? $paths.param : "value";
+    return ($paths.values as unknown[]).map((v) => ({ [param]: v }));
   }
 
   // Data file ref: { "$ref": "./data/products.json", param: "id", field: "sku" }
-  if ("$ref" in $paths && $paths.$ref) {
-    const filePath = resolve(projectRoot, $paths.$ref);
+  if ("$ref" in $paths && typeof $paths.$ref === "string" && $paths.$ref) {
+    const refPath = $paths.$ref;
+    const filePath = resolve(projectRoot, refPath);
     let data: unknown;
     try {
       data = JSON.parse(readFileSync(filePath, "utf8")) as unknown;
     } catch (error) {
       const err = error as Error;
-      console.warn(`Warning: $paths.$ref could not load "${$paths.$ref}": ${err.message}`);
+      console.warn(`Warning: $paths.$ref could not load "${refPath}": ${err.message}`);
       return [];
     }
     if (!Array.isArray(data)) {
-      console.warn(`Warning: $paths.$ref "${$paths.$ref}" must be a JSON array`);
+      console.warn(`Warning: $paths.$ref "${refPath}" must be a JSON array`);
       return [];
     }
-    const param = $paths.param ?? "id";
-    const field = $paths.field ?? "id";
+    const param = typeof $paths.param === "string" ? $paths.param : "id";
+    const field = typeof $paths.field === "string" ? $paths.field : "id";
     return (data as Record<string, unknown>[]).map((item: Record<string, unknown>) => ({
       [param]: item[field] ?? item.id ?? String(item),
     }));
+  }
+
+  // Extension-discriminated: the first key with a registered resolvePaths discriminator routes
+  // The whole value to the owning class (specs/extensions.md §8).
+  for (const key of Object.keys($paths)) {
+    const entry = registry?.byPathsDiscriminator(key);
+    if (!entry?.project) {
+      continue;
+    }
+    return (await entry.call("resolvePaths", $paths, {
+      data: sections[entry.project.key],
+      projectConfig,
+      root: projectRoot,
+    })) as Record<string, unknown>[];
   }
 
   console.warn(`Warning: unrecognized $paths shape — skipping`);

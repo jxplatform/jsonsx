@@ -58,7 +58,7 @@ const BUILTIN_LABELS = [
 
 beforeEach(() => {
   installMockPlatform();
-  resetStudioState({ projectConfig: { contentTypes: {} } as unknown });
+  resetStudioState({ projectConfig: { content: {} } as unknown });
 });
 
 afterEach(async () => {

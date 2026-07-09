@@ -186,6 +186,10 @@
       ],
       "type": "object"
     },
+    "$schema": {
+      "description": "Relative path to the generated per-project schema (conventionally ./project.schema.json, written by `jx schema`).",
+      "type": "string"
+    },
     "build": {
       "description": "Build configuration.",
       "properties": {
@@ -281,6 +285,14 @@
       },
       "type": "object"
     },
+    "extensions": {
+      "description": "Extension packages: bare package names (resolved project-first through the package exports map) or relative paths. Each must export jx-extension.json.",
+      "examples": [["@jxsuite/parser"]],
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "i18n": {
       "description": "Internationalization configuration.",
       "properties": {
@@ -364,18 +376,6 @@
       "description": "Production URL of the deployed site.",
       "examples": ["https://example.com", "https://jxsuite.com"],
       "type": "string"
-    },
-    "$schema": {
-      "description": "Relative path to the generated per-project schema (conventionally ./project.schema.json, written by `jx schema`).",
-      "type": "string"
-    },
-    "extensions": {
-      "description": "Extension packages: bare package names (resolved project-first through the package exports map) or relative paths. Each must export jx-extension.json.",
-      "examples": [["@jxsuite/parser"]],
-      "items": {
-        "type": "string"
-      },
-      "type": "array"
     }
   },
   "title": "Jx Project Core",

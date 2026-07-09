@@ -23,7 +23,8 @@ import { basename, dirname, join, resolve } from "node:path";
 import { isMappedArray, isRef } from "@jxsuite/schema/guards";
 import { loadProjectConfig } from "./site-loader.ts";
 import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
-import { buildProjectFormatRegistry } from "./format-host.ts";
+import { buildProjectExtensionRegistry } from "./format-host.ts";
+import { loadProjectSections } from "./project-sections.ts";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import { resolveLayout } from "./layout-resolver.ts";
 import { mergeHead, renderHead } from "./head-merger.ts";
@@ -45,7 +46,6 @@ import {
   resolveRefValue,
   resolveStaticValue,
 } from "../shared.ts";
-import { loadContentConfig, loadContentTypes, resolveContentTypeRefs } from "./content-loader.ts";
 import { resolvePrototypes } from "./prototype-resolver.ts";
 import { transformImageNodes } from "./image-transform.ts";
 import { getImageCacheDir, loadCache, saveCache } from "./image-cache.ts";
@@ -62,7 +62,6 @@ import type {
   JxStyle,
   ProjectConfig,
 } from "@jxsuite/schema/types";
-import type { ContentLoaderEntry } from "@jxsuite/parser/types";
 import type { SiteRoute } from "../types.ts";
 import type { CacheManifest } from "./image-cache.js";
 
@@ -90,13 +89,24 @@ export async function buildSite(
   log("Loading project.json...");
   const { config: projectConfig } = loadProjectConfig(projectRoot);
 
+  // The legacy imports-based content model is gone (specs/extensions.md v2) — fail loudly with
+  // The migration path instead of silently ignoring the section.
+  if ("contentTypes" in projectConfig) {
+    throw new Error(
+      `project.json declares "contentTypes", which is no longer supported. ` +
+        `Run \`bun scripts/migrate-project-extensions.ts <project>\` to migrate to ` +
+        `"extensions" + "content", then \`jx schema\`.`,
+    );
+  }
+
   const outDir = resolve(projectRoot, projectConfig.build.outDir);
   const pagesDir = resolve(projectRoot, "pages");
   const publicDir = resolve(projectRoot, "public");
   const trailingSlash = projectConfig.build.trailingSlash ?? "always";
 
-  // ── 1b. Build the format registry from project imports ─────────────────
-  const formatRegistry = await buildProjectFormatRegistry(projectRoot, projectConfig);
+  // ── 1b. Build the extension registry from project.json#/extensions ─────
+  const registry = await buildProjectExtensionRegistry(projectRoot, projectConfig);
+  const formatRegistry = registry.formats;
   if (formatRegistry.entries.length > 0) {
     log(
       `  Registered ${formatRegistry.entries.length} format(s): ${formatRegistry.entries
@@ -120,20 +130,22 @@ export async function buildSite(
   const staticRoutes = await discoverPages(pagesDir, formatRegistry);
   log(`  Found ${staticRoutes.length} page(s)`);
 
-  // ── 3b. Load content types ─────────────────────────────────────────────
-  log("Loading content types...");
-  const contentTypes = await loadContentTypes(projectRoot, projectConfig, formatRegistry);
-  if (contentTypes.size > 0) {
-    log(`  Loaded ${contentTypes.size} content type(s): ${[...contentTypes.keys()].join(", ")}`);
-    // Resolve cross-content-type $ref references
-    const contentConfig = loadContentConfig(projectRoot, projectConfig);
-    if (contentConfig) {
-      resolveContentTypeRefs(contentTypes, contentConfig.config);
-    }
+  // ── 3b. Load extension-contributed project sections ────────────────────
+  log("Loading project sections...");
+  const sections = await loadProjectSections(projectRoot, projectConfig, registry);
+  const sectionKeys = Object.keys(sections);
+  if (sectionKeys.length > 0) {
+    log(`  Loaded ${sectionKeys.length} section(s): ${sectionKeys.join(", ")}`);
   }
 
   // ── 4. Expand dynamic routes ────────────────────────────────────────────
-  const routes = await expandDynamicRoutes(staticRoutes, projectRoot, contentTypes, formatRegistry);
+  const routes = await expandDynamicRoutes(
+    staticRoutes,
+    projectRoot,
+    sections,
+    registry,
+    projectConfig,
+  );
   log(`  ${routes.length} route(s) after expansion`);
 
   let fileCount = 0;
@@ -235,7 +247,7 @@ export async function buildSite(
         route as unknown as SiteRoute,
         projectConfig,
         projectRoot,
-        contentTypes,
+        sections,
         imageCache,
         componentDefs,
         imageMetaCache,
@@ -445,7 +457,7 @@ export async function buildSite(
  * @param {SiteRoute} route
  * @param {ProjectConfig} projectConfig
  * @param {string} projectRoot
- * @param {Map<string, ContentLoaderEntry[]>} [contentTypes]
+ * @param {Record<string, unknown>} [sections] - Extension-loaded project sections
  * @param {import("./image-cache.js").CacheManifest | null} [imageCache]
  * @param {Map<string, JxElement>} [componentDefs]
  * @param {ImageMetaCache | null} [imageMetaCache] - Set when images.service is "cloudflare"
@@ -460,7 +472,7 @@ async function compilePage(
   route: SiteRoute,
   projectConfig: ProjectConfig,
   projectRoot: string,
-  contentTypes = new Map<string, ContentLoaderEntry[]>(),
+  sections: Record<string, unknown> = {},
   imageCache: CacheManifest | null = null,
   componentDefs = new Map<string, JxElement>(),
   imageMetaCache: ImageMetaCache | null = null,
@@ -482,12 +494,12 @@ async function compilePage(
   delete layoutDoc._pageTitle;
 
   // Inject $site and $page context
-  injectContext(layoutDoc, projectConfig, route, contentTypes, projectRoot);
+  injectContext(layoutDoc, projectConfig, route, projectRoot);
 
   // Resolve generic $prototype entries via .class.json imports
   await resolvePrototypes(layoutDoc, route, projectRoot, {
     config: projectConfig,
-    contentTypes,
+    sections,
   });
 
   // Build scope from resolved state so template strings in title/$head can be evaluated

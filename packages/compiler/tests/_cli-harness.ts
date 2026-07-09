@@ -55,6 +55,51 @@ void mock.module("../src/compiler.ts", () => ({
   },
 }));
 
+export interface SchemaCommandResult {
+  projectSchemaPath: string;
+  documentSchemaPath: string;
+}
+
+let writeProjectSchemasImpl: (root: string) => Promise<SchemaCommandResult> = (root) =>
+  Promise.resolve({
+    documentSchemaPath: `${root}/document.schema.json`,
+    projectSchemaPath: `${root}/project.schema.json`,
+  });
+
+export const writeProjectSchemasCalls: string[] = [];
+
+export function setWriteProjectSchemas(impl: typeof writeProjectSchemasImpl) {
+  writeProjectSchemasImpl = impl;
+}
+
+void mock.module("../src/site/schema-command.ts", () => ({
+  writeProjectSchemas: (root: string) => {
+    writeProjectSchemasCalls.push(root);
+    return writeProjectSchemasImpl(root);
+  },
+}));
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: unknown[] | null;
+}
+
+let validateProjectFileImpl: (root: string) => Promise<ValidationResult> = () =>
+  Promise.resolve({ errors: null, valid: true });
+
+export const validateProjectFileCalls: string[] = [];
+
+export function setValidateProjectFile(impl: typeof validateProjectFileImpl) {
+  validateProjectFileImpl = impl;
+}
+
+void mock.module("@jxsuite/schema/validate-project", () => ({
+  validateProjectFile: (root: string) => {
+    validateProjectFileCalls.push(root);
+    return validateProjectFileImpl(root);
+  },
+}));
+
 const originalArgv = process.argv;
 
 /**

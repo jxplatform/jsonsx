@@ -602,7 +602,7 @@ describe("compile — markdown file input", () => {
     try {
       const { buildProjectFormatRegistry } = await import("../src/site/format-host");
       const formats = await buildProjectFormatRegistry(fixDir, {
-        imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
+        extensions: ["@jxsuite/parser"],
       });
       const { html } = await compile(filePath, { formats });
       expect(html).toContain("Hello World");

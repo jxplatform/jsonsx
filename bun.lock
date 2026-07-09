@@ -67,13 +67,13 @@
       },
       "dependencies": {
         "@apidevtools/json-schema-ref-parser": "^15.4.0",
-        "@jxsuite/parser": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
         "sharp": "^0.35.3",
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.10.6",
+        "@jxsuite/parser": "workspace:^",
         "@types/mdast": "^4.0.4",
       },
     },
@@ -202,12 +202,14 @@
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
         "@jxsuite/import": "workspace:^",
-        "@jxsuite/parser": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
         "@jxsuite/starters": "workspace:^",
         "chokidar": "^5.0.0",
         "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "@jxsuite/parser": "workspace:^",
       },
     },
     "packages/starters": {

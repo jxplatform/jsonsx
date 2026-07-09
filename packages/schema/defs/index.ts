@@ -73,8 +73,7 @@ export {
   studioHintsSchema,
 } from "./class-def.schema";
 
-// Content & project
-export { contentTypeDefSchema } from "./content-type-def.schema";
+// Project
 export { projectConfigSchema } from "./project-config.schema";
 
 // Extensions (specs/extensions.md)

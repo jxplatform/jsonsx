@@ -937,11 +937,11 @@ describe("components — markdown discovery", () => {
   const MD_DIR = join(FIXTURES, "md-components");
   mkdirSync(MD_DIR, { recursive: true });
 
-  // .md discovery requires the Markdown format class in the project imports map
+  // .md discovery requires a Markdown-providing extension in project.json "extensions"
   writeFileSync(
     join(MD_DIR, "project.json"),
     JSON.stringify({
-      imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
+      extensions: ["@jxsuite/parser"],
       name: "MD Components",
     }),
     "utf8",
@@ -1366,10 +1366,7 @@ describe("format endpoints", () => {
   writeFileSync(
     join(FMT_DIR, "project.json"),
     JSON.stringify({
-      imports: {
-        Csv: "@jxsuite/parser/Csv.class.json",
-        Markdown: "@jxsuite/parser/Markdown.class.json",
-      },
+      extensions: ["@jxsuite/parser"],
       name: "Format Project",
     }),
     "utf8",

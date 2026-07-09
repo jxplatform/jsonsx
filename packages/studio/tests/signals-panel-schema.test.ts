@@ -203,7 +203,36 @@ describe("schema enums", () => {
     expect(fieldEl<ValueEl>(container, "mode", "sp-picker").getAttribute("value")).toBe("auto");
   });
 
-  test("$ref #/$context/contentTypes resolves project content type keys", () => {
+  test("$ref #/$context/content resolves project content type keys", () => {
+    resetStudioState({
+      projectConfig: { content: { page: {}, post: {} } },
+    });
+    const container = mountSchema(
+      { properties: { type: { enum: { $ref: "#/$context/content" } } } },
+      {},
+    );
+    const values = [...container.querySelectorAll('[data-prop="type"] sp-menu-item')].map((el) =>
+      el.getAttribute("value"),
+    );
+    expect(values).toEqual(["__none__", "page", "post"]);
+  });
+
+  test("$ref #/$context/content with no content section yields empty choices, not a textfield", () => {
+    resetStudioState({ projectConfig: {} });
+    const container = mountSchema(
+      { properties: { type: { enum: { $ref: "#/$context/content" } } } },
+      {},
+    );
+    expect(container.querySelector('[data-prop="type"] sp-picker')).not.toBeNull();
+    const values = [...container.querySelectorAll('[data-prop="type"] sp-menu-item')].map((el) =>
+      el.getAttribute("value"),
+    );
+    expect(values).toEqual(["__none__"]);
+  });
+
+  // Legacy-form coverage: old class descriptors still ship `#/$context/contentTypes` refs against
+  // A contentTypes-keyed project config.
+  test("legacy $ref #/$context/contentTypes resolves a contentTypes-keyed config", () => {
     resetStudioState({
       projectConfig: { contentTypes: { page: {}, post: {} } },
     });
@@ -217,6 +246,7 @@ describe("schema enums", () => {
     expect(values).toEqual(["__none__", "page", "post"]);
   });
 
+  // Legacy-form coverage: the deprecated string sentinel keeps resolving the legacy key.
   test("legacy $contentTypes sentinel resolves the same keys", () => {
     resetStudioState({ projectConfig: { contentTypes: { doc: {} } } });
     const container = mountSchema({ properties: { type: { enum: "$contentTypes" } } }, {});
@@ -229,7 +259,7 @@ describe("schema enums", () => {
   test("dependent {@param} ref resolves properties of the selected content type", () => {
     resetStudioState({
       projectConfig: {
-        contentTypes: {
+        content: {
           post: { schema: { properties: { date: {}, title: {} } } },
         },
       },
@@ -237,7 +267,7 @@ describe("schema enums", () => {
     const container = mountSchema(
       {
         properties: {
-          field: { enum: { $ref: "#/$context/contentTypes/{@type}/schema/properties" } },
+          field: { enum: { $ref: "#/$context/content/{@type}/schema/properties" } },
         },
       },
       { type: "post" },
@@ -250,12 +280,12 @@ describe("schema enums", () => {
 
   test("dependent ref without a selected param falls back to a text field", () => {
     resetStudioState({
-      projectConfig: { contentTypes: { post: { schema: { properties: { title: {} } } } } },
+      projectConfig: { content: { post: { schema: { properties: { title: {} } } } } },
     });
     const container = mountSchema(
       {
         properties: {
-          field: { enum: { $ref: "#/$context/contentTypes/{@type}/schema/properties" } },
+          field: { enum: { $ref: "#/$context/content/{@type}/schema/properties" } },
         },
       },
       {},
@@ -487,7 +517,7 @@ describe("array-of-objects fields", () => {
   test("inline enum with dependent contentType ref resolves against the row's parent def", () => {
     resetStudioState({
       projectConfig: {
-        contentTypes: { post: { schema: { properties: { slug: {}, title: {} } } } },
+        content: { post: { schema: { properties: { slug: {}, title: {} } } } },
       },
     });
     const schema = {
@@ -495,7 +525,7 @@ describe("array-of-objects fields", () => {
         fields: {
           items: {
             properties: {
-              name: { enum: { $ref: "#/$context/contentTypes/{@type}/schema/properties" } },
+              name: { enum: { $ref: "#/$context/content/{@type}/schema/properties" } },
             },
             type: "object",
           },

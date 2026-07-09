@@ -34,7 +34,7 @@ const posts: ContentLoaderEntry[] = [
 ];
 
 function makeProject(entries: ContentLoaderEntry[] = posts) {
-  return { contentTypes: new Map([["posts", entries]]) };
+  return { content: new Map([["posts", entries]]) };
 }
 
 // ─── evaluateFilterRule ───────────────────────────────────────────────────────

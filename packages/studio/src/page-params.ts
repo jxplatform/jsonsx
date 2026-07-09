@@ -135,10 +135,15 @@ async function resolveParamValues(pathsDef: JxPathsDef): Promise<ParamValues> {
     return out;
   }
 
-  // Content type-based: { contentType: "blog", param: "slug", field: "id" } — resolved through the
-  // Backend's ContentCollection pipeline (the same one the canvas's ContentEntry uses), so every
-  // Offered value is guaranteed to resolve in preview.
-  if ("contentType" in pathsDef && pathsDef.contentType) {
+  // Content type-based: { contentType: "blog", param: "slug", field: "id" } — an open extension
+  // Discriminator member on JxPathsDef, so narrow to string. Resolved through the backend's
+  // ContentCollection pipeline (the same one the canvas's ContentEntry uses), so every offered
+  // Value is guaranteed to resolve in preview.
+  if (
+    "contentType" in pathsDef &&
+    typeof pathsDef.contentType === "string" &&
+    pathsDef.contentType
+  ) {
     const param = pathsDef.param ?? "slug";
     const field = pathsDef.field ?? "id";
     const entries = (await resolveContentCollection(pathsDef.contentType)) as {
@@ -165,8 +170,9 @@ async function resolveParamValues(pathsDef: JxPathsDef): Promise<ParamValues> {
     return out;
   }
 
-  // Data file ref: { "$ref": "./data/products.json", param: "id", field: "sku" }
-  if ("$ref" in pathsDef && pathsDef.$ref) {
+  // Data file ref: { "$ref": "./data/products.json", param: "id", field: "sku" } — `$ref` also
+  // Reaches here as an open discriminator key, so narrow to a non-empty string.
+  if ("$ref" in pathsDef && typeof pathsDef.$ref === "string" && pathsDef.$ref) {
     const param = pathsDef.param ?? "id";
     const field = pathsDef.field ?? "id";
     const content = await getPlatform().readFile(pathsDef.$ref.replace(/^\.\//, ""));

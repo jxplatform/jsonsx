@@ -560,7 +560,7 @@ describe("block action bar", () => {
     // The content type's frontmatter schema drives the item fields.
     resetStudioState({
       projectConfig: {
-        contentTypes: {
+        content: {
           docs: { schema: { properties: { title: { type: "string" } } } },
         },
       },

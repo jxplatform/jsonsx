@@ -1,15 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { discoverPages, expandDynamicRoutes } from "../src/site/pages-discovery";
-import { buildProjectFormatRegistry } from "../src/site/format-host";
+import { buildProjectExtensionRegistry } from "../src/site/format-host";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_pages");
 
-// Registry with the Markdown format registered — .md pages require explicit imports
-const mdRegistry = await buildProjectFormatRegistry(FIXTURES, {
-  imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
+// Registry with the parser extension enabled — .md pages require a format-providing extension
+const extRegistry = await buildProjectExtensionRegistry(FIXTURES, {
+  extensions: ["@jxsuite/parser"],
 });
+const mdRegistry = extRegistry.formats;
 
 function setup() {
   rmSync(FIXTURES, { force: true, recursive: true });
@@ -200,15 +201,17 @@ describe("expandDynamicRoutes", () => {
         tagName: "div",
       }),
     );
-    const contentTypes = new Map([
-      [
-        "blog",
+    const sections = {
+      content: new Map([
         [
-          { body: null, data: { slug: "hello-world", title: "Hello" }, id: "1" },
-          { body: null, data: { slug: "second-post", title: "Second" }, id: "2" },
+          "blog",
+          [
+            { body: null, data: { slug: "hello-world", title: "Hello" }, id: "1" },
+            { body: null, data: { slug: "second-post", title: "Second" }, id: "2" },
+          ],
         ],
-      ],
-    ]);
+      ]),
+    };
     const routes = [
       {
         $layout: null,
@@ -220,7 +223,7 @@ describe("expandDynamicRoutes", () => {
         urlPattern: "/blog/:slug",
       },
     ];
-    const result = await expandDynamicRoutes(routes, FIXTURES, contentTypes);
+    const result = await expandDynamicRoutes(routes, FIXTURES, sections, extRegistry);
     expect(result.length).toBe(2);
     expect(result[0]!.urlPattern).toBe("/blog/hello-world");
     expect(result[1]!.urlPattern).toBe("/blog/second-post");

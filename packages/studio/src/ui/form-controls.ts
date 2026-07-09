@@ -87,7 +87,7 @@ function schemaBuilderControl({ key, value, onChange, ctx, rerender }: SchemaFor
   };
 
   // Content types available as reference targets, resolved through the host context
-  const contentTypesValue = ctx.resolvePointer("#/$context/contentTypes");
+  const contentTypesValue = ctx.resolvePointer("#/$context/content");
   const contentTypeNames =
     contentTypesValue && typeof contentTypesValue === "object"
       ? Object.keys(contentTypesValue)
@@ -143,7 +143,7 @@ function schemaBuilderControl({ key, value, onChange, ctx, rerender }: SchemaFor
         if (!draft.properties?.[name]) {
           return;
         }
-        draft.properties[name] = { $ref: `#/contentTypes/${target}` };
+        draft.properties[name] = { $ref: `#/content/${target}` };
       }),
     onChangeType: (name, newType) =>
       update((draft) => {

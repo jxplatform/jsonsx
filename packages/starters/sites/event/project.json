@@ -1,4 +1,5 @@
 {
+  "$schema": "./project.schema.json",
   "name": "Horizon Conf 2026",
   "url": "https://example.com",
   "defaults": {
@@ -113,10 +114,6 @@
       "color": "var(--color-primary)"
     }
   },
-  "imports": {
-    "Markdown": "@jxsuite/parser/Markdown.class.json",
-    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json"
-  },
   "images": {
     "optimize": true,
     "widths": [320, 640, 960, 1280, 1920],
@@ -130,7 +127,7 @@
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
   },
-  "contentTypes": {
+  "content": {
     "sessions": {
       "source": "./content/sessions/",
       "format": "Markdown",
@@ -161,5 +158,6 @@
     "outDir": "./dist",
     "format": "directory",
     "trailingSlash": "always"
-  }
+  },
+  "extensions": ["@jxsuite/parser"]
 }

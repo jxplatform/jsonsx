@@ -14,7 +14,8 @@ interface CollectionConfig {
   sort?: unknown;
   limit?: number;
   _project?: {
-    contentTypes?: Map<string, ContentLoaderEntry[]>;
+    /** The loaded `content` section (Content.projectData result) under its section key. */
+    content?: Map<string, ContentLoaderEntry[]>;
     [k: string]: unknown;
   };
   [k: string]: unknown;
@@ -25,7 +26,8 @@ interface EntryConfig {
   id?: unknown;
   field?: string;
   _project?: {
-    contentTypes?: Map<string, ContentLoaderEntry[]>;
+    /** The loaded `content` section (Content.projectData result) under its section key. */
+    content?: Map<string, ContentLoaderEntry[]>;
     [k: string]: unknown;
   };
   _document?: {
@@ -178,7 +180,7 @@ export class ContentCollection {
 
   resolve() {
     const { contentType, filter, sort, limit, _project } = this.config;
-    const entries = _project?.contentTypes?.get(contentType ?? "");
+    const entries = _project?.content?.get(contentType ?? "");
     if (!entries) {
       return [];
     }
@@ -205,7 +207,7 @@ export class ContentEntry {
 
   resolve() {
     const { contentType, id, field, _project, _document } = this.config;
-    const entries = _project?.contentTypes?.get(contentType ?? "");
+    const entries = _project?.content?.get(contentType ?? "");
     if (!entries) {
       return null;
     }

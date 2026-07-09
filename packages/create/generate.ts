@@ -352,13 +352,19 @@ function buildProjectJson({ name, description, url, adapter, template = "blank" 
   }
 
   return {
+    // The generated per-project schema binding; written by `jx schema` (specs/extensions.md §5.2).
+    $schema: "./project.schema.json",
     $head,
     $media: mediaForTemplate(template),
     build,
+    // The scaffolded pages/index.md needs the parser extension's Markdown format; `content` is the
+    // Parser-owned section ready for the first collection.
+    content: {},
     defaults: {
       lang: "en",
       layout: "./layouts/base.json",
     },
+    extensions: ["@jxsuite/parser"],
     name,
     style: {
       color: "#1a1a1a",
@@ -386,7 +392,11 @@ function buildPackageJson({
     .replaceAll(/[^a-z0-9]+/g, "-")
     .replaceAll(/^-|-$/g, "");
 
-  const dependencies: Record<string, string> = {};
+  // Projects own their extension dependencies (specs/extensions.md §3) — the parser extension is
+  // A runtime dependency, resolved project-first by every host.
+  const dependencies: Record<string, string> = {
+    "@jxsuite/parser": "^0.35.1",
+  };
   const devDependencies: Record<string, string> = {
     "@jxsuite/compiler": "^0.19.0",
     "@jxsuite/runtime": "^0.19.0",

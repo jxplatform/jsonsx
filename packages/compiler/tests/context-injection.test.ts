@@ -171,7 +171,7 @@ describe("injectContext", () => {
       sourcePath: "/project/pages/blog/post.json",
       urlPattern: "/blog/post",
     };
-    injectContext(doc, project, route, new Map(), "/project");
+    injectContext(doc, project, route, "/project");
     expect(doc.imports.Utils).toContain("utils.class.json");
     expect(doc.imports.Utils).toMatch(/^\.\//);
   });
@@ -200,11 +200,11 @@ describe("injectContext", () => {
         },
       },
     };
-    const contentTypes = new Map([["posts", [{ data: {}, id: "x" }]]]) as any;
-    injectContext(doc, baseProject, baseRoute, contentTypes);
+    const sections = { content: new Map([["posts", [{ data: {}, id: "x" }]]]) } as any;
+    injectContext(doc, baseProject, baseRoute);
     await resolvePrototypes(doc, baseRoute, import.meta.dir, {
       config: baseProject,
-      contentTypes,
+      sections,
     });
     expect(doc.state.post).toBeNull();
   });

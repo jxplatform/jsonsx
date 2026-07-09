@@ -21,13 +21,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FormatEntry, FormatHostIO, FormatRegistry } from "@jxsuite/schema/format-registry";
-import type {
-  ContentTypeDef,
-  ContentTypeSchema,
-  JxMutableNode,
-  ProjectConfig,
-} from "@jxsuite/schema/types";
-import type { ContentLoaderEntry } from "./types.ts";
+import type { ContentTypeSchema, JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
+import type { ContentLoaderEntry, ContentTypeDef } from "./types.ts";
 
 export type { ContentEntry, ContentLoaderEntry, TocEntry } from "./types.ts";
 

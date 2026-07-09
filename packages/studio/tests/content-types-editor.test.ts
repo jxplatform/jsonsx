@@ -12,13 +12,13 @@ import type { MockPlatformState } from "./harness";
 
 type AnyConfig = Record<string, any>;
 
-function setup(contentTypes: AnyConfig | null): {
+function setup(content: AnyConfig | null): {
   container: HTMLElement;
   state: MockPlatformState;
 } {
   const { state } = installMockPlatform();
   resetStudioState({
-    projectConfig: contentTypes === null ? null : ({ contentTypes } as unknown),
+    projectConfig: content === null ? null : ({ content } as unknown),
   });
   const container = document.createElement("div");
   renderContentTypesEditor(container);
@@ -81,7 +81,7 @@ function postsConfig(): AnyConfig {
             required: ["author"],
             type: "object",
           },
-          related: { $ref: "#/contentTypes/pages" },
+          related: { $ref: "#/content/pages" },
           tags: { items: { format: "image", type: "string" }, type: "array" },
           title: { type: "string" },
         },
@@ -142,7 +142,7 @@ describe("new content type flow", () => {
     setAndFire(input, "My Blog Posts!", "input");
     key(input, "Enter");
 
-    expect(config().contentTypes["my-blog-posts"]).toEqual({
+    expect(config().content["my-blog-posts"]).toEqual({
       schema: { properties: {}, required: [], type: "object" },
       source: "./content/my-blog-posts/",
     });
@@ -151,9 +151,7 @@ describe("new content type flow", () => {
     );
     await flush();
     expect(state.files.has("project.json")).toBe(true);
-    expect(
-      JSON.parse(state.files.get("project.json")!).contentTypes["my-blog-posts"],
-    ).toBeDefined();
+    expect(JSON.parse(state.files.get("project.json")!).content["my-blog-posts"]).toBeDefined();
     expect(state.files.get("content/my-blog-posts/.gitkeep")).toBe("");
   });
 
@@ -162,7 +160,7 @@ describe("new content type flow", () => {
     pointer(buttonByText(container, "New Content Type"), "click");
     setAndFire(container.querySelector(".settings-inline-form sp-textfield")!, "Recipes", "input");
     pointer(buttonByText(container, "Create"), "click");
-    expect(config().contentTypes.recipes).toBeDefined();
+    expect(config().content.recipes).toBeDefined();
     await flush();
     expect(state.files.has("content/recipes/.gitkeep")).toBe(true);
   });
@@ -173,7 +171,7 @@ describe("new content type flow", () => {
     const input = container.querySelector(".settings-inline-form sp-textfield")!;
     setAndFire(input, "$$$", "input");
     key(input, "Enter");
-    expect(Object.keys(config().contentTypes)).toEqual([]);
+    expect(Object.keys(config().content)).toEqual([]);
     await flush();
     expect(state.files.size).toBe(0);
     key(input, "Escape"); // Reset module state
@@ -187,7 +185,7 @@ describe("new content type flow", () => {
     const input = container.querySelector(".settings-inline-form sp-textfield")!;
     setAndFire(input, "Posts", "input");
     key(input, "Enter");
-    expect(config().contentTypes.posts.schema.properties.title).toEqual({ type: "string" });
+    expect(config().content.posts.schema.properties.title).toEqual({ type: "string" });
     await flush();
     expect(state.files.size).toBe(0);
     key(input, "Escape");
@@ -210,7 +208,7 @@ describe("new content type flow", () => {
     key(input, "Escape");
   });
 
-  test("creates contentTypes map when config lacks one", () => {
+  test("creates content map when config lacks one", () => {
     installMockPlatform();
     resetStudioState({ projectConfig: {} as unknown });
     const container = document.createElement("div");
@@ -219,7 +217,7 @@ describe("new content type flow", () => {
     const input = container.querySelector(".settings-inline-form sp-textfield")!;
     setAndFire(input, "fresh", "input");
     key(input, "Enter");
-    expect(config().contentTypes.fresh).toBeDefined();
+    expect(config().content.fresh).toBeDefined();
   });
 });
 
@@ -238,7 +236,7 @@ describe("add field flow", () => {
     setAndFire(container.querySelectorAll(".schema-add-field sp-picker")[1]!, "image");
     pointer(buttonByText(container, "Add"), "click");
 
-    const { schema } = config().contentTypes.posts;
+    const { schema } = config().content.posts;
     expect(schema.properties.heroImage).toEqual({ format: "image", type: "string" });
     expect(schema.required).toContain("heroImage");
     expect(container.querySelector(".schema-add-field")).toBeNull();
@@ -254,7 +252,7 @@ describe("add field flow", () => {
     setAndFire(container.querySelectorAll(".schema-add-field sp-picker")[0]!, "object");
     expect(container.querySelectorAll(".schema-add-field sp-picker").length).toBe(1);
     key(container.querySelector(".schema-add-field sp-textfield")!, "Enter");
-    expect(config().contentTypes.posts.schema.properties.extras).toEqual({
+    expect(config().content.posts.schema.properties.extras).toEqual({
       properties: {},
       required: [],
       type: "object",
@@ -271,7 +269,7 @@ describe("add field flow", () => {
     setAndFire(container.querySelector(".schema-add-field sp-textfield")!, "draft", "input");
     pointer(buttonByText(container, "Cancel"), "click");
     expect(container.querySelector(".schema-add-field")).toBeNull();
-    expect(config().contentTypes.posts.schema.properties.draft).toBeUndefined();
+    expect(config().content.posts.schema.properties.draft).toBeUndefined();
 
     // Reopening shows a reset form
     pointer(buttonByText(container, "Add Field"), "click");
@@ -300,8 +298,8 @@ describe("add field flow", () => {
     sw.checked = true;
     sw.dispatchEvent(new Event("change", { bubbles: true }));
     key(container.querySelector(".schema-add-field sp-textfield")!, "Enter");
-    expect(config().contentTypes.slim.schema.properties.title).toEqual({ type: "string" });
-    expect(config().contentTypes.slim.schema.required).toEqual(["title"]);
+    expect(config().content.slim.schema.properties.title).toEqual({ type: "string" });
+    expect(config().content.slim.schema.required).toEqual(["title"]);
   });
 });
 
@@ -310,7 +308,7 @@ describe("field mutations", () => {
     const { container, state } = setup(postsConfig());
     selectType(container, "posts");
     pointer(fieldCard(container, "title").querySelector('[title="Delete field"]')!, "click");
-    const { schema } = config().contentTypes.posts;
+    const { schema } = config().content.posts;
     expect(schema.properties.title).toBeUndefined();
     expect(schema.required).not.toContain("title");
     expect(() => fieldCard(container, "title")).toThrow();
@@ -326,9 +324,9 @@ describe("field mutations", () => {
         .querySelector("sp-switch")!
         .dispatchEvent(new Event("change", { bubbles: true }));
     fire();
-    expect(config().contentTypes.posts.schema.required).toContain("cover");
+    expect(config().content.posts.schema.required).toContain("cover");
     fire();
-    expect(config().contentTypes.posts.schema.required).not.toContain("cover");
+    expect(config().content.posts.schema.required).not.toContain("cover");
   });
 
   test("toggle required initializes a missing required array", () => {
@@ -339,18 +337,18 @@ describe("field mutations", () => {
     fieldCard(container, "a")
       .querySelector("sp-switch")!
       .dispatchEvent(new Event("change", { bubbles: true }));
-    expect(config().contentTypes.slim.schema.required).toEqual(["a"]);
+    expect(config().content.slim.schema.required).toEqual(["a"]);
   });
 
   test("rename camelCases the new name, remaps required, and preserves order", () => {
     const { container } = setup(postsConfig());
     selectType(container, "posts");
-    const before = Object.keys(config().contentTypes.posts.schema.properties);
+    const before = Object.keys(config().content.posts.schema.properties);
     setAndFire(
       fieldCard(container, "title").querySelector(".schema-field-name-input")!,
       "post title",
     );
-    const { schema } = config().contentTypes.posts;
+    const { schema } = config().content.posts;
     expect(schema.properties.postTitle).toEqual({ type: "string" });
     expect(schema.properties.title).toBeUndefined();
     expect(schema.required).toContain("postTitle");
@@ -363,7 +361,7 @@ describe("field mutations", () => {
     const { container } = setup(postsConfig());
     selectType(container, "posts");
     setAndFire(fieldCard(container, "title").querySelector(".schema-field-name-input")!, "cover");
-    const { schema } = config().contentTypes.posts;
+    const { schema } = config().content.posts;
     expect(schema.properties.title).toEqual({ type: "string" });
     expect(schema.properties.cover).toEqual({ format: "image", type: "string" });
   });
@@ -372,7 +370,7 @@ describe("field mutations", () => {
     const { container } = setup(postsConfig());
     selectType(container, "posts");
     setAndFire(fieldCard(container, "cover").querySelectorAll("sp-picker")[0]!, "array");
-    expect(config().contentTypes.posts.schema.properties.cover).toEqual({
+    expect(config().content.posts.schema.properties.cover).toEqual({
       items: { format: "image", type: "string" },
       type: "array",
     });
@@ -382,20 +380,20 @@ describe("field mutations", () => {
     const { container } = setup(postsConfig());
     selectType(container, "posts");
     setAndFire(fieldCard(container, "cover").querySelectorAll("sp-picker")[0]!, "number");
-    expect(config().contentTypes.posts.schema.properties.cover).toEqual({ type: "number" });
+    expect(config().content.posts.schema.properties.cover).toEqual({ type: "number" });
   });
 
   test("change format keeps the field type", () => {
     const { container } = setup(postsConfig());
     selectType(container, "posts");
     setAndFire(fieldCard(container, "title").querySelectorAll("sp-picker")[1]!, "date");
-    expect(config().contentTypes.posts.schema.properties.title).toEqual({
+    expect(config().content.posts.schema.properties.title).toEqual({
       format: "date",
       type: "string",
     });
     // Array field: format lands on items
     setAndFire(fieldCard(container, "tags").querySelectorAll("sp-picker")[1]!, "color");
-    expect(config().contentTypes.posts.schema.properties.tags).toEqual({
+    expect(config().content.posts.schema.properties.tags).toEqual({
       items: { format: "color", type: "string" },
       type: "array",
     });
@@ -409,8 +407,8 @@ describe("field mutations", () => {
     )!;
     expect(refPicker.getAttribute("value")).toBe("pages");
     setAndFire(refPicker, "posts");
-    expect(config().contentTypes.posts.schema.properties.related).toEqual({
-      $ref: "#/contentTypes/posts",
+    expect(config().content.posts.schema.properties.related).toEqual({
+      $ref: "#/content/posts",
     });
   });
 });
@@ -431,7 +429,7 @@ describe("nested field mutations", () => {
     return card as HTMLElement;
   }
   function metaSchema() {
-    return config().contentTypes.posts.schema.properties.meta;
+    return config().content.posts.schema.properties.meta;
   }
 
   test("add nested field via Enter (with picked type) and via button", async () => {
@@ -592,7 +590,7 @@ describe("stale DOM guards", () => {
 
     expect(() => {
       // Parent object removed → nested handlers bail
-      delete config().contentTypes.posts.schema.properties.meta;
+      delete config().content.posts.schema.properties.meta;
       pointer(author.querySelector('[title="Delete field"]')!, "click");
       author.querySelector("sp-switch")!.dispatchEvent(change());
       setAndFire(author.querySelectorAll("sp-picker")[0]!, "number");
@@ -602,14 +600,14 @@ describe("stale DOM guards", () => {
       key(input, "Enter");
 
       // Properties map removed → top-level handlers bail
-      delete config().contentTypes.posts.schema.properties;
+      delete config().content.posts.schema.properties;
       pointer(title.querySelector('[title="Delete field"]')!, "click");
       setAndFire(title.querySelectorAll("sp-picker")[0]!, "number");
       setAndFire(title.querySelectorAll("sp-picker")[1]!, "date");
       setAndFire(related.querySelector(".schema-field-ref-target sp-picker")!, "posts");
 
       // Schema removed entirely → toggle-required bails
-      delete config().contentTypes.posts.schema;
+      delete config().content.posts.schema;
       title.querySelector("sp-switch")!.dispatchEvent(change());
     }).not.toThrow();
 
@@ -627,18 +625,18 @@ describe("delete content type", () => {
       container.querySelector('.settings-editor-header [title="Delete content type"]')!,
       "click",
     );
-    expect(config().contentTypes.posts).toBeUndefined();
-    expect(config().contentTypes.pages).toBeDefined();
+    expect(config().content.posts).toBeUndefined();
+    expect(config().content.pages).toBeDefined();
     expect(container.querySelector(".settings-empty-state")).not.toBeNull();
     await flush();
-    expect(JSON.parse(state.files.get("project.json")!).contentTypes.posts).toBeUndefined();
+    expect(JSON.parse(state.files.get("project.json")!).content.posts).toBeUndefined();
   });
 
   test("selected type missing from config shows empty state without crashing", () => {
     const { container } = setup(postsConfig());
     selectType(container, "posts");
     // Re-render against a config that no longer contains the selected type
-    resetStudioState({ projectConfig: { contentTypes: {} } as unknown });
+    resetStudioState({ projectConfig: { content: {} } as unknown });
     const fresh = document.createElement("div");
     expect(() => renderContentTypesEditor(fresh)).not.toThrow();
     expect(fresh.querySelector(".settings-empty-state")).not.toBeNull();
@@ -647,6 +645,6 @@ describe("delete content type", () => {
       container.querySelector('.settings-editor-header [title="Delete content type"]')!,
       "click",
     );
-    expect(config().contentTypes).toEqual({});
+    expect(config().content).toEqual({});
   });
 });

@@ -55,7 +55,7 @@ function setAndFire(el: Element, value: string, type = "change") {
 
 describe("detectFieldType", () => {
   test("returns reference for $ref schemas", () => {
-    expect(detectFieldType({ $ref: "#/contentTypes/posts" })).toBe("reference");
+    expect(detectFieldType({ $ref: "#/content/posts" })).toBe("reference");
   });
 
   test("returns explicit type", () => {
@@ -115,7 +115,7 @@ describe("schemaForType", () => {
   });
 
   test("reference produces empty $ref target", () => {
-    expect(schemaForType("reference")).toEqual({ $ref: "#/contentTypes/" });
+    expect(schemaForType("reference")).toEqual({ $ref: "#/content/" });
   });
 
   test("string default with and without format", () => {
@@ -261,7 +261,7 @@ describe("fieldCardTpl rename interactions", () => {
 // ─── fieldCardTpl — reference target ─────────────────────────────────────────
 
 describe("fieldCardTpl reference fields", () => {
-  const refSchema: SchemaProperty = { $ref: "#/contentTypes/posts" };
+  const refSchema: SchemaProperty = { $ref: "#/content/posts" };
 
   test("shows target picker with current ref target and available types", async () => {
     const { calls, handlers } = makeHandlers();
@@ -274,6 +274,18 @@ describe("fieldCardTpl reference fields", () => {
     expect(items.map((i) => i.getAttribute("value"))).toEqual(["posts", "pages"]);
     setAndFire(refPicker, "pages");
     expect(calls).toContainEqual(["onChangeRefTarget", "related", "pages"]);
+  });
+
+  test("legacy #/contentTypes/ refs still yield their target (generic section-prefix strip)", async () => {
+    const { handlers } = makeHandlers();
+    const container = await renderInto(
+      fieldCardTpl("related", { $ref: "#/contentTypes/posts" }, false, handlers, [
+        "posts",
+        "pages",
+      ]),
+    );
+    const refPicker = container.querySelector(".schema-field-ref-target sp-picker")!;
+    expect(refPicker.getAttribute("value")).toBe("posts");
   });
 
   test("no format picker for references; target picker hidden when no content types", async () => {

@@ -28,7 +28,7 @@ const inertCtx: SchemaFormContext = {
 };
 
 const contentTypesCtx: SchemaFormContext = {
-  resolvePointer: (ptr) => (ptr === "#/$context/contentTypes" ? { page: {}, post: {} } : undefined),
+  resolvePointer: (ptr) => (ptr === "#/$context/content" ? { page: {}, post: {} } : undefined),
 };
 
 interface BuilderMount {
@@ -230,7 +230,7 @@ describe("schema-builder field operations", () => {
   test("reference fields pick targets from the context's content types", () => {
     const m = mountBuilder(initial(), contentTypesCtx);
     commitValue(pickerIn(card(m.container, "summary"), "Type"), "reference");
-    expect(schemaOf(m).properties.summary).toEqual({ $ref: "#/contentTypes/" });
+    expect(schemaOf(m).properties.summary).toEqual({ $ref: "#/content/" });
 
     const targetPicker = pickerIn(card(m.container, "summary"), "Target");
     const options = [...targetPicker.querySelectorAll("sp-menu-item")].map((el) =>
@@ -238,7 +238,7 @@ describe("schema-builder field operations", () => {
     );
     expect(options).toEqual(["page", "post"]);
     commitValue(targetPicker, "post");
-    expect(schemaOf(m).properties.summary).toEqual({ $ref: "#/contentTypes/post" });
+    expect(schemaOf(m).properties.summary).toEqual({ $ref: "#/content/post" });
   });
 
   test("nested fields support add, rename, type, format, required, and delete", () => {

@@ -1,4 +1,5 @@
 {
+  "$schema": "./project.schema.json",
   "name": "Jx Examples",
   "url": "https://examples.jxsuite.dev",
   "defaults": {
@@ -8,26 +9,30 @@
   "$head": [
     {
       "tagName": "meta",
-      "attributes": { "name": "generator", "content": "Jx" }
+      "attributes": {
+        "name": "generator",
+        "content": "Jx"
+      }
     }
   ],
   "style": {
     "fontFamily": "system-ui, sans-serif",
     "margin": "0"
   },
-  "imports": {
-    "Markdown": "@jxsuite/parser/Markdown.class.json",
-    "Csv": "@jxsuite/parser/Csv.class.json"
-  },
-  "contentTypes": {
+  "content": {
     "posts": {
       "source": "./content/posts/",
       "format": "Markdown",
       "schema": {
         "type": "object",
         "properties": {
-          "title": { "type": "string" },
-          "date": { "type": "string", "format": "date" }
+          "title": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
         },
         "required": ["title", "date"]
       }
@@ -35,5 +40,6 @@
   },
   "build": {
     "outDir": "./dist"
-  }
+  },
+  "extensions": ["@jxsuite/parser"]
 }

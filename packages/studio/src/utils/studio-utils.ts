@@ -5,7 +5,8 @@
  */
 
 import { defaultContentFormat, formatByName } from "../format/format-host";
-import type { ContentTypeDef, ProjectConfig } from "@jxsuite/schema/types";
+import type { ContentTypeDef } from "@jxsuite/parser/types";
+import type { ProjectConfig } from "@jxsuite/schema/types";
 
 /**
  * CamelCase → kebab-case for inline style attributes
@@ -165,14 +166,14 @@ export function findContentTypeSchema(
   documentPath: string | null,
   projectConfig: ProjectConfig | null | undefined,
 ) {
-  if (!documentPath || !projectConfig?.contentTypes) {
+  if (!documentPath || !projectConfig?.content) {
     return null;
   }
   // Content-type `source` prefixes are always forward-slash. The desktop platform can hand us
   // OS-native backslash paths on Windows, so normalize before prefix matching.
   const docPath = documentPath.replaceAll("\\", "/");
   for (const [name, def] of Object.entries(
-    projectConfig.contentTypes as Record<string, ContentTypeDef>,
+    projectConfig.content as Record<string, ContentTypeDef>,
   )) {
     if (!def.source || !def.schema) {
       continue;

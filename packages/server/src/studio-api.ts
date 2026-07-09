@@ -11,7 +11,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 
 import { errorMessage } from "@jxsuite/schema/parse";
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
+import { buildProjectExtensionRegistry } from "@jxsuite/compiler/format-host";
 import { applyRename } from "./refactor/apply.ts";
 import {
   bunExecutable,
@@ -118,8 +118,9 @@ function collectSlotDefs(node: unknown, out: SlotDef[] = []): SlotDef[] {
 const formatRegistryCache = new Map<string, { mtime: number; registry: FormatRegistry }>();
 
 /**
- * Build (or reuse) the format registry for a project root from its project.json imports map. An
- * empty registry is returned when there is no project.json — only .json files are handled then.
+ * Build (or reuse) the format-dispatch view of a project's extension registry (built from its
+ * project.json `extensions` array). An empty registry is returned when there is no project.json —
+ * only .json files are handled then.
  *
  * @param {string} projectRoot
  * @returns {Promise<FormatRegistry>}
@@ -138,7 +139,8 @@ async function getFormatRegistry(projectRoot: string): Promise<FormatRegistry> {
   if (cached && cached.mtime === mtime) {
     return cached.registry;
   }
-  const registry = await buildProjectFormatRegistry(projectRoot, projectConfig);
+  const extensionRegistry = await buildProjectExtensionRegistry(projectRoot, projectConfig);
+  const registry = extensionRegistry.formats;
   formatRegistryCache.set(projectRoot, { mtime, registry });
   return registry;
 }

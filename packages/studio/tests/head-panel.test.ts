@@ -506,7 +506,7 @@ function setupContentTab(
   installMockPlatform();
   resetStudioState({
     projectConfig: withSchema
-      ? { contentTypes: { posts: { format: "json", schema: FM_SCHEMA, source: "./posts" } } }
+      ? { content: { posts: { format: "json", schema: FM_SCHEMA, source: "./posts" } } }
       : {},
   });
   closeAllTabs();
