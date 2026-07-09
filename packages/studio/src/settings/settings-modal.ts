@@ -10,7 +10,6 @@ import { html } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ref } from "lit-html/directives/ref.js";
 import { renderDefsEditor } from "./defs-editor";
-import { renderContentTypesEditor } from "./content-types-editor";
 import { renderCssVarsEditor } from "./css-vars-editor";
 import { renderHeadEditor } from "./head-editor";
 import { renderGeneralSettings } from "./general-settings";
@@ -40,6 +39,19 @@ const sectionRegistry = new Map<string, SettingsSection>();
  */
 export function registerSettingsSection(section: SettingsSection): void {
   sectionRegistry.set(section.key, section);
+}
+
+/**
+ * Remove a registered section — used when a descriptor-contributed section's extension is disabled
+ * (see ./extension-sections). Built-ins are never unregistered.
+ *
+ * @param {string} key
+ */
+export function unregisterSettingsSection(key: string): void {
+  sectionRegistry.delete(key);
+  if (_activeSection === key) {
+    _activeSection = "general";
+  }
 }
 
 /** Registered sections sorted by order (registration order breaks ties). */
@@ -76,13 +88,8 @@ registerSettingsSection({
   order: 40,
   render: renderDefsEditor,
 });
-registerSettingsSection({
-  icon: "sp-icon-view-grid",
-  key: "contentTypes",
-  label: "Content Types",
-  order: 50,
-  render: renderContentTypesEditor,
-});
+// Content Types is no longer a built-in: @jxsuite/parser contributes it (order 50) through its
+// Content class descriptor's $studio.settings block, registered via ./extension-sections.
 registerSettingsSection({
   icon: "sp-icon-box",
   key: "dependencies",
@@ -105,6 +112,19 @@ export function openSettingsModal() {
   }
   _activeSection = "general";
   renderModal();
+  // Refresh descriptor-contributed sections (cached payloads make this cheap) and rerender the
+  // Nav once they land. Lazy import breaks the settings-modal ↔ extension-sections module cycle.
+  void import("./extension-sections")
+    .then(async ({ syncExtensionSettingsSections }) => {
+      await syncExtensionSettingsSections();
+      if (_handle) {
+        renderModal();
+        renderActiveSection();
+      }
+    })
+    .catch(() => {
+      // Contributed sections are optional — the built-ins render regardless.
+    });
 }
 
 export function closeSettingsModal() {

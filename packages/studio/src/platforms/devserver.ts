@@ -13,9 +13,11 @@ import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
   DirEntry,
+  ExtensionsInfo,
   FsEvent,
   ImportProgressEvent,
   ImportSiteOptions,
+  ProjectSchemasResponse,
   RenameResult,
   StarterInfo,
 } from "../types";
@@ -611,6 +613,27 @@ export function createDevServerPlatform() {
       }
       const body = await readJson<{ formats?: unknown[] }>(res);
       return body.formats ?? [];
+    },
+
+    /** The extensions payload riding beside `formats` on the same route. */
+    async listExtensions(): Promise<ExtensionsInfo[]> {
+      const res = await fetch(`/__studio/formats?dir=${encodeURIComponent(serverPath("."))}`);
+      if (!res.ok) {
+        return [];
+      }
+      const body = await readJson<{ extensions?: ExtensionsInfo[] }>(res);
+      return body.extensions ?? [];
+    },
+
+    /** Pre-bundled per-project entry schemas for Monaco registration (empty when unavailable). */
+    async fetchProjectSchemas(): Promise<ProjectSchemasResponse> {
+      const res = await fetch(
+        `/__studio/project-schemas?dir=${encodeURIComponent(serverPath("."))}`,
+      );
+      if (!res.ok) {
+        return {};
+      }
+      return await readJson<ProjectSchemasResponse>(res);
     },
 
     /**

@@ -66,6 +66,170 @@ export function emitProjectSchema(inputs: ProjectSchemaInputs): Record<string, u
   };
 }
 
+// ─── Generic bundler (specs/extensions.md §5.4) ──────────────────────────────
+
+/** Injected JSON loader for {@link bundleSchema} — receives a normalized, slash-separated path. */
+export type SchemaJsonLoader = (path: string) => Promise<Record<string, unknown>>;
+
+/**
+ * Bundle an entry document into a single self-contained compound schema for hosts that cannot fetch
+ * files (editor schema registration, cloud studio). Every relative-path `$ref` target is loaded
+ * through the injected loader and embedded under the entry's `$defs`, keyed by its `$id` (or a
+ * generated `urn:jx:bundled:*` one when the file declares none); the referencing `$ref`s are
+ * rewritten to those canonical URIs. Resource boundaries are preserved: embedded resources keep
+ * their `$id`s, refs inside an embedded absolute-`$id` resource are canonical and stay untouched,
+ * and a resource whose `$id` is already present in the compound document is not embedded twice.
+ *
+ * @param {Record<string, unknown>} entry - The entry document (e.g. a parsed project.schema.json)
+ * @param {SchemaJsonLoader} loadJson - Loader for `$ref` target files (host-restricted)
+ * @param {string} baseDir - Directory the entry document's relative refs resolve against
+ * @returns {Promise<Record<string, unknown>>} A new, self-contained schema (the input is not
+ *   mutated)
+ */
+export async function bundleSchema(
+  entry: Record<string, unknown>,
+  loadJson: SchemaJsonLoader,
+  baseDir: string,
+): Promise<Record<string, unknown>> {
+  const bundled = structuredClone(entry);
+  const embeddedByPath = new Map<string, string>();
+  const embeddedIds = new Set<string>();
+  collectResourceIds(bundled, embeddedIds);
+  let generatedCount = 0;
+
+  /** Ordered queue of embeds so $defs insertion happens after the entry walk (stable output). */
+  const embed = async (path: string): Promise<string> => {
+    const normalized = normalizeSchemaPath(path);
+    const prior = embeddedByPath.get(normalized);
+    if (prior !== undefined) {
+      return prior;
+    }
+    let resource: Record<string, unknown>;
+    try {
+      resource = structuredClone(await loadJson(normalized));
+    } catch (error) {
+      throw new Error(
+        `bundleSchema: cannot load $ref target "${normalized}": ${errorText(error)}`,
+        { cause: error },
+      );
+    }
+    const ownId =
+      typeof resource.$id === "string" && hasUriScheme(resource.$id) ? resource.$id : null;
+    generatedCount += ownId === null ? 1 : 0;
+    const id = ownId ?? `urn:jx:bundled:${generatedCount}`;
+    embeddedByPath.set(normalized, id);
+    if (embeddedIds.has(id)) {
+      // The canonical resource is already part of the compound document — refs land on it.
+      return id;
+    }
+    embeddedIds.add(id);
+    resource.$id = id;
+    await rewrite(resource, schemaDirOf(normalized), true);
+    const defs = (bundled.$defs ??= {}) as Record<string, unknown>;
+    defs[id] = resource;
+    return id;
+  };
+
+  /**
+   * Walk a (sub)schema rewriting relative-path `$ref`s. `fileDir` is the directory relative refs
+   * resolve against, or null inside an embedded absolute-`$id` resource (canonical scope).
+   */
+  const rewrite = async (node: unknown, fileDir: string | null, isRoot = false): Promise<void> => {
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        await rewrite(item, fileDir);
+      }
+      return;
+    }
+    if (node === null || typeof node !== "object") {
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    let scope = fileDir;
+    if (!isRoot && typeof obj.$id === "string" && hasUriScheme(obj.$id)) {
+      // Entering an embedded resource with a canonical $id: refs inside resolve against that
+      // $id (never the file location), so there is nothing to inline.
+      scope = null;
+    }
+    const ref = obj.$ref;
+    if (typeof ref === "string" && scope !== null && !ref.startsWith("#") && !hasUriScheme(ref)) {
+      const hashIndex = ref.indexOf("#");
+      const target = hashIndex === -1 ? ref : ref.slice(0, hashIndex);
+      const fragment = hashIndex === -1 ? "" : ref.slice(hashIndex);
+      if (target) {
+        const id = await embed(`${scope}/${target}`);
+        obj.$ref = `${id}${fragment}`;
+      }
+    }
+    for (const value of Object.values(obj)) {
+      await rewrite(value, scope);
+    }
+  };
+
+  await rewrite(bundled, normalizeSchemaPath(baseDir), true);
+  return bundled;
+}
+
+/** Collect every absolute `$id` already present in a document (embeds like the field union). */
+function collectResourceIds(node: unknown, out: Set<string>): void {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      collectResourceIds(item, out);
+    }
+    return;
+  }
+  if (node === null || typeof node !== "object") {
+    return;
+  }
+  const obj = node as Record<string, unknown>;
+  if (typeof obj.$id === "string" && hasUriScheme(obj.$id)) {
+    out.add(obj.$id);
+  }
+  for (const value of Object.values(obj)) {
+    collectResourceIds(value, out);
+  }
+}
+
+/** True when a ref/id carries a URI scheme (https:, urn:, file:) — i.e. is not a relative path. */
+function hasUriScheme(ref: string): boolean {
+  return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(ref);
+}
+
+/** Normalize a path to forward slashes, resolving "." and ".." segments (environment-agnostic). */
+function normalizeSchemaPath(path: string): string {
+  const slashed = path.replaceAll("\\", "/");
+  const absolute = slashed.startsWith("/");
+  const parts: string[] = [];
+  for (const segment of slashed.split("/")) {
+    if (segment === "" || segment === ".") {
+      continue;
+    }
+    if (segment === "..") {
+      if (parts.length > 0 && parts.at(-1) !== "..") {
+        parts.pop();
+      } else if (!absolute) {
+        parts.push("..");
+      }
+      continue;
+    }
+    parts.push(segment);
+  }
+  return (absolute ? "/" : "") + parts.join("/");
+}
+
+/** The directory portion of a normalized schema path ("." when there is none). */
+function schemaDirOf(path: string): string {
+  const index = path.lastIndexOf("/");
+  if (index === -1) {
+    return ".";
+  }
+  return index === 0 ? "/" : path.slice(0, index);
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export interface DocumentSchemaInputs {
   /**
    * Project-relative path of the core document schema, e.g.

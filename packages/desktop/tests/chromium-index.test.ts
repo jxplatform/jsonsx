@@ -72,7 +72,9 @@ const handlerMocks = {
   jxServerFunction: mock((p: { body: string }) =>
     Promise.resolve({ body: JSON.stringify({ server: p.body }), status: 200 }),
   ),
+  fetchProjectSchemas: mock(() => Promise.resolve({ project: { type: "object" } })),
   listDirectory: mock(() => Promise.resolve([{ name: "hello.txt", type: "file" }])),
+  listExtensions: mock(() => Promise.resolve([{ specifier: "@jxsuite/parser" }])),
   listFormats: mock(() => Promise.resolve([{ format: "markdown" }])),
   locateFile: mock(() => Promise.resolve("located/file.json")),
   openProject: mock(() => Promise.resolve({ config: { name: "P" }, handle: { root: "." } })),

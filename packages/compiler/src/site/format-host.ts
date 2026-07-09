@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { buildExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
-import type { FormatHostIO, FormatRegistry } from "@jxsuite/schema/format-registry";
+import type { FormatHostIO, FormatRegistry, ProjectBlock } from "@jxsuite/schema/format-registry";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
 export type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
@@ -99,6 +99,78 @@ export async function buildProjectFormatRegistry(
 ): Promise<FormatRegistry> {
   const registry = await buildProjectExtensionRegistry(projectRoot, projectConfig);
   return registry.formats;
+}
+
+// ─── Studio extensions payload ────────────────────────────────────────────────
+
+/** One project-section contribution on the studio wire (specs/extensions.md §9/§9.1). */
+export interface ExtensionsPayloadContribution {
+  /** The $prototype-visible class name declaring the `project` block. */
+  className: string;
+  /** The class descriptor's `project` admission block. */
+  project: ProjectBlock;
+  /** The class descriptor's `$studio` block (settings section vocabulary), when declared. */
+  studio: Record<string, unknown> | null;
+  /**
+   * The section's value schema — `properties[<key>]` of the extension's project fragment — or null
+   * when the extension ships no project fragment (or it lacks the key).
+   */
+  entrySchema: Record<string, unknown> | null;
+}
+
+/** One extension package on the studio wire (the formats route's `extensions` sibling array). */
+export interface ExtensionsPayloadEntry {
+  specifier: string;
+  name: string;
+  title?: string;
+  description?: string;
+  contributions: ExtensionsPayloadContribution[];
+}
+
+/**
+ * Build the studio-facing extensions payload from a project's extension registry: per extension,
+ * its manifest identity plus every project-section contribution paired with the entry schema read
+ * from the extension's shipped project fragment. Unreadable fragments degrade to a null entrySchema
+ * (the studio renders the section without field metadata).
+ *
+ * @param {ExtensionRegistry} registry
+ * @returns {ExtensionsPayloadEntry[]}
+ */
+export function buildExtensionsPayload(registry: ExtensionRegistry): ExtensionsPayloadEntry[] {
+  const payload: ExtensionsPayloadEntry[] = [];
+  for (const ext of registry.extensions) {
+    let fragmentProperties: Record<string, Record<string, unknown>> = {};
+    if (ext.schemas.project) {
+      try {
+        const fragment = JSON.parse(readFileSync(ext.schemas.project, "utf8")) as {
+          properties?: Record<string, Record<string, unknown>>;
+        };
+        fragmentProperties = fragment.properties ?? {};
+      } catch {
+        fragmentProperties = {};
+      }
+    }
+    const contributions: ExtensionsPayloadContribution[] = [];
+    for (const cls of ext.classes) {
+      if (!cls.project) {
+        continue;
+      }
+      contributions.push({
+        className: cls.name,
+        entrySchema: fragmentProperties[cls.project.key] ?? null,
+        project: cls.project,
+        studio: cls.studio,
+      });
+    }
+    payload.push({
+      contributions,
+      name: ext.manifest.name,
+      specifier: ext.specifier,
+      ...(ext.manifest.title === undefined ? {} : { title: ext.manifest.title }),
+      ...(ext.manifest.description === undefined ? {} : { description: ext.manifest.description }),
+    });
+  }
+  return payload;
 }
 
 /** Error message for an unregistered non-JSON extension, naming the fix. */

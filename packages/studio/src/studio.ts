@@ -63,6 +63,7 @@ import {
   documentExtensions,
   formatForPath,
   loadFormats,
+  refreshExtensionUi,
   refreshFormats,
 } from "./format/format-host";
 import {
@@ -655,6 +656,7 @@ if (_projectParam) {
             selectedPath: siteCtx.fileRelPath || null,
           });
 
+          refreshExtensionUi(platform);
           await autoSyncProjectOnOpen();
           await ensureDependenciesInstalled();
           await loadComponentRegistry();
@@ -821,6 +823,7 @@ async function openRecentProject(root: string) {
     // "No format class imported" until a reload. Mirrors openProject in files.ts.
     refreshFormats();
     void loadFormats();
+    refreshExtensionUi(platform);
     const content = await platform.readFile("project.json");
     const config = JSON.parse(content) as ProjectConfig;
 

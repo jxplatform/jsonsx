@@ -8,6 +8,7 @@
  */
 
 import { getPlatform } from "../platform";
+import type { ExtensionsInfo } from "../types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 export interface StudioFormatHints {
@@ -68,16 +69,77 @@ export function loadFormats(): Promise<StudioFormat[]> {
   return _loaded;
 }
 
-/** Invalidate the cached registry (call on project switch). */
+/** Invalidate the cached registry and extensions payload (call on project switch). */
 export function refreshFormats() {
   _loaded = null;
   _formats = [];
+  _extensionsLoaded = null;
+  _extensions = [];
 }
 
 /** Seed the registry directly (tests and hosts that preload format metadata). */
 export function setFormats(formats: StudioFormat[]) {
   _formats = formats;
   _loaded = Promise.resolve(formats);
+}
+
+// ─── Extensions payload (specs/extensions.md §9/§9.1) ────────────────────────
+
+let _extensions: ExtensionsInfo[] = [];
+let _extensionsLoaded: Promise<ExtensionsInfo[]> | null = null;
+
+/**
+ * Load (and cache) the project's enabled extensions with their project-section contributions.
+ * Backed by the platform's optional `listExtensions` member; platforms without it (or failures)
+ * degrade to an empty list, hiding descriptor-contributed settings sections.
+ */
+export function loadExtensions(): Promise<ExtensionsInfo[]> {
+  if (!_extensionsLoaded) {
+    _extensionsLoaded = (async () => {
+      try {
+        const platform = getPlatform() as {
+          listExtensions?: () => Promise<ExtensionsInfo[]>;
+        };
+        _extensions = (await platform.listExtensions?.()) ?? [];
+      } catch {
+        _extensions = [];
+      }
+      return _extensions;
+    })();
+  }
+  return _extensionsLoaded;
+}
+
+/** The last-loaded extensions payload (synchronous access for render paths). */
+export function getExtensions(): ExtensionsInfo[] {
+  return _extensions;
+}
+
+/** Seed the extensions payload directly (tests and hosts that preload it). */
+export function setExtensions(extensions: ExtensionsInfo[]) {
+  _extensions = extensions;
+  _extensionsLoaded = Promise.resolve(extensions);
+}
+
+/**
+ * Fire-and-forget refresh of the extension-facing editor surface after project (re)activation or an
+ * `extensions` change: Monaco's per-project schemas and the descriptor-contributed settings
+ * sections. Both modules load lazily — monaco is heavy and the settings registry pulls DOM
+ * templates — and both degrade silently (bundled core schemas, built-in sections only).
+ *
+ * @param {object} platform - The studio platform (only `fetchProjectSchemas` is consulted here)
+ */
+export function refreshExtensionUi(platform: {
+  fetchProjectSchemas?: () => Promise<{ project?: unknown; document?: unknown }>;
+}): void {
+  void import("../services/monaco-setup")
+    .then(({ refreshProjectSchemas }) => refreshProjectSchemas(platform))
+    .catch(() => false);
+  void import("../settings/extension-sections")
+    .then(({ syncExtensionSettingsSections }) => syncExtensionSettingsSections())
+    .catch(() => {
+      // Contributed sections also refresh on the next settings-modal open.
+    });
 }
 
 /** The last-loaded registry (synchronous access for render paths). */

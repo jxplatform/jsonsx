@@ -262,6 +262,19 @@ export interface StudioRPC {
         params: void;
         response: Record<string, unknown>[];
       };
+      // Extensions payload — the formats channel's sibling (specs/extensions.md §9/§9.1)
+      listExtensions: {
+        params: void;
+        response: Record<string, unknown>[];
+      };
+      // Pre-bundled per-project entry schemas for Monaco (project.schema.json / document.schema.json)
+      fetchProjectSchemas: {
+        params: void;
+        response: {
+          project?: Record<string, unknown>;
+          document?: Record<string, unknown>;
+        };
+      };
       formatAction: {
         params: {
           format: string;

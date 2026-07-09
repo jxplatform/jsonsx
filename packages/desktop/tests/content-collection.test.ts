@@ -9,6 +9,7 @@
  *    desktop now serves via the jxResolve handler (loading content types + injecting _project).
  */
 import { describe, expect, mock, test } from "bun:test";
+import { rmSync } from "node:fs";
 import { join } from "node:path";
 import type { StudioSchema } from "../src/handlers";
 
@@ -18,7 +19,8 @@ void mock.module("electrobun/bun", () => ({
   Utils: { openFileDialog: async () => [] },
 }));
 
-const { setProjectRoot, fetchPluginSchema, jxResolve } = await import("../src/handlers");
+const { setProjectRoot, fetchPluginSchema, fetchProjectSchemas, jxResolve, listExtensions } =
+  await import("../src/handlers");
 
 const PROJECT = join(import.meta.dir, "_fixtures_content");
 
@@ -75,5 +77,47 @@ describe("ContentCollection desktop integration", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].data.title).toBe("Advanced");
     setProjectRoot(null);
+  });
+
+  test("listExtensions serves the parser contribution with its fragment entry schema", async () => {
+    setProjectRoot(PROJECT);
+    const extensions = (await listExtensions()) as {
+      specifier: string;
+      contributions: {
+        className: string;
+        project: { key: string };
+        studio: { settings?: { layout?: string } } | null;
+        entrySchema: { additionalProperties?: { properties?: Record<string, unknown> } } | null;
+      }[];
+    }[];
+    expect(extensions).toHaveLength(1);
+    expect(extensions[0]!.specifier).toBe("@jxsuite/parser");
+    const content = extensions[0]!.contributions.find((c) => c.project.key === "content")!;
+    expect(content.className).toBe("Content");
+    expect(content.studio?.settings?.layout).toBe("map");
+    expect(Object.keys(content.entrySchema?.additionalProperties?.properties ?? {})).toContain(
+      "source",
+    );
+    setProjectRoot(null);
+  });
+
+  test("fetchProjectSchemas returns self-contained bundles (drives Monaco registration)", async () => {
+    setProjectRoot(PROJECT);
+    try {
+      const { project, document } = await fetchProjectSchemas();
+      const { allOf } = project as { allOf: { $ref: string }[] };
+      expect(allOf.map((entry) => entry.$ref)).toEqual([
+        "https://jxsuite.com/schema/project/core/v2",
+        "https://jxsuite.com/schema/ext/parser/project/v1",
+      ]);
+      const projectDefs = (project as { $defs: Record<string, unknown> }).$defs;
+      expect(projectDefs["https://jxsuite.com/schema/ext/parser/project/v1"]).toBeDefined();
+      expect((document as { $ref: string }).$ref).toBe("https://jxsuite.com/schema/v1");
+    } finally {
+      // The bundler regenerates the entry documents on demand — keep the fixture pristine.
+      rmSync(join(PROJECT, "project.schema.json"), { force: true });
+      rmSync(join(PROJECT, "document.schema.json"), { force: true });
+      setProjectRoot(null);
+    }
   });
 });

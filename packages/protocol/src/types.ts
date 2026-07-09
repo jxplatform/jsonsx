@@ -112,6 +112,56 @@ export interface ComponentMeta {
   hasElements?: boolean;
 }
 
+// ─── Extensions (specs/extensions.md §9/§9.1) ────────────────────────────────
+
+/** The `project` admission block of a section-owning extension class. */
+export interface ExtensionProjectBlock {
+  /** The project.json top-level property the class owns. */
+  key: string;
+  title?: string;
+  description?: string;
+  referenceable?: boolean;
+}
+
+/** One project-section contribution of an extension class, as served on the formats route. */
+export interface ExtensionContributionInfo {
+  /** The $prototype-visible class name declaring the `project` block. */
+  className: string;
+  project: ExtensionProjectBlock;
+  /** The class descriptor's `$studio` block (settings-section vocabulary), when declared. */
+  studio?: Record<string, unknown> | null;
+  /**
+   * The section's value schema — `properties[<key>]` of the extension's shipped project fragment —
+   * resolved backend-side; null when the extension ships no fragment (or it lacks the key).
+   */
+  entrySchema?: Record<string, unknown> | null;
+}
+
+/**
+ * One enabled extension package on the wire — the `extensions` sibling of the formats route's
+ * `formats` array (additive; the `formats` shape is unchanged).
+ */
+export interface ExtensionsInfo {
+  /** The project.json `extensions` entry that produced this extension. */
+  specifier: string;
+  /** The manifest's package name. */
+  name: string;
+  title?: string;
+  description?: string;
+  /** Project-section contributions, in class declaration order. */
+  contributions: ExtensionContributionInfo[];
+}
+
+/**
+ * Response of the project-schemas route: the project's generated entry documents
+ * (project.schema.json / document.schema.json), PRE-BUNDLED into self-contained compound schemas so
+ * editors can register them without resolving relative `$ref`s.
+ */
+export interface ProjectSchemasResponse {
+  project?: Record<string, unknown> | null;
+  document?: Record<string, unknown> | null;
+}
+
 // ─── Packages ────────────────────────────────────────────────────────────────
 
 export interface PackageInfo {

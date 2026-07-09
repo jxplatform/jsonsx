@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  buildExtensionsPayload,
   buildProjectExtensionRegistry,
   buildProjectFormatRegistry,
   createNodeFormatIO,
@@ -87,6 +88,97 @@ describe("buildProjectExtensionRegistry", () => {
       await expect(
         buildProjectExtensionRegistry(root, { extensions: ["@jxsuite/does-not-exist"] }),
       ).rejects.toThrow("is not resolvable");
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+});
+
+describe("buildExtensionsPayload", () => {
+  test("pairs each project contribution with its fragment entry schema (parser)", async () => {
+    const root = mkdtempSync(join(tmpdir(), "jx-ext-payload-"));
+    try {
+      const registry = await buildProjectExtensionRegistry(root, {
+        extensions: ["@jxsuite/parser"],
+      });
+      const payload = buildExtensionsPayload(registry);
+      expect(payload).toHaveLength(1);
+      const [parser] = payload;
+      expect(parser!.specifier).toBe("@jxsuite/parser");
+      expect(parser!.name).toBe("@jxsuite/parser");
+      expect(parser!.title).toBe("Content & Markdown");
+      expect(parser!.contributions).toHaveLength(1);
+      const [content] = parser!.contributions;
+      expect(content!.className).toBe("Content");
+      expect(content!.project).toMatchObject({ key: "content", title: "Content Types" });
+      const studio = content!.studio as { settings: { layout: string; order: number } };
+      expect(studio.settings.layout).toBe("map");
+      expect(studio.settings.order).toBe(50);
+      // The entry schema is properties.content of the shipped project fragment.
+      const entrySchema = content!.entrySchema as {
+        type: string;
+        additionalProperties: { properties: Record<string, unknown> };
+      };
+      expect(entrySchema.type).toBe("object");
+      expect(Object.keys(entrySchema.additionalProperties.properties)).toEqual([
+        "$elements",
+        "format",
+        "schema",
+        "source",
+      ]);
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("degrades to a null entrySchema for unreadable or key-less fragments", async () => {
+    const root = mkdtempSync(join(tmpdir(), "jx-ext-payload-degrade-"));
+    try {
+      mkdirSync(join(root, "local-ext"), { recursive: true });
+      writeFileSync(
+        join(root, "local-ext", "jx-extension.json"),
+        JSON.stringify({
+          classes: { Guestbook: "./Guestbook.class.json" },
+          name: "local-guestbook",
+          schemas: { project: "./missing.fragment.schema.json" },
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        join(root, "local-ext", "Guestbook.class.json"),
+        JSON.stringify({
+          project: { key: "guestbook" },
+          title: "Guestbook",
+        }),
+        "utf8",
+      );
+      const registry = await buildProjectExtensionRegistry(root, { extensions: ["./local-ext"] });
+      const payload = buildExtensionsPayload(registry);
+      expect(payload).toHaveLength(1);
+      expect(payload[0]!.title).toBeUndefined();
+      expect(payload[0]!.contributions).toEqual([
+        {
+          className: "Guestbook",
+          entrySchema: null,
+          project: { key: "guestbook" },
+          studio: null,
+        },
+      ]);
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("classes without a project block contribute nothing", async () => {
+    const root = mkdtempSync(join(tmpdir(), "jx-ext-payload-formats-"));
+    try {
+      const registry = await buildProjectExtensionRegistry(root, {
+        extensions: ["@jxsuite/parser"],
+      });
+      const [parser] = buildExtensionsPayload(registry);
+      const names = parser!.contributions.map((c) => c.className);
+      expect(names).not.toContain("Markdown");
+      expect(names).not.toContain("Csv");
     } finally {
       rmSync(root, { force: true, recursive: true });
     }

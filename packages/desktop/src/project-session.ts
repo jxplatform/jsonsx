@@ -13,7 +13,13 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { handleResolve, handleServerFunction } from "@jxsuite/server/resolve";
 import { applyRename, createFsWatcher } from "@jxsuite/server/refactor";
-import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
+import {
+  buildExtensionsPayload,
+  buildProjectExtensionRegistry,
+} from "@jxsuite/compiler/format-host";
+import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
+import type { ExtensionsPayloadEntry } from "@jxsuite/compiler/format-host";
+import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FsEventPayload, FsWatcherHandle, RenameReport } from "@jxsuite/server/refactor";
 import type { FormatCapability, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ProjectConfig } from "@jxsuite/schema/types";
@@ -319,7 +325,7 @@ export type ProjectSession = ReturnType<typeof createProjectSession>;
 
 export function createProjectSession(initialRoot: string | null) {
   let projectRoot: string | null = initialRoot;
-  let formatRegistry: { root: string; registry: FormatRegistry } | null = null;
+  let extensionRegistry: { root: string; registry: ExtensionRegistry } | null = null;
 
   function requireRoot(): string {
     if (!projectRoot) {
@@ -328,10 +334,10 @@ export function createProjectSession(initialRoot: string | null) {
     return projectRoot;
   }
 
-  async function getFormatRegistry(): Promise<FormatRegistry> {
+  async function getExtensionRegistry(): Promise<ExtensionRegistry> {
     const root = requireRoot();
-    if (formatRegistry?.root === root) {
-      return formatRegistry.registry;
+    if (extensionRegistry?.root === root) {
+      return extensionRegistry.registry;
     }
     let projectConfig: ProjectConfig | undefined;
     try {
@@ -341,9 +347,14 @@ export function createProjectSession(initialRoot: string | null) {
     } catch {
       projectConfig = undefined;
     }
-    const registry = await buildProjectFormatRegistry(root, projectConfig);
-    formatRegistry = { registry, root };
+    const registry = await buildProjectExtensionRegistry(root, projectConfig);
+    extensionRegistry = { registry, root };
     return registry;
+  }
+
+  async function getFormatRegistry(): Promise<FormatRegistry> {
+    const registry = await getExtensionRegistry();
+    return registry.formats;
   }
 
   // ─── Filesystem watching (pushes change events to the webview over RPC) ───────
@@ -398,6 +409,45 @@ export function createProjectSession(initialRoot: string | null) {
     }
   }
 
+  /**
+   * List the project's enabled extensions with their project-section contributions — the desktop
+   * twin of the dev server's formats-route `extensions` payload (entry schemas resolved from each
+   * extension's shipped project fragment).
+   */
+  async function listExtensions(): Promise<ExtensionsPayloadEntry[]> {
+    // Welcome windows have no project (and therefore no extensions) — mirror listFormats.
+    if (!projectRoot) {
+      return [];
+    }
+    try {
+      const registry = await getExtensionRegistry();
+      return buildExtensionsPayload(registry);
+    } catch (error) {
+      console.error("[desktop] listExtensions failed:", error);
+      return [];
+    }
+  }
+
+  /**
+   * The project's generated entry schemas, PRE-BUNDLED for Monaco registration — the desktop twin
+   * of GET /__studio/project-schemas (regenerates missing/stale entry documents on demand).
+   */
+  async function fetchProjectSchemas(): Promise<{
+    project?: Record<string, unknown>;
+    document?: Record<string, unknown>;
+  }> {
+    if (!projectRoot) {
+      return {};
+    }
+    try {
+      return await readBundledProjectSchemas(projectRoot);
+    } catch (error) {
+      // Editor degradation: the studio keeps its bundled core schemas.
+      console.error("[desktop] fetchProjectSchemas failed:", error);
+      return {};
+    }
+  }
+
   /** Invoke a format capability (parse/serialize) through the registry. */
   async function formatAction(params: {
     format: string;
@@ -442,7 +492,7 @@ export function createProjectSession(initialRoot: string | null) {
     const raw = await readFile(filePath, "utf8");
     const config = JSON.parse(raw) as SiteConfig;
     projectRoot = dirname(filePath);
-    formatRegistry = null;
+    extensionRegistry = null;
     startWatching();
 
     return {
@@ -531,7 +581,7 @@ export function createProjectSession(initialRoot: string | null) {
       await readFile(resolve(destPath, "project.json"), "utf8"),
     ) as SiteConfig;
     projectRoot = destPath;
-    formatRegistry = null;
+    extensionRegistry = null;
     startWatching();
 
     return { config, root: destPath };
@@ -849,12 +899,14 @@ export function createProjectSession(initialRoot: string | null) {
     },
     setProjectRoot(root: string | null) {
       projectRoot = root;
-      formatRegistry = null;
+      extensionRegistry = null;
       startWatching();
     },
     setFileEventSink,
     dispose: stopWatching,
     listFormats,
+    listExtensions,
+    fetchProjectSchemas,
     formatAction,
     openProject,
     createProject,

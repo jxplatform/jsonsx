@@ -28,15 +28,47 @@ const fakeEntry: Record<string, unknown> = {
   studio: { icon: "doc" },
 };
 
-const fakeRegistry = {
+const fakeFormats = {
   byName: (name: string) => (name === "Markdown" ? fakeEntry : undefined),
   entries: [fakeEntry],
 };
 
+// The extension registry wraps the formats view (project-session dispatches through .formats).
+const fakeRegistry = { extensions: [], formats: fakeFormats };
+
 const mockBuildRegistry = mock(async (_root: string, _config: unknown) => fakeRegistry);
 
+const fakeExtensionsPayload = [
+  {
+    contributions: [
+      {
+        className: "Content",
+        entrySchema: { type: "object" },
+        project: { key: "content" },
+        studio: { settings: { layout: "map" } },
+      },
+    ],
+    name: "@jxsuite/parser",
+    specifier: "@jxsuite/parser",
+  },
+];
+
+const mockBuildPayload = mock((_registry: unknown) => fakeExtensionsPayload);
+
 void mock.module("@jxsuite/compiler/format-host", () => ({
-  buildProjectFormatRegistry: mockBuildRegistry,
+  buildExtensionsPayload: mockBuildPayload,
+  buildProjectExtensionRegistry: mockBuildRegistry,
+}));
+
+const fakeBundles = {
+  document: { $ref: "https://jxsuite.com/schema/v1" },
+  project: { allOf: [{ $ref: "https://jxsuite.com/schema/project/core/v2" }] },
+};
+
+const mockReadBundles = mock(async (_root: string) => fakeBundles);
+
+void mock.module("@jxsuite/compiler/schema-command", () => ({
+  readBundledProjectSchemas: mockReadBundles,
 }));
 
 // ─── Resolve-proxy mock ──────────────────────────────────────────────────────
@@ -57,6 +89,8 @@ void mock.module("@jxsuite/server/resolve", () => ({
 const {
   setProjectRoot,
   listFormats,
+  listExtensions,
+  fetchProjectSchemas,
   formatAction,
   jxResolve,
   jxServerFunction,
@@ -79,6 +113,8 @@ function cleanup() {
 beforeEach(() => {
   entryCall.mockClear();
   mockBuildRegistry.mockClear();
+  mockBuildPayload.mockClear();
+  mockReadBundles.mockClear();
   mockHandleResolve.mockClear();
   mockHandleServerFunction.mockClear();
 });
@@ -169,6 +205,82 @@ describe("listFormats", () => {
       const formats = await listFormats();
       expect(formats).toEqual([]);
     } finally {
+      cleanup();
+    }
+  });
+});
+
+// ─── listExtensions ──────────────────────────────────────────────────────────
+
+describe("listExtensions", () => {
+  test("builds the payload from the cached extension registry", async () => {
+    setup();
+    try {
+      const extensions = await listExtensions();
+      expect(extensions).toEqual(fakeExtensionsPayload);
+      expect(mockBuildPayload).toHaveBeenCalledWith(fakeRegistry);
+      // A subsequent listFormats reuses the same registry (one build for both channels).
+      await listFormats();
+      expect(mockBuildRegistry).toHaveBeenCalledTimes(1);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("returns [] quietly when no project is open", async () => {
+    setProjectRoot(null);
+    const extensions = await listExtensions();
+    expect(extensions).toEqual([]);
+    expect(mockBuildRegistry).not.toHaveBeenCalled();
+  });
+
+  test("returns [] and logs when the registry build fails", async () => {
+    setup();
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      mockBuildRegistry.mockImplementationOnce(async () => {
+        throw new Error("registry exploded");
+      });
+      expect(await listExtensions()).toEqual([]);
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+      cleanup();
+    }
+  });
+});
+
+// ─── fetchProjectSchemas ─────────────────────────────────────────────────────
+
+describe("fetchProjectSchemas", () => {
+  test("returns the pre-bundled entry documents for the project root", async () => {
+    setup();
+    try {
+      const schemas = await fetchProjectSchemas();
+      expect(schemas).toEqual(fakeBundles);
+      expect(mockReadBundles).toHaveBeenCalledWith(FIXTURES);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("returns {} quietly when no project is open", async () => {
+    setProjectRoot(null);
+    expect(await fetchProjectSchemas()).toEqual({});
+    expect(mockReadBundles).not.toHaveBeenCalled();
+  });
+
+  test("returns {} and logs when bundling fails (editor keeps bundled core schemas)", async () => {
+    setup();
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      mockReadBundles.mockImplementationOnce(async () => {
+        throw new Error("no project.json");
+      });
+      expect(await fetchProjectSchemas()).toEqual({});
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
       cleanup();
     }
   });

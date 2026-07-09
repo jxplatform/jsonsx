@@ -1385,6 +1385,71 @@ describe("format endpoints", () => {
     expect(md.capabilities.parse.timing).toContain("client");
   });
 
+  test("GET /__studio/formats carries the sibling extensions payload", async () => {
+    const url = new URL(`http://localhost/__studio/formats?dir=${FMT_DIR}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await callApi(req, url, FMT_DIR);
+    const data = await res.json();
+    expect(data.extensions).toHaveLength(1);
+    const [parser] = data.extensions;
+    expect(parser.specifier).toBe("@jxsuite/parser");
+    expect(parser.name).toBe("@jxsuite/parser");
+    expect(parser.title).toBe("Content & Markdown");
+    expect(parser.contributions).toHaveLength(1);
+    const [content] = parser.contributions;
+    expect(content.className).toBe("Content");
+    expect(content.project.key).toBe("content");
+    expect(content.studio.settings.layout).toBe("map");
+    expect(content.studio.settings.entry.ui.schema.control).toBe("schema-builder");
+    // The entry schema is the fragment's properties.content section schema.
+    expect(content.entrySchema.type).toBe("object");
+    expect(content.entrySchema.additionalProperties.properties.source.type).toBe("string");
+  });
+
+  test("GET /__studio/project-schemas returns pre-bundled entry documents", async () => {
+    const url = new URL(`http://localhost/__studio/project-schemas?dir=${FMT_DIR}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await callApi(req, url, FMT_DIR);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    // Self-contained: the entry allOf refs are canonical URIs, with the targets embedded.
+    const refs = data.project.allOf.map((entry: { $ref: string }) => entry.$ref);
+    expect(refs).toEqual([
+      "https://jxsuite.com/schema/project/core/v2",
+      "https://jxsuite.com/schema/ext/parser/project/v1",
+    ]);
+    expect(data.project.$defs["https://jxsuite.com/schema/ext/parser/project/v1"]).toBeDefined();
+    expect(data.document.$ref).toBe("https://jxsuite.com/schema/v1");
+    expect(data.document.$defs["https://jxsuite.com/schema/v1"]).toBeDefined();
+    // The entry documents were regenerated into the fixture project root on demand.
+    const { existsSync } = await import("node:fs");
+    expect(existsSync(join(FMT_DIR, "project.schema.json"))).toBe(true);
+    expect(existsSync(join(FMT_DIR, "document.schema.json"))).toBe(true);
+    // Keep the committed fixture pristine (they regenerate on the next call anyway).
+    rmSync(join(FMT_DIR, "project.schema.json"), { force: true });
+    rmSync(join(FMT_DIR, "document.schema.json"), { force: true });
+  });
+
+  test("GET /__studio/project-schemas rejects a dir outside the roots", async () => {
+    const url = new URL(
+      `http://localhost/__studio/project-schemas?dir=${encodeURIComponent("../outside")}`,
+    );
+    const req = new Request(url, { method: "GET" });
+    const res = await callApi(req, url, FMT_DIR);
+    expect(res.status).toBe(400);
+  });
+
+  test("GET /__studio/project-schemas surfaces generation failures as 500", async () => {
+    const emptyDir = join(FIXTURES, "no-project-json");
+    mkdirSync(emptyDir, { recursive: true });
+    const url = new URL(`http://localhost/__studio/project-schemas?dir=${emptyDir}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await callApi(req, url, emptyDir);
+    expect(res.status).toBe(500);
+    const data = await res.json();
+    expect(typeof data.error).toBe("string");
+  });
+
   test("POST /__studio/format parse dispatches through the format class", async () => {
     const url = new URL("http://localhost/__studio/format");
     const req = new Request(url, {

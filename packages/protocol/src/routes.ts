@@ -106,8 +106,20 @@ export const STUDIO_ROUTES = {
   formats: route(
     "GET",
     "/__studio/formats",
-    "The project's format registry entries",
-    "Only .json documents open (backs listFormats).",
+    "The project's format registry entries plus a sibling `extensions` array — per enabled " +
+      "extension its manifest identity and project-section contributions (ExtensionsInfo[]; " +
+      "backs listFormats and listExtensions).",
+    "Only .json documents open (backs listFormats); descriptor-contributed settings sections " +
+      "do not appear.",
+  ),
+  projectSchemas: route(
+    "GET",
+    "/__studio/project-schemas",
+    "The project's generated entry documents (project.schema.json / document.schema.json), " +
+      "PRE-BUNDLED into self-contained schemas — {project, document} (backs fetchProjectSchemas). " +
+      "Regenerated on demand when missing or older than project.json.",
+    "The JSON editor falls back to the bundled core schemas (extension sections get no " +
+      "editor validation/completion).",
   ),
   format: route(
     "POST",

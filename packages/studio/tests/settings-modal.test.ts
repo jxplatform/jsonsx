@@ -8,7 +8,11 @@
 import { flush, installMockPlatform, key, pointer, resetStudioState } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { closeSettingsModal, openSettingsModal } from "../src/settings/settings-modal";
+import { resetExtensionSettingsSections } from "../src/settings/extension-sections";
+import { refreshFormats, setExtensions } from "../src/format/format-host";
 import { initLayers } from "../src/ui/layers";
+import "../src/ui/form-controls";
+import type { ExtensionsInfo } from "../src/types";
 
 // ─── Environment setup ───────────────────────────────────────────────────────
 
@@ -54,7 +58,47 @@ async function openAndSettle() {
   await flush(4);
 }
 
+/** A parser-like extensions payload contributing the Content Types section (order 50). */
+const parserExtensions: ExtensionsInfo[] = [
+  {
+    contributions: [
+      {
+        className: "Content",
+        entrySchema: {
+          additionalProperties: {
+            properties: {
+              format: { type: "string" },
+              schema: { type: "object" },
+              source: { type: "string" },
+            },
+            type: "object",
+          },
+          type: "object",
+        },
+        project: { key: "content", title: "Content Types" },
+        studio: {
+          settings: {
+            entry: {
+              newEntry: { schema: { properties: {}, required: [], type: "object" } },
+              ui: { schema: { control: "schema-builder" } },
+            },
+            icon: "sp-icon-view-grid",
+            label: "Content Types",
+            layout: "map",
+            order: 50,
+          },
+        },
+      },
+    ],
+    name: "@jxsuite/parser",
+    specifier: "@jxsuite/parser",
+    title: "Content & Markdown",
+  },
+];
+
 beforeEach(() => {
+  resetExtensionSettingsSections();
+  refreshFormats();
   installMockPlatform();
   resetStudioState({
     projectConfig: {
@@ -82,14 +126,7 @@ describe("open", () => {
     const navLabels = [...modal()!.querySelectorAll(".settings-nav-item")].map((b) =>
       b.textContent?.trim(),
     );
-    expect(navLabels).toEqual([
-      "General",
-      "Head",
-      "CSS Variables",
-      "Definitions",
-      "Content Types",
-      "Dependencies",
-    ]);
+    expect(navLabels).toEqual(["General", "Head", "CSS Variables", "Definitions", "Dependencies"]);
     expect(navButton("General").classList.contains("active")).toBe(true);
 
     // The deferred rAF render filled the content area with the General section
@@ -148,11 +185,27 @@ describe("section navigation", () => {
     expect(labels).toContain("Author");
   });
 
-  test("Content Types section renders the content-types editor", async () => {
+  test("a $studio.settings contribution adds Content Types at its declared order", async () => {
+    setExtensions(parserExtensions);
     await openAndSettle();
+    const navLabels = [...modal()!.querySelectorAll(".settings-nav-item")].map((b) =>
+      b.textContent?.trim(),
+    );
+    // Order 50 lands between Definitions (40) and Dependencies (60) — the historical position.
+    expect(navLabels).toEqual([
+      "General",
+      "Head",
+      "CSS Variables",
+      "Definitions",
+      "Content Types",
+      "Dependencies",
+    ]);
     pointer(navButton("Content Types"), "click");
     await flush();
-    expect(content().querySelector(".settings-empty-state")?.textContent).toContain("content type");
+    expect(content().querySelector(".settings-section-title")?.textContent).toBe("Content Types");
+    expect(content().querySelector(".settings-empty-state")?.textContent).toContain(
+      "Select or create an entry",
+    );
   });
 
   test("Dependencies section renders the dependency editor", async () => {

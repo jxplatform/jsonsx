@@ -276,6 +276,19 @@ export function createDesktopPlatform(): StudioPlatform {
       return request("listFormats", {}) as Promise<Record<string, unknown>[]>;
     },
 
+    /** The extensions payload behind descriptor-contributed settings sections. */
+    async listExtensions() {
+      return request("listExtensions", {}) as Promise<Record<string, unknown>[]>;
+    },
+
+    /** Pre-bundled per-project entry schemas for Monaco registration. */
+    async fetchProjectSchemas() {
+      return request("fetchProjectSchemas", {}) as Promise<{
+        project?: Record<string, unknown>;
+        document?: Record<string, unknown>;
+      }>;
+    },
+
     /**
      * Class resolution over HTTP: the project server gates `/__jx_resolve__` on the RPC token (a
      * token-less fetch 403s), so pass the token captured from the shell URL.

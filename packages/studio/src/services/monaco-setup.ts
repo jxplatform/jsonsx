@@ -35,29 +35,78 @@ if (typeof document !== "undefined" && document.fonts?.ready) {
   });
 }
 
-// oxlint-disable-next-line typescript/no-unsafe-call, typescript/no-unsafe-member-access -- jsonDefaults is imported from Monaco's untyped ESM contribution (see @ts-expect-error above); no type declarations exist for this named export
-jsonDefaults.setDiagnosticsOptions({
-  allowComments: false,
-  schemas: [
-    {
-      fileMatch: [
-        "pages/*.json",
-        "pages/**/*.json",
-        "layouts/*.json",
-        "layouts/**/*.json",
-        "components/*.json",
-        "components/**/*.json",
-        "elements/*.json",
-        "elements/**/*.json",
-      ],
-      schema: jxSchema,
-      uri: "https://jxsuite.com/schema/v1",
-    },
-    {
-      fileMatch: ["project.json"],
-      schema: projectSchema,
-      uri: "https://jxsuite.com/schema/project/v1",
-    },
-  ],
-  validate: true,
-});
+/** Folder globs whose JSON files validate against the (per-project or core) document schema. */
+const DOCUMENT_FILE_MATCH = [
+  "pages/*.json",
+  "pages/**/*.json",
+  "layouts/*.json",
+  "layouts/**/*.json",
+  "components/*.json",
+  "components/**/*.json",
+  "elements/*.json",
+  "elements/**/*.json",
+];
+
+/**
+ * Register the JSON diagnostics schemas. Fetched per-project schemas are inline OBJECTS (never URLs
+ * — `enableSchemaRequest` stays off), so backends must serve them PRE-BUNDLED; the bundled core
+ * schemas remain the offline fallback.
+ */
+function applyJsonSchemas(documentSchema: unknown, projectJsonSchema: unknown) {
+  // oxlint-disable-next-line typescript/no-unsafe-call, typescript/no-unsafe-member-access -- jsonDefaults is imported from Monaco's untyped ESM contribution (see @ts-expect-error above); no type declarations exist for this named export
+  jsonDefaults.setDiagnosticsOptions({
+    allowComments: false,
+    schemas: [
+      {
+        fileMatch: DOCUMENT_FILE_MATCH,
+        schema: documentSchema,
+        uri: "https://jxsuite.com/schema/v1",
+      },
+      {
+        fileMatch: ["project.json"],
+        schema: projectJsonSchema,
+        uri: "https://jxsuite.com/schema/project/v1",
+      },
+    ],
+    validate: true,
+  });
+}
+
+// Bundled core schemas register at module init — the offline fallback every platform starts from.
+applyJsonSchemas(jxSchema, projectSchema);
+
+/**
+ * Swap Monaco's JSON schemas to the ACTIVE project's generated entry documents, fetched pre-bundled
+ * through the platform's optional `fetchProjectSchemas` member (dev server:
+ * `/__studio/project-schemas`; desktop: RPC into the project session). Call on project activation
+ * and after project.json `extensions` changes.
+ *
+ * @param {object} platform - The studio platform (only `fetchProjectSchemas` is consulted)
+ * @returns {Promise<boolean>} True when per-project schemas were applied; false on fallback
+ */
+export async function refreshProjectSchemas(platform: {
+  fetchProjectSchemas?: () => Promise<{ project?: unknown; document?: unknown }>;
+}): Promise<boolean> {
+  const fetcher = platform.fetchProjectSchemas;
+  if (!fetcher) {
+    return false;
+  }
+  let schemas: { project?: unknown; document?: unknown };
+  try {
+    schemas = (await fetcher.call(platform)) ?? {};
+  } catch {
+    // Editor degradation: keep the bundled core schemas.
+    return false;
+  }
+  const { document, project } = schemas;
+  if (!document && !project) {
+    return false;
+  }
+  applyJsonSchemas(document ?? jxSchema, project ?? projectSchema);
+  return true;
+}
+
+/** Restore the bundled core schemas (project closed / tests). */
+export function resetProjectSchemas(): void {
+  applyJsonSchemas(jxSchema, projectSchema);
+}

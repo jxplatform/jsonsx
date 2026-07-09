@@ -258,7 +258,9 @@ function fillSlots(
 }
 
 /**
- * Update the project's project.json with a partial patch and persist to disk.
+ * Update the project's project.json with a partial patch and persist to disk. A patch touching
+ * `extensions` invalidates the format/extensions caches and refreshes the editor's per-project
+ * schemas plus the contributed settings sections — the enabled-extension surface just changed.
  *
  * @param {Partial<ProjectConfig>} patch - Fields to merge into the current projectConfig
  */
@@ -270,4 +272,11 @@ export async function updateSiteConfig(patch: Partial<ProjectConfig>) {
   } as ProjectConfig;
   await platform.writeFile("project.json", JSON.stringify(config, null, 2));
   setProjectState({ ...requireProjectState(), projectConfig: config });
+  if ("extensions" in patch) {
+    const { loadFormats, refreshExtensionUi, refreshFormats } =
+      await import("./format/format-host");
+    refreshFormats();
+    void loadFormats();
+    refreshExtensionUi(platform);
+  }
 }

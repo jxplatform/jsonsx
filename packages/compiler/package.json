@@ -21,6 +21,7 @@
     ".": "./src/compiler.ts",
     "./format-host": "./src/site/format-host.ts",
     "./project-sections": "./src/site/project-sections.ts",
+    "./schema-command": "./src/site/schema-command.ts",
     "./context-injection": "./src/site/context-injection.ts",
     "./head-merger": "./src/site/head-merger.ts",
     "./layout-resolver": "./src/site/layout-resolver.ts",

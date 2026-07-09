@@ -9,6 +9,7 @@ import {
   closeSettingsModal,
   openSettingsModal,
   registerSettingsSection,
+  unregisterSettingsSection,
 } from "../src/settings/settings-modal";
 import { initLayers } from "../src/ui/layers";
 
@@ -47,14 +48,8 @@ function navButton(label: string): HTMLElement {
   return button as HTMLElement;
 }
 
-const BUILTIN_LABELS = [
-  "General",
-  "Head",
-  "CSS Variables",
-  "Definitions",
-  "Content Types",
-  "Dependencies",
-];
+// Content Types is no longer built-in — @jxsuite/parser contributes it via $studio.settings.
+const BUILTIN_LABELS = ["General", "Head", "CSS Variables", "Definitions", "Dependencies"];
 
 beforeEach(() => {
   installMockPlatform();
@@ -97,7 +92,6 @@ describe("registerSettingsSection", () => {
       "CSS Variables",
       "Custom",
       "Definitions",
-      "Content Types",
       "Dependencies",
     ]);
 
@@ -136,5 +130,37 @@ describe("registerSettingsSection", () => {
     expect(
       modal()!.querySelector(".settings-modal-content .settings-section-title")?.textContent,
     ).toBe("General");
+  });
+});
+
+describe("unregisterSettingsSection", () => {
+  test("removes a registered section and resets an active selection to General", async () => {
+    // The registry is module-global — drop the custom section earlier tests registered.
+    unregisterSettingsSection("customSection");
+    registerSettingsSection({
+      key: "ephemeral",
+      label: "Ephemeral",
+      order: 55,
+      render: (container) => {
+        render(html`<div class="ephemeral-body">gone soon</div>`, container);
+      },
+    });
+    openSettingsModal();
+    await flush(4);
+    pointer(navButton("Ephemeral"), "click");
+    await flush();
+    expect(navButton("Ephemeral").classList.contains("active")).toBe(true);
+
+    unregisterSettingsSection("ephemeral");
+    closeSettingsModal();
+    await flush();
+    openSettingsModal();
+    await flush(4);
+    expect(navLabels()).toEqual(BUILTIN_LABELS);
+    expect(navButton("General").classList.contains("active")).toBe(true);
+  });
+
+  test("unregistering an unknown key is a no-op", () => {
+    expect(() => unregisterSettingsSection("never-registered")).not.toThrow();
   });
 });

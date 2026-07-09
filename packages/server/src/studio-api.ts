@@ -11,7 +11,11 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 
 import { errorMessage } from "@jxsuite/schema/parse";
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { buildProjectExtensionRegistry } from "@jxsuite/compiler/format-host";
+import {
+  buildExtensionsPayload,
+  buildProjectExtensionRegistry,
+} from "@jxsuite/compiler/format-host";
+import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import { applyRename } from "./refactor/apply.ts";
 import {
   bunExecutable,
@@ -20,6 +24,7 @@ import {
   outdatedPackages,
   setPackageVersions,
 } from "./packages.ts";
+import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ClassJsonDef } from "./types.ts";
 import type { DesignOptions } from "@jxsuite/create/generate";
@@ -113,19 +118,18 @@ function collectSlotDefs(node: unknown, out: SlotDef[] = []): SlotDef[] {
   return out;
 }
 
-// ─── Format registry (per project root, invalidated on project.json change) ──
+// ─── Extension registry (per project root, invalidated on project.json change) ──
 
-const formatRegistryCache = new Map<string, { mtime: number; registry: FormatRegistry }>();
+const extensionRegistryCache = new Map<string, { mtime: number; registry: ExtensionRegistry }>();
 
 /**
- * Build (or reuse) the format-dispatch view of a project's extension registry (built from its
- * project.json `extensions` array). An empty registry is returned when there is no project.json —
- * only .json files are handled then.
+ * Build (or reuse) a project's extension registry (built from its project.json `extensions` array).
+ * An empty registry is returned when there is no project.json — only .json files are handled then.
  *
  * @param {string} projectRoot
- * @returns {Promise<FormatRegistry>}
+ * @returns {Promise<ExtensionRegistry>}
  */
-async function getFormatRegistry(projectRoot: string): Promise<FormatRegistry> {
+async function getExtensionRegistry(projectRoot: string): Promise<ExtensionRegistry> {
   const projectJsonPath = resolve(projectRoot, "project.json");
   let mtime = 0;
   let projectConfig: ProjectConfig | undefined;
@@ -135,14 +139,19 @@ async function getFormatRegistry(projectRoot: string): Promise<FormatRegistry> {
   } catch {
     projectConfig = undefined;
   }
-  const cached = formatRegistryCache.get(projectRoot);
+  const cached = extensionRegistryCache.get(projectRoot);
   if (cached && cached.mtime === mtime) {
     return cached.registry;
   }
-  const extensionRegistry = await buildProjectExtensionRegistry(projectRoot, projectConfig);
-  const registry = extensionRegistry.formats;
-  formatRegistryCache.set(projectRoot, { mtime, registry });
+  const registry = await buildProjectExtensionRegistry(projectRoot, projectConfig);
+  extensionRegistryCache.set(projectRoot, { mtime, registry });
   return registry;
+}
+
+/** Format-dispatch view of {@link getExtensionRegistry} (parse/serialize/discover/load lookups). */
+async function getFormatRegistry(projectRoot: string): Promise<FormatRegistry> {
+  const registry = await getExtensionRegistry(projectRoot);
+  return registry.formats;
 }
 
 /**
@@ -1156,15 +1165,18 @@ export async function handleStudioApi(
   }
 
   // Format registry listing — lets the studio introspect available formats without
-  // Fetching each .class.json itself.
+  // Fetching each .class.json itself. The sibling `extensions` array carries each enabled
+  // Extension's manifest identity and project-section contributions (additive; the `formats`
+  // Shape is unchanged for compat).
   if (path === "/__studio/formats" && req.method === "GET") {
     const dir = url.searchParams.get("dir") || activeProjectRoot || root;
     const projectRoot = isAbsolute(dir) ? dir : resolve(root, dir);
     try {
       assertAccessible(projectRoot, root, activeProjectRoot);
-      const registry = await getFormatRegistry(projectRoot);
+      const registry = await getExtensionRegistry(projectRoot);
       return Response.json({
-        formats: registry.entries.map((e) => ({
+        extensions: buildExtensionsPayload(registry),
+        formats: registry.formats.entries.map((e) => ({
           capabilities: e.capabilities,
           documentKinds: e.documentKinds,
           exportTarget: e.exportTarget,
@@ -1177,6 +1189,25 @@ export async function handleStudioApi(
       });
     } catch (error) {
       return Response.json({ error: errorMessage(error) }, { status: 400 });
+    }
+  }
+
+  // Pre-bundled per-project entry schemas (project.schema.json / document.schema.json) for the
+  // Studio's editor — regenerated on demand when missing or older than project.json, then bundled
+  // Into self-contained compound documents so no relative $ref resolution is needed client-side.
+  if (path === "/__studio/project-schemas" && req.method === "GET") {
+    const dir = url.searchParams.get("dir") || activeProjectRoot || root;
+    const projectRoot = isAbsolute(dir) ? dir : resolve(root, dir);
+    try {
+      assertAccessible(projectRoot, root, activeProjectRoot);
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 400 });
+    }
+    try {
+      const { document, project } = await readBundledProjectSchemas(projectRoot);
+      return Response.json({ document, project });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 

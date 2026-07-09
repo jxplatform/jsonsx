@@ -439,6 +439,16 @@ export function createDesktopPlatform() {
       return rpc.request.listFormats();
     },
 
+    /** The extensions payload behind descriptor-contributed settings sections. */
+    async listExtensions() {
+      return rpc.request.listExtensions();
+    },
+
+    /** Pre-bundled per-project entry schemas for Monaco registration. */
+    async fetchProjectSchemas() {
+      return rpc.request.fetchProjectSchemas();
+    },
+
     /**
      * Class resolution via the shared dev-proxy pipeline (the same handler the canvas runtime
      * reaches through the fetch patch above), called directly over RPC.

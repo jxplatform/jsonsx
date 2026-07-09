@@ -55,9 +55,22 @@ describe("STUDIO_ROUTES", () => {
       expect(core).toContain(name);
     }
     // Known-optional surfaces stay optional.
-    for (const name of ["sites", "starters", "cfProxy", "gitClone"] as const) {
+    for (const name of ["sites", "starters", "cfProxy", "gitClone", "projectSchemas"] as const) {
       expect(optional).toContain(name);
     }
+  });
+
+  test("the formats route documents the additive extensions payload", () => {
+    expect(STUDIO_ROUTES.formats.summary).toContain("extensions");
+    expect(STUDIO_ROUTES.formats.summary).toContain("listExtensions");
+  });
+
+  test("the project-schemas route serves pre-bundled entry documents", () => {
+    expect(STUDIO_ROUTES.projectSchemas.path).toBe("/__studio/project-schemas");
+    expect(STUDIO_ROUTES.projectSchemas.method).toBe("GET");
+    expect(STUDIO_ROUTES.projectSchemas.optional).toBe(true);
+    expect(STUDIO_ROUTES.projectSchemas.summary).toContain("fetchProjectSchemas");
+    expect(STUDIO_ROUTES.projectSchemas.degradation).toContain("bundled core schemas");
   });
 
   test("file routes share one path across GET/PUT/DELETE", () => {

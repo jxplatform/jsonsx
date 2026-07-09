@@ -401,6 +401,8 @@ describe("platform methods", () => {
     ["locateFile", ["button.json"], "locateFile", { name: "button.json" }],
     ["searchFiles", ["query"], "searchFiles", { query: "query" }],
     ["listFormats", [], "listFormats", undefined],
+    ["listExtensions", [], "listExtensions", undefined],
+    ["fetchProjectSchemas", [], "fetchProjectSchemas", undefined],
     [
       "formatAction",
       [{ action: "parse", format: "md" }],

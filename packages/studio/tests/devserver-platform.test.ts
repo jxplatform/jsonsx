@@ -746,6 +746,48 @@ describe("formats", () => {
     expect(await p.listFormats()).toEqual([]);
   });
 
+  test("listExtensions returns body.extensions and defaults to []", async () => {
+    const payload = [
+      {
+        contributions: [
+          {
+            className: "Content",
+            entrySchema: { type: "object" },
+            project: { key: "content" },
+            studio: { settings: { layout: "map" } },
+          },
+        ],
+        name: "@jxsuite/parser",
+        specifier: "@jxsuite/parser",
+        title: "Content & Markdown",
+      },
+    ];
+    route("/__studio/formats", (c) => {
+      expect(c.search.get("dir")).toBe(".");
+      return json({ extensions: payload, formats: [] });
+    });
+    const p = createDevServerPlatform();
+    expect(await p.listExtensions()).toEqual(payload);
+    route("/__studio/formats", () => json({ formats: [] }));
+    expect(await p.listExtensions()).toEqual([]);
+    route("/__studio/formats", () => json({}, 500));
+    expect(await p.listExtensions()).toEqual([]);
+  });
+
+  test("fetchProjectSchemas returns the bundled pair and degrades to {}", async () => {
+    route("/__studio/project-schemas", (c) => {
+      expect(c.search.get("dir")).toBe(".");
+      return json({ document: { $ref: "https://jxsuite.com/schema/v1" }, project: { allOf: [] } });
+    });
+    const p = createDevServerPlatform();
+    expect(await p.fetchProjectSchemas()).toEqual({
+      document: { $ref: "https://jxsuite.com/schema/v1" },
+      project: { allOf: [] },
+    });
+    route("/__studio/project-schemas", () => json({ error: "boom" }, 500));
+    expect(await p.fetchProjectSchemas()).toEqual({});
+  });
+
   test("formatAction posts the payload plus dir and returns result", async () => {
     route("/__studio/format", (c) => {
       expect(c.body).toEqual({ action: "parse", dir: ".", format: "markdown", source: "# hi" });

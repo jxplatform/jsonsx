@@ -12,6 +12,7 @@ import type {
   CodeServiceResult,
   ComponentMeta,
   DirEntry,
+  ExtensionsInfo,
   FsEvent,
   GitBranchesResult,
   GitLogEntry,
@@ -22,6 +23,7 @@ import type {
   PackageInfo,
   PackageOpResult,
   ProjectListEntry,
+  ProjectSchemasResponse,
   RecentProjectEntry,
   RenameResult,
   StarterInfo,
@@ -37,6 +39,9 @@ export type {
   ComponentSlotMeta,
   DirEntry,
   ErrorBody,
+  ExtensionContributionInfo,
+  ExtensionProjectBlock,
+  ExtensionsInfo,
   FsEvent,
   GitBranchesResult,
   GitFileStatus,
@@ -49,6 +54,7 @@ export type {
   PackageInfo,
   PackageOpResult,
   ProjectListEntry,
+  ProjectSchemasResponse,
   PullRequestInfo,
   RecentProjectEntry,
   RenameResult,
@@ -126,6 +132,18 @@ export interface StudioPlatform {
   searchFiles: (query: string, extensions?: string[]) => Promise<DirEntry[]>;
   /** List the project's registered format classes (auto-discovered from imports). */
   listFormats?: () => Promise<unknown[]>;
+  /**
+   * List the project's enabled extension packages with their project-section contributions
+   * (specs/extensions.md §9/§9.1) — the formats route's sibling `extensions` payload. Optional:
+   * platforms without it lose descriptor-contributed settings sections.
+   */
+  listExtensions?: () => Promise<ExtensionsInfo[]>;
+  /**
+   * Fetch the project's generated entry schemas (project.schema.json / document.schema.json),
+   * PRE-BUNDLED into self-contained documents for editor registration. Optional: without it the
+   * JSON editor keeps the bundled core schemas.
+   */
+  fetchProjectSchemas?: () => Promise<ProjectSchemasResponse>;
   /** Invoke a format capability (parse/serialize) — { format, action, source?, doc?, options? }. */
   formatAction?: (payload: Record<string, unknown>) => Promise<unknown>;
   fetchPluginSchema: (src: string, prototype?: string, base?: string) => Promise<unknown>;

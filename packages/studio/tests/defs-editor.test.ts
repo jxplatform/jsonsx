@@ -3,7 +3,7 @@
  *
  * The editor keeps module-level selection state, so each test installs a fresh mock platform +
  * project config and drives selection through the rendered list buttons (same approach as
- * content-types-editor.test.ts).
+ * contributed-content-types.test.ts).
  */
 import { flush, installMockPlatform, key, pointer, resetStudioState } from "./harness";
 import { describe, expect, test } from "bun:test";

@@ -34,6 +34,7 @@ import {
   formatForPath,
   loadFormats,
   noFormatError,
+  refreshExtensionUi,
   refreshFormats,
 } from "../format/format-host";
 import { view } from "../view";
@@ -83,6 +84,7 @@ export async function loadProject() {
 
     refreshFormats();
     void loadFormats();
+    refreshExtensionUi(platform);
 
     setProjectState({
       dirs: new Map(),
@@ -145,6 +147,7 @@ export async function openProject({
 
     refreshFormats();
     void loadFormats();
+    refreshExtensionUi(platform);
 
     setProjectState({
       .../** @type {ProjectState} */ projectState,
