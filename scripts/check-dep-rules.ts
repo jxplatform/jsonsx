@@ -93,10 +93,13 @@ for (const pkg of core) {
     const text = await Bun.file(file).text();
     for (const extName of extensionNames) {
       // Catches static imports, re-exports, and dynamic import()/require()
-      // Specifiers — any quoted specifier equal to or under the package.
-      const specifier = new RegExp(`["'\`]${extName}(/[^"'\`]*)?["'\`]`);
+      // Specifiers only — quoted MENTIONS (error-message guidance, doc
+      // Examples, degradation fallback literals) are not dependencies.
+      const specifier = new RegExp(
+        `(from\\s+|import\\s*\\(\\s*|require\\s*\\(\\s*)["'\`]${extName}(/[^"'\`]*)?["'\`]`,
+      );
       if (specifier.test(text)) {
-        violations.push(`${file}: core source references extension package "${extName}"`);
+        violations.push(`${file}: core source imports extension package "${extName}"`);
       }
     }
   }

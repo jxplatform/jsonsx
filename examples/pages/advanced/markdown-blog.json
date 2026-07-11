@@ -2,8 +2,8 @@
   "title": "Markdown Blog — Jx Examples",
   "$layout": "./layouts/example.json",
   "imports": {
-    "MarkdownCollection": "../../packages/parser/MarkdownCollection.class.json",
-    "Markdown": "../../packages/parser/Markdown.class.json"
+    "MarkdownCollection": "@jxsuite/parser/MarkdownCollection.class.json",
+    "Markdown": "@jxsuite/parser/Markdown.class.json"
   },
   "state": {
     "posts": {

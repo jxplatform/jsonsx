@@ -376,7 +376,7 @@ describe("classFromSchema — via resolvePrototype", () => {
 
 describe("resolveClassJson — hybrid $implementation", () => {
   test("follows $implementation to JS module via resolveExternalPrototype", async () => {
-    const parserDir = resolvePath(__dirname, "..", "..", "parser", "src");
+    const parserDir = resolvePath(__dirname, "..", "..", "..", "extensions", "parser", "src");
     const hybridDef = {
       $implementation: "./markdown.js",
       $prototype: "Class",

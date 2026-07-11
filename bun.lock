@@ -39,6 +39,31 @@
         "@shoelace-style/shoelace": "^2.20.1",
       },
     },
+    "extensions/parser": {
+      "name": "@jxsuite/parser",
+      "version": "0.35.1",
+      "dependencies": {
+        "@jxsuite/markup": "workspace:^",
+        "@jxsuite/schema": "workspace:^",
+        "glob": "^13.0.6",
+        "mdast-util-to-string": "^4.0.0",
+        "remark-directive": "^4.0.0",
+        "remark-frontmatter": "^5.0.0",
+        "remark-gfm": "^4.0.1",
+        "remark-parse": "^11.0.0",
+        "remark-parse-frontmatter": "^1.0.3",
+        "remark-stringify": "^11.0.0",
+        "unified": "^11.0.5",
+        "unist-util-visit": "^5.1.0",
+        "yaml": "^2.9.0",
+      },
+      "devDependencies": {
+        "@happy-dom/global-registrator": "^20.10.6",
+        "@jxsuite/runtime": "workspace:^",
+        "@types/mdast": "^4.0.4",
+        "ajv": "^8.20.0",
+      },
+    },
     "packages/ai": {
       "name": "@jxsuite/ai",
       "version": "0.33.0",
@@ -148,31 +173,6 @@
       },
       "devDependencies": {
         "@types/hast": "3.0.4",
-      },
-    },
-    "packages/parser": {
-      "name": "@jxsuite/parser",
-      "version": "0.35.1",
-      "dependencies": {
-        "@jxsuite/markup": "workspace:^",
-        "@jxsuite/schema": "workspace:^",
-        "glob": "^13.0.6",
-        "mdast-util-to-string": "^4.0.0",
-        "remark-directive": "^4.0.0",
-        "remark-frontmatter": "^5.0.0",
-        "remark-gfm": "^4.0.1",
-        "remark-parse": "^11.0.0",
-        "remark-parse-frontmatter": "^1.0.3",
-        "remark-stringify": "^11.0.0",
-        "unified": "^11.0.5",
-        "unist-util-visit": "^5.1.0",
-        "yaml": "^2.9.0",
-      },
-      "devDependencies": {
-        "@happy-dom/global-registrator": "^20.10.6",
-        "@jxsuite/runtime": "workspace:^",
-        "@types/mdast": "^4.0.4",
-        "ajv": "^8.20.0",
       },
     },
     "packages/protocol": {
@@ -683,7 +683,7 @@
 
     "@jxsuite/markup": ["@jxsuite/markup@workspace:packages/markup"],
 
-    "@jxsuite/parser": ["@jxsuite/parser@workspace:packages/parser"],
+    "@jxsuite/parser": ["@jxsuite/parser@workspace:extensions/parser"],
 
     "@jxsuite/protocol": ["@jxsuite/protocol@workspace:packages/protocol"],
 

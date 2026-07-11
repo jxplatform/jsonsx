@@ -3,7 +3,7 @@
   "packages/schema": "0.35.0",
   "packages/runtime": "0.34.2",
   "packages/markup": "0.1.0",
-  "packages/parser": "0.35.1",
+  "extensions/parser": "0.35.1",
   "packages/compiler": "0.35.0",
   "packages/import": "0.35.1",
   "packages/starters": "0.35.1",

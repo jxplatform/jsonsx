@@ -1,5 +1,5 @@
 /**
- * Unit tests for packages/parser/src/transpile.ts — Jx Markdown transpiler.
+ * Unit tests for extensions/parser/src/transpile.ts — Jx Markdown transpiler.
  *
  * Covers all exported functions, every mdast node kind in JX_TAG_MAP, directive attribute routing
  * (custom vs standard elements), phrasing unwrap, and the null/edge paths of mdastNodeToJx.

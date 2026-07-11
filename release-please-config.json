@@ -22,7 +22,7 @@
       "release-type": "node",
       "component": "markup"
     },
-    "packages/parser": {
+    "extensions/parser": {
       "release-type": "node",
       "component": "parser"
     },

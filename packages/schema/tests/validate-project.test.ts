@@ -15,7 +15,7 @@ import { validateProjectFile } from "../src/validate-project";
 const CORE_FRAGMENT_SRC = resolve(import.meta.dir, "../schemas/project.core.schema.json");
 const PARSER_FRAGMENT_SRC = resolve(
   import.meta.dir,
-  "../../parser/schemas/project.fragment.schema.json",
+  "../../../extensions/parser/schemas/project.fragment.schema.json",
 );
 
 const CORE_REF = "./node_modules/@jxsuite/schema/schemas/project.core.schema.json";

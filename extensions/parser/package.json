@@ -6,7 +6,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jxsuite/jx.git",
-    "directory": "packages/parser"
+    "directory": "extensions/parser"
   },
   "files": [
     "src/",

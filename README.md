@@ -54,7 +54,7 @@ Jx is a schema and runtime for building reactive web applications using **plain 
 | [`@jxsuite/studio`](packages/studio)     | Visual builder for Jx documents                                        |
 | [`@jxsuite/desktop`](packages/desktop)   | Standalone desktop app (Electrobun)                                    |
 | [`@jxsuite/schema`](packages/schema)     | JSON Schema 2020-12 meta-schema generator                              |
-| [`@jxsuite/parser`](packages/parser)     | Markdown parser and external class integration                         |
+| [`@jxsuite/parser`](extensions/parser)   | Markdown parser and external class integration                         |
 
 ## Quick start
 
