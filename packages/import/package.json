@@ -31,7 +31,7 @@
     "import": "bun run src/cli.ts"
   },
   "dependencies": {
-    "@jxsuite/parser": "workspace:^",
+    "@jxsuite/markup": "workspace:^",
     "@jxsuite/schema": "workspace:^",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",

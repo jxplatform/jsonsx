@@ -1,4 +1,4 @@
-import { htmlToJx } from "@jxsuite/parser/html-to-jx";
+import { htmlToJx } from "@jxsuite/markup/html-to-jx";
 import type { JxElement } from "@jxsuite/schema/types";
 
 export interface ToJxResult {

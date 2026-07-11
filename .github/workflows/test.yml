@@ -23,6 +23,7 @@ jobs:
           - { dir: packages/create, flag: create }
           - { dir: packages/desktop, flag: desktop }
           - { dir: packages/import, flag: import }
+          - { dir: packages/markup, flag: markup }
           - { dir: packages/parser, flag: parser }
           - { dir: packages/protocol, flag: protocol }
           - { dir: packages/runtime, flag: runtime }

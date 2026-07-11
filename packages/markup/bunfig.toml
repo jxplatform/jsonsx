@@ -1,0 +1,5 @@
+[test]
+coverageReporter = ["text", "lcov"]
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = ["**/tests/**", "./result/**", "../schema/**"]
+coverageThreshold = { lines = 0.87, functions = 0.88 }

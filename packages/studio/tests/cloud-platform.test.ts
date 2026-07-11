@@ -533,43 +533,68 @@ describe("session events (WebSocket)", () => {
   });
 });
 
-describe("formats (browser-safe built-ins)", () => {
-  test("listFormats names the entry after the project's Markdown import", async () => {
-    mockFetch({
-      "/project-info": {
+describe("formats (session backend registry)", () => {
+  test("listFormats and listExtensions read the session formats route", async () => {
+    const calls = mockFetch({
+      "/formats": {
         body: {
-          root: "octocat/my-site",
-          name: "my-site",
-          defaultBranch: "main",
-          permission: "admin",
-          projectConfig: { imports: { Md: "@jxsuite/parser/Markdown.class.json" } },
+          formats: [{ name: "Markdown", extensions: [".md"] }],
+          extensions: [
+            {
+              specifier: "@jxsuite/parser",
+              name: "@jxsuite/parser",
+              contributions: [],
+              classes: [{ name: "Markdown", path: "/deps/parser/src/Markdown.class.json" }],
+            },
+          ],
         },
       },
     });
     const p = createCloudPlatform(PROJECT);
     const formats = (await p.listFormats?.()) as { name: string; extensions: string[] }[];
-    expect(formats[0]?.name).toBe("Md");
-    expect(formats[0]?.extensions).toEqual([".md"]);
-  });
-
-  test("listFormats defaults to Markdown when the config is unreachable", async () => {
-    mockFetch({ "/project-info": { status: 500, body: { error: "boom" } } });
-    const p = createCloudPlatform(PROJECT);
-    const formats = (await p.listFormats?.()) as { name: string }[];
     expect(formats[0]?.name).toBe("Markdown");
+    expect(formats[0]?.extensions).toEqual([".md"]);
+    const extensions = await p.listExtensions?.();
+    expect(extensions?.[0]?.classes?.[0]?.name).toBe("Markdown");
+    expect(calls.every((c) => c.url === `${BASE}/formats`)).toBe(true);
   });
 
-  test("formatAction parses and serializes markdown in-page", async () => {
-    mockFetch({});
+  test("both registry reads degrade to empty lists on backends without the route", async () => {
+    mockFetch({ "/formats": { status: 404, body: { error: "no such route" } } });
+    const p = createCloudPlatform(PROJECT);
+    expect(await p.listFormats?.()).toEqual([]);
+    expect(await p.listExtensions?.()).toEqual([]);
+    // Project-less mode has no session to ask.
+    const projectless = createCloudPlatform(null);
+    expect(await projectless.listFormats?.()).toEqual([]);
+    expect(await projectless.listExtensions?.()).toEqual([]);
+  });
+
+  test("formatAction posts to the session format route and unwraps result", async () => {
+    const calls = mockFetch({
+      "/format": { body: { result: { children: [{ tagName: "h1", textContent: "Hello" }] } } },
+    });
     const p = createCloudPlatform(PROJECT);
     const doc = (await p.formatAction?.({
       action: "parse",
+      format: "Markdown",
       source: "# Hello",
     })) as { children?: unknown[] };
     expect(JSON.stringify(doc)).toContain("Hello");
-    const text = (await p.formatAction?.({ action: "serialize", doc })) as string;
-    expect(text).toContain("Hello");
-    expect(p.formatAction?.({ action: "discover" })).rejects.toThrow(/Unsupported format action/);
+    expect(calls[0]?.url).toBe(`${BASE}/format`);
+    expect(calls[0]?.init?.method).toBe("POST");
+  });
+
+  test("formatAction surfaces backend errors and the missing-route fallback", async () => {
+    mockFetch({ "/format": { status: 400, body: { error: 'Unsupported action "discover"' } } });
+    const p = createCloudPlatform(PROJECT);
+    expect(p.formatAction?.({ action: "discover" })).rejects.toThrow(/Unsupported action/);
+
+    globalThis.fetch = (() =>
+      Promise.resolve(new Response("not found", { status: 404 }))) as unknown as typeof fetch;
+    expect(p.formatAction?.({ action: "parse", source: "" })).rejects.toThrow(
+      /cannot run format actions yet/,
+    );
   });
 });
 

@@ -17,11 +17,11 @@ import remarkFrontmatter from "remark-frontmatter";
 import remarkParseFrontmatter from "remark-parse-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkDirective from "remark-directive";
-import { htmlToJx } from "./html-to-jx.ts";
+import { htmlToJx } from "@jxsuite/markup/html-to-jx";
 import type { MdastNode, UnifiedProcessor } from "./types.ts";
 import type { JsonValue, JxAttributeValue, JxDocument, JxElement } from "@jxsuite/schema/types";
 
-export { htmlToJx } from "./html-to-jx.ts";
+export { htmlToJx } from "@jxsuite/markup/html-to-jx";
 
 // ─── Dot-path expansion ─────────────────────────────────────────────────────
 

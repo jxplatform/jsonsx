@@ -11,15 +11,11 @@
  * gitClone, resolveClass, component discovery, code services.
  */
 
-/* Import the browser-safe primitives directly (NOT the Markdown class —
-   its node-only discover/load chain drags glob/node:fs into the bundle). */
-import { transpileJxMarkdown } from "@jxsuite/parser/transpile";
-import { serializeJxMarkdown } from "@jxsuite/parser/serialize";
-import markdownClassDef from "@jxsuite/parser/Markdown.class.json";
 import type { WsCollabConnection } from "@jxsuite/collab/client";
-import type { JxDocument, ProjectConfig } from "@jxsuite/schema/types";
+import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
   DirEntry,
+  ExtensionsInfo,
   FsEvent,
   GitBranchesResult,
   GitLogEntry,
@@ -72,47 +68,6 @@ async function okJson<T>(res: Response, fallback: string): Promise<T> {
     throw new Error(await errorMessage(res, fallback));
   }
   return (await res.json()) as T;
-}
-
-/**
- * Formats the cloud can execute: browser-safe built-ins only (parse/serialize run IN the editor
- * page via @jxsuite/parser — the platform never executes project JS). The registry entry mirrors
- * the devserver's `GET /__studio/formats` shape, sourced from the canonical class descriptor.
- * Unlike the devserver we register Markdown regardless of project.json imports — the compiler still
- * requires the import for `jx build`, but the editor should never strand a .md file unopenable.
- */
-interface MarkdownClassDef {
-  format: {
-    extensions: string[];
-    mediaType: string;
-    documentKinds: string[];
-    exportTarget: boolean;
-    remote: boolean;
-  };
-  $studio: Record<string, unknown>;
-}
-
-function builtinFormats(config: ProjectConfig | null): Record<string, unknown>[] {
-  const def = markdownClassDef as unknown as MarkdownClassDef;
-  const imports = (config?.imports ?? {}) as Record<string, string>;
-  const importedName = Object.keys(imports).find((name) =>
-    imports[name]?.includes("Markdown.class.json"),
-  );
-  return [
-    {
-      name: importedName ?? "Markdown",
-      extensions: def.format.extensions,
-      mediaType: def.format.mediaType,
-      documentKinds: def.format.documentKinds,
-      exportTarget: def.format.exportTarget,
-      remote: def.format.remote,
-      studio: def.$studio,
-      capabilities: {
-        parse: { identifier: "parse", timing: ["compiler", "server", "client"] },
-        serialize: { identifier: "serialize", timing: ["compiler", "server", "client"] },
-      },
-    },
-  ];
 }
 
 /** Editor URL for a project session (mirrors the shell's route). */
@@ -246,8 +201,6 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
       throw new Error(await errorMessage(res, "Failed to update package.json"));
     }
   }
-
-  let cachedConfig: ProjectConfig | null = null;
 
   const platform: StudioPlatform = {
     id: "cloud",
@@ -415,34 +368,59 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
       };
     },
 
-    // ─── Formats (browser-safe built-ins, executed in-page) ───────────────
+    // ─── Formats (session backend registry, mirroring the dev-server seam) ─
 
+    /**
+     * The project's format registry, served by the session gateway (the dev server's `GET
+     * /__studio/formats` under this session's base path). Part-4 cleanup: the cloud ProjectSession
+     * does not serve the route yet, so this degrades to an empty registry (only .json documents
+     * open) until the backend lands it.
+     */
     async listFormats() {
-      if (cachedConfig === null) {
-        try {
-          const info = await projectInfo();
-          cachedConfig = (info.projectConfig as ProjectConfig | null) ?? null;
-        } catch {
-          cachedConfig = null;
+      try {
+        const res = await api("/formats");
+        if (!res.ok) {
+          return [];
         }
+        const body = (await res.json()) as { formats?: Record<string, unknown>[] };
+        return body.formats ?? [];
+      } catch {
+        return [];
       }
-      return builtinFormats(cachedConfig);
     },
 
+    /** The extensions payload riding beside `formats` on the same route. */
+    async listExtensions(): Promise<ExtensionsInfo[]> {
+      try {
+        const res = await api("/formats");
+        if (!res.ok) {
+          return [];
+        }
+        const body = (await res.json()) as { extensions?: ExtensionsInfo[] };
+        return body.extensions ?? [];
+      } catch {
+        return [];
+      }
+    },
+
+    /**
+     * Invoke a format capability (parse/serialize) on the session backend — the dev server's `POST
+     * /__studio/format` seam. In-page execution left with the core → @jxsuite/parser dependency, so
+     * backends without the route surface the error below instead of silently mangling format
+     * documents.
+     */
     async formatAction(payload: Record<string, unknown>) {
-      const { action, source, doc, options } = payload as {
-        action: string;
-        source?: string;
-        doc?: Record<string, unknown>;
-        options?: Record<string, unknown>;
-      };
-      if (action === "parse") {
-        return transpileJxMarkdown(source ?? "");
+      const res = await postJson("/format", payload);
+      if (!res.ok) {
+        throw new Error(
+          await errorMessage(
+            res,
+            "This cloud session cannot run format actions yet (the backend serves no format route)",
+          ),
+        );
       }
-      if (action === "serialize") {
-        return serializeJxMarkdown((doc ?? {}) as JxDocument, options);
-      }
-      throw new Error(`Unsupported format action: ${action}`);
+      const data = (await res.json()) as { result?: unknown };
+      return data.result;
     },
 
     // ─── Components / code services (cloud: static-only posture) ──────────

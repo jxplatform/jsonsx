@@ -18,6 +18,10 @@
       "release-type": "node",
       "component": "runtime"
     },
+    "packages/markup": {
+      "release-type": "node",
+      "component": "markup"
+    },
     "packages/parser": {
       "release-type": "node",
       "component": "parser"

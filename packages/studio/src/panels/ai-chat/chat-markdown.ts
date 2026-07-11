@@ -1,7 +1,7 @@
 /**
  * Chat-markdown.js — memoized markdown rendering for assistant chat messages.
  *
- * Wraps @jxsuite/parser/md-html (sanitized markdown → HTML) with a per-message cache
+ * Wraps @jxsuite/markup/md-html (sanitized markdown → HTML) with a per-message cache
  * keyed by message id + content length, so re-renders during streaming only re-parse
  * the message that actually grew. The HTML goes through unsafeHTML, which is safe here
  * because md-html sanitizes (raw HTML dropped, javascript: URLs stripped).
@@ -12,7 +12,7 @@
 import { html } from "lit-html";
 import type { TemplateResult } from "lit-html";
 import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
-import { markdownToHtml } from "@jxsuite/parser/md-html";
+import { markdownToHtml } from "@jxsuite/markup/md-html";
 
 const cache = new Map<string, { len: number; html: string }>();
 

@@ -24,7 +24,7 @@ import remarkStringify from "remark-stringify";
 import remarkDirective from "remark-directive";
 import remarkGfm from "remark-gfm";
 import { stringify as stringifyYaml } from "yaml";
-import { htmlToJx } from "./html-to-jx.ts";
+import { htmlToJx } from "@jxsuite/markup/html-to-jx";
 import { expandDotPaths } from "./transpile.ts";
 import type {
   JsonValue,

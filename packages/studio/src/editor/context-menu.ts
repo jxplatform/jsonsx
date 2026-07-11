@@ -3,7 +3,7 @@
 import { html } from "lit-html";
 import { jsonClone } from "../utils/studio-utils";
 import { ref } from "lit-html/directives/ref.js";
-import { htmlToJx } from "@jxsuite/parser/html-to-jx";
+import { htmlToJx } from "@jxsuite/markup/html-to-jx";
 import { childIndex, getNodeAtPath, parentElementPath } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
 import {

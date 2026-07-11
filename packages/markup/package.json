@@ -1,0 +1,42 @@
+{
+  "name": "@jxsuite/markup",
+  "version": "0.1.0",
+  "description": "Browser-safe markup conversion: HTML → Jx nodes, markdown → sanitized HTML",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "packages/markup"
+  },
+  "files": [
+    "src/"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./html-to-jx": "./src/html-to-jx.ts",
+    "./md-html": "./src/md-html.ts"
+  },
+  "publishConfig": {
+    "provenance": true
+  },
+  "scripts": {
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage"
+  },
+  "dependencies": {
+    "@jxsuite/schema": "workspace:^",
+    "hast-util-from-html": "^2.0.3",
+    "hast-util-whitespace": "^3.0.0",
+    "property-information": "^7.2.0",
+    "rehype-sanitize": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "unified": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/hast": "3.0.4"
+  }
+}

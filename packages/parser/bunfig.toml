@@ -8,6 +8,7 @@ coveragePathIgnorePatterns = [
   "../compiler/**",
   "../create/**",
   "../desktop/**",
+  "../markup/**",
   "../runtime/**",
   "../schema/**",
   "../server/**",

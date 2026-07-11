@@ -4,6 +4,7 @@
  */
 import { installMockPlatform } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
+import { refreshFormats, setExtensions } from "../src/format/format-host";
 import {
   documentUrlPattern,
   dynamicRouteParams,
@@ -115,6 +116,33 @@ describe("loadParamValues", () => {
         contentType: "product",
       },
     ]);
+  });
+
+  test("contentType shape derives $src from the extensions payload when present", async () => {
+    setExtensions([
+      {
+        specifier: "@jxsuite/parser",
+        name: "@jxsuite/parser",
+        contributions: [],
+        classes: [
+          { name: "Markdown", path: "/ext/parser/src/Markdown.class.json" },
+          { name: "ContentCollection", path: "/ext/parser/src/ContentCollection.class.json" },
+        ],
+      },
+    ]);
+    try {
+      const calls: Record<string, unknown>[] = [];
+      installMockPlatform({
+        resolveClass: async (body: Record<string, unknown>) => {
+          calls.push(body);
+          return [];
+        },
+      });
+      await loadParamValues("p4-ext", { contentType: "product" });
+      expect(calls[0]?.$src).toBe("/ext/parser/src/ContentCollection.class.json");
+    } finally {
+      refreshFormats();
+    }
   });
 
   test("contentType shape defaults to param=slug / field=id", async () => {

@@ -150,6 +150,12 @@ export interface ExtensionsInfo {
   description?: string;
   /** Project-section contributions, in class declaration order. */
   contributions: ExtensionContributionInfo[];
+  /**
+   * Every manifest class of the extension with its backend-resolved descriptor path, in declaration
+   * order. Optional (additive): older backends omit it, and consumers needing a class `$src` fall
+   * back to their historical literals.
+   */
+  classes?: { name: string; path: string }[];
 }
 
 /**

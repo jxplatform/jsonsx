@@ -204,7 +204,7 @@ export function createWsCollabConnection(options: WsCollabConnectionOptions): Ws
           entry.resolveOpen?.(false);
           entry.resolveOpen = null;
         }
-        return;
+        break;
       }
       default: {
         break;
@@ -290,7 +290,7 @@ export function createWsCollabConnection(options: WsCollabConnectionOptions): Ws
         }
         case "awareness": {
           applyAwarenessUpdate(awareness, frame.body, "remote");
-          return;
+          break;
         }
         default: {
           break;

@@ -1114,7 +1114,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         activeEditHost = null;
       }
       toolbarRefresh?.();
-      return;
+      break;
     }
     default: {
       break;

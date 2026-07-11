@@ -5,7 +5,7 @@
  */
 
 import { defaultContentFormat, formatByName } from "../format/format-host";
-import type { ContentTypeDef } from "@jxsuite/parser/types";
+import type { ContentSectionEntry } from "../types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
 /**
@@ -173,7 +173,7 @@ export function findContentTypeSchema(
   // OS-native backslash paths on Windows, so normalize before prefix matching.
   const docPath = documentPath.replaceAll("\\", "/");
   for (const [name, def] of Object.entries(
-    projectConfig.content as Record<string, ContentTypeDef>,
+    projectConfig.content as Record<string, ContentSectionEntry>,
   )) {
     if (!def.source || !def.schema) {
       continue;

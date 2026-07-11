@@ -1,6 +1,11 @@
 /// <reference lib="dom" />
 import type { CollabHandle } from "@jxsuite/collab/provider";
-import type { JxMutableNode, JxPath, ProjectConfig } from "@jxsuite/schema/types";
+import type {
+  ContentTypeSchema,
+  JxMutableNode,
+  JxPath,
+  ProjectConfig,
+} from "@jxsuite/schema/types";
 
 // ─── Wire types (the Studio Backend Protocol) ───────────────────────────────
 /* The request/response shapes every backend serves live in @jxsuite/protocol;
@@ -290,6 +295,18 @@ export interface StudioPlatform {
 }
 
 // ─── Studio Types ───────────────────────────────────────────────────────────
+
+/**
+ * A project.json `content` section entry, as the studio consumes it. The parser extension owns the
+ * full shape (its project fragment schema is the validation source of truth); the studio only reads
+ * these fields.
+ */
+export interface ContentSectionEntry {
+  source?: string;
+  format?: string;
+  schema?: ContentTypeSchema;
+  $elements?: unknown[];
+}
 
 export interface CanvasPanel {
   mediaName: string;

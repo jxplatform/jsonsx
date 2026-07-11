@@ -11,6 +11,7 @@
  */
 
 import { getPlatform } from "./platform";
+import { loadExtensions } from "./format/format-host";
 import type { JxMutableNode, JxPathsDef } from "@jxsuite/schema/types";
 
 /** Param name → candidate values, in `$paths` declaration order. */
@@ -191,16 +192,35 @@ async function resolveParamValues(pathsDef: JxPathsDef): Promise<ParamValues> {
 }
 
 /**
+ * The `$src` of the ContentCollection class from the enabled extensions payload — whichever
+ * extension's manifest declares a class named `ContentCollection` (its backend-resolved descriptor
+ * path feeds `/__jx_resolve__` directly). Platforms without an extensions payload fall back to the
+ * historical parser-package specifier.
+ *
+ * @returns {Promise<string>}
+ */
+async function contentCollectionSrc(): Promise<string> {
+  const extensions = await loadExtensions();
+  for (const ext of extensions) {
+    const cls = ext.classes?.find((c) => c.name === "ContentCollection");
+    if (cls) {
+      return cls.path;
+    }
+  }
+  return "@jxsuite/parser/ContentCollection.class.json";
+}
+
+/**
  * Resolve a ContentCollection for a content type via the PAL, falling back to a plain dev-proxy
  * fetch on platforms that predate `resolveClass`.
  *
  * @param {string} contentType
  * @returns {Promise<unknown>}
  */
-function resolveContentCollection(contentType: string) {
+async function resolveContentCollection(contentType: string) {
   const body = {
     $prototype: "ContentCollection",
-    $src: "@jxsuite/parser/ContentCollection.class.json",
+    $src: await contentCollectionSrc(),
     contentType,
   };
   const platform = getPlatform();

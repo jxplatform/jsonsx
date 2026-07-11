@@ -125,6 +125,11 @@ export interface ExtensionsPayloadEntry {
   title?: string;
   description?: string;
   contributions: ExtensionsPayloadContribution[];
+  /**
+   * Every manifest class of the extension with its resolved descriptor path, in declaration order
+   * (additive; lets the studio address a class by `$src` without hardcoding its package layout).
+   */
+  classes: { name: string; path: string }[];
 }
 
 /**
@@ -163,6 +168,7 @@ export function buildExtensionsPayload(registry: ExtensionRegistry): ExtensionsP
       });
     }
     payload.push({
+      classes: ext.classes.map((cls) => ({ name: cls.name, path: cls.classPath })),
       contributions,
       name: ext.manifest.name,
       specifier: ext.specifier,

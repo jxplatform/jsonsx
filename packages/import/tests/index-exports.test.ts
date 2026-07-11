@@ -27,7 +27,7 @@ describe("package exports", () => {
       "diffScreenshots",
       "verifyProject",
     ] as const) {
-      expect(typeof api[name]).toBe("function");
+      expect(typeof (api as Record<string, unknown>)[name]).toBe("function");
     }
     expect(Array.isArray(api.STYLE_ALLOWLIST)).toBe(true);
   });

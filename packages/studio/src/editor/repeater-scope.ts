@@ -16,13 +16,8 @@ import { isRef } from "@jxsuite/schema/guards";
 import { getNodeAtPath } from "../state";
 
 import type { JxPath } from "../state";
-import type { ContentTypeDef } from "@jxsuite/parser/types";
-import type {
-  JxMappedArray,
-  JxMutableNode,
-  ProjectConfig,
-  ContentTypeSchema,
-} from "@jxsuite/schema/types";
+import type { ContentSectionEntry } from "../types";
+import type { JxMappedArray, JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
 
 /** Cap on how many inferred/declared fields we enumerate (mirrors merge-tags BREADTH_CAP breadth). */
 const FIELD_CAP = 50;
@@ -104,10 +99,9 @@ export function resolveRepeaterItemFields(
       // (a) Content collection — `{ contentType: "<name>" }`. Import-aliased `$prototype` still
       // Matches because we detect on the `contentType` string, not the prototype name.
       if (typeof def.contentType === "string") {
-        const content = (projectConfig?.content ?? {}) as Record<string, ContentTypeDef>;
+        const content = (projectConfig?.content ?? {}) as Record<string, ContentSectionEntry>;
         const ct = content[def.contentType];
-        const schema = ct?.schema as ContentTypeSchema | undefined;
-        const props = schema?.properties;
+        const props = ct?.schema?.properties;
         const out = [...base, "item.id", "item.body"];
         if (props && typeof props === "object") {
           for (const f of safeFields(Object.keys(props))) {

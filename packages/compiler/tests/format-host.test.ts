@@ -107,6 +107,10 @@ describe("buildExtensionsPayload", () => {
       expect(parser!.specifier).toBe("@jxsuite/parser");
       expect(parser!.name).toBe("@jxsuite/parser");
       expect(parser!.title).toBe("Content & Markdown");
+      // Additive classes list: every manifest class with its resolved descriptor path.
+      const collection = parser!.classes.find((cls) => cls.name === "ContentCollection");
+      expect(collection?.path.endsWith("ContentCollection.class.json")).toBe(true);
+      expect(parser!.classes.length).toBeGreaterThanOrEqual(6);
       expect(parser!.contributions).toHaveLength(1);
       const [content] = parser!.contributions;
       expect(content!.className).toBe("Content");

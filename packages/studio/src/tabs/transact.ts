@@ -343,7 +343,7 @@ function applyDocOp(tab: Tab, op: JxDocOp) {
         toIndex: op.toIndex,
         toParentPath: op.toParentPath,
       });
-      return;
+      break;
     }
     default: {
       break;

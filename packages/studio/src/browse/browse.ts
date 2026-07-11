@@ -34,7 +34,7 @@ import {
 } from "../format/format-host";
 
 import type { ComponentEntry } from "../files/components";
-import type { ContentTypeDef } from "@jxsuite/parser/types";
+import type { ContentSectionEntry } from "../types";
 import type { JxDocument } from "@jxsuite/schema/types";
 
 // ─── Category definitions ────────────────────────────────────────────────────
@@ -193,7 +193,7 @@ async function collectFiles(
  */
 function contentTypeFor(filePath: string) {
   const config = projectState?.projectConfig;
-  const content = (config?.content ?? {}) as Record<string, ContentTypeDef>;
+  const content = (config?.content ?? {}) as Record<string, ContentSectionEntry>;
   for (const [name, d] of Object.entries(content)) {
     if (!d.source) {
       continue;
@@ -262,7 +262,7 @@ function getEntityTypes() {
  */
 function buildFrontmatterYaml(contentTypeName: string) {
   const config = projectState?.projectConfig;
-  const content = (config?.content ?? {}) as Record<string, ContentTypeDef>;
+  const content = (config?.content ?? {}) as Record<string, ContentSectionEntry>;
   const col = content[contentTypeName];
   if (!col?.schema?.properties) {
     return "title: Untitled\n";
@@ -283,7 +283,7 @@ function buildFrontmatterYaml(contentTypeName: string) {
  */
 function getContentTypeTypes() {
   const config = projectState?.projectConfig;
-  const content = (config?.content ?? {}) as Record<string, ContentTypeDef>;
+  const content = (config?.content ?? {}) as Record<string, ContentSectionEntry>;
   return Object.entries(content).map(([name, d]) => {
     const dir = d.source ? d.source.replace(/^\.\//, "").replace(/\/$/, "") : name;
     return {
