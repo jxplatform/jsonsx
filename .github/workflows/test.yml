@@ -18,6 +18,7 @@ jobs:
         # flag = codecov flag / artifact name (flags cannot contain "/").
         package:
           - { dir: packages/ai, flag: ai }
+          - { dir: extensions/auth, flag: auth }
           - { dir: packages/collab, flag: collab }
           - { dir: packages/compiler, flag: compiler }
           - { dir: extensions/connector, flag: connector }

@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/auth/Auth.class.json",
+  "title": "Auth",
+  "description": "Owner of the project.json `auth` section and the /_jx/auth server mount: Better Auth over a connector connection, publishing the ctx.auth hooks the data mount authorizes against",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./worker.js",
+
+  "project": {
+    "key": "auth",
+    "title": "Authentication",
+    "description": "Better Auth sessions and sign-in methods served at /_jx/auth"
+  },
+
+  "server": {
+    "basePath": "/_jx/auth",
+    "order": 10,
+    "module": "@jxsuite/auth/worker"
+  },
+
+  "$studio": {
+    "settings": {
+      "icon": "sp-icon-lock-closed",
+      "label": "Authentication",
+      "order": 58,
+      "layout": "form",
+      "entry": {
+        "ui": {
+          "connection": { "enum": { "$ref": "#/$context/connections" } },
+          "secretEnv": { "control": "secret" }
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "returnTypes": {
+      "SectionData": {
+        "type": "object",
+        "description": "The auth section value (identifiers and env-var names only), stored as _project.auth"
+      }
+    },
+
+    "methods": {
+      "projectData": {
+        "role": "projectData",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "projectData",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "sectionValue",
+            "type": { "type": "object" },
+            "description": "The project.json `auth` section value"
+          },
+          {
+            "identifier": "ctx",
+            "type": { "type": "object" },
+            "description": "Host context: { projectConfig, root, registry, io }"
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/SectionData" },
+        "description": "Expose the auth configuration under _project.auth (redirects for the auth actions; never secrets)"
+      },
+      "mount": {
+        "role": "mount",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "mount",
+        "timing": ["server"],
+        "parameters": [
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": {
+                "basePath": { "type": "string" },
+                "sections": { "type": "object" },
+                "connectors": { "type": "object" },
+                "autoSync": { "type": "boolean" }
+              }
+            },
+            "description": "Inlined mount options: project sections, provider constructors, sync mode"
+          },
+          {
+            "identifier": "ctx",
+            "type": { "type": "object" },
+            "description": "Shared JxServerContext — this mount (order 10) publishes ctx.auth for later mounts"
+          }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Fetch-style handler (request, env) → Response serving the Better Auth routes under /_jx/auth; sets ctx.auth = { getSession, authorize }"
+      },
+      "deploySchema": {
+        "role": "deploySchema",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "deploySchema",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "sectionValue",
+            "type": { "type": "object" },
+            "description": "The project.json `auth` section value"
+          },
+          {
+            "identifier": "projectConfig",
+            "type": { "type": "object" },
+            "description": "The full project config (connection lookup)"
+          },
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": {
+                "env": { "type": "object" },
+                "dryRun": { "type": "boolean" },
+                "connection": { "type": "string" },
+                "connectors": { "type": "object" }
+              }
+            },
+            "description": "Push options: env, dry-run, optional connection filter, provider stand-ins"
+          }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Additive Better Auth system-table sync: { statements, applied, warnings, connection }"
+      }
+    }
+  }
+}

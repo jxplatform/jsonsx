@@ -22,7 +22,8 @@
   },
   "scripts": {
     "test": "bun test --isolate",
-    "test:coverage": "bun test --isolate --coverage"
+    "test:coverage": "bun test --isolate --coverage",
+    "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
     "@jxsuite/schema": "workspace:^",

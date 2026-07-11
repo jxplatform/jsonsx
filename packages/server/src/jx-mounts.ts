@@ -134,12 +134,13 @@ async function buildRuntime(
 /**
  * Resolve connector implementation classes keyed by provider id, applying the dev-server `local`
  * stand-in rule: a connector declaring `local: "<provider>"` is served by the registry's class for
- * that provider instead of its own (specs/extensions.md §12).
+ * that provider instead of its own (specs/extensions.md §12). Shared with the data-api push seam so
+ * section-owner deploySchema contributions (e.g. auth) see the same stand-ins as the mounts.
  *
  * @param {ExtensionRegistry} registry
  * @returns {Promise<Record<string, unknown>>}
  */
-async function resolveConnectorStandins(
+export async function resolveConnectorStandins(
   registry: ExtensionRegistry,
 ): Promise<Record<string, unknown>> {
   const entries = registry.connectors();

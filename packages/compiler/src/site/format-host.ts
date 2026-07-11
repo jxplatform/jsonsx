@@ -128,8 +128,16 @@ export interface ExtensionsPayloadEntry {
   /**
    * Every manifest class of the extension with its resolved descriptor path, in declaration order
    * (additive; lets the studio address a class by `$src` without hardcoding its package layout).
+   * Plain state classes (no admission blocks — `$prototype` targets like TableQuery or Session)
+   * carry `state: true` plus their `$studio.stateDefaults` hint (specs/extensions.md §10), so the
+   * studio can offer them in its add-state picker and seed new defs (e.g. `timing: "client"`).
    */
-  classes: { name: string; path: string }[];
+  classes: {
+    name: string;
+    path: string;
+    state?: boolean;
+    stateDefaults?: Record<string, unknown>;
+  }[];
 }
 
 /**
@@ -168,7 +176,20 @@ export function buildExtensionsPayload(registry: ExtensionRegistry): ExtensionsP
       });
     }
     payload.push({
-      classes: ext.classes.map((cls) => ({ name: cls.name, path: cls.classPath })),
+      classes: ext.classes.map((cls) => {
+        const stateDefaults = cls.studio?.stateDefaults as Record<string, unknown> | undefined;
+        const isState =
+          cls.project === null &&
+          cls.server === null &&
+          cls.connector === null &&
+          cls.extensions.length === 0;
+        return {
+          name: cls.name,
+          path: cls.classPath,
+          ...(isState ? { state: true } : {}),
+          ...(stateDefaults && typeof stateDefaults === "object" ? { stateDefaults } : {}),
+        };
+      }),
       contributions,
       name: ext.manifest.name,
       specifier: ext.specifier,

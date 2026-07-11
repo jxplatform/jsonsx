@@ -4,10 +4,11 @@ Extension packages — the packages that extend the Jx framework the same way
 any third-party developer can, using only the public hooks documented in
 [specs/extensions.md](../specs/extensions.md).
 
-| Package                       | Purpose                                                                        |
-| ----------------------------- | ------------------------------------------------------------------------------ |
-| [`@jxsuite/parser`](./parser) | Content collections (`content` section), Markdown + CSV formats, relationships |
-| _(next: `connector`, `auth`)_ |                                                                                |
+| Package                             | Purpose                                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------ |
+| [`@jxsuite/parser`](./parser)       | Content collections (`content` section), Markdown + CSV formats, relationships       |
+| [`@jxsuite/connector`](./connector) | Database connections + dynamic data tables (`connections`/`data`) over `/_jx/data`   |
+| [`@jxsuite/auth`](./auth)           | Better Auth sessions, sign-in flows, and table permissions (`auth`) over `/_jx/auth` |
 
 ## Rules
 

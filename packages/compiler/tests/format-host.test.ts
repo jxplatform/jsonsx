@@ -173,6 +173,28 @@ describe("buildExtensionsPayload", () => {
     }
   });
 
+  test("flags plain state classes and forwards their stateDefaults hint", async () => {
+    const root = mkdtempSync(join(tmpdir(), "jx-ext-payload-state-"));
+    try {
+      const registry = await buildProjectExtensionRegistry(root, {
+        extensions: ["@jxsuite/connector"],
+      });
+      const [connector] = buildExtensionsPayload(registry);
+      const byName = new Map(connector!.classes.map((cls) => [cls.name, cls]));
+
+      // Plain $prototype targets: state + the descriptor's stateDefaults (specs §10).
+      expect(byName.get("TableQuery")).toMatchObject({
+        state: true,
+        stateDefaults: { timing: "client" },
+      });
+      // Admission-block classes are not state prototypes.
+      expect(byName.get("Data")!.state).toBeUndefined();
+      expect(byName.get("Sqlite")!.state).toBeUndefined();
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
   test("classes without a project block contribute nothing", async () => {
     const root = mkdtempSync(join(tmpdir(), "jx-ext-payload-formats-"));
     try {

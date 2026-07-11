@@ -153,9 +153,15 @@ export interface ExtensionsInfo {
   /**
    * Every manifest class of the extension with its backend-resolved descriptor path, in declaration
    * order. Optional (additive): older backends omit it, and consumers needing a class `$src` fall
-   * back to their historical literals.
+   * back to their historical literals. Plain state classes (no admission blocks) carry `state:
+   * true` plus their `$studio.stateDefaults` hint, seeding studio-created defs.
    */
-  classes?: { name: string; path: string }[];
+  classes?: {
+    name: string;
+    path: string;
+    state?: boolean;
+    stateDefaults?: Record<string, unknown>;
+  }[];
 }
 
 /**

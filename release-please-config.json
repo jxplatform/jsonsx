@@ -30,6 +30,10 @@
       "release-type": "node",
       "component": "connector"
     },
+    "extensions/auth": {
+      "release-type": "node",
+      "component": "auth"
+    },
     "packages/compiler": {
       "release-type": "node",
       "component": "compiler"

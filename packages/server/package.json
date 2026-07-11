@@ -47,6 +47,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@jxsuite/auth": "workspace:^",
     "@jxsuite/connector": "workspace:^",
     "@jxsuite/parser": "workspace:^"
   }

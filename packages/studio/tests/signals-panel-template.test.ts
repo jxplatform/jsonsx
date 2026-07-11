@@ -14,6 +14,7 @@ import {
 import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "lit-html";
 import { activeTab } from "../src/workspace/workspace";
+import { setExtensions } from "../src/format/format-host";
 import { renderSignalsTemplate } from "../src/panels/signals-panel";
 import { pluginSchemaCache } from "../src/services/code-services";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -305,6 +306,46 @@ describe("add picker", () => {
     // Collision with the existing $missing def → suffix
     expect(docState().$missing1).toEqual({ $prototype: "Missing" } as never);
     expect(h.calls.left).toBeGreaterThan(0);
+  });
+
+  test("extension state classes appear as menu items and seed stateDefaults", () => {
+    setExtensions([
+      {
+        classes: [
+          // Auth carries admission blocks → not a state class, so no menu item.
+          { name: "Auth", path: "/ext/Auth.class.json" },
+          {
+            name: "Session",
+            path: "/ext/Session.class.json",
+            state: true,
+            stateDefaults: { timing: "client" },
+          },
+          { name: "AuthActions", path: "/ext/AuthActions.class.json", state: true },
+        ],
+        contributions: [],
+        name: "@jxsuite/auth",
+        specifier: "@jxsuite/auth",
+      },
+    ]);
+    try {
+      const h = setup({});
+      const menuValues = [...h.container.querySelectorAll(".signals-add sp-menu-item")].map((el) =>
+        el.getAttribute("value"),
+      );
+      expect(menuValues).toContain("ext:Session");
+      expect(menuValues).toContain("ext:AuthActions");
+      expect(menuValues).not.toContain("ext:Auth");
+
+      // The descriptor's stateDefaults seed the created def (specs/extensions.md §10).
+      commitValue(addPicker(h), "ext:Session");
+      expect(docState().$session).toEqual({ $prototype: "Session", timing: "client" } as never);
+      // Without stateDefaults the def is the bare prototype reference.
+      commitValue(addPicker(h), "ext:AuthActions");
+      expect(docState().$authActions).toEqual({ $prototype: "AuthActions" } as never);
+      expect(h.calls.left).toBeGreaterThan(0);
+    } finally {
+      setExtensions([]);
+    }
   });
 });
 

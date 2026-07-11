@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/auth/AuthActions.class.json",
+  "title": "AuthActions",
+  "description": "Form-friendly auth handlers: resolves to { signInEmail, signUpEmail, signInSocial, signOut }, each (scope, event)-callable reading the enclosing form's FormData, bumping the session store, and applying the configured redirects",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./actions.js",
+
+  "$studio": {
+    "stateDefaults": { "timing": "client" }
+  },
+
+  "$defs": {
+    "parameters": {
+      "redirects": {
+        "identifier": "redirects",
+        "type": { "type": "object" },
+        "description": "{ afterSignIn?, afterSignOut? } paths (defaults to the project auth section's redirects)"
+      },
+      "provider": {
+        "identifier": "provider",
+        "type": { "type": "string" },
+        "description": "Default social provider id for signInSocial (a form field or the def may override)"
+      },
+      "baseUrl": {
+        "identifier": "baseUrl",
+        "type": { "type": "string" },
+        "description": "Auth route base URL (defaults to <origin>/_jx/auth)"
+      }
+    },
+    "constructor": {
+      "role": "constructor",
+      "parameters": [
+        { "$ref": "#/$defs/parameters/redirects" },
+        { "$ref": "#/$defs/parameters/provider" },
+        { "$ref": "#/$defs/parameters/baseUrl" }
+      ],
+      "body": ["this.config = config;"]
+    },
+    "methods": {
+      "resolve": {
+        "role": "method",
+        "scope": "instance",
+        "identifier": "resolve",
+        "returnType": { "type": "object" },
+        "description": "The handler map: signInEmail / signUpEmail / signInSocial / signOut, wired via $ref (e.g. onsubmit: { \"$ref\": \"auth.signInEmail\" })"
+      }
+    }
+  }
+}

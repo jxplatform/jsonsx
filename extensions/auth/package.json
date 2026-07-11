@@ -1,0 +1,51 @@
+{
+  "name": "@jxsuite/auth",
+  "version": "0.1.0",
+  "description": "Better Auth sessions, sign-in flows, and table permissions for Jx sites over /_jx/auth",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "extensions/auth"
+  },
+  "files": [
+    "src/",
+    "jx-extension.json",
+    "schemas/"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/server.ts",
+    "./authorize": "./src/authorize.ts",
+    "./config": "./src/config.ts",
+    "./server": "./src/server.ts",
+    "./worker": "./src/worker.ts",
+    "./client": "./src/client.ts",
+    "./session": "./src/session.ts",
+    "./actions": "./src/actions.ts",
+    "./jx-extension.json": "./jx-extension.json",
+    "./schemas/project.fragment.schema.json": "./schemas/project.fragment.schema.json",
+    "./Auth.class.json": "./src/Auth.class.json",
+    "./Session.class.json": "./src/Session.class.json",
+    "./AuthActions.class.json": "./src/AuthActions.class.json"
+  },
+  "publishConfig": {
+    "provenance": true
+  },
+  "scripts": {
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage",
+    "upgrade": "bunx npm-check-updates -u && bun install"
+  },
+  "dependencies": {
+    "@jxsuite/connector": "workspace:^",
+    "@jxsuite/schema": "workspace:^",
+    "better-auth": "1.6.23",
+    "kysely": "^0.28.17"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.10.6",
+    "ajv": "^8.20.0"
+  },
+  "jx": "./jx-extension.json"
+}

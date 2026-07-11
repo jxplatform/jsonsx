@@ -1,0 +1,76 @@
+{
+  "$id": "https://jxsuite.com/schema/ext/auth/project/v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Auth project fragment",
+  "description": "Project-schema fragment contributed by @jxsuite/auth: the `auth` section configuring Better Auth over a connector connection. Entries carry identifiers and env-var NAMES only — secret values live in .dev.vars locally and the platform secret store in production (specs/extensions.md §13).",
+  "type": "object",
+  "properties": {
+    "auth": {
+      "description": "Authentication configuration. Enables the /_jx/auth mount (Better Auth) and the permission rules beyond \"public\"/\"none\" on data tables.",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "description": "Name of a `connections` entry holding the auth system tables (user, session, account, verification). Defaults to the project's first-declared connection.",
+          "type": "string"
+        },
+        "secretEnv": {
+          "description": "NAME of the env var holding the Better Auth signing secret. The value itself is a secret and never enters project.json.",
+          "type": "string",
+          "default": "BETTER_AUTH_SECRET"
+        },
+        "methods": {
+          "description": "Enabled first-party sign-in methods.",
+          "type": "object",
+          "properties": {
+            "emailPassword": {
+              "description": "Email + password sign-up/sign-in (enabled by default).",
+              "type": "boolean",
+              "default": true
+            }
+          }
+        },
+        "providers": {
+          "description": "Social sign-in providers keyed by Better Auth provider id (\"github\", \"google\", …). Values name the env vars carrying each provider's OAuth credentials; defaults are <ID>_CLIENT_ID / <ID>_CLIENT_SECRET.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "clientIdEnv": {
+                "description": "NAME of the env var holding the OAuth client id.",
+                "type": "string"
+              },
+              "clientSecretEnv": {
+                "description": "NAME of the env var holding the OAuth client secret.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "redirects": {
+          "description": "Site paths the auth actions navigate to after auth state changes.",
+          "type": "object",
+          "properties": {
+            "afterSignIn": {
+              "description": "Path to navigate to after a successful sign-in/sign-up.",
+              "type": "string"
+            },
+            "afterSignOut": {
+              "description": "Path to navigate to after sign-out.",
+              "type": "string"
+            }
+          }
+        },
+        "roles": {
+          "description": "Role names usable in table permission rules (\"role:<name>\"). Declaring any role adds a `role` column to the user table; assignments are edited via the data grid.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "trustedOrigins": {
+          "description": "Extra origins allowed to call the auth routes (Better Auth trustedOrigins passthrough).",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

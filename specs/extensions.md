@@ -542,6 +542,28 @@ PATCH  /_jx/data/:table/:id
 DELETE /_jx/data/:table/:id
 ```
 
+### 11.1 Section-owner `deploySchema` (push contributions)
+
+A **non-connector** `project` class may also declare a `deploySchema`
+capability, letting its section contribute steps to the schema push
+(`jx db push`, the studio push button). The signature differs from the
+connector variant — there is no single connection def to hand over:
+
+```
+deploySchema(sectionValue, projectConfig, { env, dryRun?, connection?, connectors? })
+  → { steps, applied, warnings, connection }
+```
+
+`steps` are ready push-plan entries (`{ kind, table?, summary, sql?,
+connection? }`); hosts append them **after** the connector plan and default
+each step's `kind` to the contributing section key — the auth extension's
+Better Auth system-table migration lands as `kind: "auth"` steps this way.
+`connectors` carries the same provider stand-ins the mounts receive, so dev
+pushes hit the `local:` stand-in databases. When a push is filtered to a
+`connection` the section does not live on, the capability returns empty
+steps. Hosts stay extension-agnostic: registry dispatch only, no extension
+imports, no hardcoded section names.
+
 ---
 
 ## 12. The `connector` block

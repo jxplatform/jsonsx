@@ -1,0 +1,13 @@
+{
+  "name": "@jxsuite/auth",
+  "title": "Authentication",
+  "description": "Better Auth sessions, sign-in flows, and table permissions served over /_jx/auth",
+  "classes": {
+    "Auth": "./src/Auth.class.json",
+    "Session": "./src/Session.class.json",
+    "AuthActions": "./src/AuthActions.class.json"
+  },
+  "schemas": {
+    "project": "./schemas/project.fragment.schema.json"
+  }
+}

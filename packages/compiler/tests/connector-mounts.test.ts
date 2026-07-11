@@ -448,3 +448,47 @@ describe("schemas.fields plumbing", () => {
     }
   });
 });
+
+// ─── Real auth extension: mount order in the generated worker ────────────────
+
+describe("buildSite with the auth extension", () => {
+  test("auth (order 10) mounts before data (order 20) over one shared ctx", async () => {
+    const dir = `${TMP}-auth`;
+    rmSync(dir, { force: true, recursive: true });
+    try {
+      mkdirSync(resolve(dir, "pages"), { recursive: true });
+      writeFileSync(
+        resolve(dir, "project.json"),
+        JSON.stringify({
+          ...PROJECT,
+          auth: { connection: "main" },
+          extensions: [...PROJECT.extensions, "@jxsuite/auth"],
+          name: "Auth Mounts",
+        }),
+        "utf8",
+      );
+      writeFileSync(resolve(dir, "pages/index.json"), JSON.stringify({ tagName: "main" }));
+
+      const result = await buildSite(dir, { clean: true });
+      expect(result.errors).toEqual([]);
+      const worker = readFileSync(resolve(dir, "dist/worker.js"), "utf8");
+
+      expect(worker).toContain("import { Auth } from '@jxsuite/auth/worker'");
+      expect(worker).toContain("import { Data } from '@jxsuite/connector/worker'");
+      // One shared ctx, auth mounted first (order 10 < 20), both wired through it.
+      const ctxAt = worker.indexOf("const jxCtx = {}");
+      const authAt = worker.indexOf("Auth.mount(");
+      const dataAt = worker.indexOf("Data.mount(");
+      expect(ctxAt).toBeGreaterThan(-1);
+      expect(authAt).toBeGreaterThan(ctxAt);
+      expect(dataAt).toBeGreaterThan(authAt);
+      expect(worker).toContain("app.all('/_jx/auth/*'");
+      expect(worker).toContain("app.all('/_jx/data/*'");
+      // The inlined section manifest carries the auth section — identifiers only, no secrets.
+      expect(worker).toContain('"auth":{"connection":"main"}');
+      expect(worker).not.toContain("BETTER_AUTH_SECRET=");
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+});

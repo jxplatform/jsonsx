@@ -470,3 +470,79 @@ describe("secrets", () => {
     expect(readFileSync(resolve(sub, ".dev.vars"), "utf8")).toBe("ONLY=1\n");
   });
 });
+
+describe("push with the auth extension (section-owner deploySchema)", () => {
+  const AUTH_DIR = resolve(TMP, "authproj");
+
+  beforeAll(() => {
+    writeFixture("authproj/project.json", {
+      auth: { connection: "main" },
+      connections: { main: { provider: "sqlite" } },
+      data: {
+        comments: {
+          connection: "main",
+          ownerField: "author_id",
+          permissions: { insert: "authenticated", read: "public", update: "owner" },
+          schema: {
+            properties: { author_id: { type: "string" }, message: { type: "string" } },
+            required: ["message"],
+            type: "object",
+          },
+        },
+      },
+      extensions: ["@jxsuite/connector", "@jxsuite/auth"],
+      name: "Auth Push Fixture",
+    });
+  });
+
+  test("dry-run composes kind-auth steps after the connector plan", async () => {
+    const result = await pushDataSchema(AUTH_DIR, { dryRun: true });
+    expect(result.applied).toBe(false);
+    expect(result.errors).toBeUndefined();
+
+    const kinds = result.plan.map((step) => step.kind);
+    const authSteps = result.plan.filter((step) => step.kind === "auth");
+    expect(kinds).toContain("createTable");
+    expect(authSteps.length).toBeGreaterThan(0);
+    // Every auth step trails the connector statements.
+    expect(kinds.indexOf("auth")).toBeGreaterThan(kinds.lastIndexOf("createTable"));
+    expect(authSteps.map((step) => step.table)).toContain("user");
+    for (const step of authSteps) {
+      expect(step.connection).toBe("main");
+      expect(step.sql).toBeTruthy();
+      expect(step.summary).toContain("auth");
+    }
+  });
+
+  test("apply creates the auth system tables; a second push is a clean no-op", async () => {
+    const applied = await pushDataSchema(AUTH_DIR, {});
+    expect(applied.applied).toBe(true);
+    expect(applied.plan.some((step) => step.kind === "auth" && step.table === "user")).toBe(true);
+
+    const rows = await queryDataRows(AUTH_DIR, { table: "user" });
+    expect(rows.total).toBe(0);
+    expect(rows.columns.some((column) => column.name === "email")).toBe(true);
+
+    const again = await pushDataSchema(AUTH_DIR, {});
+    expect(again.plan).toEqual([]);
+    expect(again.applied).toBe(true);
+  });
+
+  test("a push filtered to a foreign connection skips the auth steps", async () => {
+    writeFixture("authproj2/project.json", {
+      auth: { connection: "main" },
+      connections: {
+        main: { provider: "sqlite" },
+        other: { file: "./other.sqlite", provider: "sqlite" },
+      },
+      extensions: ["@jxsuite/connector", "@jxsuite/auth"],
+      name: "Auth Push Filter Fixture",
+    });
+    const result = await pushDataSchema(resolve(TMP, "authproj2"), {
+      connection: "other",
+      dryRun: true,
+    });
+    expect(result.errors).toBeUndefined();
+    expect(result.plan.filter((step) => step.kind === "auth")).toEqual([]);
+  });
+});

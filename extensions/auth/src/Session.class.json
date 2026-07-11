@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/auth/Session.class.json",
+  "title": "Session",
+  "description": "The signed-in user's session as reactive state: resolves to { userId, role?, user } or null, updating live as auth actions sign the user in and out. Resolves to null outside browsers, so statically generated pages render the signed-out state",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./session.js",
+
+  "$studio": {
+    "stateDefaults": { "timing": "client" }
+  },
+
+  "$defs": {
+    "parameters": {
+      "baseUrl": {
+        "identifier": "baseUrl",
+        "type": { "type": "string" },
+        "description": "Auth route base URL (defaults to <origin>/_jx/auth)"
+      }
+    },
+    "constructor": {
+      "role": "constructor",
+      "parameters": [{ "$ref": "#/$defs/parameters/baseUrl" }],
+      "body": ["this.config = config;"]
+    },
+    "methods": {
+      "resolve": {
+        "role": "method",
+        "scope": "instance",
+        "identifier": "resolve",
+        "returnType": { "type": ["object", "null"] },
+        "description": "SessionInfo { userId, role?, user } for the signed-in user, or null (always null outside browsers)"
+      },
+      "subscribe": {
+        "role": "method",
+        "scope": "instance",
+        "identifier": "subscribe",
+        "parameters": [
+          {
+            "identifier": "callback",
+            "type": { "type": "object" },
+            "description": "Called with the new SessionInfo|null whenever the session store changes"
+          }
+        ],
+        "description": "Subscribe to session changes (auth actions bump the store after sign-in/out)"
+      }
+    }
+  }
+}

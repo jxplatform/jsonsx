@@ -35,6 +35,7 @@ import type {
   JxStateDefinition,
 } from "@jxsuite/schema/types";
 import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services";
+import { getExtensions, loadExtensions } from "../format/format-host";
 import type { TemplateResult } from "lit-html";
 
 interface SignalsPanelState {
@@ -134,6 +135,29 @@ const STUDIO_RESERVED_KEYS = new Set([
 ]);
 
 // ─── Signals / defs helpers ──────────────────────────────────────────────────
+
+/**
+ * Extension-manifest state classes for the add-state picker: plain `$prototype` targets (no
+ * admission blocks) across the enabled extensions, each with its `$studio.stateDefaults` hint
+ * (specs/extensions.md §10). Manifest classes need no `$src` — the registry resolves them.
+ */
+export function extensionStateClasses(): {
+  name: string;
+  stateDefaults?: Record<string, unknown>;
+}[] {
+  const out: { name: string; stateDefaults?: Record<string, unknown> }[] = [];
+  for (const ext of getExtensions()) {
+    for (const cls of ext.classes ?? []) {
+      if (cls.state) {
+        out.push({
+          name: cls.name,
+          ...(cls.stateDefaults === undefined ? {} : { stateDefaults: cls.stateDefaults }),
+        });
+      }
+    }
+  }
+  return out;
+}
 
 /**
  * View a state entry through the panel's flattened editing lens. Naked primitive and array entries
@@ -392,6 +416,10 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
   const defs = S.document.state || {};
   const entries = Object.entries(defs);
 
+  // Warm the extensions payload so manifest state classes appear in the add picker (the panel
+  // Re-renders constantly; loadExtensions memoizes, so this is a one-time fetch per project).
+  void loadExtensions();
+
   // Group by category
   const groups = {
     computed: [],
@@ -481,6 +509,29 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
               return;
             }
 
+            // Extension-manifest state classes ("ext:Session"): no $src needed — the registry
+            // Resolves them; the descriptor's stateDefaults seed the def (e.g. timing "client").
+            if (type.startsWith("ext:")) {
+              const protoName = type.slice(4);
+              const cls = extensionStateClasses().find((c) => c.name === protoName);
+              let n = `$${protoName.charAt(0).toLowerCase()}${protoName.slice(1)}`;
+              let i = 1;
+              const base = n;
+              while (S.document.state && S.document.state[n]) {
+                n = base + i;
+                i += 1;
+              }
+              transactDoc(activeTab.value, (t) =>
+                mutateAddDef(t, n, {
+                  $prototype: protoName,
+                  ...cls?.stateDefaults,
+                } as Record<string, JsonValue>),
+              );
+              expandedSignal = n;
+              ctx.renderLeftPanel();
+              return;
+            }
+
             // Handle import-based prototypes (e.g., "import:ContentCollection")
             if (type.startsWith("import:")) {
               const protoName = type.slice(7);
@@ -552,6 +603,11 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
             ? html`<sp-menu-divider></sp-menu-divider>${Object.keys(
                   projectState.projectConfig.imports,
                 ).map((k: string) => html`<sp-menu-item value="import:${k}">${k}</sp-menu-item>`)}`
+            : nothing}
+          ${extensionStateClasses().length > 0
+            ? html`<sp-menu-divider></sp-menu-divider>${extensionStateClasses().map(
+                  (cls) => html`<sp-menu-item value="ext:${cls.name}">${cls.name}</sp-menu-item>`,
+                )}`
             : nothing}
           <sp-menu-divider></sp-menu-divider>
           <sp-menu-item value="expression">Expression</sp-menu-item>

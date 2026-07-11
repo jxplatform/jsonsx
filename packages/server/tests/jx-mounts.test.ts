@@ -194,3 +194,89 @@ describe("dev-vars", () => {
     expect(loadDevVars(TMP)).toEqual({ MOUNT_TEST_SECRET: "shh" });
   });
 });
+
+describe("auth mount dispatch (@jxsuite/auth)", () => {
+  const AUTH_TMP = `${TMP}-auth`;
+
+  function authCall(method: string, path: string, body?: unknown, cookie = "") {
+    const url = `http://localhost:3000${path}`;
+    return handleJxMounts(
+      new Request(url, {
+        method,
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(cookie ? { cookie } : {}),
+        },
+      }),
+      new URL(url),
+      AUTH_TMP,
+    );
+  }
+
+  beforeAll(() => {
+    rmSync(AUTH_TMP, { force: true, recursive: true });
+    mkdirSync(AUTH_TMP, { recursive: true });
+    writeFileSync(
+      resolve(AUTH_TMP, "project.json"),
+      JSON.stringify({
+        auth: {},
+        connections: { main: { binding: "DB", databaseId: "remote-uuid", provider: "d1" } },
+        data: {
+          comments: {
+            connection: "main",
+            ownerField: "author_id",
+            permissions: { insert: "authenticated", read: "public", update: "owner" },
+            schema: {
+              properties: { author_id: { type: "string" }, message: { type: "string" } },
+              required: ["message"],
+              type: "object",
+            },
+          },
+        },
+        extensions: ["@jxsuite/connector", "@jxsuite/auth"],
+        name: "Auth Mounts Fixture",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(AUTH_TMP, ".dev.vars"),
+      "BETTER_AUTH_SECRET=dev-mount-secret-0123456789\n",
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(AUTH_TMP, { force: true, recursive: true });
+  });
+
+  test("the auth mount answers real Better Auth routes over the local sqlite stand-in", async () => {
+    // Anonymous session: the route resolves (no 404 from dispatch) and reports null.
+    const anonymous = await authCall("GET", "/_jx/auth/get-session");
+    expect(anonymous).not.toBeNull();
+    expect(anonymous!.status).toBe(200);
+    expect(await anonymous!.json()).toBeNull();
+
+    // Sign-up over the D1 connection's local sqlite stand-in (auto-synced on first touch).
+    const signUp = await authCall("POST", "/_jx/auth/sign-up/email", {
+      email: "mounts@example.com",
+      name: "Mounts",
+      password: "hunter2hunter2",
+    });
+    expect(signUp!.status).toBe(200);
+    const cookie = (signUp!.headers.get("set-cookie") ?? "").split(";")[0]!;
+    expect(cookie).toContain("better-auth");
+    expect(existsSync(resolve(AUTH_TMP, ".jx/data/main.sqlite"))).toBe(true);
+
+    // The data mount (order 20) shares ctx.auth: anonymous insert 401, cookie insert 201.
+    const denied = await authCall("POST", "/_jx/data/comments", { message: "anon" });
+    expect(denied!.status).toBe(401);
+    const created = await authCall("POST", "/_jx/data/comments", { message: "hi" }, cookie);
+    expect(created!.status).toBe(201);
+
+    // Public read passes without a session.
+    const listed = await authCall("GET", "/_jx/data/comments");
+    expect(listed!.status).toBe(200);
+    expect(((await listed!.json()) as unknown[]).length).toBe(1);
+  });
+});

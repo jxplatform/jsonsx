@@ -22,6 +22,7 @@ import { Kysely, sql } from "kysely";
 import { buildProjectExtensionRegistry } from "@jxsuite/compiler/format-host";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { loadDevVars, parseDevVars } from "./dev-vars.ts";
+import { resolveConnectorStandins } from "./jx-mounts.ts";
 import { writeFile } from "node:fs/promises";
 import type { Dialect } from "kysely";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
@@ -473,9 +474,38 @@ export async function pushDataSchema(
     }
   }
 
-  // Auth-task: auth extensions contribute additional push steps here — append their migration
-  // Steps (kind "auth") to `plan` after the connector statements, composed by this host so the
-  // Connector never special-cases auth.
+  // Section-owner push steps: any non-connector project contribution declaring a deploySchema
+  // Capability composes its own migration steps after the connector plan (the auth extension's
+  // Land as kind "auth" — its section key). The host stays extension-agnostic: registry dispatch
+  // Only, no auth import, no "auth" literal, and the same connector stand-ins the mounts see.
+  const sectionOwners = registry
+    .projectContributions()
+    .filter((entry) => entry.connector === null && entry.capabilities.deploySchema);
+  if (sectionOwners.length > 0) {
+    const connectors = await resolveConnectorStandins(registry);
+    for (const entry of sectionOwners) {
+      const { key } = entry.project!;
+      const section = (project.config as Record<string, unknown>)[key];
+      if (section === undefined || section === null) {
+        continue;
+      }
+      try {
+        const result = (await entry.call("deploySchema", section, project.config, {
+          ...(request.connection === undefined ? {} : { connection: request.connection }),
+          connectors,
+          dryRun,
+          env,
+        })) as { steps?: DataPushStep[]; warnings?: string[] };
+        for (const step of result.steps ?? []) {
+          step.kind ||= key;
+          plan.push(step);
+        }
+        warnings.push(...(result.warnings ?? []));
+      } catch (error) {
+        errors.push(`${key}: ${errorMessage(error)}`);
+      }
+    }
+  }
 
   return {
     applied: !dryRun && errors.length === 0,
