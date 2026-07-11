@@ -56,6 +56,16 @@ const responses: Record<string, unknown> = {
   searchFiles: [{ name: "match.json", path: "match.json", type: "file" }],
   uploadFile: null,
   writeFile: null,
+  // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
+  dataConnections: { connections: [{ isDefault: true, name: "main" }] },
+  dataConnectionTest: { ok: true },
+  dataPush: { applied: false, plan: [{ kind: "createTable", summary: "Create" }] },
+  dataRows: { columns: [{ name: "id", pk: true, type: "text" }], rows: [], total: 0 },
+  dataInsertRow: { row: { id: "n" } },
+  dataUpdateRow: { row: { id: "n", title: "t" } },
+  dataDeleteRow: { ok: true },
+  listSecrets: { names: ["MAIN_URL"] },
+  setSecrets: { names: ["MAIN_URL"], ok: true },
 };
 
 // Track forced errors for specific methods
@@ -400,6 +410,35 @@ describe("chromium desktop platform", () => {
   test("codeService returns null", async () => {
     const result = await platform.codeService("lint", {});
     expect(result).toBeNull();
+  });
+
+  // ─── Data surface + secrets ────────────────────────────────────────────
+
+  test("data surface members round-trip over the RPC socket", async () => {
+    const connections = await platform.dataConnections!();
+    expect(connections.connections[0]!.name).toBe("main");
+    expect(await platform.dataConnectionTest!("main")).toEqual({ ok: true });
+    const push = await platform.dataPush!({ dryRun: true });
+    expect(push.plan).toHaveLength(1);
+    const rows = await platform.dataRows!({ limit: 50, table: "posts" });
+    expect(rows.columns[0]!.pk).toBe(true);
+    const inserted = await platform.dataInsertRow!({ table: "posts", values: { title: "t" } });
+    expect(inserted.row.id).toBe("n");
+    const updated = await platform.dataUpdateRow!({
+      pk: "n",
+      set: { title: "t" },
+      table: "posts",
+    });
+    expect(updated.row.title).toBe("t");
+    expect(await platform.dataDeleteRow!({ pk: "n", table: "posts" })).toEqual({ ok: true });
+  });
+
+  test("secrets members are names-only on the way out", async () => {
+    expect(await platform.listSecrets!()).toEqual(["MAIN_URL"]);
+    expect(await platform.setSecrets!({ set: { MAIN_URL: "v" } })).toEqual({
+      names: ["MAIN_URL"],
+      ok: true,
+    });
   });
 
   test("locateFile returns path", async () => {

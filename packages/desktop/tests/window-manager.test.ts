@@ -74,6 +74,16 @@ function makeSession(initialRoot: string | null) {
     jxServerFunction: mock(async () => ({ body: "{}", status: 200 })),
     listFormats: mock(async () => []),
     formatAction: mock(async () => ({})),
+    // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
+    dataConnections: mock(async () => ({ connections: [] })),
+    dataConnectionTest: mock(async () => ({ ok: true })),
+    dataPush: mock(async () => ({ applied: false, plan: [] })),
+    dataRows: mock(async () => ({ columns: [], rows: [], total: 0 })),
+    dataInsertRow: mock(async () => ({ row: { id: "n" } })),
+    dataUpdateRow: mock(async () => ({ row: { id: "n" } })),
+    dataDeleteRow: mock(async () => ({ ok: true })),
+    listSecrets: mock(async () => ({ names: [] })),
+    setSecrets: mock(async () => ({ names: [], ok: true })),
     openProject: mock(async () => {
       root = "/proj/opened";
       return {
@@ -314,6 +324,26 @@ describe("per-window RPC", () => {
     expect(session.handleDeleteFile).toHaveBeenCalledWith({ path: "a.json" });
     expect(session.listDirectory).toHaveBeenCalledWith({ dir: "src" });
     expect(session.listFormats).toHaveBeenCalledTimes(1);
+
+    // Data surface + secrets handlers (each forwards to the window's session).
+    await reqs.dataConnections();
+    await reqs.dataConnectionTest({ connection: "main" } as never);
+    await reqs.dataPush({ dryRun: true } as never);
+    await reqs.dataRows({ table: "posts" } as never);
+    await reqs.dataInsertRow({ table: "posts", values: {} } as never);
+    await reqs.dataUpdateRow({ pk: "n", set: {}, table: "posts" } as never);
+    await reqs.dataDeleteRow({ pk: "n", table: "posts" } as never);
+    await reqs.listSecrets();
+    await reqs.setSecrets({ set: { A: "1" } } as never);
+    expect(session.dataConnections).toHaveBeenCalledTimes(1);
+    expect(session.dataConnectionTest).toHaveBeenCalledWith({ connection: "main" });
+    expect(session.dataPush).toHaveBeenCalledWith({ dryRun: true });
+    expect(session.dataRows).toHaveBeenCalledWith({ table: "posts" });
+    expect(session.dataInsertRow).toHaveBeenCalledWith({ table: "posts", values: {} });
+    expect(session.dataUpdateRow).toHaveBeenCalledWith({ pk: "n", set: {}, table: "posts" });
+    expect(session.dataDeleteRow).toHaveBeenCalledWith({ pk: "n", table: "posts" });
+    expect(session.listSecrets).toHaveBeenCalledTimes(1);
+    expect(session.setSecrets).toHaveBeenCalledWith({ set: { A: "1" } });
 
     // Git handlers.
     await reqs.gitBranches();

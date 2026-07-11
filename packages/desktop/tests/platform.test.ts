@@ -458,6 +458,36 @@ describe("platform methods", () => {
     ["getProjectRoot", [], "getProjectRoot", undefined],
     ["getRecentProjects", [], "getRecentProjects", undefined],
     ["getSettings", [], "getSettings", undefined],
+    // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
+    ["dataConnections", [], "dataConnections", undefined],
+    ["dataConnectionTest", ["main"], "dataConnectionTest", { connection: "main" }],
+    [
+      "dataPush",
+      [{ connection: "main", dryRun: true }],
+      "dataPush",
+      { connection: "main", dryRun: true },
+    ],
+    ["dataPush", [], "dataPush", {}],
+    ["dataRows", [{ limit: 50, table: "posts" }], "dataRows", { limit: 50, table: "posts" }],
+    [
+      "dataInsertRow",
+      [{ table: "posts", values: { title: "t" } }],
+      "dataInsertRow",
+      { table: "posts", values: { title: "t" } },
+    ],
+    [
+      "dataUpdateRow",
+      [{ pk: "r1", set: { title: "u" }, table: "posts" }],
+      "dataUpdateRow",
+      { pk: "r1", set: { title: "u" }, table: "posts" },
+    ],
+    [
+      "dataDeleteRow",
+      [{ pk: "r1", table: "posts" }],
+      "dataDeleteRow",
+      { pk: "r1", table: "posts" },
+    ],
+    ["setSecrets", [{ set: { MAIN_URL: "v" } }], "setSecrets", { set: { MAIN_URL: "v" } }],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of delegations) {
@@ -526,6 +556,19 @@ describe("platform methods", () => {
     expect(lastCall("discoverComponents")!.args[0]).toEqual({ dir: "components" });
     await platform.discoverComponents();
     expect(lastCall("discoverComponents")!.args[0]).toEqual({});
+  });
+
+  test("listSecrets unwraps the names-only response", async () => {
+    impls.set("listSecrets", () => ({ names: ["MAIN_URL", "OTHER"] }));
+    try {
+      const names = await (
+        platform as unknown as { listSecrets: () => Promise<string[]> }
+      ).listSecrets();
+      expect(names).toEqual(["MAIN_URL", "OTHER"]);
+      expect(lastCall("listSecrets")!.args).toEqual([]);
+    } finally {
+      impls.delete("listSecrets");
+    }
   });
 
   test("fetchPluginSchema conditionally spreads prototype and base", async () => {

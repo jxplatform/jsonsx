@@ -289,20 +289,30 @@ registerFormControl("schema-builder", schemaBuilderControl);
 
 // ─── Secret control ──────────────────────────────────────────────────────────
 
-// Secrets commit through the host's secret store, never project.json. TODO: the platform
-// SetSecrets PAL member does not exist yet — until a host supplies ctx.commitSecret, the control
-// Renders disabled as a placeholder.
-registerFormControl("secret", ({ key, value, ctx }) => {
+// Secret VALUES commit through the host's secret store (ctx.commitSecret → platform setSecrets),
+// Never project.json; the field itself persists only the derived env-var NAME commitSecret
+// Returns. Hosts without a secrets surface leave the control disabled.
+registerFormControl("secret", ({ key, value, onChange, ctx, rerender }) => {
   const { commitSecret } = ctx;
+  const envName = typeof value === "string" && value ? value : null;
   return html`<sp-textfield
     size="s"
     type="password"
     class="secret-field"
-    placeholder=${value ? "••••••••" : "Not set"}
+    placeholder=${envName ? `Stored as ${envName}` : "Not set"}
     ?disabled=${!commitSecret}
-    @change=${(e: Event) => {
-      if (commitSecret) {
-        void commitSecret(key, (e.target as HTMLInputElement).value);
+    @change=${async (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      const secretValue = target.value;
+      if (!commitSecret || !secretValue) {
+        return;
+      }
+      const name = await commitSecret(key, secretValue);
+      target.value = "";
+      if (typeof name === "string" && name && name !== envName) {
+        onChange(name);
+      } else {
+        rerender?.();
       }
     }}
   ></sp-textfield>`;

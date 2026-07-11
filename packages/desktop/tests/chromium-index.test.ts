@@ -55,6 +55,16 @@ let projectRootValue = FIXTURES;
 
 const handlerMocks = {
   codeService: mock((params: unknown) => Promise.resolve({ echoed: params })),
+  // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
+  dataConnections: mock(() => Promise.resolve({ connections: [] })),
+  dataConnectionTest: mock(() => Promise.resolve({ ok: true })),
+  dataPush: mock(() => Promise.resolve({ applied: false, plan: [] })),
+  dataRows: mock(() => Promise.resolve({ columns: [], rows: [], total: 0 })),
+  dataInsertRow: mock(() => Promise.resolve({ row: { id: "new" } })),
+  dataUpdateRow: mock(() => Promise.resolve({ row: { id: "new" } })),
+  dataDeleteRow: mock(() => Promise.resolve({ ok: true })),
+  listSecrets: mock(() => Promise.resolve({ names: ["SEEDED"] })),
+  setSecrets: mock(() => Promise.resolve({ names: ["SEEDED"], ok: true })),
   discoverComponents: mock(() => Promise.resolve([{ path: "btn.json", tagName: "my-btn" }])),
   fetchPluginSchema: mock(() => Promise.resolve({ type: "object" })),
   formatAction: mock(() => Promise.resolve({ doc: { ok: true } })),

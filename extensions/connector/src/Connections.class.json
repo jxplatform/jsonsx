@@ -20,7 +20,7 @@
       "layout": "map",
       "entry": {
         "ui": {
-          "urlEnv": { "control": "secret-env" }
+          "urlEnv": { "control": "secret" }
         },
         "newEntry": { "provider": "sqlite" }
       }

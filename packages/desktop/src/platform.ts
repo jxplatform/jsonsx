@@ -4,6 +4,13 @@ import { Electroview } from "electrobun/view";
 import { html, render as litRender } from "lit-html";
 import { streamImport } from "@jxsuite/studio/import-client";
 import type { RecentProjectEntry, StudioRPC } from "./rpc-schema";
+import type {
+  DataRowDelete,
+  DataRowInsert,
+  DataRowsQuery,
+  DataRowUpdate,
+  SecretsSetRequest,
+} from "@jxsuite/protocol";
 import type { ImportProgressEvent, ImportSiteOptions } from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload } from "@jxsuite/server/refactor";
@@ -447,6 +454,45 @@ export function createDesktopPlatform() {
     /** Pre-bundled per-project entry schemas for Monaco registration. */
     async fetchProjectSchemas() {
       return rpc.request.fetchProjectSchemas();
+    },
+
+    // ─── Data surface + secrets (owner console; names-only secrets) ────────────
+
+    async dataConnections() {
+      return rpc.request.dataConnections();
+    },
+
+    async dataConnectionTest(connection: string) {
+      return rpc.request.dataConnectionTest({ connection });
+    },
+
+    async dataPush(opts?: { connection?: string; dryRun?: boolean }) {
+      return rpc.request.dataPush(opts ?? {});
+    },
+
+    async dataRows(query: DataRowsQuery) {
+      return rpc.request.dataRows(query);
+    },
+
+    async dataInsertRow(req: DataRowInsert) {
+      return rpc.request.dataInsertRow(req);
+    },
+
+    async dataUpdateRow(req: DataRowUpdate) {
+      return rpc.request.dataUpdateRow(req);
+    },
+
+    async dataDeleteRow(req: DataRowDelete) {
+      return rpc.request.dataDeleteRow(req);
+    },
+
+    async listSecrets() {
+      const res = await rpc.request.listSecrets();
+      return res.names;
+    },
+
+    async setSecrets(req: SecretsSetRequest) {
+      return rpc.request.setSecrets(req);
     },
 
     /**

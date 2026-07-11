@@ -5,6 +5,13 @@ import { spawn } from "node:child_process";
 import {
   codeService,
   createProject,
+  dataConnectionTest,
+  dataConnections,
+  dataDeleteRow,
+  dataInsertRow,
+  dataPush,
+  dataRows,
+  dataUpdateRow,
   discoverComponents,
   fetchPluginSchema,
   fetchProjectSchemas,
@@ -22,11 +29,13 @@ import {
   listDirectory,
   listExtensions,
   listFormats,
+  listSecrets,
   locateFile,
   openProject,
   setDirectoryDialog,
   setFileDialog,
   setProjectRoot,
+  setSecrets,
 } from "../handlers";
 import {
   gitAddRemote,
@@ -153,6 +162,18 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
     writeSettings((params as { settings: Record<string, string> }).settings),
   jxResolve: (params) => jxResolve(params as { body: string }),
   jxServerFunction: (params) => jxServerFunction(params as { body: string }),
+  // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
+  dataConnections: () => dataConnections(),
+  dataConnectionTest: (params) => dataConnectionTest(params as { connection: string }),
+  dataPush: (params) => dataPush(params as { connection?: string; dryRun?: boolean }),
+  dataRows: (params) => dataRows(params as { table: string }),
+  dataInsertRow: (params) =>
+    dataInsertRow(params as { table: string; values: Record<string, unknown> }),
+  dataUpdateRow: (params) =>
+    dataUpdateRow(params as { table: string; pk: string | number; set: Record<string, unknown> }),
+  dataDeleteRow: (params) => dataDeleteRow(params as { table: string; pk: string | number }),
+  listSecrets: () => listSecrets(),
+  setSecrets: (params) => setSecrets(params as { set?: Record<string, string>; remove?: string[] }),
   readFile: (params) => handleReadFile(params as { path: string }),
   removePackage: (params) => removePackage(params as { name: string }),
   renameFile: (params) => handleRenameFile(params as { from: string; to: string }),

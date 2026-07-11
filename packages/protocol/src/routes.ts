@@ -193,6 +193,72 @@ export const STUDIO_ROUTES = {
     "Studio falls back to a direct GitHub API call with the user's token.",
   ),
 
+  // ─── Data surface (connector domain owner console) ───────────────────────
+  // These routes intentionally bypass table permission rules — the backend boundary
+  // (dev-server loopback/token, cloud collaboration permission) is the gate
+  // (specs/extensions.md §13). Secret VALUES never ride them; env-var NAMES only.
+  dataConnections: route(
+    "GET",
+    "/__studio/data/connections",
+    "Connector connections with configured/missingSecrets/isDefault state, reachable table " +
+      "names, and registry-descriptor provider metadata (DataConnectionsResponse; backs " +
+      "dataConnections)",
+    "The connections settings section shows no status, and data-domain actions stay hidden.",
+  ),
+  dataConnectionTest: route(
+    "POST",
+    "/__studio/data/connections/test",
+    "Probe a connection {connection} → DataConnectionTestResult (backs dataConnectionTest)",
+    "The Test Connection action is hidden.",
+  ),
+  dataPush: route(
+    "POST",
+    "/__studio/data/push",
+    "Additive schema push {connection?, dryRun?} → DataPushResult (plan of DataPushStep[], " +
+      "applied, warnings/errors; backs dataPush)",
+    "The Push Schema action is hidden; schemas deploy via `jx db push` instead.",
+  ),
+  dataRows: route(
+    "GET",
+    "/__studio/data/rows",
+    "Page a table (DataRowsQuery params) → DataRowsResult {rows, total, columns} (backs dataRows)",
+    "The data grid is unavailable.",
+  ),
+  dataInsertRow: route(
+    "POST",
+    "/__studio/data/rows",
+    "Insert a row {table, connection?, values} → {row} (backs dataInsertRow)",
+    "The data grid hides its add-row footer.",
+  ),
+  dataUpdateRow: route(
+    "PUT",
+    "/__studio/data/rows",
+    "Update a row keyed on its primary key {table, connection?, pk, set} → {row} (backs " +
+      "dataUpdateRow)",
+    "Data grid cells are read-only.",
+  ),
+  dataDeleteRow: route(
+    "DELETE",
+    "/__studio/data/rows",
+    "Delete a row (?table=&pk=&connection=) → {ok} (backs dataDeleteRow)",
+    "The data grid hides row deletion.",
+  ),
+
+  // ─── Secrets (names only) ─────────────────────────────────────────────────
+  secretsList: route(
+    "GET",
+    "/__studio/secrets",
+    "Configured secret env-var NAMES, never values (SecretsListResponse; backs listSecrets)",
+    "Secret fields cannot show set/unset state.",
+  ),
+  secretsSet: route(
+    "PUT",
+    "/__studio/secrets",
+    "Write/remove secrets in the backend store (.dev.vars locally) {set?, remove?} → names " +
+      "(backs setSecrets)",
+    "The secret form control renders disabled; secrets are edited in .dev.vars by hand.",
+  ),
+
   // ─── AI proxy ─────────────────────────────────────────────────────────────
   aiChat: route(
     "POST",

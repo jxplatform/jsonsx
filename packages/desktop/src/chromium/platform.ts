@@ -11,6 +11,19 @@ import type {
 } from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
+  DataConnectionsResponse,
+  DataConnectionTestResult,
+  DataPushResult,
+  DataRowDelete,
+  DataRowInsert,
+  DataRowsQuery,
+  DataRowsResult,
+  DataRowUpdate,
+  SecretsListResponse,
+  SecretsSetRequest,
+  SecretsSetResponse,
+} from "@jxsuite/protocol";
+import type {
   CodeServiceResult,
   DirEntry,
   GitBranchesResult,
@@ -287,6 +300,45 @@ export function createDesktopPlatform(): StudioPlatform {
         project?: Record<string, unknown>;
         document?: Record<string, unknown>;
       }>;
+    },
+
+    // ─── Data surface + secrets (owner console; names-only secrets) ────────────
+
+    async dataConnections() {
+      return request("dataConnections", {}) as Promise<DataConnectionsResponse>;
+    },
+
+    async dataConnectionTest(connection: string) {
+      return request("dataConnectionTest", { connection }) as Promise<DataConnectionTestResult>;
+    },
+
+    async dataPush(opts?: { connection?: string; dryRun?: boolean }) {
+      return request("dataPush", opts ?? {}) as Promise<DataPushResult>;
+    },
+
+    async dataRows(query: DataRowsQuery) {
+      return request("dataRows", { ...query }) as Promise<DataRowsResult>;
+    },
+
+    async dataInsertRow(req: DataRowInsert) {
+      return request("dataInsertRow", { ...req }) as Promise<{ row: Record<string, unknown> }>;
+    },
+
+    async dataUpdateRow(req: DataRowUpdate) {
+      return request("dataUpdateRow", { ...req }) as Promise<{ row: Record<string, unknown> }>;
+    },
+
+    async dataDeleteRow(req: DataRowDelete) {
+      return request("dataDeleteRow", { ...req }) as Promise<{ ok: boolean }>;
+    },
+
+    async listSecrets() {
+      const res = (await request("listSecrets", {})) as SecretsListResponse;
+      return res.names;
+    },
+
+    async setSecrets(req: SecretsSetRequest) {
+      return request("setSecrets", { ...req }) as Promise<SecretsSetResponse>;
     },
 
     /**

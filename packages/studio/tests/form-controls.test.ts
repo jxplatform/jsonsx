@@ -2,7 +2,7 @@
  * Tests for src/ui/form-controls.ts — the built-in "schema-builder" and "secret" form controls
  * registered for descriptor-contributed settings forms.
  */
-import { pointer } from "./harness";
+import { flush, pointer } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { html, render } from "lit-html";
 import { builtinFormControls, resetFormControlUiState } from "../src/ui/form-controls";
@@ -297,16 +297,20 @@ describe("schema-builder field operations", () => {
 // ─── Secret control ──────────────────────────────────────────────────────────
 
 describe("secret control", () => {
-  function mountSecret(ctx: SchemaFormContext, value?: unknown) {
+  function mountSecret(
+    ctx: SchemaFormContext,
+    value?: unknown,
+    onChange: (next: unknown) => void = () => {
+      // Default: ignore the committed env name
+    },
+  ) {
     const secret = getFormControl("secret")!;
     const container = document.createElement("div");
     render(
       html`${secret({
         ctx,
-        key: "apiKey",
-        onChange: () => {
-          // Secrets never patch project.json
-        },
+        key: "urlEnv",
+        onChange,
         schema: { format: "secret", type: "string" },
         value,
       })}`,
@@ -315,7 +319,7 @@ describe("secret control", () => {
     return container;
   }
 
-  test("renders disabled without a commitSecret hook (setSecrets PAL member pending)", () => {
+  test("renders disabled without a commitSecret hook (backend has no secrets surface)", () => {
     const container = mountSecret(inertCtx);
     const field = container.querySelector("sp-textfield")!;
     expect(field.hasAttribute("disabled")).toBe(true);
@@ -325,23 +329,76 @@ describe("secret control", () => {
     commitValue(field, "ignored");
   });
 
-  test("commits through ctx.commitSecret when provided", () => {
+  test("stores the VALUE via commitSecret and persists only the returned env NAME", async () => {
     const commits: [string, string][] = [];
+    const changes: unknown[] = [];
     const container = mountSecret(
       {
         commitSecret: (key, value) => {
           commits.push([key, value]);
+          return "MAIN_URL";
         },
         resolvePointer: () => {
           // No context data
         },
       },
-      "existing",
+      undefined,
+      (next) => changes.push(next),
     );
     const field = container.querySelector("sp-textfield")!;
     expect(field.hasAttribute("disabled")).toBe(false);
-    expect(field.getAttribute("placeholder")).toBe("••••••••");
-    commitValue(field, "s3cret");
-    expect(commits).toEqual([["apiKey", "s3cret"]]);
+    commitValue(field, "postgres://secret");
+    await flush();
+    expect(commits).toEqual([["urlEnv", "postgres://secret"]]);
+    expect(changes).toEqual(["MAIN_URL"]);
+    // The entered secret never lingers in the field
+    expect((field as ValueEl).value).toBe("");
+  });
+
+  test("shows the stored env NAME as placeholder and rerenders on a same-name recommit", async () => {
+    let rerenders = 0;
+    const secret = getFormControl("secret")!;
+    const container = document.createElement("div");
+    render(
+      html`${secret({
+        ctx: {
+          commitSecret: () => "MAIN_URL",
+          resolvePointer: () => {
+            // No context data
+          },
+        },
+        key: "urlEnv",
+        onChange: () => {
+          throw new Error("unchanged env names must not patch project.json");
+        },
+        rerender: () => {
+          rerenders += 1;
+        },
+        schema: { format: "secret", type: "string" },
+        value: "MAIN_URL",
+      })}`,
+      container,
+    );
+    const field = container.querySelector("sp-textfield")!;
+    expect(field.getAttribute("placeholder")).toBe("Stored as MAIN_URL");
+    commitValue(field, "rotated-value");
+    await flush();
+    expect(rerenders).toBe(1);
+  });
+
+  test("blank input never commits", async () => {
+    const commits: unknown[] = [];
+    const container = mountSecret({
+      commitSecret: (key, value) => {
+        commits.push([key, value]);
+        return "X";
+      },
+      resolvePointer: () => {
+        // No context data
+      },
+    });
+    commitValue(container.querySelector("sp-textfield")!, "");
+    await flush();
+    expect(commits).toEqual([]);
   });
 });

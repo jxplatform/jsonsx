@@ -286,6 +286,17 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         uploadFile: (params) => session.handleUploadFile(params),
         writeFile: (params) => session.handleWriteFile(params),
 
+        // Data surface + secrets (bound to this window's session)
+        dataConnections: () => session.dataConnections(),
+        dataConnectionTest: (params) => session.dataConnectionTest(params),
+        dataPush: (params) => session.dataPush(params),
+        dataRows: (params) => session.dataRows(params),
+        dataInsertRow: (params) => session.dataInsertRow(params),
+        dataUpdateRow: (params) => session.dataUpdateRow(params),
+        dataDeleteRow: (params) => session.dataDeleteRow(params),
+        listSecrets: () => session.listSecrets(),
+        setSecrets: (params) => session.setSecrets(params),
+
         // Git (bound to this window's session)
         gitAddRemote: (params) => git.gitAddRemote(params),
         gitBranches: () => git.gitBranches(),

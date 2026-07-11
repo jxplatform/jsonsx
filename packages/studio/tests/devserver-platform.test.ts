@@ -1150,3 +1150,121 @@ describe("collab capability", () => {
     }
   });
 });
+
+// ─── Data surface + secrets ──────────────────────────────────────────────────
+
+describe("data surface + secrets", () => {
+  test("dataConnections GETs the connections route scoped to the project dir", async () => {
+    route("/__studio/data/connections", () => json({ connections: [] }));
+    const p = createDevServerPlatform();
+    p.projectRoot = "examples/site-demo";
+    route("/__studio/activate", () => json({ ok: true }));
+    expect(await p.dataConnections()).toEqual({ connections: [] });
+    const [call] = callsTo("/__studio/data/connections");
+    expect(call!.search.get("dir")).toBe("examples/site-demo");
+  });
+
+  test("dataConnections surfaces backend errors", async () => {
+    route("/__studio/data/connections", () => json({ error: "boom" }, 500));
+    const p = createDevServerPlatform();
+    expect(p.dataConnections()).rejects.toThrow("boom");
+  });
+
+  test("dataConnectionTest POSTs the connection name", async () => {
+    route("/__studio/data/connections/test", () => json({ ok: true }));
+    const p = createDevServerPlatform();
+    expect(await p.dataConnectionTest("main")).toEqual({ ok: true });
+    const [call] = callsTo("/__studio/data/connections/test");
+    expect(call!.method).toBe("POST");
+    expect(call!.body).toEqual({ connection: "main" });
+  });
+
+  test("dataPush passes connection/dryRun and throws on failure", async () => {
+    route("/__studio/data/push", () => json({ applied: false, plan: [] }));
+    const p = createDevServerPlatform();
+    expect(await p.dataPush({ connection: "main", dryRun: true })).toEqual({
+      applied: false,
+      plan: [],
+    });
+    expect(callsTo("/__studio/data/push")[0]!.body).toEqual({ connection: "main", dryRun: true });
+
+    route("/__studio/data/push", () => json({ error: "no such connection" }, 404));
+    expect(p.dataPush()).rejects.toThrow("no such connection");
+  });
+
+  test("dataRows maps the query into params", async () => {
+    route("/__studio/data/rows", () => json({ columns: [], rows: [], total: 0 }), "GET");
+    const p = createDevServerPlatform();
+    await p.dataRows({
+      connection: "main",
+      dir: "desc",
+      limit: 50,
+      offset: 100,
+      orderBy: "title",
+      table: "posts",
+    });
+    const [call] = callsTo("/__studio/data/rows");
+    expect(call!.search.get("table")).toBe("posts");
+    expect(call!.search.get("connection")).toBe("main");
+    expect(call!.search.get("limit")).toBe("50");
+    expect(call!.search.get("offset")).toBe("100");
+    expect(call!.search.get("orderBy")).toBe("title");
+    expect(call!.search.get("dir")).toBe("desc");
+  });
+
+  test("dataRows throws the backend error", async () => {
+    route("/__studio/data/rows", () => json({ error: "Unknown table" }, 404), "GET");
+    const p = createDevServerPlatform();
+    expect(p.dataRows({ table: "ghost" })).rejects.toThrow("Unknown table");
+  });
+
+  test("row mutations use POST/PUT/DELETE on the shared path", async () => {
+    route("/__studio/data/rows", () => json({ row: { id: "n" } }, 201), "POST");
+    route("/__studio/data/rows", () => json({ row: { id: "n", title: "t" } }), "PUT");
+    route("/__studio/data/rows", () => json({ ok: true }), "DELETE");
+    const p = createDevServerPlatform();
+
+    const inserted = await p.dataInsertRow({ table: "posts", values: { title: "t" } });
+    expect(inserted.row.id).toBe("n");
+    const updated = await p.dataUpdateRow({ pk: "n", set: { title: "t" }, table: "posts" });
+    expect(updated.row.title).toBe("t");
+    const deleted = await p.dataDeleteRow({ connection: "main", pk: "n", table: "posts" });
+    expect(deleted).toEqual({ ok: true });
+
+    const del = calls.find((c) => c.method === "DELETE" && c.path === "/__studio/data/rows");
+    expect(del!.search.get("pk")).toBe("n");
+    expect(del!.search.get("table")).toBe("posts");
+    expect(del!.search.get("connection")).toBe("main");
+  });
+
+  test("row mutation errors surface", async () => {
+    route("/__studio/data/rows", () => json({ error: "Validation failed" }, 400), "POST");
+    route("/__studio/data/rows", () => json({ error: "Not found" }, 404), "PUT");
+    route("/__studio/data/rows", () => json({ error: "Not found" }, 404), "DELETE");
+    const p = createDevServerPlatform();
+    expect(p.dataInsertRow({ table: "posts", values: {} })).rejects.toThrow("Validation failed");
+    expect(p.dataUpdateRow({ pk: 1, set: {}, table: "posts" })).rejects.toThrow("Not found");
+    expect(p.dataDeleteRow({ pk: 1, table: "posts" })).rejects.toThrow("Not found");
+  });
+
+  test("listSecrets returns names only and setSecrets PUTs the request", async () => {
+    route("/__studio/secrets", () => json({ names: ["MAIN_URL"] }), "GET");
+    route("/__studio/secrets", () => json({ names: ["MAIN_URL"], ok: true }), "PUT");
+    const p = createDevServerPlatform();
+    expect(await p.listSecrets()).toEqual(["MAIN_URL"]);
+    expect(await p.setSecrets({ remove: ["OLD"], set: { MAIN_URL: "v" } })).toEqual({
+      names: ["MAIN_URL"],
+      ok: true,
+    });
+    const put = calls.find((c) => c.method === "PUT" && c.path === "/__studio/secrets");
+    expect(put!.body).toEqual({ remove: ["OLD"], set: { MAIN_URL: "v" } });
+  });
+
+  test("secrets errors surface", async () => {
+    route("/__studio/secrets", () => json({ error: "denied" }, 400), "GET");
+    route("/__studio/secrets", () => json({ error: "bad name" }, 400), "PUT");
+    const p = createDevServerPlatform();
+    expect(p.listSecrets()).rejects.toThrow("denied");
+    expect(p.setSecrets({ set: { X: "1" } })).rejects.toThrow("bad name");
+  });
+});

@@ -12,6 +12,17 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/p
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { handleResolve, handleServerFunction } from "@jxsuite/server/resolve";
+import {
+  deleteDataRow,
+  insertDataRow,
+  listDataConnections,
+  listSecretNames,
+  pushDataSchema,
+  queryDataRows,
+  setProjectSecrets,
+  testDataConnection,
+  updateDataRow,
+} from "@jxsuite/server/data";
 import { applyRename, createFsWatcher } from "@jxsuite/server/refactor";
 import {
   buildExtensionsPayload,
@@ -21,6 +32,14 @@ import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import type { ExtensionsPayloadEntry } from "@jxsuite/compiler/format-host";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FsEventPayload, FsWatcherHandle, RenameReport } from "@jxsuite/server/refactor";
+import type {
+  DataPushRequest,
+  DataRowDelete,
+  DataRowInsert,
+  DataRowsQuery,
+  DataRowUpdate,
+  SecretsSetRequest,
+} from "@jxsuite/protocol";
 import type { FormatCapability, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
@@ -881,6 +900,47 @@ export function createProjectSession(initialRoot: string | null) {
     return { body: await res.text(), status: res.status };
   }
 
+  // ─── Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets) ──────────
+  // Delegates verbatim to @jxsuite/server/data: the same owner-console semantics apply — admin row
+  // CRUD intentionally bypasses table permissions, with the desktop process boundary as the gate,
+  // And secrets flow through .dev.vars with names-only reads (specs/extensions.md §13).
+
+  function dataConnections() {
+    return listDataConnections(requireRoot());
+  }
+
+  function dataConnectionTest(params: { connection: string }) {
+    return testDataConnection(requireRoot(), params.connection);
+  }
+
+  function dataPush(params: DataPushRequest) {
+    return pushDataSchema(requireRoot(), params);
+  }
+
+  function dataRows(params: DataRowsQuery) {
+    return queryDataRows(requireRoot(), params);
+  }
+
+  function dataInsertRow(params: DataRowInsert) {
+    return insertDataRow(requireRoot(), params);
+  }
+
+  function dataUpdateRow(params: DataRowUpdate) {
+    return updateDataRow(requireRoot(), params);
+  }
+
+  function dataDeleteRow(params: DataRowDelete) {
+    return deleteDataRow(requireRoot(), params);
+  }
+
+  function listSecrets() {
+    return listSecretNames(requireRoot());
+  }
+
+  function setSecrets(params: SecretsSetRequest) {
+    return setProjectSecrets(requireRoot(), params);
+  }
+
   /** Proxy a timing: "server" function call. Mirrors the dev server's POST /**jx_server**. */
   async function jxServerFunction(params: { body: string }): Promise<ProxyResult> {
     const root = requireRoot();
@@ -925,5 +985,14 @@ export function createProjectSession(initialRoot: string | null) {
     fetchPluginSchema,
     jxResolve,
     jxServerFunction,
+    dataConnections,
+    dataConnectionTest,
+    dataPush,
+    dataRows,
+    dataInsertRow,
+    dataUpdateRow,
+    dataDeleteRow,
+    listSecrets,
+    setSecrets,
   };
 }

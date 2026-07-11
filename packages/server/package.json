@@ -15,6 +15,7 @@
   "exports": {
     ".": "./src/server.ts",
     "./ai-api": "./src/ai-api.ts",
+    "./data": "./src/data-api.ts",
     "./import-api": "./src/import-api.ts",
     "./packages": "./src/packages.ts",
     "./project-server": "./src/project-server.ts",
@@ -37,10 +38,12 @@
     "@jxsuite/compiler": "workspace:^",
     "@jxsuite/create": "workspace:^",
     "@jxsuite/import": "workspace:^",
+    "@jxsuite/protocol": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
     "@jxsuite/starters": "workspace:^",
     "chokidar": "^5.0.0",
+    "kysely": "^0.28.17",
     "zod": "^4.4.3"
   },
   "devDependencies": {

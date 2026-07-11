@@ -168,6 +168,171 @@ export interface ProjectSchemasResponse {
   document?: Record<string, unknown> | null;
 }
 
+// ─── Data surface (connector domain; specs/extensions.md §13) ───────────────
+/* The /__studio/data/* routes are the project owner's admin console over the connector
+   extension's connections and tables. They intentionally bypass table permission rules —
+   the backend's own boundary (dev-server loopback/token, cloud collaboration permission)
+   is the gate. Secret VALUES never ride these shapes; env-var NAMES only. */
+
+/** Connector-provider metadata resolved from the extension registry's class descriptors. */
+export interface DataConnectorInfo {
+  /** Backing-service identifier (`d1`, `supabase`, `sqlite`, ...). */
+  provider: string;
+  /** SQL dialect family (`"sqlite"` | `"postgres"`). */
+  kind?: string;
+  /** Dev-server stand-in provider (specs/extensions.md §12), when the class declares one. */
+  local?: string;
+  /** The descriptor's human description, when present. */
+  description?: string;
+}
+
+/** One project connection with its configuration state (identifiers and env NAMES only). */
+export interface DataConnectionInfo {
+  /** The `connections` section key. */
+  name: string;
+  provider: string;
+  /** The connection's project.json value — identifiers and env-var names, never secrets. */
+  settings: Record<string, unknown>;
+  /** True when every env-var name the connection references resolves in the backend env. */
+  configured: boolean;
+  /** Referenced env-var NAMES with no value in the backend environment. */
+  missingSecrets: string[];
+  /** True for the first-declared connection (the console's default pick). */
+  isDefault: boolean;
+  /**
+   * Table names reachable on this connection: tables declared in project.json plus tables
+   * discovered by introspection (e.g. auth system tables). Best-effort — introspection is skipped
+   * when the connection is missing secrets or unreachable.
+   */
+  tables: string[];
+  /** Provider metadata from the registry descriptor, when the provider class is resolvable. */
+  connector?: DataConnectorInfo | null;
+}
+
+/** Response of the data-connections route. */
+export interface DataConnectionsResponse {
+  connections: DataConnectionInfo[];
+}
+
+/** Result of the connection-test route (mirrors the connector's testConnection capability). */
+export interface DataConnectionTestResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * A push-plan step kind. Open string union: connector DDL kinds today, and future push-step
+ * contributors (e.g. `"auth"` migration steps) extend it without a protocol bump.
+ */
+export type DataPushStepKind =
+  | "createTable"
+  | "addColumn"
+  | "index"
+  | "junction"
+  | "auth"
+  | (string & Record<never, never>);
+
+/** One step of a schema-push plan. */
+export interface DataPushStep {
+  kind: DataPushStepKind;
+  /** Affected table, when derivable from the statement. */
+  table?: string;
+  /** One-line human description of the step. */
+  summary: string;
+  /** The compiled SQL statement, when the step is SQL-backed. */
+  sql?: string;
+  /** The connection the step applies to. */
+  connection?: string;
+}
+
+/** Request body of the data-push route. */
+export interface DataPushRequest {
+  /** Restrict the push to one connection; omitted = every declared connection. */
+  connection?: string;
+  /** Compile the plan without executing it. */
+  dryRun?: boolean;
+}
+
+/** Result of the data-push route. */
+export interface DataPushResult {
+  plan: DataPushStep[];
+  /** True when the plan was executed (never on dryRun or after an error). */
+  applied: boolean;
+  /** Drift/orphan warnings from the additive-only sync. */
+  warnings?: string[];
+  errors?: string[];
+}
+
+/** Query of the data-rows route (wire form: query params). */
+export interface DataRowsQuery {
+  table: string;
+  /** Connection to resolve undeclared (system) tables against; default = first declared. */
+  connection?: string;
+  /** Page size; default 50. */
+  limit?: number;
+  offset?: number;
+  /** Column to order by (must exist on the table). */
+  orderBy?: string;
+  dir?: "asc" | "desc";
+}
+
+/** Column metadata from backend introspection. */
+export interface DataColumnMeta {
+  name: string;
+  type: string;
+  pk?: boolean;
+  nullable?: boolean;
+}
+
+/** Result of the data-rows route. */
+export interface DataRowsResult {
+  rows: Record<string, unknown>[];
+  /** Total row count of the table (for pagination). */
+  total: number;
+  columns: DataColumnMeta[];
+}
+
+/** Body of the row-insert route. */
+export interface DataRowInsert {
+  table: string;
+  connection?: string;
+  values: Record<string, unknown>;
+}
+
+/** Body of the row-update route (keyed on the introspected primary key). */
+export interface DataRowUpdate {
+  table: string;
+  connection?: string;
+  pk: string | number;
+  set: Record<string, unknown>;
+}
+
+/** Parameters of the row-delete route. */
+export interface DataRowDelete {
+  table: string;
+  connection?: string;
+  pk: string | number;
+}
+
+// ─── Secrets (names only; specs/extensions.md §13) ──────────────────────────
+
+/** Response of the secrets-list route — env-var NAMES only, never values. */
+export interface SecretsListResponse {
+  names: string[];
+}
+
+/** Request body of the secrets-set route (values flow in, never back out). */
+export interface SecretsSetRequest {
+  set?: Record<string, string>;
+  remove?: string[];
+}
+
+/** Response of the secrets-set route — the resulting NAMES, never values. */
+export interface SecretsSetResponse {
+  ok: boolean;
+  names: string[];
+}
+
 // ─── Packages ────────────────────────────────────────────────────────────────
 
 export interface PackageInfo {

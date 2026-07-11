@@ -3,6 +3,20 @@ import type { RPCSchema } from "electrobun/bun";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload, RenameReport } from "@jxsuite/server/refactor";
 import type { StarterMeta } from "@jxsuite/starters";
+import type {
+  DataConnectionsResponse,
+  DataConnectionTestResult,
+  DataPushRequest,
+  DataPushResult,
+  DataRowDelete,
+  DataRowInsert,
+  DataRowsQuery,
+  DataRowsResult,
+  DataRowUpdate,
+  SecretsListResponse,
+  SecretsSetRequest,
+  SecretsSetResponse,
+} from "@jxsuite/protocol";
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
 
@@ -284,6 +298,44 @@ export interface StudioRPC {
           options?: Record<string, unknown>;
         };
         response: unknown;
+      };
+      // Data surface + secrets — desktop twins of /__studio/data/* + /__studio/secrets
+      // (@jxsuite/protocol shapes; names-only secrets, owner-console row CRUD)
+      dataConnections: {
+        params: void;
+        response: DataConnectionsResponse;
+      };
+      dataConnectionTest: {
+        params: { connection: string };
+        response: DataConnectionTestResult;
+      };
+      dataPush: {
+        params: DataPushRequest;
+        response: DataPushResult;
+      };
+      dataRows: {
+        params: DataRowsQuery;
+        response: DataRowsResult;
+      };
+      dataInsertRow: {
+        params: DataRowInsert;
+        response: { row: Record<string, unknown> };
+      };
+      dataUpdateRow: {
+        params: DataRowUpdate;
+        response: { row: Record<string, unknown> };
+      };
+      dataDeleteRow: {
+        params: DataRowDelete;
+        response: { ok: boolean };
+      };
+      listSecrets: {
+        params: void;
+        response: SecretsListResponse;
+      };
+      setSecrets: {
+        params: SecretsSetRequest;
+        response: SecretsSetResponse;
       };
       // Packages
       addPackage: {

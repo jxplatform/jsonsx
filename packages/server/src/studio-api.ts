@@ -16,6 +16,7 @@ import {
   buildProjectExtensionRegistry,
 } from "@jxsuite/compiler/format-host";
 import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
+import { handleDataApi } from "./data-api.ts";
 import { applyRename } from "./refactor/apply.ts";
 import {
   bunExecutable,
@@ -270,6 +271,12 @@ export async function handleStudioApi(
   activeProjectRoot: string | null = null,
 ) {
   const path = url.pathname;
+
+  // Data-domain owner console + secrets (names only) — delegated to data-api.ts.
+  const dataRes = await handleDataApi(req, url, root, activeProjectRoot);
+  if (dataRes) {
+    return dataRes;
+  }
 
   // Project metadata
   if (path === "/__studio/project" && req.method === "GET") {

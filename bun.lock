@@ -137,6 +137,7 @@
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
         "@jxsuite/parser": "workspace:^",
+        "@jxsuite/protocol": "workspace:^",
         "@jxsuite/schema": "workspace:^",
         "@jxsuite/server": "workspace:^",
         "@jxsuite/starters": "workspace:^",
@@ -149,6 +150,7 @@
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.10.6",
+        "@jxsuite/connector": "workspace:^",
         "@jxsuite/server": "workspace:^",
         "rcedit": "^5.0.2",
       },
@@ -233,10 +235,12 @@
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
         "@jxsuite/import": "workspace:^",
+        "@jxsuite/protocol": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
         "@jxsuite/starters": "workspace:^",
         "chokidar": "^5.0.0",
+        "kysely": "^0.28.17",
         "zod": "^4.4.3",
       },
       "devDependencies": {

@@ -73,6 +73,48 @@ describe("STUDIO_ROUTES", () => {
     expect(STUDIO_ROUTES.projectSchemas.degradation).toContain("bundled core schemas");
   });
 
+  test("data routes cover the owner-console surface as optional routes", () => {
+    const names = [
+      "dataConnections",
+      "dataConnectionTest",
+      "dataPush",
+      "dataRows",
+      "dataInsertRow",
+      "dataUpdateRow",
+      "dataDeleteRow",
+    ] as const;
+    for (const name of names) {
+      expect(STUDIO_ROUTES[name].optional, name).toBe(true);
+      expect(STUDIO_ROUTES[name].path.startsWith("/__studio/data/"), name).toBe(true);
+    }
+    expect(STUDIO_ROUTES.dataConnections.method).toBe("GET");
+    expect(STUDIO_ROUTES.dataConnectionTest.method).toBe("POST");
+    expect(STUDIO_ROUTES.dataPush.method).toBe("POST");
+    expect(STUDIO_ROUTES.dataPush.summary).toContain("DataPushStep");
+  });
+
+  test("row routes share one path across GET/POST/PUT/DELETE", () => {
+    expect(STUDIO_ROUTES.dataRows.path).toBe("/__studio/data/rows");
+    expect(STUDIO_ROUTES.dataInsertRow.path).toBe(STUDIO_ROUTES.dataRows.path);
+    expect(STUDIO_ROUTES.dataUpdateRow.path).toBe(STUDIO_ROUTES.dataRows.path);
+    expect(STUDIO_ROUTES.dataDeleteRow.path).toBe(STUDIO_ROUTES.dataRows.path);
+    expect(STUDIO_ROUTES.dataRows.method).toBe("GET");
+    expect(STUDIO_ROUTES.dataInsertRow.method).toBe("POST");
+    expect(STUDIO_ROUTES.dataUpdateRow.method).toBe("PUT");
+    expect(STUDIO_ROUTES.dataDeleteRow.method).toBe("DELETE");
+  });
+
+  test("secrets routes are optional and names-only on the way out", () => {
+    expect(STUDIO_ROUTES.secretsList.path).toBe("/__studio/secrets");
+    expect(STUDIO_ROUTES.secretsSet.path).toBe("/__studio/secrets");
+    expect(STUDIO_ROUTES.secretsList.method).toBe("GET");
+    expect(STUDIO_ROUTES.secretsSet.method).toBe("PUT");
+    expect(STUDIO_ROUTES.secretsList.optional).toBe(true);
+    expect(STUDIO_ROUTES.secretsSet.optional).toBe(true);
+    expect(STUDIO_ROUTES.secretsList.summary).toContain("NAMES");
+    expect(STUDIO_ROUTES.secretsList.summary).toContain("never values");
+  });
+
   test("file routes share one path across GET/PUT/DELETE", () => {
     expect(STUDIO_ROUTES.fileRead.path).toBe(STUDIO_ROUTES.fileWrite.path);
     expect(STUDIO_ROUTES.fileRead.path).toBe(STUDIO_ROUTES.fileDelete.path);

@@ -16,6 +16,14 @@ import type {
   CfConnection,
   CodeServiceResult,
   ComponentMeta,
+  DataConnectionsResponse,
+  DataConnectionTestResult,
+  DataPushResult,
+  DataRowDelete,
+  DataRowInsert,
+  DataRowsQuery,
+  DataRowsResult,
+  DataRowUpdate,
   DirEntry,
   ExtensionsInfo,
   FsEvent,
@@ -31,6 +39,8 @@ import type {
   ProjectSchemasResponse,
   RecentProjectEntry,
   RenameResult,
+  SecretsSetRequest,
+  SecretsSetResponse,
   StarterInfo,
 } from "@jxsuite/protocol";
 
@@ -42,6 +52,19 @@ export type {
   CodeServiceResult,
   ComponentMeta,
   ComponentSlotMeta,
+  DataColumnMeta,
+  DataConnectionInfo,
+  DataConnectionsResponse,
+  DataConnectionTestResult,
+  DataConnectorInfo,
+  DataPushRequest,
+  DataPushResult,
+  DataPushStep,
+  DataRowDelete,
+  DataRowInsert,
+  DataRowsQuery,
+  DataRowsResult,
+  DataRowUpdate,
   DirEntry,
   ErrorBody,
   ExtensionContributionInfo,
@@ -63,6 +86,9 @@ export type {
   PullRequestInfo,
   RecentProjectEntry,
   RenameResult,
+  SecretsListResponse,
+  SecretsSetRequest,
+  SecretsSetResponse,
   StarterInfo,
 } from "@jxsuite/protocol";
 
@@ -151,6 +177,25 @@ export interface StudioPlatform {
   fetchProjectSchemas?: () => Promise<ProjectSchemasResponse>;
   /** Invoke a format capability (parse/serialize) — { format, action, source?, doc?, options? }. */
   formatAction?: (payload: Record<string, unknown>) => Promise<unknown>;
+  // ─── Data surface + secrets (owner console; specs/extensions.md §13) ────────
+  // Optional as a family: backends without the connector data routes omit them all, and Studio
+  // Hides the data grid and connection/push/test actions. Row CRUD is the ADMIN path — it
+  // Intentionally bypasses table permission rules; the backend boundary is the gate.
+  /** List connector connections with configured state, table names, and provider metadata. */
+  dataConnections?: () => Promise<DataConnectionsResponse>;
+  /** Probe one connection through the backend's connector registry. */
+  dataConnectionTest?: (connection: string) => Promise<DataConnectionTestResult>;
+  /** Additive schema push; `dryRun` compiles the plan without applying it. */
+  dataPush?: (opts?: { connection?: string; dryRun?: boolean }) => Promise<DataPushResult>;
+  /** Page a table's rows with introspected column metadata. */
+  dataRows?: (query: DataRowsQuery) => Promise<DataRowsResult>;
+  dataInsertRow?: (req: DataRowInsert) => Promise<{ row: Record<string, unknown> }>;
+  dataUpdateRow?: (req: DataRowUpdate) => Promise<{ row: Record<string, unknown> }>;
+  dataDeleteRow?: (req: DataRowDelete) => Promise<{ ok: boolean }>;
+  /** Configured secret env-var NAMES — never values. */
+  listSecrets?: () => Promise<string[]>;
+  /** Write/remove secrets in the backend store (.dev.vars locally); names-only response. */
+  setSecrets?: (req: SecretsSetRequest) => Promise<SecretsSetResponse>;
   fetchPluginSchema: (src: string, prototype?: string, base?: string) => Promise<unknown>;
   /**
    * Resolve a class-prototype config through the backend's `/__jx_resolve__` pipeline (with the

@@ -42,8 +42,12 @@ export interface SchemaFormContext {
   params?: string[] | undefined;
   /** Unique prefix for per-field ephemeral UI state (e.g. the binding control's custom mode). */
   fieldKeyPrefix?: string | undefined;
-  /** Commit hook for the "secret" control; secrets never persist to project.json. */
-  commitSecret?: ((key: string, value: string) => void | Promise<void>) | undefined;
+  /**
+   * Commit hook for the "secret" control: stores the VALUE in the platform's secret store (never
+   * project.json) and returns the derived env-var NAME, which the control persists to the field
+   * instead of the value.
+   */
+  commitSecret?: ((key: string, value: string) => string | Promise<string>) | undefined;
 }
 
 /** Arguments passed to a registered form control. */

@@ -11,6 +11,7 @@
 import { getFormats, loadExtensions, loadFormats } from "../format/format-host";
 import { registerSettingsSection, unregisterSettingsSection } from "./settings-modal";
 import { renderContributedSection } from "./contributed-section";
+import { dataSectionActions } from "../panels/data-grid";
 import type { ExtensionContributionInfo } from "../types";
 import type { JsonSchema } from "../ui/schema-form";
 import type { SettingsContribution } from "./contributed-section";
@@ -106,8 +107,15 @@ export async function syncExtensionSettingsSections(): Promise<void> {
         key: derived.key,
         label: derived.label,
         order: derived.order,
-        render: (container) =>
-          renderContributedSection(container, contribution, { formats: getFormats() }),
+        render: (container) => {
+          // Data-domain sections get the Test/Push/Data-grid actions slot when the platform
+          // Implements the protocol's data routes; every other section renders actions-free.
+          const actions = dataSectionActions(derived.key);
+          renderContributedSection(container, contribution, {
+            formats: getFormats(),
+            ...(actions === null ? {} : { actions }),
+          });
+        },
       });
       next.add(derived.key);
     }

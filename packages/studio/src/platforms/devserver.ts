@@ -12,6 +12,14 @@ import { streamImport } from "../services/import-client";
 import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
+  DataConnectionsResponse,
+  DataConnectionTestResult,
+  DataPushResult,
+  DataRowDelete,
+  DataRowInsert,
+  DataRowsQuery,
+  DataRowsResult,
+  DataRowUpdate,
   DirEntry,
   ExtensionsInfo,
   FsEvent,
@@ -19,6 +27,8 @@ import type {
   ImportSiteOptions,
   ProjectSchemasResponse,
   RenameResult,
+  SecretsSetRequest,
+  SecretsSetResponse,
   StarterInfo,
 } from "../types";
 
@@ -634,6 +644,145 @@ export function createDevServerPlatform() {
         return {};
       }
       return await readJson<ProjectSchemasResponse>(res);
+    },
+
+    // ─── Data surface + secrets (owner console over /__studio/data/* + /__studio/secrets) ──
+
+    /** Connector connections with configured state, table names, and provider metadata. */
+    async dataConnections(): Promise<DataConnectionsResponse> {
+      const res = await fetch(
+        `/__studio/data/connections?dir=${encodeURIComponent(serverPath("."))}`,
+      );
+      if (!res.ok) {
+        const data = await readJson<ErrorBody>(res);
+        throw new Error(data.error || "Failed to list connections");
+      }
+      return await readJson<DataConnectionsResponse>(res);
+    },
+
+    /** Probe one connection through the backend's connector registry. */
+    async dataConnectionTest(connection: string): Promise<DataConnectionTestResult> {
+      const res = await fetch(
+        `/__studio/data/connections/test?dir=${encodeURIComponent(serverPath("."))}`,
+        {
+          body: JSON.stringify({ connection }),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+        },
+      );
+      const data = await readJson<DataConnectionTestResult & ErrorBody>(res);
+      if (!res.ok) {
+        throw new Error(data.error || "Connection test failed");
+      }
+      return data;
+    },
+
+    /** Additive schema push; `dryRun` compiles the plan without applying it. */
+    async dataPush(opts?: { connection?: string; dryRun?: boolean }): Promise<DataPushResult> {
+      const res = await fetch(`/__studio/data/push?dir=${encodeURIComponent(serverPath("."))}`, {
+        body: JSON.stringify(opts ?? {}),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const data = await readJson<DataPushResult & ErrorBody>(res);
+      if (!res.ok) {
+        throw new Error(data.error || "Schema push failed");
+      }
+      return data;
+    },
+
+    /** Page a table's rows with introspected column metadata. */
+    async dataRows(query: DataRowsQuery): Promise<DataRowsResult> {
+      const params = new URLSearchParams({ dir: serverPath("."), table: query.table });
+      if (query.connection) {
+        params.set("connection", query.connection);
+      }
+      if (query.limit !== undefined) {
+        params.set("limit", String(query.limit));
+      }
+      if (query.offset !== undefined) {
+        params.set("offset", String(query.offset));
+      }
+      if (query.orderBy !== undefined) {
+        params.set("orderBy", query.orderBy);
+      }
+      if (query.dir !== undefined) {
+        params.set("dir", query.dir);
+      }
+      const res = await fetch(`/__studio/data/rows?${params}`);
+      const data = await readJson<DataRowsResult & ErrorBody>(res);
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load rows");
+      }
+      return data;
+    },
+
+    async dataInsertRow(req: DataRowInsert): Promise<{ row: Record<string, unknown> }> {
+      const res = await fetch(`/__studio/data/rows?dir=${encodeURIComponent(serverPath("."))}`, {
+        body: JSON.stringify(req),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const data = await readJson<{ row: Record<string, unknown> } & ErrorBody>(res);
+      if (!res.ok) {
+        throw new Error(data.error || "Insert failed");
+      }
+      return data;
+    },
+
+    async dataUpdateRow(req: DataRowUpdate): Promise<{ row: Record<string, unknown> }> {
+      const res = await fetch(`/__studio/data/rows?dir=${encodeURIComponent(serverPath("."))}`, {
+        body: JSON.stringify(req),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      });
+      const data = await readJson<{ row: Record<string, unknown> } & ErrorBody>(res);
+      if (!res.ok) {
+        throw new Error(data.error || "Update failed");
+      }
+      return data;
+    },
+
+    async dataDeleteRow(req: DataRowDelete): Promise<{ ok: boolean }> {
+      const params = new URLSearchParams({
+        dir: serverPath("."),
+        pk: String(req.pk),
+        table: req.table,
+      });
+      if (req.connection) {
+        params.set("connection", req.connection);
+      }
+      const res = await fetch(`/__studio/data/rows?${params}`, { method: "DELETE" });
+      const data = await readJson<{ ok: boolean } & ErrorBody>(res);
+      if (!res.ok) {
+        throw new Error(data.error || "Delete failed");
+      }
+      return data;
+    },
+
+    /** Configured secret env-var NAMES — never values. */
+    async listSecrets(): Promise<string[]> {
+      const res = await fetch(`/__studio/secrets?dir=${encodeURIComponent(serverPath("."))}`);
+      if (!res.ok) {
+        const data = await readJson<ErrorBody>(res);
+        throw new Error(data.error || "Failed to list secrets");
+      }
+      const data = await readJson<{ names: string[] }>(res);
+      return data.names;
+    },
+
+    /** Write/remove secrets in the dev server's .dev.vars; names-only response. */
+    async setSecrets(req: SecretsSetRequest): Promise<SecretsSetResponse> {
+      const res = await fetch(`/__studio/secrets?dir=${encodeURIComponent(serverPath("."))}`, {
+        body: JSON.stringify(req),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      });
+      const data = await readJson<SecretsSetResponse & ErrorBody>(res);
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to write secrets");
+      }
+      return data;
     },
 
     /**

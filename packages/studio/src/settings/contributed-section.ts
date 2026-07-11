@@ -8,11 +8,12 @@
  * projectState.projectConfig and rewrite project.json through the platform.
  */
 
-import { html, render as litRender } from "lit-html";
+import { html, nothing, render as litRender } from "lit-html";
 import { getPlatform } from "../platform";
 import { projectState } from "../store";
 import { renderForm } from "../ui/schema-form";
 import { resolveContextPointer } from "../services/context-resolver";
+import { deriveSecretEnvName } from "../services/data-service";
 
 import type { TemplateResult } from "lit-html";
 import type { JsonSchema, SchemaFormContext } from "../ui/schema-form";
@@ -40,10 +41,24 @@ export interface SettingsContribution {
   entrySchema: JsonSchema;
 }
 
+/** Context handed to a host-provided section actions renderer. */
+export interface SectionActionsContext {
+  sectionKey: string;
+  /** The selected entry key (map layout), or null. */
+  selected: string | null;
+  rerender: () => void;
+}
+
 /** Host options threaded to the schema-form context. */
 export interface ContributedSectionOptions {
   /** Registered formats backing the `$formats` virtual root. */
   formats?: { name: string }[] | undefined;
+  /**
+   * Optional actions row rendered under the section title — the hook domain modules use to surface
+   * section-scoped operations (e.g. the data surface's Test/Push actions) without the generic
+   * renderer knowing any extension.
+   */
+  actions?: ((ctx: SectionActionsContext) => TemplateResult) | undefined;
 }
 
 // ─── Module state ─────────────────────────────────────────────────────────────
@@ -118,8 +133,17 @@ function instantiateNewEntry(
   return substitute(template) as Record<string, unknown>;
 }
 
-/** Schema-form context resolving `#/$context/…` pointers over the live project config. */
-function buildContext(sectionKey: string, opts: ContributedSectionOptions): SchemaFormContext {
+/**
+ * Schema-form context resolving `#/$context/…` pointers over the live project config. When the
+ * platform has a secrets surface, `commitSecret` backs the "secret" control: the VALUE goes to
+ * platform.setSecrets under a derived env name; the returned NAME is what lands in project.json.
+ */
+function buildContext(
+  sectionKey: string,
+  opts: ContributedSectionOptions,
+  entryKey: string | null = null,
+): SchemaFormContext {
+  const platform = getPlatform();
   return {
     fieldKeyPrefix: `$settings.${sectionKey}`,
     resolvePointer: (pointer, scope) =>
@@ -128,6 +152,15 @@ function buildContext(sectionKey: string, opts: ContributedSectionOptions): Sche
         ...(scope !== undefined && { scope }),
         ...(opts.formats !== undefined && { formats: opts.formats }),
       }),
+    ...(typeof platform.setSecrets === "function"
+      ? {
+          commitSecret: async (key: string, value: string) => {
+            const envName = deriveSecretEnvName(sectionKey, entryKey, key);
+            await platform.setSecrets!({ set: { [envName]: value } });
+            return envName;
+          },
+        }
+      : {}),
   };
 }
 
@@ -169,10 +202,15 @@ export function renderContributedSection(
       ? renderMapLayout(contribution, opts, rerender)
       : renderFormLayout(contribution, opts, rerender);
 
+  const selected = layout === "map" ? (selectedEntries.get(contribution.key) ?? null) : null;
+  const actions = opts.actions
+    ? opts.actions({ rerender, sectionKey: contribution.key, selected })
+    : nothing;
+
   const tpl = html`
     <div class="settings-section contributed-section">
       <h3 class="settings-section-title">${title}</h3>
-      ${body}
+      ${actions}${body}
     </div>
   `;
 
@@ -191,7 +229,7 @@ function renderFormLayout(
   return html`
     <div class="settings-form-panel">
       ${renderForm(contribution.entrySchema, value, {
-        context: buildContext(contribution.key, opts),
+        context: buildContext(contribution.key, opts, null),
         onChange: (patch) => {
           const target = sectionValue(contribution.key);
           if (!target) {
@@ -351,7 +389,7 @@ function renderMapLayout(
               </sp-action-button>
             </div>
             ${renderForm(contribution.entrySchema, selectedEntry as Record<string, unknown>, {
-              context: buildContext(sectionKey, opts),
+              context: buildContext(sectionKey, opts, selected),
               onChange: (patch) => {
                 applyPatch(selectedEntry as Record<string, unknown>, patch);
                 rerender();
