@@ -62,7 +62,12 @@ export type SchemaFormControl = (args: SchemaFormControlArgs) => TemplateResult;
 export interface RenderFormOptions {
   onChange: (patch: Record<string, unknown>) => void;
   context?: SchemaFormContext | undefined;
-  ui?: Record<string, { control?: string }> | undefined;
+  /**
+   * Per-field overrides from `$studio.settings.entry.ui`: a registered control name, and/or an
+   * `enum` source (choice list or `{ "$ref": "#/$context/<pointer>" }`) layered over the field
+   * schema — fragments stay valid JSON Schema while descriptors add dynamic choices.
+   */
+  ui?: Record<string, { control?: string; enum?: unknown }> | undefined;
   rerender?: (() => void) | undefined;
 }
 
@@ -291,7 +296,7 @@ function renderPropertyControl(
     return refTextField(prop, currentValue.$ref, commit);
   }
 
-  const enumValues = resolveFormEnum(ps.enum, ctx, value);
+  const enumValues = resolveFormEnum(opts.ui?.[prop]?.enum ?? ps.enum, ctx, value);
   if (enumValues) {
     return html`
       <sp-picker

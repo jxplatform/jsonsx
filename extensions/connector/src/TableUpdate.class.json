@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/connector/TableUpdate.class.json",
+  "title": "TableUpdate",
+  "description": "Update action: PATCH a row at /_jx/data/<table>/<id> (id: literal, ${...} template, or #/$params ref); lowered to an inline Function handler in compiled sites",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./table-update.js",
+
+  "$studio": {
+    "stateDefaults": { "timing": "client" }
+  },
+
+  "$defs": {
+    "parameters": {
+      "table": {
+        "identifier": "table",
+        "type": { "type": "string" },
+        "description": "Name of a `data` section table"
+      },
+      "id": {
+        "identifier": "id",
+        "type": { "type": ["string", "integer", "object"] },
+        "description": "Row id: a literal, a ${...} template, or { \"$ref\": \"#/$params/<name>\" }"
+      },
+      "values": {
+        "identifier": "values",
+        "type": { "type": "object" },
+        "description": "Literal payload columns merged over the submitting form's FormData"
+      }
+    },
+    "constructor": {
+      "role": "constructor",
+      "parameters": [
+        { "$ref": "#/$defs/parameters/table" },
+        { "$ref": "#/$defs/parameters/id" },
+        { "$ref": "#/$defs/parameters/values" }
+      ],
+      "body": ["this.config = config;"]
+    },
+    "methods": {
+      "resolve": {
+        "role": "method",
+        "scope": "instance",
+        "identifier": "resolve",
+        "returnType": { "type": "object" },
+        "description": "An event handler performing the update and bumping state._v"
+      },
+      "lower": {
+        "role": "lower",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "lower",
+        "timing": ["compiler"],
+        "parameters": [
+          { "identifier": "def", "type": { "type": "object" } },
+          { "identifier": "context", "type": { "type": "object" } }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Rewrite into an inline Function def fetching PATCH /_jx/data/<table>/<id>"
+      }
+    }
+  }
+}

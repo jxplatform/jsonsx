@@ -25,17 +25,74 @@ Commands:
   build [root]     Build a Jx site to dist/
   schema [root]    Generate project.schema.json + document.schema.json from project.json#/extensions
   validate [root]  Validate project.json against its generated project.schema.json
+  db push [root]   Sync the data section's tables to their connections (additive-only)
 
 Options:
   --verbose      Print detailed build progress
-  --no-clean     Don't clean outDir before building`);
+  --no-clean     Don't clean outDir before building
+  --dry-run      db push: print the statements without executing them
+  --connection   db push: restrict to one connection name`);
     process.exit(0);
   }
 
-  const rest = args.slice(1);
-  const flags = new Set(rest.filter((a) => a.startsWith("--")));
-  const positional = rest.find((a) => !a.startsWith("--"));
+  // `db push` is a two-word command; normalize it before the flag/positional split.
+  const isDb = command === "db";
+  const dbSubcommand = isDb ? args[1] : null;
+  const rest = args.slice(isDb ? 2 : 1);
+  const flags = new Set<string>();
+  const positionals: string[] = [];
+  let connectionArg: string | undefined;
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index]!;
+    if (arg === "--connection") {
+      index += 1;
+      connectionArg = rest[index];
+    } else if (arg.startsWith("--")) {
+      flags.add(arg);
+    } else {
+      positionals.push(arg);
+    }
+  }
+  const [positional] = positionals;
   const projectRoot = resolve(positional ?? ".");
+
+  if (isDb) {
+    if (dbSubcommand !== "push") {
+      console.error(
+        `Unknown db subcommand: ${dbSubcommand ?? "(none)"}\nUsage: jx db push [root] [--dry-run] [--connection <name>]`,
+      );
+      process.exit(1);
+    }
+    const dryRun = flags.has("--dry-run");
+    try {
+      const { dbPush } = await import("./site/db-push.ts");
+      const { results, bindingsPatched, wranglerPath } = await dbPush(projectRoot, {
+        dryRun,
+        ...(connectionArg === undefined ? {} : { connection: connectionArg }),
+      });
+      for (const result of results) {
+        const mode = result.applied ? "applied" : "dry-run";
+        console.log(
+          `${result.connection} (${result.provider}) — ${result.tables.length} table(s), ` +
+            `${result.statements.length} statement(s) [${mode}]`,
+        );
+        for (const statement of result.statements) {
+          console.log(`  ${statement}`);
+        }
+        for (const warning of result.warnings) {
+          console.warn(`  warning: ${warning}`);
+        }
+      }
+      if (bindingsPatched && wranglerPath) {
+        console.log(`Updated bindings in ${relative(projectRoot, wranglerPath)}`);
+      }
+    } catch (error) {
+      const err = error as Error;
+      console.error(`db push failed: ${err.message}`);
+      process.exit(1);
+    }
+    return;
+  }
 
   if (command === "build") {
     const verbose = flags.has("--verbose");

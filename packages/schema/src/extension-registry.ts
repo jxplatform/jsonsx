@@ -32,7 +32,12 @@ export interface ExtensionManifest {
   title?: string;
   description?: string;
   classes?: Record<string, string>;
-  schemas?: { project?: string; document?: string };
+  /**
+   * Schema fragments the package contributes: `project` (project.json sections), `document` ($paths
+   * shapes), and `fields` — a fragment whose `$defs` members are unioned into the per-project
+   * field-schema resource (extension field extras, specs/extensions.md §5.3).
+   */
+  schemas?: { project?: string; document?: string; fields?: string };
 }
 
 export interface ExtensionInfo {
@@ -44,10 +49,10 @@ export interface ExtensionInfo {
   /** Class entries in manifest order. */
   classes: FormatEntry[];
   /** Resolved absolute fragment paths, when the manifest declares them. */
-  schemas: { project?: string; document?: string };
+  schemas: { project?: string; document?: string; fields?: string };
 }
 
-export type SchemaFragmentKind = "project" | "document";
+export type SchemaFragmentKind = "project" | "document" | "fields";
 
 export class ExtensionRegistry {
   #extensions: ExtensionInfo[];
@@ -252,6 +257,9 @@ async function loadExtension(
   }
   if (manifest.schemas?.document) {
     schemas.document = io.resolvePath(manifestPath, manifest.schemas.document);
+  }
+  if (manifest.schemas?.fields) {
+    schemas.fields = io.resolvePath(manifestPath, manifest.schemas.fields);
   }
 
   return { specifier, manifestPath, manifest, classes, schemas };

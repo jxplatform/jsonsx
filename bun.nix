@@ -461,6 +461,10 @@
     url = "https://registry.npmjs.org/@babylonjs/core/-/core-7.54.3.tgz";
     hash = "sha512-P5ncXVd8GEUJLhwloP9V0oVwQYIrvZztguVeLlvd5Rx+9aQnenKjpV8auJ6SRsUlAmNZU4pFTKzwF6o2EUfhAw==";
   };
+  "@cloudflare/workers-types@5.20260711.1" = fetchurl {
+    url = "https://registry.npmjs.org/@cloudflare/workers-types/-/workers-types-5.20260711.1.tgz";
+    hash = "sha512-yY6GXfyrHJa33EWaSzS5N56Lsll02kgHo4Qodz2l2DNl4L6L5yXBMZVMvcYArirdYA1xn+o8LKVRQGdRpmSMzA==";
+  };
   "@commitlint/cli@21.2.1" = fetchurl {
     url = "https://registry.npmjs.org/@commitlint/cli/-/cli-21.2.1.tgz";
     hash = "sha512-blsZGe29hJ72VGEFVl72IVYX+1vsfINpjA9yWQA6i7OKD/McGEOXg08sKIRKjFk4JvzhV/9n0l3i6NooPLTNfg==";
@@ -748,6 +752,7 @@
   "@jxsuite/ai" = copyPathToStore ./packages/ai;
   "@jxsuite/collab" = copyPathToStore ./packages/collab;
   "@jxsuite/compiler" = copyPathToStore ./packages/compiler;
+  "@jxsuite/connector" = copyPathToStore ./extensions/connector;
   "@jxsuite/create" = copyPathToStore ./packages/create;
   "@jxsuite/desktop" = copyPathToStore ./packages/desktop;
   "@jxsuite/examples" = copyPathToStore ./examples;
@@ -2353,6 +2358,10 @@
     url = "https://registry.npmjs.org/he/-/he-1.2.0.tgz";
     hash = "sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==";
   };
+  "hono@4.12.29" = fetchurl {
+    url = "https://registry.npmjs.org/hono/-/hono-4.12.29.tgz";
+    hash = "sha512-1hNiRjawYrLq/4m3DQQjPGFg0VZkk4RjQJDff/excI6Dm9BiL75qxGrd7/c6YOxPdq6AscP3LiXhQ6fKFC1Waw==";
+  };
   "hosted-git-info@2.8.9" = fetchurl {
     url = "https://registry.npmjs.org/hosted-git-info/-/hosted-git-info-2.8.9.tgz";
     hash = "sha512-mxIDAb9Lsm6DoOJ7xH+5+X4y1LU/4Hi50L9C5sIswK3JzULS4bwk1FvjdBgvYR4bzT4tuUQiC15FE2f5HbLvYw==";
@@ -2640,6 +2649,18 @@
   "kind-of@6.0.3" = fetchurl {
     url = "https://registry.npmjs.org/kind-of/-/kind-of-6.0.3.tgz";
     hash = "sha512-dcS1ul+9tmeD95T+x28/ehLgd9mENa3LsvDTtzm3vyBEO7RPptvAD+t44WVXaUjTBRcrpFeFlC8WCruUR456hw==";
+  };
+  "kysely-d1@0.4.0" = fetchurl {
+    url = "https://registry.npmjs.org/kysely-d1/-/kysely-d1-0.4.0.tgz";
+    hash = "sha512-wUcVvQNtm30OTfuo7Ad5vYJ1qHqPXOCZc+zWchVKNyuvqY3u8OuGw4gmUx1Ypdx2wRVFLHVQC9I7v0pTmF7Nkw==";
+  };
+  "kysely-postgres-js@3.0.0" = fetchurl {
+    url = "https://registry.npmjs.org/kysely-postgres-js/-/kysely-postgres-js-3.0.0.tgz";
+    hash = "sha512-o2t/xNSYJQDW6rVGGFPXKmZ0BEz2dGn66c2B+cO/k9ZNcU2qPWPycQPQ+B+P2MBXbKYq0xV9BZmFIvkUrmFWAQ==";
+  };
+  "kysely@0.28.17" = fetchurl {
+    url = "https://registry.npmjs.org/kysely/-/kysely-0.28.17.tgz";
+    hash = "sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q==";
   };
   "levn@0.4.1" = fetchurl {
     url = "https://registry.npmjs.org/levn/-/levn-0.4.1.tgz";
@@ -3224,6 +3245,10 @@
   "posix-character-classes@0.1.1" = fetchurl {
     url = "https://registry.npmjs.org/posix-character-classes/-/posix-character-classes-0.1.1.tgz";
     hash = "sha512-xTgYBc3fuo7Yt7JbiuFxSYGToMoz8fLoE6TC9Wx1P/u+LfeThMOAqmuyECnlBaaJb+u1m9hHiXUEtwW4OzfUJg==";
+  };
+  "postgres@3.4.9" = fetchurl {
+    url = "https://registry.npmjs.org/postgres/-/postgres-3.4.9.tgz";
+    hash = "sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw==";
   };
   "prelude-ls@1.2.1" = fetchurl {
     url = "https://registry.npmjs.org/prelude-ls/-/prelude-ls-1.2.1.tgz";

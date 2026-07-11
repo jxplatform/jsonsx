@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/connector/D1.class.json",
+  "title": "D1",
+  "description": "Cloudflare D1 connection provider: binding-backed inside Workers, HTTP-API-backed for deploys, tests, and compiler bakes",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./d1.js",
+
+  "connector": {
+    "provider": "d1",
+    "kind": "sqlite",
+    "local": "sqlite",
+    "serve": "@jxsuite/connector/worker",
+    "module": "@jxsuite/connector/d1"
+  },
+
+  "$defs": {
+    "methods": {
+      "dialect": {
+        "role": "dialect",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "dialect",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "connection",
+            "type": { "type": "object" },
+            "description": "Connection definition (with $name injected by the host)"
+          },
+          {
+            "identifier": "env",
+            "type": { "type": "object" },
+            "description": "Host environment: bindings and env vars"
+          }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Kysely dialect for the connection: the D1 binding when present, else the D1 HTTP API via CLOUDFLARE_API_TOKEN"
+      },
+      "deploySchema": {
+        "role": "deploySchema",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "deploySchema",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "tables",
+            "type": { "type": "object" },
+            "description": "Table definitions of this connection"
+          },
+          { "identifier": "connection", "type": { "type": "object" } },
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": { "env": { "type": "object" }, "dryRun": { "type": "boolean" } }
+            }
+          }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Additive schema sync: { statements, applied, warnings }"
+      },
+      "bindings": {
+        "role": "bindings",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "bindings",
+        "timing": ["compiler", "server"],
+        "parameters": [{ "identifier": "connection", "type": { "type": "object" } }],
+        "returnType": { "type": "object" },
+        "description": "Wrangler config fragment: the d1_databases binding for this connection"
+      },
+      "testConnection": {
+        "role": "testConnection",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "testConnection",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          { "identifier": "connection", "type": { "type": "object" } },
+          { "identifier": "env", "type": { "type": "object" } }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Probe the connection with `select 1`: { ok, error? }"
+      }
+    }
+  }
+}

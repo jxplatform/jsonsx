@@ -28,7 +28,8 @@
     "./pages-discovery": "./src/site/pages-discovery.ts",
     "./site": "./src/site/site-build.ts",
     "./site-loader": "./src/site/site-loader.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./db-push": "./src/site/db-push.ts"
   },
   "publishConfig": {
     "provenance": true
@@ -44,12 +45,14 @@
   },
   "dependencies": {
     "@apidevtools/json-schema-ref-parser": "^15.5.0",
+    "@jxsuite/create": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
     "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.10.6",
+    "@jxsuite/connector": "workspace:^",
     "@jxsuite/parser": "workspace:^",
     "@types/mdast": "^4.0.4"
   }

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/connector/Data.class.json",
+  "title": "Data",
+  "description": "Owner of the project.json `data` section (dynamic tables) and the /_jx/data server mount implementing the canonical data wire contract",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./worker.js",
+
+  "project": {
+    "key": "data",
+    "title": "Data Tables",
+    "description": "Connection-backed dynamic tables served at /_jx/data/<table>",
+    "referenceable": true
+  },
+
+  "server": {
+    "basePath": "/_jx/data",
+    "order": 20,
+    "module": "@jxsuite/connector/worker"
+  },
+
+  "$studio": {
+    "settings": {
+      "icon": "sp-icon-table",
+      "label": "Data Tables",
+      "order": 55,
+      "layout": "map",
+      "entry": {
+        "ui": {
+          "schema": { "control": "schema-builder" },
+          "connection": { "enum": { "$ref": "#/$context/connections" } }
+        },
+        "newEntry": {
+          "connection": "",
+          "schema": { "type": "object", "properties": {}, "required": [] },
+          "permissions": { "read": "public" }
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "returnTypes": {
+      "SectionData": {
+        "type": "object",
+        "description": "Map of table name → table definition, stored as _project.data"
+      }
+    },
+
+    "methods": {
+      "projectData": {
+        "role": "projectData",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "projectData",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "sectionValue",
+            "type": { "type": "object" },
+            "description": "The project.json `data` section value (table name → definition)"
+          },
+          {
+            "identifier": "ctx",
+            "type": { "type": "object" },
+            "description": "Host context: { projectConfig, root, registry, io }"
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/SectionData" },
+        "description": "Expose the table definitions under _project.data (rows stay in the database; reads go through TableQuery/TableEntry or /_jx/data)"
+      },
+      "mount": {
+        "role": "mount",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "mount",
+        "timing": ["server"],
+        "parameters": [
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": {
+                "basePath": { "type": "string" },
+                "sections": { "type": "object" },
+                "connectors": { "type": "object" },
+                "autoSync": { "type": "boolean" }
+              }
+            },
+            "description": "Inlined mount options: project sections, provider constructors, sync mode"
+          },
+          {
+            "identifier": "ctx",
+            "type": { "type": "object" },
+            "description": "Shared JxServerContext (the auth mount populates ctx.auth)"
+          }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Fetch-style handler (request, env) → Response serving the /_jx/data wire contract; fail-closed without ctx.auth"
+      }
+    }
+  }
+}

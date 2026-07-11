@@ -1,0 +1,72 @@
+{
+  "name": "@jxsuite/connector",
+  "version": "0.1.0",
+  "description": "Jx database connections and dynamic data tables served over /_jx/data",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "extensions/connector"
+  },
+  "files": [
+    "src/",
+    "jx-extension.json",
+    "schemas/"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/connectors.ts",
+    "./types": "./src/types.ts",
+    "./columns": "./src/columns.ts",
+    "./ddl": "./src/ddl.ts",
+    "./query": "./src/query.ts",
+    "./validate": "./src/validate.ts",
+    "./worker": "./src/worker.ts",
+    "./d1": "./src/d1.ts",
+    "./supabase": "./src/supabase.ts",
+    "./sqlite": "./src/sqlite.ts",
+    "./table-state": "./src/table-state.ts",
+    "./table-node": "./src/table-node.ts",
+    "./table-shared": "./src/table-shared.ts",
+    "./table-actions": "./src/table-actions.ts",
+    "./table-insert": "./src/table-insert.ts",
+    "./table-update": "./src/table-update.ts",
+    "./table-delete": "./src/table-delete.ts",
+    "./provider-utils": "./src/provider-utils.ts",
+    "./dialects/bun-sqlite": "./src/dialects/bun-sqlite.ts",
+    "./dialects/d1-http": "./src/dialects/d1-http.ts",
+    "./jx-extension.json": "./jx-extension.json",
+    "./schemas/project.fragment.schema.json": "./schemas/project.fragment.schema.json",
+    "./D1.class.json": "./src/D1.class.json",
+    "./Supabase.class.json": "./src/Supabase.class.json",
+    "./Sqlite.class.json": "./src/Sqlite.class.json",
+    "./Connections.class.json": "./src/Connections.class.json",
+    "./Data.class.json": "./src/Data.class.json",
+    "./TableQuery.class.json": "./src/TableQuery.class.json",
+    "./TableEntry.class.json": "./src/TableEntry.class.json",
+    "./TableInsert.class.json": "./src/TableInsert.class.json",
+    "./TableUpdate.class.json": "./src/TableUpdate.class.json",
+    "./TableDelete.class.json": "./src/TableDelete.class.json"
+  },
+  "publishConfig": {
+    "provenance": true
+  },
+  "scripts": {
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage",
+    "upgrade": "bunx npm-check-updates -u && bun install"
+  },
+  "dependencies": {
+    "@jxsuite/schema": "workspace:^",
+    "kysely": "^0.28.17",
+    "kysely-d1": "^0.4.0",
+    "kysely-postgres-js": "^3.0.0",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260711.1",
+    "ajv": "^8.20.0",
+    "hono": "^4.11.3"
+  },
+  "jx": "./jx-extension.json"
+}

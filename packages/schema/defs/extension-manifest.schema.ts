@@ -27,6 +27,12 @@ export const extensionManifestSchema = {
           description: "Document-schema fragment (positions like $paths values).",
           type: "string",
         },
+        fields: {
+          description:
+            "Field-union fragment: its $defs members are unioned into the per-project " +
+            "field-schema resource as extension field extras (specs/extensions.md §5.3).",
+          type: "string",
+        },
         project: {
           description: "Project-schema fragment (top-level project.json sections).",
           type: "string",

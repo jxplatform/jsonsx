@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/connector/TableQuery.class.json",
+  "title": "TableQuery",
+  "description": "Rows of a dynamic table matching a content-grammar filter/sort/limit — fetched from /_jx/data in browsers, read directly under node, and lowered to a core Request def in compiled sites",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./table-state.js",
+
+  "$studio": {
+    "stateDefaults": { "timing": "client" }
+  },
+
+  "$defs": {
+    "parameters": {
+      "table": {
+        "identifier": "table",
+        "type": { "type": "string" },
+        "description": "Name of a `data` section table"
+      },
+      "filter": {
+        "identifier": "filter",
+        "type": { "type": ["array", "object"] },
+        "description": "Content filter grammar: rule array [{ field, op, value }] or equality-object shorthand"
+      },
+      "sort": {
+        "identifier": "sort",
+        "type": { "type": ["array", "object"] },
+        "description": "Sort rule { field, order } or a list of them"
+      },
+      "limit": { "identifier": "limit", "type": { "type": "integer" } },
+      "offset": { "identifier": "offset", "type": { "type": "integer" } },
+      "include": {
+        "identifier": "include",
+        "type": { "type": ["array", "string"] },
+        "description": "Reference fields to expand (to-one table refs and junction to-many fields)"
+      }
+    },
+    "constructor": {
+      "role": "constructor",
+      "parameters": [
+        { "$ref": "#/$defs/parameters/table" },
+        { "$ref": "#/$defs/parameters/filter" },
+        { "$ref": "#/$defs/parameters/sort" },
+        { "$ref": "#/$defs/parameters/limit" },
+        { "$ref": "#/$defs/parameters/offset" },
+        { "$ref": "#/$defs/parameters/include" }
+      ],
+      "body": ["this.config = config;"]
+    },
+    "methods": {
+      "resolve": {
+        "role": "method",
+        "scope": "instance",
+        "identifier": "resolve",
+        "returnType": { "type": "array" },
+        "description": "The matching rows"
+      },
+      "lower": {
+        "role": "lower",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "lower",
+        "timing": ["compiler"],
+        "parameters": [
+          { "identifier": "def", "type": { "type": "object" } },
+          { "identifier": "context", "type": { "type": "object" } }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Rewrite into a core Request def: /_jx/data URL with preserved template placeholders plus the `_v` read-after-write param"
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/connector/Connections.class.json",
+  "title": "Connections",
+  "description": "Owner of the project.json `connections` section: named database connections carrying identifiers and env-var names only — secret values never enter project.json",
+  "$prototype": "Class",
+  "extends": "Object",
+
+  "project": {
+    "key": "connections",
+    "title": "Connections",
+    "description": "Named database connections (identifiers only; secrets live in .dev.vars / the platform secret store)"
+  },
+
+  "$studio": {
+    "settings": {
+      "icon": "sp-icon-data",
+      "label": "Connections",
+      "order": 60,
+      "layout": "map",
+      "entry": {
+        "ui": {
+          "urlEnv": { "control": "secret-env" }
+        },
+        "newEntry": { "provider": "sqlite" }
+      }
+    }
+  }
+}

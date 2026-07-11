@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/connector/Sqlite.class.json",
+  "title": "Sqlite",
+  "description": "File-backed SQLite connection provider over bun:sqlite — the dev-server default and the `local: \"sqlite\"` stand-in target",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./sqlite.js",
+
+  "connector": {
+    "provider": "sqlite",
+    "kind": "sqlite",
+    "serve": "@jxsuite/connector/worker",
+    "module": "@jxsuite/connector/sqlite"
+  },
+
+  "$defs": {
+    "methods": {
+      "dialect": {
+        "role": "dialect",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "dialect",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          { "identifier": "connection", "type": { "type": "object" } },
+          { "identifier": "env", "type": { "type": "object" } }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Kysely bun:sqlite dialect at <JX_PROJECT_ROOT>/.jx/data/<name>.sqlite (or the connection's file path)"
+      },
+      "deploySchema": {
+        "role": "deploySchema",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "deploySchema",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          { "identifier": "tables", "type": { "type": "object" } },
+          { "identifier": "connection", "type": { "type": "object" } },
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": { "env": { "type": "object" }, "dryRun": { "type": "boolean" } }
+            }
+          }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Additive schema sync: { statements, applied, warnings }"
+      },
+      "bindings": {
+        "role": "bindings",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "bindings",
+        "timing": ["compiler", "server"],
+        "parameters": [{ "identifier": "connection", "type": { "type": "object" } }],
+        "returnType": { "type": "object" },
+        "description": "Empty fragment — SQLite is not a Cloudflare service"
+      },
+      "testConnection": {
+        "role": "testConnection",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "testConnection",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          { "identifier": "connection", "type": { "type": "object" } },
+          { "identifier": "env", "type": { "type": "object" } }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Probe the database file with `select 1`: { ok, error? }"
+      }
+    }
+  }
+}

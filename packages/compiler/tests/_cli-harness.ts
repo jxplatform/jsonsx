@@ -100,6 +100,35 @@ void mock.module("@jxsuite/schema/validate-project", () => ({
   },
 }));
 
+export interface DbPushResultLike {
+  results: {
+    connection: string;
+    provider: string;
+    tables: string[];
+    statements: string[];
+    warnings: string[];
+    applied: boolean;
+  }[];
+  bindingsPatched: boolean;
+  wranglerPath: string | null;
+}
+
+let dbPushImpl: (root: string, opts: Record<string, unknown>) => Promise<DbPushResultLike> = () =>
+  Promise.resolve({ bindingsPatched: false, results: [], wranglerPath: null });
+
+export const dbPushCalls: { root: string; opts: Record<string, unknown> }[] = [];
+
+export function setDbPush(impl: typeof dbPushImpl) {
+  dbPushImpl = impl;
+}
+
+void mock.module("../src/site/db-push.ts", () => ({
+  dbPush: (root: string, opts: Record<string, unknown>) => {
+    dbPushCalls.push({ opts, root });
+    return dbPushImpl(root, opts);
+  },
+}));
+
 const originalArgv = process.argv;
 
 /**

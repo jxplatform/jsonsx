@@ -270,4 +270,19 @@ describe("bundleSchema mechanics", () => {
     expect(props.n!.$ref).toBe("#/$defs/Local");
     expect(bundled).toEqual(entry);
   });
+
+  test("leading '..' segments survive normalization for relative base dirs", async () => {
+    // A relative baseDir with a parent-escaping ref keeps its ".." prefix (only absolute paths
+    // Clamp at the root) — the loader receives the preserved relative path.
+    const seen: string[] = [];
+    const loader = async (path: string): Promise<Record<string, unknown>> => {
+      seen.push(path);
+      return { type: "string" };
+    };
+    const entry = { properties: { x: { $ref: "../../shared/frag.json" } }, type: "object" };
+    const bundled = await bundleSchema(entry, loader, "rel");
+    expect(seen).toEqual(["../shared/frag.json"]);
+    const props = bundled.properties as Record<string, { $ref: string }>;
+    expect(props.x!.$ref).toBe("urn:jx:bundled:1");
+  });
 });

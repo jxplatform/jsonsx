@@ -4,6 +4,7 @@
   "packages/runtime": "0.34.2",
   "packages/markup": "0.1.0",
   "extensions/parser": "0.35.1",
+  "extensions/connector": "0.1.0",
   "packages/compiler": "0.35.0",
   "packages/import": "0.35.1",
   "packages/starters": "0.35.1",

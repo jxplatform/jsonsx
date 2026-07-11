@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/connector/TableDelete.class.json",
+  "title": "TableDelete",
+  "description": "Delete action: DELETE /_jx/data/<table>/<id> (id: literal, ${...} template, or #/$params ref); lowered to an inline Function handler in compiled sites",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./table-delete.js",
+
+  "$studio": {
+    "stateDefaults": { "timing": "client" }
+  },
+
+  "$defs": {
+    "parameters": {
+      "table": {
+        "identifier": "table",
+        "type": { "type": "string" },
+        "description": "Name of a `data` section table"
+      },
+      "id": {
+        "identifier": "id",
+        "type": { "type": ["string", "integer", "object"] },
+        "description": "Row id: a literal, a ${...} template, or { \"$ref\": \"#/$params/<name>\" }"
+      }
+    },
+    "constructor": {
+      "role": "constructor",
+      "parameters": [{ "$ref": "#/$defs/parameters/table" }, { "$ref": "#/$defs/parameters/id" }],
+      "body": ["this.config = config;"]
+    },
+    "methods": {
+      "resolve": {
+        "role": "method",
+        "scope": "instance",
+        "identifier": "resolve",
+        "returnType": { "type": "object" },
+        "description": "An event handler performing the delete and bumping state._v"
+      },
+      "lower": {
+        "role": "lower",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "lower",
+        "timing": ["compiler"],
+        "parameters": [
+          { "identifier": "def", "type": { "type": "object" } },
+          { "identifier": "context", "type": { "type": "object" } }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Rewrite into an inline Function def fetching DELETE /_jx/data/<table>/<id>"
+      }
+    }
+  }
+}

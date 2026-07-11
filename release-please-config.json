@@ -26,6 +26,10 @@
       "release-type": "node",
       "component": "parser"
     },
+    "extensions/connector": {
+      "release-type": "node",
+      "component": "connector"
+    },
     "packages/compiler": {
       "release-type": "node",
       "component": "compiler"

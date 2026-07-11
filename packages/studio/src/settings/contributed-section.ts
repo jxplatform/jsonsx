@@ -31,7 +31,7 @@ export interface SettingsContribution {
     layout?: "map" | "form" | undefined;
     entry?:
       | {
-          ui?: Record<string, { control?: string }> | undefined;
+          ui?: Record<string, { control?: string; enum?: unknown }> | undefined;
           newEntry?: Record<string, unknown> | undefined;
         }
       | undefined;

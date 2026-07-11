@@ -38,6 +38,7 @@ export async function writeProjectSchemas(projectRoot: string) {
   const corePath = coreSchemaRef(projectRoot, CORE_PROJECT_SPECIFIER);
   const fragments: string[] = [];
   const pathsValueRefs: string[] = [];
+  const fieldSchemaRefs: string[] = [];
   for (const ext of registry.extensions) {
     const projectFragment = ext.schemas.project;
     if (projectFragment) {
@@ -45,11 +46,18 @@ export async function writeProjectSchemas(projectRoot: string) {
     }
     const documentFragment = ext.schemas.document;
     if (documentFragment) {
-      pathsValueRefs.push(...documentPathsRefs(documentFragment));
+      pathsValueRefs.push(...fragmentDefsRefs(documentFragment));
+    }
+    // The `schemas.fields` manifest convention: a fragment whose $defs members are extension
+    // Field extras, unioned into the per-project field resource (specs/extensions.md §5.3).
+    const fieldsFragment = ext.schemas.fields;
+    if (fieldsFragment) {
+      fieldSchemaRefs.push(...fragmentDefsRefs(fieldsFragment));
+      fragments.push(fragmentRef(projectRoot, ext, fieldsFragment));
     }
   }
 
-  const projectSchema = emitProjectSchema({ corePath, fragments });
+  const projectSchema = emitProjectSchema({ corePath, fieldSchemaRefs, fragments });
   const documentSchema = emitDocumentSchema({
     corePath: coreSchemaRef(projectRoot, CORE_DOCUMENT_SPECIFIER),
     pathsValueRefs,
@@ -212,14 +220,14 @@ function projectRelativeRef(projectRoot: string, absPath: string, conventional: 
 }
 
 /**
- * Canonical "uri#/pointer" refs into a document fragment's paths shapes: one per `$defs` entry,
- * addressed by the fragment's own `$id` (refs inside the entry document's embed resolve against
- * canonical URIs, never file locations).
+ * Canonical "uri#/pointer" refs into a fragment's `$defs` shapes: one per `$defs` entry, addressed
+ * by the fragment's own `$id` (refs inside the entry document's embeds resolve against canonical
+ * URIs, never file locations). Serves both the document paths union and the fields-extras union.
  *
- * @param {string} fragmentPath - Resolved absolute document-fragment path
+ * @param {string} fragmentPath - Resolved absolute fragment path
  * @returns {string[]}
  */
-function documentPathsRefs(fragmentPath: string): string[] {
+function fragmentDefsRefs(fragmentPath: string): string[] {
   let fragment: { $id?: unknown; $defs?: Record<string, unknown> };
   try {
     fragment = JSON.parse(readFileSync(fragmentPath, "utf8")) as typeof fragment;

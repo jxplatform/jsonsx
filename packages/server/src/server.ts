@@ -17,6 +17,7 @@ import { join, relative, resolve } from "node:path";
 import { buildAll } from "./build.ts";
 import { createCollabRegistry } from "./collab.ts";
 import { createWatcher, injectSSE } from "./watch.ts";
+import { handleJxMounts } from "./jx-mounts.ts";
 import { handleResolve, handleServerFunction } from "./resolve.ts";
 import { assertAccessible, handleStudioApi } from "./studio-api.ts";
 import { handleCodeApi } from "./code-api.ts";
@@ -266,6 +267,15 @@ export async function createDevServer(options: {
       // Timing: "server" function proxy
       if (path === "/__jx_server__" && req.method === "POST") {
         return handleServerFunction(req, absRoot);
+      }
+
+      // Extension server mounts (/_jx/data etc.) — registry-driven, same wire contract as the
+      // Generated site worker (specs/extensions.md §11).
+      if (path.startsWith("/_jx/")) {
+        const mountRes = await handleJxMounts(req, url, activeProjectRoot ?? absRoot);
+        if (mountRes) {
+          return mountRes;
+        }
       }
 
       // Studio filesystem API

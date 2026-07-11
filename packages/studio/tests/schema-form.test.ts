@@ -48,7 +48,7 @@ function mountForm(
   value: Record<string, unknown>,
   opts: {
     context?: SchemaFormContext;
-    ui?: Record<string, { control?: string }>;
+    ui?: Record<string, { control?: string; enum?: unknown }>;
     withRerender?: boolean;
   } = {},
 ): Mount {
@@ -371,6 +371,27 @@ describe("control registry and ui overrides", () => {
       { ui: { field: { control: "never-registered" } } },
     );
     expect(m.container.querySelector('[data-prop="field"] sp-checkbox')).not.toBeNull();
+  });
+
+  test("ui enum overrides layer dynamic $context choices over a plain string field", () => {
+    // The connector's Data section declares `connection: { type: "string" }` in its fragment
+    // (valid JSON Schema) and adds choices via $studio.settings.entry.ui — the descriptor path.
+    const m = mountForm(
+      { properties: { connection: { type: "string" } } },
+      {},
+      {
+        context: ctxOver({
+          connections: { main: { provider: "d1" }, replica: { provider: "sqlite" } },
+        }),
+        ui: { connection: { enum: { $ref: "#/$context/connections" } } },
+      },
+    );
+    const picker = m.container.querySelector('[data-prop="connection"] sp-picker');
+    expect(picker).not.toBeNull();
+    const items = [...picker!.querySelectorAll("sp-menu-item")].map((i) => i.getAttribute("value"));
+    expect(items).toEqual(["__none__", "main", "replica"]);
+    commitValue(picker!, "replica");
+    expect(m.patches).toEqual([{ connection: "replica" }]);
   });
 });
 

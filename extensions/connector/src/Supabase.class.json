@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/connector/Supabase.class.json",
+  "title": "Supabase",
+  "description": "Supabase (postgres) connection provider over postgres-js; from Workers via a Hyperdrive binding, elsewhere via the urlEnv-named connection URL",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./supabase.js",
+
+  "connector": {
+    "provider": "supabase",
+    "kind": "postgres",
+    "serve": "@jxsuite/connector/worker",
+    "module": "@jxsuite/connector/supabase"
+  },
+
+  "$defs": {
+    "methods": {
+      "dialect": {
+        "role": "dialect",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "dialect",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          { "identifier": "connection", "type": { "type": "object" } },
+          { "identifier": "env", "type": { "type": "object" } }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Kysely postgres-js dialect: Hyperdrive binding first, then the urlEnv-named env var"
+      },
+      "deploySchema": {
+        "role": "deploySchema",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "deploySchema",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          { "identifier": "tables", "type": { "type": "object" } },
+          { "identifier": "connection", "type": { "type": "object" } },
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": { "env": { "type": "object" }, "dryRun": { "type": "boolean" } }
+            }
+          }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Additive schema sync: { statements, applied, warnings }"
+      },
+      "bindings": {
+        "role": "bindings",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "bindings",
+        "timing": ["compiler", "server"],
+        "parameters": [{ "identifier": "connection", "type": { "type": "object" } }],
+        "returnType": { "type": "object" },
+        "description": "Wrangler config fragment: the hyperdrive binding when hyperdriveId is set"
+      },
+      "testConnection": {
+        "role": "testConnection",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "testConnection",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          { "identifier": "connection", "type": { "type": "object" } },
+          { "identifier": "env", "type": { "type": "object" } }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Probe the connection with `select 1`: { ok, error? }"
+      }
+    }
+  }
+}

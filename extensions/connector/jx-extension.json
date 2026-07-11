@@ -1,0 +1,20 @@
+{
+  "name": "@jxsuite/connector",
+  "title": "Data & Connections",
+  "description": "Database connections and dynamic data tables served over /_jx/data",
+  "classes": {
+    "D1": "./src/D1.class.json",
+    "Supabase": "./src/Supabase.class.json",
+    "Sqlite": "./src/Sqlite.class.json",
+    "Connections": "./src/Connections.class.json",
+    "Data": "./src/Data.class.json",
+    "TableQuery": "./src/TableQuery.class.json",
+    "TableEntry": "./src/TableEntry.class.json",
+    "TableInsert": "./src/TableInsert.class.json",
+    "TableUpdate": "./src/TableUpdate.class.json",
+    "TableDelete": "./src/TableDelete.class.json"
+  },
+  "schemas": {
+    "project": "./schemas/project.fragment.schema.json"
+  }
+}

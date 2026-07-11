@@ -27,6 +27,7 @@
 
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { realpathSync } from "node:fs";
+import { handleJxMounts } from "./jx-mounts.ts";
 import { handleResolve, handleServerFunction } from "./resolve.ts";
 import { handleAiApi } from "./ai-api.ts";
 import { handleImportApi } from "./import-api.ts";
@@ -325,6 +326,15 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
       const root = session.projectRoot;
       if (!root) {
         return new Response("No project", { status: 404 });
+      }
+
+      // 4b. Extension server mounts (/_jx/data etc.) — registry-driven, same wire contract as
+      //     The generated site worker and the dev server (specs/extensions.md §11).
+      if (normPath.startsWith("/_jx/")) {
+        const mountRes = await handleJxMounts(req, url, root);
+        if (mountRes) {
+          return mountRes;
+        }
       }
 
       // 5. Privileged HTTP routes (RCE-capable: dynamic import()). Gate with token + loopback

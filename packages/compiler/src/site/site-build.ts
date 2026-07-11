@@ -25,12 +25,14 @@ import { loadProjectConfig } from "./site-loader.ts";
 import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
 import { buildProjectExtensionRegistry } from "./format-host.ts";
 import { loadProjectSections } from "./project-sections.ts";
-import type { FormatRegistry } from "@jxsuite/schema/format-registry";
+import type { FormatEntry, FormatRegistry } from "@jxsuite/schema/format-registry";
+import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import { resolveLayout } from "./layout-resolver.ts";
 import { mergeHead, renderHead } from "./head-merger.ts";
 import { injectContext } from "./context-injection.ts";
 import { compile, compileServer, compileSiteServer } from "../compiler.ts";
 import { compileElement } from "../targets/compile-element.ts";
+import type { SiteConnectorSpec, SiteMountSpec } from "../targets/compile-server.ts";
 import {
   DEFAULT_LIT_HTML_SRC,
   DEFAULT_REACTIVITY_SRC,
@@ -112,6 +114,28 @@ export async function buildSite(
       `  Registered ${formatRegistry.entries.length} format(s): ${formatRegistry.entries
         .map((e) => e.name)
         .join(", ")}`,
+    );
+  }
+
+  // ── 1c. Active extension server mounts (specs/extensions.md §11) ────────
+  // A mount is active when its class owns no project section, or the project declares a
+  // Non-empty value for its section key. Sites with active mounts always get a worker; a
+  // Static site cannot serve dynamic sections, so that combination is a build error.
+  const activeMounts = registry.serverMounts().filter((entry) => {
+    if (!entry.project) {
+      return true;
+    }
+    const value = projectConfig[entry.project.key] as Record<string, unknown> | undefined;
+    return value !== undefined && typeof value === "object" && Object.keys(value).length > 0;
+  });
+  if (activeMounts.length > 0 && !projectConfig.build.adapter) {
+    const sections = activeMounts
+      .map((entry) => (entry.project ? `"${entry.project.key}"` : `"${entry.server!.basePath}"`))
+      .join(", ");
+    throw new Error(
+      `project.json declares dynamic section(s) ${sections} served by extension mounts, but ` +
+        `build.adapter is "static". Dynamic tables need a server-capable adapter — set ` +
+        `build.adapter to "cloudflare-workers", "cloudflare-pages", "node", or "bun".`,
     );
   }
 
@@ -252,6 +276,7 @@ export async function buildSite(
         componentDefs,
         imageMetaCache,
         formatRegistry,
+        registry,
       );
 
       // Determine which component tags are fully static (for script omission)
@@ -367,11 +392,22 @@ export async function buildSite(
       }
     }
 
+    // Extension server mounts: static imports of the mount modules and used connector classes,
+    // Inlined JSON options (the project's section manifest — identifiers only, never secrets).
+    const { mounts, connectors } = buildMountSpecs(activeMounts, registry, projectConfig);
+    if (mounts.length > 0) {
+      log(
+        `  Mounting ${mounts.length} extension route(s): ${mounts.map((m) => m.basePath).join(", ")}`,
+      );
+    }
+
     // Cloudflare Pages uses advanced mode (_worker.js inside the build output) — the
     // Functions/ directory convention only works from the project root, not from dist/.
-    // A static-only Pages site needs no worker at all.
-    const skipWorker = adapter === "cloudflare-pages" && deduped.size === 0;
-    const workerSource = skipWorker ? null : compileSiteServer([...deduped.values()], { adapter });
+    // A static-only Pages site needs no worker at all; sites with mounts always get one.
+    const skipWorker = adapter === "cloudflare-pages" && deduped.size === 0 && mounts.length === 0;
+    const workerSource = skipWorker
+      ? null
+      : compileSiteServer([...deduped.values()], { adapter, connectors, mounts });
 
     if (workerSource) {
       const workerName = adapter === "cloudflare-pages" ? "_worker.js" : "worker.js";
@@ -477,6 +513,7 @@ async function compilePage(
   componentDefs = new Map<string, JxElement>(),
   imageMetaCache: ImageMetaCache | null = null,
   formatRegistry?: FormatRegistry,
+  registry?: ExtensionRegistry,
 ) {
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
@@ -496,10 +533,11 @@ async function compilePage(
   // Inject $site and $page context
   injectContext(layoutDoc, projectConfig, route, projectRoot);
 
-  // Resolve generic $prototype entries via .class.json imports
+  // Resolve generic $prototype entries via .class.json imports (and lower registry classes)
   await resolvePrototypes(layoutDoc, route, projectRoot, {
     config: projectConfig,
     sections,
+    ...(registry === undefined ? {} : { registry }),
   });
 
   // Build scope from resolved state so template strings in title/$head can be evaluated
@@ -627,6 +665,92 @@ async function compilePage(
     html: result.html,
     serverHandler,
   };
+}
+
+/**
+ * Build the mount + connector specs for the generated worker (specs/extensions.md §11–§12).
+ *
+ * Mount options inline the extension-contributed sections from project.json — identifiers only,
+ * never secrets (§13). Connector classes are included when any section entry names their
+ * `connector.provider`; the import specifier comes from the descriptor's `connector.module` (bare
+ * specifier — Workers cannot import filesystem paths).
+ *
+ * @param {FormatEntry[]} activeMounts - Server-mount classes with active sections
+ * @param {ExtensionRegistry} registry
+ * @param {ProjectConfig} projectConfig
+ * @returns {{ mounts: SiteMountSpec[]; connectors: SiteConnectorSpec[] }}
+ */
+function buildMountSpecs(
+  activeMounts: FormatEntry[],
+  registry: ExtensionRegistry,
+  projectConfig: ProjectConfig,
+): { mounts: SiteMountSpec[]; connectors: SiteConnectorSpec[] } {
+  if (activeMounts.length === 0) {
+    return { connectors: [], mounts: [] };
+  }
+
+  const sections: Record<string, unknown> = {};
+  for (const contribution of registry.projectContributions()) {
+    const { key } = contribution.project!;
+    if (key in projectConfig) {
+      sections[key] = projectConfig[key];
+    }
+  }
+
+  const mounts: SiteMountSpec[] = activeMounts.map((entry) => {
+    const server = entry.server!;
+    const { module } = server;
+    if (typeof module !== "string" || module === "") {
+      throw new Error(
+        `Extension class "${entry.name}": server.module (a bare import specifier) is required ` +
+          `to generate a deployable worker`,
+      );
+    }
+    return {
+      basePath: server.basePath,
+      className: (entry.classDef.title as string | undefined) ?? entry.name,
+      module,
+      options: { basePath: server.basePath, sections },
+      order: server.order ?? 100,
+    };
+  });
+
+  // Used providers: any section entry object carrying a string `provider` field (the connector
+  // Vocabulary, §12) marks that provider's class for import.
+  const usedProviders = new Set<string>();
+  for (const value of Object.values(sections)) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      continue;
+    }
+    for (const sectionEntry of Object.values(value as Record<string, unknown>)) {
+      const provider = (sectionEntry as { provider?: unknown } | null)?.provider;
+      if (typeof provider === "string") {
+        usedProviders.add(provider);
+      }
+    }
+  }
+
+  const connectors: SiteConnectorSpec[] = [];
+  for (const entry of registry.connectors()) {
+    const provider = String(entry.connector!.provider);
+    if (!usedProviders.has(provider)) {
+      continue;
+    }
+    const { module } = entry.connector!;
+    if (typeof module !== "string" || module === "") {
+      throw new Error(
+        `Connector class "${entry.name}": connector.module (a bare import specifier) is ` +
+          `required to generate a deployable worker`,
+      );
+    }
+    connectors.push({
+      className: (entry.classDef.title as string | undefined) ?? entry.name,
+      module,
+      provider,
+    });
+  }
+
+  return { connectors, mounts };
 }
 
 /**

@@ -1,0 +1,122 @@
+{
+  "$id": "https://jxsuite.com/schema/ext/connector/project/v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Connector project fragment",
+  "description": "Project-schema fragment contributed by @jxsuite/connector: the `connections` section naming database connections (identifiers only — secret values never enter project.json) and the `data` section declaring dynamic tables served over /_jx/data.",
+  "type": "object",
+  "properties": {
+    "connections": {
+      "description": "Named database connections. Entries carry identifiers and env-var NAMES only; secret values live in .dev.vars locally and the platform secret store in production (specs/extensions.md §13).",
+      "type": "object",
+      "additionalProperties": {
+        "description": "Connection definition. `provider` names a connector class provider id from an enabled extension (\"d1\", \"supabase\", \"sqlite\").",
+        "type": "object",
+        "properties": {
+          "provider": {
+            "description": "Connector provider id (the `connector.provider` of an enabled connector class).",
+            "type": "string"
+          },
+          "binding": {
+            "description": "Cloudflare binding name for this connection (D1 database binding, or the Hyperdrive binding for postgres providers).",
+            "type": "string"
+          },
+          "databaseId": {
+            "description": "Cloudflare D1 database UUID (identifier, not a secret).",
+            "type": "string"
+          },
+          "accountId": {
+            "description": "Cloudflare account id for HTTP-API access (falls back to the CLOUDFLARE_ACCOUNT_ID env var).",
+            "type": "string"
+          },
+          "urlEnv": {
+            "description": "NAME of the env var holding the postgres connection URL (e.g. \"SUPABASE_DB_URL\"). The value itself is a secret and never enters project.json.",
+            "type": "string"
+          },
+          "hyperdriveId": {
+            "description": "Cloudflare Hyperdrive configuration id fronting a postgres connection from Workers.",
+            "type": "string"
+          },
+          "file": {
+            "description": "SQLite database file path relative to the project root (defaults to ./.jx/data/<name>.sqlite).",
+            "type": "string"
+          }
+        },
+        "required": ["provider"]
+      }
+    },
+    "data": {
+      "description": "Dynamic data tables. Each key names a table served at /_jx/data/<name>; rows live in the named connection's database. Schema sync is additive-only (`jx db push`).",
+      "type": "object",
+      "additionalProperties": {
+        "description": "Table definition: connection, column schema, id strategy, and permissions.",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "description": "Name of a `connections` entry this table lives in.",
+            "type": "string"
+          },
+          "schema": {
+            "description": "Column schema. `properties` values are field schemas from the effective project field union (relationship refs included).",
+            "type": "object",
+            "properties": {
+              "type": { "const": "object" },
+              "properties": {
+                "description": "Column definitions; values are field schemas from the effective project field union.",
+                "type": "object",
+                "additionalProperties": { "$ref": "https://jxsuite.com/schema/project/fields/v2" }
+              },
+              "required": {
+                "description": "Columns every row must provide on insert.",
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "id": {
+            "description": "Primary-key strategy: \"uuid\" (text ids via crypto.randomUUID) or \"integer\" (auto-increment).",
+            "enum": ["uuid", "integer"],
+            "default": "uuid"
+          },
+          "timestamps": {
+            "description": "Maintain created_at / updated_at columns (ISO 8601 strings set by the data mount).",
+            "type": "boolean",
+            "default": true
+          },
+          "indexes": {
+            "description": "Secondary indexes: a column name, or an array of column names for a composite index.",
+            "type": "array",
+            "items": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+              ]
+            }
+          },
+          "permissions": {
+            "description": "Per-action access rules. Defaults: read \"public\", writes \"none\". Rules beyond \"public\" require the auth extension; without it the data mount fails closed.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "read": { "$ref": "#/$defs/PermissionRule" },
+              "insert": { "$ref": "#/$defs/PermissionRule" },
+              "update": { "$ref": "#/$defs/PermissionRule" },
+              "delete": { "$ref": "#/$defs/PermissionRule" }
+            }
+          },
+          "ownerField": {
+            "description": "Column recording the owning user id — required by \"owner\" permission rules; set on insert and used to scope owner reads/writes.",
+            "type": "string"
+          }
+        },
+        "required": ["connection", "schema"]
+      }
+    }
+  },
+  "$defs": {
+    "PermissionRule": {
+      "description": "Access rule: public | none | authenticated | owner | role:<role>.",
+      "type": "string",
+      "pattern": "^(public|none|authenticated|owner|role:.+)$"
+    }
+  }
+}

@@ -20,6 +20,7 @@ jobs:
           - { dir: packages/ai, flag: ai }
           - { dir: packages/collab, flag: collab }
           - { dir: packages/compiler, flag: compiler }
+          - { dir: extensions/connector, flag: connector }
           - { dir: packages/create, flag: create }
           - { dir: packages/desktop, flag: desktop }
           - { dir: packages/import, flag: import }

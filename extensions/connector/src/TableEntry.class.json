@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/connector/TableEntry.class.json",
+  "title": "TableEntry",
+  "description": "One row of a dynamic table by id — `#/$params/<name>` refs resolve against the route; lowered to a core Request def in compiled sites",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./table-state.js",
+
+  "$studio": {
+    "stateDefaults": { "timing": "client" }
+  },
+
+  "$defs": {
+    "parameters": {
+      "table": {
+        "identifier": "table",
+        "type": { "type": "string" },
+        "description": "Name of a `data` section table"
+      },
+      "id": {
+        "identifier": "id",
+        "type": { "type": ["string", "integer", "object"] },
+        "description": "Row id: a literal, a ${...} template, or { \"$ref\": \"#/$params/<name>\" }"
+      },
+      "include": {
+        "identifier": "include",
+        "type": { "type": ["array", "string"] },
+        "description": "Reference fields to expand"
+      }
+    },
+    "constructor": {
+      "role": "constructor",
+      "parameters": [
+        { "$ref": "#/$defs/parameters/table" },
+        { "$ref": "#/$defs/parameters/id" },
+        { "$ref": "#/$defs/parameters/include" }
+      ],
+      "body": ["this.config = config;"]
+    },
+    "methods": {
+      "resolve": {
+        "role": "method",
+        "scope": "instance",
+        "identifier": "resolve",
+        "returnType": { "type": "object" },
+        "description": "The row, or null"
+      },
+      "lower": {
+        "role": "lower",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "lower",
+        "timing": ["compiler"],
+        "parameters": [
+          { "identifier": "def", "type": { "type": "object" } },
+          { "identifier": "context", "type": { "type": "object" } }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Rewrite into a core Request def for one row (route params substituted at lower time)"
+      }
+    }
+  }
+}

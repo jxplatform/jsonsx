@@ -20,12 +20,14 @@ import { createRequire } from "node:module";
 import { importImplementation } from "./format-host.ts";
 import { isPrototypeDef } from "@jxsuite/schema/guards";
 import { errorMessage, parseClassDef } from "@jxsuite/schema/parse";
+import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type {
   JsonObject,
   JsonValue,
   JxDocument,
   JxMutableNode,
   JxPrototypeDef,
+  JxStateDefinition,
 } from "@jxsuite/schema/types";
 
 /**
@@ -60,9 +62,14 @@ const RESERVED_KEYS = new Set([
  * @param {JxMutableNode | JxDocument} doc - The page document (mutated in place)
  * @param {{ sourcePath?: string; _pathParams?: Record<string, string> }} route - Route info
  * @param {string} projectRoot - Absolute path to the project root
- * @param {{ config?: Record<string, unknown>; sections?: Record<string, unknown> }} [projectContext] -
- *   Project-level context injected into all classes; `sections` holds the extension-loaded project
- *   sections keyed by section key (spread into `_project`)
+ * @param {{
+ *   config?: Record<string, unknown>;
+ *   sections?: Record<string, unknown>;
+ *   registry?: ExtensionRegistry;
+ * }} [projectContext]
+ *   - Project-level context injected into all classes; `sections` holds the extension-loaded project
+ *     sections keyed by section key (spread into `_project`); `registry` enables manifest class
+ *     resolution and the generic `lower` capability
  */
 export async function resolvePrototypes(
   doc: JxMutableNode | JxDocument,
@@ -71,6 +78,7 @@ export async function resolvePrototypes(
   projectContext: {
     config?: Record<string, unknown>;
     sections?: Record<string, unknown>;
+    registry?: ExtensionRegistry;
   } = {},
 ) {
   const imports = doc.imports ?? {};
@@ -86,15 +94,33 @@ export async function resolvePrototypes(
     if (SKIP_PROTOTYPES.has(def.$prototype)) {
       continue;
     }
-    // Only resolve timing: "compiler" (or unset timing with a .class.json mapping).
-    // Leave timing: "server" and timing: "client" for their respective pipelines.
+    // Only resolve timing: "compiler" (or unset timing with a class mapping). Timing: "server"
+    // And timing: "client" stay for their pipelines — but a registry class with a `lower`
+    // Capability compiles away here into a core-shape def (specs/extensions.md §8.3): dynamic
+    // Data becomes a plain reactive fetch with no extension code shipped to the browser.
     if (def.timing && def.timing !== "compiler") {
+      const entry = projectContext.registry?.byName(def.$prototype);
+      if (entry?.capabilities.lower) {
+        try {
+          const lowered = await entry.call("lower", def, {
+            projectConfig: projectContext.config,
+            root: projectRoot,
+            route,
+          });
+          state[key] = lowered as JxStateDefinition;
+        } catch (error) {
+          console.warn(
+            `prototype-resolver: failed to lower "${key}" ($prototype: "${def.$prototype}"):`,
+            errorMessage(error),
+          );
+        }
+      }
       continue;
     }
 
-    // Look up in imports if no $src already set
+    // Look up in imports (project-local wins), then the extension registry's manifest classes.
     if (!def.$src) {
-      const mapped = imports[def.$prototype];
+      const mapped = imports[def.$prototype] ?? registryClassPath(projectContext, def.$prototype);
       if (!mapped) {
         continue;
       }
@@ -115,6 +141,22 @@ export async function resolvePrototypes(
       );
     }
   }
+}
+
+/**
+ * Descriptor path of a manifest class from the extension registry, when one is enabled. Lets
+ * `timing: "compiler"` defs name extension classes (TableQuery, ContentCollection, …) without a
+ * project-local imports entry.
+ *
+ * @param {{ registry?: ExtensionRegistry }} projectContext
+ * @param {string} prototypeName
+ * @returns {string | undefined}
+ */
+function registryClassPath(
+  projectContext: { registry?: ExtensionRegistry },
+  prototypeName: string,
+): string | undefined {
+  return projectContext.registry?.byName(prototypeName)?.classPath;
 }
 
 /**

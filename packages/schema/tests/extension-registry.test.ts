@@ -316,4 +316,22 @@ describe("ExtensionRegistry accessors", () => {
       "/nm/@acme/data/schemas/document.fragment.schema.json",
     ]);
   });
+
+  test("schemas.fields fragments resolve like the other kinds (field-union extras)", async () => {
+    const files = standardFiles();
+    files["/nm/@acme/data/jx-extension.json"] = {
+      ...DATA_MANIFEST,
+      schemas: {
+        ...DATA_MANIFEST.schemas,
+        fields: "./schemas/fields.fragment.schema.json",
+      },
+    };
+    const reg = await buildExtensionRegistry(["@acme/data"], makeIO(files), BASE);
+    expect(reg.schemaFragments("fields")).toEqual([
+      "/nm/@acme/data/schemas/fields.fragment.schema.json",
+    ]);
+    expect(reg.extensions[0]!.schemas.fields).toBe(
+      "/nm/@acme/data/schemas/fields.fragment.schema.json",
+    );
+  });
 });

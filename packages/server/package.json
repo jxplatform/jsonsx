@@ -20,7 +20,9 @@
     "./project-server": "./src/project-server.ts",
     "./refactor": "./src/refactor/index.ts",
     "./resolve": "./src/resolve.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./jx-mounts": "./src/jx-mounts.ts",
+    "./dev-vars": "./src/dev-vars.ts"
   },
   "publishConfig": {
     "provenance": true
@@ -42,6 +44,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@jxsuite/connector": "workspace:^",
     "@jxsuite/parser": "workspace:^"
   }
 }
