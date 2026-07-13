@@ -100,6 +100,18 @@ export interface AccountStatus {
   appInstallUrl?: string;
 }
 
+/** A repository visible to `StudioPlatform.listRepos` (the add-existing-repository picker). */
+export interface RepoInfo {
+  owner: string;
+  name: string;
+  fullName: string;
+  private: boolean;
+  defaultBranch: string;
+  permission: "admin" | "write" | "read" | "none";
+  /** Already recognized as a Jx project (topic-tagged / cataloged). */
+  isJxProject: boolean;
+}
+
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
@@ -318,6 +330,18 @@ export interface StudioPlatform {
    * prompt).
    */
   getAccountStatus?: () => Promise<AccountStatus | null>;
+  /**
+   * Browse every repository the platform's account link can reach — personal and organization repos
+   * covered by a GitHub App installation on cloud. Backs the "Add Existing Repository" picker;
+   * local platforms omit it (the OS picker / clone flow covers them).
+   */
+  listRepos?: () => Promise<RepoInfo[]>;
+  /**
+   * Adopt an existing repository as a Jx project and return its catalogue root key (openable via
+   * the recent-projects path). Rejects with a structured message when the repository carries no
+   * project.json.
+   */
+  importProject?: (opts: { owner: string; name: string }) => Promise<{ root: string }>;
   /**
    * Open a pull request for the current branch. Cloud platforms implement it against their session;
    * local platforms omit it and Studio falls back to a direct GitHub API call with the user's

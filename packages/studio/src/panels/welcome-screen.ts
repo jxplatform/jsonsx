@@ -6,6 +6,7 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { getAccountStatus, needsAppInstall } from "../account-status";
+import { platformSupportsAddRepo } from "../new-project/add-repo-modal";
 import { getProjectList } from "../project-list";
 import { clearRecentProjects, getRecentProjects, removeRecentProject } from "../recent-projects";
 import { renderOnly } from "../store";
@@ -16,6 +17,7 @@ interface WelcomeCtx {
   openRecentProject: (root: string) => void;
   openNewProject: () => void;
   cloneRepository: () => void;
+  addExistingRepo: () => void;
 }
 
 let _ctx: WelcomeCtx | null = null;
@@ -32,6 +34,7 @@ export function renderWelcome(host: HTMLElement) {
   // Catalogue entries already in Recent stay in that section only.
   const catalogue = getProjectList().filter((p) => !recent.some((r) => r.root === p.root));
   const showClone = platformSupportsClone();
+  const showAddRepo = platformSupportsAddRepo();
 
   litRender(
     html`
@@ -84,6 +87,22 @@ export function renderWelcome(host: HTMLElement) {
                     />
                   </svg>
                   Clone Git Repository...
+                </button>`
+              : nothing}
+            ${showAddRepo
+              ? html`<button class="welcome-action" @click=${() => ctx.addExistingRepo()}>
+                  <svg
+                    class="welcome-action-icon"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                  >
+                    <path
+                      d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.5 2.5 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.25.25 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"
+                    />
+                  </svg>
+                  Add Existing Repository...
                 </button>`
               : nothing}
           </div>

@@ -139,6 +139,7 @@ import { hydrateProjectList } from "./project-list";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
 import { hydrateSettings } from "./services/settings-store";
 import { initWelcome } from "./panels/welcome-screen";
+import { openAddRepoModal } from "./new-project/add-repo-modal";
 import { openNewProjectModal } from "./new-project/new-project-modal";
 import type { DocumentStackEntry, GitDiffState } from "./types";
 import type { JxPath } from "./state";
@@ -475,6 +476,16 @@ initCanvasRender({
 });
 
 initWelcome({
+  addExistingRepo: async () => {
+    const result = await openAddRepoModal();
+    if (result) {
+      // The catalogue gained an entry; refresh it before navigating into the project.
+      void hydrateProjectList().then(() => {
+        render();
+      });
+      void openRecentProject(result.root);
+    }
+  },
   cloneRepository: () => cloneRepository({ openRecentProject }),
   openNewProject: async () => {
     const result = await openNewProjectModal();

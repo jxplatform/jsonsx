@@ -16,10 +16,12 @@ interface Ctx {
   openRecentProject: ReturnType<typeof mock>;
   openNewProject: ReturnType<typeof mock>;
   cloneRepository: ReturnType<typeof mock>;
+  addExistingRepo: ReturnType<typeof mock>;
 }
 
 function makeCtx(): Ctx {
   return {
+    addExistingRepo: mock(() => {}),
     cloneRepository: mock(() => {}),
     openNewProject: mock(() => {}),
     openProject: mock(() => {}),
@@ -68,6 +70,20 @@ describe("renderWelcome — start actions", () => {
     pointer(openBtn!, "click");
     expect(ctx.openProject).toHaveBeenCalledTimes(1);
     expect(ctx.cloneRepository).not.toHaveBeenCalled();
+  });
+
+  test("shows Add Existing Repository when the platform can browse + import repos", () => {
+    installMockPlatform({
+      importProject: (() => Promise.resolve({ root: "octocat/site@main" })) as never,
+      listRepos: (() => Promise.resolve([])) as never,
+    });
+    const ctx = makeCtx();
+    const host = renderScreen(ctx);
+    const btns = actions(host);
+    expect(btns).toHaveLength(3);
+    expect(btns[2]!.textContent).toContain("Add Existing Repository...");
+    pointer(btns[2]!, "click");
+    expect(ctx.addExistingRepo).toHaveBeenCalledTimes(1);
   });
 
   test("shows the clone action when the platform supports gitClone", () => {

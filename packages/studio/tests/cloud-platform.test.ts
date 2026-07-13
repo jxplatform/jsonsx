@@ -362,6 +362,64 @@ describe("identity & cloudflare surface", () => {
     expect(calls[0]?.url).toBe(`${BASE}/git/pr`);
   });
 
+  test("listRepos maps the installation-repo browse list", async () => {
+    mockFetch({
+      "/api/v1/repos": {
+        body: [
+          {
+            repoId: 9,
+            owner: "acme",
+            name: "site",
+            fullName: "acme/site",
+            private: true,
+            defaultBranch: "main",
+            permission: "write",
+            isJxProject: false,
+            pushedAt: "2026-07-01T00:00:00Z",
+          },
+        ],
+      },
+    });
+    const p = createCloudPlatform(null);
+    expect(await p.listRepos?.()).toEqual([
+      {
+        owner: "acme",
+        name: "site",
+        fullName: "acme/site",
+        private: true,
+        defaultBranch: "main",
+        permission: "write",
+        isJxProject: false,
+      },
+    ]);
+
+    mockFetch({ "/api/v1/repos": { status: 401, body: { error: "sign in again" } } });
+    expect(p.listRepos?.()).rejects.toThrow(/sign in again/);
+  });
+
+  test("importProject resolves the catalogue root key; failures carry the backend message", async () => {
+    const calls = mockFetch({
+      "/api/v1/projects/import": {
+        body: { repoId: 9, root: "acme/site", owner: "acme", name: "site", defaultBranch: "main" },
+      },
+    });
+    const p = createCloudPlatform(null);
+    expect(await p.importProject?.({ owner: "acme", name: "site" })).toEqual({
+      root: "acme/site@main",
+    });
+    expect(calls[0]?.url).toBe("/api/v1/projects/import");
+
+    mockFetch({
+      "/api/v1/projects/import": {
+        status: 422,
+        body: { error: "acme/plain has no readable project.json", code: "not_jx_project" },
+      },
+    });
+    expect(p.importProject?.({ owner: "acme", name: "plain" })).rejects.toThrow(
+      /no readable project.json/,
+    );
+  });
+
   test("getAccountStatus surfaces installations + install URL, null on failure", async () => {
     mockFetch({
       "/api/v1/me": {

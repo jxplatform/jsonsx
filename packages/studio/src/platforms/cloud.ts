@@ -23,6 +23,7 @@ import type {
   PackageInfo,
   ProjectListEntry,
   RenameResult,
+  RepoInfo,
   StarterInfo,
   StudioPlatform,
 } from "../types";
@@ -711,6 +712,45 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
         login: me.user.login,
         ...(me.user.name ? { name: me.user.name } : {}),
         ...(me.user.avatar_url ? { avatarUrl: me.user.avatar_url } : {}),
+      };
+    },
+
+    /** Repositories reachable through the user's Jx Suite App installations (user + org). */
+    async listRepos(): Promise<RepoInfo[]> {
+      const res = await fetch("/api/v1/repos", { credentials: "include" });
+      if (!res.ok) {
+        throw new Error(await errorMessage(res, "Failed to list repositories"));
+      }
+      const entries = (await res.json()) as (RepoInfo & { repoId: number })[];
+      return entries.map((r) => ({
+        owner: r.owner,
+        name: r.name,
+        fullName: r.fullName,
+        private: r.private,
+        defaultBranch: r.defaultBranch,
+        permission: r.permission,
+        isJxProject: r.isJxProject,
+      }));
+    },
+
+    /** Adopt an existing repo as a Jx project; resolves to its catalogue root key. */
+    async importProject(opts: { owner: string; name: string }) {
+      const res = await fetch("/api/v1/projects/import", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts),
+      });
+      const imported = await okJson<{ owner: string; name: string; defaultBranch: string }>(
+        res,
+        "Failed to import repository",
+      );
+      return {
+        root: projectRootKey({
+          owner: imported.owner,
+          repo: imported.name,
+          branch: imported.defaultBranch,
+        }),
       };
     },
 
