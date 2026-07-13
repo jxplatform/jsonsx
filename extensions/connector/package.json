@@ -58,15 +58,15 @@
   },
   "dependencies": {
     "@jxsuite/schema": "workspace:^",
-    "kysely": "^0.28.17",
+    "kysely": "^0.29.3",
     "kysely-d1": "^0.4.0",
     "kysely-postgres-js": "^3.0.0",
     "postgres": "^3.4.9"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260711.1",
+    "@cloudflare/workers-types": "^5.20260713.1",
     "ajv": "^8.20.0",
-    "hono": "^4.11.3"
+    "hono": "^4.12.30"
   },
   "jx": "./jx-extension.json"
 }

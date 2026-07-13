@@ -43,7 +43,7 @@
     "@jxsuite/schema": "workspace:^",
     "@jxsuite/starters": "workspace:^",
     "chokidar": "^5.0.0",
-    "kysely": "^0.28.17",
+    "kysely": "^0.29.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
