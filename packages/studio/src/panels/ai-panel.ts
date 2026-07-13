@@ -16,12 +16,13 @@
  * @license MIT
  */
 
-import { html, render as litRender } from "lit-html";
+import { html, render as litRender, nothing } from "lit-html";
 import type { TemplateResult } from "lit-html";
+import { getPlatform } from "../platform";
 import { effect, effectScope } from "../reactivity";
 import { createDocumentAssistant } from "../services/document-assistant";
 import { hasOpenAiKey } from "../services/ai-settings";
-import { fetchAvailableModels, isProxyConfigured } from "../services/ai-models";
+import { fetchAvailableModels, isManagedProxy, isProxyConfigured } from "../services/ai-models";
 import { createAiCredentialsForm } from "../ui/ai-credentials-form";
 import { clearMarkdownCache } from "./ai-chat/chat-markdown";
 import { renderChatHeader, renderMessageList } from "./ai-chat/chat-view";
@@ -168,11 +169,67 @@ function startEditApiKey() {
   credsForm.startEdit();
 }
 
-/** The OpenAI (or compatible) key + endpoint settings form, shown as a gate when no key is set. */
+// ─── Managed Cloudflare connect (Workers AI) ─────────────────────────────────
+
+let cfConnectBusy = false;
+let cfConnectError = "";
+
+/**
+ * Managed platforms broker Workers AI on the user's own Cloudflare account: offer connecting it as
+ * the keyless alternative whenever the proxy says managed-but-unconfigured and the platform can run
+ * the hosted OAuth flow (the PAL seam — desktop shells can implement cfConnect later).
+ */
+function canOfferManagedConnect(): boolean {
+  return isManagedProxy() && !isProxyConfigured() && Boolean(getPlatform().cfConnect);
+}
+
+async function connectCloudflareForAi() {
+  if (cfConnectBusy) {
+    return;
+  }
+  cfConnectBusy = true;
+  cfConnectError = "";
+  scheduleAiRender();
+  try {
+    const connection = await getPlatform().cfConnect?.();
+    if (connection) {
+      // Re-probe: /models flips to configured once the connection lands, opening the gate.
+      await fetchAvailableModels({ force: true });
+    } else {
+      cfConnectError = "Cloudflare connection was not completed.";
+    }
+  } catch (error) {
+    cfConnectError = error instanceof Error ? error.message : String(error);
+  }
+  cfConnectBusy = false;
+  scheduleAiRender();
+}
+
+function renderManagedConnect() {
+  return html`
+    <div class="ai-managed-connect">
+      <div>Use Workers AI on your own Cloudflare account — no API key needed.</div>
+      <sp-button size="s" ?disabled=${cfConnectBusy} @click=${() => void connectCloudflareForAi()}>
+        ${cfConnectBusy ? "Connecting…" : "Connect Cloudflare"}
+      </sp-button>
+      ${cfConnectError
+        ? html`<div class="ai-managed-connect-error">${cfConnectError}</div>`
+        : nothing}
+      <div class="ai-managed-connect-divider">— or bring your own key —</div>
+    </div>
+  `;
+}
+
+/**
+ * The credentials gate: on managed platforms a keyless "Connect Cloudflare" (Workers AI) option
+ * sits above the OpenAI-compatible key form — both are real, working paths.
+ */
 function renderKeyGate() {
   return html`
     <div class="ai-tab-body">
-      <div class="ai-status-center">${credsForm.render()}</div>
+      <div class="ai-status-center">
+        ${canOfferManagedConnect() ? renderManagedConnect() : nothing} ${credsForm.render()}
+      </div>
     </div>
   `;
 }

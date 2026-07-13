@@ -132,6 +132,8 @@ async function fetchCfConnection(): Promise<{
   };
 }
 
+type CfConnectionInfo = Awaited<ReturnType<typeof fetchCfConnection>>;
+
 /** Parse an "owner/repo@branch" root key; null when malformed. */
 export function parseRootKey(root: string): CloudProject | null {
   const match = /^([^/@]+)\/([^/@]+)@(.+)$/.exec(root);
@@ -717,8 +719,11 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
     },
 
     /**
-     * Hosted OAuth connect: open the broker flow in a popup and poll until the connection lands (or
-     * the popup closes / times out). Popup-blocked browsers fall back to a full-page redirect.
+     * Hosted OAuth connect: open the broker flow in a popup. The home shell relays the callback's
+     * result back via postMessage {source: "jx-cf"} and closes the popup, so success resolves and
+     * OAuth errors (denial, invalid_scope misregistration) REJECT with the real reason instead of
+     * timing out. A 1.5s poll remains as fallback for older shells / blocked message delivery, and
+     * popup-blocked browsers fall back to a full-page redirect.
      */
     async cfConnect() {
       if (typeof window === "undefined" || typeof location === "undefined") {
@@ -730,20 +735,56 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
         return null;
       }
       const deadline = Date.now() + 180_000;
-      while (Date.now() < deadline) {
-        await new Promise((resolve) => {
-          setTimeout(resolve, 1500);
-        });
-        const connection = await fetchCfConnection();
-        if (connection) {
-          popup.close();
-          return connection;
-        }
-        if (popup.closed) {
-          return fetchCfConnection();
-        }
-      }
-      return null;
+      return new Promise<CfConnectionInfo>((resolve, reject) => {
+        let timer = 0;
+        const cleanup = () => {
+          window.removeEventListener("message", onMessage);
+          window.clearTimeout(timer);
+          if (!popup.closed) {
+            popup.close();
+          }
+        };
+        const settle = (connection: CfConnectionInfo) => {
+          cleanup();
+          resolve(connection);
+        };
+        const fail = (reason: string) => {
+          cleanup();
+          reject(new Error(reason));
+        };
+        const onMessage = (event: MessageEvent) => {
+          if (event.origin !== location.origin) {
+            return;
+          }
+          const data = event.data as { source?: string; status?: string; reason?: string | null };
+          if (!data || data.source !== "jx-cf") {
+            return;
+          }
+          if (data.status === "error") {
+            fail(data.reason ?? "Cloudflare authorization failed");
+            return;
+          }
+          void fetchCfConnection().then(settle);
+        };
+        window.addEventListener("message", onMessage);
+        const poll = async () => {
+          if (Date.now() > deadline) {
+            settle(null);
+            return;
+          }
+          const connection = await fetchCfConnection();
+          if (connection) {
+            settle(connection);
+            return;
+          }
+          if (popup.closed) {
+            settle(await fetchCfConnection());
+            return;
+          }
+          timer = window.setTimeout(() => void poll(), 1500);
+        };
+        timer = window.setTimeout(() => void poll(), 1500);
+      });
     },
 
     /** Allowlisted Cloudflare API passthrough (platform injects the OAuth token). */

@@ -410,6 +410,56 @@ describe("identity & cloudflare surface", () => {
       (window as { open: unknown }).open = realOpen;
     }
   });
+
+  test("cfConnect resolves on the home shell's jx-cf success relay", async () => {
+    mockFetch({
+      "/api/v1/cf/connection": { body: { connected: true, accountId: "acct" } },
+    });
+    const realOpen = window.open;
+    const popup = { close: mock(() => {}), closed: false };
+    (window as { open: unknown }).open = mock(() => popup);
+    try {
+      const p = createCloudPlatform(null);
+      const pending = p.cfConnect?.();
+      // Foreign-source noise is ignored; the jx-cf relay settles the promise.
+      window.dispatchEvent(
+        new MessageEvent("message", { data: { source: "other" }, origin: location.origin }),
+      );
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { source: "jx-cf", status: "connected", reason: null },
+          origin: location.origin,
+        }),
+      );
+      expect(await pending).toEqual({ connected: true, accountId: "acct" });
+    } finally {
+      (window as { open: unknown }).open = realOpen;
+    }
+  });
+
+  test("cfConnect rejects with the relayed OAuth error reason", async () => {
+    mockFetch({});
+    const realOpen = window.open;
+    const popup = { close: mock(() => {}), closed: false };
+    (window as { open: unknown }).open = mock(() => popup);
+    try {
+      const p = createCloudPlatform(null);
+      const pending = p.cfConnect?.();
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: {
+            source: "jx-cf",
+            status: "error",
+            reason: "The OAuth 2.0 Client is not allowed to request scope 'offline_access'.",
+          },
+          origin: location.origin,
+        }),
+      );
+      expect(pending).rejects.toThrow(/offline_access/);
+    } finally {
+      (window as { open: unknown }).open = realOpen;
+    }
+  });
 });
 
 describe("bound session surface", () => {

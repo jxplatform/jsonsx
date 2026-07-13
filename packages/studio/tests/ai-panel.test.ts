@@ -20,7 +20,7 @@ import type { Message } from "@jxsuite/ai/chat-state";
 import type { SessionMeta } from "../src/services/ai-session-store";
 import { fetchAvailableModels, invalidateModelCache } from "../src/services/ai-models";
 
-installMockPlatform();
+const { platform: mockPlatform } = installMockPlatform();
 
 // Model-picker fetches resolve instantly with one model.
 (globalThis as Record<string, unknown>).fetch = async () =>
@@ -111,6 +111,43 @@ describe("ai-panel", () => {
     expect(q(".ai-creds-form")).not.toBeNull();
     expect(q(".ai-chat-messages")).toBeNull();
     chatState.messages.length = 0;
+  });
+
+  test("offers Connect Cloudflare on managed platforms and unlocks after connecting", async () => {
+    globalThis.localStorage.clear();
+    const realFetch = globalThis.fetch;
+    // Managed platform, Workers AI not yet connected.
+    (globalThis as Record<string, unknown>).fetch = async () =>
+      Response.json({ models: [], configured: false, managed: true }, { status: 200 });
+    await fetchAvailableModels({ force: true });
+    const cfConnect = mock(async () => ({ connected: true, accountId: "acc-1" }));
+    mockPlatform.cfConnect = cfConnect;
+    pushMessage("user", "nudge render");
+    await flush(3);
+    // Both real paths show: the managed connect CTA above the BYOK form.
+    expect(q(".ai-managed-connect")).not.toBeNull();
+    expect(q(".ai-creds-form")).not.toBeNull();
+
+    // Connecting flips /models to configured — the gate opens into the chat.
+    (globalThis as Record<string, unknown>).fetch = async () =>
+      Response.json(
+        { models: [{ id: "@cf/meta/llama-4" }], configured: true, managed: true },
+        { status: 200 },
+      );
+    const button = [...host.querySelectorAll("sp-button")].find((b) =>
+      b.textContent?.includes("Connect Cloudflare"),
+    )!;
+    pointer(button, "click");
+    await flush(6);
+    expect(cfConnect).toHaveBeenCalledTimes(1);
+    expect(q(".ai-managed-connect")).toBeNull();
+    expect(q(".ai-composer textarea")).not.toBeNull();
+
+    chatState.messages.length = 0;
+    delete mockPlatform.cfConnect;
+    invalidateModelCache();
+    (globalThis as Record<string, unknown>).fetch = realFetch;
+    await flush(3);
   });
 
   test("unlocks without a key when the proxy reports itself configured (managed platforms)", async () => {
