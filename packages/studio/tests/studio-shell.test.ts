@@ -74,6 +74,7 @@ const renderCanvasMock = mock(() => {});
 let consumePatchedReturn = false;
 const consumePatchedMock = mock((_doc: object) => consumePatchedReturn);
 let newProjectResult: { root: string } | null = null;
+let addRepoResult: { root: string } | null = null;
 
 void mock.module("../src/services/monaco-setup.js", () => ({}));
 
@@ -160,6 +161,12 @@ void mock.module("../src/canvas/canvas-patcher.ts", () => ({
 void mock.module("../src/new-project/new-project-modal.ts", () => ({
   closeNewProjectModal: mock(() => {}),
   openNewProjectModal: mock(async () => newProjectResult),
+}));
+
+void mock.module("../src/new-project/add-repo-modal.ts", () => ({
+  closeAddRepoModal: mock(() => {}),
+  openAddRepoModal: mock(async () => addRepoResult),
+  platformSupportsAddRepo: mock(() => true),
 }));
 
 // ─── Platform (must be registered before import so devserver PAL is skipped) ──
@@ -666,6 +673,25 @@ describe("project open delegates", () => {
       newProjectResult = null;
     }
     expect(platform.projectRoot).toBe("/new/site");
+    expect(statusMessages).toContain("Opened project: Recent Project");
+  });
+
+  test("welcome addExistingRepo does nothing when the modal is cancelled", async () => {
+    addRepoResult = null;
+    await welcomeCtx.addExistingRepo();
+    expect(statusMessages).toHaveLength(0);
+  });
+
+  test("welcome addExistingRepo opens the imported repo", async () => {
+    addRepoResult = { root: "/added/repo" };
+    try {
+      // AddExistingRepo fires openRecentProject without awaiting it; poll for completion.
+      await welcomeCtx.addExistingRepo();
+      await waitFor(() => statusMessages.includes("Opened project: Recent Project"));
+    } finally {
+      addRepoResult = null;
+    }
+    expect(platform.projectRoot).toBe("/added/repo");
     expect(statusMessages).toContain("Opened project: Recent Project");
   });
 });

@@ -5,13 +5,15 @@ coveragePathIgnorePatterns = [
   "**/tests/**",
   "./dist/*",
   "./result/**",
-  "../compiler/**",
-  "../create/**",
-  "../desktop/**",
-  "../markup/**",
-  "../runtime/**",
-  "../schema/**",
-  "../server/**",
-  "../studio/**",
+  # Cross-package workspace source pulled in via imports. Parser lives under
+  # extensions/, so sibling packages resolve at ../../packages/* (not ../*).
+  "../../packages/compiler/**",
+  "../../packages/create/**",
+  "../../packages/desktop/**",
+  "../../packages/markup/**",
+  "../../packages/runtime/**",
+  "../../packages/schema/**",
+  "../../packages/server/**",
+  "../../packages/studio/**",
 ]
 coverageThreshold = { lines = 0.87, functions = 0.88 }

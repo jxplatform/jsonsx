@@ -40,6 +40,10 @@ const responses: Record<string, unknown> = {
       type: "file",
     },
   ],
+  // Format-host proxies (descriptor-contributed settings + Monaco schema registration)
+  fetchProjectSchemas: { document: { $ref: "doc/v1" }, project: { $ref: "project/v2" } },
+  listExtensions: [{ name: "@jxsuite/parser", specifier: "@jxsuite/parser" }],
+  listFormats: [{ extensions: [".md"], mediaType: "text/markdown", name: "Markdown" }],
   listPackages: [{ name: "lodash", version: "^4.0.0" }],
   dependenciesNeedInstall: true,
   installDependencies: { ok: true },
@@ -449,6 +453,28 @@ describe("chromium desktop platform", () => {
   test("fetchPluginSchema returns schema", async () => {
     const schema = await platform.fetchPluginSchema("./Plugin.ts", "Plugin");
     expect(schema).toEqual({ properties: {}, type: "object" });
+  });
+
+  // ─── Format host: formats, extensions, project schemas ─────────────────
+
+  test("listFormats returns the registered format metadata", async () => {
+    const formats = await platform.listFormats!();
+    expect(formats).toEqual([
+      { extensions: [".md"], mediaType: "text/markdown", name: "Markdown" },
+    ]);
+  });
+
+  test("listExtensions returns the extensions payload", async () => {
+    const extensions = await platform.listExtensions!();
+    expect(extensions).toEqual([
+      { name: "@jxsuite/parser", specifier: "@jxsuite/parser" },
+    ] as never);
+  });
+
+  test("fetchProjectSchemas returns the pre-bundled project/document schemas", async () => {
+    const schemas = await platform.fetchProjectSchemas!();
+    expect(schemas.project).toEqual({ $ref: "project/v2" });
+    expect(schemas.document).toEqual({ $ref: "doc/v1" });
   });
 
   // ─── Git operations ────────────────────────────────────────────────────

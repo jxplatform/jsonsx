@@ -4,10 +4,12 @@ coverageSkipTestFiles = true
 coveragePathIgnorePatterns = [
   "**/tests/**",
   "./result/**",
+  # Parser moved under extensions/; it resolves at ../../extensions/parser now.
+  "../../extensions/parser/**",
   "../compiler/**",
   "../create/**",
   "../desktop/**",
-  "../parser/**",
+  "../markup/**",
   "../schema/**",
   "../server/**",
   "../studio/**",
