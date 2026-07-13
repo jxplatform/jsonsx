@@ -27,7 +27,6 @@ jobs:
       matrix:
         package:
           - compiler
-          - parser
           - runtime
           - studio
     steps:
