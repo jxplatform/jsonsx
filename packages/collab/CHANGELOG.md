@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/jxsuite/jx/compare/collab-v0.2.1...collab-v0.3.0) (2026-07-13)
+
+
+### Features
+
+* **markup:** shared markup-conversion core package; sever studio/import from parser ([a075e74](https://github.com/jxsuite/jx/commit/a075e74a6c45e91b1d1c7c1a6007e2e344fbb341))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.0.0
+
 ## [0.2.1](https://github.com/jxsuite/jx/compare/collab-v0.2.0...collab-v0.2.1) (2026-07-08)
 
 

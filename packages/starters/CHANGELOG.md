@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.0](https://github.com/jxsuite/jx/compare/starters-v0.35.1...starters-v1.0.0) (2026-07-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* hosts switch to the extension model; migrate all projects to content sections
+
+### Features
+
+* hosts switch to the extension model; migrate all projects to content sections ([c40b45c](https://github.com/jxsuite/jx/commit/c40b45c2c1ac2052cba4467d9353de22f4c0f060))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @jxsuite/schema bumped to 1.0.0
+
 ## [0.35.1](https://github.com/jxsuite/jx/compare/starters-v0.35.0...starters-v0.35.1) (2026-07-07)
 
 
