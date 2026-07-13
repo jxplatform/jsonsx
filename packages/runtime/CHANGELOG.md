@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.0](https://github.com/jxsuite/jx/compare/runtime-v0.34.2...runtime-v1.0.0) (2026-07-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* move @jxsuite/parser to the extensions/ tree
+
+### Features
+
+* move @jxsuite/parser to the extensions/ tree ([07cd6e0](https://github.com/jxsuite/jx/commit/07cd6e0ad1ef24fe60013de996e5cf0592ff1131))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.0.0
+
 ## [0.34.2](https://github.com/jxsuite/jx/compare/runtime-v0.34.1...runtime-v0.34.2) (2026-07-07)
 
 ### Dependencies

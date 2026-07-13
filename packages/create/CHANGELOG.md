@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.0.0](https://github.com/jxsuite/jx/compare/create-v0.36.0...create-v1.0.0) (2026-07-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* hosts switch to the extension model; migrate all projects to content sections
+
+### Features
+
+* **connector:** dynamic data tables extension — Kysely core, /_jx/data mount, db push ([3085ab4](https://github.com/jxsuite/jx/commit/3085ab4d29c2c0c9f0b3a3007aadbd17da1994d4))
+* hosts switch to the extension model; migrate all projects to content sections ([c40b45c](https://github.com/jxsuite/jx/commit/c40b45c2c1ac2052cba4467d9353de22f4c0f060))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/starters bumped to 1.0.0
+
 ## [0.36.0](https://github.com/jxsuite/jx/compare/create-v0.35.0...create-v0.36.0) (2026-07-07)
 
 ### Features
