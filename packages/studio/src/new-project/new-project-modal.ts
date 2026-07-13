@@ -13,6 +13,7 @@ import { html } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { openModal } from "../ui/layers";
 import { getPlatform } from "../platform";
+import { installUrlOf } from "../platform-errors";
 import { hasOpenAiKey } from "../services/ai-settings";
 import { setPendingAgentPrompt } from "../services/agent-seed";
 import { createAiCredentialsForm } from "../ui/ai-credentials-form";
@@ -56,6 +57,14 @@ let _agentPrompt = "";
 let _paramsSeededFor = "";
 
 let _error = "";
+
+/** GitHub-App install link carried by a structured needs_installation_access failure. */
+let _errorInstallUrl = "";
+
+function captureError(error: unknown) {
+  _error = errorMessage(error);
+  _errorInstallUrl = installUrlOf(error) ?? "";
+}
 
 let _creating = false;
 
@@ -111,6 +120,7 @@ export function openNewProjectModal(): Promise<{
   _agentPrompt = "";
   _paramsSeededFor = "";
   _error = "";
+  _errorInstallUrl = "";
   _creating = false;
   _starters = [];
   _dirDerived = true;
@@ -320,7 +330,7 @@ function renderModal() {
       finish(result);
     } catch (error) {
       _creating = false;
-      _error = errorMessage(error);
+      captureError(error);
       renderModal();
     }
   };
@@ -351,7 +361,7 @@ function renderModal() {
       finish(result);
     } catch (error) {
       _creating = false;
-      _error = errorMessage(error);
+      captureError(error);
       renderModal();
     }
   };
@@ -593,7 +603,16 @@ function renderModal() {
         : ""}
       <div class="new-project-modal-body">
         ${bodyTpl()}
-        ${_tab !== "import" && _error ? html`<div class="new-project-error">${_error}</div>` : ""}
+        ${_tab !== "import" && _error
+          ? html`<div class="new-project-error">
+              ${_error}
+              ${_errorInstallUrl
+                ? html`<a href=${_errorInstallUrl} target="_blank" rel="noreferrer">
+                    Install the Jx Suite GitHub App →
+                  </a>`
+                : ""}
+            </div>`
+          : ""}
       </div>
       <div class="new-project-modal-footer">${footerTpl()}</div>
     </div>

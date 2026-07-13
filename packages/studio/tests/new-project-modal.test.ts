@@ -47,7 +47,7 @@ function clickCreate() {
 }
 
 function errorText(): string | null {
-  return document.querySelector("#layer-modal .new-project-error")?.textContent ?? null;
+  return document.querySelector("#layer-modal .new-project-error")?.textContent?.trim() ?? null;
 }
 
 function switchTab(value: string) {
@@ -394,6 +394,31 @@ describe("openNewProjectModal — submit", () => {
     expect(footerButtons()[1].hasAttribute("disabled")).toBe(false);
     expect(footerButtons()[1].textContent).toContain("Create Project");
     expect(settled).toBe(false);
+
+    closeNewProjectModal();
+    expect(await promise).toBeNull();
+  });
+
+  test("a structured needs_installation_access failure renders the install link", async () => {
+    const installUrl = "https://github.com/apps/jx-suite/installations/new";
+    installMockPlatform({
+      createProject: (async () => {
+        throw Object.assign(new Error("GitHub blocked repository creation."), {
+          code: "needs_installation_access",
+          installUrl,
+        });
+      }) as never,
+    });
+    const promise = openNewProjectModal();
+    goNext();
+    typeInto(field(0), "Blocked");
+    clickCreate();
+    await flush();
+
+    expect(errorText()).toContain("blocked repository creation");
+    const link = document.querySelector<HTMLAnchorElement>("#layer-modal .new-project-error a");
+    expect(link?.getAttribute("href")).toBe(installUrl);
+    expect(link?.textContent).toContain("Install the Jx Suite GitHub App");
 
     closeNewProjectModal();
     expect(await promise).toBeNull();

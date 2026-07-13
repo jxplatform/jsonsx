@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 const { initWelcome, renderWelcome } = await import("../src/panels/welcome-screen");
 const { hydrateProjectList, resetProjectList } = await import("../src/project-list");
+const { hydrateAccountStatus, resetAccountStatus } = await import("../src/account-status");
 
 const RECENT_KEY = "jx-studio-recent-projects";
 
@@ -40,6 +41,7 @@ function actions(host: HTMLElement): HTMLButtonElement[] {
 beforeEach(() => {
   localStorage.removeItem(RECENT_KEY);
   resetProjectList();
+  resetAccountStatus();
   installMockPlatform();
 });
 
@@ -153,6 +155,43 @@ describe("renderWelcome — recent projects", () => {
     pointer(clearBtn, "click");
     renderWelcome(host);
     expect(host.querySelectorAll(".welcome-recent")).toHaveLength(0);
+  });
+});
+
+describe("renderWelcome — GitHub App install prompt", () => {
+  const INSTALL_URL = "https://github.com/apps/jx-suite/installations/new";
+
+  test("prompts to install the App when the account has no installations", async () => {
+    installMockPlatform({
+      getAccountStatus: () => Promise.resolve({ appInstallUrl: INSTALL_URL, installations: [] }),
+    });
+    await hydrateAccountStatus();
+    const host = renderScreen(makeCtx());
+    const link = host.querySelector("a.welcome-action") as HTMLAnchorElement;
+    expect(link).toBeTruthy();
+    expect(link.textContent).toContain("Install the Jx Suite GitHub App");
+    expect(link.getAttribute("href")).toBe(INSTALL_URL);
+    expect(host.textContent).toContain("Repository access");
+  });
+
+  test("stays silent with an installation present, without the member, or on unknown status", async () => {
+    installMockPlatform({
+      getAccountStatus: () =>
+        Promise.resolve({
+          appInstallUrl: INSTALL_URL,
+          installations: [{ account: "octocat", id: 1 }],
+        }),
+    });
+    await hydrateAccountStatus();
+    expect(renderScreen(makeCtx()).querySelector("a.welcome-action")).toBeNull();
+
+    installMockPlatform(); // No getAccountStatus member at all.
+    await hydrateAccountStatus();
+    expect(renderScreen(makeCtx()).querySelector("a.welcome-action")).toBeNull();
+
+    installMockPlatform({ getAccountStatus: () => Promise.reject(new Error("offline")) });
+    await hydrateAccountStatus();
+    expect(renderScreen(makeCtx()).querySelector("a.welcome-action")).toBeNull();
   });
 });
 

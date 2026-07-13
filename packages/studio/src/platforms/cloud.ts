@@ -672,10 +672,18 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
           starter: opts.starter,
         }),
       });
-      const created = await okJson<{ owner: string; name: string; defaultBranch: string }>(
-        res,
-        "Failed to create project",
-      );
+      if (!res.ok) {
+        // Preserve the structured 403 (needs_installation_access + installUrl) so the New
+        // Project modal can render an install link instead of flattened text.
+        const body = (await res.json().catch(() => null)) as
+          | (ErrorBody & { installUrl?: string })
+          | null;
+        throw Object.assign(new Error(body?.error ?? "Failed to create project"), {
+          ...(body?.code ? { code: body.code } : {}),
+          ...(body?.installUrl ? { installUrl: body.installUrl } : {}),
+        });
+      }
+      const created = (await res.json()) as { owner: string; name: string; defaultBranch: string };
       return {
         root: projectRootKey({
           owner: created.owner,
@@ -703,6 +711,22 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
         login: me.user.login,
         ...(me.user.name ? { name: me.user.name } : {}),
         ...(me.user.avatar_url ? { avatarUrl: me.user.avatar_url } : {}),
+      };
+    },
+
+    /** GitHub-App installation coverage from /me — powers the welcome install prompt. */
+    async getAccountStatus() {
+      const res = await fetch("/api/v1/me", { credentials: "include" });
+      if (!res.ok) {
+        return null;
+      }
+      const me = (await res.json()) as {
+        installations?: { id: number; account: string | null }[];
+        appInstallUrl?: string;
+      };
+      return {
+        installations: me.installations ?? [],
+        ...(me.appInstallUrl ? { appInstallUrl: me.appInstallUrl } : {}),
       };
     },
 

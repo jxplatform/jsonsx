@@ -362,6 +362,47 @@ describe("identity & cloudflare surface", () => {
     expect(calls[0]?.url).toBe(`${BASE}/git/pr`);
   });
 
+  test("getAccountStatus surfaces installations + install URL, null on failure", async () => {
+    mockFetch({
+      "/api/v1/me": {
+        body: {
+          user: { login: "octocat" },
+          installations: [{ id: 1, account: "octocat" }],
+          appInstallUrl: "https://github.com/apps/jx-suite/installations/new",
+        },
+      },
+    });
+    const p = createCloudPlatform(null);
+    expect(await p.getAccountStatus?.()).toEqual({
+      installations: [{ id: 1, account: "octocat" }],
+      appInstallUrl: "https://github.com/apps/jx-suite/installations/new",
+    });
+
+    mockFetch({ "/api/v1/me": { status: 401, body: { error: "nope" } } });
+    expect(await p.getAccountStatus?.()).toBeNull();
+  });
+
+  test("createProject preserves the structured needs_installation_access failure", async () => {
+    mockFetch({
+      "/api/v1/projects": {
+        status: 403,
+        body: {
+          error: "GitHub blocked repository creation for this app installation.",
+          code: "needs_installation_access",
+          installUrl: "https://github.com/apps/jx-suite/installations/new",
+        },
+      },
+    });
+    const p = createCloudPlatform(null);
+    const failure = await p
+      .createProject({ directory: "site", name: "Site" })
+      .then(() => null)
+      .catch((error: unknown) => error as Error & { code?: string; installUrl?: string });
+    expect(failure?.message).toContain("blocked repository creation");
+    expect(failure?.code).toBe("needs_installation_access");
+    expect(failure?.installUrl).toBe("https://github.com/apps/jx-suite/installations/new");
+  });
+
   test("cfConnection maps the brokered connection and nulls when absent", async () => {
     mockFetch({
       "/api/v1/cf/connection": {

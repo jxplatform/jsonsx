@@ -134,6 +134,7 @@ import {
 } from "./panels/block-action-bar";
 import { initCssData } from "./panels/style-utils";
 import { initQuickSearch } from "./panels/quick-search";
+import { hydrateAccountStatus } from "./account-status";
 import { hydrateProjectList } from "./project-list";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
 import { hydrateSettings } from "./services/settings-store";
@@ -770,6 +771,13 @@ void hydrateRecentProjects().then(() => {
 // Welcome screen, which reads it synchronously. No-op on platforms without listProjects.
 // oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: hydration must not block initial render
 void hydrateProjectList().then(() => {
+  render();
+});
+
+// Hydrate the account onboarding status (GitHub-App installation coverage on cloud), then refresh
+// The welcome screen's install prompt. No-op on platforms without getAccountStatus.
+// oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: hydration must not block initial render
+void hydrateAccountStatus().then(() => {
   render();
 });
 

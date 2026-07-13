@@ -1,0 +1,86 @@
+/**
+ * Tests for src/account-status.ts — the synchronous render cache over the optional
+ * `platform.getAccountStatus` PAL member, and src/platform-errors.ts — structured platform-error
+ * recovery (the needs_installation_access install link).
+ */
+import { installMockPlatform } from "./harness";
+import { beforeEach, describe, expect, test } from "bun:test";
+import {
+  getAccountStatus,
+  hydrateAccountStatus,
+  needsAppInstall,
+  resetAccountStatus,
+} from "../src/account-status";
+import { installUrlOf, platformErrorInfo } from "../src/platform-errors";
+
+const INSTALL_URL = "https://github.com/apps/jx-suite/installations/new";
+
+beforeEach(() => {
+  resetAccountStatus();
+});
+
+describe("account-status cache", () => {
+  test("hydrates from the platform and reports needsAppInstall on empty coverage", async () => {
+    installMockPlatform({
+      getAccountStatus: () => Promise.resolve({ appInstallUrl: INSTALL_URL, installations: [] }),
+    });
+    expect(getAccountStatus()).toBeNull();
+    expect(needsAppInstall()).toBe(false);
+    await hydrateAccountStatus();
+    expect(getAccountStatus()?.appInstallUrl).toBe(INSTALL_URL);
+    expect(needsAppInstall()).toBe(true);
+  });
+
+  test("an existing installation means no prompt", async () => {
+    installMockPlatform({
+      getAccountStatus: () =>
+        Promise.resolve({
+          appInstallUrl: INSTALL_URL,
+          installations: [{ account: "octocat", id: 7 }],
+        }),
+    });
+    await hydrateAccountStatus();
+    expect(needsAppInstall()).toBe(false);
+  });
+
+  test("no install URL means no prompt even with zero installations", async () => {
+    installMockPlatform({ getAccountStatus: () => Promise.resolve({ installations: [] }) });
+    await hydrateAccountStatus();
+    expect(needsAppInstall()).toBe(false);
+  });
+
+  test("unsupported platforms and failures resolve to unknown (null, never nags)", async () => {
+    installMockPlatform();
+    await hydrateAccountStatus();
+    expect(getAccountStatus()).toBeNull();
+
+    installMockPlatform({ getAccountStatus: () => Promise.reject(new Error("offline")) });
+    await hydrateAccountStatus();
+    expect(getAccountStatus()).toBeNull();
+    expect(needsAppInstall()).toBe(false);
+  });
+});
+
+describe("platform-errors", () => {
+  test("recovers structured fields from an augmented Error", () => {
+    const error = Object.assign(new Error("blocked"), {
+      code: "needs_installation_access",
+      installUrl: INSTALL_URL,
+    });
+    expect(platformErrorInfo(error)).toEqual({
+      code: "needs_installation_access",
+      installUrl: INSTALL_URL,
+    });
+    expect(installUrlOf(error)).toBe(INSTALL_URL);
+  });
+
+  test("plain errors and non-errors carry nothing", () => {
+    expect(platformErrorInfo(new Error("boom"))).toEqual({});
+    expect(platformErrorInfo("boom")).toEqual({});
+    expect(platformErrorInfo(null)).toEqual({});
+    expect(installUrlOf(new Error("boom"))).toBeNull();
+    // A different structured code is not the install case.
+    const otherCode = Object.assign(new Error("x"), { code: "other", installUrl: "u" });
+    expect(installUrlOf(otherCode)).toBeNull();
+  });
+});

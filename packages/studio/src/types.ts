@@ -92,6 +92,14 @@ export type {
   StarterInfo,
 } from "@jxsuite/protocol";
 
+/** Repository-access onboarding state returned by `StudioPlatform.getAccountStatus`. */
+export interface AccountStatus {
+  /** GitHub App installations (personal + organization) visible to the signed-in user. */
+  installations: { id: number; account: string | null }[];
+  /** Where to install the App (github.com/apps/<slug>/installations/new), when known. */
+  appInstallUrl?: string;
+}
+
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
@@ -303,6 +311,13 @@ export interface StudioPlatform {
   // ─── Identity & hosting connections (publish surface) ───────────────────────
   /** The signed-in user's identity, when the platform has one (cloud). */
   getUser?: () => Promise<{ login: string; name?: string; avatarUrl?: string } | null>;
+  /**
+   * Repository-access onboarding state: the platform's GitHub App installations visible to this
+   * user and where to install the App. Cloud-only; when the list is empty Studio's welcome screen
+   * prompts the user to install the App (without it, no repos are reachable). Null = unknown (don't
+   * prompt).
+   */
+  getAccountStatus?: () => Promise<AccountStatus | null>;
   /**
    * Open a pull request for the current branch. Cloud platforms implement it against their session;
    * local platforms omit it and Studio falls back to a direct GitHub API call with the user's
