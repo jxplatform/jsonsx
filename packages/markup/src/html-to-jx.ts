@@ -37,7 +37,7 @@ function convertHastChildren(children: HastNode[]) {
  */
 function convertHastNode(node: HastNode) {
   if (node.type === "text") {
-    if (whitespace(node as unknown as HastNode)) {
+    if (whitespace(node as Parameters<typeof whitespace>[0])) {
       return null;
     }
     return node.value ?? null;
