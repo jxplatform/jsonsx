@@ -57,8 +57,8 @@ function errorView(title: string, message: string, onClose: () => void): Templat
       <pre
         style="font-size:var(--spectrum-font-size-50, 11px);white-space:pre-wrap;overflow:auto;max-height:240px;margin:0;color:var(--fg-dim,#aaa)"
       >
-${message}</pre
-      >
+        ${message}
+      </pre>
     </div>
     <div style="display:flex;justify-content:flex-end">
       <sp-button size="s" @click=${onClose}>Close</sp-button>

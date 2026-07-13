@@ -16,6 +16,7 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `dish-starters` — [photo](https://www.pexels.com/photo/close-up-of-food-on-plate-251599/) by [Expect Best](https://www.pexels.com/@expect-best-79873) on Pexels
 - `dish-mains` — [photo](https://www.pexels.com/photo/close-up-of-a-gourmet-dish-on-a-plate-25205263/) by [Adriano Bragi](https://www.pexels.com/@adriano-bragi-1288014591) on Pexels
 - `dish-desserts` — [photo](https://www.pexels.com/photo/gourmet-chocolate-dessert-with-strawberries-33731580/) by [Eden FC](https://www.pexels.com/@eden-fc-620771246) on Pexels
+
 <!-- site:restaurant:end -->
 
 <!-- site:home-services:start -->
@@ -28,6 +29,7 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `gallery-2` — [photo](https://www.pexels.com/photo/close-up-of-electric-heating-element-glowing-red-36788832/) by [Zulfugar Karimov](https://www.pexels.com/@zulfugarkarimov) on Pexels
 - `gallery-3` — [photo](https://www.pexels.com/photo/technician-inspecting-outdoor-hvac-unit-32497161/) by [Kathleen Austin Kuhn](https://www.pexels.com/@kathleen-austin-kuhn-2152973960) on Pexels
 - `cta-bg` — [photo](https://www.pexels.com/photo/view-of-houses-11018246/) by [Curtis Adams](https://www.pexels.com/@curtis-adams-1694007) on Pexels
+
 <!-- site:home-services:end -->
 
 <!-- site:nonprofit:start -->
@@ -42,6 +44,7 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `program-4` — [photo](https://www.pexels.com/photo/a-picture-of-a-couple-s-hands-with-a-house-key-inside-a-house-illustration-7766930/) by [Kindel Media](https://www.pexels.com/@kindelmedia) on Pexels
 - `program-5` — [photo](https://www.pexels.com/photo/community-gathering-with-technology-in-rwanda-29521026/) by [finix photographer](https://www.pexels.com/@finix-photographer-826467311) on Pexels
 - `cta-bg` — [photo](https://www.pexels.com/photo/a-person-holding-an-egg-tray-7345444/) by [AI25.Studio Studio](https://www.pexels.com/@ai25studioai) on Pexels
+
 <!-- site:nonprofit:end -->
 
 <!-- site:course:start -->
@@ -51,6 +54,7 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `hero` — [photo](https://www.pexels.com/photo/person-teaching-girl-on-laptop-screen-6266990/) by [AI25.Studio Studio](https://www.pexels.com/@ai25studioai) on Pexels
 - `instructor` — [photo](https://www.pexels.com/photo/woman-holding-a-notebook-8423069/) by [Pavel Danilyuk](https://www.pexels.com/@pavel-danilyuk) on Pexels
 - `about` — [photo](https://www.pexels.com/photo/people-using-computers-at-work-7988079/) by [Mikhail Nilov](https://www.pexels.com/@mikhail-nilov) on Pexels
+
 <!-- site:course:end -->
 
 <!-- site:saas:start -->
@@ -61,6 +65,7 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `feature-1` — [photo](https://www.pexels.com/photo/men-sitting-at-the-desks-in-an-office-and-using-computers-6804068/) by [cottonbro studio](https://www.pexels.com/@cottonbro) on Pexels
 - `feature-2` — [photo](https://www.pexels.com/photo/blue-and-green-pie-chart-97080/) by [Negative Space](https://www.pexels.com/@negativespace) on Pexels
 - `feature-3` — [photo](https://www.pexels.com/photo/black-smartphone-with-icons-3850263/) by [ready made](https://www.pexels.com/@readymade) on Pexels
+
 <!-- site:saas:end -->
 
 <!-- site:event:start -->
@@ -73,6 +78,7 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `speaker-3` — [photo](https://www.pexels.com/photo/confident-businessman-in-blue-suit-gesturing-37148334/) by [Vincent Santamaria](https://www.pexels.com/@vincent-santamaria-194760512) on Pexels
 - `speaker-4` — [photo](https://www.pexels.com/photo/confident-businessman-in-blue-suit-gesturing-37148334/) by [Vincent Santamaria](https://www.pexels.com/@vincent-santamaria-194760512) on Pexels
 - `venue` — [photo](https://www.pexels.com/photo/empty-conference-room-16859956/) by [Skills Media](https://www.pexels.com/@skills-media-437558258) on Pexels
+
 <!-- site:event:end -->
 
 <!-- site:blog:start -->
@@ -87,6 +93,7 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `post-4` — [photo](https://www.pexels.com/photo/charming-architectural-street-view-in-dresden-37718865/) by [Memory Lane](https://www.pexels.com/@memory-lane-2157293172) on Pexels
 - `post-5` — [photo](https://www.pexels.com/photo/person-holding-a-stack-of-hardbound-books-8762862/) by [Alexandra Krainyukhova](https://www.pexels.com/@alexakrain) on Pexels
 - `post-6` — [photo](https://www.pexels.com/photo/wrinkled-black-paper-8749388/) by [Tamanna Rumee](https://www.pexels.com/@tamanna-rumee-52377920) on Pexels
+
 <!-- site:blog:end -->
 
 <!-- site:portfolio:start -->
@@ -101,6 +108,7 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `project-4` — [photo](https://www.pexels.com/photo/lush-green-landscape-in-asturias-spain-35479203/) by [Altamart](https://www.pexels.com/@altamar) on Pexels
 - `project-5` — [photo](https://www.pexels.com/photo/elegant-fine-dining-with-gourmet-dishes-37322902/) by [Kemal Can](https://www.pexels.com/@kemalcanfilm) on Pexels
 - `project-6` — [photo](https://www.pexels.com/photo/modern-architectural-staircase-and-facade-design-34661673/) by [木 灬](https://www.pexels.com/@236636281) on Pexels
+
 <!-- site:portfolio:end -->
 
 <!-- site:fitness-studio:start -->
@@ -114,6 +122,7 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `class-3` — [photo](https://www.pexels.com/photo/man-in-white-tank-top-holding-exercise-equipment-3888405/) by [Andrea Piacquadio](https://www.pexels.com/@olly) on Pexels
 - `instructor-1` — [photo](https://www.pexels.com/photo/blonde-woman-in-active-wear-6739935/) by [Mikhail Nilov](https://www.pexels.com/@mikhail-nilov) on Pexels
 - `instructor-2` — [photo](https://www.pexels.com/photo/blonde-woman-in-active-wear-6739935/) by [Mikhail Nilov](https://www.pexels.com/@mikhail-nilov) on Pexels
+
 <!-- site:fitness-studio:end -->
 
 <!-- site:professional-firm:start -->
@@ -127,6 +136,7 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `team-3` — [photo](https://www.pexels.com/photo/portrait-of-a-business-professional-in-suit-37148308/) by [Vincent Santamaria](https://www.pexels.com/@vincent-santamaria-194760512) on Pexels
 - `team-4` — [photo](https://www.pexels.com/photo/portrait-of-a-business-professional-in-suit-37148308/) by [Vincent Santamaria](https://www.pexels.com/@vincent-santamaria-194760512) on Pexels
 - `insight-cover` — [photo](https://www.pexels.com/photo/person-holding-white-printer-paper-graphs-9034283/) by [RDNE Stock project](https://www.pexels.com/@rdne) on Pexels
+
 <!-- site:professional-firm:end -->
 
 <!-- site:shop:start -->
@@ -141,6 +151,7 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `product-4` — [photo](https://www.pexels.com/photo/children-s-bicycles-in-front-of-blue-garage-door-28506741/) by [Jan van der Wolf](https://www.pexels.com/@jan-van-der-wolf-11680885) on Pexels
 - `product-5` — [photo](https://www.pexels.com/photo/cycling-helmets-on-bicycle-handles-12956080/) by [Atlantic Ambience](https://www.pexels.com/@freestockpro) on Pexels
 - `product-6` — [photo](https://www.pexels.com/photo/mountain-bike-handlebar-overhead-view-30443844/) by [R. ᴋ.](https://www.pexels.com/@r-462547867) on Pexels
+
 <!-- site:shop:end -->
 
 <!-- site:real-estate:start -->
@@ -160,4 +171,5 @@ All photos from [Pexels](https://www.pexels.com) under the [Pexels License](http
 - `agent-1` — [photo](https://www.pexels.com/photo/a-woman-in-black-suit-jacket-7414903/) by [MART PRODUCTION](https://www.pexels.com/@mart-production) on Pexels
 - `agent-2` — [photo](https://www.pexels.com/photo/man-in-blue-dress-shirt-holding-a-for-sale-sign-7578866/) by [Kindel Media](https://www.pexels.com/@kindelmedia) on Pexels
 - `agent-3` — [photo](https://www.pexels.com/photo/man-holding-a-for-sale-signage-7578856/) by [Kindel Media](https://www.pexels.com/@kindelmedia) on Pexels
+
 <!-- site:real-estate:end -->

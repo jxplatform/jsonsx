@@ -198,35 +198,37 @@ export function isMutatingOperator(op) { ... }
 ```
 
 **Operand → JS source mapping:**
-| Operand | Output |
-|---------|--------|
-| `{ "$ref": "#/state/x" }` | `state.x` |
-| `{ "$ref": "#/state/items/0/name" }` | `state.items[0].name` |
-| `{ "$ref": "event#/target/value" }` | `e.target.value` |
-| `{ "$ref": "$map/item/qty" }` | `item.qty` |
-| `{ "$ref": "$map/index" }` | `index` |
-| `{ "$ref": "$reduce/acc" }` | `acc` |
-| `{ "$ref": "parent#/label" }` | `state.label` (already merged into scope) |
-| Literal number `42` | `42` |
-| Literal string `"hello"` | `"hello"` |
-| Literal boolean `true` | `true` |
-| Literal null | `null` |
-| Nested ExpressionNode | `(` + recursive compile + `)` |
+
+| Operand                              | Output                                    |
+| ------------------------------------ | ----------------------------------------- |
+| `{ "$ref": "#/state/x" }`            | `state.x`                                 |
+| `{ "$ref": "#/state/items/0/name" }` | `state.items[0].name`                     |
+| `{ "$ref": "event#/target/value" }`  | `e.target.value`                          |
+| `{ "$ref": "$map/item/qty" }`        | `item.qty`                                |
+| `{ "$ref": "$map/index" }`           | `index`                                   |
+| `{ "$ref": "$reduce/acc" }`          | `acc`                                     |
+| `{ "$ref": "parent#/label" }`        | `state.label` (already merged into scope) |
+| Literal number `42`                  | `42`                                      |
+| Literal string `"hello"`             | `"hello"`                                 |
+| Literal boolean `true`               | `true`                                    |
+| Literal null                         | `null`                                    |
+| Nested ExpressionNode                | `(` + recursive compile + `)`             |
 
 **Node → JS source mapping:**
-| Operator type | Output |
-|---------------|--------|
-| Unary `!` | `(!compiledTarget)` |
-| Unary `-` | `(-compiledTarget)` |
-| Binary `+` | `(compiledTarget + compiledValue)` |
-| Assignment `=` | `compiledTarget = compiledValue` |
-| Assignment `+=` | `compiledTarget += compiledValue` |
-| `push` | `compiledTarget.push(compiledValue)` |
-| `pop` | `compiledTarget.pop()` |
-| `splice` | `compiledTarget.splice(compiledValues...)` |
-| `reduce` | `compiledTarget.reduce((acc, item, index) => compiledValue, compiledInitial)` |
-| `map` | `compiledTarget.map((item, index) => compiledValue)` |
-| `filter` | `compiledTarget.filter((item, index) => compiledValue)` |
+
+| Operator type   | Output                                                                        |
+| --------------- | ----------------------------------------------------------------------------- |
+| Unary `!`       | `(!compiledTarget)`                                                           |
+| Unary `-`       | `(-compiledTarget)`                                                           |
+| Binary `+`      | `(compiledTarget + compiledValue)`                                            |
+| Assignment `=`  | `compiledTarget = compiledValue`                                              |
+| Assignment `+=` | `compiledTarget += compiledValue`                                             |
+| `push`          | `compiledTarget.push(compiledValue)`                                          |
+| `pop`           | `compiledTarget.pop()`                                                        |
+| `splice`        | `compiledTarget.splice(compiledValues...)`                                    |
+| `reduce`        | `compiledTarget.reduce((acc, item, index) => compiledValue, compiledInitial)` |
+| `map`           | `compiledTarget.map((item, index) => compiledValue)`                          |
+| `filter`        | `compiledTarget.filter((item, index) => compiledValue)`                       |
 
 ### 3.2 Expression Detection in `buildInitialScope`
 

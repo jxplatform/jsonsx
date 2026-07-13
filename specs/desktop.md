@@ -291,9 +291,7 @@ projectState = {
   name: "My Site", // From project.json
   projectRoot: ".", // Relative path prefix for API calls
   isSiteProject: true,
-  projectConfig: {
-    /* parsed project.json */
-  },
+  projectConfig: {/* parsed project.json */},
   dirs: new Map(), // Cached directory listings
   expanded: new Set(), // Expanded tree nodes
   selectedPath: null,

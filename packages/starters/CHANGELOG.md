@@ -2,17 +2,15 @@
 
 ## [0.35.1](https://github.com/jxsuite/jx/compare/starters-v0.35.0...starters-v0.35.1) (2026-07-07)
 
-
 ### Dependencies
 
-* The following workspace dependencies were updated
-  * devDependencies
-    * @jxsuite/schema bumped to 0.35.0
+- The following workspace dependencies were updated
+  - devDependencies
+    - @jxsuite/schema bumped to 0.35.0
 
 ## [0.35.0](https://github.com/jxsuite/jx/compare/starters-v0.34.0...starters-v0.35.0) (2026-07-06)
 
-
 ### Features
 
-* **starters:** init starter sites ([1f883b5](https://github.com/jxsuite/jx/commit/1f883b526ea91ae935de76932283302d0720f104))
-* use site screenshots for template selector ([ba49dfa](https://github.com/jxsuite/jx/commit/ba49dfa9fec9c705bee3e87126acfefe197bcc74))
+- **starters:** init starter sites ([1f883b5](https://github.com/jxsuite/jx/commit/1f883b526ea91ae935de76932283302d0720f104))
+- use site screenshots for template selector ([ba49dfa](https://github.com/jxsuite/jx/commit/ba49dfa9fec9c705bee3e87126acfefe197bcc74))

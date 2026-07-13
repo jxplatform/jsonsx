@@ -75,7 +75,7 @@ export function renderStatusbar() {
     // Step width varies. Emitting a crumb per node keeps the array pseudo-element ("Repeater") and
     // Its template both visible instead of collapsing the array into a bare `[index]`.
     const pathSegments = [];
-    for (let i = 0; i < sel.length; ) {
+    for (let i = 0; i < sel.length;) {
       const seg = sel[i];
       const step = seg === "map" ? 1 : 2;
       const subPath = sel.slice(0, i + step);
