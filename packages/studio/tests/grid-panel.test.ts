@@ -1,6 +1,7 @@
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { FakeTabulator, tabulatorMockModule } from "./tabulator-mock";
+import { render } from "lit-html";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
 import type { GridEditBatch, GridSource } from "../src/grid/grid-source";
 
@@ -11,7 +12,17 @@ void mock.module("../src/ui/layers.js", () => ({
   getLayerSlot: () => document.createElement("div"),
   initLayers: () => {},
   openModal: () => ({ close: () => {}, update: () => {} }),
-  renderPopover: () => ({ dismiss: () => {} }),
+  renderPopover: (template: unknown) => {
+    const host = document.createElement("div");
+    host.className = "test-popover-host";
+    document.body.append(host);
+    render(template as never, host);
+    return {
+      dismiss: () => {
+        host.remove();
+      },
+    };
+  },
   showConfirmDialog: async () => true,
   showDialog: async () => null,
 }));
@@ -283,6 +294,35 @@ describe("renderGridMode", () => {
     expect(queries.at(-1)).toEqual({ limit: 50, offset: 50 });
     expect(wrap.textContent).toContain("51–100");
     expect(prev.hasAttribute("disabled")).toBeFalse();
+  });
+
+  test("the Replace popover buffers replacements and reports the count", async () => {
+    const wrap = document.createElement("div");
+    document.body.append(wrap);
+    const tab = gridTab();
+    const controller = createGridController(tab, stubSource());
+    await controller.load();
+    renderGridMode(wrap, tab);
+    await flush();
+
+    const replaceButton = [...wrap.querySelectorAll("sp-action-button")].find((b) =>
+      b.textContent?.includes("Replace"),
+    ) as HTMLElement;
+    replaceButton.click();
+    await flush();
+
+    const popover = document.querySelector(".jx-grid-replace-popover")!;
+    expect(popover).not.toBeNull();
+    const [findInput, replaceInput] = [...popover.querySelectorAll("input")];
+    findInput!.value = "One";
+    findInput!.dispatchEvent(new Event("input", { bubbles: true }));
+    replaceInput!.value = "Uno";
+    replaceInput!.dispatchEvent(new Event("input", { bubbles: true }));
+    (popover.querySelector("sp-button") as HTMLElement).click();
+    await flush();
+
+    expect(controller.buffer.effectiveValue("a", "title")).toBe("Uno");
+    expect(wrap.textContent).toContain("Save (1)");
   });
 
   test("detachGridPanel destroys the view and stops shell updates", async () => {

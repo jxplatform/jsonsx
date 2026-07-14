@@ -23,6 +23,11 @@ declare module "tabulator-tables" {
     getCells: () => CellComponent[][];
   }
 
+  export interface ColumnComponent {
+    getField: () => string;
+    getWidth: () => number;
+  }
+
   export type CellEditor = (
     cell: CellComponent,
     onRendered: (fn: () => void) => void,

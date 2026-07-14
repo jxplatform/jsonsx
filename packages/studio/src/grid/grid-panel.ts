@@ -11,6 +11,9 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import { effect, effectScope } from "../reactivity";
+import { renderPopover } from "../ui/layers";
+import { statusMessage } from "../panels/statusbar";
+import { rectOf } from "../utils/geometry";
 import { createGridController, getGridController } from "./grid-controller";
 import { createCsvFileSource } from "./sources/csv-file-source";
 import { createGridView } from "./grid-view";
@@ -106,6 +109,14 @@ function toolbarTpl(controller: GridController, getView: () => GridView | null) 
       >
         Fill Down
       </sp-action-button>
+      <sp-action-button
+        size="s"
+        quiet
+        title="Find & replace across text cells"
+        @click=${(e: MouseEvent) => openReplacePopover(controller, e.currentTarget as HTMLElement)}
+      >
+        Replace
+      </sp-action-button>
       <sp-search
         size="s"
         quiet
@@ -124,6 +135,57 @@ function toolbarTpl(controller: GridController, getView: () => GridView | null) 
       </span>
     </div>
   `;
+}
+
+/** Find & replace popover — buffers all replacements as one undo group. */
+function openReplacePopover(controller: GridController, anchor: HTMLElement) {
+  const rect = rectOf(anchor);
+  let find = "";
+  let replace = "";
+  const handle = renderPopover(
+    html`<sp-popover
+      open
+      class="jx-grid-replace-popover"
+      style="position:fixed;z-index:10000;left:${Math.max(4, rect.left)}px;top:${rect.bottom + 4}px"
+    >
+      <div class="jx-grid-cell-popover-body">
+        <div class="jx-grid-cell-popover-title">Find &amp; Replace</div>
+        <input
+          class="jx-grid-input"
+          placeholder="Find…"
+          @input=${(e: Event) => (find = (e.target as HTMLInputElement).value)}
+        />
+        <input
+          class="jx-grid-input"
+          placeholder="Replace with…"
+          @input=${(e: Event) => (replace = (e.target as HTMLInputElement).value)}
+        />
+        <div class="jx-grid-cell-popover-actions">
+          <sp-button
+            size="s"
+            variant="accent"
+            @click=${() => {
+              const changed = controller.replaceAll(find, replace);
+              statusMessage(
+                changed === 0
+                  ? "No matches"
+                  : `Replaced in ${changed} cell${changed === 1 ? "" : "s"} — save to apply`,
+              );
+              if (changed > 0) {
+                handle.dismiss();
+              }
+            }}
+          >
+            Replace All
+          </sp-button>
+          <sp-button size="s" variant="secondary" @click=${() => handle.dismiss()}>
+            Cancel
+          </sp-button>
+        </div>
+      </div>
+    </sp-popover>`,
+    { dismissOnOutsideClick: true },
+  );
 }
 
 /** Prev/Next pager for remote-paged sources (connector tables). */

@@ -332,6 +332,37 @@ describe("row actions and view binding", () => {
   });
 });
 
+describe("replaceAll", () => {
+  test("replaces across editable text cells (existing + pending inserts) as one undo group", async () => {
+    installMockPlatform();
+    const controller = createGridController(openGridTab(), stubSource());
+    await controller.load();
+    let refreshes = 0;
+    controller.bindView({ refreshData: () => (refreshes += 1) });
+    const tempKey = controller.addRow({ title: "One more" });
+
+    const changed = controller.replaceAll("One", "Uno");
+    expect(changed).toBe(2);
+    expect(controller.buffer.effectiveValue("a", "title")).toBe("Uno");
+    expect(controller.buffer.effectiveValue(tempKey, "title")).toBe("Uno more");
+    expect(refreshes).toBeGreaterThanOrEqual(2);
+
+    controller.buffer.undo(); // One group reverts both replacements.
+    expect(controller.buffer.effectiveValue("a", "title")).toBe("One");
+    expect(controller.buffer.effectiveValue(tempKey, "title")).toBe("One more");
+  });
+
+  test("skips pending-delete rows, non-text columns, and empty finds", async () => {
+    installMockPlatform();
+    const controller = createGridController(openGridTab(), stubSource());
+    await controller.load();
+    controller.buffer.deleteRow("a");
+    expect(controller.replaceAll("", "x")).toBe(0);
+    expect(controller.replaceAll("One", "Uno")).toBe(0); // Row "a" is pending-delete.
+    expect(controller.replaceAll("2", "9")).toBe(0); // Count is a number column.
+  });
+});
+
 describe("refresh and fs staleness", () => {
   test("refresh with pending edits asks first; cancel keeps the buffer", async () => {
     installMockPlatform();

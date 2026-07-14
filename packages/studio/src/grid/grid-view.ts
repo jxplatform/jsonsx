@@ -31,7 +31,13 @@ import { rectOf } from "../utils/geometry";
 import { editorForColumn, formatterForColumn } from "./cell-editors";
 import { hasPopoverEditor, openCellValuePopover } from "./cell-popovers";
 import { ROW_KEY_FIELD } from "./grid-controller";
-import type { CellComponent, ColumnDefinition, RowComponent } from "tabulator-tables";
+import { applyGridLayout, loadGridLayout, saveGridLayout } from "./grid-layout";
+import type {
+  CellComponent,
+  ColumnComponent,
+  ColumnDefinition,
+  RowComponent,
+} from "tabulator-tables";
 import type { GridCellValue, GridColumn } from "./grid-source";
 import type { GridController } from "./grid-controller";
 
@@ -160,6 +166,9 @@ export function createGridView(host: HTMLElement, controller: GridController): G
     };
   });
 
+  const gridId = controller.source.id;
+  const layout = loadGridLayout(gridId);
+
   const table = new Tabulator(host, {
     clipboard: true,
     clipboardCopyConfig: { columnHeaders: false, rowHeaders: false },
@@ -168,7 +177,7 @@ export function createGridView(host: HTMLElement, controller: GridController): G
     clipboardPasteAction: "range",
     clipboardPasteParser: "range",
     columnDefaults: { headerSortTristate: true, resizable: "header" },
-    columns: columnDefs,
+    columns: applyGridLayout(columnDefs, layout),
     data: controller.effectiveRows(),
     editTriggerEvent: "dblclick",
     headerSortClickElement: "icon",
@@ -236,6 +245,14 @@ export function createGridView(host: HTMLElement, controller: GridController): G
     }
     paintCell(cell);
     paintRow(cell.getRow());
+  });
+
+  table.on("columnResized", (column: ColumnComponent) => {
+    saveGridLayout(gridId, { widths: { [column.getField()]: column.getWidth() } });
+  });
+
+  table.on("columnMoved", (_column: ColumnComponent, ordered: ColumnComponent[]) => {
+    saveGridLayout(gridId, { order: ordered.map((c) => c.getField()) });
   });
 
   table.on("cellDblClick", (_event: unknown, cell: CellComponent) => {

@@ -530,6 +530,35 @@ describe("file context menu", () => {
     ]);
   });
 
+  test("collection and pages directories offer grid bulk-edit entries", async () => {
+    const handle = installFsPlatform();
+    siteState({
+      projectConfig: {
+        content: { posts: { format: "Markdown", schema: {}, source: "./posts/" } },
+        name: "Demo",
+      },
+    });
+    seedTreeState();
+    requireProjectState().dirs.get(".")!.push({ name: "posts", path: "posts", type: "directory" });
+    const tree = makeTreeCtx();
+    const out = await renderInto(renderFilesTemplate(tree.ctx), host);
+    void handle;
+
+    pointer(rowFor(out, "posts"), "contextmenu");
+    await flush();
+    expect(popoverMenuItems().map((el) => el.textContent?.trim())).toContain(
+      "Edit Collection in Grid",
+    );
+    await clickMenuItem("Edit Collection in Grid");
+    expect(workspace.tabs.has("grid://collection/posts")).toBeTrue();
+
+    pointer(rowFor(out, "pages"), "contextmenu");
+    await flush();
+    expect(popoverMenuItems().map((el) => el.textContent?.trim())).toContain("Edit Pages in Grid");
+    await clickMenuItem("Edit Pages in Grid");
+    expect(workspace.tabs.has("grid://pages")).toBeTrue();
+  });
+
   test("opening a second menu dismisses the first", async () => {
     const { out } = await renderSeededTree();
 

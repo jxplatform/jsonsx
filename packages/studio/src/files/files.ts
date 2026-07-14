@@ -28,7 +28,7 @@ import {
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { activateTab, openTab, renameTab, replaceAllTabs, workspace } from "../workspace/workspace";
-import { openCollectionGrid, openCsvGridTab } from "../grid/grid-open";
+import { openCollectionGrid, openCsvGridTab, openPagesGrid } from "../grid/grid-open";
 import { collectionDirs } from "../grid/sources/content-source";
 import { parseSourceForPath, serializeDocument } from "./file-ops";
 import {
@@ -731,6 +731,14 @@ function showFileContextMenu(
           openCollectionGrid(collection.name);
         },
         label: "Edit Collection in Grid",
+      });
+    }
+    if (entry.path === "pages" || entry.path.endsWith("/pages")) {
+      items.push({
+        action: () => {
+          openPagesGrid();
+        },
+        label: "Edit Pages in Grid",
       });
     }
   }

@@ -321,6 +321,30 @@ describe("popover cells and insert-only columns", () => {
   });
 });
 
+describe("column layout persistence", () => {
+  test("saved layout applies at creation; resize/move events persist changes", async () => {
+    const { clearGridLayout, loadGridLayout, saveGridLayout } =
+      await import("../src/grid/grid-layout");
+    clearGridLayout("grid://collection/x");
+    saveGridLayout("grid://collection/x", { order: ["count", "title"], widths: { title: 321 } });
+
+    const { table } = await setupView();
+    const defs = table.options.columns as { field: string; width?: number }[];
+    expect(defs.map((d) => d.field)).toEqual(["count", "title", "id", "done"]);
+    expect(defs.find((d) => d.field === "title")!.width).toBe(321);
+
+    table.emit("columnResized", { getField: () => "done", getWidth: () => 77 });
+    expect(loadGridLayout("grid://collection/x")!.widths!.done).toBe(77);
+
+    table.emit("columnMoved", { getField: () => "done" }, [
+      { getField: () => "done" },
+      { getField: () => "id" },
+    ]);
+    expect(loadGridLayout("grid://collection/x")!.order).toEqual(["done", "id"]);
+    clearGridLayout("grid://collection/x");
+  });
+});
+
 describe("row painting", () => {
   test("rowFormatter applies pending-delete and insert classes from buffer state", async () => {
     const { controller, table } = await setupView();

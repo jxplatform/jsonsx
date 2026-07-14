@@ -72,6 +72,8 @@ export interface GridController {
   deleteRows: (rowKeys: string[]) => void;
   /** Drop one row's pending edits (not undoable) and sync the view. */
   discardRow: (rowKey: string) => void;
+  /** Replace text across editable string/text cells (one undo group). Returns cells changed. */
+  replaceAll: (find: string, replace: string) => number;
 }
 
 /** Row-object key carrying the grid row identity through the engine. */
@@ -169,6 +171,35 @@ export function createGridController(tab: Tab, source: GridSource): GridControll
     discardRow(rowKey) {
       buffer.discardRow(rowKey);
       syncView();
+    },
+
+    replaceAll(find, replace) {
+      if (find === "") {
+        return 0;
+      }
+      const textColumns = state.columns.filter(
+        (column) => column.editable && (column.kind === "string" || column.kind === "text"),
+      );
+      const rowKeys = [...state.rows.map((row) => row.key), ...buffer.state.inserts.keys()];
+      let changed = 0;
+      buffer.group(() => {
+        for (const rowKey of rowKeys) {
+          if (buffer.rowState(rowKey) === "pending-delete") {
+            continue;
+          }
+          for (const column of textColumns) {
+            const value = buffer.effectiveValue(rowKey, column.field);
+            if (typeof value === "string" && value.includes(find)) {
+              buffer.setCell(rowKey, column.field, value.replaceAll(find, replace));
+              changed += 1;
+            }
+          }
+        }
+      });
+      if (changed > 0) {
+        syncView();
+      }
+      return changed;
     },
 
     effectiveRows() {
