@@ -12,6 +12,7 @@ import { errorMessage } from "@jxsuite/schema/parse";
 import { statusMessage } from "../panels/statusbar";
 import { validateComponentSlots } from "../services/cem-export";
 import { getPlatform } from "../platform";
+import { getGridController } from "../grid/grid-controller";
 import { activeTab, openTab } from "../workspace/workspace";
 import { collabSave } from "../collab/collab-session";
 import { isEditing, stopEditing } from "../editor/inline-edit";
@@ -162,6 +163,12 @@ export async function saveFile() {
   if (!tab) {
     return;
   }
+  // Grid tabs batch-save through their controller (per-source commit semantics, not a doc write).
+  const grid = getGridController(tab);
+  if (grid) {
+    await grid.save();
+    return;
+  }
   try {
     // A co-edited tab persists through its provider (a direct file write would reset the room).
     if (await collabSave(tab)) {
@@ -264,6 +271,13 @@ export async function exportFile() {
  * @returns {Promise<string>}
  */
 export async function serializeDocument(tab: Tab): Promise<string> {
+  // Grid tabs serialize through their source (pending edits included) — e.g. the Monaco source
+  // View of a CSV grid tab shows the live file text.
+  const grid = getGridController(tab);
+  const gridText = grid?.serializeForSource();
+  if (gridText) {
+    return gridText;
+  }
   await loadFormats();
   const sourceFormat = formatByName(tab.doc.sourceFormat);
   if (sourceFormat?.capabilities.serialize) {

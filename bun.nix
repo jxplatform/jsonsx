@@ -4259,6 +4259,10 @@
     url = "https://registry.npmjs.org/table/-/table-6.9.0.tgz";
     hash = "sha512-9kY+CygyYM6j02t5YFHbNz2FN5QmYGv9zAjVp4lCDjlCw7amdckXlEt/bjMhUIfj4ThGRE4gCUH5+yGnNuPo5A==";
   };
+  "tabulator-tables@6.5.2" = fetchurl {
+    url = "https://registry.npmjs.org/tabulator-tables/-/tabulator-tables-6.5.2.tgz";
+    hash = "sha512-cRL3xsaaf5RzND8KPbn4C9Ce5tzyiQUE01E/10zN50MjdRKl/Gl5nXkzLN6cvEyRfWHCPuqBF92y50CBw20WYA==";
+  };
   "tar-fs@3.1.3" = fetchurl {
     url = "https://registry.npmjs.org/tar-fs/-/tar-fs-3.1.3.tgz";
     hash = "sha512-/hU4AXnIdZu+Gvl1pk0oI5f5HxWsCJRtY2aFaJdk9VvyL48DWU6iU5WAIPG+wIi1YvWA6eTJvIviP/tMAZZNwQ==";

@@ -2,35 +2,33 @@
 
 ## [1.0.0](https://github.com/jxsuite/jx/compare/studio-v0.37.1...studio-v1.0.0) (2026-07-13)
 
-
 ### ⚠ BREAKING CHANGES
 
-* hosts switch to the extension model; migrate all projects to content sections
+- hosts switch to the extension model; migrate all projects to content sections
 
 ### Features
 
-* **auth:** Better Auth extension — sessions, permissions, auth-gated data ([bf47228](https://github.com/jxsuite/jx/commit/bf472285581afbfe7b650b5d52578078359655fa))
-* **connector:** dynamic data tables extension — Kysely core, /_jx/data mount, db push ([3085ab4](https://github.com/jxsuite/jx/commit/3085ab4d29c2c0c9f0b3a3007aadbd17da1994d4))
-* hosts switch to the extension model; migrate all projects to content sections ([c40b45c](https://github.com/jxsuite/jx/commit/c40b45c2c1ac2052cba4467d9353de22f4c0f060))
-* **markup:** shared markup-conversion core package; sever studio/import from parser ([a075e74](https://github.com/jxsuite/jx/commit/a075e74a6c45e91b1d1c7c1a6007e2e344fbb341))
-* **studio:** add/open existing repositories from the welcome screen ([4edc293](https://github.com/jxsuite/jx/commit/4edc293d439cf613060b4113b10973251785c3e7))
-* **studio:** data console — connections, schema push, secrets, data grid ([ea92f95](https://github.com/jxsuite/jx/commit/ea92f955cdfce5774a0ae72f01038e00c8d310ae))
-* **studio:** descriptor-contributed settings + fetched project schemas ([60f1465](https://github.com/jxsuite/jx/commit/60f1465cdc18c07c7d172372f4df2d67dee1ca88))
-* **studio:** instant CF connect handshake + Connect-Cloudflare option in the AI gate ([f7de0a3](https://github.com/jxsuite/jx/commit/f7de0a3fecb2a375ff9984446243ac157fe10db9))
-* **studio:** prompt for GitHub App installation from the project UI ([850f8cb](https://github.com/jxsuite/jx/commit/850f8cba4c40d2b3ecab425633a2ec49f966190e))
-* **studio:** reusable schema-form engine, context resolver, settings registry ([4cb1d63](https://github.com/jxsuite/jx/commit/4cb1d63d70fc16535646897466e1a2fb1719157c))
-
+- **auth:** Better Auth extension — sessions, permissions, auth-gated data ([bf47228](https://github.com/jxsuite/jx/commit/bf472285581afbfe7b650b5d52578078359655fa))
+- **connector:** dynamic data tables extension — Kysely core, /_jx/data mount, db push ([3085ab4](https://github.com/jxsuite/jx/commit/3085ab4d29c2c0c9f0b3a3007aadbd17da1994d4))
+- hosts switch to the extension model; migrate all projects to content sections ([c40b45c](https://github.com/jxsuite/jx/commit/c40b45c2c1ac2052cba4467d9353de22f4c0f060))
+- **markup:** shared markup-conversion core package; sever studio/import from parser ([a075e74](https://github.com/jxsuite/jx/commit/a075e74a6c45e91b1d1c7c1a6007e2e344fbb341))
+- **studio:** add/open existing repositories from the welcome screen ([4edc293](https://github.com/jxsuite/jx/commit/4edc293d439cf613060b4113b10973251785c3e7))
+- **studio:** data console — connections, schema push, secrets, data grid ([ea92f95](https://github.com/jxsuite/jx/commit/ea92f955cdfce5774a0ae72f01038e00c8d310ae))
+- **studio:** descriptor-contributed settings + fetched project schemas ([60f1465](https://github.com/jxsuite/jx/commit/60f1465cdc18c07c7d172372f4df2d67dee1ca88))
+- **studio:** instant CF connect handshake + Connect-Cloudflare option in the AI gate ([f7de0a3](https://github.com/jxsuite/jx/commit/f7de0a3fecb2a375ff9984446243ac157fe10db9))
+- **studio:** prompt for GitHub App installation from the project UI ([850f8cb](https://github.com/jxsuite/jx/commit/850f8cba4c40d2b3ecab425633a2ec49f966190e))
+- **studio:** reusable schema-form engine, context resolver, settings registry ([4cb1d63](https://github.com/jxsuite/jx/commit/4cb1d63d70fc16535646897466e1a2fb1719157c))
 
 ### Dependencies
 
-* The following workspace dependencies were updated
-  * dependencies
-    * @jxsuite/collab bumped to 0.3.0
-    * @jxsuite/create bumped to 1.0.0
-    * @jxsuite/markup bumped to 0.2.0
-    * @jxsuite/protocol bumped to 0.4.0
-    * @jxsuite/runtime bumped to 1.0.0
-    * @jxsuite/schema bumped to 1.0.0
+- The following workspace dependencies were updated
+  - dependencies
+    - @jxsuite/collab bumped to 0.3.0
+    - @jxsuite/create bumped to 1.0.0
+    - @jxsuite/markup bumped to 0.2.0
+    - @jxsuite/protocol bumped to 0.4.0
+    - @jxsuite/runtime bumped to 1.0.0
+    - @jxsuite/schema bumped to 1.0.0
 
 ## [0.37.1](https://github.com/jxsuite/jx/compare/studio-v0.37.0...studio-v0.37.1) (2026-07-08)
 

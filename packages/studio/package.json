@@ -87,6 +87,7 @@
     "lit": "^3.3.3",
     "lit-html": "^3.3.3",
     "monaco-editor": "^0.55.1",
+    "tabulator-tables": "^6.3",
     "y-monaco": "^0.1.6",
     "yaml": "^2.9.0"
   },

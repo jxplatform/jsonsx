@@ -17,7 +17,7 @@
 
   "$studio": {
     "icon": "table",
-    "modes": ["source"]
+    "modes": ["grid", "source"]
   },
 
   "$defs": {

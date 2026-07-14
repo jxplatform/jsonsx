@@ -28,6 +28,7 @@ import {
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { activateTab, openTab, renameTab, replaceAllTabs, workspace } from "../workspace/workspace";
+import { openCsvGridTab } from "../grid/grid-open";
 import { parseSourceForPath, serializeDocument } from "./file-ops";
 import {
   documentExtensions,
@@ -1030,6 +1031,23 @@ export async function openFileInTab(path: string) {
       requireProjectState().selectedPath = path;
       return;
     }
+  }
+
+  // CSV files open in the grid editor (source mode remains as the raw-text alternate).
+  if (path.toLowerCase().endsWith(".csv")) {
+    try {
+      await openCsvGridTab(path);
+      requireProjectState().selectedPath = path;
+      trackRecentFile({
+        name: path.split("/").pop() || path,
+        path,
+        root: requireProjectState().projectRoot,
+      });
+      statusMessage(`Opened ${path.split("/").pop()}`);
+    } catch (error) {
+      statusMessage(`Error: ${errorMessage(error)}`);
+    }
+    return;
   }
 
   const platform = getPlatform();

@@ -11,6 +11,7 @@ import { classMap } from "lit-html/directives/class-map.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { effect, effectScope } from "../reactivity";
 import { activateTab, closeTab, workspace } from "../workspace/workspace";
+import { gridTabLabel } from "../grid/grid-source";
 import type { Tab } from "../tabs/tab";
 import { showConfirmDialog } from "../ui/layers";
 import type { EffectScope } from "@vue/reactivity";
@@ -80,7 +81,7 @@ function render() {
                     void requestClose(id);
                   }
                 }}
-                title=${tab.documentPath || "Untitled"}
+                title=${tab.documentPath || gridTabLabel(tab.id) || "Untitled"}
               >
                 <span class="tab-strip-label">${label}</span>
                 ${isDirty ? html`<span class="tab-strip-dirty">●</span>` : nothing}
@@ -104,7 +105,7 @@ function render() {
 }
 
 /**
- * Derive a short label from the tab's documentPath.
+ * Derive a short label from the tab's documentPath (virtual grid tabs label from their id).
  *
  * @param {Tab} tab
  * @returns {string}
@@ -112,7 +113,7 @@ function render() {
 function tabLabel(tab: Tab) {
   const path = tab.documentPath;
   if (!path) {
-    return "Untitled";
+    return gridTabLabel(tab.id) ?? "Untitled";
   }
   const parts = path.split("/");
   return parts.at(-1);

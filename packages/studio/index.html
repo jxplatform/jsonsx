@@ -4320,6 +4320,189 @@
         color: var(--fg);
         background: var(--hover-bg);
       }
+
+      /* ─── Grid editor (Tabulator theme over Spectrum tokens) ─────────────── */
+      .jx-grid {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+        background: var(--bg);
+      }
+      .jx-grid-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-panel);
+        flex-shrink: 0;
+      }
+      .jx-grid-toolbar sp-search {
+        width: 200px;
+      }
+      .jx-grid-spacer {
+        flex: 1;
+      }
+      .jx-grid-note {
+        font-size: var(--spectrum-font-size-50, 11px);
+        color: var(--fg-dim);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1px 6px;
+        cursor: help;
+      }
+      .jx-grid-count {
+        font-size: var(--spectrum-font-size-75, 12px);
+        color: var(--fg-dim);
+        white-space: nowrap;
+      }
+      .jx-grid-error-text {
+        color: var(--danger);
+      }
+      .jx-grid-host {
+        flex: 1;
+        min-height: 0;
+      }
+      .jx-grid-missing {
+        padding: 24px;
+        color: var(--fg-dim);
+      }
+
+      /* Tabulator structural overrides — tokens only, scoped under .jx-grid. */
+      .jx-grid .tabulator {
+        background: var(--bg);
+        color: var(--fg);
+        border: none;
+        font-size: var(--spectrum-font-size-75, 12px);
+        height: 100%;
+      }
+      .jx-grid .tabulator .tabulator-header {
+        background: var(--bg-panel);
+        color: var(--fg);
+        border-bottom: 1px solid var(--border);
+      }
+      .jx-grid .tabulator .tabulator-header .tabulator-col {
+        background: var(--bg-panel);
+        border-right: 1px solid var(--border);
+      }
+      .jx-grid .tabulator .tabulator-header .tabulator-col .tabulator-col-title {
+        color: var(--fg);
+        font-weight: 600;
+      }
+      .jx-grid .tabulator .tabulator-header .tabulator-header-filter input {
+        background: var(--bg);
+        color: var(--fg);
+        border: 1px solid var(--border);
+        border-radius: var(--spectrum-corner-radius-75, 2px);
+        padding: 1px 4px;
+        font: inherit;
+      }
+      .jx-grid .tabulator .tabulator-tableholder {
+        background: var(--bg);
+      }
+      .jx-grid .tabulator .tabulator-row {
+        background: var(--bg);
+        color: var(--fg);
+        border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+        min-height: 26px;
+      }
+      .jx-grid .tabulator .tabulator-row.tabulator-row-even {
+        background: color-mix(in srgb, var(--bg-panel) 45%, var(--bg));
+      }
+      .jx-grid .tabulator .tabulator-row.tabulator-selected {
+        background: color-mix(in srgb, var(--accent) 16%, var(--bg));
+      }
+      .jx-grid .tabulator .tabulator-row .tabulator-cell {
+        border-right: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+        padding: 3px 8px;
+      }
+      .jx-grid .tabulator .tabulator-row .tabulator-cell.tabulator-frozen {
+        background: var(--bg-panel);
+        border-right: 1px solid var(--border);
+      }
+      .jx-grid .tabulator .tabulator-range {
+        border: 1px solid var(--accent);
+        background: color-mix(in srgb, var(--accent) 10%, transparent);
+      }
+      .jx-grid .tabulator .tabulator-range-overlay .tabulator-range-cell-active {
+        border: 2px solid var(--accent);
+      }
+      .jx-grid .tabulator .tabulator-placeholder .tabulator-placeholder-contents {
+        color: var(--fg-dim);
+        background: transparent;
+      }
+
+      /* Buffer-state paint (dirty / error / stale / pending rows). */
+      .jx-grid .tabulator-cell.jx-grid-cell--dirty {
+        box-shadow: inset 2px 0 0 var(--accent);
+        background: color-mix(in srgb, var(--accent) 8%, transparent);
+      }
+      .jx-grid .tabulator-cell.jx-grid-cell--error {
+        box-shadow: inset 2px 0 0 var(--danger);
+        background: color-mix(in srgb, var(--danger) 12%, transparent);
+      }
+      .jx-grid .tabulator-cell.jx-grid-cell--stale {
+        opacity: 0.65;
+      }
+      .jx-grid .tabulator-row.jx-grid-row--pending-delete .tabulator-cell {
+        text-decoration: line-through;
+        opacity: 0.55;
+      }
+      .jx-grid .tabulator-row.jx-grid-row--pending-insert {
+        background: color-mix(in srgb, var(--success, var(--accent)) 10%, var(--bg));
+      }
+      .jx-grid .tabulator-row.jx-grid-row--stale {
+        outline: 1px dashed var(--fg-dim);
+        outline-offset: -1px;
+      }
+
+      /* Cell content + in-cell editors. */
+      .jx-grid-cell-content {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .jx-grid-kind-number {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .jx-grid-kind-readonly {
+        color: var(--fg-dim);
+        font-family: var(--font-mono);
+        font-size: var(--spectrum-font-size-50, 11px);
+      }
+      .jx-grid-chip {
+        display: inline-block;
+        background: color-mix(in srgb, var(--accent) 18%, transparent);
+        border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+        border-radius: 8px;
+        padding: 0 6px;
+        margin-right: 4px;
+        font-size: var(--spectrum-font-size-50, 11px);
+        line-height: 16px;
+      }
+      .jx-grid-editor {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+      }
+      .jx-grid-editor .jx-grid-input,
+      .jx-grid-editor .jx-grid-select {
+        width: 100%;
+        background: var(--bg);
+        color: var(--fg);
+        border: 1px solid var(--accent);
+        border-radius: var(--spectrum-corner-radius-75, 2px);
+        padding: 2px 6px;
+        font: inherit;
+        outline: none;
+      }
+      .jx-grid-editor .jx-grid-checkbox {
+        margin: 0 auto;
+        accent-color: var(--accent);
+      }
     </style>
   </head>
   <body>

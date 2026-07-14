@@ -15,6 +15,7 @@ import { attachCursorStyles } from "../collab/monaco-cursors";
 import type { AwarenessLike } from "../collab/monaco-cursors";
 import { view } from "../view";
 import { parseSourceForPath, serializeDocument } from "../files/file-ops";
+import { detachGridPanel, gridPanelMounted, renderGridMode } from "../grid/grid-panel";
 import { formatByName, formatForPath } from "../format/format-host";
 import { renderWelcome } from "../panels/welcome-screen";
 import { projectState } from "../state";
@@ -174,6 +175,7 @@ function resetCanvasView() {
     view.functionEditor.dispose();
     view.functionEditor = null;
   }
+  detachGridPanel();
   disposeSourceCollab();
   if (view.monacoEditor) {
     view.monacoEditor.getModel()?.dispose();
@@ -287,6 +289,12 @@ export function renderCanvas() {
     return;
   }
 
+  // Grid fast-path: the grid panel runs its own effect scope (toolbar + engine stay live), so a
+  // Same-tab re-render while the panel is mounted needs nothing from the canvas pipeline.
+  if (canvasMode === "grid" && gridPanelMounted(tab)) {
+    return;
+  }
+
   // Stylebook fast-path: a style edit re-applies IN PLACE via the bridge (the iframe re-runs the
   // Runtime's style applier on the specimen root — real @media, no re-render, no iframe reload).
   // Filter/Customized changes fall through to the full rebuild (they change which specimens exist),
@@ -344,6 +352,9 @@ export function renderCanvas() {
       view.centerObserver = null;
     }
 
+    // Destroy the grid panel if switching away from grid mode
+    detachGridPanel();
+
     // Dispose Monaco editor if switching away from source mode
     disposeSourceCollab();
     if (view.monacoEditor) {
@@ -383,6 +394,15 @@ export function renderCanvas() {
       renderZoomIndicator,
       updateActivePanelHeaders,
     });
+    return;
+  }
+
+  // Grid mode: spreadsheet editor over the tab's grid source (mirrors the Monaco/stylebook
+  // Non-iframe-editor pattern; the panel owns its own reactivity from here).
+  if (canvasMode === "grid") {
+    canvasWrap.style.padding = "0";
+    canvasWrap.style.display = "block";
+    renderGridMode(canvasWrap, tab);
     return;
   }
 

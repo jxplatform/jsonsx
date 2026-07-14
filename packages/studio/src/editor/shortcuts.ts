@@ -161,6 +161,11 @@ export function initShortcuts(
       return;
     }
     if (mod) {
+      // Grid mode: copy/paste/duplicate/zoom belong to the grid engine (Tabulator clipboard
+      // Needs the native events); only tab/app-level chords pass through.
+      if (canvasMode === "grid" && !["o", "p", "s", "w", "z"].includes(e.key)) {
+        return;
+      }
       switch (e.key) {
         case "w": {
           e.preventDefault();
@@ -263,6 +268,12 @@ export function initShortcuts(
           break;
         }
       }
+      return;
+    }
+
+    // Grid mode: Delete/Escape/Enter/arrows drive the grid's own range clearing and cell
+    // Navigation — never the canvas document.
+    if (canvasMode === "grid") {
       return;
     }
 

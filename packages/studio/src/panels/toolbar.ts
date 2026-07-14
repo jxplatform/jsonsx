@@ -59,6 +59,7 @@ const toolbarIconMap = {
   "sp-icon-redo": html`<sp-icon-redo slot="icon"></sp-icon-redo>`,
   "sp-icon-save-floppy": html`<sp-icon-save-floppy slot="icon"></sp-icon-save-floppy>`,
   "sp-icon-undo": html`<sp-icon-undo slot="icon"></sp-icon-undo>`,
+  "sp-icon-view-grid": html`<sp-icon-view-grid slot="icon"></sp-icon-view-grid>`,
   "sp-icon-view-list": html`<sp-icon-view-list slot="icon"></sp-icon-view-list>`,
 } as Record<string, TemplateResult>;
 
@@ -315,6 +316,7 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
 const modes = [
   { iconTag: "sp-icon-edit", key: "edit", label: "Edit" },
   { iconTag: "sp-icon-artboard", key: "design", label: "Design" },
+  { iconTag: "sp-icon-view-grid", key: "grid", label: "Grid" },
   { iconTag: "sp-icon-code", key: "source", label: "Code" },
   { iconTag: "sp-icon-brush", key: "stylebook", label: "Stylebook" },
 ];

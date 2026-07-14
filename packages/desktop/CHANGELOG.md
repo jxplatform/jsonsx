@@ -2,33 +2,31 @@
 
 ## [1.0.0](https://github.com/jxsuite/jx/compare/desktop-v0.35.3...desktop-v1.0.0) (2026-07-13)
 
-
 ### ⚠ BREAKING CHANGES
 
-* hosts switch to the extension model; migrate all projects to content sections
+- hosts switch to the extension model; migrate all projects to content sections
 
 ### Features
 
-* hosts switch to the extension model; migrate all projects to content sections ([c40b45c](https://github.com/jxsuite/jx/commit/c40b45c2c1ac2052cba4467d9353de22f4c0f060))
-* **studio:** data console — connections, schema push, secrets, data grid ([ea92f95](https://github.com/jxsuite/jx/commit/ea92f955cdfce5774a0ae72f01038e00c8d310ae))
-* **studio:** descriptor-contributed settings + fetched project schemas ([60f1465](https://github.com/jxsuite/jx/commit/60f1465cdc18c07c7d172372f4df2d67dee1ca88))
-
+- hosts switch to the extension model; migrate all projects to content sections ([c40b45c](https://github.com/jxsuite/jx/commit/c40b45c2c1ac2052cba4467d9353de22f4c0f060))
+- **studio:** data console — connections, schema push, secrets, data grid ([ea92f95](https://github.com/jxsuite/jx/commit/ea92f955cdfce5774a0ae72f01038e00c8d310ae))
+- **studio:** descriptor-contributed settings + fetched project schemas ([60f1465](https://github.com/jxsuite/jx/commit/60f1465cdc18c07c7d172372f4df2d67dee1ca88))
 
 ### Dependencies
 
-* The following workspace dependencies were updated
-  * dependencies
-    * @jxsuite/compiler bumped to 1.0.0
-    * @jxsuite/create bumped to 1.0.0
-    * @jxsuite/parser bumped to 1.0.0
-    * @jxsuite/protocol bumped to 0.4.0
-    * @jxsuite/schema bumped to 1.0.0
-    * @jxsuite/server bumped to 1.0.0
-    * @jxsuite/starters bumped to 1.0.0
-    * @jxsuite/studio bumped to 1.0.0
-  * devDependencies
-    * @jxsuite/connector bumped to 0.2.0
-    * @jxsuite/server bumped to 1.0.0
+- The following workspace dependencies were updated
+  - dependencies
+    - @jxsuite/compiler bumped to 1.0.0
+    - @jxsuite/create bumped to 1.0.0
+    - @jxsuite/parser bumped to 1.0.0
+    - @jxsuite/protocol bumped to 0.4.0
+    - @jxsuite/schema bumped to 1.0.0
+    - @jxsuite/server bumped to 1.0.0
+    - @jxsuite/starters bumped to 1.0.0
+    - @jxsuite/studio bumped to 1.0.0
+  - devDependencies
+    - @jxsuite/connector bumped to 0.2.0
+    - @jxsuite/server bumped to 1.0.0
 
 ## [0.35.3](https://github.com/jxsuite/jx/compare/desktop-v0.35.2...desktop-v0.35.3) (2026-07-08)
 
