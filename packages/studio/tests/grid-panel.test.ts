@@ -252,6 +252,39 @@ describe("renderGridMode", () => {
     expect(wrap.textContent).toContain("backend exploded");
   });
 
+  test("remote-paged sources get a working Prev/Next pager", async () => {
+    const wrap = document.createElement("div");
+    document.body.append(wrap);
+    const tab = gridTab("grid://data/main/users");
+    const queries: unknown[] = [];
+    const source = stubSource("grid://data/main/users");
+    source.capabilities = { delete: true, insert: true, remotePaging: true, remoteSort: true };
+    source.rows = async (q) => {
+      queries.push({ ...q });
+      return { rows: [{ cells: { title: "Row" }, key: `r${q?.offset ?? 0}` }], total: 120 };
+    };
+    const controller = createGridController(tab, source);
+    await controller.load();
+    renderGridMode(wrap, tab);
+    await flush();
+
+    const next = [...wrap.querySelectorAll("sp-action-button")].find(
+      (b) => b.getAttribute("title") === "Next page",
+    ) as HTMLElement;
+    const prev = [...wrap.querySelectorAll("sp-action-button")].find(
+      (b) => b.getAttribute("title") === "Previous page",
+    ) as HTMLElement;
+    expect(next).toBeDefined();
+    expect(prev.hasAttribute("disabled")).toBeTrue();
+    expect(wrap.textContent).toContain("1–50");
+
+    next.click();
+    await flush();
+    expect(queries.at(-1)).toEqual({ limit: 50, offset: 50 });
+    expect(wrap.textContent).toContain("51–100");
+    expect(prev.hasAttribute("disabled")).toBeFalse();
+  });
+
   test("detachGridPanel destroys the view and stops shell updates", async () => {
     const wrap = document.createElement("div");
     document.body.append(wrap);

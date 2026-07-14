@@ -93,10 +93,10 @@ function dirEntriesFor(files: Map<string, string>, dir: string): DirEntry[] {
       continue;
     }
     seen.set(head, {
-      kind: rest.includes("/") ? "directory" : "file",
       name: head,
       path: prefix + head,
-    } as unknown as DirEntry);
+      type: rest.includes("/") ? "directory" : "file",
+    } satisfies DirEntry);
   }
   return [...seen.values()];
 }
@@ -186,9 +186,7 @@ export function installMockPlatform(
     searchFiles: log("searchFiles", async (query) =>
       [...state.files.keys()]
         .filter((path) => path.includes(query))
-        .map(
-          (path) => ({ kind: "file", name: path.split("/").pop()!, path }) as unknown as DirEntry,
-        ),
+        .map((path) => ({ name: path.split("/").pop()!, path, type: "file" }) satisfies DirEntry),
     ),
     uploadFile: log("uploadFile", async () => ({})),
     writeFile: log("writeFile", async (path, content) => {

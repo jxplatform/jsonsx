@@ -1,22 +1,21 @@
 /**
- * Tests for src/panels/data-grid.ts — the data-surface owner console: grid modal lifecycle
- * (connection/table pickers, pagination, inline edit keyed on pk, add-row footer, two-step delete),
- * the contributed-section actions slot (Test Connection / Push Schema / Open Data Grid), the push
- * dry-run confirmation dialog, and degradation when the platform lacks the data routes.
+ * Tests for src/panels/data-grid.ts — the data-surface owner console actions: the
+ * contributed-section actions slot (Test Connection / Push Schema / Open Data Grid — now the
+ * grid-tab source picker), the push dry-run confirmation dialog, and degradation when the platform
+ * lacks the data routes. Table editing itself is covered by the grid tests (grid-connector-source
+ * and friends).
  */
 import { flush, installMockPlatform, pointer, resetStudioState } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "lit-html";
 import { initLayers } from "../src/ui/layers";
 import {
-  closeDataGrid,
-  DATA_GRID_PAGE_SIZE,
   dataSectionActions,
   isDataGridAvailable,
-  openDataGrid,
   resetDataGridState,
   startPush,
 } from "../src/panels/data-grid";
+import { closeAllTabs } from "../src/workspace/workspace";
 import type { DataPushResult, DataRowsQuery, StudioPlatform } from "../src/types";
 import type { SectionActionsContext } from "../src/settings/contributed-section";
 
@@ -33,15 +32,11 @@ function modalLayer(): HTMLElement {
   return document.querySelector("#layer-modal") as HTMLElement;
 }
 
-function gridEl(): HTMLElement | null {
-  return modalLayer().querySelector(".data-grid-modal");
-}
-
 function pushDialogEl(): HTMLElement | null {
   return modalLayer().querySelector(".push-dialog");
 }
 
-function textOf(selector: string, scope: HTMLElement | null = gridEl()): string {
+function textOf(selector: string, scope: HTMLElement | null): string {
   return scope?.querySelector(selector)?.textContent?.trim() ?? "";
 }
 
@@ -165,6 +160,7 @@ function installDataPlatform(opts: InstallOptions = {}): Calls {
 beforeEach(() => {
   resetDataGridState();
   resetStudioState();
+  closeAllTabs();
 });
 
 afterEach(() => {
@@ -173,166 +169,39 @@ afterEach(() => {
 
 // ─── Grid modal ───────────────────────────────────────────────────────────────
 
-describe("data grid modal", () => {
-  test("degrades to a no-op when the platform lacks dataRows", async () => {
+describe("grid opening", () => {
+  test("availability tracks the platform's dataRows member", () => {
     installMockPlatform();
     expect(isDataGridAvailable()).toBe(false);
-    await openDataGrid();
-    expect(gridEl()).toBeNull();
-  });
-
-  test("renders connections, tables, columns (pk badge), rows, and the range", async () => {
     installDataPlatform();
     expect(isDataGridAvailable()).toBe(true);
-    await openDataGrid();
-    await flush();
+  });
 
-    const grid = gridEl()!;
-    expect(grid).not.toBeNull();
-    const headers = [...grid.querySelectorAll("thead th")].map((th) =>
-      th.textContent?.replaceAll(/\s+/g, " ").trim(),
+  test("Open Data Grid opens the grid-tab source picker listing connections' tables", async () => {
+    installDataPlatform();
+    resetStudioState({ projectConfig: { content: {} } });
+    const actions = dataSectionActions("data")!;
+    const host = document.createElement("div");
+    document.body.append(host);
+    render(
+      actions({ rerender: () => {}, selected: null } as unknown as SectionActionsContext),
+      host,
     );
-    expect(headers.slice(0, 4)).toEqual(["id pk", "created_at", "title", "views"]);
-    expect(grid.querySelector(".data-grid-pk")).not.toBeNull();
-    expect(grid.querySelectorAll("tbody tr")).toHaveLength(2);
-    // Pk and timestamp columns are read-only; title/views are editable inputs.
-    const firstRow = grid.querySelector("tbody tr")!;
-    expect(firstRow.querySelectorAll(".data-grid-readonly")).toHaveLength(2);
-    expect(firstRow.querySelectorAll("input.data-grid-cell")).toHaveLength(2);
-    expect(textOf(".data-grid-range")).toBe("1–2 of 2");
-  });
-
-  test("commits an inline cell edit via dataUpdateRow keyed on the pk", async () => {
-    const calls = installDataPlatform();
-    await openDataGrid();
     await flush();
 
-    const cell = gridEl()!.querySelector("tbody tr input.data-grid-cell") as HTMLInputElement;
-    cell.value = "Renamed";
-    cell.dispatchEvent(new Event("change"));
+    (host.querySelector(".data-action-grid") as HTMLElement).click();
     await flush();
-
-    expect(calls.updates).toEqual([
-      { connection: "main", pk: "r0", set: { title: "Renamed" }, table: "posts" },
-    ]);
-    // The grid reflects the backend's returned row without a reload.
-    expect(calls.rows).toHaveLength(1);
-    const firstCell = gridEl()!.querySelector("tbody tr input.data-grid-cell") as HTMLInputElement;
-    expect(firstCell.value).toBe("Renamed");
-  });
-
-  test("unchanged cell edits do not hit the backend", async () => {
-    const calls = installDataPlatform();
-    await openDataGrid();
-    await flush();
-    const cell = gridEl()!.querySelector("tbody tr input.data-grid-cell") as HTMLInputElement;
-    cell.dispatchEvent(new Event("change"));
-    await flush();
-    expect(calls.updates).toEqual([]);
-  });
-
-  test("adds a row from the footer draft", async () => {
-    const calls = installDataPlatform();
-    await openDataGrid();
-    await flush();
-
-    const draft = gridEl()!.querySelector("tfoot input.data-grid-draft") as HTMLInputElement;
-    expect(draft.getAttribute("placeholder")).toBe("title");
-    draft.value = "Fresh";
-    draft.dispatchEvent(new Event("input"));
-    pointer(gridEl()!.querySelector(".data-grid-add")!, "click");
-    await flush();
-
-    expect(calls.inserts).toEqual([
-      { connection: "main", table: "posts", values: { title: "Fresh" } },
-    ]);
-    // The page reloads after an insert.
-    expect(calls.rows).toHaveLength(2);
-  });
-
-  test("deletes a row behind a two-step confirm", async () => {
-    const calls = installDataPlatform();
-    await openDataGrid();
-    await flush();
-
-    const del = () => gridEl()!.querySelector(".data-grid-delete") as HTMLElement;
-    expect(del().textContent?.trim()).toBe("Delete");
-    pointer(del(), "click");
-    await flush();
-    expect(calls.deletes).toEqual([]);
-    expect(del().textContent?.trim()).toBe("Confirm?");
-
-    pointer(del(), "click");
-    await flush();
-    expect(calls.deletes).toEqual([{ connection: "main", pk: "r0", table: "posts" }]);
-    expect(calls.rows).toHaveLength(2);
-  });
-
-  test("pages 50 rows at a time", async () => {
-    const calls = installDataPlatform({ total: 120 });
-    await openDataGrid();
-    await flush();
-
-    expect(calls.rows[0]).toMatchObject({ limit: DATA_GRID_PAGE_SIZE, offset: 0 });
-    expect(textOf(".data-grid-range")).toBe("1–50 of 120");
-    expect(gridEl()!.querySelector(".data-grid-prev")!.hasAttribute("disabled")).toBe(true);
-
-    pointer(gridEl()!.querySelector(".data-grid-next")!, "click");
-    await flush();
-    expect(calls.rows[1]).toMatchObject({ limit: DATA_GRID_PAGE_SIZE, offset: 50 });
-    expect(textOf(".data-grid-range")).toBe("51–100 of 120");
-
-    pointer(gridEl()!.querySelector(".data-grid-prev")!, "click");
-    await flush();
-    expect(calls.rows[2]).toMatchObject({ offset: 0 });
-  });
-
-  test("switching table and connection resets paging and reloads", async () => {
-    const calls = installDataPlatform();
-    await openDataGrid();
-    await flush();
-
-    const tables = gridEl()!.querySelector(".data-grid-tables") as HTMLInputElement;
-    tables.value = "user";
-    tables.dispatchEvent(new Event("change"));
-    await flush();
-    expect(calls.rows.at(-1)).toMatchObject({ connection: "main", table: "user" });
-
-    const connections = gridEl()!.querySelector(".data-grid-connection") as HTMLInputElement;
-    connections.value = "empty";
-    connections.dispatchEvent(new Event("change"));
-    await flush();
-    // The empty connection has no tables: the grid explains instead of querying.
-    expect(textOf(".data-grid-empty")).toContain("No tables");
-  });
-
-  test("surfaces row-load errors and recovers state on close", async () => {
-    installDataPlatform({ failRows: true });
-    await openDataGrid();
-    await flush();
-    expect(textOf(".data-grid-error")).toBe("table vanished");
-    closeDataGrid();
-    expect(gridEl()).toBeNull();
-  });
-
-  test("honors preselect and ignores a second open while one is up", async () => {
-    const calls = installDataPlatform();
-    await openDataGrid({ connection: "main", table: "user" });
-    await flush();
-    expect(calls.rows[0]).toMatchObject({ table: "user" });
-    await openDataGrid({ table: "posts" });
-    expect(calls.rows).toHaveLength(1);
-  });
-
-  test("a failing connections route leaves an explanatory empty grid", async () => {
-    installDataPlatform({ failConnections: true });
-    await openDataGrid();
-    await flush();
-    expect(textOf(".data-grid-empty")).toContain("No tables");
+    const picker = modalLayer().querySelector(".jx-grid-picker");
+    expect(picker).not.toBeNull();
+    const items = [...picker!.querySelectorAll("sp-menu-item")].map((m) => m.textContent?.trim());
+    expect(items).toContain("Pages");
+    expect(items).toContain("posts");
+    expect(items).toContain("user");
+    expect(items).toContain("No tables — push a schema first");
+    host.remove();
+    modalLayer().replaceChildren();
   });
 });
-
-// ─── Section actions ──────────────────────────────────────────────────────────
 
 function mountActions(sectionKey: string, selected: string | null) {
   const actions = dataSectionActions(sectionKey);
@@ -390,7 +259,8 @@ describe("data section actions", () => {
     expect(container.querySelector(".data-action-push")).not.toBeNull();
     pointer(container.querySelector(".data-action-grid")!, "click");
     await flush();
-    expect(gridEl()).not.toBeNull();
+    expect(modalLayer().querySelector(".jx-grid-picker")).not.toBeNull();
+    modalLayer().replaceChildren();
   });
 });
 

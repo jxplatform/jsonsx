@@ -114,7 +114,7 @@ function toolbarTpl(controller: GridController, getView: () => GridView | null) 
         @submit=${(e: Event) => e.preventDefault()}
       ></sp-search>
       <span class="jx-grid-spacer"></span>
-      ${lossyNote}
+      ${lossyNote} ${controller.source.capabilities.remotePaging ? pagerTpl(controller) : nothing}
       <span class="jx-grid-count">
         ${state.loading
           ? "Loading…"
@@ -123,6 +123,41 @@ function toolbarTpl(controller: GridController, getView: () => GridView | null) 
             : `${state.total} row${state.total === 1 ? "" : "s"}`}
       </span>
     </div>
+  `;
+}
+
+/** Prev/Next pager for remote-paged sources (connector tables). */
+function pagerTpl(controller: GridController) {
+  const { state } = controller;
+  const limit = state.query.limit ?? 50;
+  const offset = state.query.offset ?? 0;
+  const from = state.total === 0 ? 0 : offset + 1;
+  const to = Math.min(offset + limit, state.total);
+  return html`
+    <sp-action-button
+      size="s"
+      quiet
+      title="Previous page"
+      ?disabled=${offset === 0 || state.loading}
+      @click=${() =>
+        void controller.setQuery({
+          ...state.query,
+          limit,
+          offset: Math.max(0, offset - limit),
+        })}
+    >
+      ‹ Prev
+    </sp-action-button>
+    <span class="jx-grid-count">${from}–${to}</span>
+    <sp-action-button
+      size="s"
+      quiet
+      title="Next page"
+      ?disabled=${offset + limit >= state.total || state.loading}
+      @click=${() => void controller.setQuery({ ...state.query, limit, offset: offset + limit })}
+    >
+      Next ›
+    </sp-action-button>
   `;
 }
 
@@ -183,6 +218,7 @@ export function renderGridMode(canvasWrap: HTMLElement, tab: Tab) {
       void controller.state.saving;
       void controller.state.error;
       void controller.state.total;
+      void controller.state.query.offset;
       void controller.buffer.dirtyCount();
 
       litRender(

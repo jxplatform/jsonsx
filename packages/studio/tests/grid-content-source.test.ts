@@ -6,6 +6,7 @@ import {
   collectionDirs,
   collectionInfo,
   createCollectionSource,
+  createPagesSource,
   listCollectionEntryIds,
   PATH_FIELD,
 } from "../src/grid/sources/content-source";
@@ -314,5 +315,54 @@ describe("refresh and backing paths", () => {
     const backing = source.backingPaths!();
     expect(backing.get("content/posts/hello.md")).toBe("content/posts/hello.md");
     expect(backing.size).toBe(2);
+  });
+});
+
+describe("pages source", () => {
+  test("lists format-class pages with inferred columns (title/description first)", async () => {
+    setup({
+      "pages/about.md": "---\ntitle: About\nlayout: base\ndescription: Who we are\n---\n\nBody\n",
+      "pages/index.md": "---\ntitle: Home\ndraft: false\n---\n\nWelcome\n",
+      "pages/nested/deep.md": "---\ntitle: Deep\n---\n",
+      "pages/plain.json": "{}",
+    });
+    const source = createPagesSource();
+    expect(source.id).toBe("grid://pages");
+    const { rows, total } = await source.rows();
+    expect(total).toBe(3); // .json pages are excluded.
+    expect(rows.map((r) => r.key)).toEqual([
+      "pages/about.md",
+      "pages/index.md",
+      "pages/nested/deep.md",
+    ]);
+
+    const columns = await source.columns();
+    expect(columns[0]!.field).toBe(PATH_FIELD);
+    expect(columns[1]!.field).toBe("title");
+    expect(columns[2]!.field).toBe("description");
+    expect(columns.find((c) => c.field === "draft")!.kind).toBe("boolean");
+  });
+
+  test("edits patch page frontmatter; inserts land under pages/ with a page extension", async () => {
+    const state = setup({ "pages/index.md": "---\ntitle: Home\n---\n\nWelcome\n" });
+    const source = createPagesSource();
+    await source.rows();
+
+    const edit = await source.commit({
+      cells: [{ baseline: "Home", field: "title", rowKey: "pages/index.md", value: "Start" }],
+      deletes: [],
+      inserts: [],
+    });
+    expect(edit.cells[0]!.ok).toBeTrue();
+    expect(state.files.get("pages/index.md")).toContain("title: Start");
+    expect(state.files.get("pages/index.md")).toContain("Welcome");
+
+    const insert = await source.commit({
+      cells: [],
+      deletes: [],
+      inserts: [{ cells: { [PATH_FIELD]: "landing", title: "Landing" }, tempKey: "t1" }],
+    });
+    expect(insert.inserts[0]).toEqual({ newKey: "pages/landing.md", ok: true, tempKey: "t1" });
+    expect(state.files.get("pages/landing.md")).toContain("title: Landing");
   });
 });

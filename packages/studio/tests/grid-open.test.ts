@@ -11,7 +11,23 @@ void mock.module("../src/format/format-host.js", () => ({
 }));
 
 const { getGridController } = await import("../src/grid/grid-controller");
-const { openCollectionGrid, openCsvGridTab } = await import("../src/grid/grid-open");
+const {
+  openCollectionGrid,
+  openConnectorGrid,
+  openCsvGridTab,
+  openGridSourcePicker,
+  openPagesGrid,
+} = await import("../src/grid/grid-open");
+const { initLayers } = await import("../src/ui/layers");
+
+for (const id of ["layer-popover", "layer-modal", "layer-dialog"]) {
+  if (!document.querySelector(`#${id}`)) {
+    const el = document.createElement("div");
+    el.id = id;
+    document.body.append(el);
+  }
+}
+initLayers();
 
 beforeEach(() => {
   resetStudioState();
@@ -82,5 +98,74 @@ describe("openCsvGridTab", () => {
     const tab = await openCsvGridTab("b.csv");
     expect(tab.doc.sourceFormat).toBeNull();
     expect(tab.session.ui.canvasMode).toBe("grid");
+  });
+});
+
+describe("virtual grid openers", () => {
+  test("openPagesGrid and openConnectorGrid open deduped virtual tabs", () => {
+    installMockPlatform();
+    resetStudioState({ projectConfig: { content: {} } });
+    const pages = openPagesGrid();
+    expect(pages.id).toBe("grid://pages");
+    expect(getGridController(pages)).not.toBeNull();
+    expect(openPagesGrid().id).toBe(pages.id);
+    expect(workspace.tabs.size).toBe(1);
+
+    const data = openConnectorGrid("main", "users");
+    expect(data.id).toBe("grid://data/main/users");
+    expect(data.capabilities.modes).toEqual(["grid"]);
+    expect(workspace.tabs.size).toBe(2);
+  });
+
+  test("the source picker lists pages, collections, and connector tables", async () => {
+    installMockPlatform({
+      dataConnections: async () => ({
+        connections: [
+          {
+            configured: true,
+            isDefault: true,
+            missingSecrets: [],
+            name: "main",
+            provider: "sqlite",
+            settings: {},
+            tables: ["users"],
+          },
+        ],
+      }),
+      dataRows: async () => ({ columns: [], rows: [], total: 0 }),
+    });
+    resetStudioState({
+      projectConfig: {
+        content: { posts: { format: "Markdown", schema: {}, source: "./content/posts/" } },
+      },
+    });
+    await openGridSourcePicker();
+    const picker = document.querySelector("#layer-modal .jx-grid-picker")!;
+    expect(picker).not.toBeNull();
+    const items = [...picker.querySelectorAll("sp-menu-item")].map((m) => m.textContent?.trim());
+    expect(items).toEqual(["Pages", "Collection: posts", "users"]);
+
+    // Picking entries closes the dialog and opens (deduped) tabs.
+    const item = (label: string) =>
+      [...document.querySelectorAll("#layer-modal sp-menu-item")].find(
+        (m) => m.textContent?.trim() === label,
+      ) as HTMLElement;
+    item("users").click();
+    expect(workspace.tabs.has("grid://data/main/users")).toBeTrue();
+
+    await openGridSourcePicker();
+    item("Pages").click();
+    expect(workspace.tabs.has("grid://pages")).toBeTrue();
+
+    await openGridSourcePicker();
+    item("Collection: posts").click();
+    expect(workspace.tabs.has("grid://collection/posts")).toBeTrue();
+
+    // Re-picking activates the existing tabs instead of duplicating them.
+    const before = workspace.tabs.size;
+    openConnectorGrid("main", "users");
+    openPagesGrid();
+    expect(workspace.tabs.size).toBe(before);
+    document.querySelector("#layer-modal")!.replaceChildren();
   });
 });

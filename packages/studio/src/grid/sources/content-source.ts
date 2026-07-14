@@ -1,12 +1,16 @@
 /**
- * Content-collection grid source — one row per entry file, columns from the collection schema.
+ * Frontmatter-file grid sources — content collections and the pages tree.
  *
- * Rows load by enumerating the collection's source directory and parsing each entry through the
+ * One row per entry file: rows load by enumerating a directory and parsing each file through the
  * format registry (same path the editor tabs use); cells are the entry frontmatter. Commit is
- * per-row: each affected file is guarded (stale-on-disk check against the load-time text, and a
- * skip when the file is open in a dirty tab), then its frontmatter is patched and re-serialized
- * through the format's roundtrip capability — the same lossy-YAML semantics as saving a single tab.
- * Inserts write `<dir>/<slug><ext>` from the required Path cell; deletes remove files.
+ * per-row with the same guards a tab save gets: a stale-on-disk check against the load-time text,
+ * and a skip when the file is open in a dirty tab (a clean open tab reloads after the write).
+ * Frontmatter re-serializes through the format's roundtrip capability — the same lossy-YAML
+ * semantics as saving a single tab. Inserts write a new file from the required Path cell; deletes
+ * remove files (never while a tab is open on them).
+ *
+ * Collections type their columns from the content-type schema (plus inferred extras found in the
+ * data); the pages grid is fully inference-driven.
  */
 import { getPlatform } from "../../platform";
 import { projectState } from "../../store";
@@ -14,7 +18,9 @@ import { workspace } from "../../workspace/workspace";
 import { isRecentLocal, markLocalMutation } from "../../files/fs-events";
 import {
   defaultContentFormat,
+  documentExtensions,
   formatByName,
+  formatForPath,
   formatSerialize,
   loadFormats,
 } from "../../format/format-host";
@@ -83,8 +89,8 @@ export function collectionDirs(): { name: string; dir: string }[] {
     .map(([name, def]) => ({ dir: def.source!.replace(/^\.\//, "").replace(/\/$/, ""), name }));
 }
 
-/** Recursively list entry files under a collection dir with the collection's extension. */
-async function listEntryFiles(dir: string, ext: string): Promise<string[]> {
+/** Recursively list entry files under a dir matching any of the extensions. */
+async function listEntryFiles(dir: string, exts: string[]): Promise<string[]> {
   const platform = getPlatform();
   const results: string[] = [];
   const walk = async (current: string) => {
@@ -92,12 +98,12 @@ async function listEntryFiles(dir: string, ext: string): Promise<string[]> {
     try {
       children = await platform.listDirectory(current);
     } catch {
-      return; // Missing/unreadable directory — an empty collection, not an error.
+      return; // Missing/unreadable directory — an empty source, not an error.
     }
     for (const entry of children) {
       if (entry.type === "directory") {
         await walk(entry.path);
-      } else if (entry.path.endsWith(ext)) {
+      } else if (exts.some((ext) => entry.path.endsWith(ext))) {
         results.push(entry.path);
       }
     }
@@ -113,7 +119,7 @@ export async function listCollectionEntryIds(typeName: string): Promise<string[]
   if (!info) {
     return [];
   }
-  const files = await listEntryFiles(info.dir, info.ext);
+  const files = await listEntryFiles(info.dir, [info.ext]);
   return files.map((path) => {
     const base = path.split("/").pop() ?? path;
     return base.slice(0, base.length - info.ext.length);
@@ -153,19 +159,7 @@ function toCellValue(value: unknown): GridCellValue {
   return JSON.stringify(value);
 }
 
-/** The path a pending insert's Path cell resolves to (dir prefix + extension enforced). */
-function insertPath(raw: string, info: CollectionInfo): string {
-  let path = raw.trim().replace(/^\.\//, "").replace(/^\//, "");
-  if (!path.includes("/")) {
-    path = `${info.dir}/${path}`;
-  }
-  if (!path.endsWith(info.ext)) {
-    path = `${path}${info.ext}`;
-  }
-  return path;
-}
-
-/** A tab open on this path, if any (raw Map scan — workspace tabs key by id = path). */
+/** A tab open on this path, if any (workspace tabs key by id = path). */
 function openTabFor(path: string) {
   for (const tab of workspace.tabs.values()) {
     if (tab.documentPath === path) {
@@ -175,19 +169,36 @@ function openTabFor(path: string) {
   return null;
 }
 
-/** Create the grid source for one content collection. */
-export function createCollectionSource(typeName: string): GridSource {
+/** Whether every sampled value for a field was a genuine string (vs. stringified objects). */
+function extraRowsAreStrings(rows: Record<string, GridCellValue>[], field: string): boolean {
+  return rows.every((row) => {
+    const value = row[field];
+    return value === null || value === undefined || typeof value !== "string"
+      ? true
+      : !value.startsWith("{") && !value.startsWith("[");
+  });
+}
+
+interface EntryFileSourceOptions {
+  id: string;
+  label: string;
+  /** List the entry file paths (called on every (re)load). */
+  list: () => Promise<string[]>;
+  /** Schema driving typed columns; null/undefined → columns are fully inferred. */
+  schema: () => ContentSectionEntry["schema"] | null | undefined;
+  /** Normalize a Path-cell value into a full project path for inserts. */
+  resolveInsertPath: (raw: string) => string;
+  /** Format used to serialize a NEW entry at this path; null blocks the insert. */
+  insertFormatName: (path: string) => string | null;
+  /** Inferred columns to front-load, in order (e.g. title/description for pages). */
+  priorityFields?: string[];
+}
+
+/** Shared engine for frontmatter-file sources (collections, pages). */
+function createEntryFileSource(opts: EntryFileSourceOptions): GridSource {
   const entries = new Map<string, EntryRecord>();
   let loadPromise: Promise<void> | null = null;
   let columnsCache: GridColumn[] | null = null;
-
-  const requireInfo = (): CollectionInfo => {
-    const info = collectionInfo(typeName);
-    if (!info) {
-      throw new Error(`No content collection named "${typeName}" in project.json`);
-    }
-    return info;
-  };
 
   const load = (force = false): Promise<void> => {
     if (!force && loadPromise) {
@@ -195,9 +206,8 @@ export function createCollectionSource(typeName: string): GridSource {
     }
     loadPromise = (async () => {
       await loadFormats().catch(() => {}); // Extension resolution needs the format registry.
-      const info = requireInfo();
       const platform = getPlatform();
-      const files = await listEntryFiles(info.dir, info.ext);
+      const files = await opts.list();
       entries.clear();
       columnsCache = null;
       await mapLimit(files, 8, async (path) => {
@@ -222,7 +232,6 @@ export function createCollectionSource(typeName: string): GridSource {
     if (columnsCache) {
       return columnsCache;
     }
-    const info = requireInfo();
     const pathColumn: GridColumn = {
       editable: false,
       field: PATH_FIELD,
@@ -233,7 +242,7 @@ export function createCollectionSource(typeName: string): GridSource {
       title: "Path",
       widthHint: 220,
     };
-    const schemaColumns = columnsFromSchema(info.def.schema);
+    const schemaColumns = columnsFromSchema(opts.schema());
     const known = new Set([PATH_FIELD, ...schemaColumns.map((c) => c.field)]);
 
     // Keys present in entry data but absent from the schema still get (inferred) columns.
@@ -250,6 +259,13 @@ export function createCollectionSource(typeName: string): GridSource {
     for (const column of extraColumns) {
       // Values we had to stringify (nested objects) must not round-trip as strings.
       column.editable = column.kind !== "text" || extraRowsAreStrings(extraRows, column.field);
+    }
+    if (opts.priorityFields?.length) {
+      const rank = (c: GridColumn) => {
+        const index = opts.priorityFields!.indexOf(c.field);
+        return index === -1 ? opts.priorityFields!.length : index;
+      };
+      extraColumns.sort((a, b) => rank(a) - rank(b));
     }
 
     columnsCache = [pathColumn, ...schemaColumns, ...extraColumns];
@@ -301,7 +317,6 @@ export function createCollectionSource(typeName: string): GridSource {
 
     async commit(batch: GridEditBatch): Promise<CommitResult> {
       await load();
-      const info = requireInfo();
       const platform = getPlatform();
       const result: CommitResult = { cells: [], deletes: [], inserts: [] };
 
@@ -359,7 +374,7 @@ export function createCollectionSource(typeName: string): GridSource {
           result.inserts.push({ error: "Path is required", ok: false, tempKey: insert.tempKey });
           continue;
         }
-        const path = insertPath(rawPath, info);
+        const path = opts.resolveInsertPath(rawPath);
         let exists = entries.has(path);
         if (!exists) {
           try {
@@ -377,6 +392,15 @@ export function createCollectionSource(typeName: string): GridSource {
           });
           continue;
         }
+        const formatName = opts.insertFormatName(path);
+        if (!formatName) {
+          result.inserts.push({
+            error: `No format can serialize ${path}`,
+            ok: false,
+            tempKey: insert.tempKey,
+          });
+          continue;
+        }
         try {
           const frontmatter: Record<string, unknown> = {};
           for (const [field, value] of Object.entries(insert.cells)) {
@@ -385,9 +409,7 @@ export function createCollectionSource(typeName: string): GridSource {
             }
           }
           const text = await formatSerialize(
-            info.def.format && formatByName(info.def.format)
-              ? formatByName(info.def.format)!.name
-              : (defaultContentFormat()?.name ?? "Markdown"),
+            formatName,
             { ...frontmatter, children: [] },
             { frontmatter: Object.keys(frontmatter).length > 0, mode: "roundtrip" },
           );
@@ -437,8 +459,8 @@ export function createCollectionSource(typeName: string): GridSource {
       return result;
     },
 
-    id: makeGridTabId({ kind: "collection", name: typeName }),
-    label: typeName,
+    id: opts.id,
+    label: opts.label,
 
     async refresh(): Promise<void> {
       await load(true);
@@ -452,12 +474,69 @@ export function createCollectionSource(typeName: string): GridSource {
   };
 }
 
-/** Whether every sampled value for a field was a genuine string (vs. stringified objects). */
-function extraRowsAreStrings(rows: Record<string, GridCellValue>[], field: string): boolean {
-  return rows.every((row) => {
-    const value = row[field];
-    return value === null || value === undefined || typeof value !== "string"
-      ? true
-      : !value.startsWith("{") && !value.startsWith("[");
+/** Create the grid source for one content collection. */
+export function createCollectionSource(typeName: string): GridSource {
+  const requireInfo = (): CollectionInfo => {
+    const info = collectionInfo(typeName);
+    if (!info) {
+      throw new Error(`No content collection named "${typeName}" in project.json`);
+    }
+    return info;
+  };
+
+  return createEntryFileSource({
+    id: makeGridTabId({ kind: "collection", name: typeName }),
+    insertFormatName: (path) => {
+      const info = requireInfo();
+      return (
+        (info.def.format ? formatByName(info.def.format)?.name : undefined) ??
+        formatForPath(path)?.name ??
+        defaultContentFormat()?.name ??
+        null
+      );
+    },
+    label: typeName,
+    list: () => {
+      const info = requireInfo();
+      return listEntryFiles(info.dir, [info.ext]);
+    },
+    resolveInsertPath: (raw) => {
+      const info = requireInfo();
+      let path = raw.trim().replace(/^\.\//, "").replace(/^\//, "");
+      if (!path.includes("/")) {
+        path = `${info.dir}/${path}`;
+      }
+      if (!path.endsWith(info.ext)) {
+        path = `${path}${info.ext}`;
+      }
+      return path;
+    },
+    schema: () => requireInfo().def.schema,
+  });
+}
+
+/** Create the grid source for the pages tree (format-class pages; .json pages are excluded). */
+export function createPagesSource(): GridSource {
+  const pageExts = () => {
+    const exts = documentExtensions("page").filter((ext) => ext !== ".json");
+    return exts.length > 0 ? exts : [".md"];
+  };
+  return createEntryFileSource({
+    id: makeGridTabId({ kind: "pages" }),
+    insertFormatName: (path) => formatForPath(path)?.name ?? null,
+    label: "Pages",
+    list: () => listEntryFiles("pages", pageExts()),
+    priorityFields: ["title", "description"],
+    resolveInsertPath: (raw) => {
+      let path = raw.trim().replace(/^\.\//, "").replace(/^\//, "");
+      if (!path.startsWith("pages/")) {
+        path = `pages/${path}`;
+      }
+      if (!pageExts().some((ext) => path.endsWith(ext))) {
+        path = `${path}${pageExts()[0]}`;
+      }
+      return path;
+    },
+    schema: () => null,
   });
 }
