@@ -211,4 +211,23 @@ describe("resolveCanvasDocument", () => {
     );
     expect(refs.some((r) => r?.includes("components/x-card-live.json"))).toBe(true);
   });
+
+  test("auto-discovers project components in a layout opened directly (no content mode)", async () => {
+    installMockPlatform({
+      discoverComponents: async () => [
+        { path: "components/x-card-live.json", source: "jx", tagName: "x-card-live" },
+      ],
+    });
+    await loadComponentRegistry();
+    // A layout opened on its own is not a page (no layoutWrapped) and a plain .json file never
+    // Sets content mode, yet its custom-element tags must still be registered for the canvas.
+    const result = await resolve(
+      { children: [{ tagName: "x-card-live" }], tagName: "div" } as JxMutableNode,
+      { documentPath: "layouts/base.json" },
+    );
+    const refs = ((result.renderDoc as { $elements?: { $ref?: string }[] }).$elements ?? []).map(
+      (e) => e.$ref,
+    );
+    expect(refs.some((r) => r?.includes("components/x-card-live.json"))).toBe(true);
+  });
 });

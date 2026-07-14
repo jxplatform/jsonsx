@@ -219,9 +219,16 @@ export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
     })(doc, []);
   }
 
-  // Component auto-discovery (content mode or layout) — mirrors the legacy render path.
+  // Component auto-discovery (content mode, wrapped layout, or a layout opened on its own) —
+  // Mirrors the legacy render path. A directly-opened layout is neither a page (so it never
+  // Sets layoutWrapped) nor content mode (a plain .json file skips the mode-setting parse),
+  // So it needs its own gate; scoping to layouts/ avoids the single-component-edit path, where
+  // The doc's own root tag would otherwise inject a $ref to itself.
+  const isLayoutDoc =
+    S.documentPath != null &&
+    (S.documentPath.startsWith("layouts/") || S.documentPath.startsWith("./layouts/"));
   const effectiveElements = getEffectiveElements(renderDoc.$elements as (JxElement | string)[]);
-  if ((S.mode === "content" || layoutWrapped) && componentRegistry.length > 0) {
+  if ((S.mode === "content" || layoutWrapped || isLayoutDoc) && componentRegistry.length > 0) {
     const existingRefs = new Set(
       effectiveElements.map((e: JxElement | string) => (typeof e === "string" ? e : e?.$ref)),
     );
