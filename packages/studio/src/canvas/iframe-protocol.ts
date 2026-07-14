@@ -248,14 +248,22 @@ export type IframeToParent =
       metaKey: boolean;
       shiftKey: boolean;
     }
-  // Inline editing started in the iframe (the parent shows the format toolbar from here).
-  | { kind: "editStart"; path: (string | number)[] }
+  // Inline editing started in the iframe (the parent shows the format toolbar from here). `prop`
+  // Names the component-instance prop when the session edits prop-bound text (plain sessions).
+  | { kind: "editStart"; path: (string | number)[]; prop?: string }
   // Committed inline-edit content (rich `children` else `textContent`) for the parent to persist.
   | {
       kind: "editCommit";
       path: (string | number)[];
       children: (JxMutableNode | string)[] | null;
       textContent: string | null;
+    }
+  // Committed prop-bound text: persist `value` into `$props[prop]` of the instance at `path`.
+  | {
+      kind: "editCommitProp";
+      path: (string | number)[];
+      prop: string;
+      value: string;
     }
   // Enter split a paragraph: keep `before` in the node, insert a new one with `after`.
   | {

@@ -12,6 +12,7 @@ import { canvasBaseOrigin } from "./canvas-origin";
 import { resolveCanvasDocument } from "./canvas-live-render";
 import {
   applyInlineCommit,
+  applyInlinePropCommit,
   applyInlineInsert,
   applyInlineSplit,
 } from "../editor/inline-edit-apply";
@@ -70,6 +71,8 @@ interface HostState {
   presenceMeta: Map<string, { color: string; label: string }>;
   /** Whether an inline-edit session is live in this host's iframe (drives the format toolbar). */
   editing: boolean;
+  /** The prop a live plain session edits (prop-bound text) — null for rich sessions/none. */
+  editingProp: string | null;
   /** The latest selection snapshot from this host's iframe (active tags + caret rect + link). */
   snapshot: SelectionSnapshot | null;
   /** Highest snapshot `seq` seen, so stale (re-ordered) snapshots are dropped. */
@@ -665,6 +668,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     canvasUrl,
     channel,
     editing: false,
+    editingProp: null,
     iframe,
     insertHideTimer: null,
     insertZone: null,
@@ -1025,10 +1029,12 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // Tear down any other host's editing state and make this the single active edit host.
       if (activeEditHost && activeEditHost !== state) {
         activeEditHost.editing = false;
+        activeEditHost.editingProp = null;
         activeEditHost.snapshot = null;
       }
       activeEditHost = state;
       state.editing = true;
+      state.editingProp = msg.prop ?? null;
       state.snapshot = null;
       state.lastSnapshotSeq = 0;
       toolbarRefresh?.();
@@ -1048,6 +1054,12 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // Route to the tab this host's iframe renders — NOT activeTab, which may have changed while
       // The message was in flight (the cross-document bleed).
       applyInlineCommit(hostTab(state), msg.path, msg.children, msg.textContent);
+      return;
+    }
+    case "editCommitProp": {
+      // A prop-bound plain session committed: persist into the instance's $props (same host-tab
+      // Routing as editCommit; the unchanged-value no-op lives in the apply).
+      applyInlinePropCommit(hostTab(state), msg.path, msg.prop, msg.value);
       return;
     }
     case "editSplit": {
@@ -1109,6 +1121,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         return;
       }
       state.editing = false;
+      state.editingProp = null;
       state.snapshot = null;
       if (activeEditHost === state) {
         activeEditHost = null;
@@ -1381,11 +1394,19 @@ export function getActiveEditHost(): HostState | null {
 }
 
 /** The current edit session's editing flag + latest selection snapshot, for the parent toolbar. */
-export function getEditSnapshot(): { editing: boolean; snapshot: SelectionSnapshot | null } {
+export function getEditSnapshot(): {
+  editing: boolean;
+  editingProp: string | null;
+  snapshot: SelectionSnapshot | null;
+} {
   if (!activeEditHost) {
-    return { editing: false, snapshot: null };
+    return { editing: false, editingProp: null, snapshot: null };
   }
-  return { editing: activeEditHost.editing, snapshot: activeEditHost.snapshot };
+  return {
+    editing: activeEditHost.editing,
+    editingProp: activeEditHost.editingProp,
+    snapshot: activeEditHost.snapshot,
+  };
 }
 
 /** Post an `applyFormat` intent to the active edit host's iframe (no-op when none/not ready). */

@@ -37,15 +37,26 @@ void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
 
 interface HostMock {
   editing: boolean;
+  editingProp: string | null;
   snapshot: SelectionSnapshot | null;
   anchor: { left: number; top: number; width: number; height: number } | null;
   posted: ApplyFormatIntent[];
 }
-const host: HostMock = { anchor: null, editing: false, posted: [], snapshot: null };
+const host: HostMock = {
+  anchor: null,
+  editing: false,
+  editingProp: null,
+  posted: [],
+  snapshot: null,
+};
 
 void mock.module("../src/canvas/iframe-host", () => ({
   getEditBarAnchorRect: () => host.anchor,
-  getEditSnapshot: () => ({ editing: host.editing, snapshot: host.snapshot }),
+  getEditSnapshot: () => ({
+    editing: host.editing,
+    editingProp: host.editingProp,
+    snapshot: host.snapshot,
+  }),
   postApplyFormat: (intent: ApplyFormatIntent) => host.posted.push(intent),
 }));
 
@@ -152,6 +163,7 @@ describe("block action bar", () => {
     dnd.draggables.length = 0;
     componentRegistry.length = 0;
     host.editing = false;
+    host.editingProp = null;
     host.snapshot = null;
     host.anchor = null;
     host.posted.length = 0;
@@ -392,6 +404,20 @@ describe("block action bar", () => {
 
     barButton("Edit Component").click();
     expect(navigated).toEqual(["components/card.json"]);
+  });
+
+  test("a live prop session suffixes the badge with the prop and shows no format group", () => {
+    componentRegistry.push({ path: "components/card.json", tagName: "x-card" } as never);
+    setup({ children: [{ $props: { title: "Local" }, tagName: "x-card" }], tagName: "div" }, [
+      "children",
+      0,
+    ]);
+    host.editing = true;
+    host.editingProp = "title";
+    renderBlockActionBar();
+
+    expect(bar()!.querySelector(".bar-tag")!.textContent!.trim()).toBe("x-card · title");
+    expect(bar()!.querySelector("sp-action-group")).toBeNull();
   });
 
   // ─── Repeater ($prototype:"Array") pseudo-element badge ────────────────────

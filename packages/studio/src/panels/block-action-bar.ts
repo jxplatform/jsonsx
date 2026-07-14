@@ -606,10 +606,12 @@ export function renderBlockActionBar() {
   const tag = (node.tagName ?? "div").toLowerCase();
 
   // Inline format state, sourced from the iframe's selection snapshot.
-  const { editing, snapshot } = getEditSnapshot();
+  const { editing, editingProp, snapshot } = getEditSnapshot();
   const inlineEditing = editing;
   const actions = getInlineActions(tag) || [];
-  const showFormat = inlineEditing && actions.length > 0;
+  // A prop-bound plain session edits a single plain string — never show the format group (belt and
+  // Braces: component tags have no $inlineActions, so `actions` is empty there anyway).
+  const showFormat = inlineEditing && !editingProp && actions.length > 0;
   const activeValues =
     showFormat && snapshot
       ? actions.filter((a) => snapshot.activeTags.includes(a.tag)).map((a) => a.tag)
@@ -646,7 +648,10 @@ export function renderBlockActionBar() {
           @click=${badgeInteractive
             ? (e: MouseEvent) => onTagBadgeClick(e, convertTargets, selection)
             : nothing}
-          >${isRepeater ? nodeLabel(node) : node.$id || (node.tagName ?? "div")}</span
+          >${isRepeater ? nodeLabel(node) : node.$id || (node.tagName ?? "div")}${inlineEditing &&
+          editingProp
+            ? ` · ${editingProp}`
+            : ""}</span
         >
 
         ${selection.length >= 2

@@ -20,6 +20,7 @@ import {
   setCanvasViewportTranspose,
   setRootMedia,
   setSkipServerFunctions,
+  setStampPropBindings,
   transposeCanvasUnits,
 } from "@jxsuite/runtime";
 import { classifyRenderNode, serializeJxPath } from "./path-mapping";
@@ -145,6 +146,18 @@ export const EDIT_PLACEHOLDER_CSS = `
 }
 [contenteditable="true"]:empty::after {
   content: "Type / for commands";
+  color: color-mix(in srgb, #808080 40%, transparent);
+  font-style: italic;
+  font-size: 13px;
+  pointer-events: none;
+}
+[data-jx-bound-prop]:hover {
+  cursor: text;
+  outline: 1px dashed color-mix(in srgb, #808080 40%, transparent);
+  outline-offset: 1px;
+}
+[data-jx-bound-prop]:empty:not([contenteditable="plaintext-only"]):not([contenteditable="true"])::after {
+  content: "Empty \\2014  double-click to edit";
   color: color-mix(in srgb, #808080 40%, transparent);
   font-style: italic;
   font-size: 13px;
@@ -425,6 +438,11 @@ export async function renderResolvedDocument(opts: {
   // De-link `<a href>` in design/edit so clicks select the anchor instead of navigating the iframe;
   // Preview keeps real links live (mirrors the server-function gate above).
   setCanvasDelinkAnchors(opts.mode !== "preview");
+  // Stamp `data-jx-bound-prop` on component-internal invertible text bindings in design/edit only —
+  // The inline prop-edit affordance. Set every render so a preview/stylebook render in the same
+  // Iframe clears it (page-level templates are inert in design/edit via prepareForEditMode, so only
+  // Component internals get stamped).
+  setStampPropBindings(opts.mode === "design" || opts.mode === "edit");
   applySiteStyle(opts.siteStyle);
   injectHead(opts.doc);
   syncEditModeCss(opts.container.ownerDocument, opts.mode);

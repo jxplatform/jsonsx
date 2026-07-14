@@ -193,6 +193,15 @@ let endFn: (() => void) | null = null; // Function() called when editing stops
  */
 let _blurCloseSuspended = false;
 
+/**
+ * Plain (plaintext-only) session state — used for prop-bound text, where the committed value is a
+ * plain string (a directive attribute), so rich formatting, Enter-split, and the slash menu are all
+ * disabled: Enter commits, Escape restores `_plainOriginal` and commits unchanged (the host no-ops
+ * an unchanged prop value).
+ */
+let _plainMode = false;
+let _plainOriginal = "";
+
 /** Suspend blur-driven `stopEditing` (call while the parent toolbar/popover may steal focus). */
 export function suspendBlurClose() {
   _blurCloseSuspended = true;
@@ -252,6 +261,8 @@ export function isInlineElement(node: JxMutableNode, parentNode?: JxMutableNode)
  *   onInsert: (path: JxPath, elementDef: SlashCommand, commitData?: JxContentResult) => void;
  *   onEnd: () => void;
  * }} callbacks
+ * @param {{ plainText?: boolean }} [opts] - `plainText` runs a plaintext-only session (prop-bound
+ *   text: no rich formatting/split/slash; Enter commits, Escape cancels)
  */
 export function startEditing(
   el: HTMLElement,
@@ -270,6 +281,7 @@ export function startEditing(
     onInsert: (path: JxPath, elementDef: SlashCommand, commitData?: JxContentResult) => void;
     onEnd: () => void;
   },
+  opts?: { plainText?: boolean },
 ) {
   if (activeEl) {
     // Re-enter (e.g. after a split/insert re-render): tear the old session down WITHOUT firing the
@@ -283,9 +295,21 @@ export function startEditing(
   splitFn = callbacks.onSplit;
   insertFn = callbacks.onInsert;
   endFn = callbacks.onEnd;
+  _plainMode = opts?.plainText === true;
+  _plainOriginal = _plainMode ? (el.textContent ?? "") : "";
 
   // Enable editing
-  el.contentEditable = "true";
+  if (_plainMode) {
+    try {
+      el.contentEditable = "plaintext-only";
+    } catch {
+      // Engines without plaintext-only support throw on assignment; paste is already plain via
+      // HandlePaste, and the keydown plain branch inertifies the format shortcuts.
+      el.contentEditable = "true";
+    }
+  } else {
+    el.contentEditable = "true";
+  }
   el.style.pointerEvents = "auto";
   el.style.outline = "2px solid var(--accent, #4a9eff)";
   el.style.outlineOffset = "1px";
@@ -338,6 +362,8 @@ export function stopEditing(silent = false) {
   commitFn = null;
   splitFn = null;
   insertFn = null;
+  _plainMode = false;
+  _plainOriginal = "";
 
   if (silent) {
     endFn = null;
@@ -389,6 +415,30 @@ export function isSlashActive() {
 
 /** @param {KeyboardEvent} e */
 function handleKeydown(e: KeyboardEvent) {
+  if (_plainMode) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (activeEl) {
+        // Cancel: restore the original text; the commit posts the unchanged value (host no-ops).
+        activeEl.textContent = _plainOriginal;
+      }
+      stopEditing();
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      stopEditing();
+      return;
+    }
+    // Inertify the browser's native rich shortcuts for the contentEditable="true" fallback.
+    if ((e.ctrlKey || e.metaKey) && ["b", "i", "u", "`"].includes(e.key)) {
+      e.preventDefault();
+    }
+    return;
+  }
+
   if (e.key === "Escape") {
     e.preventDefault();
     e.stopPropagation();
@@ -548,6 +598,13 @@ function handleEnterKey() {
 
 function commitChanges() {
   if (!commitFn || !activeEl || !activePath) {
+    return;
+  }
+
+  if (_plainMode) {
+    // A prop value is a plain single-line string (a directive attribute) — flatten any newline
+    // That survived plaintext editing and skip the rich DOM→Jx serialization entirely.
+    commitFn(activePath, null, (activeEl.textContent ?? "").replaceAll("\n", " "));
     return;
   }
 

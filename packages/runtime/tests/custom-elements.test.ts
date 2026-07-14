@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+import { reactive } from "@vue/reactivity";
 
 import {
   defineElement,
@@ -8,6 +9,7 @@ import {
   RESERVED_KEYS,
   applyStyle,
   setRootMedia,
+  setStampPropBindings,
 } from "../src/runtime";
 
 try {
@@ -299,5 +301,124 @@ describe("component @media (setRootMedia seeds the iframe path)", () => {
 
     el.remove();
     setRootMedia({}); // Reset so the map can't leak into other tests.
+  });
+});
+
+describe("prop-binding markers (setStampPropBindings)", () => {
+  // Module-level flag leaks across tests otherwise.
+  afterEach(() => {
+    setStampPropBindings(false);
+  });
+
+  test("stamps data-jx-bound-prop on a pure ${state.key} textContent binding", () => {
+    setStampPropBindings(true);
+    const el = renderNode(
+      { tagName: "h3", textContent: "${state.title}" },
+      reactive({ title: "Local" }),
+    );
+    expect(el.dataset.jxBoundProp).toBe("title");
+    expect(el.textContent).toBe("Local");
+  });
+
+  test("stamps a single-segment #/state/key $ref textContent binding", () => {
+    setStampPropBindings(true);
+    const el = renderNode(
+      { tagName: "p", textContent: { $ref: "#/state/description" } },
+      reactive({ description: "Body" }),
+    );
+    expect(el.dataset.jxBoundProp).toBe("description");
+    expect(el.textContent).toBe("Body");
+  });
+
+  test("does not stamp when the flag is off (the default)", () => {
+    const el = renderNode(
+      { tagName: "h3", textContent: "${state.title}" },
+      reactive({ title: "x" }),
+    );
+    expect(el.dataset.jxBoundProp).toBeUndefined();
+  });
+
+  test("does not stamp mixed or multi-key templates", () => {
+    setStampPropBindings(true);
+    const state = reactive({ a: "1", b: "2", t: "x" });
+    for (const textContent of ["Hi ${state.t}", "${state.a}${state.b}", "$${state.a}"]) {
+      const el = renderNode({ tagName: "p", textContent }, state);
+      expect(el.dataset.jxBoundProp).toBeUndefined();
+    }
+  });
+
+  test("does not stamp non-state or deep bindings", () => {
+    setStampPropBindings(true);
+    const state = reactive({ a: { b: "deep" } });
+    expect(
+      renderNode({ tagName: "p", textContent: "${window.name}" }, state).dataset.jxBoundProp,
+    ).toBeUndefined();
+    expect(
+      renderNode({ tagName: "p", textContent: "${state.a.b}" }, state).dataset.jxBoundProp,
+    ).toBeUndefined();
+    expect(
+      renderNode({ tagName: "p", textContent: { $ref: "#/state/a/b" } }, state).dataset.jxBoundProp,
+    ).toBeUndefined();
+    expect(
+      renderNode({ tagName: "p", textContent: { $ref: "#/$defs/x" } }, state).dataset.jxBoundProp,
+    ).toBeUndefined();
+  });
+
+  test("does not stamp template bindings on keys other than textContent", () => {
+    setStampPropBindings(true);
+    const el = renderNode({ tagName: "p", title: "${state.t}" }, reactive({ t: "tip" }));
+    expect(el.dataset.jxBoundProp).toBeUndefined();
+  });
+
+  test("does not stamp bindings to computed, function, or object state entries", async () => {
+    setStampPropBindings(true);
+    // BuildScope turns a template-string state entry into a computed ref — not a writable prop.
+    const scope = await buildScope({
+      state: {
+        first: "Ada",
+        fullName: "${state.first} L.",
+        onPick: { $prototype: "Function", body: "return 1" },
+        profile: { city: "x" },
+      },
+    });
+    expect(
+      renderNode({ tagName: "h4", textContent: "${state.fullName}" }, scope).dataset.jxBoundProp,
+    ).toBeUndefined();
+    expect(
+      renderNode({ tagName: "p", textContent: { $ref: "#/state/fullName" } }, scope).dataset
+        .jxBoundProp,
+    ).toBeUndefined();
+    expect(
+      renderNode({ tagName: "p", textContent: "${state.onPick}" }, scope).dataset.jxBoundProp,
+    ).toBeUndefined();
+    expect(
+      renderNode({ tagName: "p", textContent: "${state.profile}" }, scope).dataset.jxBoundProp,
+    ).toBeUndefined();
+    // The plain data entry on the SAME scope stays stampable.
+    expect(
+      renderNode({ tagName: "p", textContent: "${state.first}" }, scope).dataset.jxBoundProp,
+    ).toBe("first");
+  });
+
+  test("stamps component internals rendered by connectedCallback", async () => {
+    setStampPropBindings(true);
+    const tag = uniqueTag();
+    await defineElement({
+      children: [{ tagName: "h3", textContent: "${state.title}" }],
+      state: { title: "default" },
+      tagName: tag,
+    });
+
+    const el = document.createElement(tag);
+    (el as any).title = "Stamped";
+    document.body.append(el);
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+
+    const h3 = el.querySelector("h3") as HTMLElement;
+    expect(h3.dataset.jxBoundProp).toBe("title");
+    expect(h3.textContent).toBe("Stamped");
+    el.remove();
   });
 });

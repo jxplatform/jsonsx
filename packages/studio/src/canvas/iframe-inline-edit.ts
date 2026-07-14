@@ -33,6 +33,7 @@ import { isTagActiveInSelection, toggleInlineFormat } from "../editor/inline-for
 import { applyLink, insertTemplateToken, linkStateForSelection } from "../editor/inline-link";
 import { restoreTemplateExpressions } from "../utils/edit-display";
 import { rectOfRange } from "../utils/geometry";
+import { getNodeAtPath } from "../state";
 import { parseJxPath, serializeJxPath } from "./path-mapping";
 import type { IframeChannel } from "./iframe-channel";
 import type {
@@ -43,6 +44,7 @@ import type {
   SerializableRect,
 } from "./iframe-protocol";
 import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 /** Toolbar command → inline tag (mirrors the parent's old `cmdToTag`, now iframe-side). */
 const CMD_TO_TAG: Record<string, string> = {
@@ -74,6 +76,43 @@ function findEditableTarget(target: EventTarget | null): { el: HTMLElement; path
   return null;
 }
 
+/**
+ * Walk up from an event target to the nearest element carrying `data-jx-bound-prop` (a component-
+ * internal element whose text is an invertible prop binding — stamped by the runtime, see
+ * setStampPropBindings). Component internals are unstamped, so hitting a `data-jx-path` element
+ * first means the target sits in page-level DOM (or slotted content) — not a prop-bound target.
+ */
+function findPropBoundTarget(target: EventTarget | null): { el: HTMLElement; prop: string } | null {
+  let el = target instanceof Element ? target : null;
+  while (el) {
+    if (el instanceof HTMLElement) {
+      if (el.dataset.jxBoundProp) {
+        return { el, prop: el.dataset.jxBoundProp };
+      }
+      if (el.dataset.jxPath) {
+        return null;
+      }
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
+
+/**
+ * The instance that owns a prop-bound element: its nearest custom-element ancestor (that element's
+ * connectedCallback rendered the marker with its state, so the walk can never skip the owner).
+ */
+function ownerInstanceOf(el: HTMLElement): HTMLElement | null {
+  let cur = el.parentElement;
+  while (cur) {
+    if (cur.tagName.includes("-")) {
+      return cur;
+    }
+    cur = cur.parentElement;
+  }
+  return null;
+}
+
 /** Locate the rendered element for a document path via its stamped `data-jx-path`. */
 function elementForPath(container: HTMLElement, path: JxPath): HTMLElement | null {
   const serialized = serializeJxPath(path);
@@ -95,7 +134,7 @@ function toSerializableRect(rect: DOMRect): SerializableRect {
 export function startIframeInlineEdit(
   channel: IframeChannel<IframeToParent, ParentToIframe>,
   container: HTMLElement,
-  opts?: { getMode?: () => string },
+  opts?: { getMode?: () => string; getShadowDoc?: () => JxMutableNode | null },
 ): () => void {
   const doc = container.ownerDocument;
 
@@ -251,6 +290,56 @@ export function startIframeInlineEdit(
     onSelectionChange();
   };
 
+  /**
+   * Whether the instance's RAW `$props[prop]` value (from the pre-edit-display shadow doc) is
+   * plain-text editable. Template-valued (`"${...}"`) and `$ref`-valued props render display sugar,
+   * not the value — committing typed text would silently destroy the binding, so they're blocked.
+   * An absent getShadowDoc is permissive (tests, same contract as getMode).
+   */
+  const propEditableAt = (hostPath: JxPath, prop: string): boolean => {
+    const shadowDoc = opts?.getShadowDoc?.();
+    if (!shadowDoc) {
+      return true;
+    }
+    const node = getNodeAtPath(shadowDoc, hostPath) as JxMutableNode | undefined;
+    const raw = (node?.$props as Record<string, unknown> | undefined)?.[prop];
+    if (raw == null) {
+      return true; // Unset — editing ADDS the prop, overriding the definition default.
+    }
+    if (typeof raw === "object") {
+      return false;
+    }
+    return !(typeof raw === "string" && raw.includes("${"));
+  };
+
+  /**
+   * Enter a plain (plaintext-only) session on a prop-bound component-internal element. The session
+   * path is the INSTANCE path — the marker element has no path of its own, and an external `$props`
+   * patch at the host path must disturb (commit + end) this session before detaching its element.
+   */
+  const enterPropEditAt = (el: HTMLElement, hostPath: JxPath, prop: string) => {
+    channel.post({ kind: "editStart", path: hostPath, prop });
+    suspendBlurClose();
+    startEditing(
+      el,
+      hostPath,
+      {
+        onCommit: (p, _children, textContent) =>
+          channel.post({ kind: "editCommitProp", path: p, prop, value: textContent ?? "" }),
+        onEnd: () => {
+          resumeBlurClose();
+          clearHighlight();
+          lastNonEmptyRange = null;
+          channel.post({ kind: "editEnd" });
+        },
+        // Prop values are single plain strings — no split, no slash-insert.
+        onInsert: () => {},
+        onSplit: () => {},
+      },
+      { plainText: true },
+    );
+  };
+
   /** Apply a format/link/insert intent to the iframe's cached selection range. */
   const applyFormatIntent = (intent: ApplyFormatIntent) => {
     const el = getActiveElement();
@@ -288,6 +377,23 @@ export function startIframeInlineEdit(
 
   const onDblClick = (e: Event) => {
     if (!editingAllowed()) {
+      return;
+    }
+    // Prop-bound targets win: they sit in unstamped component internals, deeper than any editable
+    // Page block, and once a marker is hit the event must NOT fall through to rich editing (an
+    // Instance nested inside a page-level editable would otherwise rich-edit that whole ancestor).
+    const propHit = findPropBoundTarget(e.target);
+    if (propHit) {
+      const host = ownerInstanceOf(propHit.el);
+      const hostPathRaw = host?.dataset.jxPath;
+      if (host && hostPathRaw) {
+        const hostPath = parseJxPath(hostPathRaw);
+        if (propEditableAt(hostPath, propHit.prop)) {
+          enterPropEditAt(propHit.el, hostPath, propHit.prop);
+        }
+      }
+      // A path-less host is itself internal to another definition — its $props live in a document
+      // Not open in this tab, so there is no write-back target: blocked.
       return;
     }
     const hit = findEditableTarget(e.target);

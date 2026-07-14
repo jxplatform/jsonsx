@@ -459,3 +459,124 @@ describe("session accessors", () => {
     expect(getActivePath()).toBeNull();
   });
 });
+
+// ─── Plain (prop-bound) sessions ─────────────────────────────────────────────
+
+describe("plain (plaintext-only) sessions", () => {
+  let el: HTMLElement;
+  let commits: { path: unknown; children: unknown; textContent: string | null }[];
+  let splitCount = 0;
+  let endCount = 0;
+  let slashShown = false;
+  const path = ["children", 2];
+
+  const start = () => {
+    startEditing(
+      el,
+      path,
+      {
+        onCommit: (p, children, textContent) => commits.push({ children, path: p, textContent }),
+        onEnd: () => (endCount += 1),
+        onInsert: () => {},
+        onSplit: () => (splitCount += 1),
+      },
+      { plainText: true },
+    );
+  };
+
+  beforeEach(() => {
+    el = document.createElement("h3");
+    el.textContent = "Local";
+    document.body.append(el);
+    commits = [];
+    splitCount = 0;
+    endCount = 0;
+    slashShown = false;
+    setSlashController({
+      dismiss: () => {},
+      isOpen: () => false,
+      show: () => (slashShown = true),
+    });
+  });
+
+  afterEach(() => {
+    if (isEditing()) {
+      stopEditing();
+    }
+    el.remove();
+    setSlashController({ dismiss: dismissSlashMenu, isOpen: isSlashMenuOpen, show: showSlashMenu });
+  });
+
+  test("starts a plaintext-only session (or the contentEditable fallback)", () => {
+    start();
+    expect(isEditing()).toBe(true);
+    expect(["plaintext-only", "true"]).toContain(el.contentEditable);
+  });
+
+  test("Enter commits textContent (children null) without splitting and ends the session", () => {
+    start();
+    el.textContent = "Regional";
+    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+
+    expect(splitCount).toBe(0);
+    expect(commits).toEqual([{ children: null, path, textContent: "Regional" }]);
+    expect(endCount).toBe(1);
+    expect(isEditing()).toBe(false);
+  });
+
+  test("Escape restores the original text and commits it unchanged", () => {
+    start();
+    el.textContent = "half-typed junk";
+    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+
+    expect(el.textContent).toBe("Local");
+    expect(commits).toEqual([{ children: null, path, textContent: "Local" }]);
+    expect(isEditing()).toBe(false);
+  });
+
+  test("commit flattens newlines to spaces (directive attributes are single-line)", () => {
+    start();
+    el.textContent = "line one\nline two";
+    stopEditing();
+    expect(commits).toEqual([{ children: null, path, textContent: "line one line two" }]);
+  });
+
+  test("the slash menu never opens in a plain session", () => {
+    start();
+    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "/" }));
+    expect(slashShown).toBe(false);
+  });
+
+  test("format shortcuts are inert (prevented) in a plain session", () => {
+    start();
+    const ev = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+      key: "b",
+    });
+    el.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true);
+    expect(el.querySelector("strong")).toBeNull();
+  });
+
+  test("plain mode does not leak into the next (rich) session", () => {
+    start();
+    stopEditing();
+    commits = [];
+
+    const rich = document.createElement("p");
+    rich.textContent = "rich";
+    document.body.append(rich);
+    startEditing(rich, ["children", 5], {
+      onCommit: (p, children, textContent) => commits.push({ children, path: p, textContent }),
+      onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    expect(rich.contentEditable).toBe("true");
+    stopEditing();
+    expect(commits).toEqual([{ children: null, path: ["children", 5], textContent: "rich" }]);
+    rich.remove();
+  });
+});

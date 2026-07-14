@@ -226,8 +226,11 @@ export function startCanvasIframe(opts: {
   // Document, so without this they'd be swallowed whenever focus is inside the canvas iframe.
   const stopKeyForwarding = startKeyForwarding(channel, container.ownerDocument);
   // Run inline editing (contenteditable) here, posting committed/split/insert results to the parent.
+  // The shadow-doc accessor gates prop-bound sessions on the RAW instance prop value (template/$ref
+  // Valued props render display sugar and must not be plain-text edited).
   const stopInlineEdit = startIframeInlineEdit(channel, container, {
     getMode: () => currentMode,
+    getShadowDoc: () => shadowDoc,
   });
   // Bridge the engine's slash menu to the parent's Spectrum menu (show/nav/select over the channel).
   const stopSlashBridge = startIframeSlashBridge(channel, container.ownerDocument);

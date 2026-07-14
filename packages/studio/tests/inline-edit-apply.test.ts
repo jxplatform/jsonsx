@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import {
   applyInlineCommit,
   applyInlineInsert,
+  applyInlinePropCommit,
   applyInlineSplit,
   isEmptyContent,
 } from "../src/editor/inline-edit-apply";
@@ -89,6 +90,56 @@ describe("applyInlineInsert", () => {
     expect(path).toEqual(["children", 1]);
     expect(kids()[0]!.textContent).toBe("Hello");
     expect(kids()[1]!.tagName).toBe("h2");
+  });
+});
+
+describe("applyInlinePropCommit", () => {
+  const instanceDoc = () => ({
+    children: [
+      { tagName: "p", textContent: "Hello" },
+      { $props: { title: "Local" }, tagName: "x-card" },
+    ],
+    tagName: "div",
+  });
+
+  beforeEach(() => {
+    tab = resetWorkspaceWithTab(instanceDoc());
+  });
+
+  test("writes the value into the instance's $props", () => {
+    applyInlinePropCommit(tab, ["children", 1], "title", "Regional");
+    expect((kids()[1]!.$props as { title?: string }).title).toBe("Regional");
+    expect(tab.doc.dirty).toBe(true);
+  });
+
+  test("adds an unset prop (overriding the definition default)", () => {
+    applyInlinePropCommit(tab, ["children", 1], "description", "Body text");
+    expect((kids()[1]!.$props as { description?: string }).description).toBe("Body text");
+  });
+
+  test("deletes the prop on an empty value (reverting to the definition default)", () => {
+    applyInlinePropCommit(tab, ["children", 1], "title", "");
+    expect((kids()[1]!.$props as { title?: string } | undefined)?.title).toBeUndefined();
+  });
+
+  test("no-ops when the value is unchanged (load-bearing: Escape/disturb re-commits)", () => {
+    const rootBefore = tab.doc.document;
+    applyInlinePropCommit(tab, ["children", 1], "title", "Local");
+    // TransactDoc swaps the root reference on every real transaction — same ref means no-op.
+    expect(tab.doc.document).toBe(rootBefore);
+    expect(tab.doc.dirty).toBeFalsy();
+  });
+
+  test("treats an unset prop and an empty value as unchanged", () => {
+    const rootBefore = tab.doc.document;
+    applyInlinePropCommit(tab, ["children", 1], "description", "");
+    expect(tab.doc.document).toBe(rootBefore);
+  });
+
+  test("no-ops on a null tab or a missing node", () => {
+    applyInlinePropCommit(null, ["children", 1], "title", "ghost");
+    applyInlinePropCommit(tab, ["children", 9], "title", "ghost");
+    expect((kids()[1]!.$props as { title?: string }).title).toBe("Local");
   });
 });
 

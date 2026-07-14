@@ -21,6 +21,7 @@ import {
   onEffectCleanup,
   reactive,
   ref,
+  toRaw,
 } from "@vue/reactivity";
 import { evaluateExpression, isMutating } from "./expression.ts";
 import type { DynamicClass, JxEventHandler, JxPath, JxRenderOptions, JxScope } from "./types.ts";
@@ -257,6 +258,55 @@ function canvasAttrName(el: HTMLElement, key: string): string {
     return "data-jx-href";
   }
   return key;
+}
+
+/**
+ * Studio-canvas prop-binding markers. When on, `bindProperty` stamps `data-jx-bound-prop="<key>"`
+ * on elements whose `textContent` is an invertible single-key state binding — the pure template
+ * `"${state.key}"` or `{ "$ref": "#/state/key" }`. The studio canvas uses the marker to offer
+ * inline editing of component-instance prop values; the rendered text must BE the prop value
+ * verbatim, so mixed templates and deep paths are never stamped. Off (the default) leaves
+ * production rendering untouched; the studio sets it for design/edit (not preview — see
+ * iframe-render).
+ */
+let _stampPropBindings = false;
+export function setStampPropBindings(on: boolean) {
+  _stampPropBindings = on;
+}
+
+/** The single invertible template form: the whole string is exactly one `${state.key}` access. */
+const PURE_STATE_TEMPLATE = /^\s*\$\{\s*state\.(\w+)\s*\}\s*$/;
+
+/** The state key of an invertible `textContent` binding, or null (mixed template, deep path). */
+function boundPropKey(key: string, val: unknown, state: JxScope): string | null {
+  if (!_stampPropBindings || key !== "textContent") {
+    return null;
+  }
+  let sub: string | null = null;
+  if (isRefObj(val)) {
+    if (!val.$ref.startsWith("#/state/")) {
+      return null;
+    }
+    const rest = val.$ref.slice("#/state/".length);
+    sub = rest && !rest.includes("/") ? rest : null;
+  } else if (typeof val === "string") {
+    sub = PURE_STATE_TEMPLATE.exec(val)?.[1] ?? null;
+  }
+  if (!sub) {
+    return null;
+  }
+  // Only plain writable data entries are per-instance props. Computed/signal entries live as refs
+  // In the raw scope (auto-unwrapped by the reactive proxy), and function/object entries (handlers,
+  // $prototype instances) are not prop-overridable either — an instance $props write against any of
+  // Them would clobber the definition's behavior, so their bindings are never marked editable.
+  const stored = (toRaw(state) as Record<string, unknown>)[sub];
+  if (isRef(stored) || typeof stored === "function") {
+    return null;
+  }
+  if (typeof stored === "object" && stored !== null) {
+    return null;
+  }
+  return sub;
 }
 
 /**
@@ -744,6 +794,10 @@ function applyProperties(el: HTMLElement, def: JxElement, state: JxScope) {
  */
 function bindProperty(el: HTMLElement, key: string, val: unknown, state: JxScope) {
   const target = el as unknown as Record<string, unknown>;
+  const boundProp = boundPropKey(key, val, state);
+  if (boundProp) {
+    el.dataset.jxBoundProp = boundProp;
+  }
   if (isRefObj(val)) {
     const refVal = val as { $ref: string };
     if (key === "id") {

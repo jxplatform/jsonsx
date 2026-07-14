@@ -1,8 +1,13 @@
 import "./with-dom.js";
 import { afterEach, describe, expect, test } from "bun:test";
-import { setCanvasDelinkAnchors, setCanvasViewportTranspose } from "@jxsuite/runtime";
+import {
+  setCanvasDelinkAnchors,
+  setCanvasViewportTranspose,
+  setStampPropBindings,
+} from "@jxsuite/runtime";
 import {
   applySiteStyle,
+  EDIT_PLACEHOLDER_CSS,
   EDIT_PLACEHOLDER_STYLE_ID,
   injectHead,
   installCanvasImageRetry,
@@ -256,6 +261,84 @@ describe("canvas transpose + anchor de-link flags", () => {
     expect(previewAnchor.getAttribute("href")).toBe("/x");
     expect(previewAnchor.dataset.jxHref).toBeUndefined();
     previewHandle.dispose();
+  });
+});
+
+describe("prop-binding markers (inline prop editing)", () => {
+  // `setStampPropBindings` is a GLOBAL module-level runtime flag (same discipline as the transpose/
+  // De-link flags above): reset after every test so it cannot leak into other studio tests.
+  afterEach(() => {
+    setStampPropBindings(false);
+  });
+
+  let uid = 0;
+  const uniqueTag = () => `eer-propmark-${(uid += 1)}`;
+
+  const instanceDoc = (tag: string) => ({
+    $elements: [
+      {
+        children: [{ tagName: "h3", textContent: "${state.title}" }],
+        state: { title: "" },
+        tagName: tag,
+      },
+    ],
+    children: [{ $props: { title: "Local" }, tagName: tag }],
+    tagName: "div",
+  });
+
+  test("the edit-mode canvas CSS carries the prop-bound hover/empty affordances", () => {
+    expect(EDIT_PLACEHOLDER_CSS).toContain("[data-jx-bound-prop]:hover");
+    expect(EDIT_PLACEHOLDER_CSS).toContain("[data-jx-bound-prop]:empty");
+  });
+
+  test("a design-mode render stamps component internals with data-jx-bound-prop", async () => {
+    const tag = uniqueTag();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const handle = await renderResolvedDocument({
+      container,
+      doc: instanceDoc(tag) as never,
+      docBase: "http://localhost:3000/page.json",
+      mapperCtx: ctx,
+      mode: "design",
+    });
+    // The custom element's async connectedCallback renders its light DOM on a later timer.
+    await new Promise((r) => {
+      setTimeout(r, 150);
+    });
+
+    const h3 = container.querySelector(`${tag} h3`) as HTMLElement;
+    expect(h3).not.toBeNull();
+    expect(h3.dataset.jxBoundProp).toBe("title");
+    expect(h3.textContent).toBe("Local");
+    // Internals stay path-less — the marker is the ONLY studio annotation inside the instance.
+    expect(h3.dataset.jxPath).toBeUndefined();
+
+    handle.dispose();
+    container.remove();
+  });
+
+  test("a preview render leaves component internals unstamped", async () => {
+    const tag = uniqueTag();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const handle = await renderResolvedDocument({
+      container,
+      doc: instanceDoc(tag) as never,
+      docBase: "http://localhost:3000/page.json",
+      mapperCtx: ctx,
+      mode: "preview",
+    });
+    await new Promise((r) => {
+      setTimeout(r, 150);
+    });
+
+    const h3 = container.querySelector(`${tag} h3`) as HTMLElement;
+    expect(h3).not.toBeNull();
+    expect(h3.dataset.jxBoundProp).toBeUndefined();
+
+    handle.dispose();
+    container.remove();
   });
 });
 

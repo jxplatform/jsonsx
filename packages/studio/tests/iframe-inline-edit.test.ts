@@ -619,3 +619,166 @@ describe("selection snapshot + applyFormat", () => {
     stop();
   });
 });
+
+// ─── Prop-bound (plain) sessions ─────────────────────────────────────────────
+
+/**
+ * A rendered component instance: stamped host (`data-jx-path`) whose UNSTAMPED internals contain a
+ * runtime-marked prop-bound h3 (`data-jx-bound-prop`), plus the matching raw shadow doc.
+ */
+function propBoundContainer(rawProps?: Record<string, unknown>) {
+  const container = document.createElement("div");
+  const host = document.createElement("x-card");
+  host.dataset.jxPath = serializeJxPath(["children", 1]);
+  const wrap = document.createElement("div");
+  const h3 = document.createElement("h3");
+  h3.dataset.jxBoundProp = "title";
+  h3.textContent = "Local";
+  wrap.append(h3);
+  host.append(wrap);
+  container.append(host);
+  document.body.append(container);
+  const shadowDoc = {
+    children: [{ tagName: "p" }, { tagName: "x-card", ...(rawProps ? { $props: rawProps } : {}) }],
+    tagName: "main",
+  } as never;
+  return { container, h3, host, shadowDoc };
+}
+
+describe("prop-bound inline editing", () => {
+  test("double-click on marked internals starts a plain session and posts editStart with prop", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+
+    dblclick(h3);
+    expect(h3.isContentEditable).toBe(true);
+    expect(posts).toContainEqual({ kind: "editStart", path: ["children", 1], prop: "title" });
+    stop();
+  });
+
+  test("committing posts editCommitProp with the instance path, prop, and value", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+
+    dblclick(h3);
+    h3.textContent = "Regional";
+    stopEditing();
+
+    expect(posts).toContainEqual({
+      kind: "editCommitProp",
+      path: ["children", 1],
+      prop: "title",
+      value: "Regional",
+    });
+    expect(posts.some((p) => p.kind === "editCommit")).toBe(false);
+    expect(posts).toContainEqual({ kind: "editEnd" });
+    stop();
+  });
+
+  test("an unset raw prop is editable (the commit ADDS the instance override)", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer();
+    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+
+    dblclick(h3);
+    expect(posts).toContainEqual({ kind: "editStart", path: ["children", 1], prop: "title" });
+    stop();
+  });
+
+  test("a host without data-jx-path is blocked (definition internals have no write-back target)", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, h3, host, shadowDoc } = propBoundContainer({ title: "Local" });
+    delete host.dataset.jxPath;
+    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+
+    dblclick(h3);
+    expect(h3.isContentEditable).toBe(false);
+    expect(posts).toHaveLength(0);
+    stop();
+  });
+
+  test("template-valued and $ref-valued raw props are blocked", () => {
+    for (const raw of ["${$defs.headline}", { $ref: "#/$defs/x" }]) {
+      const { channel, posts } = fakeChannel();
+      const { container, h3, shadowDoc } = propBoundContainer({ title: raw });
+      const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+
+      dblclick(h3);
+      expect(h3.isContentEditable).toBe(false);
+      expect(posts).toHaveLength(0);
+      stop();
+      document.body.innerHTML = "";
+    }
+  });
+
+  test("a marker owned by a nested path-less custom element is blocked, not misattributed", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
+    // Interpose an inner (unstamped) custom element between the marker and the stamped host: the
+    // Prop belongs to the INNER instance, whose $props live in a definition document — blocked.
+    const inner = document.createElement("y-inner");
+    h3.replaceWith(inner);
+    inner.append(h3);
+    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+
+    dblclick(h3);
+    expect(h3.isContentEditable).toBe(false);
+    expect(posts).toHaveLength(0);
+    stop();
+  });
+
+  test("a prop-bound hit never falls through to rich-edit an ancestor page editable", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, h3, host, shadowDoc } = propBoundContainer({ title: "${$defs.x}" });
+    // Nest the (blocked) instance inside a page-level editable block.
+    const li = document.createElement("li");
+    li.dataset.jxPath = serializeJxPath(["children", 0]);
+    host.replaceWith(li);
+    li.append(host);
+    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+
+    dblclick(h3);
+    expect(li.isContentEditable).toBe(false);
+    expect(posts).toHaveLength(0);
+    stop();
+  });
+
+  test("pointerdown outside the active prop editable commits the session", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+
+    dblclick(h3);
+    h3.textContent = "Changed";
+    document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+
+    expect(posts).toContainEqual({
+      kind: "editCommitProp",
+      path: ["children", 1],
+      prop: "title",
+      value: "Changed",
+    });
+    stop();
+  });
+
+  test("a parent endEdit message commits a live prop session", () => {
+    const { channel, deliver, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+
+    dblclick(h3);
+    h3.textContent = "Via endEdit";
+    deliver({ kind: "endEdit" });
+
+    expect(posts).toContainEqual({
+      kind: "editCommitProp",
+      path: ["children", 1],
+      prop: "title",
+      value: "Via endEdit",
+    });
+    expect(isEditing()).toBe(false);
+    stop();
+  });
+});

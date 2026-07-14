@@ -739,6 +739,58 @@ describe("iframe canvas inline-edit bridge", () => {
       "fresh",
     );
   });
+
+  test("editCommitProp persists into the instance's $props on the live document", async () => {
+    resetWorkspaceWithTab({
+      children: [{ $props: { title: "Local" }, tagName: "x-card" }],
+      tagName: "div",
+    });
+    await mountReady();
+    channels[0]!.deliver({
+      kind: "editCommitProp",
+      path: ["children", 0],
+      prop: "title",
+      value: "Regional",
+    });
+    const card = (activeTab.value!.doc.document.children as { $props?: { title?: string } }[])[0]!;
+    expect(card.$props?.title).toBe("Regional");
+  });
+
+  test("editCommitProp routes to the ORIGINATING tab when it races a tab switch", async () => {
+    const { openTab } = await import("../src/workspace/workspace");
+    resetWorkspaceWithTab({
+      children: [{ $props: { title: "A title" }, tagName: "x-card" }],
+      tagName: "div",
+    });
+    const tabA = activeTab.value!;
+    await mountReady();
+    // Switch to tab B; the host re-mounts for B but the iframe has NOT acked — the in-flight
+    // Prop commit still belongs to tab A's session (FIFO drains it before renderComplete(2)).
+    const tabB = openTab({
+      document: { children: [{ $props: { title: "B title" }, tagName: "x-card" }], tagName: "div" },
+      id: "tab-b-prop",
+    });
+    const canvasEl = document.body.querySelector("div")!;
+    await mountIframeCanvas(2, {} as never, canvasEl, null, tabB.id);
+    channels[0]!.deliver({
+      kind: "editCommitProp",
+      path: ["children", 0],
+      prop: "title",
+      value: "A edited",
+    });
+    const propOf = (t: typeof tabA) =>
+      (t.doc.document.children as { $props?: { title?: string } }[])[0]!.$props?.title;
+    expect(propOf(tabA)).toBe("A edited");
+    expect(propOf(tabB)).toBe("B title");
+  });
+
+  test("editStart carries the prop into getEditSnapshot; editEnd clears it", async () => {
+    await mountReady();
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0], prop: "title" });
+    expect(getEditSnapshot()).toMatchObject({ editing: true, editingProp: "title" });
+    channels[0]!.deliver({ kind: "editEnd" });
+    expect(getEditSnapshot()).toMatchObject({ editing: false, editingProp: null });
+  });
 });
 
 // ─── Format-toolbar bridge: editing state + snapshot + applyFormat (Phase 4b-2) ──

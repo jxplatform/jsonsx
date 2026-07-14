@@ -9,7 +9,12 @@
 
 import { childIndex, getNodeAtPath, parentElementPath } from "../store";
 import { isTabActive } from "../workspace/workspace";
-import { mutateInsertNode, mutateUpdateProperty, transactDoc } from "../tabs/transact";
+import {
+  mutateInsertNode,
+  mutateUpdateProp,
+  mutateUpdateProperty,
+  transactDoc,
+} from "../tabs/transact";
 import { defaultDef } from "../panels/shared";
 
 import type { JxContentResult, SlashCommand } from "./inline-edit";
@@ -81,6 +86,36 @@ export function applyInlineCommit(
       mutateUpdateProperty(t, path, "textContent", textContent);
     });
   }
+}
+
+/**
+ * Commit a prop-bound inline edit: persist `value` into `$props[prop]` of the component instance at
+ * `path`. The unchanged-value no-op is LOAD-BEARING, not cosmetic: Escape-cancel and
+ * patch-disturbed sessions post unchanged values, and without the equality check a commit→patch→
+ * disturb→re-commit cycle loops (and pollutes undo history). An empty value deletes the prop
+ * (mutateUpdateProp), reverting the instance to the definition default — same as clearing the
+ * sidebar field.
+ */
+export function applyInlinePropCommit(
+  tab: Tab | null,
+  path: JxPath,
+  prop: string,
+  value: string,
+): void {
+  if (!tab) {
+    return;
+  }
+  const node = getNodeAtPath(tab.doc.document, path);
+  if (!node) {
+    return;
+  }
+  const current = (node.$props as Record<string, unknown> | undefined)?.[prop];
+  if (`${current ?? ""}` === value) {
+    return;
+  }
+  transactDoc(tab, (t) => {
+    mutateUpdateProp(t, path, prop, value);
+  });
 }
 
 /**
