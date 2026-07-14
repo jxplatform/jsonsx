@@ -13,6 +13,7 @@ import {
   renderPopover,
   showConfirmDialog,
   showDialog,
+  showSaveDiscardDialog,
 } from "../src/ui/layers";
 
 function layer(id: string): HTMLElement {
@@ -92,6 +93,39 @@ describe("layers after init", () => {
       expect(dlg.classList.contains("dialog-destructive")).toBe(false);
       dlg.dispatchEvent(new Event("close"));
       expect(await promise).toBe(false);
+    });
+  });
+
+  describe("showSaveDiscardDialog", () => {
+    test("confirm resolves 'save' with the given labels", async () => {
+      const promise = showSaveDiscardDialog("Unsaved Changes", `"c.json" has unsaved changes.`);
+      const dlg = layer("dialog").querySelector("sp-dialog-wrapper") as HTMLElement;
+      expect(dlg.getAttribute("headline")).toBe("Unsaved Changes");
+      expect(dlg.getAttribute("confirm-label")).toBe("Save");
+      expect(dlg.getAttribute("secondary-label")).toBe("Discard");
+      expect(dlg.getAttribute("cancel-label")).toBe("Cancel");
+      dlg.dispatchEvent(new Event("confirm"));
+      expect(await promise).toBe("save");
+    });
+
+    test("secondary resolves 'discard'", async () => {
+      const promise = showSaveDiscardDialog("Unsaved Changes", "msg");
+      const dlg = layer("dialog").querySelector("sp-dialog-wrapper") as HTMLElement;
+      dlg.dispatchEvent(new Event("secondary"));
+      expect(await promise).toBe("discard");
+    });
+
+    test("cancel and close both resolve 'cancel'", async () => {
+      const p1 = showSaveDiscardDialog("H", "m");
+      (layer("dialog").querySelector("sp-dialog-wrapper") as HTMLElement).dispatchEvent(
+        new Event("cancel"),
+      );
+      expect(await p1).toBe("cancel");
+      const p2 = showSaveDiscardDialog("H", "m");
+      (layer("dialog").querySelector("sp-dialog-wrapper") as HTMLElement).dispatchEvent(
+        new Event("close"),
+      );
+      expect(await p2).toBe("cancel");
     });
   });
 

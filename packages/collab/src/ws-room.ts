@@ -44,6 +44,10 @@ interface Room {
   epoch: number;
   subscribers: Set<HostConnection>;
   ready: Promise<void>;
+  /** The source text as of the last persist (seed or markPersisted) — the room-dirty baseline. */
+  baseline: string;
+  /** True while the live source differs from `baseline`; mirrored to peers via `doc-dirty`. */
+  dirty: boolean;
 }
 
 export interface HostConnection {
@@ -64,6 +68,12 @@ export interface CollabHost {
   subscriberCount: (path: string) => number;
   /** Destroy an empty room (embedder teardown after its grace period). */
   destroyRoomIfEmpty: (path: string) => void;
+  /**
+   * The embedder folded the room's source to durable storage: reset the dirty baseline to the
+   * current source and broadcast `doc-dirty{false}` to every subscriber. Called from `onFlush`
+   * after a successful write.
+   */
+  markPersisted: (path: string) => void;
   destroy: () => void;
 }
 
@@ -114,27 +124,32 @@ export function createCollabHost(options: CollabHostOptions): CollabHost {
   };
 
   const ensureRoom = (path: string): Room => {
-    let room = rooms.get(path);
-    if (room) {
-      return room;
+    const existing = rooms.get(path);
+    if (existing) {
+      return existing;
     }
     const doc = new Y.Doc();
     const epoch = epochs.get(path) ?? 0;
     epochs.set(path, epoch);
-    room = {
+    const room: Room = {
+      baseline: "",
+      dirty: false,
       doc,
       epoch,
-      ready: (async () => {
-        const source = await options.loadSource(path);
-        if (source === null) {
-          throw new Error("content-not-loaded");
-        }
-        doc.transact(() => {
-          sourceText(doc).insert(0, source);
-        }, "seed");
-      })(),
+      ready: Promise.resolve(),
       subscribers: new Set(),
     };
+    room.ready = (async () => {
+      const source = await options.loadSource(path);
+      if (source === null) {
+        throw new Error("content-not-loaded");
+      }
+      // The seeded text IS the on-disk state — the initial clean baseline.
+      room.baseline = source;
+      doc.transact(() => {
+        sourceText(doc).insert(0, source);
+      }, "seed");
+    })();
     doc.on("update", (update: Uint8Array, origin: unknown) => {
       const current = rooms.get(path);
       if (!current || current.doc !== doc) {
@@ -148,6 +163,15 @@ export function createCollabHost(options: CollabHostOptions): CollabHost {
         origin instanceof Object && "socket" in origin ? (origin as InternalConnection) : undefined,
       );
       options.onSourceChange?.(path);
+      // Room-level dirty: broadcast on transition so every peer's Save affordance stays in sync.
+      const nowDirty = sourceText(current.doc).toString() !== current.baseline;
+      if (nowDirty !== current.dirty) {
+        current.dirty = nowDirty;
+        broadcastToRoom(current, {
+          message: { dirty: nowDirty, path, type: "doc-dirty" },
+          type: "control",
+        });
+      }
     });
     rooms.set(path, room);
     return room;
@@ -178,6 +202,8 @@ export function createCollabHost(options: CollabHostOptions): CollabHost {
     room.subscribers.add(conn);
     conn.subscribed.add(path);
     sendControl(conn, { epoch: room.epoch, path, type: "opened" });
+    // The joiner learns the room's current unsaved state (it may join a room others have dirtied).
+    sendControl(conn, { dirty: room.dirty, path, type: "doc-dirty" });
     // Server-initiated step1: learn the client's state (it replies step2 + its own step1).
     const body = encoding.createEncoder();
     syncProtocol.writeSyncStep1(body, room.doc);
@@ -391,6 +417,21 @@ export function createCollabHost(options: CollabHostOptions): CollabHost {
       if (room && room.subscribers.size === 0) {
         room.doc.destroy();
         rooms.delete(path);
+      }
+    },
+
+    markPersisted(path) {
+      const room = rooms.get(path);
+      if (!room) {
+        return;
+      }
+      room.baseline = sourceText(room.doc).toString();
+      if (room.dirty) {
+        room.dirty = false;
+        broadcastToRoom(room, {
+          message: { dirty: false, path, type: "doc-dirty" },
+          type: "control",
+        });
       }
     },
 

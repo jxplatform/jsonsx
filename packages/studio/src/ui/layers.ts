@@ -79,6 +79,46 @@ export function showConfirmDialog(
 }
 
 /**
+ * Show a three-way Save / Discard / Cancel dialog. Resolves "save", "discard", or "cancel"
+ * (dismiss/close counts as cancel).
+ *
+ * @param {string} headline
+ * @param {string | import("lit-html").TemplateResult} message
+ * @param {{ saveLabel?: string; discardLabel?: string; cancelLabel?: string }} [opts]
+ * @returns {Promise<"save" | "discard" | "cancel">}
+ */
+export function showSaveDiscardDialog(
+  headline: string,
+  message: string | TemplateResult,
+  opts: {
+    saveLabel?: string;
+    discardLabel?: string;
+    cancelLabel?: string;
+  } = {},
+): Promise<"save" | "discard" | "cancel"> {
+  const { saveLabel = "Save", discardLabel = "Discard", cancelLabel = "Cancel" } = opts;
+  return showDialog<"save" | "discard" | "cancel">(
+    (done) => html`
+      <sp-dialog-wrapper
+        open
+        underlay
+        headline=${headline}
+        confirm-label=${saveLabel}
+        secondary-label=${discardLabel}
+        cancel-label=${cancelLabel}
+        size="s"
+        @confirm=${() => done("save")}
+        @secondary=${() => done("discard")}
+        @cancel=${() => done("cancel")}
+        @close=${() => done("cancel")}
+      >
+        <p>${message}</p>
+      </sp-dialog-wrapper>
+    `,
+  );
+}
+
+/**
  * Open a persistent modal. Returns a handle with update() and close() methods.
  *
  * @param {import("lit-html").TemplateResult} template

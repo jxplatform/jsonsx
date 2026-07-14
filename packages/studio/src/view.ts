@@ -47,7 +47,6 @@ interface ViewState {
   leftPanelCollapsed: boolean;
   rightPanelCollapsed: boolean;
   chatPanelCollapsed: boolean;
-  autosaveTimer: ReturnType<typeof setTimeout> | null;
   _layersCollapsed: Set<string> | null;
   [key: string]: unknown;
 }
@@ -106,9 +105,6 @@ export const view: ViewState = {
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
   chatPanelCollapsed: false,
-
-  // Autosave
-  autosaveTimer: null,
 
   // Layers panel collapsed state
   _layersCollapsed: null,

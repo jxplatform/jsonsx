@@ -67,6 +67,9 @@ interface DocEntry {
   resetCbs: Set<() => void>;
   pendingFlush: Set<() => void>;
   handleDestroyed: boolean;
+  /** Latest room-level dirty state from the server (survives reconnect on the same entry). */
+  dirty: boolean;
+  dirtyCbs: Set<(dirty: boolean) => void>;
 }
 
 export function createWsCollabConnection(options: WsCollabConnectionOptions): WsCollabConnection {
@@ -177,6 +180,16 @@ export function createWsCollabConnection(options: WsCollabConnectionOptions): Ws
             resolve();
           }
           entry.pendingFlush.clear();
+        }
+        return;
+      }
+      case "doc-dirty": {
+        const entry = docs.get(message.path);
+        if (entry) {
+          entry.dirty = message.dirty;
+          for (const cb of entry.dirtyCbs) {
+            cb(message.dirty);
+          }
         }
         return;
       }
@@ -349,6 +362,8 @@ export function createWsCollabConnection(options: WsCollabConnectionOptions): Ws
         resolveSynced = resolve;
       });
       const entry: DocEntry = {
+        dirty: false,
+        dirtyCbs: new Set(),
         doc: new Y.Doc(),
         epoch: 0,
         handleDestroyed: false,
@@ -418,6 +433,13 @@ export function createWsCollabConnection(options: WsCollabConnectionOptions): Ws
             sendFrame({ message: { path, type: "flush" }, type: "control" });
           }),
         identity: () => identity,
+        onDirty: (cb) => {
+          entry.dirtyCbs.add(cb);
+          // Deliver current state synchronously: the server's open-handshake `doc-dirty` may have
+          // Already landed before the caller subscribes, and it must not miss the initial value.
+          cb(entry.dirty);
+          return () => entry.dirtyCbs.delete(cb);
+        },
         onReset: (cb) => {
           entry.resetCbs.add(cb);
           return () => entry.resetCbs.delete(cb);

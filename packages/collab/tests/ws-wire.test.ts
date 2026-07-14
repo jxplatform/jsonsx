@@ -439,6 +439,100 @@ describe("lifecycle", () => {
     expect(await connection.openDoc("pages/never.json")).toBeNull();
   });
 
+  test("room-level dirty broadcasts to every subscriber on a source change", async () => {
+    const fx = fixture();
+    const a = await fx.connect().openDoc("pages/index.json");
+    const b = await fx.connect().openDoc("pages/index.json");
+    await a!.whenSynced;
+    await b!.whenSynced;
+    const aDirty: boolean[] = [];
+    const bDirty: boolean[] = [];
+    a!.onDirty((d) => aDirty.push(d));
+    b!.onDirty((d) => bDirty.push(d));
+    // Fresh clean room: onDirty delivers the current (false) synchronously on subscribe.
+    expect(aDirty).toEqual([false]);
+    expect(bDirty).toEqual([false]);
+
+    // Edit the SOURCE text (what the studio's mirror folds into) — structure edits don't dirty.
+    a!.doc.transact(() => {
+      const s = sourceText(a!.doc);
+      s.insert(s.length, " ");
+    }, LOCAL_ORIGIN);
+    await settle();
+    expect(aDirty.at(-1)).toBe(true);
+    expect(bDirty.at(-1)).toBe(true);
+
+    // A persist resets the baseline (markPersisted) and clears dirty for everyone.
+    fx.host.markPersisted("pages/index.json");
+    await settle();
+    expect(aDirty.at(-1)).toBe(false);
+    expect(bDirty.at(-1)).toBe(false);
+
+    // Baseline moved: a further source edit re-dirties.
+    a!.doc.transact(() => {
+      const s = sourceText(a!.doc);
+      s.insert(s.length, "!");
+    }, LOCAL_ORIGIN);
+    await settle();
+    expect(aDirty.at(-1)).toBe(true);
+    expect(bDirty.at(-1)).toBe(true);
+  });
+
+  test("a late joiner learns the room's current dirty state during the open handshake", async () => {
+    const fx = fixture();
+    const a = await fx.connect().openDoc("pages/index.json");
+    await a!.whenSynced;
+    a!.doc.transact(() => {
+      const s = sourceText(a!.doc);
+      s.insert(s.length, "edited");
+    }, LOCAL_ORIGIN);
+    await settle();
+
+    const c = await fx.connect().openDoc("pages/index.json");
+    await c!.whenSynced;
+    const cDirty: boolean[] = [];
+    c!.onDirty((d) => cDirty.push(d));
+    await settle();
+    // Whether the handshake doc-dirty landed before or after subscribe, the value converges to true.
+    expect(cDirty.at(-1)).toBe(true);
+  });
+
+  test("onDirty delivers the current state synchronously and unsubscribes cleanly", async () => {
+    const fx = fixture();
+    const handle = await fx.connect().openDoc("pages/index.json");
+    await handle!.whenSynced;
+    const seen: boolean[] = [];
+    const off = handle!.onDirty((d) => seen.push(d));
+    // Fires synchronously with the current (clean) value the moment we subscribe.
+    expect(seen).toEqual([false]);
+    off();
+    handle!.doc.transact(() => {
+      const s = sourceText(handle!.doc);
+      s.insert(s.length, "x");
+    }, LOCAL_ORIGIN);
+    await settle();
+    // After unsubscribing, no further callbacks land.
+    expect(seen).toEqual([false]);
+  });
+
+  test("markPersisted on an unknown path and a doc-dirty for an unopened path are no-ops", async () => {
+    const fx = fixture();
+    const connection = fx.connect();
+    const handle = await connection.openDoc("pages/index.json");
+    await handle!.whenSynced;
+    // No room for this path — early return, no throw.
+    fx.host.markPersisted("pages/never-opened.json");
+    // A doc-dirty for a path this client never opened is dropped by handleControl.
+    fx.sockets[0]!.onmessage?.({
+      data: encodeFrame({
+        message: { dirty: true, path: "pages/other.json", type: "doc-dirty" },
+        type: "control",
+      }).buffer,
+    });
+    await settle();
+    expect(connection.status()).toBe("connected");
+  });
+
   test("a dropped connection reconnects, re-opens, and resyncs offline edits", async () => {
     const fx = fixture();
     const connection = createWsCollabConnection({

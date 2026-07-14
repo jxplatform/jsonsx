@@ -48,6 +48,13 @@ export type ControlMessage =
   /** Server → client: the flush landed. */
   | { type: "flush-ack"; path: string }
   /**
+   * Server → client: the room's unsaved-since-last-persist state changed (drives the Save
+   * affordance). Room-level and authoritative: any peer's edit dirties the room for everyone; a
+   * persist clears it for everyone. Sent to a newly-subscribing connection during the open
+   * handshake so it learns the current state.
+   */
+  | { type: "doc-dirty"; path: string; dirty: boolean }
+  /**
    * Server → client: a request was refused (codes: read-only, content-not-loaded, too-large,
    * rate-limited, binary-file, unknown-frame).
    */

@@ -2,11 +2,15 @@
  * Collab.ts — the dev server's realtime co-editing endpoint (`/__studio/collab`): the reference
  * implementation of the Jx collab wire contract, built on `@jxsuite/collab/room`.
  *
- * Rooms are keyed by server-root-relative path; a room's Y.Text source seeds from the file on disk
- * and writes back (debounced) so every non-collab consumer — preview, live reload, plain editors —
- * keeps working off the real file. Genuinely external file changes (not our own write-back echo)
- * bump the doc's epoch and reset subscribers, per the contract. No persistence beyond the files
- * themselves: this is deliberately a reference implementation.
+ * Rooms are keyed by server-root-relative path; a room's Y.Text source seeds from the file on disk.
+ * Persistence is EXPLICIT: the shared source is written back to disk only on an explicit flush
+ * (Cmd+S / Save) and, as a last-ditch safety, on graceful server shutdown. Unsaved collaborative
+ * edits therefore live only in the room's in-memory Y.Doc until saved — non-collab consumers
+ * (preview, live reload, plain editors) intentionally keep working off the last-saved file until
+ * then. The host owns the room-level dirty signal broadcast to every peer; the embedder just tells
+ * it a persist landed via `markPersisted`. Genuinely external file changes (not our own write-back
+ * echo) bump the doc's epoch and reset subscribers, per the contract. No persistence beyond the
+ * files themselves: this is deliberately a reference implementation.
  */
 
 import { resolve } from "node:path";
@@ -17,7 +21,6 @@ import { assertAccessible } from "./studio-api";
 import type { ServerWebSocket, WebSocketHandler } from "bun";
 import type { HostConnection } from "@jxsuite/collab/room";
 
-const WRITE_BACK_DEBOUNCE_MS = 800;
 const EMPTY_ROOM_GRACE_MS = 30_000;
 
 const BINARY_EXTENSIONS = new Set([
@@ -79,8 +82,9 @@ export function createCollabRegistry(opts: {
   let connectionCounter = 0;
   let stopped = false;
 
-  const writeTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const destroyTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Paths with unsaved edits (source changed since the last persist) — the shutdown worklist. */
+  const pendingPersist = new Set<string>();
   /** Content we last wrote (or are about to write) per path — the watcher-echo signature. */
   const lastWritten = new Map<string, string>();
 
@@ -103,13 +107,19 @@ export function createCollabRegistry(opts: {
       return;
     }
     if (lastWritten.get(path) === source) {
+      pendingPersist.delete(path);
       return;
     }
+    // Optimistic: closes the watcher-echo race (our own write must not read back as external).
     lastWritten.set(path, source);
     try {
       await writeFile(absPathFor(path), source, "utf8");
+      pendingPersist.delete(path);
+      // Tell the host the room is durable now: it resets the dirty baseline and broadcasts clean.
+      host.markPersisted(path);
     } catch {
-      // Disk write failures leave the room live; the next change retries.
+      // Write failed — clear the optimistic signature so the next explicit save retries.
+      lastWritten.delete(path);
     }
   };
 
@@ -126,34 +136,22 @@ export function createCollabRegistry(opts: {
       if (existing) {
         clearTimeout(existing);
       }
+      // Warnings-only model: an empty room is NOT auto-persisted (the last collaborator was warned
+      // Before leaving). Its unsaved edits are dropped when the room is torn down after the grace.
       destroyTimers.set(
         path,
         setTimeout(() => {
           destroyTimers.delete(path);
-          void persist(path).then(() => host.destroyRoomIfEmpty(path));
+          pendingPersist.delete(path);
+          host.destroyRoomIfEmpty(path);
         }, EMPTY_ROOM_GRACE_MS),
       );
     },
-    onFlush: (path) => {
-      const timer = writeTimers.get(path);
-      if (timer) {
-        clearTimeout(timer);
-        writeTimers.delete(path);
-      }
-      return persist(path);
-    },
+    onFlush: (path) => persist(path),
     onSourceChange: (path) => {
-      const existing = writeTimers.get(path);
-      if (existing) {
-        clearTimeout(existing);
-      }
-      writeTimers.set(
-        path,
-        setTimeout(() => {
-          writeTimers.delete(path);
-          void persist(path);
-        }, WRITE_BACK_DEBOUNCE_MS),
-      );
+      // No write-back: edits reach disk only on explicit flush (or graceful shutdown). The host
+      // Owns the dirty broadcast; we just note the path for the shutdown worklist.
+      pendingPersist.add(path);
     },
     rejectPath: (path) => {
       if (isBinaryPath(path)) {
@@ -205,17 +203,15 @@ export function createCollabRegistry(opts: {
         return;
       }
       stopped = true;
-      for (const timer of writeTimers.values()) {
-        clearTimeout(timer);
-      }
       for (const timer of destroyTimers.values()) {
         clearTimeout(timer);
       }
+      // Last-ditch safety on graceful shutdown: flush every path with unsaved edits.
       const flushes: Promise<void>[] = [];
-      for (const path of writeTimers.keys()) {
+      for (const path of pendingPersist) {
         flushes.push(persist(path));
       }
-      writeTimers.clear();
+      pendingPersist.clear();
       destroyTimers.clear();
       await Promise.all(flushes);
       host.destroy();

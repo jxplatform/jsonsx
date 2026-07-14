@@ -53,6 +53,20 @@ describe("session attach", () => {
     expect(tab.doc.dirty).toBe(false);
   });
 
+  test("the server's room-level dirty broadcast drives tab.doc.dirty", async () => {
+    const hub = createMockCollabHub();
+    const tab = openCollabTab(hub);
+    await settleCollab();
+    // A fresh clean room leaves the tab clean (onDirty fired false on attach).
+    expect(tab.doc.dirty).toBe(false);
+    // The server reports the room dirty (any peer edited): the Save affordance lights up.
+    hub.setDirty(PATH, true);
+    expect(tab.doc.dirty).toBe(true);
+    // A save by any collaborator clears the room for everyone.
+    hub.setDirty(PATH, false);
+    expect(tab.doc.dirty).toBe(false);
+  });
+
   test("a second client adopts the already-seeded shared tree", async () => {
     const hub = createMockCollabHub();
     const shared: JxMutableNode = {

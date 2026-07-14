@@ -39,6 +39,12 @@ export interface CollabHandle {
    * is dead: destroy it and re-acquire a fresh one via platform.collab.
    */
   onReset: (cb: () => void) => () => void;
+  /**
+   * Room-level unsaved state changed: any peer edited since the last persist, or a persist cleared
+   * it. Fires immediately with the current value on subscribe (the server sends it during the open
+   * handshake, so the callback must run synchronously to win that race). Returns an unsubscribe.
+   */
+  onDirty: (cb: (dirty: boolean) => void) => () => void;
   destroy: () => void;
 }
 

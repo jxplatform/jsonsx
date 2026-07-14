@@ -5,6 +5,7 @@
 import { flush } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mount, unmount } from "../src/panels/tab-strip";
+import { collabState } from "../src/collab/collab-state";
 import { closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
 import { initLayers } from "../src/ui/layers";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -173,6 +174,34 @@ describe("tab strip interactions", () => {
     dialog.dispatchEvent(new Event("confirm"));
     await flush();
     expect(workspace.tabs.has("a")).toBe(false);
+  });
+
+  test("a co-edited dirty tab with peers still on the doc closes without a prompt", async () => {
+    const a = open("a");
+    a.doc.dirty = true;
+    const state = collabState(a);
+    state.active = true;
+    state.peers = [{ clientId: 2, state: { focusedPath: "/project/a.json" } as never }];
+    await flush();
+    (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+    await flush();
+    // The shared session lives on with the remaining peer — closing is safe, no prompt.
+    expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).toBeNull();
+    expect(workspace.tabs.has("a")).toBe(false);
+  });
+
+  test("the last collaborator on a dirty doc is still prompted before closing", async () => {
+    const a = open("a");
+    a.doc.dirty = true;
+    const state = collabState(a);
+    state.active = true;
+    // A peer exists but is focused on a different doc — nobody else holds THIS doc.
+    state.peers = [{ clientId: 2, state: { focusedPath: "/project/other.json" } as never }];
+    await flush();
+    (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+    await flush();
+    expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).not.toBeNull();
+    expect(workspace.tabs.has("a")).toBe(true);
   });
 
   test("requestClose on a vanished tab id is a no-op", async () => {

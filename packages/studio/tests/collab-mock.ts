@@ -13,6 +13,8 @@ interface Connection {
   awareness: Awareness;
   statusCbs: Set<(status: CollabStatus) => void>;
   resetCbs: Set<() => void>;
+  dirtyCbs: Set<(dirty: boolean) => void>;
+  dirty: boolean;
   destroyed: boolean;
 }
 
@@ -24,6 +26,8 @@ export interface MockCollabHub {
   reset: (path: string) => void;
   /** Push a connection status to every live handle on this path. */
   setStatus: (path: string, status: CollabStatus) => void;
+  /** Broadcast a room-level dirty state to every live handle on this path (simulates the server). */
+  setDirty: (path: string, dirty: boolean) => void;
   /** Paths flushed via handle.flush(), in order. */
   flushes: string[];
   /** Live handle count per path. */
@@ -78,6 +82,8 @@ export function createMockCollabHub(
     const conn: Connection = {
       awareness: new Awareness(new Y.Doc()),
       destroyed: false,
+      dirty: false,
+      dirtyCbs: new Set(),
       doc: new Y.Doc(),
       resetCbs: new Set(),
       statusCbs: new Set(),
@@ -136,6 +142,12 @@ export function createMockCollabHub(
         return Promise.resolve();
       },
       identity: () => identity,
+      onDirty: (cb) => {
+        conn.dirtyCbs.add(cb);
+        // Mirror the real provider: deliver the current state synchronously on subscribe.
+        cb(conn.dirty);
+        return () => conn.dirtyCbs.delete(cb);
+      },
       onReset: (cb) => {
         conn.resetCbs.add(cb);
         return () => conn.resetCbs.delete(cb);
@@ -164,6 +176,14 @@ export function createMockCollabHub(
       }
     },
     serverDoc,
+    setDirty: (path, dirty) => {
+      for (const conn of connsFor(path)) {
+        conn.dirty = dirty;
+        for (const cb of conn.dirtyCbs) {
+          cb(dirty);
+        }
+      }
+    },
     setStatus: (path, status) => {
       for (const conn of connsFor(path)) {
         for (const cb of conn.statusCbs) {

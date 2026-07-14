@@ -7,8 +7,14 @@
  * before-image). Inbound: remote Y transactions convert back into JxDocOps and replay through
  * `applyExternalDocOps`, riding the surgical canvas patcher; unconvertible shapes hard-reconcile
  * the tab from the Y tree. Undo becomes a local-origin-scoped Y.UndoManager registered as the tab's
- * history delegate. While attached, the shared session persists automatically: `dirty` stays false
- * and Cmd+S becomes a serialize→flush.
+ * history delegate.
+ *
+ * Saving is EXPLICIT even while attached: syncing edits to peers (the Y.Doc) is automatic, but
+ * folding the shared source to disk is not. Local edits mark `tab.doc.dirty` immediately for
+ * instant Save-button feedback; the room-level, server-authoritative unsaved state then arrives via
+ * `handle.onDirty` (any peer's edit dirties the room for everyone; a save clears it for everyone).
+ * Cmd+S / Save runs a serialize→mirror→flush, and the provider broadcasts the room clean once the
+ * write lands.
  *
  * All yjs code sits behind a dynamic import: the unsplit bundle inlines the bytes, but module
  * evaluation defers until a collab session actually attaches.
@@ -177,17 +183,18 @@ function onTransact(tab: Tab, record: TransactionRecord, origin: TransactOrigin)
   }
   session.lastSeenRef = toRaw(tab.doc.document) as object;
   if (origin === "remote") {
-    // The reconciler keeps source text fresh regardless of WHO edited the structure.
+    // The reconciler keeps source text fresh regardless of WHO edited the structure. The tab's
+    // Dirty state is driven by the server's room-level `doc-dirty` broadcast (see onDirty in
+    // CreateSession), not forced here.
     scheduleMirror(session);
-    tab.doc.dirty = false;
     return;
   }
   if (session.canWrite) {
     publishRecord(session, record);
     scheduleMirror(session);
   }
-  // The shared session persists automatically; the dirty dot means "unsaved" and stays off.
-  tab.doc.dirty = false;
+  // Local edits leave the tab dirty (transactDoc already set it) until an explicit save flushes and
+  // The provider broadcasts the room clean.
 }
 
 function onBatchEnd(tab: Tab): void {
@@ -673,7 +680,15 @@ function createSession(
     });
   }
   session.lastSeenRef = toRaw(tab.doc.document) as object;
-  tab.doc.dirty = false;
+
+  // The server owns the room-level unsaved state: `onDirty` fires synchronously with the current
+  // Value on subscribe (delivered during the open handshake), so attaching to a clean room clears
+  // Any dirty the initial reconcile set, and attaching to an already-dirty room shows dirty.
+  session.disposers.push(
+    handle.onDirty((dirty) => {
+      tab.doc.dirty = dirty;
+    }),
+  );
 
   // Presence identity + write capability (drives reconciler election).
   handle.awareness.setLocalState({
@@ -864,7 +879,7 @@ function createSession(
         session.lastSeenRef = nowRef;
         publishDiff(session);
         scheduleMirror(session);
-        tab.doc.dirty = false;
+        // Dirty stays as the edit left it; the server's doc-dirty broadcast is authoritative.
       });
     });
   });

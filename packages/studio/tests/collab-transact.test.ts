@@ -54,7 +54,9 @@ describe("outbound publishing", () => {
     transactDoc(tab, (t) => mutateInsertNode(t, [], 2, { tagName: "footer" }));
 
     expect(yDocToJson(hub.serverDoc(PATH))).toEqual(tabJson(tab));
-    expect(tab.doc.dirty).toBe(false);
+    // Local edits leave the tab dirty (explicit-save model): syncing to peers is automatic, but the
+    // Save affordance stays lit until an explicit flush clears it via the server's doc-dirty.
+    expect(tab.doc.dirty).toBe(true);
   });
 
   test("un-instrumented mutations reconcile by diff", async () => {
@@ -117,7 +119,8 @@ describe("inbound application", () => {
     expect(doc.children[1]!.textContent).toBe("From peer");
     // Remote edits never create local history entries.
     expect(tab.history.snapshots).toHaveLength(1);
-    expect(tab.doc.dirty).toBe(false);
+    // A peer's edit means the shared doc now differs from disk: the room is dirty for this tab too.
+    expect(tab.doc.dirty).toBe(true);
     peer.destroy();
   });
 

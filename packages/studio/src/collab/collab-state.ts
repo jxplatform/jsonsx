@@ -4,7 +4,7 @@
  * fs-sync/reload guards without importing the session machinery.
  */
 
-import { reactive } from "../reactivity";
+import { reactive, toRaw } from "../reactivity";
 import type { Tab } from "../tabs/tab";
 import type { CollabAwarenessState } from "@jxsuite/collab/awareness-types";
 
@@ -33,7 +33,10 @@ const states = new WeakMap<Tab, TabCollabState>();
 const attachedPaths = new Map<string, number>();
 
 export function collabState(tab: Tab): TabCollabState {
-  let state = states.get(tab);
+  // Key on the raw tab: writers (the collab session, via ensureCollab's raw tab) and readers
+  // (toolbar/tab-strip, via reactive `workspace.tabs.get` proxies) must resolve the same entry.
+  const key = toRaw(tab as unknown as object) as Tab;
+  let state = states.get(key);
   if (!state) {
     state = reactive({
       active: false,
@@ -42,7 +45,7 @@ export function collabState(tab: Tab): TabCollabState {
       sourceCanonical: false,
       status: "detached",
     }) as TabCollabState;
-    states.set(tab, state);
+    states.set(key, state);
   }
   return state;
 }

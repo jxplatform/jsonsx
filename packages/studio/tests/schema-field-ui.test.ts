@@ -487,8 +487,14 @@ describe("addFieldFormTpl", () => {
     const { calls, handlers } = makeFormHandlers();
     const container = await renderInto(addFieldFormTpl(baseState, handlers));
     const buttons = [...container.querySelectorAll("sp-action-button")];
-    pointer(buttons.find((b) => b.textContent?.includes("Add"))!, "click");
-    pointer(buttons.find((b) => b.textContent?.includes("Cancel"))!, "click");
+    pointer(
+      buttons.find((b) => b.textContent?.includes("Add"))!,
+      "click",
+    );
+    pointer(
+      buttons.find((b) => b.textContent?.includes("Cancel"))!,
+      "click",
+    );
     expect(calls).toContainEqual(["onConfirm"]);
     expect(calls).toContainEqual(["onCancel"]);
   });

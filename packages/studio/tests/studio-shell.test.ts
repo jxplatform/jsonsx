@@ -260,7 +260,6 @@ beforeEach(() => {
   consumePatchedMock.mockClear();
   consumePatchedReturn = false;
   view.functionEditor = null;
-  view.autosaveTimer = null;
   view.panX = 0;
   view.panY = 0;
   view.needsCenter = true;
@@ -399,6 +398,12 @@ describe("navigateToComponent", () => {
   });
 });
 
+/** Dispatch a Save/Discard/Cancel choice on the currently-open drill-out dialog. */
+function answerDrillPrompt(event: "confirm" | "secondary" | "cancel"): void {
+  const dlg = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
+  dlg.dispatchEvent(new Event(event));
+}
+
 describe("navigateBack", () => {
   function frameFor(tagName: string) {
     return {
@@ -417,35 +422,90 @@ describe("navigateBack", () => {
     expect(statusMessages).toHaveLength(0);
   });
 
-  test("saves a dirty document then restores the parent frame", async () => {
+  test("clean child leaves without a prompt and restores the parent frame", async () => {
     const tab = openShellTab();
     tab.session.documentStack = [frameFor("section")] as any;
-    tab.documentPath = "components/card.json";
-    tab.doc.dirty = true;
+    tab.documentPath = "components/card-clean.json";
+    tab.doc.dirty = false;
+    const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
+    const before = writes();
     await tabBarCtx.navigateBack();
-    expect(state.files.get("components/card.json")).toContain('"tagName"');
+    expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).toBeNull();
+    expect(writes()).toBe(before);
+    expect((tab.doc.document as any).tagName).toBe("section");
+    expect(tab.session.documentStack).toHaveLength(0);
+    expect(statusMessages.at(-1)).toBe("Returned to parent document");
+  });
+
+  test("Save on a dirty child writes it, then restores the parent frame", async () => {
+    const tab = openShellTab();
+    tab.session.documentStack = [frameFor("section")] as any;
+    tab.documentPath = "components/card-save.json";
+    tab.doc.dirty = true;
+    const nav = tabBarCtx.navigateBack();
+    await flush();
+    answerDrillPrompt("confirm");
+    await nav;
+    expect(state.files.get("components/card-save.json")).toContain('"tagName"');
     expect((tab.doc.document as any).tagName).toBe("section");
     expect(tab.documentPath).toBe("pages/parent.json");
     expect(tab.session.documentStack).toHaveLength(0);
     expect(statusMessages.at(-1)).toBe("Returned to parent document");
   });
 
-  test("a failing save is reported but navigation still proceeds", async () => {
+  test("Discard leaves the child unwritten and restores the parent frame", async () => {
+    const tab = openShellTab();
+    tab.session.documentStack = [frameFor("section")] as any;
+    tab.documentPath = "components/card-discard.json";
+    tab.doc.dirty = true;
+    const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
+    const before = writes();
+    const nav = tabBarCtx.navigateBack();
+    await flush();
+    answerDrillPrompt("secondary");
+    await nav;
+    expect(writes()).toBe(before);
+    expect((tab.doc.document as any).tagName).toBe("section");
+    expect(statusMessages.at(-1)).toBe("Returned to parent document");
+  });
+
+  test("Cancel aborts navigation and keeps the child open", async () => {
+    const tab = openShellTab();
+    tab.session.documentStack = [frameFor("section")] as any;
+    tab.documentPath = "components/card-cancel.json";
+    tab.doc.dirty = true;
+    const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
+    const before = writes();
+    const nav = tabBarCtx.navigateBack();
+    await flush();
+    answerDrillPrompt("cancel");
+    await nav;
+    expect(writes()).toBe(before);
+    expect(tab.documentPath).toBe("components/card-cancel.json");
+    expect(tab.session.documentStack).toHaveLength(1);
+  });
+
+  test("a failing save is reported and navigation is cancelled", async () => {
     const tab = openShellTab();
     tab.session.documentStack = [frameFor("article")] as any;
+    tab.documentPath = "components/card-fail.json";
     tab.doc.dirty = true;
     const originalWrite = platform.writeFile;
     platform.writeFile = async () => {
       throw new Error("disk full");
     };
     try {
-      await tabBarCtx.navigateBack();
+      const nav = tabBarCtx.navigateBack();
+      await flush();
+      answerDrillPrompt("confirm");
+      await nav;
     } finally {
       platform.writeFile = originalWrite;
     }
-    expect(statusMessages[0]).toBe("Save error: disk full");
-    expect((tab.doc.document as any).tagName).toBe("article");
-    expect(statusMessages.at(-1)).toBe("Returned to parent document");
+    expect(statusMessages.at(-1)).toBe("Save error: disk full");
+    // The child is still open — its edits were not lost to a discard.
+    expect(tab.documentPath).toBe("components/card-fail.json");
+    expect(tab.session.documentStack).toHaveLength(1);
   });
 
   test("a stack holding an undefined frame is popped without applying it", async () => {
@@ -496,32 +556,55 @@ describe("navigateToLevel", () => {
     expect(statusMessages.at(-1)).toBe("Returned to parent document");
   });
 
-  test("saves a dirty document before jumping", async () => {
+  test("Save on a dirty document writes it before jumping", async () => {
     const tab = openShellTab();
     tab.session.documentStack = [frame("root")] as any;
-    tab.documentPath = "pages/deep.json";
+    tab.documentPath = "pages/deep-save.json";
     tab.doc.dirty = true;
-    await tabBarCtx.navigateToLevel(0);
-    expect(state.files.has("pages/deep.json")).toBe(true);
+    const nav = tabBarCtx.navigateToLevel(0);
+    await flush();
+    answerDrillPrompt("confirm");
+    await nav;
+    expect(state.files.has("pages/deep-save.json")).toBe(true);
     expect((tab.doc.document as any).tagName).toBe("root");
   });
 
-  test("reports save errors but still jumps", async () => {
+  test("Discard jumps without writing the dirty document", async () => {
     const tab = openShellTab();
     tab.session.documentStack = [frame("root")] as any;
-    tab.documentPath = "pages/deep.json";
+    tab.documentPath = "pages/deep-discard.json";
+    tab.doc.dirty = true;
+    const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
+    const before = writes();
+    const nav = tabBarCtx.navigateToLevel(0);
+    await flush();
+    answerDrillPrompt("secondary");
+    await nav;
+    expect(writes()).toBe(before);
+    expect((tab.doc.document as any).tagName).toBe("root");
+  });
+
+  test("a failing save is reported and the jump is cancelled", async () => {
+    const tab = openShellTab();
+    tab.session.documentStack = [frame("root")] as any;
+    tab.documentPath = "pages/deep-fail.json";
     tab.doc.dirty = true;
     const originalWrite = platform.writeFile;
     platform.writeFile = async () => {
       throw new Error("readonly fs");
     };
     try {
-      await tabBarCtx.navigateToLevel(0);
+      const nav = tabBarCtx.navigateToLevel(0);
+      await flush();
+      answerDrillPrompt("confirm");
+      await nav;
     } finally {
       platform.writeFile = originalWrite;
     }
-    expect(statusMessages[0]).toBe("Save error: readonly fs");
-    expect((tab.doc.document as any).tagName).toBe("root");
+    expect(statusMessages.at(-1)).toBe("Save error: readonly fs");
+    // The jump was aborted — the deep doc is still active.
+    expect(tab.documentPath).toBe("pages/deep-fail.json");
+    expect(tab.session.documentStack).toHaveLength(1);
   });
 });
 
@@ -844,85 +927,18 @@ describe("zoom wiring", () => {
   });
 });
 
-describe("autosave", () => {
-  function makeFileHandle(behavior: { failCreate?: boolean } = {}) {
-    const write = mock(async (_: string) => {});
-    const close = mock(async () => {});
-    const handle = {
-      createWritable: async () => {
-        if (behavior.failCreate) {
-          throw new Error("no permission");
-        }
-        return { close, write };
-      },
-    };
-    return { close, handle, write };
-  }
-
-  /** Capture the 2s autosave callback by patching setTimeout around a dirty toggle. */
-  function captureAutosave(trigger: () => void): (() => Promise<void>) | null {
-    const origSetTimeout = globalThis.setTimeout;
-    let captured: (() => Promise<void>) | null = null;
-    (globalThis as any).setTimeout = (cb: () => Promise<void>, ms?: number) => {
-      if (ms === 2000) {
-        captured = cb;
-        return 0;
-      }
-      return origSetTimeout(cb, ms);
-    };
-    try {
-      trigger();
-    } finally {
-      globalThis.setTimeout = origSetTimeout;
-    }
-    return captured;
-  }
-
-  test("does not schedule when the tab has no file handle", () => {
+describe("unsaved-changes guard", () => {
+  test("beforeunload is cancelled only while a tab has unsaved changes", () => {
     const tab = openShellTab();
-    const captured = captureAutosave(() => {
-      tab.doc.dirty = true;
-    });
-    expect(captured).toBeNull();
-  });
-
-  test("writes the document through the file handle and clears dirty", async () => {
-    const { close, handle, write } = makeFileHandle();
-    const tab = openShellTab(undefined, { fileHandle: handle, id: "autosave-tab" });
-    // Pre-existing timer exercises the clearTimeout branch.
-    view.autosaveTimer = setTimeout(() => {}, 60_000);
-    const captured = captureAutosave(() => {
-      tab.doc.dirty = true;
-    });
-    expect(captured).not.toBeNull();
-    await captured!();
-    expect(write).toHaveBeenCalledTimes(1);
-    expect(String(write.mock.calls[0]![0])).toContain('"tagName"');
-    expect(close).toHaveBeenCalledTimes(1);
-    expect(tab.doc.dirty).toBe(false);
-    expect(statusMessages).toContain("Auto-saved");
-  });
-
-  test("skips the write when the document is clean by the time the timer fires", async () => {
-    const { handle, write } = makeFileHandle();
-    const tab = openShellTab(undefined, { fileHandle: handle, id: "autosave-clean" });
-    const captured = captureAutosave(() => {
-      tab.doc.dirty = true;
-    });
     tab.doc.dirty = false;
-    await captured!();
-    expect(write).not.toHaveBeenCalled();
-  });
+    const clean = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
 
-  test("swallows save failures and leaves the document dirty", async () => {
-    const { handle, write } = makeFileHandle({ failCreate: true });
-    const tab = openShellTab(undefined, { fileHandle: handle, id: "autosave-fail" });
-    const captured = captureAutosave(() => {
-      tab.doc.dirty = true;
-    });
-    await captured!();
-    expect(write).not.toHaveBeenCalled();
-    expect(tab.doc.dirty).toBe(true);
+    tab.doc.dirty = true;
+    const dirty = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
   });
 });
 

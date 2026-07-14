@@ -24,7 +24,13 @@ import {
   updateUi,
 } from "./store";
 
-import { activeTab, closeAllTabs, openTab, setWorkspaceProject } from "./workspace/workspace";
+import {
+  activeTab,
+  closeAllTabs,
+  openTab,
+  setWorkspaceProject,
+  workspace,
+} from "./workspace/workspace";
 import { mutateUpdateDef, mutateUpdateProperty, transactDoc } from "./tabs/transact";
 import { effect } from "./reactivity";
 
@@ -114,7 +120,7 @@ import { components as _swc } from "./ui/spectrum";
 import "./ui/panel-resize.js";
 // Built-in schema-form controls (schema-builder, secret) register on import
 import "./ui/form-controls.js";
-import { initLayers } from "./ui/layers";
+import { initLayers, showSaveDiscardDialog } from "./ui/layers";
 import { initShortcuts } from "./editor/shortcuts";
 import { renderActivityBar, mount as mountActivityBar } from "./panels/activity-bar";
 import * as toolbarPanel from "./panels/toolbar";
@@ -145,6 +151,7 @@ import { initWelcome } from "./panels/welcome-screen";
 import { openAddRepoModal } from "./new-project/add-repo-modal";
 import { openNewProjectModal } from "./new-project/new-project-modal";
 import type { DocumentStackEntry, GitDiffState } from "./types";
+import type { Tab } from "./tabs/tab";
 import type { JxPath } from "./state";
 import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
 
@@ -226,19 +233,41 @@ async function navigateToComponent(componentPath: string) {
   }
 }
 
+/**
+ * Leaving a drilled-in component discards its edits (the pop restores the parent). Because saving
+ * is explicit, prompt when the child is dirty: Save writes it, Discard drops it, Cancel stays.
+ * Returns false to abort navigation.
+ *
+ * @param {Tab} tab
+ */
+async function confirmLeaveDirtyChild(tab: Tab): Promise<boolean> {
+  if (!tab.doc.dirty || !tab.documentPath) {
+    return true;
+  }
+  const name = tab.documentPath.split("/").pop() || "component";
+  const choice = await showSaveDiscardDialog("Unsaved Changes", `"${name}" has unsaved changes.`);
+  if (choice === "cancel") {
+    return false;
+  }
+  if (choice === "save") {
+    try {
+      await getPlatform().writeFile(tab.documentPath, await serializeDocument(tab));
+    } catch (error) {
+      statusMessage(`Save error: ${(error as Error).message}`);
+      return false;
+    }
+  }
+  // "discard": leave without writing — the child's edits are dropped with the popped frame.
+  return true;
+}
+
 async function navigateBack() {
   const tab = activeTab.value;
   if (!tab?.session.documentStack || tab.session.documentStack.length === 0) {
     return;
   }
-  if (tab.doc.dirty && tab.documentPath) {
-    try {
-      const platform = getPlatform();
-      await platform.writeFile(tab.documentPath, await serializeDocument(tab));
-    } catch (error) {
-      const err = error as Error;
-      statusMessage(`Save error: ${err.message}`);
-    }
+  if (!(await confirmLeaveDirtyChild(tab))) {
+    return;
   }
 
   // Pop the stack
@@ -265,14 +294,8 @@ async function navigateToLevel(targetIndex: number) {
   if (!stack || targetIndex < 0 || targetIndex >= stack.length) {
     return;
   }
-  if (tab.doc.dirty && tab.documentPath) {
-    try {
-      const platform = getPlatform();
-      await platform.writeFile(tab.documentPath, await serializeDocument(tab));
-    } catch (error) {
-      const err = error as Error;
-      statusMessage(`Save error: ${err.message}`);
-    }
+  if (!(await confirmLeaveDirtyChild(tab))) {
+    return;
   }
 
   const frame = stack[targetIndex] as DocumentStackEntry;
@@ -444,6 +467,26 @@ document.addEventListener(
   },
   true,
 );
+
+// Unsaved-changes guard: saving is explicit (no idle autosave), so warn before the window unloads
+// While any open tab has unsaved edits. For collab tabs, `dirty` reflects the room-level unsaved
+// State; closing loses in-memory edits that were never flushed to disk.
+export function hasUnsavedTabs(): boolean {
+  for (const tab of workspace.tabs.values()) {
+    if (tab.doc.dirty) {
+      return true;
+    }
+  }
+  return false;
+}
+
+window.addEventListener("beforeunload", (e: BeforeUnloadEvent) => {
+  if (hasUnsavedTabs()) {
+    e.preventDefault();
+    // Legacy browsers require a truthy returnValue to trigger the native confirm prompt.
+    e.returnValue = "";
+  }
+});
 
 initCanvasUtils({
   getCanvasMode,
@@ -938,35 +981,3 @@ initShortcuts(() => ({
     view.needsCenter = false;
   },
 }));
-
-// ─── Autosave (registered as update middleware) ──────────────────────────────
-
-const AUTO_SAVE_DELAY = 2000;
-
-function scheduleAutosave() {
-  const tab = activeTab.value;
-  if (!tab?.fileHandle || !tab.doc.dirty) {
-    return;
-  }
-  if (view.autosaveTimer) {
-    clearTimeout(view.autosaveTimer);
-  }
-  view.autosaveTimer = setTimeout(async () => {
-    const t = activeTab.value;
-    if (t?.fileHandle && t.doc.dirty && "createWritable" in t.fileHandle) {
-      try {
-        const writable = await t.fileHandle.createWritable();
-        await writable.write(await serializeDocument(t));
-        await writable.close();
-        t.doc.dirty = false;
-        statusMessage("Auto-saved");
-      } catch {}
-    }
-  }, AUTO_SAVE_DELAY);
-}
-
-effect(() => {
-  if (activeTab.value?.doc.dirty) {
-    scheduleAutosave();
-  }
-});

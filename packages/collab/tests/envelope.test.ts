@@ -45,6 +45,8 @@ describe("envelope roundtrip", () => {
       { epoch: 4, path: "p.md", type: "doc-reset" },
       { path: "p.md", type: "flush" },
       { path: "p.md", type: "flush-ack" },
+      { dirty: true, path: "p.md", type: "doc-dirty" },
+      { dirty: false, path: "p.md", type: "doc-dirty" },
       { code: "read-only", message: "Write access required", path: "p.md", type: "error" },
     ];
     for (const message of messages) {

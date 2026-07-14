@@ -14,6 +14,7 @@ import { activateTab, closeTab, workspace } from "../workspace/workspace";
 import { gridTabLabel } from "../grid/grid-source";
 import type { Tab } from "../tabs/tab";
 import { showConfirmDialog } from "../ui/layers";
+import { collabState } from "../collab/collab-state";
 import type { EffectScope } from "@vue/reactivity";
 
 let _host: HTMLElement | null = null;
@@ -120,7 +121,27 @@ function tabLabel(tab: Tab) {
 }
 
 /**
- * Close a tab, prompting if dirty.
+ * True when closing this tab would lose unsaved work the user must be warned about: the tab is
+ * dirty AND either it is not co-edited, or this client is the last active collaborator on the doc
+ * (no other peer is focused on its path). When peers remain, the shared session lives on and the
+ * edits are still on the server, so closing is safe.
+ *
+ * @param {Tab} tab
+ */
+export function shouldWarnOnClose(tab: Tab): boolean {
+  if (!tab.doc.dirty) {
+    return false;
+  }
+  const state = collabState(tab);
+  if (!state.active) {
+    return true;
+  }
+  const peersHere = state.peers.filter((p) => p.state?.focusedPath === tab.documentPath);
+  return peersHere.length === 0;
+}
+
+/**
+ * Close a tab, prompting if closing would lose unsaved work.
  *
  * @param {string} id
  */
@@ -129,7 +150,7 @@ async function requestClose(id: string) {
   if (!tab) {
     return;
   }
-  if (tab.doc.dirty) {
+  if (shouldWarnOnClose(tab)) {
     const confirmed = await showConfirmDialog(
       "Unsaved Changes",
       `"${tabLabel(tab)}" has unsaved changes. Close without saving?`,

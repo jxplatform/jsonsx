@@ -19,6 +19,7 @@ import {
 import { isEditing, stopEditing } from "./inline-edit";
 import { copyNode, cutNode, pasteNode } from "./context-menu";
 import { openQuickSearch } from "../panels/quick-search";
+import { shouldWarnOnClose } from "../panels/tab-strip";
 import { showConfirmDialog } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
 
@@ -171,7 +172,7 @@ export function initShortcuts(
           e.preventDefault();
           if (workspace.activeTabId && workspace.tabOrder.length > 1) {
             const tabToClose = workspace.tabs.get(workspace.activeTabId);
-            if (tabToClose?.doc.dirty) {
+            if (tabToClose && shouldWarnOnClose(tabToClose)) {
               const name = tabToClose.documentPath?.split("/").pop() || "Untitled";
               void showConfirmDialog(
                 "Unsaved Changes",

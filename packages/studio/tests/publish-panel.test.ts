@@ -193,7 +193,10 @@ describe("openPublishPanel — connect form", () => {
     };
     type(byValue("my-site"), "my-site");
     type(byValue(""), "octocat");
-    type(fields.find((f) => f.getAttribute("value") === "" && f.value !== "octocat")!, "site");
+    type(
+      fields.find((f) => f.getAttribute("value") === "" && f.value !== "octocat")!,
+      "site",
+    );
     type(byValue("main"), "main");
     const picker = document.querySelector("#layer-modal sp-picker") as HTMLInputElement;
     picker.value = "a".repeat(32);

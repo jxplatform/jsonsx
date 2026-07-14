@@ -1,7 +1,7 @@
 /**
  * Integration: the real dev server's /__studio/collab endpoint driven by the real collab wire
- * client over actual WebSockets — probe, two-client convergence, disk write-back, flush, and
- * (registry-level) external-change resets.
+ * client over actual WebSockets — probe, two-client convergence, explicit-save persistence,
+ * room-level dirty, and (registry-level) external-change resets.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -102,19 +102,40 @@ describe("/__studio/collab", () => {
     b!.destroy();
   });
 
-  test("the debounced write-back lands without an explicit flush", async () => {
+  test("edits do NOT auto-persist; the room goes dirty and an explicit flush writes + clears it", async () => {
     const handle = await connect().openDoc(PAGE);
     await handle!.whenSynced;
-    const marker = `auto-${Date.now()}`;
+    const dirtyStates: boolean[] = [];
+    handle!.onDirty((d) => dirtyStates.push(d));
+    const before = readFileSync(join(FIXTURES, PAGE), "utf8");
+    const marker = `explicit-${Date.now()}`;
     updateSourceText(handle!.doc, `# Hello\n\n${marker}\n`, "test");
-    await until(() => {
-      try {
-        return readFileSync(join(FIXTURES, PAGE), "utf8").includes(marker);
-      } catch {
-        return false;
-      }
+    // The room reports dirty over the wire, but nothing reaches disk without an explicit flush.
+    await until(() => dirtyStates.at(-1) === true);
+    await new Promise((resolveSleep) => {
+      setTimeout(resolveSleep, 200);
     });
+    expect(readFileSync(join(FIXTURES, PAGE), "utf8")).toBe(before);
+    // The explicit flush persists it and clears the room-level dirty for every peer.
+    await handle!.flush();
+    expect(readFileSync(join(FIXTURES, PAGE), "utf8")).toContain(marker);
+    await until(() => dirtyStates.at(-1) === false);
     handle!.destroy();
+  });
+
+  test("a redundant flush with no new edits is a no-op", async () => {
+    const handle = await connect().openDoc(PAGE);
+    await handle!.whenSynced;
+    await handle!.flush();
+    const before = readFileSync(join(FIXTURES, PAGE), "utf8");
+    // Nothing changed since the last flush: the persist path short-circuits, no rewrite.
+    await handle!.flush();
+    expect(readFileSync(join(FIXTURES, PAGE), "utf8")).toBe(before);
+    handle!.destroy();
+  });
+
+  test("a binary path is refused by the capability", async () => {
+    expect(await connect().openDoc("assets/logo.png")).toBeNull();
   });
 });
 
@@ -152,6 +173,50 @@ describe("watcher-driven resets", () => {
     } finally {
       connection.destroy();
       watched.stop(true);
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+});
+
+describe("graceful shutdown", () => {
+  test("stop() flushes unsaved edits to disk and is idempotent", async () => {
+    const dir = resolve(import.meta.dir, "_collab_stop_fixtures");
+    rmSync(dir, { force: true, recursive: true });
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "doc.md"), "start\n");
+    const registry = createCollabRegistry({ absRoot: dir, activeProjectRoot: () => null });
+    const srv = Bun.serve({
+      fetch: (req, bunServer) => registry.handleRequest(req, bunServer) ?? new Response("ok"),
+      port: 0,
+      websocket: registry.websocket,
+    });
+    const connection = createWsCollabConnection({
+      openTimeoutMs: 5000,
+      url: `ws://localhost:${srv.port}`,
+    });
+    try {
+      const handle = await connection.openDoc("doc.md");
+      await handle!.whenSynced;
+      updateSourceText(handle!.doc, "start\n\nunsaved edit\n", "test");
+      // Wait for the edit to reach the server room (the dirty broadcast confirms it landed).
+      await new Promise<void>((res) => {
+        const off = handle!.onDirty((d) => {
+          if (d) {
+            off();
+            res();
+          }
+        });
+      });
+      // No explicit flush — the file on disk is still the original.
+      expect(readFileSync(join(dir, "doc.md"), "utf8")).toBe("start\n");
+      // Graceful shutdown flushes the pending edit as a last-ditch safety.
+      await registry.stop();
+      expect(readFileSync(join(dir, "doc.md"), "utf8")).toBe("start\n\nunsaved edit\n");
+      // A second stop() is idempotent.
+      await registry.stop();
+    } finally {
+      connection.destroy();
+      void srv.stop(true);
       rmSync(dir, { force: true, recursive: true });
     }
   });
