@@ -230,12 +230,14 @@ export function coerceCellInput(raw: unknown, col: GridColumn): GridCellValue {
             .filter(Boolean);
     }
     case "reference": {
+      // Relationship VALUES are plain target-entry ids ("jane-doe") — the $ref lives on the
+      // Schema property, not in the data (specs/relationships.md; parser resolveContentTypeRefs).
       if (typeof raw === "object" && raw !== null && "$ref" in raw) {
         const ref = (raw as { $ref: unknown }).$ref;
-        return typeof ref === "string" && ref !== "" ? { $ref: ref } : null;
+        return typeof ref === "string" && ref !== "" ? ref : null;
       }
       const text = String(raw).trim();
-      return text === "" ? null : { $ref: text };
+      return text === "" ? null : text;
     }
     default: {
       const text = String(raw);

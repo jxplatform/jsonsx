@@ -11,7 +11,7 @@ void mock.module("../src/format/format-host.js", () => ({
 }));
 
 const { getGridController } = await import("../src/grid/grid-controller");
-const { openCsvGridTab } = await import("../src/grid/grid-open");
+const { openCollectionGrid, openCsvGridTab } = await import("../src/grid/grid-open");
 
 beforeEach(() => {
   resetStudioState();
@@ -48,6 +48,27 @@ describe("openCsvGridTab", () => {
     expect(second.id).toBe(first.id);
     expect(workspace.tabs.size).toBe(1);
     expect(workspace.activeTabId as string | null).toBe("a.csv");
+  });
+
+  test("openCollectionGrid opens a deduped virtual tab bound to the collection source", async () => {
+    installMockPlatform({}, { "content/posts/a.md": "---\ntitle: A\n---\n" });
+    resetStudioState({
+      projectConfig: {
+        content: { posts: { format: "Markdown", schema: {}, source: "./content/posts/" } },
+      },
+    });
+    const tab = openCollectionGrid("posts");
+    expect(tab.id).toBe("grid://collection/posts");
+    expect(tab.documentPath).toBeNull();
+    expect(tab.capabilities.modes).toEqual(["grid"]);
+    expect(tab.session.ui.canvasMode).toBe("grid");
+    expect(getGridController(tab)).not.toBeNull();
+
+    workspace.activeTabId = null;
+    const again = openCollectionGrid("posts");
+    expect(again.id).toBe(tab.id);
+    expect(workspace.tabs.size).toBe(1);
+    expect(workspace.activeTabId as string | null).toBe(tab.id);
   });
 
   test("tolerates an unavailable format registry", async () => {

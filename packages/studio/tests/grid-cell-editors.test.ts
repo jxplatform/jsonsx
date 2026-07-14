@@ -82,14 +82,59 @@ describe("editorForColumn", () => {
     expect(blur.outcome.success).toEqual(["world"]);
   });
 
-  test("array editor round-trips comma text to string[]", async () => {
+  test("pill editor renders chips, adds on Enter/comma, commits on empty Enter", async () => {
     const { host, outcome } = openEditor(col("array"), ["a", "b"]);
     await flush();
+    expect(
+      [...host.querySelectorAll(".jx-grid-chip")].map((c) =>
+        c.textContent?.replaceAll(/\s+/g, " ").trim(),
+      ),
+    ).toEqual(["a ×", "b ×"]);
+
     const input = host.querySelector("input")!;
-    expect(input.value).toBe("a, b");
-    input.value = "x, y , z";
-    keydown(input, "Enter");
-    expect(outcome.success).toEqual([["x", "y", "z"]]);
+    input.value = "c";
+    keydown(input, "Enter"); // Adds a chip, keeps editing.
+    expect(outcome.success).toEqual([]);
+    expect(host.querySelectorAll(".jx-grid-chip")).toHaveLength(3);
+
+    const next = host.querySelector("input")!;
+    next.value = "d";
+    keydown(next, ","); // Comma also adds.
+    expect(host.querySelectorAll(".jx-grid-chip")).toHaveLength(4);
+
+    keydown(host.querySelector("input")!, "Enter"); // Empty Enter commits.
+    expect(outcome.success).toEqual([["a", "b", "c", "d"]]);
+  });
+
+  test("pill editor pops on Backspace, removes via ×, folds pending text on blur", async () => {
+    const pops = openEditor(col("array"), ["x", "y"]);
+    await flush();
+    keydown(pops.host.querySelector("input")!, "Backspace");
+    expect(pops.host.querySelectorAll(".jx-grid-chip")).toHaveLength(1);
+
+    (pops.host.querySelector(".jx-grid-chip-x") as HTMLElement).click();
+    expect(pops.host.querySelectorAll(".jx-grid-chip")).toHaveLength(0);
+
+    const input = pops.host.querySelector("input")!;
+    input.value = "z";
+    input.dispatchEvent(new Event("blur"));
+    expect(pops.outcome.success).toEqual([["z"]]);
+
+    const escape = openEditor(col("array"), ["a"]);
+    await flush();
+    keydown(escape.host.querySelector("input")!, "Escape");
+    expect(escape.outcome.cancel).toBe(1);
+  });
+
+  test("insert-only columns still get an editor (row gating happens in the view)", () => {
+    const column: GridColumn = {
+      editable: false,
+      field: "__path",
+      insertOnly: true,
+      kind: "string",
+      title: "Path",
+    };
+    expect(editorForColumn(column, makeHost)).toBeDefined();
   });
 
   test("date editor shows the date part and commits the string", async () => {

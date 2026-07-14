@@ -4503,6 +4503,67 @@
         margin: 0 auto;
         accent-color: var(--accent);
       }
+      .jx-grid-pill-editor .jx-grid-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        align-items: center;
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--accent);
+        border-radius: var(--spectrum-corner-radius-75, 2px);
+        padding: 1px 4px;
+      }
+      .jx-grid-pill-input {
+        flex: 1;
+        min-width: 60px;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--fg);
+        font: inherit;
+      }
+      .jx-grid-chip-x {
+        background: none;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        padding: 0 0 0 4px;
+        font: inherit;
+        line-height: 1;
+      }
+      .jx-grid-chip-x:hover {
+        color: var(--danger);
+      }
+      .jx-grid-cell-popover-body {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        min-width: 260px;
+      }
+      .jx-grid-cell-popover-title {
+        font-weight: 600;
+        font-size: var(--spectrum-font-size-75, 12px);
+      }
+      .jx-grid-cell-popover-hint {
+        color: var(--fg-dim);
+        font-size: var(--spectrum-font-size-50, 11px);
+      }
+      .jx-grid-cell-popover-actions {
+        display: flex;
+        justify-content: flex-end;
+      }
+      .jx-grid-cell-popover .jx-grid-select,
+      .jx-grid-cell-popover .jx-grid-input {
+        width: 100%;
+        background: var(--bg);
+        color: var(--fg);
+        border: 1px solid var(--border);
+        border-radius: var(--spectrum-corner-radius-75, 2px);
+        padding: 3px 6px;
+        font: inherit;
+      }
     </style>
   </head>
   <body>

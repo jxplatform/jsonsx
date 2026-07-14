@@ -7,7 +7,13 @@ import type { GridEditBatch, GridSource } from "../src/grid/grid-source";
 void mock.module("tabulator-tables", () => tabulatorMockModule);
 void mock.module("tabulator-tables/dist/css/tabulator.min.css", () => ({}));
 void mock.module("../src/ui/layers.js", () => ({
+  clearLayerSlot: () => {},
+  getLayerSlot: () => document.createElement("div"),
+  initLayers: () => {},
+  openModal: () => ({ close: () => {}, update: () => {} }),
+  renderPopover: () => ({ dismiss: () => {} }),
   showConfirmDialog: async () => true,
+  showDialog: async () => null,
 }));
 void mock.module("../src/ui/progress-modal.js", () => ({
   showProgressModal: () => ({ done: () => {}, fail: () => {}, setStatus: () => {} }),

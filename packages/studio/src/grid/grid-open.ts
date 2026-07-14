@@ -9,6 +9,9 @@ import { activateTab, openTab, workspace } from "../workspace/workspace";
 import { formatForPath, loadFormats } from "../format/format-host";
 import { createGridController } from "./grid-controller";
 import { createCsvFileSource } from "./sources/csv-file-source";
+import { createCollectionSource } from "./sources/content-source";
+import { makeGridTabId } from "./grid-source";
+import type { GridSource } from "./grid-source";
 import type { Tab } from "../tabs/tab";
 
 /** Placeholder document for grid tabs — the grid never reads it; save routes to the controller. */
@@ -40,4 +43,33 @@ export async function openCsvGridTab(path: string): Promise<Tab> {
   const controller = createGridController(tab, source);
   void controller.load();
   return tab;
+}
+
+/** Open (or activate) a virtual grid tab for a source (collections now; more kinds later). */
+function openVirtualGridTab(source: GridSource): Tab {
+  const existing = workspace.tabs.get(source.id);
+  if (existing) {
+    activateTab(source.id);
+    return existing;
+  }
+  const tab = openTab({
+    capabilities: { modes: ["grid"] },
+    document: structuredClone(GRID_STUB_DOCUMENT),
+    documentPath: null,
+    id: source.id,
+  });
+  const controller = createGridController(tab, source);
+  void controller.load();
+  return tab;
+}
+
+/** Open (or activate) the grid tab for a content collection. */
+export function openCollectionGrid(typeName: string): Tab {
+  const id = makeGridTabId({ kind: "collection", name: typeName });
+  const existing = workspace.tabs.get(id);
+  if (existing) {
+    activateTab(id);
+    return existing;
+  }
+  return openVirtualGridTab(createCollectionSource(typeName));
 }

@@ -15,6 +15,20 @@ void mock.module("../src/ui/progress-modal.js", () => ({
 }));
 void mock.module("../src/panels/statusbar.js", () => ({ statusMessage: () => {} }));
 
+const popoverCalls: { column: string; value: unknown; commit: (v: unknown) => void }[] = [];
+void mock.module("../src/grid/cell-popovers.js", () => ({
+  hasPopoverEditor: (column: { kind: string }) =>
+    column.kind === "image" || column.kind === "reference",
+  openCellValuePopover: async (args: {
+    column: { field: string };
+    value: unknown;
+    commit: (v: unknown) => void;
+  }) => {
+    popoverCalls.push({ column: args.column.field, commit: args.commit, value: args.value });
+  },
+  referenceTargetType: () => null,
+}));
+
 const { createGridController, ROW_KEY_FIELD } = await import("../src/grid/grid-controller");
 const { createGridView } = await import("../src/grid/grid-view");
 
@@ -66,6 +80,7 @@ beforeEach(() => {
   closeAllTabs();
   installMockPlatform();
   FakeTabulator.reset();
+  popoverCalls.length = 0;
 });
 
 describe("createGridView — construction", () => {
@@ -238,6 +253,71 @@ describe("view actions", () => {
     const before = table.replaceDataCalls.length;
     controller.addRow({});
     expect(table.replaceDataCalls.length).toBe(before);
+  });
+});
+
+describe("popover cells and insert-only columns", () => {
+  const richSource = (): GridSource =>
+    stubSource({
+      columns: async () => [
+        {
+          editable: false,
+          field: "__path",
+          insertOnly: true,
+          kind: "string",
+          pk: true,
+          title: "Path",
+        },
+        { editable: true, field: "cover", kind: "image", title: "Cover" },
+        { editable: true, field: "title", kind: "string", title: "Title" },
+      ],
+      id: "grid://collection/rich",
+    });
+
+  test("image/reference columns get no inline editor; dblclick opens the popover", async () => {
+    const { controller, table } = await setupView(richSource());
+    const defs = table.options.columns as Record<string, unknown>[];
+    const byField = new Map(defs.map((d) => [d.field, d]));
+    expect(byField.get("cover")!.editor).toBeUndefined();
+    expect(typeof byField.get("title")!.editor).toBe("function");
+
+    controller.buffer.setCell("a", "cover", "/img/a.png");
+    const row = fakeRow({ [ROW_KEY_FIELD]: "a", cover: "/img/a.png" });
+    const cell = fakeCell(row, "cover", table);
+    table.emit("cellDblClick", {}, cell);
+    await flush();
+    expect(popoverCalls).toHaveLength(1);
+    expect(popoverCalls[0]!.value).toBe("/img/a.png");
+
+    popoverCalls[0]!.commit("/img/b.png");
+    expect(controller.buffer.effectiveValue("a", "cover")).toBe("/img/b.png");
+    expect(row.data.cover).toBe("/img/b.png"); // Normalized into the table.
+  });
+
+  test("popover never opens for pending-delete rows or non-popover kinds", async () => {
+    const { controller, table } = await setupView(richSource());
+    controller.buffer.deleteRow("a");
+    const row = fakeRow({ [ROW_KEY_FIELD]: "a", cover: "x" });
+    table.emit("cellDblClick", {}, fakeCell(row, "cover", table));
+    table.emit("cellDblClick", {}, fakeCell(row, "title", table));
+    await flush();
+    expect(popoverCalls).toHaveLength(0);
+  });
+
+  test("insert-only columns are editable only on pending-insert rows", async () => {
+    const { controller, table } = await setupView(richSource());
+    const defs = table.options.columns as {
+      field: string;
+      editable: (cell: ReturnType<typeof fakeCell>) => boolean;
+    }[];
+    const pathDef = defs.find((d) => d.field === "__path")!;
+
+    const existing = fakeRow({ [ROW_KEY_FIELD]: "a" });
+    expect(pathDef.editable(fakeCell(existing, "__path", table))).toBeFalse();
+
+    const tempKey = controller.buffer.insertRow({});
+    const inserted = fakeRow({ [ROW_KEY_FIELD]: tempKey });
+    expect(pathDef.editable(fakeCell(inserted, "__path", table))).toBeTrue();
   });
 });
 

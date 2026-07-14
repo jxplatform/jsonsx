@@ -27,7 +27,9 @@ import {
 import "tabulator-tables/dist/css/tabulator.min.css";
 import { cellValuesEqual } from "./grid-source";
 import { cellToText, coerceCellInput } from "./schema-columns";
+import { rectOf } from "../utils/geometry";
 import { editorForColumn, formatterForColumn } from "./cell-editors";
+import { hasPopoverEditor, openCellValuePopover } from "./cell-popovers";
 import { ROW_KEY_FIELD } from "./grid-controller";
 import type { CellComponent, ColumnDefinition, RowComponent } from "tabulator-tables";
 import type { GridCellValue, GridColumn } from "./grid-source";
@@ -134,12 +136,16 @@ export function createGridView(host: HTMLElement, controller: GridController): G
     }
   };
 
+  const cellEditable = (column: GridColumn, rowKey: string) =>
+    (column.editable || (column.insertOnly === true && buffer.isInsertKey(rowKey))) &&
+    buffer.rowState(rowKey) !== "pending-delete";
+
   const columnDefs: ColumnDefinition[] = columns.map((column) => {
     const baseFormatter = formatterForColumn(column, makeHost);
     return {
-      editable: (cell: CellComponent) =>
-        column.editable && buffer.rowState(rowKeyOf(cell.getRow())) !== "pending-delete",
-      editor: editorForColumn(column, makeHost),
+      editable: (cell: CellComponent) => cellEditable(column, rowKeyOf(cell.getRow())),
+      // Image/reference cells edit through an anchored popover (dblclick), not an editor session.
+      editor: hasPopoverEditor(column) ? undefined : editorForColumn(column, makeHost),
       field: column.field,
       formatter: (cell, _params, onRendered) => {
         onRendered(() => paintCell(cell));
@@ -230,6 +236,31 @@ export function createGridView(host: HTMLElement, controller: GridController): G
     }
     paintCell(cell);
     paintRow(cell.getRow());
+  });
+
+  table.on("cellDblClick", (_event: unknown, cell: CellComponent) => {
+    const column = columnByField.get(cell.getField());
+    const rowKey = rowKeyOf(cell.getRow());
+    if (!column || !hasPopoverEditor(column) || !cellEditable(column, rowKey)) {
+      return;
+    }
+    const rect = rectOf(cell.getElement());
+    void openCellValuePopover({
+      anchor: { bottom: rect.bottom, left: rect.left },
+      column,
+      commit: (value) => {
+        buffer.setCell(rowKey, column.field, value);
+        suppress = true;
+        try {
+          cell.setValue(value, true);
+        } finally {
+          suppress = false;
+        }
+        paintCell(cell);
+        paintRow(cell.getRow());
+      },
+      value: buffer.effectiveValue(rowKey, column.field),
+    });
   });
 
   // Group edit bursts (paste, range clear) into single undo entries. The burst's cellEdited

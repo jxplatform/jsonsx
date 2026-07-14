@@ -160,12 +160,95 @@ function selectEditor(makeHost: HostFactory, column: GridColumn): CellEditorFn {
   };
 }
 
+/** Pill/chip editor for string arrays: Enter/comma adds, Backspace pops, × removes. */
+function pillEditor(makeHost: HostFactory, column: GridColumn): CellEditorFn {
+  return (cell, onRendered, success, cancel) => {
+    const host = makeHost("jx-grid-editor jx-grid-pill-editor");
+    const initial = coerceCellInput(cell.getValue(), column);
+    const chips: string[] = Array.isArray(initial) ? [...initial] : [];
+    let done = false;
+    const finish = (committed: string[] | null) => {
+      if (done) {
+        return;
+      }
+      done = true;
+      if (committed) {
+        success(committed);
+      } else {
+        cancel();
+      }
+    };
+    const inputEl = () => host.querySelector("input");
+    const addFromInput = (input: HTMLInputElement): boolean => {
+      const text = input.value.trim();
+      if (text === "") {
+        return false;
+      }
+      chips.push(text);
+      input.value = "";
+      return true;
+    };
+    const doRender = () => {
+      render(
+        html`<span class="jx-grid-pills">
+          ${chips.map(
+            (chip, i) => html`<span class="jx-grid-chip"
+              >${chip}<button
+                class="jx-grid-chip-x"
+                title="Remove"
+                @mousedown=${(e: Event) => e.preventDefault()}
+                @click=${() => {
+                  chips.splice(i, 1);
+                  doRender();
+                  inputEl()?.focus();
+                }}
+              >
+                ×
+              </button></span
+            >`,
+          )}
+          <input
+            class="jx-grid-pill-input"
+            placeholder=${chips.length === 0 ? "add…" : ""}
+            @keydown=${(e: KeyboardEvent) => {
+              const input = e.target as HTMLInputElement;
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                if (addFromInput(input)) {
+                  doRender();
+                  inputEl()?.focus();
+                } else if (e.key === "Enter") {
+                  finish([...chips]);
+                }
+              } else if (e.key === "Backspace" && input.value === "" && chips.length > 0) {
+                chips.pop();
+                doRender();
+                inputEl()?.focus();
+              } else if (e.key === "Escape") {
+                finish(null);
+              }
+            }}
+            @blur=${(e: Event) => {
+              addFromInput(e.target as HTMLInputElement);
+              finish([...chips]);
+            }}
+          />
+        </span>`,
+        host,
+      );
+    };
+    doRender();
+    onRendered(() => inputEl()?.focus());
+    return host;
+  };
+}
+
 /** Editor factory for a column; undefined means the column is not editable in place. */
 export function editorForColumn(
   column: GridColumn,
   makeHost: HostFactory,
 ): CellEditorFn | undefined {
-  if (!column.editable || column.kind === "readonly") {
+  if (column.kind === "readonly" || (!column.editable && !column.insertOnly)) {
     return undefined;
   }
   switch (column.kind) {
@@ -178,8 +261,11 @@ export function editorForColumn(
     case "date": {
       return inputEditor(makeHost, column, "date");
     }
+    case "array": {
+      return pillEditor(makeHost, column);
+    }
     default: {
-      // String/text/number/array/image/reference — text input + column-typed coercion.
+      // String/text/number/image/reference — text input + column-typed coercion.
       return inputEditor(makeHost, column, "text");
     }
   }

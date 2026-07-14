@@ -146,10 +146,10 @@ describe("coerceCellInput", () => {
     expect(coerceCellInput(["x", 1], c)).toEqual(["x", "1"]);
   });
 
-  test("references wrap strings and normalize $ref objects", () => {
+  test("references stay plain entry-id strings; $ref objects unwrap", () => {
     const c = col("reference");
-    expect(coerceCellInput("#/content/posts/hello", c)).toEqual({ $ref: "#/content/posts/hello" });
-    expect(coerceCellInput({ $ref: "#/x" }, c)).toEqual({ $ref: "#/x" });
+    expect(coerceCellInput("jane-doe", c)).toBe("jane-doe");
+    expect(coerceCellInput({ $ref: "jane-doe" }, c)).toBe("jane-doe");
     expect(coerceCellInput({ $ref: "" }, c)).toBeNull();
     expect(coerceCellInput("", c)).toBeNull();
   });

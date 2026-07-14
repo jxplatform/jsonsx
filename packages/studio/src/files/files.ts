@@ -28,7 +28,8 @@ import {
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { activateTab, openTab, renameTab, replaceAllTabs, workspace } from "../workspace/workspace";
-import { openCsvGridTab } from "../grid/grid-open";
+import { openCollectionGrid, openCsvGridTab } from "../grid/grid-open";
+import { collectionDirs } from "../grid/sources/content-source";
 import { parseSourceForPath, serializeDocument } from "./file-ops";
 import {
   documentExtensions,
@@ -720,6 +721,18 @@ function showFileContextMenu(
       action: () => createNewFile(entry.path, ctx.renderLeftPanel),
       label: "New File\u2026",
     });
+    // Directories backing a content collection get a bulk-edit affordance.
+    const collection = collectionDirs().find(
+      ({ dir }) => entry.path === dir || entry.path.endsWith(`/${dir}`),
+    );
+    if (collection) {
+      items.push({
+        action: () => {
+          openCollectionGrid(collection.name);
+        },
+        label: "Edit Collection in Grid",
+      });
+    }
   }
   items.push(
     { label: "\u2014" },

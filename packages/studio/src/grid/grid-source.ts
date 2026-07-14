@@ -35,6 +35,8 @@ export interface GridColumn {
   editable: boolean;
   /** Row-identity column (frozen first, never editable). */
   pk?: boolean | undefined;
+  /** Editable only on pending-insert rows (e.g. a new entry's path). */
+  insertOnly?: boolean | undefined;
   /** Preferred initial width in px. */
   widthHint?: number | undefined;
 }
