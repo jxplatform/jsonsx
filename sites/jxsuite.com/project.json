@@ -1,4 +1,5 @@
 {
+  "$schema": "./project.schema.json",
   "name": "Jx Suite",
   "url": "https://jxsuite.com",
   "defaults": {
@@ -17,12 +18,6 @@
     },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true
-  },
-  "imports": {
-    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json",
-    "ContentEntry": "@jxsuite/parser/ContentEntry.class.json",
-    "Markdown": "@jxsuite/parser/Markdown.class.json",
-    "MarkdownCollection": "@jxsuite/parser/MarkdownCollection.class.json"
   },
   "$head": [
     {
@@ -143,7 +138,7 @@
       }
     }
   },
-  "contentTypes": {
+  "content": {
     "docs": {
       "source": "./content/docs/",
       "format": "Markdown",
@@ -169,5 +164,6 @@
   "build": {
     "outDir": "./dist",
     "trailingSlash": "always"
-  }
+  },
+  "extensions": ["@jxsuite/parser"]
 }
