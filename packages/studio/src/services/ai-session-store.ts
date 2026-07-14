@@ -248,3 +248,31 @@ export function deleteSession(root: string, id: string) {
   }
   writeIndex(root, index);
 }
+
+/**
+ * Move a session between roots — the bootstrap handoff: a chat started with no project (unscoped
+ * root "") re-keys to the created project's root so `saveSession` keeps persisting it (it
+ * early-returns when the target index has no meta for the id). The moved session becomes the target
+ * root's active session. No-op when the session doesn't exist at `fromRoot`; delete-first ordering
+ * keeps a re-run idempotent.
+ */
+export function moveSession(fromRoot: string, toRoot: string, id: string) {
+  if (fromRoot === toRoot) {
+    return;
+  }
+  const msgs = loadSession(fromRoot, id);
+  const fromIndex = readIndex(fromRoot);
+  const meta = fromIndex.sessions.find((s) => s.id === id);
+  if (!msgs || !meta) {
+    return;
+  }
+
+  deleteSession(fromRoot, id);
+
+  writeJson(payloadKey(toRoot, id), msgs);
+  const toIndex = readIndex(toRoot);
+  toIndex.sessions = toIndex.sessions.filter((s) => s.id !== id);
+  toIndex.sessions.unshift({ ...meta });
+  toIndex.activeId = id;
+  writeIndex(toRoot, toIndex);
+}

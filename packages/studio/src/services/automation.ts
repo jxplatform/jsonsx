@@ -94,6 +94,15 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
       deps.render();
     },
     setRightTab(tab: string) {
+      // "assistant" now lives in the persistent chat sidebar, not the right panel — keep the
+      // Screenshot-manifest verb working by opening that sidebar instead.
+      if (tab === "assistant") {
+        view.chatPanelCollapsed = false;
+        applyPanelCollapse();
+        renderOnly("chatPanel");
+        deps.render();
+        return;
+      }
       updateUi("rightTab", tab);
       deps.render();
     },

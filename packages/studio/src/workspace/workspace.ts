@@ -58,6 +58,20 @@ export const activeTab = computed(() =>
 ) as unknown as ComputedRef<Tab | null>;
 
 /**
+ * Record the open project on the reactive workspace. `root` must be the absolute project root (the
+ * same value `createProject` returns and the pending-agent-prompt handoff is keyed by) — not the
+ * "."-relative root projectState sometimes holds. Consumers: AI session scoping, system-prompt
+ * project context, and the chat panel's pending-prompt effect.
+ *
+ * @param {string | null} root
+ * @param {object | null} [config]
+ */
+export function setWorkspaceProject(root: string | null, config: object | null = null) {
+  workspace.projectRoot = root;
+  workspace.projectConfig = config;
+}
+
+/**
  * Whether `tab` is the active tab. Identity check survives reactive-proxy wrapping (activeTab.value
  * is a proxy; callers may hold either the raw tab or a proxy of it).
  *

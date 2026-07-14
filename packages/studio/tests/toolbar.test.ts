@@ -258,6 +258,22 @@ describe("minimal toolbar (no open tab)", () => {
     expect(view.rightPanelCollapsed).toBe(false);
   });
 
+  test("assistant toggle flips the chat sidebar collapse state", async () => {
+    view.chatPanelCollapsed = false;
+    toolbar.mount(root, makeCtx());
+    await flush();
+
+    const toggle = () => root.querySelector("sp-action-button[title='Toggle Assistant']")!;
+    expect(toggle()).not.toBeNull();
+    click(toggle());
+    await flush();
+    expect(view.chatPanelCollapsed).toBe(true);
+
+    click(toggle());
+    await flush();
+    expect(view.chatPanelCollapsed).toBe(false);
+  });
+
   test("window controls render and dispatch when the platform provides them", async () => {
     const controls = { close: mock(() => {}), maximize: mock(() => {}), minimize: mock(() => {}) };
     (globalThis as any).__jxPlatform = { windowControls: controls };

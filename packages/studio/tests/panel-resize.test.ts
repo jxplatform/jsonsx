@@ -8,12 +8,20 @@ const root = document.documentElement;
 // The resize handles at import time, so the fixture must exist before the dynamic import below.
 localStorage.setItem(
   STORAGE_KEY,
-  JSON.stringify({ left: 300, leftCollapsed: true, right: 320, rightCollapsed: true }),
+  JSON.stringify({
+    chat: 360,
+    chatCollapsed: true,
+    left: 300,
+    leftCollapsed: true,
+    right: 320,
+    rightCollapsed: true,
+  }),
 );
 document.body.innerHTML = `
   <div id="app"></div>
   <div id="resize-left"></div>
   <div id="resize-right"></div>
+  <div id="resize-chat"></div>
 `;
 
 const { view } = await import("../src/view");
@@ -21,6 +29,7 @@ await import("../src/ui/panel-resize");
 
 const leftHandle = document.querySelector("#resize-left") as HTMLElement;
 const rightHandle = document.querySelector("#resize-right") as HTMLElement;
+const chatHandle = document.querySelector("#resize-chat") as HTMLElement;
 
 function drag(handle: HTMLElement, type: string, clientX: number) {
   handle.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX }));
@@ -39,14 +48,17 @@ describe("import-time restore", () => {
   test("saved widths are applied to the root custom properties", () => {
     expect(widthOf("--panel-w-left")).toBe("300px");
     expect(widthOf("--panel-w-right")).toBe("320px");
+    expect(widthOf("--panel-w-chat")).toBe("360px");
   });
 
   test("saved collapse flags restore view state and #app classes", () => {
     expect(view.leftPanelCollapsed).toBe(true);
     expect(view.rightPanelCollapsed).toBe(true);
+    expect(view.chatPanelCollapsed).toBe(true);
     const app = document.querySelector("#app") as HTMLElement;
     expect(app.classList.contains("left-collapsed")).toBe(true);
     expect(app.classList.contains("right-collapsed")).toBe(true);
+    expect(app.classList.contains("chat-collapsed")).toBe(true);
   });
 });
 
@@ -122,5 +134,22 @@ describe("right handle drag", () => {
   test("double-click resets the right panel to its default width", () => {
     rightHandle.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     expect(widthOf("--panel-w-right")).toBe("280px");
+  });
+});
+
+describe("chat handle drag", () => {
+  test("dragging left grows the chat sidebar (inverted delta) and persists it", () => {
+    const start = startWidth("--panel-w-chat", 320);
+    drag(chatHandle, "pointerdown", 800);
+    drag(chatHandle, "pointermove", 770);
+    expect(widthOf("--panel-w-chat")).toBe(`${start + 30}px`);
+    drag(chatHandle, "pointerup", 770);
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    expect(typeof saved.chat).toBe("number");
+  });
+
+  test("double-click resets the chat sidebar to its default width", () => {
+    chatHandle.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(widthOf("--panel-w-chat")).toBe("320px");
   });
 });

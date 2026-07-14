@@ -22,6 +22,149 @@ interface BuildSystemPromptOptions {
   components?: ComponentEntry[] | undefined;
   /** Project root path. */
   projectRoot?: string | undefined;
+  /** Whether a project is open. Defaults to `!!projectRoot` (kept explicit for tests). */
+  hasProject?: boolean | undefined;
+  /** Project-relative file paths for the inventory section (project modes; capped). */
+  fileInventory?: string[] | undefined;
+}
+
+/** Max file paths embedded in the prompt's inventory section. */
+const FILE_INVENTORY_CAP = 100;
+
+// ─── Tool tiers (single source of truth for prompt AND gating) ──────────────
+
+/** Studio state a tool tier requires. Used by the gating registry AND the prompt tool list. */
+export type AiToolTier = "no-project" | "project" | "document";
+
+export interface AiToolInfo {
+  name: string;
+  tier: AiToolTier;
+  /** One-line signature + purpose shown in the system prompt's tool list. */
+  blurb: string;
+}
+
+/**
+ * Every assistant tool with its availability tier and prompt blurb. document-assistant.ts derives
+ * the gating predicates from the same rows, so the advertised tool list and the executable tool
+ * list cannot drift (a test asserts the names match the registered tools).
+ */
+export const AI_TOOL_TIERS: AiToolInfo[] = [
+  // Bootstrap (no project open)
+  {
+    name: "create_project",
+    tier: "no-project",
+    blurb:
+      "create_project(name, description?, template?, directory?, design?) — scaffold a new Jx project (project.json, conventional directories, starter pages) and open it in the studio.",
+  },
+  {
+    name: "list_starters",
+    tier: "no-project",
+    blurb: "list_starters() — list the starter templates available for new projects.",
+  },
+  // Cross-file (project open, document optional)
+  {
+    name: "list_files",
+    tier: "project",
+    blurb: "list_files(dir?) — list the project's files recursively (build folders excluded).",
+  },
+  {
+    name: "read_file",
+    tier: "project",
+    blurb: "read_file(path) — read any project file (Jx documents, markdown, CSS, data).",
+  },
+  {
+    name: "write_file",
+    tier: "project",
+    blurb:
+      "write_file(path, content) — create or overwrite a project file. Jx documents are schema-validated and render-checked BEFORE writing; refused while the file is open with unsaved changes. Not undoable.",
+  },
+  {
+    name: "search_files",
+    tier: "project",
+    blurb: "search_files(query, extensions?) — find files by file NAME (not content).",
+  },
+  {
+    name: "create_component",
+    tier: "project",
+    blurb: "create_component(path, content) — create a new .json component file on disk.",
+  },
+  {
+    name: "create_page",
+    tier: "project",
+    blurb: "create_page(path, content) — create a new .json page file on disk.",
+  },
+  {
+    name: "open_document",
+    tier: "project",
+    blurb:
+      "open_document(path) — open a file on the canvas as the active document; the document tools then operate on it. Use when the user should SEE the page, or for iterative visual refinement.",
+  },
+  // Document (an active document on the canvas)
+  {
+    name: "read_document",
+    tier: "document",
+    blurb:
+      'read_document(path?) — inspect the whole document or the subtree at a path. Paths are JSON arrays of keys/indices from the root, e.g. ["children", 0, "children", 1].',
+  },
+  {
+    name: "set_property",
+    tier: "document",
+    blurb:
+      "set_property(path, key, value) — set or remove a property on the node at path (tagName, textContent, className, style, attributes, $props…). Pass value: null to remove.",
+  },
+  {
+    name: "set_style",
+    tier: "document",
+    blurb:
+      'set_style(path, property, value) — set or remove a CSS style property (camelCase) on a node. Values as strings: "10px", "var(--color-accent)". Pass value: null to remove.',
+  },
+  {
+    name: "set_text",
+    tier: "document",
+    blurb: 'set_text(path, value) — convenient alias for set_property with key: "textContent".',
+  },
+  {
+    name: "add_child",
+    tier: "document",
+    blurb:
+      "add_child(parentPath, index, node) — insert a new node into the children of parentPath at index.",
+  },
+  {
+    name: "remove_node",
+    tier: "document",
+    blurb: "remove_node(path) — remove the node at path.",
+  },
+  {
+    name: "move_node",
+    tier: "document",
+    blurb: "move_node(fromPath, toParentPath, toIndex) — move a node from one location to another.",
+  },
+  {
+    name: "add_state",
+    tier: "document",
+    blurb:
+      "add_state(key, value) — add a reactive state variable under the document's 'state' object. Value can be scalar, typed, computed, function, or data source.",
+  },
+  {
+    name: "update_state",
+    tier: "document",
+    blurb: "update_state(key, value) — update or remove (value: null) an existing state variable.",
+  },
+];
+
+/**
+ * Whether a tier's tools are active for the given studio state. Shared semantics with the gating
+ * registry: bootstrap tools vanish once a project opens; project tools need a project; document
+ * tools need an active document (even in single-file mode without a project).
+ */
+export function tierActive(tier: AiToolTier, hasProject: boolean, hasDocument: boolean): boolean {
+  if (tier === "no-project") {
+    return !hasProject;
+  }
+  if (tier === "project") {
+    return hasProject;
+  }
+  return hasDocument;
 }
 
 // ─── Jx Schema Reference (condensed) ────────────────────────────────────────
@@ -381,41 +524,58 @@ export function buildSystemPrompt({
   projectConfig,
   components,
   projectRoot,
+  hasProject = Boolean(projectRoot),
+  fileInventory,
 }: BuildSystemPromptOptions = {}) {
-  // 1. Role & capabilities
-  const sections = [
-    `You are an expert Jx builder assistant embedded in Jx Studio. You help users build websites, components, pages, and layouts using the Jx JSON schema. The live jxsuite.com marketing site is built entirely with Jx — you can produce production-quality Jx code.
+  const hasDocument = Boolean(document);
 
-You have access to these tools that read and modify the live Jx document directly. Always prefer tool calls over describing changes in text:
-- read_document(path?) — inspect the whole document or the subtree at a path. Paths are JSON arrays of keys/indices from the root, e.g. ["children", 0, "children", 1].
-- set_property(path, key, value) — set or remove a property on the node at path (tagName, textContent, className, style, attributes, $props…). Pass value: null to remove.
-- set_style(path, property, value) — set or remove a CSS style property (camelCase) on a node. Values as strings: "10px", "var(--color-accent)". Pass value: null to remove.
-- set_text(path, value) — convenient alias for set_property with key: "textContent".
-- add_child(parentPath, index, node) — insert a new node into the children of parentPath at index.
-- remove_node(path) — remove the node at path.
-- move_node(fromPath, toParentPath, toIndex) — move a node from one location to another.
-- add_state(key, value) — add a reactive state variable under the document's 'state' object. Value can be scalar, typed, computed, function, or data source.
-- update_state(key, value) — update or remove (value: null) an existing state variable.
-- create_component(path, content) — create a new .json component file on disk.
-- create_page(path, content) — create a new .json page file on disk.
-- open_document(path) — switch the active document to another file. After opening, all tools operate on the new document. Use this after create_page/create_component to iteratively refine the new file.
+  // 1. Role, state-appropriate workflow, and the tool list for the current state.
+  const toolList = AI_TOOL_TIERS.filter((t) => tierActive(t.tier, hasProject, hasDocument))
+    .map((t) => `- ${t.blurb}`)
+    .join("\n");
+
+  const role = `You are an expert Jx builder assistant embedded in Jx Studio. You help users build websites, components, pages, and layouts using the Jx JSON schema. The live jxsuite.com marketing site is built entirely with Jx — you can produce production-quality Jx code.`;
+
+  let workflow: string;
+  if (!hasProject && !hasDocument) {
+    workflow = `No project is open yet. Your first job is to bootstrap one:
+1. Gather what the user wants (site type, name, look) — ask briefly only if essential details are missing.
+2. Call create_project with a fitting name, template, and design quickstart (colors/fonts) derived from the request.
+3. After it succeeds the studio opens the project, and the file and document tools become available in the next round — continue building pages, components, and layouts with them without waiting to be asked.
+
+Tools available right now:
+${toolList}`;
+  } else if (!hasDocument) {
+    workflow = `A project is open, but no document is on the canvas. Work across the project's files directly — you do not need to open documents to develop:
+1. Discover with list_files / search_files, inspect with read_file.
+2. Create or modify files with write_file / create_page / create_component. Jx documents are validated before writing; fix reported errors and retry.
+3. Use open_document only when the user should see a page on the canvas, or when you want the finer-grained document tools for iterative edits.
+
+Tools available right now:
+${toolList}`;
+  } else {
+    workflow = `You have tools that read and modify the live Jx document directly, plus project-wide file tools. Always prefer tool calls over describing changes in text:
+${toolList}
 
 When the user asks you to build or modify something:
 1. Call read_document first if needed to discover the current structure and valid paths.
 2. Plan your changes — think about which tools you'll need.
 3. Execute the tools in the right order (e.g., add_child before set_property on the new node).
-4. Summarize what you changed clearly.
+4. For changes spanning OTHER files, use read_file/write_file directly instead of opening each one.
+5. Summarize what you changed clearly.
 
-Your edits apply to the live canvas immediately and are individually undoable. After each edit the document is schema-validated: if a tool returns { success: false } reporting schema errors, your change introduced them — issue a follow-up edit to fix them.
+Your document edits apply to the live canvas immediately and are individually undoable (file writes are not). After each edit the document is schema-validated: if a tool returns { success: false } reporting schema errors, your change introduced them — issue a follow-up edit to fix them.`;
+  }
 
-You have a limited number of tool-call rounds per message. On vague or open-ended prompts ("make it look better", "improve this"), prefer a small number of targeted, high-impact changes over attempting to rebuild the entire page. Explain what you changed and offer to do more.
+  const closing = `You have a limited number of tool-call rounds per message. On vague or open-ended prompts ("make it look better", "improve this"), prefer a small number of targeted, high-impact changes over attempting to rebuild the entire page. Explain what you changed and offer to do more.
 
-Be concise. Don't explain what Jx is unless asked. Just build.`,
-  ];
+Be concise. Don't explain what Jx is unless asked. Just build.`;
+
+  const sections = [`${role}\n\n${workflow}\n\n${closing}`];
 
   // eslint-disable-next-line unicorn/no-immediate-mutation -- conditional section builder: later sections are pushed only when their context exists
   sections.push(
-    // 2. Jx schema reference
+    // 2. Jx schema reference — kept in ALL modes (pre-project the model plans starter content)
     JX_SCHEMA_REFERENCE,
     // 3. State shape decision tree
     STATE_SHAPE_DECISION_TREE,
@@ -436,11 +596,21 @@ Be concise. Don't explain what Jx is unless asked. Just build.`,
   }
 
   // 6. Project context
-  if (projectConfig || components || projectRoot) {
+  if (hasProject && (projectConfig || components || projectRoot)) {
     const projectSummary = buildProjectSummary({ projectConfig, components, projectRoot });
     if (projectSummary) {
       sections.push(`## Project Context\n\n${projectSummary}`);
     }
+  }
+
+  // 6a. File inventory — a compact map of the project for cross-file work
+  if (hasProject && fileInventory && fileInventory.length > 0) {
+    const capped = fileInventory.slice(0, FILE_INVENTORY_CAP);
+    const more =
+      fileInventory.length > capped.length
+        ? `\n… and ${fileInventory.length - capped.length} more (use list_files)`
+        : "";
+    sections.push(`## Project Files\n\n${capped.join("\n")}${more}`);
   }
 
   // 7. Error recovery guidance

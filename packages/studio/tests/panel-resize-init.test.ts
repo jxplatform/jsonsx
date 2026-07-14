@@ -14,11 +14,14 @@ test("corrupt saved state is ignored and collapse flags stay default", () => {
   const root = document.documentElement;
   expect(root.style.getPropertyValue("--panel-w-left")).toBe("");
   expect(root.style.getPropertyValue("--panel-w-right")).toBe("");
+  expect(root.style.getPropertyValue("--panel-w-chat")).toBe("");
   expect(view.leftPanelCollapsed).toBe(false);
   expect(view.rightPanelCollapsed).toBe(false);
+  expect(view.chatPanelCollapsed).toBe(false);
 });
 
 test("missing handles leave the document inert (no listeners bound)", () => {
   expect(document.querySelector("#resize-left")).toBeNull();
   expect(document.querySelector("#resize-right")).toBeNull();
+  expect(document.querySelector("#resize-chat")).toBeNull();
 });

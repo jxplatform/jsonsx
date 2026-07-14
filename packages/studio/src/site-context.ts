@@ -8,6 +8,7 @@
 
 import { projectState, requireProjectState, setProjectState } from "./store";
 import { getPlatform } from "./platform";
+import { setWorkspaceProject, workspace } from "./workspace/workspace";
 
 import type {
   JxElement,
@@ -272,6 +273,7 @@ export async function updateSiteConfig(patch: Partial<ProjectConfig>) {
   } as ProjectConfig;
   await platform.writeFile("project.json", JSON.stringify(config, null, 2));
   setProjectState({ ...requireProjectState(), projectConfig: config });
+  setWorkspaceProject(workspace.projectRoot, config);
   if ("extensions" in patch) {
     const { loadFormats, refreshExtensionUi, refreshFormats } =
       await import("./format/format-host");

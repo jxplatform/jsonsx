@@ -37,6 +37,7 @@ export let canvasWrap = null as unknown as HTMLElement;
 export let activityBar = null as unknown as HTMLElement;
 export let leftPanel = null as unknown as HTMLElement;
 export let rightPanel = null as unknown as HTMLElement;
+export let chatPanelEl = null as unknown as HTMLElement;
 export let toolbarEl = null as unknown as HTMLElement;
 export let statusbarEl = null as unknown as HTMLElement;
 
@@ -45,6 +46,7 @@ export function initShellRefs() {
   activityBar = document.querySelector("#activity-bar") as HTMLElement;
   leftPanel = document.querySelector("#left-panel") as HTMLElement;
   rightPanel = document.querySelector("#right-panel") as HTMLElement;
+  chatPanelEl = document.querySelector("#chat-panel") as HTMLElement;
   toolbarEl = document.querySelector("#toolbar") as HTMLElement;
   statusbarEl = document.querySelector("#statusbar") as HTMLElement;
 }

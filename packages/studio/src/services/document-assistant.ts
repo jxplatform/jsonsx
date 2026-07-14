@@ -12,16 +12,22 @@
 import { createChatState, createProxyStreamingClient, createToolRegistry } from "@jxsuite/ai";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import { getPlatform } from "../platform";
-import { activeTab, workspace } from "../workspace/workspace";
+import { activeTab, setWorkspaceProject, workspace } from "../workspace/workspace";
 import { toRaw } from "../reactivity";
+import { projectState, setProjectState } from "../store";
+import type { Tab } from "../tabs/tab";
 import { componentRegistry } from "../files/components";
 import { registerAiTools } from "./ai-tools";
+import { registerProjectTools } from "./ai-project-tools";
+import { createGatedToolRegistry } from "./gated-registry";
+import type { ToolAvailability } from "./gated-registry";
+import { adoptProject } from "./project-adoption";
 import { runAgentLoop } from "./tool-executor";
-import { buildSystemPrompt } from "./ai-system-prompt";
+import { AI_TOOL_TIERS, buildSystemPrompt, tierActive } from "./ai-system-prompt";
 import { getBaseUrl, getModel, getOpenAiKey } from "./ai-settings";
 import { trimContext } from "./context-manager";
 import { renderCheck } from "./render-critic";
-import { openFileInTab } from "../files/files";
+import { openFileInTab, reloadFileInTab } from "../files/files";
 import * as sessionStore from "./ai-session-store";
 
 /**
@@ -51,8 +57,23 @@ function projectRoot() {
 export function createDocumentAssistant() {
   const chatState = createChatState({ model: getModel() });
 
-  const toolRegistry = createToolRegistry();
-  registerAiTools(toolRegistry, {
+  /** The persisted session backing the live chat; null = fresh unsaved chat. */
+  let sessionId: string | null = null;
+
+  const getProjectStyle = () =>
+    (workspace.projectConfig as ProjectConfig | null)?.style as Record<string, string> | undefined;
+
+  const findOpenTab = (path: string): Tab | null => {
+    for (const tab of workspace.tabs.values()) {
+      if (tab.documentPath === path) {
+        return tab;
+      }
+    }
+    return null;
+  };
+
+  const innerRegistry = createToolRegistry();
+  registerAiTools(innerRegistry, {
     getTab: () => activeTab.value,
     saveFile: async (relPath: string, content: string) => {
       const plat = getPlatform();
@@ -62,23 +83,72 @@ export function createDocumentAssistant() {
       doc: unknown,
     ) => Promise<{ ok: true } | { ok: false; error: string }>,
     openDocument: openFileInTab,
-    projectStyle: (workspace.projectConfig as ProjectConfig | null)?.style as
-      | Record<string, string>
-      | undefined,
+    getProjectStyle,
+    findOpenTab,
+    reloadTab: reloadFileInTab,
   });
+  registerProjectTools(innerRegistry, {
+    getTab: () => activeTab.value,
+    renderCheck: renderCheck as (
+      doc: unknown,
+    ) => Promise<{ ok: true } | { ok: false; error: string }>,
+    getProjectStyle,
+    findOpenTab,
+    reloadTab: reloadFileInTab,
+    adoptProject,
+    // Re-key the live chat from the unscoped store to the adopted project so the bootstrap
+    // Conversation keeps persisting (saveSession drops writes for ids missing from the index).
+    onProjectAdopted: (root: string) => {
+      if (sessionId) {
+        sessionStore.moveSession("", root, sessionId);
+      }
+    },
+    onProjectConfigWritten: (config: object) => {
+      setWorkspaceProject(workspace.projectRoot, config);
+      if (projectState) {
+        setProjectState({ ...projectState, projectConfig: config as ProjectConfig });
+      }
+    },
+  });
+
+  /*
+   * Gate tool advertisement/execution on live studio state, derived from the same tier table the
+   * system prompt renders — the model is never shown a tool it cannot execute. listForLLM() runs
+   * every agent-loop round, so a mid-loop create_project unlocks the higher tiers immediately.
+   */
+  const TIER_REQUIREMENTS = {
+    "no-project": "no project to be open (it bootstraps one)",
+    project: "an open project",
+    document: "an open document (use open_document first)",
+  } as const;
+  const availability = new Map<string, ToolAvailability>(
+    AI_TOOL_TIERS.map((t) => [
+      t.name,
+      {
+        when: () => tierActive(t.tier, Boolean(workspace.projectRoot), Boolean(activeTab.value)),
+        requires: TIER_REQUIREMENTS[t.tier],
+      },
+    ]),
+  );
+  const toolRegistry = createGatedToolRegistry(innerRegistry, availability);
 
   let controller: AbortController | null = null;
 
-  /** The persisted session backing the live chat; null = fresh unsaved chat. */
-  let sessionId: string | null = null;
-
   function buildPrompt() {
     const tab = activeTab.value;
+    const inventory = projectState
+      ? [...projectState.dirs.values()]
+          .flat()
+          .filter((e) => e.type === "file")
+          .map((e) => e.path)
+      : undefined;
     return buildSystemPrompt({
       document: tab ? toRaw(tab.doc.document) : undefined,
       projectConfig: (workspace.projectConfig as ProjectConfig | null) || undefined,
       components: componentRegistry.length > 0 ? componentRegistry : undefined,
       projectRoot: workspace.projectRoot || undefined,
+      hasProject: Boolean(workspace.projectRoot),
+      ...(inventory && inventory.length > 0 ? { fileInventory: inventory } : {}),
     });
   }
 

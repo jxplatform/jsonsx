@@ -33,15 +33,26 @@ const PATH_DESCRIPTION =
   "Path to a node in the document, as a JSON array of keys/indices from the root " +
   '(e.g. ["children", 0, "children", 1]). Use read_document to discover valid paths.';
 
+/** Steering error for document tools called with no active tab. */
+function noDocError(): ToolResult {
+  return {
+    success: false,
+    error:
+      "No document is open — use open_document(path) to open one on the canvas, or " +
+      "read_file/write_file to work with project files directly.",
+  };
+}
+
 /**
  * Translate a raw JSON Schema validation error into a Jx-specific actionable message. The LLM needs
- * concrete guidance on HOW to fix errors, not just what rule was violated.
+ * concrete guidance on HOW to fix errors, not just what rule was violated. Shared with the
+ * project-level file tools (ai-project-tools.ts), which pre-validate Jx documents before writing.
  *
  * @param {string} rawError - Message from ajv (e.g. "/children/0/style: must NOT have additional
  *   property")
  * @returns {string}
  */
-function translateValidationError(rawError: string): string {
+export function translateValidationError(rawError: string): string {
   const lower = rawError.toLowerCase();
 
   // Additional property — extract the offending key from the message if present
@@ -162,6 +173,9 @@ async function applyAndValidate(
  *   renderCheck?: (doc: unknown) => Promise<{ ok: true } | { ok: false; error: string }>;
  *   openDocument?: (path: string) => Promise<void>;
  *   projectStyle?: Record<string, string>;
+ *   getProjectStyle?: () => Record<string, string> | undefined;
+ *   findOpenTab?: (path: string) => import("../tabs/tab").Tab | null;
+ *   reloadTab?: (path: string) => Promise<void>;
  * }} ctx
  */
 export function registerAiTools(
@@ -173,6 +187,9 @@ export function registerAiTools(
     renderCheck,
     openDocument,
     projectStyle,
+    getProjectStyle,
+    findOpenTab,
+    reloadTab,
   }: {
     getTab: () => Tab | null;
     validate?: (doc: unknown) => Promise<string[]>;
@@ -180,8 +197,44 @@ export function registerAiTools(
     renderCheck?: (doc: unknown) => Promise<{ ok: true } | { ok: false; error: string }>;
     openDocument?: (path: string) => Promise<void>;
     projectStyle?: Record<string, string> | undefined;
+    /**
+     * Live variant of `projectStyle` — takes precedence; re-read per tool call so a project
+     * bootstrapped mid-session contributes its design tokens.
+     */
+    getProjectStyle?: () => Record<string, string> | undefined;
+    /** The open tab whose documentPath equals a project-relative path (write reconciliation). */
+    findOpenTab?: (path: string) => Tab | null;
+    /** Reload an open tab's document from disk after a file write. */
+    reloadTab?: (path: string) => Promise<void>;
   },
 ) {
+  const styleOf = getProjectStyle ?? (() => projectStyle);
+
+  /**
+   * Guard a disk write against an open tab: refuse while the tab has unsaved changes (the write
+   * would silently diverge from the editor). Returns null when the write may proceed.
+   */
+  function dirtyTabError(relPath: string): ToolResult | null {
+    const tab = findOpenTab?.(relPath);
+    if (tab?.doc.dirty) {
+      return {
+        success: false,
+        error:
+          `"${relPath}" is open in the editor with unsaved changes. Use open_document plus the ` +
+          `document tools to edit it, or ask the user to save or discard their changes first.`,
+      };
+    }
+    return null;
+  }
+
+  /** Refresh an open (clean) tab from disk after a write; annotate the summary accordingly. */
+  async function reconcileAfterWrite(relPath: string, summary: string): Promise<string> {
+    if (findOpenTab?.(relPath)) {
+      await reloadTab?.(relPath);
+      return `${summary} The file's open editor tab was refreshed. (Saved to disk; not undoable.)`;
+    }
+    return `${summary} (Saved to disk; not undoable.)`;
+  }
   registry.register(
     createToolDefinition({
       name: "read_document",
@@ -202,7 +255,7 @@ export function registerAiTools(
       execute(args) {
         const tab = getTab();
         if (!tab) {
-          return { success: false, error: "No document is open." };
+          return noDocError();
         }
         const { path } = args as { path?: JxPath };
         const node =
@@ -246,7 +299,7 @@ export function registerAiTools(
       async execute(args) {
         const tab = getTab();
         if (!tab) {
-          return { success: false, error: "No document is open." };
+          return noDocError();
         }
         const { path, key, value } = args as { path: JxPath; key: string; value?: JxNodeValue };
         const node = getNodeAtPath(tab.doc.document, path);
@@ -259,7 +312,7 @@ export function registerAiTools(
           `Set "${key}" at ${JSON.stringify(path)}.`,
           validate,
           renderCheck,
-          projectStyle,
+          styleOf(),
         );
       },
     }),
@@ -292,7 +345,7 @@ export function registerAiTools(
       async execute(args) {
         const tab = getTab();
         if (!tab) {
-          return { success: false, error: "No document is open." };
+          return noDocError();
         }
         const {
           parentPath,
@@ -337,7 +390,7 @@ export function registerAiTools(
           `Inserted node at ${JSON.stringify([...parentPath, "children", index])}.`,
           validate,
           renderCheck,
-          projectStyle,
+          styleOf(),
         );
       },
     }),
@@ -378,7 +431,7 @@ export function registerAiTools(
       async execute(args) {
         const tab = getTab();
         if (!tab) {
-          return { success: false, error: "No document is open." };
+          return noDocError();
         }
         const { path, property, value } = args as {
           path: JxPath;
@@ -396,7 +449,7 @@ export function registerAiTools(
           `Set style "${prop}" at ${JSON.stringify(path)}.`,
           validate,
           renderCheck,
-          projectStyle,
+          styleOf(),
         );
       },
     }),
@@ -424,7 +477,7 @@ export function registerAiTools(
       async execute(args) {
         const tab = getTab();
         if (!tab) {
-          return { success: false, error: "No document is open." };
+          return noDocError();
         }
         const { path, value } = args as { path: JxPath; value: string };
         if (getNodeAtPath(tab.doc.document, path) === undefined) {
@@ -440,7 +493,7 @@ export function registerAiTools(
           `Set text at ${JSON.stringify(path)}.`,
           validate,
           renderCheck,
-          projectStyle,
+          styleOf(),
         );
       },
     }),
@@ -470,7 +523,7 @@ export function registerAiTools(
       async execute(args) {
         const tab = getTab();
         if (!tab) {
-          return { success: false, error: "No document is open." };
+          return noDocError();
         }
         const { key, value } = args as { key: string; value: JxStateDefinition };
         if (tab.doc.document.state && tab.doc.document.state[key] !== undefined) {
@@ -495,7 +548,7 @@ export function registerAiTools(
           `Added state "${key}".`,
           validate,
           renderCheck,
-          projectStyle,
+          styleOf(),
         );
       },
     }),
@@ -526,7 +579,7 @@ export function registerAiTools(
       async execute(args) {
         const tab = getTab();
         if (!tab) {
-          return { success: false, error: "No document is open." };
+          return noDocError();
         }
         const { key, value } = args as { key: string; value?: JxStateDefinition | null };
         if (!tab.doc.document.state || tab.doc.document.state[key] === undefined) {
@@ -555,7 +608,7 @@ export function registerAiTools(
           value == null ? `Removed state "${key}".` : `Updated state "${key}".`,
           validate,
           renderCheck,
-          projectStyle,
+          styleOf(),
         );
       },
     }),
@@ -592,7 +645,7 @@ export function registerAiTools(
       async execute(args) {
         const tab = getTab();
         if (!tab) {
-          return { success: false, error: "No document is open." };
+          return noDocError();
         }
         const { fromPath, toParentPath, toIndex } = args as {
           fromPath: JxPath;
@@ -620,7 +673,7 @@ export function registerAiTools(
           `Moved node from ${JSON.stringify(fromPath)} to ${JSON.stringify([...toParentPath, "children", toIndex])}.`,
           validate,
           renderCheck,
-          projectStyle,
+          styleOf(),
         );
       },
     }),
@@ -658,6 +711,10 @@ export function registerAiTools(
           };
         }
         const { path: relPath, content } = args as { path: string; content: object };
+        const dirtyError = dirtyTabError(relPath);
+        if (dirtyError) {
+          return dirtyError;
+        }
         const errors = await validate(content);
         if (errors.length > 0) {
           const formatted = errors.map((e) => `- ${translateValidationError(e)}`).join("\n");
@@ -677,7 +734,10 @@ export function registerAiTools(
         }
         try {
           await saveFile(relPath, JSON.stringify(content, null, 2));
-          return { success: true, summary: `Created component at "${relPath}".` };
+          return {
+            success: true,
+            summary: await reconcileAfterWrite(relPath, `Created component at "${relPath}".`),
+          };
         } catch (error) {
           return {
             success: false,
@@ -719,6 +779,10 @@ export function registerAiTools(
           };
         }
         const { path: relPath, content } = args as { path: string; content: object };
+        const dirtyError = dirtyTabError(relPath);
+        if (dirtyError) {
+          return dirtyError;
+        }
         const errors = await validate(content);
         if (errors.length > 0) {
           const formatted = errors.map((e) => `- ${translateValidationError(e)}`).join("\n");
@@ -738,7 +802,10 @@ export function registerAiTools(
         }
         try {
           await saveFile(relPath, JSON.stringify(content, null, 2));
-          return { success: true, summary: `Created page at "${relPath}".` };
+          return {
+            success: true,
+            summary: await reconcileAfterWrite(relPath, `Created page at "${relPath}".`),
+          };
         } catch (error) {
           return {
             success: false,
@@ -831,7 +898,7 @@ export function registerAiTools(
       async execute(args) {
         const tab = getTab();
         if (!tab) {
-          return { success: false, error: "No document is open." };
+          return noDocError();
         }
         const { path } = args as { path: JxPath };
         if (path.length < 2) {
@@ -846,7 +913,7 @@ export function registerAiTools(
           `Removed node at ${JSON.stringify(path)}.`,
           validate,
           renderCheck,
-          projectStyle,
+          styleOf(),
         );
       },
     }),

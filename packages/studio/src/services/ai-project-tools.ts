@@ -1,0 +1,541 @@
+/**
+ * Ai-project-tools.ts — project-level tools for the AI assistant.
+ *
+ * Two tiers registered here (document tools live in ai-tools.ts):
+ *
+ * - Bootstrap (no project open): `create_project` scaffolds through the platform's shared
+ *   `createProject` pipeline (`@jxsuite/create` server-side) and adopts the result into this
+ *   window; `list_starters` enumerates starter templates.
+ * - Cross-file (project open): `list_files` / `read_file` / `write_file` / `search_files` operate
+ *   through the platform adapter without touching the tab strip, so the agent can develop across
+ *   many files. `write_file` pre-validates Jx documents (no undo exists for disk writes, so
+ *   validation blocks instead of optimistically applying) and reconciles with open tabs.
+ *
+ * @license MIT
+ */
+
+import { createToolDefinition } from "@jxsuite/ai/tools";
+import type { ToolRegistry, ToolResult } from "@jxsuite/ai/tools";
+import type { JxMutableNode } from "@jxsuite/schema/types";
+import { getPlatform } from "../platform";
+import { workspace } from "../workspace/workspace";
+import type { Tab } from "../tabs/tab";
+import { beginBatch, endBatch, isBatching } from "../tabs/transact";
+import { translateValidationError } from "./ai-tools";
+import { validateDoc } from "./jx-validate";
+import { flagHardcodedTokens, formatTokenHints } from "./token-lint";
+
+/** Directories the file tools never descend into or report. */
+const EXCLUDED_DIRS = new Set(["node_modules", "dist", ".git", ".jx-cache"]);
+
+/** Caps keeping tool results inside chat-context and localStorage budgets. */
+const LIST_CAP = 200;
+const SEARCH_CAP = 100;
+const READ_CAP_BYTES = 48 * 1024;
+const WRITE_CAP_BYTES = 256 * 1024;
+
+const NOT_UNDOABLE = "(saved to disk; not undoable with Cmd+Z)";
+
+/**
+ * Normalize a project-relative path, or return null when it escapes the project (absolute paths,
+ * `..` segments, drive letters). The server re-checks; this keeps the error actionable.
+ */
+export function normalizeRelPath(path: unknown): string | null {
+  if (typeof path !== "string" || !path.trim()) {
+    return null;
+  }
+  let p = path.trim().replaceAll("\\", "/");
+  while (p.startsWith("./")) {
+    p = p.slice(2);
+  }
+  if (p.startsWith("/") || p.startsWith("~") || /^[A-Za-z]:/.test(p)) {
+    return null;
+  }
+  if (p.split("/").includes("..")) {
+    return null;
+  }
+  return p;
+}
+
+function pathError(path: unknown): ToolResult {
+  return {
+    success: false,
+    error: `Invalid path ${JSON.stringify(path)} — use a path relative to the project root (no leading "/", no "..").`,
+  };
+}
+
+/** Whether a project-relative path conventionally holds a Jx document. */
+function isJxDocPath(path: string): boolean {
+  return /^(pages|layouts|components)\//.test(path) && path.endsWith(".json");
+}
+
+/** Structural sniff for Jx-document-shaped JSON values. */
+function looksLikeJxDoc(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    ("tagName" in value || "$id" in value || "$elements" in value)
+  );
+}
+
+export interface ProjectToolsCtx {
+  getTab: () => Tab | null;
+  validate?: (doc: unknown) => Promise<string[]>;
+  renderCheck?: (doc: unknown) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /** Live getter — the project style appears only after a project is open/bootstrapped. */
+  getProjectStyle?: () => Record<string, string> | undefined;
+  /** The open tab whose `documentPath` equals the given project-relative path, if any. */
+  findOpenTab: (path: string) => Tab | null;
+  /** Reload an open tab's document from disk (files.ts `reloadFileInTab`). */
+  reloadTab: (path: string) => Promise<void>;
+  /** Open the project at an absolute root in this window (project-adoption.ts). */
+  adoptProject: (root: string) => Promise<void>;
+  /** Fired after adoption is verified — the session store re-keys the live chat here. */
+  onProjectAdopted?: (root: string) => void;
+  /** Fired after a successful `project.json` write so workspace/project state stay in sync. */
+  onProjectConfigWritten?: (config: object) => void;
+}
+
+/**
+ * Register the project-level tools into a tool registry.
+ *
+ * @param {Pick<ToolRegistry, "register">} registry
+ * @param {ProjectToolsCtx} ctx
+ */
+export function registerProjectTools(
+  registry: Pick<ToolRegistry, "register">,
+  {
+    getTab,
+    validate = validateDoc,
+    renderCheck,
+    getProjectStyle,
+    findOpenTab,
+    reloadTab,
+    adoptProject,
+    onProjectAdopted,
+    onProjectConfigWritten,
+  }: ProjectToolsCtx,
+) {
+  // ── list_files ─────────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "list_files",
+      description:
+        "List the project's files recursively (paths relative to the project root, with type and " +
+        "size). Use this to discover pages, layouts, components, content, data, and styles before " +
+        "reading or writing files. Build folders (node_modules, dist, .git) are excluded.",
+      parameters: {
+        type: "object",
+        properties: {
+          dir: {
+            type: "string",
+            description:
+              'Directory to list, relative to the project root. Omit for the root (".").',
+          },
+        },
+        required: [],
+      },
+      async execute(args) {
+        const { dir } = args as { dir?: string };
+        const start = dir === undefined || dir === "" ? "." : normalizeRelPath(dir);
+        if (start === null) {
+          return pathError(dir);
+        }
+        const platform = getPlatform();
+        const entries: { path: string; type: string; size?: number }[] = [];
+        const queue = [start];
+        let truncated = false;
+        while (queue.length > 0 && !truncated) {
+          const current = queue.shift()!;
+          let children;
+          try {
+            children = await platform.listDirectory(current);
+          } catch {
+            continue;
+          }
+          for (const e of children) {
+            const name = e.name || e.path.split("/").pop() || "";
+            if (EXCLUDED_DIRS.has(name) || name.startsWith(".")) {
+              continue;
+            }
+            const path = e.path || (current === "." ? name : `${current}/${name}`);
+            if (entries.length >= LIST_CAP) {
+              truncated = true;
+              break;
+            }
+            entries.push({
+              path,
+              type: e.type,
+              ...(typeof e.size === "number" ? { size: e.size } : {}),
+            });
+            if (e.type === "directory") {
+              queue.push(path);
+            }
+          }
+        }
+        return {
+          success: true,
+          data: { entries, truncated },
+          summary: `Listed ${entries.length} entries under "${start}"${truncated ? ` (truncated at ${LIST_CAP})` : ""}.`,
+        };
+      },
+    }),
+  );
+
+  // ── read_file ──────────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "read_file",
+      description:
+        "Read a project file's content by its project-relative path. Works for any text file " +
+        "(Jx documents, markdown, CSS, data). Large files are truncated.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: 'Project-relative file path, e.g. "pages/about.json".',
+          },
+        },
+        required: ["path"],
+      },
+      async execute(args) {
+        const relPath = normalizeRelPath((args as { path: string }).path);
+        if (relPath === null) {
+          return pathError((args as { path: string }).path);
+        }
+        try {
+          const content = await getPlatform().readFile(relPath);
+          if (content.length > READ_CAP_BYTES) {
+            return {
+              success: true,
+              data: {
+                content: `${content.slice(0, READ_CAP_BYTES)}\n… [truncated: file is ${content.length} bytes, showing first ${READ_CAP_BYTES}]`,
+                truncated: true,
+              },
+            };
+          }
+          return { success: true, data: { content, truncated: false } };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Failed to read "${relPath}": ${error instanceof Error ? error.message : String(error)}`,
+          };
+        }
+      },
+    }),
+  );
+
+  // ── write_file ─────────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "write_file",
+      description:
+        "Write a project file (create or overwrite) at a project-relative path. Jx documents " +
+        "(.json under pages/, layouts/, components/) are schema-validated and render-checked " +
+        "before writing — fix reported errors and retry. Refused while the target file is open " +
+        "with unsaved changes. Disk writes are not undoable.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: 'Project-relative file path, e.g. "components/footer.json".',
+          },
+          content: {
+            type: "string",
+            description: "The complete new file content (full file, not a diff).",
+          },
+        },
+        required: ["path", "content"],
+      },
+      async execute(args) {
+        const { path, content } = args as { path: string; content: string };
+        const relPath = normalizeRelPath(path);
+        if (relPath === null) {
+          return pathError(path);
+        }
+        if (content.length > WRITE_CAP_BYTES) {
+          return {
+            success: false,
+            error: `Content is ${content.length} bytes — the write cap is ${WRITE_CAP_BYTES}. Split the content across smaller files.`,
+          };
+        }
+
+        // Reconcile with an open tab BEFORE writing: a dirty tab would silently diverge from disk.
+        const openTab = findOpenTab(relPath);
+        if (openTab?.doc.dirty) {
+          return {
+            success: false,
+            error:
+              `"${relPath}" is open in the editor with unsaved changes. Use open_document plus the ` +
+              `document tools to edit it, or ask the user to save or discard their changes first.`,
+          };
+        }
+
+        // Pre-validate Jx documents — disk writes have no undo to lean on.
+        let parsed: unknown;
+        const isJson = relPath.endsWith(".json") && relPath !== "project.json";
+        if (isJson) {
+          try {
+            parsed = JSON.parse(content);
+          } catch (error) {
+            return {
+              success: false,
+              error: `Content is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+            };
+          }
+        }
+        let tokenHints = "";
+        if (isJson && (isJxDocPath(relPath) || looksLikeJxDoc(parsed))) {
+          const errors = await validate(parsed);
+          if (errors.length > 0) {
+            const formatted = errors.map((e) => `- ${translateValidationError(e)}`).join("\n");
+            return {
+              success: false,
+              error: `Document has schema errors — nothing was written. Fix these and retry:\n${formatted}`,
+            };
+          }
+          if (renderCheck) {
+            const renderResult = await renderCheck(parsed);
+            if (!renderResult.ok) {
+              return {
+                success: false,
+                error: `Document is schema-valid but fails to render — nothing was written. Fix and retry:\n- ${renderResult.error}`,
+              };
+            }
+          }
+          const projectStyle = getProjectStyle?.();
+          if (projectStyle) {
+            tokenHints = formatTokenHints(
+              flagHardcodedTokens(parsed as JxMutableNode, projectStyle),
+            );
+          }
+        }
+
+        if (relPath === "project.json") {
+          try {
+            JSON.parse(content);
+          } catch (error) {
+            return {
+              success: false,
+              error: `project.json must be valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+            };
+          }
+        }
+
+        try {
+          await getPlatform().writeFile(relPath, content);
+        } catch (error) {
+          return {
+            success: false,
+            error: `Failed to write "${relPath}": ${error instanceof Error ? error.message : String(error)}`,
+          };
+        }
+
+        if (relPath === "project.json") {
+          onProjectConfigWritten?.(JSON.parse(content) as object);
+        }
+
+        let summary = `Wrote "${relPath}" ${NOT_UNDOABLE}.`;
+        if (openTab) {
+          await reloadTab(relPath);
+          summary = `Wrote "${relPath}" and refreshed its open editor tab ${NOT_UNDOABLE}.`;
+        }
+        return { success: true, summary: tokenHints ? `${summary}\n\n${tokenHints}` : summary };
+      },
+    }),
+  );
+
+  // ── search_files ───────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "search_files",
+      description:
+        "Search project files by file NAME (not content). Returns matching paths. Use list_files " +
+        "for a directory overview and read_file to inspect contents.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: 'Substring of the file name, e.g. "hero".' },
+          extensions: {
+            type: "array",
+            description: 'Optional extension filter, e.g. [".json", ".md"].',
+            items: { type: "string" },
+          },
+        },
+        required: ["query"],
+      },
+      async execute(args) {
+        const { query, extensions } = args as { query: string; extensions?: string[] };
+        try {
+          const results = await getPlatform().searchFiles(query, extensions);
+          const paths = results.map((r) => r.path).slice(0, SEARCH_CAP);
+          return {
+            success: true,
+            data: { paths, truncated: results.length > SEARCH_CAP },
+            summary: `Found ${paths.length} file(s) matching "${query}".`,
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Search failed: ${error instanceof Error ? error.message : String(error)}`,
+          };
+        }
+      },
+    }),
+  );
+
+  // ── create_project ─────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "create_project",
+      description:
+        "Create a new Jx project (project.json, conventional directories, starter pages) and open " +
+        "it in the studio. Only available while no project is open. After it succeeds, the file " +
+        "and document tools become available for building out the project. If the directory " +
+        "already exists, retry with a different directory slug.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: 'Human project name, e.g. "Acme Bakery".' },
+          description: { type: "string", description: "Short project description." },
+          template: {
+            type: "string",
+            description:
+              'Scaffold variant: "blank" (default), "desktop-first", "mobile-first", or "mobile-app".',
+            enum: ["blank", "desktop-first", "mobile-first", "mobile-app"],
+          },
+          directory: {
+            type: "string",
+            description: "Directory slug to create the project in. Defaults to a slug of the name.",
+          },
+          design: {
+            type: "object",
+            description:
+              "Optional design quickstart: { accent, background, text, bodyFont, headingFont } — " +
+              "CSS colors and font-family names applied to the scaffold's design tokens.",
+          },
+        },
+        required: ["name"],
+      },
+      async execute(args) {
+        const { name, description, template, directory, design } = args as {
+          name: string;
+          description?: string;
+          template?: string;
+          directory?: string;
+          design?: Record<string, string>;
+        };
+        if (workspace.projectRoot) {
+          return {
+            success: false,
+            error:
+              "A project is already open in this window — create_project is only for bootstrapping.",
+          };
+        }
+        const slug =
+          directory?.trim() ||
+          name
+            .toLowerCase()
+            .replaceAll(/[^a-z0-9]+/g, "-")
+            .replaceAll(/^-|-$/g, "");
+        if (!slug) {
+          return { success: false, error: 'Could not derive a directory slug — pass "directory".' };
+        }
+
+        let result: { root: string; config: object };
+        try {
+          result = await getPlatform().createProject({
+            name,
+            directory: slug,
+            ...(description ? { description } : {}),
+            ...(template ? { template } : {}),
+            ...(design ? { design } : {}),
+          });
+        } catch (error) {
+          return {
+            success: false,
+            error: `Failed to create project: ${error instanceof Error ? error.message : String(error)}`,
+          };
+        }
+
+        /*
+         * Adoption runs the full project-open flow (closes all tabs, opens the home page). The
+         * agent loop may hold an undo batch on the pre-adoption tab — flush it first and re-open
+         * one on whatever tab adoption leaves active, mirroring open_document's batch dance.
+         */
+        const wasBatching = isBatching();
+        if (wasBatching) {
+          endBatch();
+        }
+        let adoptionError: string | null = null;
+        try {
+          await adoptProject(result.root);
+        } catch (error) {
+          adoptionError = error instanceof Error ? error.message : String(error);
+        }
+        if (wasBatching) {
+          beginBatch(getTab());
+        }
+
+        /*
+         * The adopter (openRecentProject) swallows failures into a status message, so a resolved
+         * promise is not proof of adoption — verify against the workspace before re-keying the
+         * chat session.
+         */
+        const adopted = workspace.projectRoot === result.root;
+        if (adopted) {
+          onProjectAdopted?.(result.root);
+          return {
+            success: true,
+            summary:
+              `Created project "${name}" at ${result.root} and opened it. The file tools ` +
+              `(list_files, read_file, write_file) and document tools are now available — start ` +
+              `with list_files to see the scaffolded pages, layouts, and components.`,
+          };
+        }
+        return {
+          success: true,
+          summary:
+            `Created project "${name}" at ${result.root}, but it was not opened in this window` +
+            `${adoptionError ? ` (${adoptionError})` : " (it may have opened in another window)"}. ` +
+            `Ask the user to open it from the welcome screen or recent projects.`,
+        };
+      },
+    }),
+  );
+
+  // ── list_starters ──────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "list_starters",
+      description:
+        "List the starter templates available for new projects (id, name, description). " +
+        "Currently informational — create_project scaffolds from built-in template variants.",
+      parameters: { type: "object", properties: {}, required: [] },
+      async execute() {
+        try {
+          const starters = (await getPlatform().listStarters?.()) ?? [];
+          return {
+            success: true,
+            data: { starters },
+            summary: `${starters.length} starter(s) available.`,
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Failed to list starters: ${error instanceof Error ? error.message : String(error)}`,
+          };
+        }
+      },
+    }),
+  );
+}

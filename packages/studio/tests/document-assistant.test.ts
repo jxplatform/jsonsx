@@ -6,7 +6,7 @@
  * real, so the full wiring — system prompt, context trim, tool registry, agent loop, persistence —
  * runs without a network. The tool path mutates the live document as one undo step.
  */
-import { installMockPlatform, resetWorkspaceWithTab } from "./harness";
+import { installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { createChatState, createToolRegistry } from "@jxsuite/ai";
 import type { StreamingClient } from "@jxsuite/ai/streaming-client";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -19,18 +19,24 @@ type StreamEvent =
 let nextRounds: StreamEvent[][] = [];
 let createErrorMessage: string | null = null;
 let lastClientOpts: Record<string, unknown> | null = null;
+let capturedTools: string[][] = [];
+let capturedSystemPrompts: string[] = [];
 
 function fakeClient(rounds: StreamEvent[][]): StreamingClient {
   let call = 0;
   return {
-    async *streamChat() {
+    async *streamChat(_messages: unknown, tools?: unknown, systemPrompt?: unknown) {
+      capturedTools.push(
+        ((tools as { function: { name: string } }[]) ?? []).map((t) => t.function.name),
+      );
+      capturedSystemPrompts.push(String(systemPrompt ?? ""));
       const events = rounds[call] ?? [{ stopReason: "stop", type: "done" }];
       call += 1;
       for (const e of events) {
         yield e;
       }
     },
-  };
+  } as unknown as StreamingClient;
 }
 
 /** One tool call followed by a tool_calls stop. */
@@ -59,6 +65,9 @@ const LEGACY_PERSIST_KEY = "jx-ai-chat-history";
 const { createDocumentAssistant } = await import("../src/services/document-assistant");
 const { getActiveSessionId, listSessions, loadSession } =
   await import("../src/services/ai-session-store");
+const { setProjectAdopter } = await import("../src/services/project-adoption");
+const { closeAllTabs, setWorkspaceProject, workspace } = await import("../src/workspace/workspace");
+const store = await import("../src/store");
 
 /** The messages persisted for the assistant's active session (tests run with no project root). */
 function persistedMessages() {
@@ -69,10 +78,14 @@ function persistedMessages() {
 beforeEach(() => {
   installMockPlatform();
   resetWorkspaceWithTab();
+  setWorkspaceProject(null);
+  setProjectAdopter(async () => {});
   globalThis.localStorage.clear();
   nextRounds = [];
   createErrorMessage = null;
   lastClientOpts = null;
+  capturedTools = [];
+  capturedSystemPrompts = [];
 });
 
 afterEach(() => {
@@ -136,6 +149,8 @@ describe("document-assistant", () => {
 
   test("create_page writes the file through the platform saveFile wiring", async () => {
     const { state } = installMockPlatform();
+    // Create_page sits in the "project" tool tier — it needs an open project to be executable.
+    setWorkspaceProject("/proj");
     nextRounds = [
       toolCallRound("c1", "create_page", {
         content: { children: [{ tagName: "p", textContent: "About us" }], tagName: "div" },
@@ -269,5 +284,124 @@ describe("document-assistant", () => {
 
     globalThis.localStorage.setItem(LEGACY_PERSIST_KEY, "[]");
     expect(createDocumentAssistant().chatState.messages).toHaveLength(0);
+  });
+});
+
+describe("document-assistant — state-gated tools & bootstrap", () => {
+  test("sends with no document and no project, advertising only bootstrap tools", async () => {
+    closeAllTabs();
+    nextRounds = [
+      [
+        { content: "Let's start a project", type: "delta" },
+        { stopReason: "stop", type: "done" },
+      ],
+    ];
+    const a = createDocumentAssistant();
+    await a.sendMessage("I want a portfolio site");
+
+    expect(a.chatState.status).toBe("idle");
+    expect(capturedTools[0]).toContain("create_project");
+    expect(capturedTools[0]).toContain("list_starters");
+    expect(capturedTools[0]).not.toContain("list_files");
+    expect(capturedTools[0]).not.toContain("set_property");
+    expect(capturedSystemPrompts[0]).toContain("No project is open yet");
+  });
+
+  test("with a project and a document, file and document tools are advertised together", async () => {
+    setWorkspaceProject("/proj");
+    nextRounds = [[{ stopReason: "stop", type: "done" }]];
+    const a = createDocumentAssistant();
+    await a.sendMessage("hi");
+
+    expect(capturedTools[0]).toContain("set_property");
+    expect(capturedTools[0]).toContain("write_file");
+    expect(capturedTools[0]).not.toContain("create_project");
+  });
+
+  test("create_project adopts the scaffold and re-keys the pre-project session", async () => {
+    closeAllTabs();
+    // The registered adopter stands in for openRecentProject: it "opens" the project.
+    setProjectAdopter(async (root: string) => {
+      setWorkspaceProject(root, { name: "Fresh" });
+    });
+    nextRounds = [
+      toolCallRound("c1", "create_project", { name: "Fresh Site" }),
+      [
+        { content: "Project ready", type: "delta" },
+        { stopReason: "stop", type: "done" },
+      ],
+    ];
+
+    const a = createDocumentAssistant();
+    await a.sendMessage("bootstrap a site");
+
+    const root = workspace.projectRoot!;
+    expect(root).toBeTruthy();
+    // The live session moved from the unscoped store to the adopted root and stayed active.
+    expect(listSessions("").some((s) => s.id === a.activeSessionId())).toBe(false);
+    const moved = listSessions(root).find((s) => s.id === a.activeSessionId());
+    expect(moved?.title).toBe("bootstrap a site");
+    expect(getActiveSessionId(root)).toBe(a.activeSessionId());
+    // Post-adoption persistence lands in the re-keyed store.
+    expect(
+      loadSession(root, a.activeSessionId()!)?.some((m) => m.content === "Project ready"),
+    ).toBe(true);
+    // The second round re-advertised the unlocked tiers (mid-loop re-listing).
+    expect(capturedTools[1]).toContain("list_files");
+    expect(capturedTools[1]).not.toContain("create_project");
+  });
+});
+
+describe("document-assistant — cross-file wiring", () => {
+  test("a project.json write syncs workspace + project config, and the inventory feeds the prompt", async () => {
+    setWorkspaceProject("/proj", { name: "Old Name" });
+    resetStudioState({
+      dirs: new Map([
+        [
+          ".",
+          [
+            { name: "index.json", path: "pages/index.json", type: "file" },
+            { name: "pages", path: "pages", type: "directory" },
+          ],
+        ],
+      ]),
+    });
+    nextRounds = [
+      toolCallRound("c1", "write_file", {
+        content: JSON.stringify({ name: "New Name" }),
+        path: "project.json",
+      }),
+      [{ stopReason: "stop", type: "done" }],
+    ];
+
+    const a = createDocumentAssistant();
+    await a.sendMessage("rename the project");
+
+    expect((workspace.projectConfig as { name?: string } | null)?.name).toBe("New Name");
+    expect((store.projectState?.projectConfig as { name?: string } | null)?.name).toBe("New Name");
+    // The file inventory section rode along in the system prompt, files only (no directories).
+    const filesSection = capturedSystemPrompts[0]!.split("## Project Files")[1]!;
+    expect(filesSection.split("\n\n---\n\n")[0]!.trim()).toBe("pages/index.json");
+  });
+
+  test("write_file over the open clean tab reloads the document from disk", async () => {
+    setWorkspaceProject("/proj");
+    installMockPlatform();
+    const tab = resetWorkspaceWithTab(undefined, { documentPath: "pages/index.json" });
+    nextRounds = [
+      toolCallRound("c1", "write_file", {
+        content: JSON.stringify({ children: [], tagName: "section" }),
+        path: "pages/index.json",
+      }),
+      [{ stopReason: "stop", type: "done" }],
+    ];
+
+    const a = createDocumentAssistant();
+    await a.sendMessage("rewrite the home page");
+
+    // The write landed AND the open tab reconciled to the on-disk content.
+    expect(tab.doc.document.tagName).toBe("section");
+    expect(tab.doc.dirty).toBe(false);
+    expect(a.chatState.status).toBe("idle");
   });
 });

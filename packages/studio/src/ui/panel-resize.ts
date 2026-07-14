@@ -13,6 +13,7 @@ const MIN_WIDTH = 160;
 const MAX_RATIO = 0.5; // Max 50% of viewport
 const DEFAULT_LEFT = 240;
 const DEFAULT_RIGHT = 280;
+const DEFAULT_CHAT = 320;
 
 const root = document.documentElement;
 
@@ -27,8 +28,10 @@ try {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as {
     left?: number;
     right?: number;
+    chat?: number;
     leftCollapsed?: boolean;
     rightCollapsed?: boolean;
+    chatCollapsed?: boolean;
   };
   if (saved.left) {
     root.style.setProperty("--panel-w-left", `${saved.left}px`);
@@ -36,11 +39,17 @@ try {
   if (saved.right) {
     root.style.setProperty("--panel-w-right", `${saved.right}px`);
   }
+  if (saved.chat) {
+    root.style.setProperty("--panel-w-chat", `${saved.chat}px`);
+  }
   if (saved.leftCollapsed) {
     view.leftPanelCollapsed = true;
   }
   if (saved.rightCollapsed) {
     view.rightPanelCollapsed = true;
+  }
+  if (saved.chatCollapsed) {
+    view.chatPanelCollapsed = true;
   }
   applyPanelCollapse();
 } catch {
@@ -111,8 +120,9 @@ function setupHandle(
 function persistWidths() {
   const left = readPxVar("--panel-w-left") || DEFAULT_LEFT;
   const right = readPxVar("--panel-w-right") || DEFAULT_RIGHT;
+  const chat = readPxVar("--panel-w-chat") || DEFAULT_CHAT;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ left, right }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ chat, left, right }));
   } catch {
     // Storage full or unavailable
   }
@@ -122,10 +132,14 @@ function persistWidths() {
 
 const resizeLeft = document.querySelector<HTMLElement>("#resize-left");
 const resizeRight = document.querySelector<HTMLElement>("#resize-right");
+const resizeChat = document.querySelector<HTMLElement>("#resize-chat");
 
 if (resizeLeft) {
   setupHandle(resizeLeft, "--panel-w-left", "left", DEFAULT_LEFT);
 }
 if (resizeRight) {
   setupHandle(resizeRight, "--panel-w-right", "right", DEFAULT_RIGHT);
+}
+if (resizeChat) {
+  setupHandle(resizeChat, "--panel-w-chat", "right", DEFAULT_CHAT);
 }

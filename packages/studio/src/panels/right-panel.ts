@@ -10,8 +10,7 @@ import { rightPanel, updateUi } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { createPanelScheduler } from "./panel-scheduler";
 import type { PanelScheduler } from "./panel-scheduler";
-import { activeTab, workspace } from "../workspace/workspace";
-import { consumePendingAgentPrompt, hasPendingAgentPrompt } from "../services/agent-seed";
+import { activeTab } from "../workspace/workspace";
 import { tabIcon } from "./activity-bar";
 import { eventsSidebarTemplate } from "./events-panel";
 import { isCustomElementDoc } from "./signals-panel";
@@ -21,12 +20,6 @@ import { renderStylePanelTemplate } from "./style-panel";
 import { renderPropertiesPanelTemplate } from "./properties-panel";
 
 import type { EffectScope } from "@vue/reactivity";
-import {
-  renderAiPanelTemplate,
-  bindAiPanelHost,
-  mountAiPanel,
-  seedAssistantPrompt,
-} from "./ai-panel";
 
 interface RightPanelCtx {
   navigateToComponent: (path: string) => void;
@@ -47,7 +40,6 @@ let _scheduler: PanelScheduler | null = null;
  */
 export function mount(ctx: RightPanelCtx) {
   _ctx = ctx;
-  mountAiPanel();
   _scheduler = createPanelScheduler({
     blockWhile: isColorPopoverOpen,
     render: _doRender,
@@ -87,7 +79,6 @@ export function unmount() {
   _propsContainer = null;
   _eventsContainer = null;
   _styleContainer = null;
-  _assistantContainer = null;
 }
 
 /**
@@ -101,7 +92,6 @@ export function render() {
 let _propsContainer: HTMLElement | null = null;
 let _eventsContainer: HTMLElement | null = null;
 let _styleContainer: HTMLElement | null = null;
-let _assistantContainer: HTMLElement | null = null;
 
 function _ensureContainers() {
   if (_propsContainer) {
@@ -113,12 +103,6 @@ function _ensureContainers() {
   _eventsContainer.className = "panel-body";
   _styleContainer = document.createElement("div");
   _styleContainer.className = "panel-body";
-  _assistantContainer = document.createElement("div");
-  _assistantContainer.className = "panel-body";
-  _assistantContainer.style.cssText = "display:flex;flex-direction:column;overflow:hidden";
-  // The AI panel owns a focus-guard-free rAF render loop into this container so
-  // Streaming repaints while the composer is focused (see ai-panel.ts).
-  bindAiPanelHost(_assistantContainer);
 }
 
 function _doRender() {
@@ -138,20 +122,17 @@ function _doRender() {
       selection: aTab.session.selection,
       ui: aTab.session.ui,
     };
-    // A pending agent prompt (stored by the New Project flow, possibly from another window)
-    // Forces the Assistant tab open — same updateUi mechanism the automation hook uses.
-    const root = workspace.projectRoot;
-    if (root && S.ui.rightTab !== "assistant" && hasPendingAgentPrompt(root)) {
-      updateUi("rightTab", "assistant");
-    }
-    const tab = S.ui.rightTab;
+    // Coerce stale values ("assistant" moved to the persistent chat sidebar; automation or a
+    // Restored session may still carry it).
+    const tab = ["properties", "events", "style"].includes(S.ui.rightTab)
+      ? S.ui.rightTab
+      : "properties";
 
     // Render tabs header
     const panelTabs = [
       { icon: "sp-icon-properties", label: "Properties", value: "properties" },
       { icon: "sp-icon-event", label: "Events", value: "events" },
       { icon: "sp-icon-brush", label: "Style", value: "style" },
-      { icon: "sp-icon-chat", label: "Assistant", value: "assistant" },
     ];
     const tabsT = html`
       <div class="panel-tabs">
@@ -178,21 +159,12 @@ function _doRender() {
     `;
 
     _ensureContainers();
-    const containers = [
-      _propsContainer,
-      _eventsContainer,
-      _styleContainer,
-      _assistantContainer,
-    ] as HTMLElement[];
-    const tabKeys = ["properties", "events", "style", "assistant"];
+    const containers = [_propsContainer, _eventsContainer, _styleContainer] as HTMLElement[];
+    const tabKeys = ["properties", "events", "style"];
 
     // Show/hide containers
     for (let i = 0; i < containers.length; i++) {
-      if (tabKeys[i] === tab) {
-        containers[i]!.style.display = tabKeys[i] === "assistant" ? "flex" : "";
-      } else {
-        containers[i]!.style.display = "none";
-      }
+      containers[i]!.style.display = tabKeys[i] === tab ? "" : "none";
     }
 
     // Render tabs into the right panel, append containers
@@ -223,16 +195,6 @@ function _doRender() {
         litRender(renderStylePanelTemplate({ getCanvasMode: ctx.getCanvasMode }), _styleContainer!);
       } catch (error) {
         console.error("[renderStylePanelTemplate]", error);
-      }
-    } else if (tab === "assistant") {
-      litRender(renderAiPanelTemplate(), _assistantContainer!);
-      if (root) {
-        // Consume-on-read keeps repeated renders idempotent; seed after the panel template
-        // Has rendered so the assistant machinery is in place.
-        const prompt = consumePendingAgentPrompt(root);
-        if (prompt) {
-          requestAnimationFrame(() => void seedAssistantPrompt(prompt));
-        }
       }
     }
   } catch (error) {

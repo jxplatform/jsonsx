@@ -11,6 +11,7 @@ import { errorMessage } from "@jxsuite/schema/parse";
 
 import {
   canvasWrap,
+  chatPanelEl,
   getNodeAtPath,
   initShellRefs,
   projectState,
@@ -23,7 +24,7 @@ import {
   updateUi,
 } from "./store";
 
-import { activeTab, closeAllTabs, openTab } from "./workspace/workspace";
+import { activeTab, closeAllTabs, openTab, setWorkspaceProject } from "./workspace/workspace";
 import { mutateUpdateDef, mutateUpdateProperty, transactDoc } from "./tabs/transact";
 import { effect } from "./reactivity";
 
@@ -119,6 +120,8 @@ import { renderActivityBar, mount as mountActivityBar } from "./panels/activity-
 import * as toolbarPanel from "./panels/toolbar";
 import * as overlaysPanel from "./panels/overlays";
 import * as rightPanelMod from "./panels/right-panel";
+import * as chatPanelMod from "./panels/chat-panel";
+import { setProjectAdopter } from "./services/project-adoption";
 import * as leftPanelMod from "./panels/left-panel";
 import * as tabStrip from "./panels/tab-strip";
 import * as tabBar from "./panels/tab-bar";
@@ -537,6 +540,12 @@ rightPanelMod.mount({
   renderCanvas: () => renderCanvas(),
 });
 
+// The persistent AI chat sidebar — mounts once, available with or without a project/document.
+chatPanelMod.mount(chatPanelEl);
+// The assistant's create_project tool adopts freshly scaffolded projects through the same
+// Flow as the recent-projects list.
+setProjectAdopter(openRecentProject);
+
 leftPanelMod.mount({
   cloneRepository: () => cloneRepository({ openRecentProject }),
   defBadgeLabel,
@@ -568,6 +577,7 @@ leftPanelMod.mount({
 registerRenderer("leftPanel", () => leftPanelMod.render());
 registerRenderer("canvas", () => renderCanvas());
 registerRenderer("rightPanel", () => rightPanelMod.render());
+registerRenderer("chatPanel", () => chatPanelMod.render());
 registerRenderer("overlays", () => overlaysPanel.render());
 setStatusbarRenderer(() => renderStatusbar());
 mountStatusbar();
@@ -667,6 +677,7 @@ if (_projectParam) {
             searchQuery: "",
             selectedPath: siteCtx.fileRelPath || null,
           });
+          setWorkspaceProject(siteCtx.sitePath, siteCtx.projectConfig || null);
 
           refreshExtensionUi(platform);
           await autoSyncProjectOnOpen();
@@ -859,6 +870,7 @@ async function openRecentProject(root: string) {
       searchQuery: "",
       selectedPath: null,
     });
+    setWorkspaceProject(root, config);
 
     await autoSyncProjectOnOpen();
     await ensureDependenciesInstalled();

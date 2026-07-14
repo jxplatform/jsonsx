@@ -57,6 +57,7 @@
       :root {
         --panel-w-left: 240px;
         --panel-w-right: 280px;
+        --panel-w-chat: 320px;
       }
       /* Studio semantic token layer.
          Declared on sp-theme — not :root — so each var(--spectrum-*) reference
@@ -198,7 +199,9 @@
       #app {
         display: grid;
         grid-template-rows: 36px auto auto minmax(0, 1fr) 24px;
-        grid-template-columns: 48px var(--panel-w-left) 1fr var(--panel-w-right);
+        grid-template-columns: 48px var(--panel-w-left) 1fr var(--panel-w-right) var(
+            --panel-w-chat
+          );
         height: 100%;
       }
       #toolbar {
@@ -400,12 +403,18 @@
         background: var(--bg);
         border-left: 1px solid var(--border);
       }
-      #right-panel:has(.ai-tab-body) {
+      /* Persistent AI chat sidebar — always a flex column (the chat UI owns its
+         own scrolling), unlike #right-panel which scrolls the whole panel. */
+      #chat-panel {
+        grid-row: 2 / 5;
+        grid-column: 5;
         display: flex;
         flex-direction: column;
-        overflow-y: hidden;
+        overflow: hidden;
+        background: var(--bg);
+        border-left: 1px solid var(--border);
       }
-      #right-panel:has(.ai-tab-body) .panel-body {
+      #chat-panel .panel-body {
         flex: 1;
         min-height: 0;
         display: flex;
@@ -426,6 +435,13 @@
       }
       #app.right-collapsed #right-panel,
       #app.right-collapsed #resize-right {
+        display: none;
+      }
+      #app.chat-collapsed {
+        --panel-w-chat: 0px;
+      }
+      #app.chat-collapsed #chat-panel,
+      #app.chat-collapsed #resize-chat {
         display: none;
       }
 
@@ -871,6 +887,10 @@
       }
       #resize-right {
         grid-column: 4;
+        justify-self: start;
+      }
+      #resize-chat {
+        grid-column: 5;
         justify-self: start;
       }
 
@@ -4578,6 +4598,8 @@
         <div id="canvas-wrap"></div>
         <div id="resize-right" class="resize-handle"></div>
         <div id="right-panel"></div>
+        <div id="resize-chat" class="resize-handle"></div>
+        <div id="chat-panel"></div>
         <div id="statusbar"></div>
       </div>
       <div

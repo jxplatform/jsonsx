@@ -10,6 +10,7 @@ beforeEach(() => {
   localStorage.removeItem(STORAGE_KEY);
   view.leftPanelCollapsed = false;
   view.rightPanelCollapsed = false;
+  view.chatPanelCollapsed = false;
 });
 
 afterEach(() => {
@@ -34,11 +35,17 @@ describe("applyPanelCollapse", () => {
     const app = mountApp();
     view.leftPanelCollapsed = true;
     view.rightPanelCollapsed = false;
+    view.chatPanelCollapsed = true;
 
     applyPanelCollapse();
 
     expect(app.classList.contains("left-collapsed")).toBe(true);
     expect(app.classList.contains("right-collapsed")).toBe(false);
+    expect(app.classList.contains("chat-collapsed")).toBe(true);
+
+    view.chatPanelCollapsed = false;
+    applyPanelCollapse();
+    expect(app.classList.contains("chat-collapsed")).toBe(false);
   });
 
   test("removes classes when panels are expanded again", () => {
@@ -61,12 +68,14 @@ describe("applyPanelCollapse", () => {
     mountApp();
     view.leftPanelCollapsed = true;
     view.rightPanelCollapsed = true;
+    view.chatPanelCollapsed = true;
 
     applyPanelCollapse();
 
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
     expect(saved.leftCollapsed).toBe(true);
     expect(saved.rightCollapsed).toBe(true);
+    expect(saved.chatCollapsed).toBe(true);
   });
 
   test("merges with existing saved panel widths", () => {

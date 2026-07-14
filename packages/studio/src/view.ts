@@ -46,6 +46,7 @@ interface ViewState {
   leftTab: string;
   leftPanelCollapsed: boolean;
   rightPanelCollapsed: boolean;
+  chatPanelCollapsed: boolean;
   autosaveTimer: ReturnType<typeof setTimeout> | null;
   _layersCollapsed: Set<string> | null;
   [key: string]: unknown;
@@ -104,6 +105,7 @@ export const view: ViewState = {
   leftTab: "layers",
   leftPanelCollapsed: false,
   rightPanelCollapsed: false,
+  chatPanelCollapsed: false,
 
   // Autosave
   autosaveTimer: null,
@@ -121,6 +123,7 @@ export function applyPanelCollapse() {
   }
   app.classList.toggle("left-collapsed", view.leftPanelCollapsed);
   app.classList.toggle("right-collapsed", view.rightPanelCollapsed);
+  app.classList.toggle("chat-collapsed", view.chatPanelCollapsed);
   try {
     const saved = JSON.parse(localStorage.getItem(COLLAPSE_STORAGE_KEY) || "{}") as Record<
       string,
@@ -128,6 +131,7 @@ export function applyPanelCollapse() {
     >;
     saved.leftCollapsed = view.leftPanelCollapsed;
     saved.rightCollapsed = view.rightPanelCollapsed;
+    saved.chatCollapsed = view.chatPanelCollapsed;
     localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(saved));
   } catch {
     // Storage unavailable

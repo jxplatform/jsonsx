@@ -563,3 +563,65 @@ describe("ai-tools — file creation", () => {
     expect(res.error).toContain("no active tab");
   });
 });
+
+describe("ai-tools — write reconciliation with open tabs", () => {
+  test("create_page refuses while the target file is open with unsaved changes", async () => {
+    const openTab = createTab({ document: { children: [], tagName: "div" }, id: "pages/x.json" });
+    openTab.documentPath = "pages/x.json";
+    openTab.doc.dirty = true;
+    const saved: string[] = [];
+    const { tab, registry } = harness(
+      { tagName: "div", children: [] },
+      {
+        findOpenTab: (p) => (p === "pages/x.json" ? openTab : null),
+        saveFile: async (p) => void saved.push(p),
+        validate: async () => [],
+      },
+    );
+    const res = await registry.execute("create_page", {
+      content: { children: [], tagName: "div" },
+      path: "pages/x.json",
+    });
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("unsaved changes");
+    expect(saved).toHaveLength(0);
+    disposeTab(openTab);
+    disposeTab(tab);
+  });
+
+  test("create_component over a clean open tab reloads it and flags no-undo", async () => {
+    const openTab = createTab({
+      document: { children: [], tagName: "div" },
+      id: "components/c.json",
+    });
+    openTab.documentPath = "components/c.json";
+    const reloaded: string[] = [];
+    const { tab, registry } = harness(
+      { tagName: "div", children: [] },
+      {
+        findOpenTab: (p) => (p === "components/c.json" ? openTab : null),
+        reloadTab: async (p) => void reloaded.push(p),
+        saveFile: async () => {},
+        validate: async () => [],
+      },
+    );
+    const res = await registry.execute("create_component", {
+      content: { children: [], tagName: "my-c" },
+      path: "components/c.json",
+    });
+    expect(res.success).toBe(true);
+    expect(res.summary).toContain("refreshed");
+    expect(res.summary).toContain("not undoable");
+    expect(reloaded).toEqual(["components/c.json"]);
+    disposeTab(openTab);
+    disposeTab(tab);
+  });
+
+  test("the no-document error steers toward open_document and the file tools", async () => {
+    const registry = createToolRegistry();
+    registerAiTools(registry, { getTab: () => null, validate: async () => [] });
+    const err = await execErr(registry, "read_document", {});
+    expect(err).toContain("open_document");
+    expect(err).toContain("write_file");
+  });
+});

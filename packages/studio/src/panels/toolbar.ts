@@ -322,7 +322,26 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
         ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
         : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`}
     </sp-action-button>
-    ${csdTpl}
+    ${chatToggleTpl()} ${csdTpl}
+  `;
+}
+
+/** Toggle for the persistent AI chat sidebar (selected = open). Shared by both layouts. */
+function chatToggleTpl() {
+  return html`
+    <sp-action-button
+      quiet
+      size="s"
+      title="Toggle Assistant"
+      ?selected=${!view.chatPanelCollapsed}
+      @click=${() => {
+        view.chatPanelCollapsed = !view.chatPanelCollapsed;
+        applyPanelCollapse();
+        render();
+      }}
+    >
+      <sp-icon-chat slot="icon"></sp-icon-chat>
+    </sp-action-button>
   `;
 }
 
@@ -560,6 +579,6 @@ function toolbarTemplate() {
         ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
         : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`}
     </sp-action-button>
-    ${isMac ? nothing : csdTpl}
+    ${chatToggleTpl()} ${isMac ? nothing : csdTpl}
   `;
 }

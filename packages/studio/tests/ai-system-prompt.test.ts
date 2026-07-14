@@ -112,3 +112,74 @@ describe("ai-system-prompt — buildSystemPrompt", () => {
     expect(prompt).not.toContain("## Project Context");
   });
 });
+
+describe("ai-system-prompt — state-aware modes", () => {
+  test("no-project mode offers bootstrap tools only, keeping the static Jx knowledge", () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).toContain("No project is open yet");
+    expect(prompt).toContain("create_project(");
+    expect(prompt).toContain("list_starters()");
+    // No file or document tools are advertised…
+    expect(prompt).not.toContain("- list_files(");
+    expect(prompt).not.toContain("- set_property(");
+    // …but the schema/pattern sections stay so the model can plan starter content.
+    expect(prompt).toContain("## Jx Document Format");
+    expect(prompt).toContain("## Design Principles");
+  });
+
+  test("project mode (no document) advertises the cross-file workflow", () => {
+    const prompt = buildSystemPrompt({ projectRoot: "/proj" });
+    expect(prompt).toContain("no document is on the canvas");
+    expect(prompt).toContain("- list_files(");
+    expect(prompt).toContain("- write_file(");
+    expect(prompt).toContain("- open_document(");
+    expect(prompt).not.toContain("- create_project(");
+    expect(prompt).not.toContain("- set_property(");
+  });
+
+  test("document mode lists document AND file tools", () => {
+    const prompt = buildSystemPrompt({
+      document: { children: [], tagName: "div" } as unknown as JxMutableNode,
+      projectRoot: "/proj",
+    });
+    expect(prompt).toContain("- set_property(");
+    expect(prompt).toContain("- read_file(");
+    expect(prompt).not.toContain("- create_project(");
+    expect(prompt).toContain("## Current Document");
+  });
+
+  test("file inventory renders in project mode and caps at 100 entries", () => {
+    const fileInventory = Array.from({ length: 120 }, (_, i) => `pages/p${i}.json`);
+    const prompt = buildSystemPrompt({ fileInventory, projectRoot: "/proj" });
+    expect(prompt).toContain("## Project Files");
+    expect(prompt).toContain("pages/p0.json");
+    expect(prompt).toContain("pages/p99.json");
+    expect(prompt).not.toContain("pages/p100.json");
+    expect(prompt).toContain("and 20 more");
+    // Without a project the inventory is omitted even if passed.
+    expect(buildSystemPrompt({ fileInventory })).not.toContain("## Project Files");
+  });
+});
+
+describe("ai-system-prompt — tool-table/gating consistency", () => {
+  test("AI_TOOL_TIERS names exactly match the registered tools", async () => {
+    const { AI_TOOL_TIERS } = await import("../src/services/ai-system-prompt");
+    const { createToolRegistry } = await import("@jxsuite/ai");
+    const { registerAiTools } = await import("../src/services/ai-tools");
+    const { registerProjectTools } = await import("../src/services/ai-project-tools");
+
+    const registry = createToolRegistry();
+    registerAiTools(registry, { getTab: () => null, validate: async () => [] });
+    registerProjectTools(registry, {
+      adoptProject: async () => {},
+      findOpenTab: () => null,
+      getTab: () => null,
+      reloadTab: async () => {},
+      validate: async () => [],
+    });
+
+    const registered = new Set(registry.list().map((t) => t.name));
+    const tiered = new Set(AI_TOOL_TIERS.map((t) => t.name));
+    expect([...registered].toSorted()).toEqual([...tiered].toSorted());
+  });
+});

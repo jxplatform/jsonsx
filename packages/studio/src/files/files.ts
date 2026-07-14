@@ -27,7 +27,14 @@ import {
   monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
-import { activateTab, openTab, renameTab, replaceAllTabs, workspace } from "../workspace/workspace";
+import {
+  activateTab,
+  openTab,
+  renameTab,
+  replaceAllTabs,
+  setWorkspaceProject,
+  workspace,
+} from "../workspace/workspace";
 import { openCollectionGrid, openCsvGridTab, openPagesGrid } from "../grid/grid-open";
 import { collectionDirs } from "../grid/sources/content-source";
 import { parseSourceForPath, serializeDocument } from "./file-ops";
@@ -100,6 +107,11 @@ export async function loadProject() {
       searchQuery: "",
       selectedPath: null,
     });
+    // Only a site project counts as an open project for the workspace (a bare monorepo root keeps
+    // The assistant in bootstrap mode).
+    if (info.isSiteProject) {
+      setWorkspaceProject(meta.root || ".", info.projectConfig || null);
+    }
 
     if (info.isSiteProject) {
       addRecentProject(requireProjectState().name, meta.root);
@@ -162,6 +174,7 @@ export async function openProject({
       searchQuery: "",
       selectedPath: null,
     });
+    setWorkspaceProject(handle.root, config);
 
     await autoSyncProjectOnOpen();
     await ensureDependenciesInstalled();

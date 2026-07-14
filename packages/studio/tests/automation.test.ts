@@ -130,6 +130,21 @@ describe("createAutomationApi", () => {
     });
   });
 
+  test('setRightTab("assistant") opens the chat sidebar instead of a right-panel tab', () => {
+    resetWorkspaceWithTab();
+    const deps = makeDeps();
+    const api = createAutomationApi(deps);
+    api.setRightTab("style");
+    view.chatPanelCollapsed = true;
+    api.setRightTab("assistant");
+    // The retired tab value maps to the persistent chat sidebar…
+    expect(view.chatPanelCollapsed).toBe(false);
+    // …and the right panel's own tab selection is untouched.
+    const ui = activeTab.value?.session.ui as unknown as Record<string, unknown>;
+    expect(ui.rightTab).toBe("style");
+    expect(deps.render).toHaveBeenCalled();
+  });
+
   test("editDef targets a named state function", () => {
     resetWorkspaceWithTab();
     const api = createAutomationApi(makeDeps());

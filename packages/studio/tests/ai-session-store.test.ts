@@ -261,3 +261,40 @@ describe("defensive paths", () => {
     }
   });
 });
+
+describe("moveSession — bootstrap re-keying", () => {
+  test("moves a session from the unscoped store to a project root and activates it", async () => {
+    const { moveSession } = await import("../src/services/ai-session-store");
+    const meta = createSession("", "build me a site");
+    saveSession("", meta.id, [msg("user", "build me a site"), msg("assistant", "on it")]);
+
+    moveSession("", ROOT, meta.id);
+
+    // Gone from the source store…
+    expect(listSessions("").some((s) => s.id === meta.id)).toBe(false);
+    expect(loadSession("", meta.id)).toBeNull();
+    // …present, loadable, and active at the target root with its meta intact.
+    const moved = listSessions(ROOT).find((s) => s.id === meta.id);
+    expect(moved?.title).toBe("build me a site");
+    expect(getActiveSessionId(ROOT)).toBe(meta.id);
+    expect(loadSession(ROOT, meta.id)?.map((m) => m.content)).toEqual(["build me a site", "on it"]);
+    // SaveSession keeps working against the new root (the whole point of the move).
+    saveSession(ROOT, meta.id, [msg("user", "build me a site"), msg("assistant", "done")]);
+    expect(listSessions(ROOT).find((s) => s.id === meta.id)?.messageCount).toBe(2);
+  });
+
+  test("is a no-op for unknown sessions, same roots, and repeated moves", async () => {
+    const { moveSession } = await import("../src/services/ai-session-store");
+    expect(() => moveSession("", ROOT, "ghost")).not.toThrow();
+    expect(listSessions(ROOT)).toHaveLength(0);
+
+    const meta = createSession(ROOT, "hello");
+    saveSession(ROOT, meta.id, [msg("user", "hello")]);
+    moveSession(ROOT, ROOT, meta.id);
+    expect(listSessions(ROOT)).toHaveLength(1);
+
+    moveSession("", ROOT, meta.id); // Source doesn't hold it → no-op, target untouched.
+    expect(listSessions(ROOT)).toHaveLength(1);
+    expect(loadSession(ROOT, meta.id)).not.toBeNull();
+  });
+});

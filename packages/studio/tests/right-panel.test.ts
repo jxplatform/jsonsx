@@ -1,36 +1,12 @@
 /**
- * Right panel orchestrator — mount/unmount lifecycle, tab routing
- * (properties/events/style/assistant), the sp-tabs change handler, and the no-active-tab clear
- * path.
+ * Right panel orchestrator — mount/unmount lifecycle, tab routing (properties/events/style), the
+ * sp-tabs change handler, the stale-"assistant" coercion (the Assistant tab moved to the persistent
+ * chat sidebar), and the no-active-tab clear path.
  */
 import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
-import { reactive } from "@vue/reactivity";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { initShellRefs, rightPanel, updateUi } from "../src/store";
-import { activeTab, closeAllTabs, workspace } from "../src/workspace/workspace";
-import { setPendingAgentPrompt } from "../src/services/agent-seed";
-
-// The right panel imports the AI panel, which instantiates a document assistant at module load.
-// Mock it (before the dynamic right-panel import below) so the assistant tab — and the pending
-// Agent-prompt seeding — never touches the network.
-const assistantChatState = reactive({
-  error: null as string | null,
-  messages: [] as { role: string; content: string }[],
-  status: "idle" as "idle" | "streaming" | "error",
-});
-const assistantSend = mock(async (_text: string) => {});
-void mock.module("../src/services/document-assistant", () => ({
-  createDocumentAssistant: () => ({
-    activeSessionId: () => null,
-    chatState: assistantChatState,
-    deleteSession: () => {},
-    listSessions: () => [],
-    newChat: () => {},
-    openSession: () => {},
-    sendMessage: assistantSend,
-    stop: () => {},
-  }),
-}));
+import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 
 const { mount, render, unmount } = await import("../src/panels/right-panel");
 
@@ -51,7 +27,8 @@ function makeCtx() {
 beforeEach(() => {
   document.body.innerHTML = `<div id="app">
     <div id="toolbar"></div><div id="activity-bar"></div><div id="left-panel"></div>
-    <div id="canvas-wrap"></div><div id="right-panel"></div><div id="statusbar"></div>
+    <div id="canvas-wrap"></div><div id="right-panel"></div><div id="chat-panel"></div>
+    <div id="statusbar"></div>
   </div>`;
   initShellRefs();
   resetStudioState();
@@ -69,7 +46,7 @@ describe("right panel", () => {
     render();
     await flush(4);
     expect(rightPanel.querySelector("sp-tabs")).toBeTruthy();
-    expect(rightPanel.querySelectorAll("sp-tab").length).toBe(4);
+    expect(rightPanel.querySelectorAll("sp-tab").length).toBe(3);
     const visible = [...rightPanel.querySelectorAll(".panel-body")].filter(
       (el) => (el as HTMLElement).style.display !== "none",
     );
@@ -84,11 +61,11 @@ describe("right panel", () => {
     expect(rightPanel.textContent).toBe("");
   });
 
-  test("routes to events, style, and assistant tabs", async () => {
+  test("routes to events and style tabs", async () => {
     resetWorkspaceWithTab();
     const ctx = makeCtx();
     mount(ctx as never);
-    for (const tabName of ["events", "style", "assistant"]) {
+    for (const tabName of ["events", "style"]) {
       updateUi("rightTab", tabName);
       render();
       await flush(4);
@@ -97,6 +74,18 @@ describe("right panel", () => {
       expect(visible.length).toBe(1);
     }
     expect(ctx.getCanvasMode).toHaveBeenCalled();
+  });
+
+  test("a stale 'assistant' rightTab coerces to properties", async () => {
+    resetWorkspaceWithTab();
+    mount(makeCtx() as never);
+    updateUi("rightTab", "assistant");
+    render();
+    await flush(4);
+    const tabs = rightPanel.querySelector("sp-tabs") as HTMLElement;
+    expect(tabs.getAttribute("selected")).toBe("properties");
+    // No fourth container appears for the retired tab.
+    expect(rightPanel.querySelectorAll(".panel-body").length).toBe(3);
   });
 
   test("sp-tabs change handler switches the active tab", async () => {
@@ -124,25 +113,6 @@ describe("right panel", () => {
     unmount();
     expect(() => render()).not.toThrow();
     await flush(2);
-  });
-
-  test("a pending agent prompt flips to the assistant tab and is consumed", async () => {
-    resetWorkspaceWithTab();
-    workspace.projectRoot = "/proj-a";
-    setPendingAgentPrompt("/proj-a", "build a pricing page");
-    assistantSend.mockClear();
-    try {
-      mount(makeCtx() as never);
-      render();
-      await flush(6);
-      expect(activeTab.value?.session.ui.rightTab).toBe("assistant");
-      // Consume-on-read: the localStorage entry is gone after the first render…
-      expect(globalThis.localStorage.getItem("jx.ai.pendingAgentPrompt:/proj-a")).toBeNull();
-      // …and the prompt was handed to the assistant send path.
-      expect(assistantSend).toHaveBeenCalledWith("build a pricing page");
-    } finally {
-      workspace.projectRoot = null;
-    }
   });
 });
 
