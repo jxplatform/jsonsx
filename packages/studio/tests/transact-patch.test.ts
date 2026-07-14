@@ -6,7 +6,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { toRaw } from "../src/reactivity";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
-import { setPatchConsumer } from "../src/tabs/patch-ops";
+import {
+  beginRecording,
+  endRecording,
+  markNonInvertible,
+  setPatchConsumer,
+} from "../src/tabs/patch-ops";
 import {
   mutateAddDef,
   mutateDuplicateNode,
@@ -172,6 +177,18 @@ describe("mutator op recording", () => {
     expect(opsFor((t) => mutateUpdateProp(t, ["children", 0], "label", "x"))).toEqual([
       { op: "replace", path: ["children", 0] },
     ]);
+  });
+});
+
+describe("recording primitives", () => {
+  test("markNonInvertible flags the current transaction record", () => {
+    beginRecording();
+    markNonInvertible();
+    const record = endRecording();
+    expect(record.invertible).toBe(false);
+    // Recording state resets after endRecording.
+    beginRecording();
+    expect(endRecording().invertible).toBe(true);
   });
 });
 

@@ -8,7 +8,16 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { GENERATED_SCHEMA_COMMENT } from "@jxsuite/schema/project-schemas";
 import { readBundledProjectSchemas, writeProjectSchemas } from "../src/site/schema-command";
@@ -25,8 +34,17 @@ function writeFile(relPath: string, content: string | object) {
   );
 }
 
-function readJson(relPath: string): Record<string, any> {
-  return JSON.parse(readFileSync(resolve(TMP, relPath), "utf8"));
+interface SchemaDoc {
+  $comment?: string;
+  $ref?: string;
+  allOf?: { $ref: string }[];
+  $defs?: Record<string, Record<string, unknown>>;
+  unevaluatedProperties?: boolean;
+  [key: string]: unknown;
+}
+
+function readJson(relPath: string): SchemaDoc {
+  return JSON.parse(readFileSync(resolve(TMP, relPath), "utf8")) as SchemaDoc;
 }
 
 beforeAll(() => {
@@ -74,7 +92,7 @@ describe("writeProjectSchemas", () => {
     expect(project.$comment).toBe(GENERATED_SCHEMA_COMMENT);
     // Workspace resolution escapes the fixture root → conventional node_modules fallback; the
     // Local extension stays a plain in-project path.
-    expect(project.allOf.map((entry: { $ref: string }) => entry.$ref)).toEqual([
+    expect(project.allOf!.map((entry) => entry.$ref)).toEqual([
       "./node_modules/@jxsuite/schema/schemas/project.core.schema.json",
       "./node_modules/@jxsuite/parser/schemas/project.fragment.schema.json",
       "./local-ext/project.fragment.schema.json",
@@ -84,7 +102,7 @@ describe("writeProjectSchemas", () => {
     const document = readJson("document.schema.json");
     expect(document.$ref).toBe("./node_modules/@jxsuite/schema/schema.json");
     // Parser's fragment contributes its canonical paths shape; the $id-less local fragment none.
-    expect(document.$defs.PathsValue.anyOf).toEqual([
+    expect(document.$defs!.PathsValue!.anyOf).toEqual([
       { $ref: "https://jxsuite.com/schema/ext/parser/document/v1#/$defs/ContentPathsSource" },
     ]);
   });
@@ -98,7 +116,7 @@ describe("writeProjectSchemas", () => {
     });
     await writeProjectSchemas(TMP);
     let document = readJson("document.schema.json");
-    expect(document.$defs.PathsValue.anyOf).toEqual([
+    expect(document.$defs!.PathsValue!.anyOf).toEqual([
       { $ref: "https://jxsuite.com/schema/ext/parser/document/v1#/$defs/ContentPathsSource" },
     ]);
 
@@ -114,9 +132,39 @@ describe("writeProjectSchemas", () => {
     });
     await writeProjectSchemas(TMP);
     document = readJson("document.schema.json");
-    expect(document.$defs.PathsValue.anyOf).toEqual([
+    expect(document.$defs!.PathsValue!.anyOf).toEqual([
       { $ref: "https://jxsuite.com/schema/ext/parser/document/v1#/$defs/ContentPathsSource" },
     ]);
+  });
+
+  it("falls back to host resolution for core refs outside the workspace", async () => {
+    // A project root outside the monorepo: project-first resolution fails (the empty node_modules
+    // Disables Bun's install-cache fallback), so the core specifiers resolve through the host and
+    // Escape the root — landing on the conventional ./node_modules refs.
+    const root = mkdtempSync(resolve(tmpdir(), "jx-schema-command-"));
+    try {
+      mkdirSync(resolve(root, "node_modules"));
+      writeFileSync(
+        resolve(root, "project.json"),
+        JSON.stringify({ name: "Host Fallback Fixture" }, null, 2),
+        "utf8",
+      );
+
+      await writeProjectSchemas(root);
+
+      const project = JSON.parse(
+        readFileSync(resolve(root, "project.schema.json"), "utf8"),
+      ) as SchemaDoc;
+      expect(project.allOf!.map((entry) => entry.$ref)).toEqual([
+        "./node_modules/@jxsuite/schema/schemas/project.core.schema.json",
+      ]);
+      const document = JSON.parse(
+        readFileSync(resolve(root, "document.schema.json"), "utf8"),
+      ) as SchemaDoc;
+      expect(document.$ref).toBe("./node_modules/@jxsuite/schema/schema.json");
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
   });
 });
 
@@ -225,5 +273,42 @@ describe("readBundledProjectSchemas", () => {
     // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
     await expect(readBundledProjectSchemas(TMP)).rejects.toThrow("does not exist");
     rmSync(projectSchemaPath, { force: true });
+  });
+
+  it("errors on node_modules refs resolvable neither project-first nor from the host", async () => {
+    await readBundledProjectSchemas(TMP);
+    const projectSchemaPath = resolve(TMP, "project.schema.json");
+    const hijacked = {
+      ...readJson("project.schema.json"),
+      allOf: [{ $ref: "./node_modules/@nonexistent-scope/pkg/x.schema.json" }],
+    };
+    writeFileSync(projectSchemaPath, JSON.stringify(hijacked, null, 2), "utf8");
+    const future = new Date(Date.now() + 60_000);
+    utimesSync(projectSchemaPath, future, future);
+    // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
+    await expect(readBundledProjectSchemas(TMP)).rejects.toThrow(
+      "not resolvable from the project or the host",
+    );
+    rmSync(projectSchemaPath, { force: true });
+  });
+
+  it("returns existing entry documents when project.json is missing", async () => {
+    // Regenerate fresh entry documents, then mark the project one so a regeneration would show.
+    await readBundledProjectSchemas(TMP);
+    const projectSchemaPath = resolve(TMP, "project.schema.json");
+    const marked = { ...readJson("project.schema.json"), $comment: "kept without project.json" };
+    writeFileSync(projectSchemaPath, JSON.stringify(marked, null, 2), "utf8");
+
+    const projectJsonPath = resolve(TMP, "project.json");
+    const savedProjectJson = readFileSync(projectJsonPath, "utf8");
+    rmSync(projectJsonPath);
+    try {
+      // Staleness cannot be determined (project.json is gone) → the docs are reused as-is; a
+      // Regeneration attempt would throw from loadProjectConfig instead.
+      const { project } = await readBundledProjectSchemas(TMP);
+      expect(project.$comment).toBe("kept without project.json");
+    } finally {
+      writeFileSync(projectJsonPath, savedProjectJson, "utf8");
+    }
   });
 });

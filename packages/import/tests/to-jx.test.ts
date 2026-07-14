@@ -82,10 +82,10 @@ describe("convertToJx", () => {
   test("handles inline styles on elements", () => {
     const html = `<div style="color: red; font-size: 16px"><p>Styled</p></div>`;
     const result = convertToJx(html);
-    const [outerDiv] = result.document.children as any[];
-    expect(outerDiv.style).toBeDefined();
-    expect(outerDiv.style.color).toBe("red");
-    expect(outerDiv.style["font-size"]).toBe("16px");
+    const [outerDiv] = result.document.children as JxElement[];
+    expect(outerDiv!.style).toBeDefined();
+    expect(outerDiv!.style!.color).toBe("red");
+    expect(outerDiv!.style!["font-size"]).toBe("16px");
   });
 
   test("reports node count accurately", () => {
@@ -115,5 +115,23 @@ describe("convertToJx", () => {
     expect(result.document.tagName).toBe("div");
     expect(result.nodeCount).toBe(1);
     expect(result.collectedStyles).toEqual([]);
+  });
+
+  test("keeps text nodes alongside element children", () => {
+    const result = convertToJx("<p>Hello <b>bold</b></p>");
+    const [p] = result.document.children as JxElement[];
+    const children = p!.children as (JxElement | string)[];
+    expect(children[0]).toBe("Hello ");
+    expect((children[1] as JxElement).tagName).toBe("b");
+    // Wrapper(1) + p(1) + b(1) — text nodes are not counted
+    expect(result.nodeCount).toBe(3);
+  });
+
+  test("preserves top-level bare text", () => {
+    const result = convertToJx("plain text <span>x</span>");
+    const children = result.document.children as (JxElement | string)[];
+    expect(children[0]).toBe("plain text ");
+    expect((children[1] as JxElement).tagName).toBe("span");
+    expect(result.nodeCount).toBe(2);
   });
 });

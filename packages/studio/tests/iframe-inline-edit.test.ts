@@ -6,7 +6,13 @@
 import "./with-dom.js";
 import { afterEach, describe, expect, test } from "bun:test";
 import { startIframeInlineEdit } from "../src/canvas/iframe-inline-edit";
-import { isEditing, resumeBlurClose, stopEditing } from "../src/editor/inline-edit";
+import {
+  isEditing,
+  resumeBlurClose,
+  setSlashController,
+  stopEditing,
+} from "../src/editor/inline-edit";
+import type { SlashCommand } from "../src/editor/inline-edit";
 import { serializeJxPath } from "../src/canvas/path-mapping";
 import type {
   ApplyFormatIntent,
@@ -209,6 +215,67 @@ describe("session lifecycle", () => {
     });
     expect(posts).toContainEqual({ kind: "editEnd" });
     stop();
+  });
+});
+
+// ─── Guard paths + the slash-insert bridge ───────────────────────────────────
+
+describe("guards and inserts", () => {
+  test("mouseup/keyup/selectionchange without a session are guarded no-ops", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, el } = editableContainer();
+    const stop = startIframeInlineEdit(channel, container);
+
+    document.dispatchEvent(new Event("selectionchange"));
+    el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    el.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true }));
+
+    expect(posts).toEqual([]);
+    expect(isEditing()).toBe(false);
+    stop();
+  });
+
+  test("a slash-menu insert posts editInsert with the commit data", async () => {
+    const selects: ((cmd: SlashCommand) => void)[] = [];
+    setSlashController({
+      dismiss: () => {},
+      isOpen: () => false,
+      show: (_anchor, _filter, cbs) => {
+        selects.push(cbs.onSelect);
+      },
+    });
+    const { channel, posts } = fakeChannel();
+    const { container, el } = editableContainer();
+    const stop = startIframeInlineEdit(channel, container);
+
+    try {
+      dblclick(el);
+      // Caret at the very start → the "/" trigger sees empty text-before and opens the menu.
+      const range = document.createRange();
+      range.setStart(el.firstChild!, 0);
+      range.collapse(true);
+      const sel = window.getSelection()!;
+      sel.removeAllRanges();
+      sel.addRange(range);
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: "/" }));
+      await new Promise((resolve) => {
+        requestAnimationFrame(resolve);
+      });
+      expect(selects).toHaveLength(1);
+
+      posts.length = 0;
+      selects[0]!({ description: "Horizontal rule", label: "Divider", tag: "hr" });
+
+      const insertPost = posts.find((p) => p.kind === "editInsert")!;
+      expect(insertPost).toMatchObject({ cmd: { tag: "hr" }, path: ["children", 0] });
+      expect(insertPost.commitData).toBeDefined();
+      // The insert ends the session (the parent re-enters after the re-render).
+      expect(posts).toContainEqual({ kind: "editEnd" });
+      expect(isEditing()).toBe(false);
+    } finally {
+      setSlashController({ dismiss: () => {}, isOpen: () => false, show: () => {} });
+      stop();
+    }
   });
 });
 

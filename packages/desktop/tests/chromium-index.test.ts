@@ -517,6 +517,44 @@ describe("chromium launcher RPC dispatch", () => {
     expect(gitMocks.gitAddRemote).toHaveBeenCalledWith({ name: "origin", url: "git@host:r.git" });
   });
 
+  test("data surface + secrets methods dispatch with params to their handlers", async () => {
+    expect(await rpc("dataConnections")).toEqual({ connections: [] });
+    expect(handlerMocks.dataConnections).toHaveBeenCalled();
+    expect(await rpc("dataConnectionTest", { connection: "main" })).toEqual({ ok: true });
+    expect(handlerMocks.dataConnectionTest).toHaveBeenCalledWith({ connection: "main" });
+    expect(await rpc("dataPush", { dryRun: true })).toEqual({ applied: false, plan: [] });
+    expect(handlerMocks.dataPush).toHaveBeenCalledWith({ dryRun: true });
+    expect(await rpc("dataRows", { table: "posts" })).toEqual({ columns: [], rows: [], total: 0 });
+    expect(handlerMocks.dataRows).toHaveBeenCalledWith({ table: "posts" });
+    expect(await rpc("dataInsertRow", { table: "posts", values: { title: "hi" } })).toEqual({
+      row: { id: "new" },
+    });
+    expect(handlerMocks.dataInsertRow).toHaveBeenCalledWith({
+      table: "posts",
+      values: { title: "hi" },
+    });
+    expect(await rpc("dataUpdateRow", { pk: 1, set: { title: "yo" }, table: "posts" })).toEqual({
+      row: { id: "new" },
+    });
+    expect(handlerMocks.dataUpdateRow).toHaveBeenCalledWith({
+      pk: 1,
+      set: { title: "yo" },
+      table: "posts",
+    });
+    expect(await rpc("dataDeleteRow", { pk: 1, table: "posts" })).toEqual({ ok: true });
+    expect(handlerMocks.dataDeleteRow).toHaveBeenCalledWith({ pk: 1, table: "posts" });
+    expect(await rpc("listSecrets")).toEqual({ names: ["SEEDED"] });
+    expect(handlerMocks.listSecrets).toHaveBeenCalled();
+    expect(await rpc("setSecrets", { remove: ["OLD"], set: { API_KEY: "v" } })).toEqual({
+      names: ["SEEDED"],
+      ok: true,
+    });
+    expect(handlerMocks.setSecrets).toHaveBeenCalledWith({
+      remove: ["OLD"],
+      set: { API_KEY: "v" },
+    });
+  });
+
   test("package methods dispatch to the packages module", async () => {
     expect(await rpc("addPackage", { name: "left-pad" })).toEqual({ added: true });
     expect(await rpc("removePackage", { name: "left-pad" })).toEqual({ removed: true });

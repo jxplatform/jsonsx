@@ -345,6 +345,100 @@ describe("column layout persistence", () => {
   });
 });
 
+describe("formatters and sorters", () => {
+  test("the column formatter renders into a host and paints error state on render", async () => {
+    const { controller, table } = await setupView();
+    const defs = table.options.columns as {
+      field: string;
+      formatter: (
+        cell: ReturnType<typeof fakeCell>,
+        params: unknown,
+        onRendered: (fn: () => void) => void,
+      ) => HTMLElement;
+    }[];
+    const titleDef = defs.find((d) => d.field === "title")!;
+    const row = fakeRow({ [ROW_KEY_FIELD]: "a", title: "One" });
+    const cell = fakeCell(row, "title", table);
+
+    controller.buffer.applyCommitResult({
+      cells: [{ error: "bad value", field: "title", ok: false, rowKey: "a" }],
+      deletes: [],
+      inserts: [],
+    });
+    const rendered: (() => void)[] = [];
+    const host = titleDef.formatter(cell, {}, (fn) => rendered.push(fn));
+    expect(host.className).toContain("jx-grid-cell-content");
+    expect(host.textContent).toBe("One");
+    for (const fn of rendered) {
+      fn();
+    }
+    expect(cell.element.classList.contains("jx-grid-cell--error")).toBeTrue();
+    expect(cell.element.getAttribute("title")).toBe("bad value");
+  });
+
+  test("array columns sort by their joined text", async () => {
+    const { table } = await setupView(
+      stubSource({
+        columns: async () => [
+          { editable: true, field: "id", kind: "readonly", pk: true, title: "Id" },
+          { editable: true, field: "tags", kind: "array", title: "Tags" },
+        ],
+        id: "grid://collection/arr",
+      }),
+    );
+    const defs = table.options.columns as { field: string; sorter: unknown }[];
+    const sorter = defs.find((d) => d.field === "tags")!.sorter as (
+      a: unknown,
+      b: unknown,
+    ) => number;
+    expect(sorter(["alpha"], ["beta"])).toBeLessThan(0);
+    expect(sorter(["beta"], ["alpha"])).toBeGreaterThan(0);
+    expect(sorter(["same"], ["same"])).toBe(0);
+  });
+});
+
+describe("event guards and deferred refresh", () => {
+  test("refreshData before tableBuilt queues and flushes once built", async () => {
+    const { table, view } = await setupView();
+    expect(table.replaceDataCalls).toHaveLength(0);
+    view.refreshData(); // Not built yet — deferred.
+    expect(table.replaceDataCalls).toHaveLength(0);
+    table.emit("tableBuilt");
+    await flush();
+    expect(table.replaceDataCalls).toHaveLength(1);
+  });
+
+  test("cellEdited for an unknown field is ignored", async () => {
+    const { controller, table } = await setupView();
+    const row = fakeRow({ [ROW_KEY_FIELD]: "a", ghost: "x" });
+    table.emit("cellEdited", fakeCell(row, "ghost", table));
+    expect(controller.buffer.isDirty()).toBeFalse();
+  });
+
+  test("overlapping burst triggers share one open group; Delete keydown opens one", async () => {
+    const { controller, host, table } = await setupView();
+    // Two synchronous pastes — the second hits the group-already-open early return.
+    host.dispatchEvent(new Event("paste", { bubbles: true }));
+    host.dispatchEvent(new Event("paste", { bubbles: true }));
+    const rowA = fakeRow({ [ROW_KEY_FIELD]: "a", title: "One" });
+    rowA.data.title = "P1";
+    table.emit("cellEdited", fakeCell(rowA, "title", table));
+    await flush();
+    controller.buffer.undo(); // One group despite two paste events.
+    expect(controller.buffer.dirtyCount()).toBe(0);
+
+    host.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "x" }));
+    host.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Delete" }));
+    const rowB = fakeRow({ [ROW_KEY_FIELD]: "b", title: "Two" });
+    rowB.data.title = "";
+    table.emit("cellEdited", fakeCell(rowB, "title", table));
+    await flush();
+    expect(controller.buffer.dirtyCount()).toBe(1);
+    controller.buffer.undo();
+    expect(controller.buffer.dirtyCount()).toBe(0);
+  });
+});
+
 describe("row painting", () => {
   test("rowFormatter applies pending-delete and insert classes from buffer state", async () => {
     const { controller, table } = await setupView();

@@ -90,10 +90,15 @@ void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   },
 }));
 
+const renderStatusbarMock = mock(() => {});
+let statusbarRenderer: (() => void) | null = null;
+
 void mock.module("../src/panels/statusbar.ts", () => ({
   mountStatusbar: mock(() => {}),
-  renderStatusbar: mock(() => {}),
-  setStatusbarRenderer: mock(() => {}),
+  renderStatusbar: renderStatusbarMock,
+  setStatusbarRenderer: (fn: () => void) => {
+    statusbarRenderer = fn;
+  },
   statusMessage: (msg: string) => {
     statusMessages.push(msg);
   },
@@ -167,6 +172,49 @@ void mock.module("../src/new-project/add-repo-modal.ts", () => ({
   closeAddRepoModal: mock(() => {}),
   openAddRepoModal: mock(async () => addRepoResult),
   platformSupportsAddRepo: mock(() => true),
+}));
+
+// Capture the left-panel mount ctx (setGitDiffState / renderCanvas / cloneRepository arrows).
+let leftPanelCtx: any = null;
+void mock.module("../src/panels/left-panel.ts", () => ({
+  mount: (ctx: unknown) => {
+    leftPanelCtx = ctx;
+  },
+  render: mock(() => {}),
+  unmount: mock(() => {}),
+}));
+
+// Wrap iframe-host: capture the stylebook hit handler and make the edit snapshot controllable
+// (the pointerdown commit guard needs an "editing" session without a real iframe host).
+// NB: mock.module rebinds the live namespace too, so snapshot the actual exports FIRST.
+const iframeHostSnapshot = { ...(await import("../src/canvas/iframe-host")) };
+let stylebookHit: ((tag: string | null, media: string | null) => void) | null = null;
+let editingOverride = false;
+const commitEditMock = mock(() => {});
+void mock.module("../src/canvas/iframe-host.ts", () => ({
+  ...iframeHostSnapshot,
+  commitActiveEditSession: commitEditMock,
+  getEditSnapshot: () =>
+    editingOverride ? { editing: true, snapshot: null } : iframeHostSnapshot.getEditSnapshot(),
+  setStylebookHitHandler: (fn: (tag: string | null, media: string | null) => void) => {
+    stylebookHit = fn;
+    iframeHostSnapshot.setStylebookHitHandler(fn);
+  },
+}));
+
+// Wrap collab-session: capture the source parser studio injects at init.
+const collabSnapshot = { ...(await import("../src/collab/collab-session")) };
+type CollabParserFn = (
+  tab: Tab,
+  text: string,
+) => Promise<{ document: Record<string, unknown>; frontmatter?: Record<string, unknown> }>;
+let collabParser: CollabParserFn | null = null;
+void mock.module("../src/collab/collab-session.ts", () => ({
+  ...collabSnapshot,
+  configureCollabParser: (fn: CollabParserFn | null) => {
+    collabParser = fn;
+    collabSnapshot.configureCollabParser(fn as never);
+  },
 }));
 
 // ─── Platform (must be registered before import so devserver PAL is skipped) ──
@@ -885,5 +933,153 @@ describe("parent-chrome commit guard", () => {
     expect(() =>
       document.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })),
     ).not.toThrow();
+    expect(commitEditMock).not.toHaveBeenCalled();
+  });
+
+  test("a chrome pointerdown during a live edit session commits it", () => {
+    editingOverride = true;
+    try {
+      document.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      expect(commitEditMock).toHaveBeenCalled();
+    } finally {
+      editingOverride = false;
+      commitEditMock.mockClear();
+    }
+  });
+});
+
+describe("stylebook hit routing", () => {
+  test("a tag hit selects the stylebook tag; a null hit clears the selection", () => {
+    const tab = openShellTab();
+    expect(stylebookHit).not.toBeNull();
+    stylebookHit!("button", "sm");
+    expect(tab.session.ui.stylebookSelection).toBe("button");
+    expect(tab.session.ui.activeSelector).toBe("button");
+    expect(tab.session.ui.activeMedia).toBe("sm");
+    stylebookHit!(null, null);
+    expect(tab.session.ui.stylebookSelection).toBeNull();
+    expect(tab.session.ui.activeSelector).toBeNull();
+  });
+});
+
+describe("left panel wiring", () => {
+  test("mount ctx propagates git-diff state and canvas renders", () => {
+    expect(leftPanelCtx).not.toBeNull();
+    leftPanelCtx.setGitDiffState({ path: "z.json" });
+    expect(canvasRenderCtx.gitDiffState).toEqual({ path: "z.json" });
+    leftPanelCtx.setGitDiffState(null);
+    expect(canvasRenderCtx.gitDiffState).toBeNull();
+
+    renderCanvasMock.mockClear();
+    leftPanelCtx.renderCanvas();
+    expect(renderCanvasMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("clone-repository delegates report unsupported platforms", async () => {
+    // The in-memory platform has no gitClone, so both delegates hit the unsupported guard.
+    await leftPanelCtx.cloneRepository();
+    expect(statusMessages.at(-1)).toBe("Clone not supported on this platform");
+    statusMessages.length = 0;
+    await welcomeCtx.cloneRepository();
+    expect(statusMessages.at(-1)).toBe("Clone not supported on this platform");
+  });
+});
+
+describe("collab parser wiring", () => {
+  test("parses JSON documents directly when no format claims the path", async () => {
+    const tab = openShellTab();
+    const result = await collabParser!(tab, '{"tagName":"div"}');
+    expect(result.document).toEqual({ tagName: "div" });
+  });
+
+  test("routes format-claimed paths through the format host", async () => {
+    const { setFormats } = await import("../src/format/format-host");
+    setFormats([
+      {
+        capabilities: { parse: { identifier: "parse", timing: ["client"] } },
+        documentKinds: ["page"],
+        exportTarget: false,
+        extensions: [".md"],
+        mediaType: "text/markdown",
+        name: "Markdown",
+        remote: false,
+        studio: null,
+      } as never,
+    ]);
+    try {
+      const tab = openShellTab(undefined, { documentPath: "pages/x.md", id: "md-tab" });
+      // The stub format has no client parser class, so parseSourceForPath rejects — the
+      // Format-dispatch branch of the parser still ran.
+      let threw = false;
+      try {
+        await collabParser!(tab, "# hi");
+      } catch {
+        threw = true;
+      }
+      expect(threw).toBe(true);
+    } finally {
+      setFormats([]);
+    }
+  });
+});
+
+describe("multi-window project routing", () => {
+  test("openRecentProject routes to a new window when this window holds a project", async () => {
+    const openInNew = mock(async (_root: string) => {});
+    (platform as any).openProjectInNewWindow = openInNew;
+    try {
+      const before = state.calls.filter((c) => c[0] === "readFile").length;
+      await toolbarCtx.openRecentProject("/other/site");
+      expect(openInNew).toHaveBeenCalledWith("/other/site");
+      // Early return: this window's project stays put, no project.json read.
+      expect(state.calls.filter((c) => c[0] === "readFile").length).toBe(before);
+      expect(statusMessages).toHaveLength(0);
+    } finally {
+      delete (platform as any).openProjectInNewWindow;
+    }
+  });
+
+  test("setWindowProject dedupe bails; a fresh bind proceeds to open", async () => {
+    let deduped = true;
+    (platform as any).setWindowProject = mock(async (_root: string) => ({ deduped }));
+    try {
+      await toolbarCtx.openRecentProject("/recent/site");
+      expect(statusMessages).toHaveLength(0); // Focused the other window and bailed.
+
+      deduped = false;
+      await toolbarCtx.openRecentProject("/recent/site");
+      expect(statusMessages).toContain("Opened project: Recent Project");
+    } finally {
+      delete (platform as any).setWindowProject;
+    }
+  });
+});
+
+describe("remaining wiring arrows", () => {
+  test("toolbar saveFile writes the active document through the platform", async () => {
+    const tab = openShellTab();
+    tab.doc.dirty = true;
+    const before = state.calls.filter((c) => c[0] === "writeFile").length;
+    await toolbarCtx.saveFile();
+    expect(state.calls.filter((c) => c[0] === "writeFile").length).toBe(before + 1);
+  });
+
+  test("tab bar closeFunctionEditor shares the toolbar delegate (no-op path)", async () => {
+    const tab = openShellTab();
+    tab.session.ui.editingFunction = null;
+    await tabBarCtx.closeFunctionEditor();
+    expect(tab.session.ui.editingFunction).toBeNull();
+  });
+
+  test("welcome openRecentProject opens the project directly", async () => {
+    await welcomeCtx.openRecentProject("/recent/site");
+    expect(statusMessages).toContain("Opened project: Recent Project");
+  });
+
+  test("the statusbar renderer arrow delegates to the statusbar module", () => {
+    expect(statusbarRenderer).not.toBeNull();
+    renderStatusbarMock.mockClear();
+    statusbarRenderer!();
+    expect(renderStatusbarMock).toHaveBeenCalledTimes(1);
   });
 });

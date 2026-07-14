@@ -73,4 +73,164 @@ describe("downloadAssets", () => {
       await rm(tmpDir, { recursive: true, force: true });
     }
   });
+
+  test("skips malformed asset URLs", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "jx-import-test-"));
+    try {
+      const assets: DiscoveredAsset[] = [{ url: "not a url", source: "img-src" }];
+
+      const result = await downloadAssets(assets, tmpDir);
+
+      expect(result.skipped).toEqual(["not a url"]);
+      expect(result.failed.length).toBe(0);
+      expect(result.rewriteMap.size).toBe(0);
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("downloads successful responses and builds the rewrite map", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "jx-import-test-"));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("hello")) as unknown as typeof fetch;
+    try {
+      const url = "https://example.com/images/pic.jpg";
+      const result = await downloadAssets([{ url, source: "img-src" }], tmpDir);
+
+      expect(result.rewriteMap.get(url)).toBe("public/assets/images/pic.jpg");
+      expect(result.totalBytes).toBe(5);
+      expect(result.failed.length).toBe(0);
+      expect(existsSync(join(tmpDir, "public", "assets", "images", "pic.jpg"))).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("classifies assets into subdirectories by source and extension", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "jx-import-test-"));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("data")) as unknown as typeof fetch;
+    try {
+      const assets: DiscoveredAsset[] = [
+        { url: "https://fonts.example.com/custom.ttf", source: "font-face" },
+        { url: "https://example.com/favicon.ico", source: "favicon" },
+        { url: "https://cdn.example.com/inter.woff2", source: "css-url" },
+        { url: "https://example.com/whitepaper.pdf", source: "img-src" },
+      ];
+
+      const result = await downloadAssets(assets, tmpDir);
+
+      expect(result.rewriteMap.get("https://fonts.example.com/custom.ttf")).toBe(
+        "public/assets/fonts/custom.ttf",
+      );
+      expect(result.rewriteMap.get("https://example.com/favicon.ico")).toBe(
+        "public/assets/icons/favicon.ico",
+      );
+      expect(result.rewriteMap.get("https://cdn.example.com/inter.woff2")).toBe(
+        "public/assets/fonts/inter.woff2",
+      );
+      expect(result.rewriteMap.get("https://example.com/whitepaper.pdf")).toBe(
+        "public/assets/other/whitepaper.pdf",
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("sanitizes extensionless and overlong filenames", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "jx-import-test-"));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("data")) as unknown as typeof fetch;
+    try {
+      const longName = "a".repeat(116);
+      const assets: DiscoveredAsset[] = [
+        { url: "https://example.com/assets/logo", source: "img-src" },
+        { url: `https://example.com/${longName}.png`, source: "img-src" },
+      ];
+
+      const result = await downloadAssets(assets, tmpDir);
+
+      // No extension → ".bin" appended (and classified as "other")
+      expect(result.rewriteMap.get("https://example.com/assets/logo")).toBe(
+        "public/assets/other/logo.bin",
+      );
+      // 120-char filename → capped to 96 chars + extension
+      expect(result.rewriteMap.get(`https://example.com/${longName}.png`)).toBe(
+        `public/assets/images/${"a".repeat(96)}.png`,
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("dedupes colliding filenames within a subdirectory", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "jx-import-test-"));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("data")) as unknown as typeof fetch;
+    try {
+      const assets: DiscoveredAsset[] = [
+        { url: "https://a.example.com/logo.png", source: "img-src" },
+        { url: "https://b.example.com/logo.png", source: "img-src" },
+      ];
+
+      const result = await downloadAssets(assets, tmpDir);
+
+      expect(result.rewriteMap.get("https://a.example.com/logo.png")).toBe(
+        "public/assets/images/logo.png",
+      );
+      expect(result.rewriteMap.get("https://b.example.com/logo.png")).toBe(
+        "public/assets/images/logo-1.png",
+      );
+      expect(existsSync(join(tmpDir, "public", "assets", "images", "logo-1.png"))).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("sends a Referer header when sourceUrl is provided", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "jx-import-test-"));
+    const originalFetch = globalThis.fetch;
+    const seenHeaders: Record<string, string>[] = [];
+    globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
+      seenHeaders.push({ ...(init?.headers as Record<string, string>) });
+      return new Response("data");
+    }) as unknown as typeof fetch;
+    try {
+      const assets: DiscoveredAsset[] = [
+        { url: "https://example.com/hero.jpg", source: "img-src" },
+      ];
+
+      await downloadAssets(assets, tmpDir, "https://example.com/page");
+
+      expect(seenHeaders).toHaveLength(1);
+      expect(seenHeaders[0]!["Referer"]).toBe("https://example.com/page");
+      expect(seenHeaders[0]!["User-Agent"]).toContain("Mozilla/5.0");
+    } finally {
+      globalThis.fetch = originalFetch;
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("records non-ok responses as failed", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "jx-import-test-"));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response("nope", { status: 404 })) as unknown as typeof fetch;
+    try {
+      const url = "https://example.com/gone.jpg";
+      const result = await downloadAssets([{ url, source: "img-src" }], tmpDir);
+
+      expect(result.failed).toEqual([url]);
+      expect(result.rewriteMap.size).toBe(0);
+      expect(result.totalBytes).toBe(0);
+      expect(existsSync(join(tmpDir, "public", "assets", "images", "gone.jpg"))).toBe(false);
+    } finally {
+      globalThis.fetch = originalFetch;
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
 });

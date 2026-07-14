@@ -134,6 +134,31 @@ describe("document-assistant", () => {
     expect(a.chatState.status).toBe("idle");
   });
 
+  test("create_page writes the file through the platform saveFile wiring", async () => {
+    const { state } = installMockPlatform();
+    nextRounds = [
+      toolCallRound("c1", "create_page", {
+        content: { children: [{ tagName: "p", textContent: "About us" }], tagName: "div" },
+        path: "pages/about.json",
+      }),
+      [{ stopReason: "stop", type: "done" }],
+    ];
+
+    const a = createDocumentAssistant();
+    await a.sendMessage("make an about page");
+
+    const writes = state.calls.filter(([name]) => name === "writeFile");
+    expect(writes).toHaveLength(1);
+    expect(writes[0]![1]).toBe("pages/about.json");
+    expect(String(writes[0]![2])).toContain("About us");
+    expect(a.chatState.status).toBe("idle");
+    // ListSessions surfaces the lazily created session, newest first.
+    const sessions = a.listSessions();
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]!.title).toBe("make an about page");
+    expect(sessions[0]!.id).toBe(a.activeSessionId()!);
+  });
+
   test("ignores empty input and re-entrant sends while streaming", async () => {
     const a = createDocumentAssistant();
     await a.sendMessage("   ");

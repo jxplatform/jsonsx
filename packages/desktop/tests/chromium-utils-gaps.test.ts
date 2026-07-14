@@ -145,6 +145,14 @@ describe("openFileDialog (chromium / D-Bus portal)", () => {
     const result = await openFileDialog();
     expect(result).toBe("/delayed/project.json");
   });
+
+  test("resolves null via the cancel timeout when the portal never responds", async () => {
+    // Config.respond stays unset: the Request registers its handler but "Response" never fires,
+    // So only the cancel timeout (shortened from its 60s default) can settle the promise.
+    const result = await openFileDialog(5);
+    expect(result).toBeNull();
+    expect(endCalls).toBe(1);
+  });
 });
 
 describe("openDirectoryDialog (chromium / D-Bus portal)", () => {

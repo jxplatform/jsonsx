@@ -114,6 +114,32 @@ describe("columns and rows", () => {
     expect(calls.rows.at(-1)).toEqual({ limit: DATA_PAGE_SIZE, offset: 0, table: "posts" });
     expect(source.id).toBe("grid://data/default/posts");
   });
+
+  test("object cell values surface as JSON text; rows without a pk key by index", async () => {
+    installMockPlatform({
+      dataRows: async () => ({
+        columns: COLUMNS,
+        rows: [{ id: null, published: false, title: "A", views: { count: 3 } }],
+        total: 1,
+      }),
+    });
+    const source = createConnectorSource("main", "posts");
+    const page = await source.rows();
+    expect(page.rows[0]!.key).toBe("row-0");
+    expect(page.rows[0]!.cells.views).toBe('{"count":3}');
+  });
+
+  test("refresh clears cached introspection so columns re-fetch", async () => {
+    const calls = installDataPlatform();
+    const source = createConnectorSource("main", "posts");
+    await source.columns();
+    expect(calls.rows).toHaveLength(1);
+    await source.columns(); // Cached — no extra introspection query.
+    expect(calls.rows).toHaveLength(1);
+    await source.refresh?.();
+    await source.columns();
+    expect(calls.rows).toHaveLength(2);
+  });
 });
 
 describe("commit", () => {
@@ -172,6 +198,36 @@ describe("commit", () => {
     expect(result.deletes.find((d) => d.rowKey === "ghost")!.error).toContain("primary key");
     expect(result.cells[0]!.error).toContain("primary key");
     expect(calls.updates).toHaveLength(0);
+  });
+
+  test("a failing dataInsertRow surfaces as an insert error", async () => {
+    installMockPlatform({
+      dataInsertRow: async () => {
+        throw new Error("insert exploded");
+      },
+      dataRows: async () => ({ columns: COLUMNS, rows: [{ id: 1, title: "A" }], total: 1 }),
+    });
+    const source = createConnectorSource("main", "posts");
+    await source.rows();
+    const result = await source.commit({
+      cells: [],
+      deletes: [],
+      inserts: [{ cells: { title: "Nope" }, tempKey: "t1" }],
+    });
+    expect(result.inserts[0]).toEqual({ error: "insert exploded", ok: false, tempKey: "t1" });
+  });
+
+  test("a failing dataDeleteRow surfaces as a delete error", async () => {
+    installMockPlatform({
+      dataDeleteRow: async () => {
+        throw new Error("locked table");
+      },
+      dataRows: async () => ({ columns: COLUMNS, rows: [{ id: 7, title: "A" }], total: 1 }),
+    });
+    const source = createConnectorSource("main", "posts");
+    await source.rows(); // Seeds pk 7 into the key map.
+    const result = await source.commit({ cells: [], deletes: [{ rowKey: "7" }], inserts: [] });
+    expect(result.deletes[0]).toEqual({ error: "locked table", ok: false, rowKey: "7" });
   });
 
   test("per-row API failures surface as row errors without aborting the batch", async () => {

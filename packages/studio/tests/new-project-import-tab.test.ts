@@ -9,6 +9,7 @@ import type { ImportProgressEvent } from "../src/types";
 
 const { closeNewProjectModal, openNewProjectModal } =
   await import("../src/new-project/new-project-modal");
+const { importButtonLabel, startImport } = await import("../src/new-project/import-tab");
 const { initLayers } = await import("../src/ui/layers");
 
 document.body.innerHTML = `
@@ -159,6 +160,74 @@ describe("Import source step", () => {
   });
 });
 
+describe("Import — parameters validation", () => {
+  test("an empty project name blocks the import; Back shows the inline error", async () => {
+    setKey();
+    importPlatform();
+    void reachParams();
+    typeInto(field(0), ""); // Clear the prefilled name.
+    clickFooter("Import Site");
+    await flush();
+    expect(captured).toBeNull();
+
+    clickFooter("Back");
+    expect(document.querySelector("#layer-modal .new-project-error")?.textContent).toContain(
+      "Project name is required",
+    );
+  });
+
+  test("a blank directory defaults to the name's slug", async () => {
+    setKey();
+    importPlatform();
+    void reachParams();
+    typeInto(field(0), "Coffee & Cream");
+    typeInto(field(1), ""); // Clear the derived directory.
+    clickFooter("Import Site");
+    await flush();
+    expect(captured!.opts).toMatchObject({ directory: "coffee-cream", name: "Coffee & Cream" });
+  });
+
+  test("crawl options and the AI-naming switch thread into importSite", async () => {
+    setKey();
+    importPlatform();
+    void openNewProjectModal();
+    switchTab("import");
+    typeInto(field(0), "https://clone.example/");
+
+    const numberFields = [
+      ...document.querySelectorAll("#layer-modal sp-number-field"),
+    ] as (HTMLElement & { value: string })[];
+    numberFields[0]!.value = "2";
+    numberFields[0]!.dispatchEvent(new Event("change", { bubbles: true }));
+    numberFields[1]!.value = "50";
+    numberFields[1]!.dispatchEvent(new Event("change", { bubbles: true }));
+    const aiSwitch = document.querySelector("#layer-modal sp-switch") as HTMLElement & {
+      checked: boolean;
+    };
+    aiSwitch.checked = false;
+    aiSwitch.dispatchEvent(new Event("change", { bubbles: true }));
+
+    clickFooter("Next");
+    clickFooter("Import Site");
+    await flush();
+    expect(captured!.opts).toMatchObject({ aiComponents: false, depth: 2, maxPages: 50 });
+  });
+
+  test("Import Site is a no-op when the platform lacks importSite", async () => {
+    installMockPlatform();
+    let rerenders = 0;
+    await startImport({
+      credsForm: { render: () => "" as never, startEdit: () => {} },
+      form: { directory: "", name: "Site" },
+      onDone: () => {},
+      rerender: () => {
+        rerenders += 1;
+      },
+    });
+    expect(rerenders).toBe(0);
+  });
+});
+
 describe("Import — streaming flow", () => {
   test("threads options + stored credentials into importSite and streams the log", async () => {
     setKey();
@@ -199,6 +268,16 @@ describe("Import — streaming flow", () => {
     expect(modal()).toBeNull();
   });
 
+  test("the primary-button label reads Importing… while a run is active", async () => {
+    setKey();
+    importPlatform();
+    void reachParams();
+    expect(importButtonLabel()).toBe("Import Site");
+    clickFooter("Import Site");
+    await flush();
+    expect(importButtonLabel()).toBe("Importing…");
+  });
+
   test("a failing import shows the error, keeps the log, and offers Retry", async () => {
     setKey();
     importPlatform();
@@ -216,6 +295,14 @@ describe("Import — streaming flow", () => {
     );
     const labels = footerButtons().map((b) => b.textContent?.trim());
     expect(labels.at(-1)).toContain("Retry Import");
+    expect(importButtonLabel()).toBe("Retry Import");
+
+    // Back on the Import source step, the error and the retained log both render.
+    clickFooter("Back");
+    expect(document.querySelector("#layer-modal .new-project-error")?.textContent).toContain(
+      "Chrome not found",
+    );
+    expect(logLines()).toEqual(["launch Launching browser..."]);
   });
 
   test("Cancel Import aborts the signal and returns to the Parameters step", async () => {

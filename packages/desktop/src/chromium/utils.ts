@@ -16,16 +16,21 @@ interface DbusRequest {
 /**
  * Open the freedesktop FileChooser portal and resolve to the first selected path (or null on
  * cancel/error). `directory: true` selects a folder (used by New Project to pick a parent dir);
- * `directory: false` selects a project.json file (used by Open Project).
+ * `directory: false` selects a project.json file (used by Open Project). Resolves null if the
+ * portal never fires a Response within `timeoutMs`.
  *
  * @param {{ directory: boolean; title: string; filters?: boolean }} opts
+ * @param {number} [timeoutMs]
  * @returns {Promise<string | null>}
  */
-async function chooseViaPortal(opts: {
-  directory: boolean;
-  title: string;
-  filters?: boolean;
-}): Promise<string | null> {
+async function chooseViaPortal(
+  opts: {
+    directory: boolean;
+    title: string;
+    filters?: boolean;
+  },
+  timeoutMs = 60_000,
+): Promise<string | null> {
   const bus = await sessionBus();
 
   try {
@@ -49,7 +54,7 @@ async function chooseViaPortal(opts: {
     const [handle] = await portal.OpenFile("", opts.title, options);
 
     const result = await new Promise<string | null>((resolve) => {
-      const timeout = setTimeout(() => resolve(null), 60_000);
+      const timeout = setTimeout(() => resolve(null), timeoutMs);
 
       void bus
         .getInterface("org.freedesktop.portal.Desktop", handle, "org.freedesktop.portal.Request")
@@ -83,8 +88,11 @@ async function chooseViaPortal(opts: {
   }
 }
 
-export function openFileDialog(): Promise<string | null> {
-  return chooseViaPortal({ directory: false, filters: true, title: "Open project.json" });
+export function openFileDialog(timeoutMs?: number): Promise<string | null> {
+  return chooseViaPortal(
+    { directory: false, filters: true, title: "Open project.json" },
+    timeoutMs,
+  );
 }
 
 /** Pick a folder — used by New Project to choose where to scaffold the project. */

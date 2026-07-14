@@ -9,6 +9,7 @@ import { createCollabHost } from "../src/ws-room.ts";
 import type { CollabHost } from "../src/ws-room.ts";
 import { createWsCollabConnection } from "../src/ws-client.ts";
 import type { WsCollabConnection, WsLike } from "../src/ws-client.ts";
+import { encodeFrame } from "../src/envelope.ts";
 import type { CollabIdentity } from "../src/provider.ts";
 import { applyDocOpsToY, LOCAL_ORIGIN } from "../src/op-bridge.ts";
 import { seedStructure, sourceText, structureMap, yDocToJson } from "../src/schema.ts";
@@ -322,6 +323,106 @@ describe("lifecycle", () => {
     connection.destroy();
   });
 
+  test("onReset / onStatus unsubscribe closures remove their callbacks", async () => {
+    const fx = fixture();
+    const handle = await fx.connect().openDoc("pages/index.json");
+    await handle!.whenSynced;
+    let resets = 0;
+    let statuses = 0;
+    const offReset = handle!.onReset(() => {
+      resets += 1;
+    });
+    const offStatus = handle!.onStatus(() => {
+      statuses += 1;
+    });
+    offReset();
+    offStatus();
+
+    // A doc-reset would fire onReset (see the resetDoc test above) — not after unsubscribing.
+    fx.host.resetDoc("pages/index.json");
+    await settle();
+    // A server-side drop flips the status to "offline" — nobody is listening anymore.
+    fx.sockets[0]!.dropFromServer();
+    await settle();
+    expect(resets).toBe(0);
+    expect(statuses).toBe(0);
+  });
+
+  test("openDoc gives up after openTimeoutMs when the server never answers", async () => {
+    // A "server" that accepts the socket but swallows every frame: the "open" control goes
+    // Nowhere, so no "opened" reply can resolve the open — only the client-side timeout can.
+    const silentHost = {
+      connect: () => ({ close: () => {}, handleMessage: () => {} }),
+    } as unknown as CollabHost;
+    const connection = createWsCollabConnection({
+      openTimeoutMs: 1,
+      url: "ws://silent",
+      webSocketImpl: socketImplFor(
+        silentHost,
+        { color: "#fff", login: "octocat", permission: "write" },
+        [],
+      ),
+    });
+    cleanups.push(() => connection.destroy());
+    expect(await connection.openDoc("pages/index.json")).toBeNull();
+    expect(connection.status()).toBe("connected");
+  });
+
+  test("an 'opened' control at a different epoch resets the live handle", async () => {
+    const fx = fixture();
+    const connection = fx.connect();
+    const handle = await connection.openDoc("pages/index.json");
+    await handle!.whenSynced;
+    let resets = 0;
+    handle!.onReset(() => {
+      resets += 1;
+    });
+    // The server re-announces the doc at a new epoch (its history moved while we were away):
+    // The handle is dead and must reset rather than merge divergent histories.
+    fx.sockets[0]!.onmessage?.({
+      data: encodeFrame({
+        message: { epoch: 777, path: "pages/index.json", type: "opened" },
+        type: "control",
+      }).buffer,
+    });
+    expect(resets).toBe(1);
+  });
+
+  test("junk, unknown-path, and unhandled frames from the server are ignored", async () => {
+    const fx = fixture();
+    const connection = fx.connect();
+    const handle = await connection.openDoc("pages/index.json");
+    await handle!.whenSynced;
+    const socket = fx.sockets[0]!;
+    const inject = (frame: Parameters<typeof encodeFrame>[0]) => {
+      socket.onmessage?.({ data: encodeFrame(frame).buffer });
+    };
+
+    // Non-binary data and an undecodable frame are dropped.
+    socket.onmessage?.({ data: "not-binary" });
+    socket.onmessage?.({ data: new Uint8Array([9]).buffer });
+    // A server never sends doc-close; the frame switch's default arm drops it.
+    inject({ path: "pages/index.json", type: "doc-close" });
+    // A server never sends "open"; the control switch's default arm drops it.
+    inject({ message: { path: "pages/index.json", type: "open" }, type: "control" });
+    // Control frames for paths this client never opened are ignored.
+    inject({ message: { epoch: 1, path: "pages/other.json", type: "opened" }, type: "control" });
+    inject({
+      message: { code: "too-large", message: "x", path: "pages/other.json", type: "error" },
+      type: "control",
+    });
+    // An error without a path has no doc to fail.
+    inject({ message: { code: "rate-limited", message: "x", type: "error" }, type: "control" });
+    // Doc-sync at a stale epoch or for an unopened path is dropped.
+    inject({ body: new Uint8Array([0]), epoch: 99, path: "pages/index.json", type: "doc-sync" });
+    inject({ body: new Uint8Array([0]), epoch: 1, path: "pages/other.json", type: "doc-sync" });
+
+    await settle();
+    // The connection survives all of it with its sync intact.
+    expect(connection.status()).toBe("connected");
+    expect(sourceText(handle!.doc).toString()).toBe(`{"tagName":"div"}`);
+  });
+
   test("a failing hydratePath falls back to solo", async () => {
     const fx = fixture();
     const connection = createWsCollabConnection({
@@ -358,6 +459,9 @@ describe("lifecycle", () => {
 
     const statuses: string[] = [];
     handle!.onStatus((s) => statuses.push(s));
+    // Presence published before the drop: reconnect must re-publish the full local state.
+    handle!.awareness.setLocalState({ user: { login: "octocat" } });
+    await settle();
     // Server-side drop; client reconnects with a fresh socket.
     fx.sockets[0]!.dropFromServer();
     // Offline edit while disconnected.
@@ -368,10 +472,16 @@ describe("lifecycle", () => {
 
     expect(statuses).toContain("offline");
     expect(statuses).toContain("connected");
-    // A second client sees the offline edit after resync.
+    // The local awareness state survived the reconnect re-publish.
+    expect(handle!.awareness.getLocalState()).toEqual({ user: { login: "octocat" } });
+    // A second client sees the offline edit after resync — and the re-published presence.
     const b = await fx.connect().openDoc("pages/index.json");
     await b!.whenSynced;
     await settle();
     expect((yDocToJson(b!.doc) as { tagName?: string }).tagName).toBe("edited-offline");
+    const seenByB = [...b!.awareness.getStates().values()];
+    expect(
+      seenByB.some((s) => (s as { user?: { login?: string } }).user?.login === "octocat"),
+    ).toBe(true);
   });
 });

@@ -53,13 +53,11 @@ export async function openCsvGridTab(path: string): Promise<Tab> {
   return tab;
 }
 
-/** Open (or activate) a virtual grid tab for a source (collections now; more kinds later). */
+/**
+ * Open a virtual grid tab for a source (collections now; more kinds later). Callers dedupe by the
+ * same `makeGridTabId` id before constructing the source.
+ */
 function openVirtualGridTab(source: GridSource): Tab {
-  const existing = workspace.tabs.get(source.id);
-  if (existing) {
-    activateTab(source.id);
-    return existing;
-  }
   const tab = openTab({
     capabilities: { modes: ["grid"] },
     document: structuredClone(GRID_STUB_DOCUMENT),

@@ -40,17 +40,11 @@ function stripTags(nodes: (JxElement | string)[]): {
 
     const tag = String(node.tagName ?? "").toLowerCase();
 
-    // Collect inline <style> content for Phase 1
+    // Collect inline <style> content for Phase 1. Style elements hold raw text, which htmlToJx
+    // Always collapses into textContent (never string children).
     if (tag === "style") {
       if (typeof node.textContent === "string") {
         styles.push(node.textContent);
-      }
-      if (Array.isArray(node.children)) {
-        for (const c of node.children) {
-          if (typeof c === "string") {
-            styles.push(c);
-          }
-        }
       }
       continue;
     }

@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { rewriteAssetUrls } from "../src/asset-rewrite.ts";
-import type { JxElement } from "@jxsuite/schema/types";
+import type { JxElement, JxStyle } from "@jxsuite/schema/types";
 
 describe("rewriteAssetUrls", () => {
   test("rewrites img src attribute", () => {
@@ -70,7 +70,7 @@ describe("rewriteAssetUrls", () => {
         backgroundImage: 'url("https://example.com/bg-desktop.png")',
         "@--768": {
           backgroundImage: 'url("https://example.com/bg-mobile.png")',
-        } as any,
+        },
       },
     };
     const map = new Map([
@@ -82,7 +82,7 @@ describe("rewriteAssetUrls", () => {
 
     expect(count).toBe(2);
     expect(tree.style!.backgroundImage).toBe('url("public/assets/images/bg-desktop.png")');
-    expect((tree.style!["@--768"] as any).backgroundImage).toBe(
+    expect((tree.style!["@--768"] as JxStyle).backgroundImage).toBe(
       'url("public/assets/images/bg-mobile.png")',
     );
   });
@@ -220,6 +220,71 @@ describe("rewriteAssetUrls", () => {
     const count = rewriteAssetUrls(tree, map);
 
     expect(count).toBe(1);
+  });
+
+  test("matches map keys that differ by a trailing slash", () => {
+    const tree: JxElement = {
+      tagName: "img",
+      attributes: { src: "https://example.com/x" },
+    };
+    const map = new Map([["https://example.com/x/", "public/assets/images/x"]]);
+
+    const count = rewriteAssetUrls(tree, map);
+
+    expect(count).toBe(1);
+    expect(tree.attributes!.src).toBe("public/assets/images/x");
+  });
+
+  test("leaves relative URLs whose resolution misses the map", () => {
+    const tree: JxElement = {
+      tagName: "img",
+      attributes: { src: "/missing.jpg" },
+    };
+    const map = new Map([["https://example.com/hero.jpg", "public/assets/images/hero.jpg"]]);
+
+    const count = rewriteAssetUrls(tree, map, "https://example.com/");
+
+    expect(count).toBe(0);
+    expect(tree.attributes!.src).toBe("/missing.jpg");
+  });
+
+  test("skips resolution when sourceUrl is not a valid base", () => {
+    const tree: JxElement = {
+      tagName: "img",
+      attributes: { src: "/x.jpg" },
+    };
+    const map = new Map([["https://example.com/hero.jpg", "public/assets/images/hero.jpg"]]);
+
+    const count = rewriteAssetUrls(tree, map, "::::not-a-base");
+
+    expect(count).toBe(0);
+    expect(tree.attributes!.src).toBe("/x.jpg");
+  });
+
+  test("leaves css url() references not in the map unchanged", () => {
+    const tree: JxElement = {
+      tagName: "div",
+      style: { backgroundImage: 'url("https://unknown.example/bg.png")' },
+    };
+    const map = new Map([["https://example.com/hero.jpg", "public/assets/images/hero.jpg"]]);
+
+    const count = rewriteAssetUrls(tree, map);
+
+    expect(count).toBe(0);
+    expect(tree.style!.backgroundImage).toBe('url("https://unknown.example/bg.png")');
+  });
+
+  test("rewrites href on non-anchor elements", () => {
+    const tree: JxElement = {
+      tagName: "link",
+      attributes: { href: "https://example.com/favicon.ico", rel: "icon" },
+    };
+    const map = new Map([["https://example.com/favicon.ico", "public/assets/icons/favicon.ico"]]);
+
+    const count = rewriteAssetUrls(tree, map);
+
+    expect(count).toBe(1);
+    expect(tree.attributes!.href).toBe("public/assets/icons/favicon.ico");
   });
 
   test("rewrites multiple assets in one pass", () => {

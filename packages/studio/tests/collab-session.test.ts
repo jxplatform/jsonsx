@@ -8,7 +8,7 @@ import {
   configureCollabSerializer,
   resetCollabForTests,
 } from "../src/collab/collab-session";
-import { collabState, isCollabPath } from "../src/collab/collab-state";
+import { collabState, isCollabActive, isCollabPath } from "../src/collab/collab-state";
 import { reloadCleanTab } from "../src/files/files";
 import { saveFile } from "../src/files/file-ops";
 import { mutateUpdateProperty, transactDoc } from "../src/tabs/transact";
@@ -41,10 +41,12 @@ describe("session attach", () => {
   test("openTab attaches, seeds the shared structure, and clears dirty", async () => {
     const hub = createMockCollabHub();
     const tab = openCollabTab(hub);
+    expect(isCollabActive(tab)).toBe(false);
     await settleCollab();
 
     const state = collabState(tab);
     expect(state.active).toBe(true);
+    expect(isCollabActive(tab)).toBe(true);
     expect(state.status).toBe("synced");
     expect(isCollabPath(PATH)).toBe(true);
     expect(yDocToJson(hub.serverDoc(PATH))).toEqual(DOC);

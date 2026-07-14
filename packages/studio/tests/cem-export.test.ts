@@ -297,6 +297,39 @@ describe("exportCemManifest", () => {
     exportCemManifest(S, helpers);
   });
 
+  test("legacy handler entries emit bare method members; css parts map through", async () => {
+    const originalCreate = URL.createObjectURL;
+    const blobs: Blob[] = [];
+    URL.createObjectURL = (b: Blob) => {
+      blobs.push(b);
+      return "blob:cem-test";
+    };
+    try {
+      const S = {
+        document: {
+          children: [],
+          state: {
+            // No $prototype: defCategory says "function" but isFunctionDef rejects → legacy branch.
+            legacyRun: { body: "doStuff()", description: "Legacy handler" },
+          },
+          tagName: "my-legacy",
+        },
+      };
+      exportCemManifest(S, { ...helpers, collectCssParts: () => [{ name: "button" }] });
+
+      const manifest = JSON.parse(await blobs[0]!.text()) as {
+        modules: { declarations: { members: unknown[]; cssParts: unknown[] }[] }[];
+      };
+      const decl = manifest.modules[0]!.declarations[0]!;
+      expect(decl.members).toEqual([
+        { description: "Legacy handler", kind: "method", name: "legacyRun" },
+      ]);
+      expect(decl.cssParts).toEqual([{ name: "button" }]);
+    } finally {
+      URL.createObjectURL = originalCreate;
+    }
+  });
+
   test("handles deprecated fields", () => {
     const S = {
       document: {

@@ -168,4 +168,29 @@ describe("virtual grid openers", () => {
     expect(workspace.tabs.size).toBe(before);
     document.querySelector("#layer-modal")!.replaceChildren();
   });
+
+  test("the picker dismisses on the dialog close event", async () => {
+    installMockPlatform({ dataRows: async () => ({ columns: [], rows: [], total: 0 }) });
+    resetStudioState({ projectConfig: { content: {} } });
+    await openGridSourcePicker();
+    const dialog = document.querySelector("#layer-modal sp-dialog-wrapper")!;
+    expect(dialog).not.toBeNull();
+    dialog.dispatchEvent(new Event("close"));
+    expect(document.querySelector("#layer-modal .jx-grid-picker")).toBeNull();
+  });
+
+  test("a failing connections fetch degrades to no connector groups", async () => {
+    installMockPlatform({
+      dataConnections: async () => {
+        throw new Error("data surface down");
+      },
+      dataRows: async () => ({ columns: [], rows: [], total: 0 }),
+    });
+    resetStudioState({ projectConfig: { content: {} } });
+    await openGridSourcePicker();
+    const picker = document.querySelector("#layer-modal .jx-grid-picker")!;
+    const items = [...picker.querySelectorAll("sp-menu-item")].map((m) => m.textContent?.trim());
+    expect(items).toEqual(["Pages"]);
+    document.querySelector("#layer-modal")!.replaceChildren();
+  });
 });

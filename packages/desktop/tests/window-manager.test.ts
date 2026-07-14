@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 // ─── Mock electrobun/bun ────────────────────────────────────────────────────
 
 const rpcConfigs: { handlers: { requests: Record<string, (p?: never) => unknown> } }[] = [];
-const rpcObjects: { send: { updateReady: ReturnType<typeof mock> } }[] = [];
+const rpcObjects: {
+  send: { updateReady: ReturnType<typeof mock>; onFileEvents: ReturnType<typeof mock> };
+}[] = [];
 const createdWindows: MockWindow[] = [];
 let nextWinId = 1;
 
@@ -34,7 +36,12 @@ void mock.module("electrobun/bun", () => ({
   BrowserView: {
     defineRPC: (config: { handlers: { requests: Record<string, (p?: never) => unknown> } }) => {
       rpcConfigs.push(config);
-      const rpc = { send: { updateReady: mock((_p: { version: string }) => {}) } };
+      const rpc = {
+        send: {
+          onFileEvents: mock((_p: { events: unknown[] }) => {}),
+          updateReady: mock((_p: { version: string }) => {}),
+        },
+      };
       rpcObjects.push(rpc);
       return rpc;
     },
@@ -84,6 +91,7 @@ function makeSession(initialRoot: string | null) {
     dataDeleteRow: mock(async () => ({ ok: true })),
     listSecrets: mock(async () => ({ names: [] })),
     setSecrets: mock(async () => ({ names: [], ok: true })),
+    pickDirectory: mock(async () => "/picked"),
     openProject: mock(async () => {
       root = "/proj/opened";
       return {
@@ -206,9 +214,11 @@ const {
   broadcastUpdateReady,
   parseProjectDirFromUrl,
   setAiServerUrl,
+  setImportServiceUrl,
 } = await import("../src/window-manager");
 
 setAiServerUrl("http://localhost:9000");
+setImportServiceUrl("http://x/import?token=t");
 
 const DASH = "—"; // Em dash used in window titles
 
@@ -416,6 +426,18 @@ describe("per-window RPC", () => {
     expect(reqs.aiChatUrl()).toBe("http://localhost:9000/__studio/ai/chat");
   });
 
+  test("importSiteUrl resolves to the shared token-gated import endpoint", () => {
+    openProjectWindow("/proj/import");
+    expect(lastRequests().importSiteUrl()).toBe("http://x/import?token=t");
+  });
+
+  test("pickDirectory delegates to this window's session", async () => {
+    openProjectWindow("/proj/pick");
+    const session = sessions.at(-1)!;
+    expect(await lastRequests().pickDirectory()).toBe("/picked");
+    expect(session.pickDirectory).toHaveBeenCalledTimes(1);
+  });
+
   test("getProjectRoot reports this window's root", () => {
     openProjectWindow("/proj/which");
     expect(lastRequests().getProjectRoot()).toEqual({ root: "/proj/which" });
@@ -606,6 +628,27 @@ describe("broadcastUpdateReady", () => {
     broadcastUpdateReady("9.9.9");
     expect(rpc1.send.updateReady).toHaveBeenCalledWith({ version: "9.9.9" });
     expect(rpc2.send.updateReady).toHaveBeenCalledWith({ version: "9.9.9" });
+  });
+});
+
+// ─── File-event sink ────────────────────────────────────────────────────────
+
+describe("file event sink", () => {
+  test("pushes session file events to the webview and absorbs send failures", () => {
+    openProjectWindow("/proj/events");
+    const session = sessions.at(-1)!;
+    const rpc = rpcObjects.at(-1)!;
+    const sink = session.setFileEventSink.mock.calls[0]![0] as (events: unknown[]) => void;
+
+    const events = [{ kind: "change", path: "pages/index.json" }];
+    sink(events);
+    expect(rpc.send.onFileEvents).toHaveBeenCalledWith({ events });
+
+    // The webview may not be ready yet; the sink must swallow a failed send.
+    rpc.send.onFileEvents.mockImplementationOnce(() => {
+      throw new Error("webview gone");
+    });
+    expect(() => sink(events)).not.toThrow();
   });
 });
 

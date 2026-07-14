@@ -43,6 +43,19 @@ let _rootEl: HTMLElement | null = null;
 
 let _ctx: ToolbarCtx | null = null;
 
+/** Test override for the mac CSD layout — happy-dom forbids redefining navigator.platform. */
+let _isMacOverride: boolean | null = null;
+
+/** Force (or restore, with null) the mac/non-mac window-control layout detection. */
+export function setMacPlatformForTests(value: boolean | null): void {
+  _isMacOverride = value;
+}
+
+/** True on macOS — picks the CSD window-control order (close-first, toolbar-leading). */
+function isMacPlatform(): boolean {
+  return _isMacOverride ?? navigator.platform.startsWith("Mac");
+}
+
 let _scope: EffectScope | null = null;
 
 const toolbarIconMap = {
@@ -401,7 +414,7 @@ function toolbarTemplate() {
       };
     }
   ).__jxPlatform?.windowControls;
-  const isMac = navigator.platform.startsWith("Mac");
+  const isMac = isMacPlatform();
   const csdTpl = windowControls
     ? isMac
       ? html`

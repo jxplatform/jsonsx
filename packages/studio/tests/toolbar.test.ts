@@ -488,15 +488,7 @@ describe("full toolbar (active tab)", () => {
   });
 
   test("mac platforms put window controls first with close leading", async () => {
-    const original = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(navigator), "platform");
-    try {
-      Object.defineProperty(navigator, "platform", {
-        configurable: true,
-        value: "MacIntel",
-      });
-    } catch {
-      return; // Environment forbids overriding navigator.platform — covered in blockers.
-    }
+    toolbar.setMacPlatformForTests(true);
     try {
       const controls = {
         close: mock(() => {}),
@@ -516,14 +508,16 @@ describe("full toolbar (active tab)", () => {
         "Minimize",
         "Maximize",
       ]);
+      click(buttons[0]!);
+      expect(controls.close).toHaveBeenCalledTimes(1);
       click(buttons[1]!);
       expect(controls.minimize).toHaveBeenCalledTimes(1);
-      expect(root.firstElementChild?.nextElementSibling).not.toBeNull();
+      click(buttons[2]!);
+      expect(controls.maximize).toHaveBeenCalledTimes(1);
+      // Mac CSD renders at the START of the toolbar.
+      expect(root.firstElementChild?.classList.contains("window-controls")).toBe(true);
     } finally {
-      delete (navigator as any).platform;
-      if (original) {
-        Object.defineProperty(Object.getPrototypeOf(navigator), "platform", original);
-      }
+      toolbar.setMacPlatformForTests(null);
     }
   });
 });
