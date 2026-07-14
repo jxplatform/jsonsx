@@ -17,6 +17,10 @@
     },
     "memory": {
       "command": "mcp-server-memory"
+    },
+    "ttsc-graph": {
+      "args": ["-y", "@ttsc/graph"],
+      "command": "bunx"
     }
   }
 }
