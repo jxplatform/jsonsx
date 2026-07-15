@@ -1,0 +1,5 @@
+{
+  "name": "compact",
+  "description": "A copy of an array with the falsy elements removed (Array.prototype.filter on truthiness).",
+  "parameters": [{ "name": "values", "type": { "text": "unknown[]" } }]
+}

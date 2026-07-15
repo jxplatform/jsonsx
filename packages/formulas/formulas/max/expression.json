@@ -1,0 +1,10 @@
+{
+  "operator": "reduce",
+  "target": { "$ref": "$args/values" },
+  "initial": { "$ref": "$args/values/0" },
+  "value": {
+    "operator": "call",
+    "target": { "$ref": "window#/Math/max" },
+    "value": [{ "$ref": "$reduce/acc" }, { "$ref": "$map/item" }]
+  }
+}

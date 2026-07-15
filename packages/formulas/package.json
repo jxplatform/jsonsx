@@ -1,0 +1,30 @@
+{
+  "name": "@jxsuite/formulas",
+  "version": "1.0.0",
+  "description": "Composite pure formulas for Jx, authored as declarative $expression JSON",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "packages/formulas"
+  },
+  "files": [
+    "src/",
+    "formulas/"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./catalog": "./src/catalog.ts"
+  },
+  "scripts": {
+    "generate": "bun run bin/generate.ts",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@jxsuite/schema": "workspace:^"
+  },
+  "devDependencies": {
+    "@jxsuite/runtime": "workspace:^"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "operator": "/",
+  "target": {
+    "operator": "call",
+    "target": { "$ref": "window#/Math/round" },
+    "value": [
+      {
+        "operator": "*",
+        "target": { "$ref": "$args/value" },
+        "value": {
+          "operator": "call",
+          "target": { "$ref": "window#/Math/pow" },
+          "value": [10, { "$ref": "$args/digits" }]
+        }
+      }
+    ]
+  },
+  "value": {
+    "operator": "call",
+    "target": { "$ref": "window#/Math/pow" },
+    "value": [10, { "$ref": "$args/digits" }]
+  }
+}

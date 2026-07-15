@@ -1,0 +1,5 @@
+{
+  "name": "sum",
+  "description": "Add every number in an array (Array.prototype.reduce with +, seeded at 0).",
+  "parameters": [{ "name": "values", "type": { "text": "number[]" } }]
+}

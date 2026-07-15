@@ -1,0 +1,5 @@
+{
+  "name": "first",
+  "description": "The first element of an array (index 0), or null when empty.",
+  "parameters": [{ "name": "values", "type": { "text": "unknown[]" } }]
+}

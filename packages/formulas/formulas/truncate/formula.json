@@ -1,0 +1,8 @@
+{
+  "name": "truncate",
+  "description": "Shorten a string to at most the given length, appending a horizontal ellipsis when cut.",
+  "parameters": [
+    { "name": "text", "type": { "text": "string" } },
+    { "name": "length", "type": { "text": "number" } }
+  ]
+}

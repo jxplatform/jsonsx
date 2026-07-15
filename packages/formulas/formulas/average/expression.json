@@ -1,0 +1,19 @@
+{
+  "operator": "?:",
+  "target": { "$ref": "$args/values/length" },
+  "value": {
+    "operator": "/",
+    "target": {
+      "operator": "reduce",
+      "target": { "$ref": "$args/values" },
+      "initial": 0,
+      "value": {
+        "operator": "+",
+        "target": { "$ref": "$reduce/acc" },
+        "value": { "$ref": "$map/item" }
+      }
+    },
+    "value": { "$ref": "$args/values/length" }
+  },
+  "initial": 0
+}

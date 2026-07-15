@@ -1,0 +1,5 @@
+{
+  "operator": "filter",
+  "target": { "$ref": "$args/values" },
+  "value": { "operator": "!", "target": { "operator": "!", "target": { "$ref": "$map/item" } } }
+}

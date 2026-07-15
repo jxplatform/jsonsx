@@ -71,12 +71,57 @@ const ARRAY_METHOD_OPS = new Set(["push", "pop", "shift", "unshift", "splice"]);
 const AGGREGATE_OPS = new Set(["reduce", "map", "filter"]);
 const CONDITIONAL_OPS = new Set(["?:", "switch"]);
 
+/**
+ * Pure standard-library method operators (spec §19.4d): genuine `String.prototype` /
+ * `Array.prototype` / `Number.prototype` methods that never mutate their receiver — the ES2023
+ * change-by-copy family stands in where mutation would otherwise occur (`toSorted`, not `sort`).
+ * Receiver in `target`; `value` carries the argument (bare scalar) or argument list (array), the
+ * splice precedent. No token is invented.
+ */
+export const PURE_METHOD_OPS = new Set([
+  // Array.prototype (and the String.prototype homonyms: includes/indexOf/slice/at/concat)
+  "includes",
+  "indexOf",
+  "lastIndexOf",
+  "join",
+  "slice",
+  "concat",
+  "at",
+  "flat",
+  "toSorted",
+  "toReversed",
+  "toSpliced",
+  "with",
+  // String.prototype
+  "toUpperCase",
+  "toLowerCase",
+  "trim",
+  "trimStart",
+  "trimEnd",
+  "split",
+  "startsWith",
+  "endsWith",
+  "padStart",
+  "padEnd",
+  "replaceAll",
+  "repeat",
+  "charAt",
+  "normalize",
+  "toLocaleUpperCase",
+  "toLocaleLowerCase",
+  // Number.prototype
+  "toFixed",
+  "toPrecision",
+  "toLocaleString",
+]);
+
 export const BLESSED_OPERATORS = new Set([
   ...MUTATING_OPS,
   ...UNARY_OPS,
   ...BINARY_OPS,
   ...AGGREGATE_OPS,
   ...CONDITIONAL_OPS,
+  ...PURE_METHOD_OPS,
   "call",
 ]);
 
@@ -618,6 +663,23 @@ function evaluateNode(
     }
   }
 
+  // ─── Pure standard-library methods (spec §19.4d) ───
+  if (PURE_METHOD_OPS.has(operator)) {
+    const receiver = resolveOperand(target, state, event, iterCtx, subTrace(trace, "target"));
+    const args =
+      value === undefined
+        ? []
+        : Array.isArray(value)
+          ? (resolveOperand(value, state, event, iterCtx, subTrace(trace, "value")) as unknown[])
+          : [resolveOperand(value, state, event, iterCtx, subTrace(trace, "value"))];
+    const method = (receiver as Record<string, unknown> | null | undefined)?.[operator];
+    if (typeof method !== "function") {
+      // Null-safe, like path reads: a missing receiver or method yields undefined, not a throw.
+      return undefined;
+    }
+    return (method as (...a: unknown[]) => unknown).apply(receiver, args);
+  }
+
   // ─── Aggregates (pure) ───
   if (AGGREGATE_OPS.has(operator)) {
     const arr: unknown[] = resolveOperand(
@@ -878,6 +940,19 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
         break;
       }
     }
+  }
+
+  // ─── Pure standard-library methods (spec §19.4d) ───
+  if (PURE_METHOD_OPS.has(operator)) {
+    const receiver: string = compileOperand(target, opts);
+    const args: string =
+      value === undefined
+        ? ""
+        : Array.isArray(value)
+          ? value.map((o: unknown) => compileOperand(o, opts)).join(", ")
+          : compileOperand(value, opts);
+    // ?.method?.() matches the interpreter: missing receiver or method yields undefined.
+    return `(${receiver})?.${operator}?.(${args})`;
   }
 
   // ─── Aggregates (pure) ───

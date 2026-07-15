@@ -1,0 +1,5 @@
+{
+  "name": "capitalize",
+  "description": "Uppercase the first character of a string, leaving the rest unchanged (the CSS text-transform: capitalize shape for a single word).",
+  "parameters": [{ "name": "text", "type": { "text": "string" } }]
+}

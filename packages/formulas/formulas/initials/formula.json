@@ -1,0 +1,5 @@
+{
+  "name": "initials",
+  "description": "The uppercase first letters of each whitespace-separated word, joined (e.g. \"ada lovelace\" → \"AL\").",
+  "parameters": [{ "name": "name", "type": { "text": "string" } }]
+}

@@ -10,7 +10,7 @@
  * token is invented).
  */
 
-import { BLESSED_GLOBALS, BLESSED_OPERATORS } from "@jxsuite/runtime/expression";
+import { BLESSED_GLOBALS, BLESSED_OPERATORS, PURE_METHOD_OPS } from "@jxsuite/runtime/expression";
 import { isJsonObject, isNamedFormulaDef } from "@jxsuite/schema/guards";
 
 import type {
@@ -270,20 +270,91 @@ export function operatorEntries(): FormulaCatalogEntry[] {
   const out: FormulaCatalogEntry[] = [];
   for (const op of BLESSED_OPERATORS) {
     const meta = OPERATOR_META[op];
-    if (!meta) {
-      continue;
+    if (meta) {
+      out.push({
+        description: meta.description,
+        group: meta.group,
+        insert: meta.insert,
+        kind: "operator",
+        label: op,
+        name: op,
+        parameters: meta.parameters,
+      });
+    } else if (PURE_METHOD_OPS.has(op)) {
+      out.push(pureMethodEntry(op));
     }
-    out.push({
-      description: meta.description,
-      group: meta.group,
-      insert: meta.insert,
-      kind: "operator",
-      label: op,
-      name: op,
-      parameters: meta.parameters,
-    });
   }
   return out;
+}
+
+// ─── Pure standard-library methods (derived, spec §19.4d) ───────────────────
+
+/** Prototype owner per pure method — drives grouping and the derived description. */
+const PURE_METHOD_PROTO: Record<string, string> = {
+  at: "Array/String",
+  charAt: "String",
+  concat: "Array/String",
+  endsWith: "String",
+  flat: "Array",
+  includes: "Array/String",
+  indexOf: "Array/String",
+  join: "Array",
+  lastIndexOf: "Array/String",
+  normalize: "String",
+  padEnd: "String",
+  padStart: "String",
+  repeat: "String",
+  replaceAll: "String",
+  slice: "Array/String",
+  split: "String",
+  startsWith: "String",
+  toFixed: "Number",
+  toLocaleLowerCase: "String",
+  toLocaleString: "Number",
+  toLocaleUpperCase: "String",
+  toLowerCase: "String",
+  toPrecision: "Number",
+  toReversed: "Array",
+  toSorted: "Array",
+  toSpliced: "Array",
+  toUpperCase: "String",
+  trim: "String",
+  trimEnd: "String",
+  trimStart: "String",
+  with: "Array",
+};
+
+/** Methods that take no argument — their insert seed omits `value`. */
+export const ZERO_ARG_METHODS = new Set([
+  "flat",
+  "normalize",
+  "toLocaleLowerCase",
+  "toLocaleString",
+  "toLocaleUpperCase",
+  "toLowerCase",
+  "toReversed",
+  "toSorted",
+  "toUpperCase",
+  "trim",
+  "trimEnd",
+  "trimStart",
+]);
+
+/** The derived catalog entry for one pure method operator (spec §19.4d). */
+function pureMethodEntry(op: string): FormulaCatalogEntry {
+  const proto = PURE_METHOD_PROTO[op] ?? "Standard library";
+  return {
+    description: `${proto}.prototype.${op} (ECMA) — pure: never mutates the receiver. Receiver in target; argument (or argument list) in value.`,
+    group: `${proto} methods`,
+    insert: () =>
+      ZERO_ARG_METHODS.has(op)
+        ? { operator: op, target: { $ref: "" } }
+        : { operator: op, target: { $ref: "" }, value: null },
+    kind: "operator",
+    label: op,
+    name: op,
+    parameters: [],
+  };
 }
 
 // ─── Blessed globals (derived) ──────────────────────────────────────────────

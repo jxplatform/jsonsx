@@ -1,0 +1,5 @@
+{
+  "name": "count",
+  "description": "The length of an array or string, or 0 when the value is missing.",
+  "parameters": [{ "name": "values", "type": { "text": "unknown[] | string" } }]
+}

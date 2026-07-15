@@ -1,0 +1,8 @@
+{
+  "name": "percent",
+  "description": "part / whole as a percentage (0 when the whole is 0 or missing).",
+  "parameters": [
+    { "name": "part", "type": { "text": "number" } },
+    { "name": "whole", "type": { "text": "number" } }
+  ]
+}

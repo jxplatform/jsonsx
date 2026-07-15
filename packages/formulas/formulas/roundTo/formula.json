@@ -1,0 +1,8 @@
+{
+  "name": "roundTo",
+  "description": "Round a number to the given decimal places (Math.round against a Math.pow(10, digits) scale).",
+  "parameters": [
+    { "name": "value", "type": { "text": "number" } },
+    { "name": "digits", "type": { "text": "number" }, "default": 0 }
+  ]
+}

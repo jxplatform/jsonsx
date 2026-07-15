@@ -1,0 +1,8 @@
+{
+  "operator": "+",
+  "target": {
+    "operator": "toUpperCase",
+    "target": { "operator": "charAt", "target": { "$ref": "$args/text" }, "value": 0 }
+  },
+  "value": { "operator": "slice", "target": { "$ref": "$args/text" }, "value": 1 }
+}

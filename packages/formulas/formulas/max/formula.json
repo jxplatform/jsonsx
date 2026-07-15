@@ -1,0 +1,5 @@
+{
+  "name": "max",
+  "description": "The largest number in an array (Math.max folded over the values); undefined for an empty array.",
+  "parameters": [{ "name": "values", "type": { "text": "number[]" } }]
+}

@@ -1,0 +1,5 @@
+{
+  "operator": "??",
+  "target": { "$ref": "$args/values/length" },
+  "value": 0
+}

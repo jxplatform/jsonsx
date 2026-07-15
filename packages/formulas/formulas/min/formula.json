@@ -1,0 +1,5 @@
+{
+  "name": "min",
+  "description": "The smallest number in an array (Math.min folded over the values); undefined for an empty array.",
+  "parameters": [{ "name": "values", "type": { "text": "number[]" } }]
+}

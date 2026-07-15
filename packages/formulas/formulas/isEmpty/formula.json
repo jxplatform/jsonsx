@@ -1,0 +1,5 @@
+{
+  "name": "isEmpty",
+  "description": "True when an array or string has no elements (length 0 — a missing value counts as empty).",
+  "parameters": [{ "name": "value", "type": { "text": "unknown[] | string" } }]
+}

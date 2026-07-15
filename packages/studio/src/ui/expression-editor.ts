@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
+import { PURE_METHOD_OPS } from "@jxsuite/runtime/expression";
 import { isJsonObject, isRef } from "@jxsuite/schema/guards";
 import { renderFieldRow } from "./field-row";
 import { renderFormulaChips } from "./formula-chips";
@@ -37,6 +38,21 @@ const ASSIGN_OPS = new Set(["=", "+=", "-=", "*=", "/="]);
 const NO_ARG_OPS = new Set(["pop", "shift"]);
 const ONE_ARG_OPS = new Set(["push", "unshift"]);
 
+const ZERO_ARG_METHOD_OPS = new Set([
+  "flat",
+  "normalize",
+  "toLocaleLowerCase",
+  "toLocaleString",
+  "toLocaleUpperCase",
+  "toLowerCase",
+  "toReversed",
+  "toSorted",
+  "toUpperCase",
+  "trim",
+  "trimEnd",
+  "trimStart",
+]);
+
 const OPERATOR_GROUPS = [
   { label: "Assignment", ops: ["=", "+=", "-=", "*=", "/="] },
   { label: "Unary", ops: ["!", "-"] },
@@ -48,6 +64,43 @@ const OPERATOR_GROUPS = [
     label: "Array methods",
     ops: ["push", "pop", "shift", "unshift", "splice"],
   },
+  {
+    label: "Pure methods (String)",
+    ops: [
+      "toUpperCase",
+      "toLowerCase",
+      "trim",
+      "trimStart",
+      "trimEnd",
+      "split",
+      "startsWith",
+      "endsWith",
+      "padStart",
+      "padEnd",
+      "replaceAll",
+      "repeat",
+      "charAt",
+      "normalize",
+    ],
+  },
+  {
+    label: "Pure methods (Array)",
+    ops: [
+      "includes",
+      "indexOf",
+      "lastIndexOf",
+      "join",
+      "slice",
+      "concat",
+      "at",
+      "flat",
+      "toSorted",
+      "toReversed",
+      "toSpliced",
+      "with",
+    ],
+  },
+  { label: "Pure methods (Number)", ops: ["toFixed", "toPrecision", "toLocaleString"] },
   { label: "Aggregate", ops: ["reduce", "map", "filter"] },
   { label: "Function", ops: ["call"] },
 ];
@@ -89,6 +142,10 @@ function operatorInfo(op: string): OperatorInfo {
   }
   if (op === "call") {
     return { ...INFO_DEFAULTS, callArgs: true, targetMustBeRef: true };
+  }
+  if (PURE_METHOD_OPS.has(op)) {
+    // Receiver in target (any operand); zero-arg methods render no value row.
+    return { ...INFO_DEFAULTS, needsValue: !ZERO_ARG_METHOD_OPS.has(op) };
   }
   if (BINARY_OPS.has(op)) {
     return { ...INFO_DEFAULTS, needsValue: true };
@@ -229,7 +286,7 @@ export function expressionHint(node: unknown) {
   if (op === "call") {
     return `${targetLabel.replace("window#/", "").replaceAll("/", ".")}(…)`;
   }
-  if (op === "reduce" || op === "map" || op === "filter") {
+  if (op === "reduce" || op === "map" || op === "filter" || PURE_METHOD_OPS.has(op)) {
     return `${op}(${targetLabel})`;
   }
   if (op === "?:") {

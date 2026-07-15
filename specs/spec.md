@@ -1646,6 +1646,25 @@ Inside a formula body, parameters resolve via the **`$args/` scheme** — a cont
 
 **Semantics and lowering.** Project-global formulas live in `project.json` `state` and reach every page through the standard project-state merge — there is no separate formulas section. `buildScope` lowers a named formula to a scope callable that maps positional arguments onto parameter names; call sites therefore compile to plain positional calls (`state.lineTotal(3, 4)`), identical in the interpreter and every compiled target. `call` chains are bounded by `MAX_CALL_DEPTH` (64) against unbounded recursion; the compiler must additionally reject statically detectable call cycles. Reads inside a formula body are tracked reactively as usual — a computed that calls a formula recomputes when the formula's inputs change.
 
+### 19.4d Pure Standard-Library Method Operators
+
+The method-operator table extends to genuine **pure** `String.prototype`, `Array.prototype`, and `Number.prototype` methods — the receiver in `target` (any operand, including a derived value), the argument in `value` (bare scalar) or argument list (array, the `splice` precedent). Where the standard library's original method mutates, the ES2023 change-by-copy name stands in — `toSorted` not `sort`, `toReversed` not `reverse`, `toSpliced`/`with` not `splice`/index assignment — so every operator in this table remains pure. No token is invented.
+
+| Prototype | Operators                                                                                                                                                                                                                 |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Array     | `includes` `indexOf` `lastIndexOf` `join` `slice` `concat` `at` `flat` `toSorted` `toReversed` `toSpliced` `with`                                                                                                         |
+| String    | `toUpperCase` `toLowerCase` `trim` `trimStart` `trimEnd` `split` `startsWith` `endsWith` `padStart` `padEnd` `replaceAll` `repeat` `charAt` `normalize` `toLocaleUpperCase` `toLocaleLowerCase` (plus the Array homonyms) |
+| Number    | `toFixed` `toPrecision` `toLocaleString`                                                                                                                                                                                  |
+
+```json
+{ "operator": "toUpperCase", "target": { "$ref": "#/state/name" } }
+{ "operator": "includes",    "target": { "$ref": "#/state/tags" }, "value": "featured" }
+{ "operator": "toSorted",    "target": { "$ref": "#/state/scores" } }
+{ "operator": "padStart",    "target": { "$ref": "#/state/code" }, "value": [6, "0"] }
+```
+
+Evaluation is null-safe, matching path reads: a missing receiver or a method absent from the receiver's type yields `undefined` rather than throwing (compiled form: `(receiver)?.method?.(args)`). Aggregates (§19.4a) likewise accept a derived array as `target` — `join(map(split(name, " "), …), "")` composes without intermediate state entries.
+
 ### 19.5 The `event#` Reference Scheme
 
 Handlers receive `(state, event)` (§4.3). To allow `$expression` handlers to read event data without escalating to a `body` string, the reference system (§7.2) is extended with one scheme:

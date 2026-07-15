@@ -1,0 +1,5 @@
+{
+  "operator": "===",
+  "target": { "operator": "??", "target": { "$ref": "$args/value/length" }, "value": 0 },
+  "value": 0
+}

@@ -40,6 +40,43 @@ export const binaryOperatorSchema = {
 export const conditionalOperatorSchema = { const: "?:" } as const;
 export const switchOperatorSchema = { const: "switch" } as const;
 export const callOperatorSchema = { const: "call" } as const;
+export const pureMethodSchema = {
+  description:
+    "A genuine pure String.prototype / Array.prototype / Number.prototype method (spec §19.4d). The ES2023 change-by-copy family (toSorted, toReversed, toSpliced, with) stands in where mutation would otherwise occur. Receiver in target; value carries the argument (bare scalar) or argument list (array).",
+  enum: [
+    "includes",
+    "indexOf",
+    "lastIndexOf",
+    "join",
+    "slice",
+    "concat",
+    "at",
+    "flat",
+    "toSorted",
+    "toReversed",
+    "toSpliced",
+    "with",
+    "toUpperCase",
+    "toLowerCase",
+    "trim",
+    "trimStart",
+    "trimEnd",
+    "split",
+    "startsWith",
+    "endsWith",
+    "padStart",
+    "padEnd",
+    "replaceAll",
+    "repeat",
+    "charAt",
+    "normalize",
+    "toLocaleUpperCase",
+    "toLocaleLowerCase",
+    "toFixed",
+    "toPrecision",
+    "toLocaleString",
+  ],
+} as const;
 export const assignmentOperatorSchema = { enum: ["=", "+=", "-=", "*=", "/="] } as const;
 export const noArgMethodSchema = { enum: ["pop", "shift"] } as const;
 export const oneArgMethodSchema = { enum: ["push", "unshift"] } as const;
@@ -103,21 +140,25 @@ export const expressionNodeSchema = {
     {
       properties: {
         operator: { $ref: "#/$defs/ReduceMethod" },
-        target: { $ref: "#/$defs/ExpressionPointer" },
+        target: {
+          anyOf: [{ $ref: "#/$defs/ExpressionPointer" }, { $ref: "#/$defs/ExpressionNode" }],
+        },
         value: { $ref: "#/$defs/ExpressionNode" },
       },
       required: ["operator", "value", "initial"],
-      title: "reduce — pure fold; per-item expression in value, seed in initial",
+      title: "reduce — pure fold over a pointer or derived array; seed in initial",
     },
     {
       not: { required: ["initial"] },
       properties: {
         operator: { $ref: "#/$defs/MapFilterMethod" },
-        target: { $ref: "#/$defs/ExpressionPointer" },
+        target: {
+          anyOf: [{ $ref: "#/$defs/ExpressionPointer" }, { $ref: "#/$defs/ExpressionNode" }],
+        },
         value: { $ref: "#/$defs/ExpressionNode" },
       },
       required: ["operator", "value"],
-      title: "map / filter — pure; per-item expression in value, no initial",
+      title: "map / filter — pure over a pointer or derived array; per-item expression in value",
     },
     {
       description:
@@ -141,6 +182,14 @@ export const expressionNodeSchema = {
       required: ["operator", "cases"],
       title:
         "switch — pure value-keyed selection; discriminant in target, results in cases/default",
+    },
+    {
+      description:
+        "A pure standard-library method call: target is the receiver (any operand — never mutated; change-by-copy names replace the mutating originals), value the optional argument (bare scalar) or argument list (array). A missing receiver or method yields undefined, matching null-safe path reads.",
+      not: { required: ["initial"] },
+      properties: { operator: { $ref: "#/$defs/PureMethod" } },
+      required: ["operator"],
+      title: "Pure method — genuine prototype methods; receiver in target, args in value",
     },
     {
       description:

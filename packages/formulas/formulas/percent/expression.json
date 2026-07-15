@@ -1,0 +1,14 @@
+{
+  "operator": "?:",
+  "target": { "$ref": "$args/whole" },
+  "value": {
+    "operator": "*",
+    "target": {
+      "operator": "/",
+      "target": { "$ref": "$args/part" },
+      "value": { "$ref": "$args/whole" }
+    },
+    "value": 100
+  },
+  "initial": 0
+}

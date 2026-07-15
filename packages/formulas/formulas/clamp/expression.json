@@ -1,0 +1,12 @@
+{
+  "operator": "call",
+  "target": { "$ref": "window#/Math/min" },
+  "value": [
+    {
+      "operator": "call",
+      "target": { "$ref": "window#/Math/max" },
+      "value": [{ "$ref": "$args/value" }, { "$ref": "$args/min" }]
+    },
+    { "$ref": "$args/max" }
+  ]
+}

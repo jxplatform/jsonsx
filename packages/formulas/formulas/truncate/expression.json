@@ -1,0 +1,18 @@
+{
+  "operator": "?:",
+  "target": {
+    "operator": ">",
+    "target": { "$ref": "$args/text/length" },
+    "value": { "$ref": "$args/length" }
+  },
+  "value": {
+    "operator": "+",
+    "target": {
+      "operator": "slice",
+      "target": { "$ref": "$args/text" },
+      "value": [0, { "$ref": "$args/length" }]
+    },
+    "value": "…"
+  },
+  "initial": { "$ref": "$args/text" }
+}

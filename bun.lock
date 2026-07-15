@@ -170,6 +170,16 @@
         "rcedit": "^5.0.2",
       },
     },
+    "packages/formulas": {
+      "name": "@jxsuite/formulas",
+      "version": "1.0.0",
+      "dependencies": {
+        "@jxsuite/schema": "workspace:^",
+      },
+      "devDependencies": {
+        "@jxsuite/runtime": "workspace:^",
+      },
+    },
     "packages/import": {
       "name": "@jxsuite/import",
       "version": "0.36.0",
@@ -746,6 +756,8 @@
     "@jxsuite/desktop": ["@jxsuite/desktop@workspace:packages/desktop"],
 
     "@jxsuite/examples": ["@jxsuite/examples@workspace:examples"],
+
+    "@jxsuite/formulas": ["@jxsuite/formulas@workspace:packages/formulas"],
 
     "@jxsuite/import": ["@jxsuite/import@workspace:packages/import"],
 

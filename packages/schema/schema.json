@@ -1058,6 +1058,42 @@
     "CallOperator": {
       "const": "call"
     },
+    "PureMethod": {
+      "description": "A genuine pure String.prototype / Array.prototype / Number.prototype method (spec §19.4d). The ES2023 change-by-copy family (toSorted, toReversed, toSpliced, with) stands in where mutation would otherwise occur. Receiver in target; value carries the argument (bare scalar) or argument list (array).",
+      "enum": [
+        "includes",
+        "indexOf",
+        "lastIndexOf",
+        "join",
+        "slice",
+        "concat",
+        "at",
+        "flat",
+        "toSorted",
+        "toReversed",
+        "toSpliced",
+        "with",
+        "toUpperCase",
+        "toLowerCase",
+        "trim",
+        "trimStart",
+        "trimEnd",
+        "split",
+        "startsWith",
+        "endsWith",
+        "padStart",
+        "padEnd",
+        "replaceAll",
+        "repeat",
+        "charAt",
+        "normalize",
+        "toLocaleUpperCase",
+        "toLocaleLowerCase",
+        "toFixed",
+        "toPrecision",
+        "toLocaleString"
+      ]
+    },
     "AssignmentOperator": {
       "enum": [
         "=",
@@ -1238,7 +1274,14 @@
               "$ref": "#/$defs/ReduceMethod"
             },
             "target": {
-              "$ref": "#/$defs/ExpressionPointer"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ExpressionPointer"
+                },
+                {
+                  "$ref": "#/$defs/ExpressionNode"
+                }
+              ]
             },
             "value": {
               "$ref": "#/$defs/ExpressionNode"
@@ -1249,7 +1292,7 @@
             "value",
             "initial"
           ],
-          "title": "reduce — pure fold; per-item expression in value, seed in initial"
+          "title": "reduce — pure fold over a pointer or derived array; seed in initial"
         },
         {
           "not": {
@@ -1262,7 +1305,14 @@
               "$ref": "#/$defs/MapFilterMethod"
             },
             "target": {
-              "$ref": "#/$defs/ExpressionPointer"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ExpressionPointer"
+                },
+                {
+                  "$ref": "#/$defs/ExpressionNode"
+                }
+              ]
             },
             "value": {
               "$ref": "#/$defs/ExpressionNode"
@@ -1272,7 +1322,7 @@
             "operator",
             "value"
           ],
-          "title": "map / filter — pure; per-item expression in value, no initial"
+          "title": "map / filter — pure over a pointer or derived array; per-item expression in value"
         },
         {
           "description": "The ECMAScript conditional (ternary) operator, pure: target is the test, value the consequent, initial the alternate (the reduce precedent for repurposing initial). Chain else-if by nesting another ?: node in initial.",
@@ -1323,6 +1373,23 @@
             "cases"
           ],
           "title": "switch — pure value-keyed selection; discriminant in target, results in cases/default"
+        },
+        {
+          "description": "A pure standard-library method call: target is the receiver (any operand — never mutated; change-by-copy names replace the mutating originals), value the optional argument (bare scalar) or argument list (array). A missing receiver or method yields undefined, matching null-safe path reads.",
+          "not": {
+            "required": [
+              "initial"
+            ]
+          },
+          "properties": {
+            "operator": {
+              "$ref": "#/$defs/PureMethod"
+            }
+          },
+          "required": [
+            "operator"
+          ],
+          "title": "Pure method — genuine prototype methods; receiver in target, args in value"
         },
         {
           "description": "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, Intl.*) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",

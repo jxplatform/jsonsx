@@ -1,0 +1,5 @@
+{
+  "name": "last",
+  "description": "The last element of an array (Array.prototype.at(-1)), or undefined when empty.",
+  "parameters": [{ "name": "values", "type": { "text": "unknown[]" } }]
+}

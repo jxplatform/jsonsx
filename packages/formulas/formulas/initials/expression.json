@@ -1,0 +1,12 @@
+{
+  "operator": "join",
+  "target": {
+    "operator": "map",
+    "target": { "operator": "split", "target": { "$ref": "$args/name" }, "value": " " },
+    "value": {
+      "operator": "toUpperCase",
+      "target": { "operator": "charAt", "target": { "$ref": "$map/item" }, "value": 0 }
+    }
+  },
+  "value": ""
+}

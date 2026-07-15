@@ -1,0 +1,9 @@
+{
+  "name": "clamp",
+  "description": "Bound a number to the [min, max] range (the TC39 Math.clamp shape): returns min when below, max when above, the value itself otherwise.",
+  "parameters": [
+    { "name": "value", "type": { "text": "number" } },
+    { "name": "min", "type": { "text": "number" } },
+    { "name": "max", "type": { "text": "number" } }
+  ]
+}

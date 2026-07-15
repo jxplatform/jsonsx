@@ -1144,3 +1144,95 @@ describe("call operator — named formulas and blessed globals", () => {
     );
   });
 });
+
+describe("pure standard-library method operators (spec §19.4d)", () => {
+  test("blessed and pure", () => {
+    for (const op of ["toUpperCase", "includes", "toSorted", "join", "slice", "toFixed"]) {
+      expect(BLESSED_OPERATORS.has(op)).toBe(true);
+      expect(isMutating(op)).toBe(false);
+    }
+    // The mutating originals stay excluded — change-by-copy names replace them.
+    expect(BLESSED_OPERATORS.has("sort")).toBe(false);
+    expect(BLESSED_OPERATORS.has("reverse")).toBe(false);
+  });
+
+  test("string methods evaluate against the receiver", () => {
+    const state: JxScope = { name: "ada lovelace" };
+    expect(
+      evaluateExpression({ operator: "toUpperCase", target: ref("#/state/name") }, state, null),
+    ).toBe("ADA LOVELACE");
+    expect(
+      evaluateExpression(
+        { operator: "split", target: ref("#/state/name"), value: " " },
+        state,
+        null,
+      ),
+    ).toEqual(["ada", "lovelace"]);
+    expect(
+      evaluateExpression(
+        { operator: "padStart", target: ref("#/state/name"), value: [15, "*"] },
+        state,
+        null,
+      ),
+    ).toBe("***ada lovelace");
+  });
+
+  test("array methods are change-by-copy — the receiver is untouched", () => {
+    const state: JxScope = { scores: [3, 1, 2] };
+    expect(
+      evaluateExpression({ operator: "toSorted", target: ref("#/state/scores") }, state, null),
+    ).toEqual([1, 2, 3]);
+    expect(state.scores).toEqual([3, 1, 2]);
+    expect(
+      evaluateExpression(
+        { operator: "join", target: ref("#/state/scores"), value: ", " },
+        state,
+        null,
+      ),
+    ).toBe("3, 1, 2");
+    expect(
+      evaluateExpression(
+        { operator: "includes", target: ref("#/state/scores"), value: 2 },
+        state,
+        null,
+      ),
+    ).toBe(true);
+  });
+
+  test("number methods evaluate; missing receiver or method yields undefined", () => {
+    expect(evaluateExpression({ operator: "toFixed", target: 1.23456, value: 2 }, {}, null)).toBe(
+      "1.23",
+    );
+    expect(
+      evaluateExpression({ operator: "toUpperCase", target: ref("#/state/nope") }, {}, null),
+    ).toBeUndefined();
+    expect(evaluateExpression({ operator: "toUpperCase", target: 42 }, {}, null)).toBeUndefined();
+  });
+
+  test("compiled === interpreted, including the null-safe cases", () => {
+    const cases: ExpressionNode[] = [
+      { operator: "toUpperCase", target: ref("#/state/name") },
+      { operator: "split", target: ref("#/state/name"), value: " " },
+      { operator: "toSorted", target: ref("#/state/scores") },
+      { operator: "padStart", target: ref("#/state/name"), value: [15, "*"] },
+      { operator: "toUpperCase", target: ref("#/state/missing") },
+      { operator: "toFixed", target: 1.23456, value: 2 },
+    ];
+    const state = { name: "ada lovelace", scores: [3, 1, 2] };
+    for (const node of cases) {
+      const fn = new Function("state", `return ${compileExpression(node)}`);
+      expect(fn(structuredClone(state))).toEqual(
+        evaluateExpression(node, structuredClone(state) as JxScope, null) as never,
+      );
+    }
+  });
+
+  test("compiles to optional-chained method calls", () => {
+    expect(compileExpression({ operator: "toUpperCase", target: ref("#/state/name") })).toBe(
+      "(state.name)?.toUpperCase?.()",
+    );
+    expect(
+      compileExpression({ operator: "padStart", target: ref("#/state/s"), value: [5, "0"] }),
+    ).toBe('(state.s)?.padStart?.(5, "0")');
+  });
+});

@@ -50,6 +50,7 @@ export {
   conditionalOperatorSchema,
   switchOperatorSchema,
   callOperatorSchema,
+  pureMethodSchema,
   assignmentOperatorSchema,
   noArgMethodSchema,
   oneArgMethodSchema,

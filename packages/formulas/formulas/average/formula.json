@@ -1,0 +1,5 @@
+{
+  "name": "average",
+  "description": "Arithmetic mean of an array of numbers; 0 for an empty array.",
+  "parameters": [{ "name": "values", "type": { "text": "number[]" } }]
+}
