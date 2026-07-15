@@ -427,6 +427,18 @@ export interface FunctionEditDef {
   parameters?: string[];
 }
 
+/**
+ * Identifies which document position's `$expression` the full-screen formula workspace is editing:
+ * a state entry (`type: "def"` + defName) or an element event binding (`type: "event"` + path +
+ * eventKey). Mirrors FunctionEditDef, the Monaco function editor's target shape.
+ */
+export interface FormulaEditDef {
+  type: "def" | "event";
+  defName?: string;
+  path?: JxPath;
+  eventKey?: string;
+}
+
 export interface GitDiffState {
   filePath: string;
   originalContent: string;

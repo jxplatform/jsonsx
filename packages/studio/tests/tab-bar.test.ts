@@ -25,6 +25,7 @@ type TabBarCtx = Parameters<typeof tabBar.mount>[1];
 
 function makeCtx(overrides: Partial<TabBarCtx> = {}): TabBarCtx {
   return {
+    closeFormulaWorkspace: mock(() => {}),
     closeFunctionEditor: mock(() => {}),
     exportFile: mock(() => {}),
     getCanvasMode: mock(() => "edit"),
@@ -375,6 +376,44 @@ describe("function editor", () => {
     expect(root.querySelector(".breadcrumb-item.current")?.textContent).toBe("ƒ greet");
     expect(root.querySelector(".breadcrumb-item.clickable")).toBeNull();
     expect(hasBtn(root, "Export")).toBe(false);
+  });
+});
+
+// ─── Formula workspace ──────────────────────────────────────────────────────────
+
+describe("formula workspace", () => {
+  test("shows a Back button + fx breadcrumb and closes via ctx.closeFormulaWorkspace", async () => {
+    const tab = openTestTab();
+    const ctx = makeCtx();
+    tabBar.mount(root, ctx);
+    tab.session.ui.editingFormula = { defName: "total", type: "def" };
+    await flush();
+
+    expect(root.querySelector(".breadcrumb-item.current")?.textContent).toBe("fx total");
+    pointer(btn(root, "Back"), "click");
+    expect(ctx.closeFormulaWorkspace).toHaveBeenCalledTimes(1);
+    expect(ctx.closeFunctionEditor).not.toHaveBeenCalled();
+  });
+
+  test("uses the event key for the label and hides the settings cluster and zoom widget", async () => {
+    const tab = openTestTab();
+    tabBar.mount(root, makeCtx());
+    tab.session.ui.editingFormula = { eventKey: "onclick", type: "event" };
+    await flush();
+
+    expect(root.querySelector(".breadcrumb-item.current")?.textContent).toBe("fx onclick");
+    expect(hasBtn(root, "Preview")).toBe(false);
+    expect(root.querySelector(".tb-zoom")).toBeNull();
+  });
+
+  test("the function editor breadcrumb takes precedence over the formula workspace", async () => {
+    const tab = openTestTab();
+    tabBar.mount(root, makeCtx());
+    tab.session.ui.editingFormula = { defName: "total", type: "def" };
+    tab.session.ui.editingFunction = { defName: "greet", type: "def" };
+    await flush();
+
+    expect(root.querySelector(".breadcrumb-item.current")?.textContent).toBe("ƒ greet");
   });
 });
 

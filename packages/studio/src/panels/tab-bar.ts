@@ -19,7 +19,7 @@ import { dynamicRouteParams, loadParamValues, pagePathsDef } from "../page-param
 import { mediaDisplayName } from "./shared";
 import type { ParamValues } from "../page-params";
 import type { Tab } from "../tabs/tab";
-import type { DocumentStackEntry, FunctionEditDef } from "../types";
+import type { DocumentStackEntry, FormulaEditDef, FunctionEditDef } from "../types";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
 
@@ -27,6 +27,7 @@ interface TabBarCtx {
   navigateBack: () => void;
   navigateToLevel: (level: number) => void;
   closeFunctionEditor: () => void;
+  closeFormulaWorkspace: () => void;
   exportFile: () => void;
   getCanvasMode: () => string;
   parseMediaEntries: (media: Record<string, string> | null | undefined) => {
@@ -69,6 +70,7 @@ export function mount(host: HTMLElement, ctx: TabBarCtx) {
         void tab.session.documentStack.length;
         void tab.session.ui.canvasMode;
         void tab.session.ui.editZoom;
+        void tab.session.ui.editingFormula;
         void tab.session.ui.editingFunction;
         void tab.session.ui.featureToggles;
         void tab.session.ui.preview;
@@ -113,9 +115,13 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
   };
   const canvasMode = ctx.getCanvasMode();
   const editing = S.ui.editingFunction as FunctionEditDef | null;
+  const formulaEditing = S.ui.editingFormula as FormulaEditDef | null;
+  // Any full-screen canvas takeover (function editor or formula workspace) suppresses the zoom
+  // Widget, the view-settings cluster, and the Export action below.
+  const takeover = Boolean(editing) || Boolean(formulaEditing);
   const hasStack = S.documentStack && S.documentStack.length > 0;
 
-  // ── Left region: navigation context (function editor takes precedence over the stack) ──
+  // ── Left region: navigation context (function editor > formula workspace > document stack) ──
   let navTpl: TemplateResult | typeof nothing = nothing;
   if (editing) {
     const docName = S.documentPath?.split("/").pop() || S.document?.tagName || "document";
@@ -129,6 +135,27 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
         <span class="breadcrumb-item">${docName}</span>
         <span class="breadcrumb-sep"> › </span>
         <span class="breadcrumb-item current">${funcLabel}</span>
+      </div>
+    `;
+  } else if (formulaEditing) {
+    const docName = S.documentPath?.split("/").pop() || S.document?.tagName || "document";
+    const formulaLabel =
+      formulaEditing.type === "def"
+        ? `fx ${formulaEditing.defName}`
+        : `fx ${formulaEditing.eventKey}`;
+    navTpl = html`
+      <div class="breadcrumb">
+        <sp-action-button
+          size="s"
+          title="Close formula workspace"
+          @click=${ctx.closeFormulaWorkspace}
+        >
+          <sp-icon-back slot="icon"></sp-icon-back>
+          Back
+        </sp-action-button>
+        <span class="breadcrumb-item">${docName}</span>
+        <span class="breadcrumb-sep"> › </span>
+        <span class="breadcrumb-item current">${formulaLabel}</span>
       </div>
     `;
   } else if (hasStack) {
@@ -158,7 +185,7 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
   // Stylebook / git-diff / preview all render on the panzoom surface and drive `ui.zoom` (with the
   // Panzoom-only fit-to-screen action).
   let zoomTpl: TemplateResult | typeof nothing = nothing;
-  if (!editing && canvasMode === "edit") {
+  if (!takeover && canvasMode === "edit") {
     const editZoom = S.ui.editZoom ?? 1;
     zoomTpl = html`
       <sp-action-group compact size="s" class="tb-zoom">
@@ -187,7 +214,7 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
       </sp-action-group>
     `;
   } else if (
-    !editing &&
+    !takeover &&
     (canvasMode === "design" ||
       canvasMode === "stylebook" ||
       canvasMode === "git-diff" ||
@@ -239,7 +266,7 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
     (S.documentPath.startsWith("pages/") || S.documentPath.startsWith("./pages/")),
   );
   let settingsTpl: TemplateResult | typeof nothing = nothing;
-  if (!editing && (baseMode === "edit" || baseMode === "design")) {
+  if (!takeover && (baseMode === "edit" || baseMode === "design")) {
     const canPreview = tab.capabilities.modes.includes("preview");
     const hasLayout = isPage && Boolean(getEffectiveLayoutPath(S.document?.$layout));
     const pickersTpl = isPage ? paramPickersTpl(tab) : nothing;
@@ -309,7 +336,7 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
 
   // ── Right region: mode actions (Code-mode Export) ──
   const exportTpl =
-    !editing && canvasMode === "source"
+    !takeover && canvasMode === "source"
       ? html`
           <sp-action-button size="s" @click=${ctx.exportFile}>
             <sp-icon-export slot="icon"></sp-icon-export>

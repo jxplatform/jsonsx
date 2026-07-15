@@ -4,6 +4,7 @@ import { formatByName, formatForPath } from "../format/format-host";
 import { normalizeArrayChildren } from "../state";
 import type {
   DocumentStackEntry,
+  FormulaEditDef,
   FunctionEditDef,
   GitBranchesResult,
   GitDiffState,
@@ -33,6 +34,8 @@ export interface TabUi {
   activeMedia: string | null;
   activeSelector: string | null;
   editingFunction: FunctionEditDef | null;
+  /** Full-screen formula workspace target ($expression editing); editingFunction wins if both set. */
+  editingFormula: FormulaEditDef | null;
   featureToggles: Record<string, boolean>;
   styleSections: Record<string, boolean>;
   inspectorSections: Record<string, boolean>;
@@ -119,6 +122,7 @@ function createDefaultUi(canvasMode: string, preview = false) {
     activeSelector: null,
     canvasMode,
     editZoom: 1,
+    editingFormula: null,
     editingFunction: null,
     featureToggles: {},
     frontmatterOpen: true,

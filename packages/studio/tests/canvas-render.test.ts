@@ -151,6 +151,13 @@ void mock.module("../src/panels/editors.js", () => ({
   renderFunctionEditor,
 }));
 
+const renderFormulaWorkspace = mock(() => {});
+void mock.module("../src/panels/formula-workspace.js", () => ({
+  closeFormulaWorkspace: () => {},
+  formulaRoot: () => null,
+  renderFormulaWorkspace,
+}));
+
 void mock.module("../src/panels/statusbar.js", () => ({
   mountStatusbar: () => {},
   renderStatusbar: () => {},
@@ -479,6 +486,29 @@ describe("function editor dispatch", () => {
     renderCanvas();
     expect(dispose).toHaveBeenCalled();
     expect(view.functionEditor).toBeNull();
+  });
+});
+
+// ─── Formula workspace ────────────────────────────────────────────────────────
+
+describe("formula workspace dispatch", () => {
+  test("renders the formula workspace while editingFormula is set", () => {
+    const tab = openSyncedTab();
+    tab.session.ui.editingFormula = { defName: "total", type: "def" };
+    renderFormulaWorkspace.mockClear();
+    renderCanvas();
+    expect(renderFormulaWorkspace).toHaveBeenCalled();
+  });
+
+  test("the function editor takes precedence when both targets are set", () => {
+    const tab = openSyncedTab();
+    tab.session.ui.editingFormula = { defName: "total", type: "def" };
+    tab.session.ui.editingFunction = { defName: "greet", type: "def" } as never;
+    renderFormulaWorkspace.mockClear();
+    renderFunctionEditor.mockClear();
+    renderCanvas();
+    expect(renderFunctionEditor).toHaveBeenCalled();
+    expect(renderFormulaWorkspace).not.toHaveBeenCalled();
   });
 });
 

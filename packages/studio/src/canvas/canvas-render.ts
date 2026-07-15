@@ -40,6 +40,7 @@ import { dismissBlockActionBar, dismissLinkPopover } from "../panels/block-actio
 import { dismissContextMenu } from "../editor/context-menu";
 import { dismissSlashMenu } from "../editor/slash-menu";
 import { renderFunctionEditor } from "../panels/editors";
+import { renderFormulaWorkspace } from "../panels/formula-workspace";
 import { mediaDisplayName } from "../panels/shared";
 import { statusMessage } from "../panels/statusbar";
 import * as overlaysPanel from "../panels/overlays";
@@ -264,6 +265,13 @@ export function renderCanvas() {
   if (view.functionEditor) {
     view.functionEditor.dispose();
     view.functionEditor = null;
+  }
+
+  // Formula workspace mode: full-screen structured editing of an $expression (the function editor
+  // Takes precedence when both targets are set).
+  if (S.ui.editingFormula) {
+    renderFormulaWorkspace();
+    return;
   }
 
   // Source mode: update existing Monaco editor without recreating. Don't replace the buffer while

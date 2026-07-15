@@ -137,6 +137,7 @@ import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from ".
 import { registerCanvasDndBridge } from "./panels/canvas-dnd-bridge";
 import { defaultDef } from "./panels/shared";
 import { registerFunctionCompletions } from "./panels/editors";
+import { closeFormulaWorkspace } from "./panels/formula-workspace";
 import {
   initBlockActionBar,
   isEditChromeTarget,
@@ -420,6 +421,7 @@ initQuickSearch({ openRecentProject: (root: string) => openRecentProject(root) }
 tabStrip.mount(document.querySelector("#tab-strip") as HTMLElement);
 
 tabBar.mount(document.querySelector("#tab-bar") as HTMLElement, {
+  closeFormulaWorkspace: () => closeFormulaWorkspace(),
   closeFunctionEditor: () => closeFunctionEditor(),
   exportFile,
   getCanvasMode,
@@ -565,6 +567,7 @@ effect(() => {
   if (tab) {
     void tab.doc.mode;
     void tab.session.ui.canvasMode;
+    void tab.session.ui.editingFormula;
     void tab.session.ui.editingFunction;
     void tab.session.ui.featureToggles;
     void tab.session.ui.preview;
