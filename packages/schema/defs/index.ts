@@ -34,6 +34,7 @@ export {
 // State shapes
 export { typedStateDefSchema } from "./typed-state-def.schema";
 export { functionDefSchema } from "./function-def.schema";
+export { statementSchema, statementListSchema } from "./statement.schema";
 export { externalClassDefSchema, BUILT_IN_PROTOTYPES } from "./external-class-def.schema";
 export { pureTypeDefSchema } from "./pure-type-def.schema";
 
@@ -46,6 +47,9 @@ export {
   expressionEntrySchema,
   unaryOperatorSchema,
   binaryOperatorSchema,
+  conditionalOperatorSchema,
+  switchOperatorSchema,
+  callOperatorSchema,
   assignmentOperatorSchema,
   noArgMethodSchema,
   oneArgMethodSchema,

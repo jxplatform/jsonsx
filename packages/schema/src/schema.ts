@@ -58,11 +58,14 @@ import {
 } from "../defs/element-def.schema";
 import { typedStateDefSchema } from "../defs/typed-state-def.schema";
 import { functionDefSchema } from "../defs/function-def.schema";
+import { statementListSchema, statementSchema } from "../defs/statement.schema";
 import { externalClassDefSchema } from "../defs/external-class-def.schema";
 import { pureTypeDefSchema } from "../defs/pure-type-def.schema";
 import {
   assignmentOperatorSchema,
   binaryOperatorSchema,
+  callOperatorSchema,
+  conditionalOperatorSchema,
   expressionEntrySchema,
   expressionLiteralSchema,
   expressionNodeSchema,
@@ -73,6 +76,7 @@ import {
   oneArgMethodSchema,
   reduceMethodSchema,
   spliceMethodSchema,
+  switchOperatorSchema,
   unaryOperatorSchema,
 } from "../defs/expression-node.schema";
 import {
@@ -218,6 +222,9 @@ export async function generateSchema() {
       ExpressionOperand: expressionOperandSchema,
       UnaryOperator: unaryOperatorSchema,
       BinaryOperator: binaryOperatorSchema,
+      ConditionalOperator: conditionalOperatorSchema,
+      SwitchOperator: switchOperatorSchema,
+      CallOperator: callOperatorSchema,
       AssignmentOperator: assignmentOperatorSchema,
       NoArgMethod: noArgMethodSchema,
       OneArgMethod: oneArgMethodSchema,
@@ -226,6 +233,8 @@ export async function generateSchema() {
       MapFilterMethod: mapFilterMethodSchema,
       ExpressionNode: expressionNodeSchema,
       ExpressionEntry: expressionEntrySchema,
+      Statement: statementSchema,
+      StatementList: statementListSchema,
 
       // Element defs — with webref data injected
       ElementDef: {

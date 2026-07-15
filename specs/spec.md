@@ -1470,13 +1470,14 @@ An expression node is one of two **modes**, determined entirely by its operator:
 
 The mode is not declared; it follows from the blessed operator set (§19.4). The compiler routes a mutating node to a handler and a pure node to a `computed()` (§19.8). A pure node may nest inside either mode; a mutating node may only appear at a handler boundary, never as an operand.
 
-| Arity      | Mode     | Uses `target`  | Uses `value`        | Operators                                   |
-| ---------- | -------- | -------------- | ------------------- | ------------------------------------------- |
-| Unary      | Pure     | Yes            | No                  | `!`, `-` (negation)                         |
-| Binary     | Pure     | Yes (left)     | Yes (right)         | `+ - * / %`, `=== !== < <= > >=`, `&& \|\|` |
-| Assignment | Mutating | Yes (LHS)      | Yes (RHS)           | `=`, `+= -= *= /=`                          |
-| Method     | Mutating | Yes (receiver) | Args (see below)    | `push`, `pop`, `shift`, `unshift`, `splice` |
-| Aggregate  | Pure     | Yes (source)   | Per-item expression | `reduce`, `map`, `filter` (see §19.4a)      |
+| Arity       | Mode     | Uses `target`      | Uses `value`         | Operators                                      |
+| ----------- | -------- | ------------------ | -------------------- | ---------------------------------------------- |
+| Unary       | Pure     | Yes                | No                   | `!`, `-` (negation)                            |
+| Binary      | Pure     | Yes (left)         | Yes (right)          | `+ - * / %`, `=== !== < <= > >=`, `&& \|\| ??` |
+| Conditional | Pure     | Yes (test / disc.) | Branches (see below) | `?:`, `switch` (see §19.4b)                    |
+| Assignment  | Mutating | Yes (LHS)          | Yes (RHS)            | `=`, `+= -= *= /=`                             |
+| Method      | Mutating | Yes (receiver)     | Args (see below)     | `push`, `pop`, `shift`, `unshift`, `splice`    |
+| Aggregate   | Pure     | Yes (source)       | Per-item expression  | `reduce`, `map`, `filter` (see §19.4a)         |
 
 For **binary** operators, `target` is the left operand and `value` the right; the result is a value (it does not mutate). For **assignment** operators, `target` is the assignable location (a writable `$ref`) and the operation mutates it. For **method** operators, `target` is the array receiver and `value` carries the arguments: a single value for `push`/`unshift`, an array of arguments for `splice` (`[start, deleteCount, ...items]`), and omitted for `pop`/`shift`. **Aggregate** operators are defined in §19.4a.
 
@@ -1497,11 +1498,12 @@ The operator set is **closed**. An operator outside this list is a compile-time 
 | Unary                  | `!` `-`                                 |
 | Arithmetic (binary)    | `+` `-` `*` `/` `%`                     |
 | Comparison             | `===` `!==` `<` `<=` `>` `>=`           |
-| Logical (binary)       | `&&` `\|\|`                             |
+| Logical (binary)       | `&&` `\|\|` `??`                        |
+| Conditional (pure)     | `?:` `switch` (see §19.4b)              |
 | Array mutation methods | `push` `pop` `shift` `unshift` `splice` |
 | Aggregate (pure)       | `reduce` `map` `filter`                 |
 
-All tokens except the methods are genuine ECMAScript operator punctuators. The array and aggregate methods are genuine `Array.prototype` methods. No token in this table is invented.
+All tokens except the methods and `switch` are genuine ECMAScript operator punctuators (`?:` names the conditional operator's two punctuators as one token; `??` is nullish coalescing). `switch` is the ECMAScript selection keyword, mirroring the element-level `$switch` (§14). The array and aggregate methods are genuine `Array.prototype` methods. No token in this table is invented.
 
 ### 19.4a Aggregate Operators
 
@@ -1564,6 +1566,86 @@ This is the same `$map/` binding §10.2 establishes for mapped-array templates; 
 
 Aggregate `map`/`filter` are the inline, declarative form of the `filter`/`sort` hooks gestured at in §10.3 — those hooks accept a `$ref` to a function today; an aggregate expression expresses the same predicate structurally.
 
+### 19.4b Conditional Operators
+
+Conditional operators are **pure** (§19.1): they select among operands and return the selected value, mutating nothing. They are the declarative replacement for conditional logic that would otherwise require a template string or a `body` string.
+
+**`?:`** is the ECMAScript conditional operator. Its fields map onto the existing node shape following ESTree's `ConditionalExpression` (test / consequent / alternate): `target` is the test, `value` the consequent, and `initial` the alternate (the same field-repurposing precedent as `reduce`'s seed). All three are required.
+
+```json
+{
+  "operator": "?:",
+  "target": { "operator": ">", "target": { "$ref": "#/state/cart/length" }, "value": 10 },
+  "value": "Cart full",
+  "initial": "Keep shopping"
+}
+```
+
+Else-if chains nest another `?:` in `initial`, exactly as in ECMAScript. A visual editor renders the chain as a flat If / Else-if / Else list; the AST needs no dedicated chain node.
+
+**`switch`** is value-keyed multiway selection, mirroring the element-level `$switch`/`cases` (§14) at expression level: `target` is the discriminant, `cases` maps the discriminant's **string form** to result operands, and the optional `default` is the result when no key matches (`undefined` without it). `value` and `initial` are not used.
+
+```json
+{
+  "operator": "switch",
+  "target": { "$ref": "#/state/status" },
+  "cases": { "loading": "Please wait…", "error": { "$ref": "#/state/errorMessage" } },
+  "default": { "$ref": "#/state/data/title" }
+}
+```
+
+Matching is on the string form (`String(discriminant)`) because JSON object keys are strings — the same normalization the element-level `$switch` applies. Arbitrary-condition branching composes from `?:` chains; `switch` is reserved for discriminant matching, as in ECMAScript.
+
+**`??`** (nullish coalescing) joins the binary table: `target ?? value`, returning `value` only when `target` is `null` or `undefined`. Prefer it over `\|\|` when `0`, `""`, or `false` are legitimate values.
+
+In production evaluation `?:` and `switch` evaluate only the taken branch. Under the editor trace (§19.9) every branch is evaluated so each carries a live value.
+
+### 19.4c Named Formulas and the `call` Operator
+
+A **named formula** is a Shape 5 expression entry with `parameters` (the same CEM-compatible convention as Function entries): a pure, reusable computation. Parameterless pure entries remain computed values exactly as before; the presence of `parameters` makes the entry **callable** instead.
+
+```json
+{
+  "state": {
+    "lineTotal": {
+      "parameters": [
+        { "name": "price", "type": { "text": "number" } },
+        { "name": "qty", "type": { "text": "number" }, "default": 1 }
+      ],
+      "$expression": {
+        "operator": "*",
+        "target": { "$ref": "$args/price" },
+        "value": { "$ref": "$args/qty" }
+      }
+    }
+  }
+}
+```
+
+Inside a formula body, parameters resolve via the **`$args/` scheme** — a context binding like `$map/` and `$reduce/acc`, inserted into the §7.4 resolution order above `event#/`. Deep paths (`$args/user/name`) navigate the argument value.
+
+**`call`** (a genuine `Function.prototype` name) invokes a callable: `target` is the callee pointer and `value` is the positional argument list — the `splice` args-in-value precedent. Argument order follows the callee's declared `parameters`; omitted arguments take their CEM `default`.
+
+```json
+{
+  "operator": "call",
+  "target": { "$ref": "#/state/lineTotal" },
+  "value": [{ "$ref": "$map/item/price" }, { "$ref": "$map/item/qty" }]
+}
+```
+
+**Blessed globals.** A callee may also be a pure standard-library function through the existing `window#/` scheme, gated by the closed `BLESSED_GLOBALS` allowlist (`Math.*`, `JSON.*`, `Object.keys/values/entries/fromEntries`, `Number.*`, `Array.from/isArray/of`, `Intl` formatters to follow, …). Every entry is a genuine ECMAScript or WHATWG function with no side effects; anything off the list is an error at compile time and evaluation time alike. Impure platform functions (`fetch`, `alert`, `Math.random`, `Date.now`) are deliberately absent — side effects belong to Function entries.
+
+```json
+{
+  "operator": "call",
+  "target": { "$ref": "window#/Math/max" },
+  "value": [{ "$ref": "#/state/a" }, { "$ref": "#/state/b" }, 0]
+}
+```
+
+**Semantics and lowering.** Project-global formulas live in `project.json` `state` and reach every page through the standard project-state merge — there is no separate formulas section. `buildScope` lowers a named formula to a scope callable that maps positional arguments onto parameter names; call sites therefore compile to plain positional calls (`state.lineTotal(3, 4)`), identical in the interpreter and every compiled target. `call` chains are bounded by `MAX_CALL_DEPTH` (64) against unbounded recursion; the compiler must additionally reject statically detectable call cycles. Reads inside a formula body are tracked reactively as usual — a computed that calls a formula recomputes when the formula's inputs change.
+
 ### 19.5 The `event#` Reference Scheme
 
 Handlers receive `(state, event)` (§4.3). To allow `$expression` handlers to read event data without escalating to a `body` string, the reference system (§7.2) is extended with one scheme:
@@ -1577,11 +1659,12 @@ Handlers receive `(state, event)` (§4.3). To allow `$expression` handlers to re
 ```
 1. $map/       — iteration context
 2. $reduce/acc — fold accumulator (reduce per-item expression only)
-3. event#/     — handler event context (handler position only)
-4. #/state/    — current component scope
-5. parent#/    — explicitly passed props
-6. window#/    — global window properties
-7. document#/  — global document properties
+3. $args/      — named-formula parameters (callable body only, §19.4c)
+4. event#/     — handler event context (handler position only)
+5. #/state/    — current component scope
+6. parent#/    — explicitly passed props
+7. window#/    — global window properties
+8. document#/  — global document properties
 ```
 
 Example — an input handler with no `body` string:
@@ -1700,6 +1783,76 @@ computed(() => state.cart.reduce((acc, item) => acc + item.price * item.qty, 0))
 ```
 
 The per-item expression node becomes the callback body, with `$reduce/acc` bound to the accumulator parameter and `$map/item` / `$map/index` to the element and index. Because the source array is read inside the `computed`, Vue tracks it — the total recomputes whenever the cart or any line's `price`/`qty` changes. As with handlers, the callback is _constructed from the node tree_, never parsed from a string, so it stays analyzable and the visual builder can render each node as an editable form control.
+
+Conditional nodes compile to their ECMAScript equivalents: `?:` to a parenthesized ternary, `??` to a parenthesized binary, and `switch` to a strict-equality chain over the discriminant's string form, bound once (`((_d) => _d === "loading" ? … : _default)(String(…))`).
+
+### 19.9 Editor Evaluation Trace
+
+The interpreter accepts an optional **trace** — a `report(path, value)` callback — so a visual editor can badge every node of an expression with its live value against real component state. This mirrors the dual-mode evaluation pattern proven by Nordcraft's formula editor.
+
+- Every node and `$ref`/nested operand reports its evaluated value, keyed by its path within the expression tree (`["value", "target"]` etc.).
+- Branch-selecting operators (`?:`, `switch`) evaluate **all** branches under trace — the untaken branches' values are reported, then the semantically correct result is returned. (`&&`/`\|\|`/`??` already evaluate both operands eagerly; purity makes this observationally equivalent.)
+- Aggregates report a **first-iteration sample** of their per-item expression rather than one report per element.
+- Because branch-forcing removes natural exit conditions, reporting stops beyond `MAX_REPORT_DEPTH` (64); evaluation itself continues untraced.
+- The trace is interpreter-only. Compiled output (§19.8) is never affected, and evaluation without a trace takes the untouched production path — including branch short-circuiting.
+
+---
+
+## 20. Structured Function Bodies (Statements)
+
+### 20.1 Motivation
+
+§19 removed the `body`-string escape hatch for single operations; multi-step side effects (mutate, branch, notify) still required opaque JavaScript. A Function entry's `body` may now be a **JSON array of statements** instead of a source string — explicit structured function declaration, analyzable by tooling and editable visually. This mirrors ESTree exactly: a function body is `Statement[]`. No new keyword, no new entry kind — the escalation ladder _within_ Shape 4 becomes structured statements → JS string.
+
+```json
+{
+  "state": {
+    "addToCart": {
+      "$prototype": "Function",
+      "parameters": ["item"],
+      "emits": [{ "name": "cart-changed" }],
+      "body": [
+        {
+          "operator": "push",
+          "target": { "$ref": "#/state/cart" },
+          "value": { "$ref": "$args/item" }
+        },
+        {
+          "if": { "operator": ">", "target": { "$ref": "#/state/cart/length" }, "value": 10 },
+          "then": [{ "dispatchEvent": "cart-full" }],
+          "else": [{ "operator": "call", "target": { "$ref": "#/state/refreshTotals" } }]
+        },
+        {
+          "dispatchEvent": "cart-changed",
+          "detail": { "$ref": "#/state/cart" },
+          "bubbles": true,
+          "composed": true
+        }
+      ]
+    }
+  }
+}
+```
+
+### 20.2 Statement Kinds
+
+Every statement kind reuses a web-platform name — §19.4's law extended to statement position:
+
+| Kind       | Shape                                                | Source of the name                           |
+| ---------- | ---------------------------------------------------- | -------------------------------------------- |
+| Expression | a bare §19 expression node (mutation or `call`)      | ECMAScript ExpressionStatement               |
+| Branch     | `{ if, then, else? }` — statement lists in then/else | JSON Schema 2020-12 conditional keywords     |
+| Multiway   | `{ $switch, cases, default? }` — statement lists     | Element-level `$switch` (§14), ECMA switch   |
+| Dispatch   | `{ dispatchEvent, detail?, bubbles?, composed? }`    | WHATWG DOM `dispatchEvent`/`CustomEventInit` |
+
+- The branch `if` and the `$switch` discriminant hold **pure** operands; `$switch` matches by string form, exactly like §19.4b.
+- **Result capture** composes — an assignment statement whose `value` is a `call` node — so no dedicated capture field exists.
+- `dispatchEvent` dispatches from the handler's `event.currentTarget` (interpreter and client islands) or the component instance (compiled custom elements); the entry's `emits` (CEM) remains the declaration the editor autocompletes from.
+- Statements execute sequentially; a statement whose value is a thenable is awaited before the next (ECMA async/await semantics).
+
+### 20.3 Lowering
+
+`body: Statement[]` follows the named-formula pattern (§19.4c): without `parameters` the entry lowers to an event handler `(state, event)`; with `parameters` it lowers to a positional callable whose arguments bind to `$args/` names. The engine is `runStatements` (interpreter) + `compileStatements` (JS emitter) — one module, both halves, mirroring §19.8: `if`/`else` and `switch` emit their genuine ECMAScript statement forms, and dispatch emits `dispatchEvent(new CustomEvent(type, init))`. Inline event bindings accept structured bodies through the existing Function binding form — `JxEventBinding` is unchanged.
 
 ---
 

@@ -19,6 +19,7 @@ import type {
   JxPrototypeDef,
   JxRef,
   JxServerFnDef,
+  JxStatement,
   JxStateObject,
   JxStyle,
 } from "../types";
@@ -47,6 +48,26 @@ export function isFunctionDef(value: unknown): value is JxFunctionDef {
 /** Shape 5: a declarative expression entry — `{ $expression: { operator, target } }`. */
 export function isExpressionDef(value: unknown): value is JxExpressionDef {
   return isJsonObject(value) && isJsonObject(value.$expression);
+}
+
+/**
+ * Shape 5 with `parameters`: a named formula — a pure, reusable computation invoked via the `call`
+ * operator rather than lowered to a computed value.
+ */
+export function isNamedFormulaDef(
+  value: unknown,
+): value is JxExpressionDef & { parameters: unknown[] } {
+  return isExpressionDef(value) && Array.isArray(value.parameters) && value.parameters.length > 0;
+}
+
+/**
+ * Shape 4 with a structured body: a Function entry whose `body` is a statement array (spec §20)
+ * rather than opaque JS source.
+ */
+export function hasStructuredBody(
+  value: unknown,
+): value is JxFunctionDef & { body: JxStatement[] } {
+  return isFunctionDef(value) && Array.isArray(value.body);
 }
 
 /** A non-Function `$prototype` instance (Request, Storage, ContentCollection, classes, …). */

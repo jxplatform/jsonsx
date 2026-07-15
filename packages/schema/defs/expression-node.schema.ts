@@ -1,9 +1,10 @@
 export const expressionPointerSchema = {
   additionalProperties: false,
-  description: "A JSON Pointer $ref operand within an expression node.",
+  description:
+    "A JSON Pointer $ref operand within an expression node. $args/<name> resolves a named formula's parameter (callable entries only).",
   properties: {
     $ref: {
-      pattern: "^(\\$map/|\\$reduce/|event#/|#/|parent#/|window#/|document#/)",
+      pattern: "^(\\$map/|\\$reduce/|\\$args/|event#/|#/|parent#/|window#/|document#/)",
       type: "string",
     },
   },
@@ -34,8 +35,11 @@ export const expressionOperandSchema = {
 
 export const unaryOperatorSchema = { enum: ["!", "-"] } as const;
 export const binaryOperatorSchema = {
-  enum: ["+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=", "&&", "||"],
+  enum: ["+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=", "&&", "||", "??"],
 } as const;
+export const conditionalOperatorSchema = { const: "?:" } as const;
+export const switchOperatorSchema = { const: "switch" } as const;
+export const callOperatorSchema = { const: "call" } as const;
 export const assignmentOperatorSchema = { enum: ["=", "+=", "-=", "*=", "/="] } as const;
 export const noArgMethodSchema = { enum: ["pop", "shift"] } as const;
 export const oneArgMethodSchema = { enum: ["push", "unshift"] } as const;
@@ -115,8 +119,52 @@ export const expressionNodeSchema = {
       required: ["operator", "value"],
       title: "map / filter — pure; per-item expression in value, no initial",
     },
+    {
+      description:
+        "The ECMAScript conditional (ternary) operator, pure: target is the test, value the consequent, initial the alternate (the reduce precedent for repurposing initial). Chain else-if by nesting another ?: node in initial.",
+      properties: { operator: { $ref: "#/$defs/ConditionalOperator" } },
+      required: ["operator", "value", "initial"],
+      title: "?: — pure conditional; test in target, consequent in value, alternate in initial",
+    },
+    {
+      description:
+        "Value-keyed multiway selection, pure: target is the discriminant (matched against case keys by its string form, like element-level $switch), cases maps matched values to result operands, default is the operand when no case matches (result is undefined without it). Condition-chain branching composes from nested ?: nodes instead.",
+      not: { anyOf: [{ required: ["value"] }, { required: ["initial"] }] },
+      properties: {
+        cases: {
+          additionalProperties: { $ref: "#/$defs/ExpressionOperand" },
+          type: "object",
+        },
+        default: { $ref: "#/$defs/ExpressionOperand" },
+        operator: { $ref: "#/$defs/SwitchOperator" },
+      },
+      required: ["operator", "cases"],
+      title:
+        "switch — pure value-keyed selection; discriminant in target, results in cases/default",
+    },
+    {
+      description:
+        "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, Intl.*) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
+      not: { required: ["initial"] },
+      properties: {
+        operator: { $ref: "#/$defs/CallOperator" },
+        target: { $ref: "#/$defs/ExpressionPointer" },
+        value: { items: { $ref: "#/$defs/ExpressionOperand" }, type: "array" },
+      },
+      required: ["operator"],
+      title: "call — invoke a named formula or blessed global; callee in target, args in value",
+    },
   ],
   properties: {
+    cases: {
+      additionalProperties: { $ref: "#/$defs/ExpressionOperand" },
+      description: "switch only: matched discriminant value (string form) → result operand.",
+      type: "object",
+    },
+    default: {
+      $ref: "#/$defs/ExpressionOperand",
+      description: "switch only: result operand when no case key matches.",
+    },
     initial: { $ref: "#/$defs/ExpressionOperand" },
     operator: { type: "string" },
     target: { $ref: "#/$defs/ExpressionOperand" },
@@ -129,11 +177,17 @@ export const expressionNodeSchema = {
 export const expressionEntrySchema = {
   additionalProperties: false,
   description:
-    "A declarative expression entry (Shape 5). Used as a state entry or inline event handler.",
+    "A declarative expression entry (Shape 5). Used as a state entry or inline event handler. With parameters it is a named formula: a pure, reusable computation invoked via the call operator, its parameters resolved through $args/<name> refs in the body.",
   properties: {
     $description: { type: "string" },
     $expression: { $ref: "#/$defs/ExpressionNode" },
     $title: { type: "string" },
+    parameters: {
+      description:
+        "Named-formula parameters (CEM convention, as on Function entries): bare names or CEM parameter objects. Present ⇒ the entry is callable, not a computed value.",
+      items: { anyOf: [{ type: "string" }, { $ref: "#/$defs/CemParameter" }] },
+      type: "array",
+    },
   },
   required: ["$expression"],
   type: "object",

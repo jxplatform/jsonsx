@@ -30,6 +30,11 @@ function scopeMap(state: JxScope): ScopeMapCtx | undefined {
 interface CompileOpts {
   statePrefix?: string;
   eventParam?: string;
+  /**
+   * Parameter-name order per named-formula state key, used by `call` sites to map positional
+   * argument lists onto the emitted formula functions' named-args object.
+   */
+  formulaParams?: Record<string, string[]>;
 }
 
 const MUTATING_OPS = new Set([
@@ -59,17 +64,80 @@ const BINARY_OPS = new Set([
   ">=",
   "&&",
   "||",
+  "??",
 ]);
 const ASSIGNMENT_OPS = new Set(["=", "+=", "-=", "*=", "/="]);
 const ARRAY_METHOD_OPS = new Set(["push", "pop", "shift", "unshift", "splice"]);
 const AGGREGATE_OPS = new Set(["reduce", "map", "filter"]);
+const CONDITIONAL_OPS = new Set(["?:", "switch"]);
 
 export const BLESSED_OPERATORS = new Set([
   ...MUTATING_OPS,
   ...UNARY_OPS,
   ...BINARY_OPS,
   ...AGGREGATE_OPS,
+  ...CONDITIONAL_OPS,
+  "call",
 ]);
+
+/**
+ * Pure globals a `call` node may target through the `window#/` scheme (spec §19.4c). Every entry is
+ * a genuine ECMAScript or WHATWG standard-library function with no side effects; anything off this
+ * list is a compile-time error, keeping formula purity decidable.
+ */
+export const BLESSED_GLOBALS = new Set([
+  // Global functions
+  "isNaN",
+  "isFinite",
+  "parseFloat",
+  "parseInt",
+  "encodeURIComponent",
+  "decodeURIComponent",
+  "structuredClone",
+  // Math
+  "Math/abs",
+  "Math/ceil",
+  "Math/floor",
+  "Math/round",
+  "Math/trunc",
+  "Math/sign",
+  "Math/sqrt",
+  "Math/cbrt",
+  "Math/pow",
+  "Math/exp",
+  "Math/log",
+  "Math/log2",
+  "Math/log10",
+  "Math/min",
+  "Math/max",
+  "Math/hypot",
+  // Number
+  "Number/isInteger",
+  "Number/isFinite",
+  "Number/isNaN",
+  "Number/parseFloat",
+  "Number/parseInt",
+  // JSON
+  "JSON/parse",
+  "JSON/stringify",
+  // Object
+  "Object/keys",
+  "Object/values",
+  "Object/entries",
+  "Object/fromEntries",
+  // Array
+  "Array/from",
+  "Array/isArray",
+  "Array/of",
+  // String
+  "String/fromCharCode",
+  "String/fromCodePoint",
+]);
+
+/** Whether a `window#/…` callee ref is on the blessed pure-globals list. */
+export function isBlessedGlobal(ref: string): boolean {
+  return ref.startsWith("window#/") && BLESSED_GLOBALS.has(ref.slice("window#/".length));
+}
 
 /**
  * @param {string} op
@@ -85,6 +153,49 @@ interface IterCtx {
   acc?: unknown;
   item?: unknown;
   index?: number;
+  /** Named-formula arguments bound for the current `call` body ($args/<name> refs). */
+  args?: Record<string, unknown>;
+  /** Call-nesting depth; capped at MAX_CALL_DEPTH to bound recursive formulas. */
+  callDepth?: number;
+}
+
+/** Recursion bound for `call` chains (formula → formula), mirroring MAX_REPORT_DEPTH. */
+export const MAX_CALL_DEPTH = 64;
+
+/**
+ * Editor-mode evaluation trace (spec §19.9). When passed, every node and operand reports its
+ * evaluated value keyed by its path within the expression tree, and the branch-selecting operators
+ * (`?:`, `switch` — plus the eager `&&`/`||`/`??`) yield values for ALL branches so a visual editor
+ * can badge every node. Absent (production), evaluation is untouched.
+ */
+export interface ExpressionTrace {
+  report: (path: (string | number)[], value: unknown) => void;
+  /** Current node path — internal; leave unset at the call boundary. */
+  path?: (string | number)[];
+  /** Recursion depth — internal; reporting stops beyond MAX_REPORT_DEPTH. */
+  depth?: number;
+}
+
+/** Reporting recursion bound: branch-forcing removes natural exit conditions, so cap the walk. */
+export const MAX_REPORT_DEPTH = 64;
+
+/** Derive the trace for a child operand at path segment(s) `seg`; undefined once capped. */
+function subTrace(
+  trace: ExpressionTrace | undefined,
+  seg: string | number | (string | number)[],
+): ExpressionTrace | undefined {
+  if (!trace) {
+    return undefined;
+  }
+  const depth = (trace.depth ?? 0) + 1;
+  if (depth > MAX_REPORT_DEPTH) {
+    return undefined;
+  }
+  return {
+    depth,
+    path: [...(trace.path ?? []), ...(Array.isArray(seg) ? seg : [seg])],
+    report: trace.report,
+  };
 }
 
 /** Resolve an operand to its runtime value. */
@@ -93,6 +204,7 @@ function resolveOperand(
   state: JxScope,
   event: Event | null,
   iterCtx?: IterCtx,
+  trace?: ExpressionTrace,
 ): unknown {
   if (operand === null || operand === undefined) {
     return operand;
@@ -100,20 +212,25 @@ function resolveOperand(
 
   // Nested expression node
   if (typeof operand === "object" && !Array.isArray(operand) && "operator" in operand) {
-    return evaluateExpression(operand as ExpressionNode, state, event, iterCtx);
+    return evaluateExpression(operand as ExpressionNode, state, event, iterCtx, trace);
   }
 
   // $ref pointer
   if (typeof operand === "object" && !Array.isArray(operand) && "$ref" in operand) {
-    return resolveExprRef((operand as { $ref: string }).$ref, state, event, iterCtx);
+    const resolved = resolveExprRef((operand as { $ref: string }).$ref, state, event, iterCtx);
+    trace?.report(trace.path ?? [], resolved);
+    return resolved;
   }
 
   // Array of operands (e.g., splice args)
   if (Array.isArray(operand)) {
-    return operand.map((o: unknown) => resolveOperand(o, state, event, iterCtx));
+    return operand.map((o: unknown, i: number) =>
+      resolveOperand(o, state, event, iterCtx, subTrace(trace, i)),
+    );
   }
 
   // Literal
+  trace?.report(trace.path ?? [], operand);
   return operand;
 }
 
@@ -124,6 +241,11 @@ function resolveExprRef(ref: string, state: JxScope, event: Event | null, iterCt
   }
   if (ref.startsWith("$reduce/")) {
     return iterCtx?.acc;
+  }
+  if (ref.startsWith("$args/")) {
+    const parts = ref.slice("$args/".length).split("/");
+    const base = iterCtx?.args?.[parts[0]!];
+    return parts.length > 1 ? getPath(base, parts.slice(1).join("/")) : base;
   }
   if (ref.startsWith("event#/")) {
     const path = ref.slice("event#/".length);
@@ -217,6 +339,19 @@ export function evaluateExpression(
   state: JxScope,
   event: Event | null,
   iterCtx?: IterCtx,
+  trace?: ExpressionTrace,
+): unknown {
+  const result = evaluateNode(node, state, event, iterCtx, trace);
+  trace?.report(trace.path ?? [], result);
+  return result;
+}
+
+function evaluateNode(
+  node: ExpressionNode,
+  state: JxScope,
+  event: Event | null,
+  iterCtx?: IterCtx,
+  trace?: ExpressionTrace,
 ): unknown {
   const { operator, target, value, initial } = node;
 
@@ -226,7 +361,13 @@ export function evaluateExpression(
 
   // ─── Unary ───
   if (UNARY_OPS.has(operator) && !("value" in node)) {
-    const operand: unknown = resolveOperand(target, state, event, iterCtx);
+    const operand: unknown = resolveOperand(
+      target,
+      state,
+      event,
+      iterCtx,
+      subTrace(trace, "target"),
+    );
     if (operator === "!") {
       return !operand;
     }
@@ -235,10 +376,120 @@ export function evaluateExpression(
     }
   }
 
+  // ─── Call (spec §19.4c) ───
+  if (operator === "call") {
+    const calleeRef = (target as { $ref?: string } | null)?.$ref;
+    if (typeof calleeRef !== "string") {
+      throw new TypeError("$expression: call target must be a $ref pointer");
+    }
+    const callDepth = (iterCtx?.callDepth ?? 0) + 1;
+    if (callDepth > MAX_CALL_DEPTH) {
+      throw new Error(`$expression: call depth exceeded (${MAX_CALL_DEPTH})`);
+    }
+    const argValues = Array.isArray(value)
+      ? value.map((o: unknown, i: number) =>
+          resolveOperand(o, state, event, iterCtx, subTrace(trace, ["value", i])),
+        )
+      : [];
+
+    // Blessed pure global via the window#/ scheme (Math.max, JSON.parse, …).
+    if (calleeRef.startsWith("window#/")) {
+      if (!isBlessedGlobal(calleeRef)) {
+        throw new Error(`$expression: "${calleeRef}" is not a blessed pure global`);
+      }
+      const globalPath = calleeRef.slice("window#/".length);
+      const fn = getPath(globalThis.window, globalPath) as (...a: unknown[]) => unknown;
+      const lastSlash = globalPath.lastIndexOf("/");
+      const thisArg =
+        lastSlash === -1
+          ? globalThis.window
+          : getPath(globalThis.window, globalPath.slice(0, lastSlash));
+      return fn.apply(thisArg, argValues);
+    }
+
+    const callee = resolveExprRef(calleeRef, state, event, iterCtx);
+    // A scope callable (buildScope lowers parameterized formula entries to functions).
+    if (typeof callee === "function") {
+      return (callee as (...a: unknown[]) => unknown)(...argValues);
+    }
+    // A raw named-formula def (standalone evaluation, e.g. editor preview).
+    if (callee && typeof callee === "object" && "$expression" in callee) {
+      const def = callee as { $expression: ExpressionNode; parameters?: unknown[] };
+      const args: Record<string, unknown> = {};
+      for (const [i, p] of (def.parameters ?? []).entries()) {
+        const name = typeof p === "string" ? p : ((p as { name?: string } | null)?.name ?? "");
+        if (!name) {
+          continue;
+        }
+        args[name] =
+          argValues[i] === undefined && typeof p === "object" && p !== null && "default" in p
+            ? (p as { default?: unknown }).default
+            : argValues[i];
+      }
+      // The callee body's node paths are its own tree, not the call site's — no trace inside.
+      return evaluateExpression(def.$expression, state, event, { args, callDepth });
+    }
+    throw new TypeError(`$expression: call target "${calleeRef}" is not callable`);
+  }
+
+  // ─── Conditional (pure) ───
+  if (CONDITIONAL_OPS.has(operator)) {
+    if (operator === "?:") {
+      const test = resolveOperand(target, state, event, iterCtx, subTrace(trace, "target"));
+      if (trace) {
+        // Editor mode: evaluate both branches so each carries a live value.
+        const consequent = resolveOperand(value, state, event, iterCtx, subTrace(trace, "value"));
+        const alternate = resolveOperand(
+          initial,
+          state,
+          event,
+          iterCtx,
+          subTrace(trace, "initial"),
+        );
+        return test ? consequent : alternate;
+      }
+      return test
+        ? resolveOperand(value, state, event, iterCtx)
+        : resolveOperand(initial, state, event, iterCtx);
+    }
+    // Switch — value-keyed selection; discriminant matched against case keys by string form.
+    const discriminant = resolveOperand(target, state, event, iterCtx, subTrace(trace, "target"));
+    const key = String(discriminant);
+    const cases = node.cases ?? {};
+    const matched = Object.hasOwn(cases, key);
+    if (trace) {
+      let result: unknown;
+      for (const [k, caseOperand] of Object.entries(cases)) {
+        const v = resolveOperand(caseOperand, state, event, iterCtx, subTrace(trace, ["cases", k]));
+        if (k === key) {
+          result = v;
+        }
+      }
+      const fallback = resolveOperand(
+        node.default,
+        state,
+        event,
+        iterCtx,
+        subTrace(trace, "default"),
+      );
+      return matched ? result : fallback;
+    }
+    return matched
+      ? resolveOperand(cases[key], state, event, iterCtx)
+      : resolveOperand(node.default, state, event, iterCtx);
+  }
+
   // ─── Binary (pure) ───
   if (BINARY_OPS.has(operator)) {
-    const left = resolveOperand(target, state, event, iterCtx) as number & string;
-    const right = resolveOperand(value, state, event, iterCtx) as number & string;
+    const left = resolveOperand(
+      target,
+      state,
+      event,
+      iterCtx,
+      subTrace(trace, "target"),
+    ) as number & string;
+    const right = resolveOperand(value, state, event, iterCtx, subTrace(trace, "value")) as number &
+      string;
     switch (operator) {
       case "+": {
         return left + right;
@@ -279,6 +530,9 @@ export function evaluateExpression(
       case "||": {
         return left || right;
       }
+      case "??": {
+        return (left as unknown) ?? (right as unknown);
+      }
       default: {
         break;
       }
@@ -287,7 +541,7 @@ export function evaluateExpression(
 
   // ─── Assignment ───
   if (ASSIGNMENT_OPS.has(operator)) {
-    const rhs = resolveOperand(value, state, event, iterCtx) as number;
+    const rhs = resolveOperand(value, state, event, iterCtx, subTrace(trace, "value")) as number;
     const { obj, key } = resolveWritableRef(
       (target as { $ref: string }).$ref,
       state,
@@ -328,13 +582,19 @@ export function evaluateExpression(
 
   // ─── Array methods ───
   if (ARRAY_METHOD_OPS.has(operator)) {
-    const arr: unknown[] = resolveOperand(target, state, event, iterCtx) as unknown[];
+    const arr: unknown[] = resolveOperand(
+      target,
+      state,
+      event,
+      iterCtx,
+      subTrace(trace, "target"),
+    ) as unknown[];
     switch (operator) {
       case "push": {
-        return arr.push(resolveOperand(value, state, event, iterCtx));
+        return arr.push(resolveOperand(value, state, event, iterCtx, subTrace(trace, "value")));
       }
       case "unshift": {
-        return arr.unshift(resolveOperand(value, state, event, iterCtx));
+        return arr.unshift(resolveOperand(value, state, event, iterCtx, subTrace(trace, "value")));
       }
       case "pop": {
         return arr.pop();
@@ -343,7 +603,13 @@ export function evaluateExpression(
         return arr.shift();
       }
       case "splice": {
-        const args: unknown[] = resolveOperand(value, state, event, iterCtx) as unknown[];
+        const args: unknown[] = resolveOperand(
+          value,
+          state,
+          event,
+          iterCtx,
+          subTrace(trace, "value"),
+        ) as unknown[];
         return (arr.splice as (...a: unknown[]) => unknown[])(...args);
       }
       default: {
@@ -354,34 +620,48 @@ export function evaluateExpression(
 
   // ─── Aggregates (pure) ───
   if (AGGREGATE_OPS.has(operator)) {
-    const arr: unknown[] = resolveOperand(target, state, event, iterCtx) as unknown[];
+    const arr: unknown[] = resolveOperand(
+      target,
+      state,
+      event,
+      iterCtx,
+      subTrace(trace, "target"),
+    ) as unknown[];
+    // Trace only the first iteration's per-item expression — one sample badge per node,
+    // Not one report per array element.
     if (operator === "reduce") {
-      let acc: unknown = resolveOperand(initial, state, event, iterCtx);
+      let acc: unknown = resolveOperand(initial, state, event, iterCtx, subTrace(trace, "initial"));
       for (const [index, item] of arr.entries()) {
-        acc = evaluateExpression(value as ExpressionNode, state, event, {
-          acc,
-          index,
-          item,
-        });
+        acc = evaluateExpression(
+          value as ExpressionNode,
+          state,
+          event,
+          { acc, index, item },
+          index === 0 ? subTrace(trace, "value") : undefined,
+        );
       }
       return acc;
     }
     if (operator === "map") {
       return arr.map((item: unknown, index: number) =>
-        evaluateExpression(value as ExpressionNode, state, event, {
-          ...iterCtx,
-          index,
-          item,
-        }),
+        evaluateExpression(
+          value as ExpressionNode,
+          state,
+          event,
+          { ...iterCtx, index, item },
+          index === 0 ? subTrace(trace, "value") : undefined,
+        ),
       );
     }
     if (operator === "filter") {
       return arr.filter((item: unknown, index: number) =>
-        evaluateExpression(value as ExpressionNode, state, event, {
-          ...iterCtx,
-          index,
-          item,
-        }),
+        evaluateExpression(
+          value as ExpressionNode,
+          state,
+          event,
+          { ...iterCtx, index, item },
+          index === 0 ? subTrace(trace, "value") : undefined,
+        ),
       );
     }
   }
@@ -420,6 +700,17 @@ function compileOperand(operand: unknown, opts: CompileOpts): string {
 }
 
 /**
+ * The module-scope function name a named formula compiles to. Shared by call-site emission here and
+ * the declaration emission in the compiler targets.
+ *
+ * @param {string} key
+ * @returns {string}
+ */
+export function formulaFnName(key: string) {
+  return `_fx_${key.replaceAll(/[^A-Za-z0-9_$]/g, "_")}`;
+}
+
+/**
  * Compile a $ref to its JS equivalent.
  *
  * @param {string} ref
@@ -435,6 +726,10 @@ function compileRef(ref: string, opts: CompileOpts) {
   }
   if (ref.startsWith("$reduce/")) {
     return "_acc";
+  }
+  if (ref.startsWith("$args/")) {
+    const parts = ref.slice("$args/".length).split("/");
+    return `_args${parts.map((p) => `[${JSON.stringify(p)}]`).join("")}`;
   }
 
   if (ref.startsWith("event#/")) {
@@ -500,6 +795,47 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
     if (operator === "-") {
       return `-(${operand})`;
     }
+  }
+
+  // ─── Call (spec §19.4c) ───
+  if (operator === "call") {
+    const calleeRef = (target as { $ref?: string } | null)?.$ref ?? "";
+    const args = Array.isArray(value) ? value.map((o: unknown) => compileOperand(o, opts)) : [];
+    if (calleeRef.startsWith("window#/")) {
+      if (!isBlessedGlobal(calleeRef)) {
+        throw new Error(`$expression: "${calleeRef}" is not a blessed pure global`);
+      }
+      return `window.${calleeRef.slice("window#/".length).replaceAll("/", ".")}(${args.join(", ")})`;
+    }
+    if (calleeRef.startsWith("#/state/")) {
+      const key = calleeRef.slice("#/state/".length);
+      const params = opts.formulaParams?.[key];
+      if (params) {
+        const named = params
+          .map((p, i) => `${JSON.stringify(p)}: ${args[i] ?? "undefined"}`)
+          .join(", ");
+        return `${formulaFnName(key)}(${opts.statePrefix ?? "state"}, { ${named} })`;
+      }
+    }
+    // Fallback: the scope member itself is callable.
+    return `${compileRef(calleeRef, opts)}(${args.join(", ")})`;
+  }
+
+  // ─── Conditional (pure) ───
+  if (CONDITIONAL_OPS.has(operator)) {
+    if (operator === "?:") {
+      const test: string = compileOperand(target, opts);
+      const consequent: string = compileOperand(value, opts);
+      const alternate: string = compileOperand(initial, opts);
+      return `(${test} ? ${consequent} : ${alternate})`;
+    }
+    // Switch — bind the discriminant's string form once, then chain strict-equality tests.
+    const discriminant: string = compileOperand(target, opts);
+    const chain = Object.entries(node.cases ?? {})
+      .map(([k, v]) => `_d === ${JSON.stringify(k)} ? ${compileOperand(v, opts)} : `)
+      .join("");
+    const fallback = "default" in node ? compileOperand(node.default, opts) : "undefined";
+    return `((_d) => ${chain}${fallback})(String(${discriminant}))`;
   }
 
   // ─── Binary (pure) ───
@@ -573,3 +909,25 @@ function getPath(obj: unknown, path: string): unknown {
   }
   return current;
 }
+
+// ─── Statement-Engine Surface (spec §20) ─────────────────────────────────────
+
+/**
+ * Evaluate a bare operand (pointer, literal, or nested node) outside a node position — used by
+ * statement execution (spec §20) for `if` tests and `$switch` discriminants.
+ */
+export function evaluateOperand(
+  operand: unknown,
+  state: JxScope,
+  event: Event | null,
+  iterCtx?: IterCtx,
+): unknown {
+  return resolveOperand(operand, state, event, iterCtx);
+}
+
+/** Compile a bare operand to JS source — the statement compiler's counterpart to evaluateOperand. */
+export function compileOperandSource(operand: unknown, opts: CompileOpts = {}): string {
+  return compileOperand(operand, opts);
+}
+
+export type { CompileOpts, IterCtx };

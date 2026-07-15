@@ -95,11 +95,20 @@ export interface JxExpressionNode {
   target: JxExpressionOperand;
   value?: JxExpressionOperand;
   initial?: JxExpressionOperand;
+  /** `switch` only: matched discriminant value (string form) → result operand. */
+  cases?: Record<string, JxExpressionOperand>;
+  /** `switch` only: result operand when no case key matches. */
+  default?: JxExpressionOperand;
 }
 
 /** A state entry (or event binding) whose value is computed from a declarative expression. */
 export interface JxExpressionDef {
   $expression: JxExpressionNode;
+  /**
+   * Named-formula parameters (CEM convention, as on Function entries). Present ⇒ the entry is a
+   * callable formula invoked via the `call` operator, with `$args/<name>` refs in its body.
+   */
+  parameters?: (string | CemParameter)[];
   [key: string]: unknown;
 }
 
@@ -108,11 +117,50 @@ export interface JxExpressionDef {
 // Detection algorithm in buildScope(). Use the guards in `@jxsuite/schema/guards`
 // To discriminate.
 
+// ─── Statement Model (spec §20) ─────────────────────────────────────────────────
+// Structured function bodies: `body` as a statement array instead of opaque JS source,
+// Mirroring ESTree's BlockStatement.body = Statement[].
+
+/** An `{ if, then, else }` branch — the JSON Schema 2020-12 conditional keyword triple. */
+export interface JxIfStatement {
+  if: JxExpressionOperand;
+  then: JxStatement[];
+  else?: JxStatement[];
+}
+
+/** A `{ $switch, cases }` multiway branch in statement position (element-level convention). */
+export interface JxSwitchStatement {
+  $switch: JxExpressionOperand;
+  cases: Record<string, JxStatement[]>;
+  default?: JxStatement[];
+}
+
+/** A WHATWG `dispatchEvent` statement: emits a CustomEvent with CustomEventInit members. */
+export interface JxDispatchStatement {
+  dispatchEvent: string;
+  detail?: JxExpressionOperand;
+  bubbles?: boolean;
+  composed?: boolean;
+}
+
+/**
+ * One statement of a structured function body: a bare expression node in statement position
+ * (mutation or `call`), a branch, a multiway branch, or an event dispatch.
+ */
+export type JxStatement =
+  | JxExpressionNode
+  | JxIfStatement
+  | JxSwitchStatement
+  | JxDispatchStatement;
+
 /** A function declaration: inline `body` or external `$src`/`$export`. */
 export interface JxFunctionDef {
   $prototype: "Function";
-  /** Inline function body. The reactive scope is the implicit first parameter. */
-  body?: string;
+  /**
+   * Inline function body: opaque JS source (the reactive scope is the implicit first parameter) or
+   * a structured statement array (spec §20).
+   */
+  body?: string | JxStatement[];
   /** Parameters after the implicit scope parameter: bare names or CEM parameter objects. */
   parameters?: (string | CemParameter)[];
   /** Explicit function name; defaults to the state key. */

@@ -1,9 +1,12 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { describe, expect, test } from "bun:test";
 import {
+  BLESSED_GLOBALS,
   BLESSED_OPERATORS,
   compileExpression,
   evaluateExpression,
+  formulaFnName,
+  isBlessedGlobal,
   isMutating,
 } from "../src/expression.ts";
 import type { ExpressionNode } from "../src/expression.ts";
@@ -709,5 +712,435 @@ describe("compileExpression — fallthrough", () => {
 
   test("unary operator with value present compiles to undefined", () => {
     expect(compileExpression({ operator: "!", target: 1, value: 2 })).toBe("undefined");
+  });
+});
+
+describe("conditional operators — ?:, ??, switch", () => {
+  test("blessed and pure", () => {
+    for (const op of ["?:", "??", "switch"]) {
+      expect(BLESSED_OPERATORS.has(op)).toBe(true);
+      expect(isMutating(op)).toBe(false);
+    }
+  });
+
+  test("?: selects consequent or alternate", () => {
+    const node: ExpressionNode = {
+      initial: "keep shopping",
+      operator: "?:",
+      target: { operator: ">", target: ref("#/state/count"), value: 10 },
+      value: "cart full",
+    };
+    expect(evaluateExpression(node, { count: 11 }, null)).toBe("cart full");
+    expect(evaluateExpression(node, { count: 3 }, null)).toBe("keep shopping");
+  });
+
+  test("?: chains else-if by nesting in initial", () => {
+    const node: ExpressionNode = {
+      initial: {
+        initial: "low",
+        operator: "?:",
+        target: { operator: ">", target: ref("#/state/n"), value: 10 },
+        value: "mid",
+      },
+      operator: "?:",
+      target: { operator: ">", target: ref("#/state/n"), value: 100 },
+      value: "high",
+    };
+    expect(evaluateExpression(node, { n: 500 }, null)).toBe("high");
+    expect(evaluateExpression(node, { n: 50 }, null)).toBe("mid");
+    expect(evaluateExpression(node, { n: 5 }, null)).toBe("low");
+  });
+
+  test("?? returns right only for nullish left", () => {
+    expect(evaluateExpression({ operator: "??", target: null, value: "fallback" }, {}, null)).toBe(
+      "fallback",
+    );
+    expect(evaluateExpression({ operator: "??", target: "", value: "fallback" }, {}, null)).toBe(
+      "",
+    );
+    expect(evaluateExpression({ operator: "??", target: 0, value: 1 }, {}, null)).toBe(0);
+    expect(
+      evaluateExpression({ operator: "??", target: ref("#/state/missing"), value: "x" }, {}, null),
+    ).toBe("x");
+  });
+
+  test("switch matches case by string form of discriminant", () => {
+    const node: ExpressionNode = {
+      cases: { error: ref("#/state/message"), loading: "please wait" },
+      default: "ready",
+      operator: "switch",
+      target: ref("#/state/status"),
+    };
+    expect(evaluateExpression(node, { status: "loading" }, null)).toBe("please wait");
+    expect(evaluateExpression(node, { message: "boom", status: "error" }, null)).toBe("boom");
+    expect(evaluateExpression(node, { status: "done" }, null)).toBe("ready");
+  });
+
+  test("switch on a numeric discriminant matches its string key", () => {
+    const node: ExpressionNode = {
+      cases: { "1": "one", "2": "two" },
+      operator: "switch",
+      target: ref("#/state/n"),
+    };
+    expect(evaluateExpression(node, { n: 2 }, null)).toBe("two");
+  });
+
+  test("switch without default and no match yields undefined", () => {
+    const node: ExpressionNode = { cases: { a: 1 }, operator: "switch", target: "z" };
+    expect(evaluateExpression(node, {}, null)).toBeUndefined();
+  });
+
+  test("?: compiles to a ternary; compiled === interpreted", () => {
+    const node: ExpressionNode = {
+      initial: "no",
+      operator: "?:",
+      target: { operator: ">=", target: ref("#/state/n"), value: 5 },
+      value: "yes",
+    };
+    const source = compileExpression(node);
+    expect(source).toBe('((state.n >= 5) ? "yes" : "no")');
+    const fn = new Function("state", `return ${source}`);
+    for (const n of [3, 5, 9]) {
+      expect(fn({ n })).toBe(evaluateExpression(node, { n }, null) as string);
+    }
+  });
+
+  test("?? compiles as a parenthesized binary; compiled === interpreted", () => {
+    const node: ExpressionNode = { operator: "??", target: ref("#/state/a"), value: "d" };
+    const source = compileExpression(node);
+    expect(source).toBe('(state.a ?? "d")');
+    const fn = new Function("state", `return ${source}`);
+    for (const a of [null, undefined, "", 0, "v"]) {
+      expect(fn({ a })).toBe(evaluateExpression(node, { a } as JxScope, null) as string);
+    }
+  });
+
+  test("switch compiles to a bound-discriminant chain; compiled === interpreted", () => {
+    const node: ExpressionNode = {
+      cases: { error: ref("#/state/message"), loading: "wait" },
+      default: "ready",
+      operator: "switch",
+      target: ref("#/state/status"),
+    };
+    const source = compileExpression(node);
+    expect(source).toBe(
+      '((_d) => _d === "error" ? state.message : _d === "loading" ? "wait" : "ready")(String(state.status))',
+    );
+    const fn = new Function("state", `return ${source}`);
+    for (const state of [
+      { message: "boom", status: "error" },
+      { status: "loading" },
+      { status: "anything" },
+    ]) {
+      expect(fn(state)).toBe(evaluateExpression(node, state as JxScope, null) as string);
+    }
+  });
+
+  test("switch without default compiles undefined fallback", () => {
+    const source = compileExpression({ cases: { a: 1 }, operator: "switch", target: ref("x") });
+    const fn = new Function("state", `return ${source}`);
+    expect(fn({ x: "z" })).toBeUndefined();
+    expect(fn({ x: "a" })).toBe(1);
+  });
+});
+
+describe("evaluateExpression — trace reporting", () => {
+  const collect = () => {
+    const seen = new Map<string, unknown>();
+    return {
+      seen,
+      trace: {
+        report: (path: (string | number)[], value: unknown) => seen.set(path.join("/"), value),
+      },
+    };
+  };
+
+  test("reports the root and operand values", () => {
+    const { seen, trace } = collect();
+    const node: ExpressionNode = {
+      operator: "+",
+      target: ref("#/state/a"),
+      value: { operator: "*", target: ref("#/state/b"), value: 2 },
+    };
+    expect(evaluateExpression(node, { a: 1, b: 3 }, null, undefined, trace)).toBe(7);
+    expect(seen.get("")).toBe(7);
+    expect(seen.get("target")).toBe(1);
+    expect(seen.get("value")).toBe(6);
+    expect(seen.get("value/target")).toBe(3);
+  });
+
+  test("?: reports BOTH branches under trace but returns the taken one", () => {
+    const { seen, trace } = collect();
+    const node: ExpressionNode = {
+      initial: ref("#/state/no"),
+      operator: "?:",
+      target: true,
+      value: ref("#/state/yes"),
+    };
+    expect(evaluateExpression(node, { no: "N", yes: "Y" }, null, undefined, trace)).toBe("Y");
+    expect(seen.get("value")).toBe("Y");
+    expect(seen.get("initial")).toBe("N");
+  });
+
+  test("switch reports every case and the default under trace", () => {
+    const { seen, trace } = collect();
+    const node: ExpressionNode = {
+      cases: { a: ref("#/state/a"), b: ref("#/state/b") },
+      default: ref("#/state/d"),
+      operator: "switch",
+      target: "b",
+    };
+    expect(evaluateExpression(node, { a: 1, b: 2, d: 3 }, null, undefined, trace)).toBe(2);
+    expect(seen.get("cases/a")).toBe(1);
+    expect(seen.get("cases/b")).toBe(2);
+    expect(seen.get("default")).toBe(3);
+  });
+
+  test("aggregates report a first-iteration sample only", () => {
+    const { seen, trace } = collect();
+    const node: ExpressionNode = {
+      operator: "map",
+      target: ref("#/state/nums"),
+      value: { operator: "*", target: ref("$map/item"), value: 10 },
+    };
+    expect(evaluateExpression(node, { nums: [1, 2, 3] }, null, undefined, trace)).toEqual([
+      10, 20, 30,
+    ]);
+    expect(seen.get("target")).toEqual([1, 2, 3]);
+    expect(seen.get("value")).toBe(10);
+    expect(seen.get("value/target")).toBe(1);
+  });
+
+  test("assignment reports the written value; state still mutates", () => {
+    const { seen, trace } = collect();
+    const state: JxScope = { n: 1 };
+    evaluateExpression(
+      { operator: "=", target: ref("#/state/n"), value: 42 },
+      state,
+      null,
+      undefined,
+      trace,
+    );
+    expect(state.n).toBe(42);
+    expect(seen.has("")).toBe(true);
+  });
+
+  test("reporting stops beyond MAX_REPORT_DEPTH but evaluation completes", () => {
+    const { seen, trace } = collect();
+    let node: ExpressionNode = { operator: "!", target: ref("#/state/flag") };
+    for (let i = 0; i < 70; i++) {
+      node = { operator: "!", target: node };
+    }
+    expect(evaluateExpression(node, { flag: true }, null, undefined, trace)).toBe(false);
+    // 70 nested targets, reporting capped: strictly fewer reports than nodes.
+    expect(seen.size).toBeGreaterThan(0);
+    expect(seen.size).toBeLessThan(70);
+  });
+
+  test("production path (no trace) short-circuits ?: branches", () => {
+    // The untaken branch references a missing deep path that would throw if resolved eagerly
+    // Through a non-object; with plain refs it resolves to undefined — assert via a counter ref
+    // On window instead.
+    let touched = 0;
+    Object.defineProperty(globalThis.window, "__traceProbe", {
+      configurable: true,
+      get() {
+        touched += 1;
+        return 1;
+      },
+    });
+    const node: ExpressionNode = {
+      initial: ref("window#/__traceProbe"),
+      operator: "?:",
+      target: true,
+      value: "taken",
+    };
+    expect(evaluateExpression(node, {}, null)).toBe("taken");
+    expect(touched).toBe(0);
+    expect(evaluateExpression(node, {}, null, undefined, { report: () => {} })).toBe("taken");
+    expect(touched).toBe(1);
+  });
+});
+
+describe("call operator — named formulas and blessed globals", () => {
+  const lineTotal = {
+    $expression: {
+      operator: "*",
+      target: { $ref: "$args/price" },
+      value: { $ref: "$args/qty" },
+    },
+    parameters: [{ name: "price" }, { name: "qty", default: 1 }],
+  };
+
+  test("call is blessed and pure", () => {
+    expect(BLESSED_OPERATORS.has("call")).toBe(true);
+    expect(isMutating("call")).toBe(false);
+  });
+
+  test("calls a named formula def with positional args mapped to parameters", () => {
+    const state: JxScope = { lineTotal };
+    const node: ExpressionNode = {
+      operator: "call",
+      target: ref("#/state/lineTotal"),
+      value: [3, 4],
+    };
+    expect(evaluateExpression(node, state, null)).toBe(12);
+  });
+
+  test("omitted args fall back to CemParameter defaults", () => {
+    const state: JxScope = { lineTotal };
+    const node: ExpressionNode = {
+      operator: "call",
+      target: ref("#/state/lineTotal"),
+      value: [5],
+    };
+    expect(evaluateExpression(node, state, null)).toBe(5);
+  });
+
+  test("$args supports deep paths", () => {
+    const state: JxScope = {
+      firstName: {
+        $expression: { operator: "+", target: { $ref: "$args/user/name/first" }, value: "" },
+        parameters: ["user"],
+      },
+    };
+    const node: ExpressionNode = {
+      operator: "call",
+      target: ref("#/state/firstName"),
+      value: [{ $ref: "#/state/person" }],
+    };
+    expect(evaluateExpression(node, { ...state, person: { name: { first: "Ada" } } }, null)).toBe(
+      "Ada",
+    );
+  });
+
+  test("calls a plain scope function with positional args", () => {
+    const state: JxScope = { sum: (a: number, b: number) => a + b };
+    const node: ExpressionNode = { operator: "call", target: ref("#/state/sum"), value: [2, 3] };
+    expect(evaluateExpression(node, state, null)).toBe(5);
+  });
+
+  test("calls blessed globals through window#/", () => {
+    expect(
+      evaluateExpression(
+        { operator: "call", target: ref("window#/Math/max"), value: [1, 9, 4] },
+        {},
+        null,
+      ),
+    ).toBe(9);
+    expect(
+      evaluateExpression(
+        { operator: "call", target: ref("window#/JSON/stringify"), value: [[1, 2]] },
+        {},
+        null,
+      ),
+    ).toBe("[1,2]");
+    expect(
+      evaluateExpression(
+        { operator: "call", target: ref("window#/Object/keys"), value: [ref("#/state/obj")] },
+        { obj: { a: 1, b: 2 } },
+        null,
+      ),
+    ).toEqual(["a", "b"]);
+  });
+
+  test("non-blessed globals are rejected at evaluation", () => {
+    expect(isBlessedGlobal("window#/Math/max")).toBe(true);
+    expect(isBlessedGlobal("window#/alert")).toBe(false);
+    expect(BLESSED_GLOBALS.has("alert")).toBe(false);
+    expect(() =>
+      evaluateExpression(
+        { operator: "call", target: ref("window#/alert"), value: ["hi"] },
+        {},
+        null,
+      ),
+    ).toThrow("not a blessed pure global");
+  });
+
+  test("non-callable target throws; non-ref target throws", () => {
+    expect(() =>
+      evaluateExpression({ operator: "call", target: ref("#/state/n"), value: [] }, { n: 5 }, null),
+    ).toThrow("not callable");
+    expect(() => evaluateExpression({ operator: "call", target: 42, value: [] }, {}, null)).toThrow(
+      "must be a $ref pointer",
+    );
+  });
+
+  test("unbounded formula recursion hits the call depth cap", () => {
+    const state: JxScope = {
+      loop: {
+        $expression: { operator: "call", target: { $ref: "#/state/loop" }, value: [] },
+        parameters: ["x"],
+      },
+    };
+    expect(() =>
+      evaluateExpression({ operator: "call", target: ref("#/state/loop"), value: [] }, state, null),
+    ).toThrow("call depth exceeded");
+  });
+
+  test("compiles blessed global calls; compiled === interpreted", () => {
+    const node: ExpressionNode = {
+      operator: "call",
+      target: ref("window#/Math/max"),
+      value: [ref("#/state/a"), ref("#/state/b"), 0],
+    };
+    const source = compileExpression(node);
+    expect(source).toBe("window.Math.max(state.a, state.b, 0)");
+    const fn = new Function("state", `return ${source}`);
+    expect(fn({ a: 3, b: 7 })).toBe(evaluateExpression(node, { a: 3, b: 7 } as JxScope, null));
+  });
+
+  test("compiles non-blessed global calls as a build error", () => {
+    expect(() =>
+      compileExpression({ operator: "call", target: ref("window#/fetch"), value: [] }),
+    ).toThrow("not a blessed pure global");
+  });
+
+  test("compiles named-formula call sites against formulaParams", () => {
+    const node: ExpressionNode = {
+      operator: "call",
+      target: ref("#/state/lineTotal"),
+      value: [ref("$map/item/price"), 2],
+    };
+    const source = compileExpression(node, { formulaParams: { lineTotal: ["price", "qty"] } });
+    expect(source).toBe('_fx_lineTotal(state, { "price": _item.price, "qty": 2 })');
+  });
+
+  test("emitted formula fn + call site round-trips to the interpreted result", () => {
+    const bodySource = compileExpression(lineTotal.$expression as ExpressionNode, {
+      formulaParams: { lineTotal: ["price", "qty"] },
+    });
+    const decl = `const ${formulaFnName("lineTotal")} = (state, _args) => ${bodySource};`;
+    const callSource = compileExpression(
+      { operator: "call", target: ref("#/state/lineTotal"), value: [3, 4] },
+      { formulaParams: { lineTotal: ["price", "qty"] } },
+    );
+    const fn = new Function("state", `${decl} return ${callSource};`);
+    expect(fn({})).toBe(12);
+    expect(
+      evaluateExpression(
+        { operator: "call", target: ref("#/state/lineTotal"), value: [3, 4] },
+        { lineTotal },
+        null,
+      ),
+    ).toBe(12);
+  });
+
+  test("callee without formulaParams compiles to a direct scope call", () => {
+    const source = compileExpression({
+      operator: "call",
+      target: ref("#/state/sum"),
+      value: [1, 2],
+    });
+    expect(source).toBe("state.sum(1, 2)");
+  });
+
+  test("$args refs compile to _args member access", () => {
+    expect(compileExpression({ operator: "+", target: ref("$args/price"), value: 1 })).toBe(
+      '(_args["price"] + 1)',
+    );
+    expect(compileExpression({ operator: "+", target: ref("$args/user/name"), value: "" })).toBe(
+      '(_args["user"]["name"] + "")',
+    );
   });
 });
