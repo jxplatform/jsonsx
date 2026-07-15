@@ -21,6 +21,7 @@ import { view } from "../view";
 import { componentRegistry } from "../files/components";
 import { widgetForType } from "./style-inputs";
 import { renderFieldRow } from "../ui/field-row";
+import { renderDynamicSlot } from "../ui/dynamic-slot";
 import { spTextArea, spTextField } from "../ui/field-input";
 import {
   attrLabel,
@@ -41,6 +42,7 @@ import { getPlatform } from "../platform";
 import htmlMeta from "../../data/html-meta.json";
 
 import type {
+  JxAttributeValue,
   JxMutableNode,
   JxPrototypeDef,
   JxStateDefinition,
@@ -138,58 +140,24 @@ function bindableFieldRow(
           ></sp-checkbox>`
         : spTextField(fieldKey, String(staticVal), (v: string) => onChange(v));
 
-  const boundTpl = html`
-    <sp-picker
-      size="s"
-      quiet
-      placeholder="— select signal —"
-      value=${boundRef ?? nothing}
-      @change=${(e: Event) => {
-        if ((e.target as HTMLInputElement).value) {
-          onChange({ $ref: (e.target as HTMLInputElement).value });
-        } else {
-          onChange();
-        }
-      }}
-    >
-      ${signalDefs.map(
-        ([defName]) => html`<sp-menu-item value=${`#/state/${defName}`}>${defName}</sp-menu-item>`,
-      )}
-      ${extraSignals
-        ? html`
-            <sp-menu-divider></sp-menu-divider>
-            ${extraSignals.map(
-              (sig: SignalOption) =>
-                html`<sp-menu-item value=${sig.value}>${sig.label}</sp-menu-item>`,
-            )}
-          `
-        : nothing}
-    </sp-picker>
-  `;
-
-  const onToggle = () => {
-    if (boundRef !== null) {
-      const defName = boundRef.startsWith("#/state/") ? boundRef.slice(8) : boundRef;
-      const staticDefault = defaultAsString(defs[defName]);
-      onChange(staticDefault || undefined);
-    } else if (signalDefs.length > 0) {
-      onChange({ $ref: `#/state/${signalDefs[0]![0]}` });
-    } else if (extraSignals && extraSignals.length > 0) {
-      onChange({ $ref: extraSignals[0]!.value });
-    }
-  };
+  // De-escalating to literal restores the bound signal's declared default (old unbind behavior).
+  const literalDefault = boundRef
+    ? defaultAsString(defs[boundRef.startsWith("#/state/") ? boundRef.slice(8) : boundRef]) ||
+      undefined
+    : undefined;
 
   return html`
     <div class="field-row">
       <sp-field-label size="s">${label}</sp-field-label>
-      ${isBound ? boundTpl : staticTpl}
-      <sp-action-button
-        size="xs"
-        quiet
-        title=${isBound ? "Unbind (switch to static)" : "Bind to signal"}
-        @click=${onToggle}
-        >${isBound ? "\u26A1" : "\u2194"}</sp-action-button
-      >
+      ${renderDynamicSlot({
+        caps: ["literal", "ref"],
+        extraSignals,
+        literalDefault,
+        onChange,
+        staticWidget: staticTpl,
+        stateDefs: signalDefs.map(([defName]) => defName),
+        value: rawValue,
+      })}
     </div>
   `;
 }
@@ -1162,9 +1130,22 @@ export function renderPropertiesPanelTemplate(ctx: {
       ]
     : null;
 
+  // Signals offered to attribute/textContent bindings (handlers and Functions excluded).
+  const bindableSignals = Object.entries(tab.doc.document.state || {})
+    .filter(
+      ([, d]) =>
+        !(d as Record<string, unknown>)?.$handler &&
+        (d as JxPrototypeDef)?.$prototype !== "Function",
+    )
+    .map(([defName]) => defName);
+
   function renderAttrRow(attr: string, entry: HtmlMetaEntry, value: unknown) {
     const type = inferInputType(entry);
     const hasVal = value !== undefined && value !== "";
+    const commitAttr = (v?: JsonValue) =>
+      transactDoc(activeTab.value!, (t) =>
+        mutateUpdateAttribute(t, path, attr, v as JxAttributeValue | undefined),
+      );
 
     // Enhanced Link handling: only for anchors (a/area) with a plain (non-binding) value. Bindings
     // ($ref objects or ${…} template strings) fall through to the raw widget to stay editable.
@@ -1178,39 +1159,49 @@ export function renderPropertiesPanelTemplate(ctx: {
       }
     }
 
+    // Attribute strings are schema-legal at three rungs: literal, $ref binding, ${} template.
+    const attrSlot = (staticWidget: unknown) =>
+      renderDynamicSlot({
+        caps: ["literal", "ref", "template"],
+        extraSignals: mapSignals,
+        onChange: commitAttr,
+        staticWidget,
+        stateDefs: bindableSignals,
+        value,
+      });
+
     if (entry.type === "boolean") {
+      const checkboxWidget = html`
+        <sp-checkbox
+          size="s"
+          .checked=${live(Boolean(value))}
+          @change=${(e: Event) =>
+            commitAttr((e.target as HTMLInputElement).checked ? "" : undefined)}
+        >
+        </sp-checkbox>
+      `;
       return renderFieldRow({
         hasValue: hasVal,
         label: attrLabel(entry, attr),
         onClear: () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr)),
         prop: attr,
-        widget: html`
-          <sp-checkbox
-            size="s"
-            .checked=${live(Boolean(value))}
-            @change=${(e: Event) =>
-              transactDoc(activeTab.value, (t) =>
-                mutateUpdateAttribute(
-                  t,
-                  path,
-                  attr,
-                  (e.target as HTMLInputElement).checked ? "" : undefined,
-                ),
-              )}
-          >
-          </sp-checkbox>
-        `,
+        widget: attrSlot(checkboxWidget),
       });
     }
 
+    const literalWidget = widgetForType(
+      type,
+      entry,
+      attr,
+      isRef(value) ? "" : String(value || ""),
+      (v: string) => commitAttr(v || undefined),
+    );
     return renderFieldRow({
       hasValue: hasVal,
       label: attrLabel(entry, attr),
       onClear: () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr)),
       prop: attr,
-      widget: widgetForType(type, entry, attr, String(value || ""), (v: string) =>
-        transactDoc(activeTab.value!, (t) => mutateUpdateAttribute(t, path, attr, v || undefined)),
-      ),
+      widget: attrSlot(literalWidget),
     });
   }
 
@@ -1366,14 +1357,24 @@ export function renderPropertiesPanelTemplate(ctx: {
                     : nothing}
                   <sp-field-label size="s">Text Content</sp-field-label>
                 </div>
-                ${spTextArea(
-                  "prop:textContent",
-                  typeof node.textContent === "string" ? node.textContent : "",
-                  (v: string) =>
+                ${renderDynamicSlot({
+                  caps: ["literal", "ref", "template"],
+                  extraSignals: mapSignals,
+                  onChange: (v?: JsonValue) =>
                     transactDoc(activeTab.value, (t) =>
-                      mutateUpdateProperty(t, path, "textContent", v || undefined),
+                      mutateUpdateProperty(t, path, "textContent", v),
                     ),
-                )}
+                  staticWidget: spTextArea(
+                    "prop:textContent",
+                    typeof node.textContent === "string" ? node.textContent : "",
+                    (v: string) =>
+                      transactDoc(activeTab.value, (t) =>
+                        mutateUpdateProperty(t, path, "textContent", v || undefined),
+                      ),
+                  ),
+                  stateDefs: bindableSignals,
+                  value: node.textContent,
+                })}
               </div>
             `
           : nothing}
