@@ -3,8 +3,15 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { isJsonObject, isRef } from "@jxsuite/schema/guards";
 import { renderFieldRow } from "./field-row";
+import { renderFormulaChips } from "./formula-chips";
+import { calleeEntry, formulaCatalog } from "./formula-catalog";
+import { openFormulaPalette } from "./formula-palette";
 
-import type { JxExpressionNode, JxExpressionOperand } from "@jxsuite/schema/types";
+import type {
+  JxExpressionNode,
+  JxExpressionOperand,
+  JxStateDefinition,
+} from "@jxsuite/schema/types";
 import type { TemplateResult } from "lit-html";
 
 // ─── Operator Categories ────────────────────────────────────────────────────
@@ -24,6 +31,7 @@ const BINARY_OPS = new Set([
   ">=",
   "&&",
   "||",
+  "??",
 ]);
 const ASSIGN_OPS = new Set(["=", "+=", "-=", "*=", "/="]);
 const NO_ARG_OPS = new Set(["pop", "shift"]);
@@ -34,104 +42,82 @@ const OPERATOR_GROUPS = [
   { label: "Unary", ops: ["!", "-"] },
   { label: "Arithmetic", ops: ["+", "-", "*", "/", "%"] },
   { label: "Comparison", ops: ["===", "!==", "<", "<=", ">", ">="] },
-  { label: "Logical", ops: ["&&", "||"] },
+  { label: "Logical", ops: ["&&", "||", "??"] },
+  { label: "Conditional", ops: ["?:", "switch"] },
   {
     label: "Array methods",
     ops: ["push", "pop", "shift", "unshift", "splice"],
   },
   { label: "Aggregate", ops: ["reduce", "map", "filter"] },
+  { label: "Function", ops: ["call"] },
 ];
+
+interface OperatorInfo {
+  needsValue: boolean;
+  needsInitial: boolean;
+  targetMustBeRef: boolean;
+  spliceArray: boolean;
+  valueIsNode: boolean;
+  switchCases: boolean;
+  /** `call`: value is a positional-args array; target is the callee pointer. */
+  callArgs: boolean;
+}
+
+const INFO_DEFAULTS: OperatorInfo = {
+  callArgs: false,
+  needsInitial: false,
+  needsValue: false,
+  spliceArray: false,
+  switchCases: false,
+  targetMustBeRef: false,
+  valueIsNode: false,
+};
 
 /**
  * @param {string} op
- * @returns {{
- *   needsValue: boolean;
- *   needsInitial: boolean;
- *   targetMustBeRef: boolean;
- *   spliceArray: boolean;
- *   valueIsNode: boolean;
- * }}
+ * @returns {OperatorInfo}
  */
-function operatorInfo(op: string) {
+function operatorInfo(op: string): OperatorInfo {
   if (UNARY_OPS.has(op)) {
-    return {
-      needsInitial: false,
-      needsValue: false,
-      spliceArray: false,
-      targetMustBeRef: false,
-      valueIsNode: false,
-    };
+    return { ...INFO_DEFAULTS };
+  }
+  if (op === "?:") {
+    return { ...INFO_DEFAULTS, needsInitial: true, needsValue: true };
+  }
+  if (op === "switch") {
+    return { ...INFO_DEFAULTS, switchCases: true };
+  }
+  if (op === "call") {
+    return { ...INFO_DEFAULTS, callArgs: true, targetMustBeRef: true };
   }
   if (BINARY_OPS.has(op)) {
-    return {
-      needsInitial: false,
-      needsValue: true,
-      spliceArray: false,
-      targetMustBeRef: false,
-      valueIsNode: false,
-    };
+    return { ...INFO_DEFAULTS, needsValue: true };
   }
   if (ASSIGN_OPS.has(op)) {
-    return {
-      needsInitial: false,
-      needsValue: true,
-      spliceArray: false,
-      targetMustBeRef: true,
-      valueIsNode: false,
-    };
+    return { ...INFO_DEFAULTS, needsValue: true, targetMustBeRef: true };
   }
   if (NO_ARG_OPS.has(op)) {
-    return {
-      needsInitial: false,
-      needsValue: false,
-      spliceArray: false,
-      targetMustBeRef: true,
-      valueIsNode: false,
-    };
+    return { ...INFO_DEFAULTS, targetMustBeRef: true };
   }
   if (ONE_ARG_OPS.has(op)) {
-    return {
-      needsInitial: false,
-      needsValue: true,
-      spliceArray: false,
-      targetMustBeRef: true,
-      valueIsNode: false,
-    };
+    return { ...INFO_DEFAULTS, needsValue: true, targetMustBeRef: true };
   }
   if (op === "splice") {
-    return {
-      needsInitial: false,
-      needsValue: true,
-      spliceArray: true,
-      targetMustBeRef: true,
-      valueIsNode: false,
-    };
+    return { ...INFO_DEFAULTS, needsValue: true, spliceArray: true, targetMustBeRef: true };
   }
   if (op === "reduce") {
     return {
+      ...INFO_DEFAULTS,
       needsInitial: true,
       needsValue: true,
-      spliceArray: false,
       targetMustBeRef: true,
       valueIsNode: true,
     };
   }
   if (op === "map" || op === "filter") {
-    return {
-      needsInitial: false,
-      needsValue: true,
-      spliceArray: false,
-      targetMustBeRef: true,
-      valueIsNode: true,
-    };
+    return { ...INFO_DEFAULTS, needsValue: true, targetMustBeRef: true, valueIsNode: true };
   }
-  return {
-    needsInitial: false,
-    needsValue: false,
-    spliceArray: false,
-    targetMustBeRef: false,
-    valueIsNode: false,
-  };
+  return { ...INFO_DEFAULTS };
 }
 
 // ─── Operand Mode Detection ─────────────────────────────────────────────────
@@ -150,6 +136,16 @@ function operandMode(operand: unknown) {
     }
   }
   return "literal";
+}
+
+/** Positional-arg labels for a `call` node, from the callee's catalog entry when resolvable. */
+function calleeParamLabels(
+  target: unknown,
+  state?: Record<string, JxStateDefinition> | null,
+): string[] {
+  const ref = isRef(target) ? target.$ref : "";
+  const entry = ref ? calleeEntry(ref, state) : undefined;
+  return entry?.kind === "formula" ? entry.parameters.map((p) => p.name) : [];
 }
 
 /**
@@ -230,13 +226,46 @@ export function expressionHint(node: unknown) {
   if (op === "splice") {
     return `splice(${targetLabel})`;
   }
+  if (op === "call") {
+    return `${targetLabel.replace("window#/", "").replaceAll("/", ".")}(…)`;
+  }
   if (op === "reduce" || op === "map" || op === "filter") {
     return `${op}(${targetLabel})`;
+  }
+  if (op === "?:") {
+    return `${targetLabel} ? … : …`;
+  }
+  if (op === "switch") {
+    return `switch(${targetLabel})`;
   }
   if (UNARY_OPS.has(op)) {
     return `${op}${targetLabel}`;
   }
   return `${targetLabel} ${op} …`;
+}
+
+// ─── Live Value Badge (spec §19.9) ──────────────────────────────────────────
+
+/** Preview data computed by services/preview-eval.ts — display strings keyed by node path. */
+export interface EditorPreview {
+  values: Map<string, string>;
+  error: string | null;
+  mutating: boolean;
+}
+
+function renderValueBadge(preview: EditorPreview | null | undefined, pathKey: string) {
+  const text = preview?.values.get(pathKey);
+  if (text === undefined) {
+    return nothing;
+  }
+  return html`
+    <span
+      class="expr-live-badge"
+      title=${text}
+      style="font-family:var(--spectrum-code-font-family, monospace);font-size:10px;line-height:16px;padding:0 5px;border-radius:4px;background:var(--spectrum-gray-200, #323232);color:var(--spectrum-seafoam-900, #35a690);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;flex-shrink:1"
+      >${text}</span
+    >
+  `;
 }
 
 // ─── Ref Picker ─────────────────────────────────────────────────────────────
@@ -343,6 +372,10 @@ function renderLiteralEditor(operand: unknown, onChange: (newVal: JxExpressionOp
 // ─── Operand Editor ─────────────────────────────────────────────────────────
 
 /**
+ * Single-operand editor (mode picker + literal/ref/nested-expression widget). Exported for
+ * statement-position operand slots (spec §20: `if` tests, `$switch` discriminants, `dispatchEvent`
+ * detail).
+ *
  * @param {unknown} operand
  * @param {(newOperand: unknown) => void} onChange
  * @param {{
@@ -353,7 +386,7 @@ function renderLiteralEditor(operand: unknown, onChange: (newVal: JxExpressionOp
  * }} opts
  * @returns {import("lit-html").TemplateResult}
  */
-function renderOperandEditor(
+export function renderOperandEditor(
   operand: unknown,
   onChange: (newOperand: unknown) => void,
   opts: {
@@ -361,6 +394,9 @@ function renderOperandEditor(
     allowEventRef: boolean;
     depth: number;
     mustBeRef?: boolean;
+    preview?: EditorPreview | null;
+    path?: (string | number)[];
+    stateEntries?: Record<string, JxStateDefinition> | null;
   },
 ): TemplateResult {
   if (opts.mustBeRef) {
@@ -402,21 +438,24 @@ function renderOperandEditor(
   `;
 }
 
-// ─── Splice Args Editor ─────────────────────────────────────────────────────
+// ─── Positional Args Editor (splice / call) ─────────────────────────────────
 
 /**
  * @param {unknown[]} args
  * @param {(newArgs: unknown[]) => void} onChange
  * @param {{ stateDefs: string[]; allowEventRef: boolean; depth: number }} opts
+ * @param {{ labels?: string[]; fallbackLabel?: string }} [naming]
  * @returns {import("lit-html").TemplateResult}
  */
 function renderSpliceArgsEditor(
   args: unknown[],
   onChange: (newArgs: unknown[]) => void,
   opts: { stateDefs: string[]; allowEventRef: boolean; depth: number },
+  naming: { labels?: string[]; fallbackLabel?: string } = {},
 ): TemplateResult {
   const safeArgs = Array.isArray(args) ? args : [];
-  const labels = ["start", "del", "item"];
+  const labels = naming.labels ?? ["start", "del", "item"];
+  const fallbackLabel = naming.fallbackLabel ?? "item";
 
   return html`
     <div class="array-object-field">
@@ -427,7 +466,7 @@ function renderSpliceArgsEditor(
             style="display:flex;gap:4px;align-items:center;margin-bottom:4px"
           >
             <span style="font-size:10px;color:var(--spectrum-gray-600, #808080);min-width:30px">
-              ${labels[idx] ?? "item"}
+              ${labels[idx] ?? fallbackLabel}
             </span>
             ${renderOperandEditor(
               arg,
@@ -472,20 +511,28 @@ const _operatorMenuCache = OPERATOR_GROUPS.map(
 
 // ─── Main Expression Editor ─────────────────────────────────────────────────
 
+export interface ExpressionEditorOpts {
+  stateDefs: string[];
+  allowEventRef: boolean;
+  depth?: number;
+  preview?: EditorPreview | null;
+  path?: (string | number)[];
+  /** Full state defs map — resolves named-formula catalog entries (call labels, palette). */
+  stateEntries?: Record<string, JxStateDefinition> | null;
+  /** Chip-strip click hook (depth 0). No-op when absent. */
+  onChipSelect?: (path: (string | number)[]) => void;
+}
+
 /**
  * @param {unknown} node
  * @param {(node: unknown) => void} onChange
- * @param {{
- *   stateDefs: string[];
- *   allowEventRef: boolean;
- *   depth?: number;
- * }} opts
+ * @param {ExpressionEditorOpts} opts
  * @returns {import("lit-html").TemplateResult}
  */
 export function renderExpressionEditor(
   node: unknown,
   onChange: (node: unknown) => void,
-  opts: { stateDefs: string[]; allowEventRef: boolean; depth?: number },
+  opts: ExpressionEditorOpts,
 ): TemplateResult {
   const depth = opts.depth ?? 0;
   const safeNode: Record<string, unknown> =
@@ -494,71 +541,130 @@ export function renderExpressionEditor(
       : { operator: "=", target: null };
   const op = (safeNode.operator as string) || "=";
   const info = operatorInfo(op);
+  const preview = opts.preview ?? null;
+  const path = opts.path ?? [];
+  const pathKey = path.join("/");
+  const sub = (...segs: (string | number)[]) => [...path, ...segs].join("/");
+  /** Wrap an operand widget with its live value badge. */
+  const withBadge = (widget: unknown, key: string) =>
+    html`<div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
+      ${widget}${renderValueBadge(preview, key)}
+    </div>`;
 
   const nestStyle =
     depth > 0
       ? "border-left:2px solid var(--spectrum-gray-300, #3c3c3c);margin-left:8px;padding-left:8px;"
       : "";
 
+  // The root badge: pure roots show their result; mutating roots' effect shows on target/value.
+  const rootBadge =
+    depth === 0 && preview && !preview.mutating ? renderValueBadge(preview, pathKey) : nothing;
+
   return html`
     <div class="expression-editor" style=${nestStyle}>
+      ${depth === 0
+        ? renderFormulaChips(safeNode, opts.onChipSelect ?? (() => {}), { path, preview })
+        : nothing}
+      ${depth === 0 && preview?.error
+        ? html`<div
+            style="font-size:10px;color:var(--spectrum-negative-content-color-default, #f76a63);padding:2px 0"
+          >
+            ${preview.error}
+          </div>`
+        : nothing}
       ${renderFieldRow({
         hasValue: false,
         label: "Operator",
         prop: "operator",
         widget: html`
-          <sp-picker
-            size="s"
-            .value=${live(op)}
-            @change=${(e: Event) => {
-              const newOp = (e.target as HTMLInputElement).value;
-              const newInfo = operatorInfo(newOp);
-              const updated: Record<string, unknown> = {
-                operator: newOp,
-                target: safeNode.target,
-              };
-              if (newInfo.targetMustBeRef && operandMode(safeNode.target) !== "ref") {
-                updated.target = { $ref: "" };
-              }
-              if (newInfo.needsValue) {
-                if (newInfo.valueIsNode) {
-                  const val = safeNode.value as Record<string, unknown> | null;
-                  updated.value = val?.operator ? safeNode.value : { operator: "!", target: null };
-                } else if (newInfo.spliceArray) {
-                  updated.value = Array.isArray(safeNode.value) ? safeNode.value : [null];
-                } else {
-                  updated.value = safeNode.value ?? null;
+          <div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
+            <sp-picker
+              size="s"
+              .value=${live(op)}
+              @change=${(e: Event) => {
+                const newOp = (e.target as HTMLInputElement).value;
+                const newInfo = operatorInfo(newOp);
+                const updated: Record<string, unknown> = {
+                  operator: newOp,
+                  target: safeNode.target,
+                };
+                if (newInfo.targetMustBeRef && operandMode(safeNode.target) !== "ref") {
+                  updated.target = { $ref: "" };
                 }
-              }
-              if (newInfo.needsInitial) {
-                updated.initial = safeNode.initial ?? 0;
-              }
-              onChange(updated);
-            }}
-          >
-            ${_operatorMenuCache}
-          </sp-picker>
+                if (newInfo.needsValue) {
+                  if (newInfo.valueIsNode) {
+                    const val = safeNode.value as Record<string, unknown> | null;
+                    updated.value = val?.operator
+                      ? safeNode.value
+                      : { operator: "!", target: null };
+                  } else if (newInfo.spliceArray) {
+                    updated.value = Array.isArray(safeNode.value) ? safeNode.value : [null];
+                  } else {
+                    updated.value = safeNode.value ?? null;
+                  }
+                }
+                if (newInfo.needsInitial) {
+                  updated.initial = safeNode.initial ?? (newOp === "?:" ? null : 0);
+                }
+                if (newInfo.switchCases) {
+                  updated.cases = isJsonObject(safeNode.cases) ? safeNode.cases : {};
+                  if ("default" in safeNode) {
+                    updated.default = safeNode.default;
+                  }
+                }
+                if (newInfo.callArgs) {
+                  updated.value = Array.isArray(safeNode.value) ? safeNode.value : [];
+                }
+                onChange(updated);
+              }}
+            >
+              ${_operatorMenuCache}
+            </sp-picker>
+            <sp-action-button
+              quiet
+              size="s"
+              class="expr-browse-catalog"
+              title="Browse catalog"
+              @click=${(e: Event) =>
+                openFormulaPalette({
+                  anchor: e.currentTarget as HTMLElement,
+                  entries: formulaCatalog(opts.stateEntries),
+                  onPick: (entry) => onChange(entry.insert()),
+                })}
+            >
+              <sp-icon-brackets slot="icon"></sp-icon-brackets>
+            </sp-action-button>
+            ${rootBadge}
+          </div>
         `,
       })}
       ${renderFieldRow({
         hasValue: false,
-        label: "Target",
+        label: op === "?:" ? "If" : op === "switch" ? "On" : op === "call" ? "Callee" : "Target",
         prop: "target",
-        widget: renderOperandEditor(safeNode.target, (t) => onChange({ ...safeNode, target: t }), {
-          ...opts,
-          depth,
-          mustBeRef: info.targetMustBeRef,
-        }),
+        widget: withBadge(
+          renderOperandEditor(safeNode.target, (t) => onChange({ ...safeNode, target: t }), {
+            ...opts,
+            depth,
+            mustBeRef: info.targetMustBeRef,
+            path: [...path, "target"],
+          }),
+          sub("target"),
+        ),
       })}
       ${info.needsValue && !info.valueIsNode && !info.spliceArray
         ? renderFieldRow({
             hasValue: false,
-            label: "Value",
+            label: op === "?:" ? "Then" : "Value",
             prop: "value",
-            widget: renderOperandEditor(
-              safeNode.value,
-              (v) => onChange({ ...safeNode, value: v }),
-              { ...opts, depth, mustBeRef: false },
+            widget: withBadge(
+              renderOperandEditor(safeNode.value, (v) => onChange({ ...safeNode, value: v }), {
+                ...opts,
+                depth,
+                mustBeRef: false,
+                path: [...path, "value"],
+              }),
+              sub("value"),
             ),
           })
         : nothing}
@@ -576,7 +682,7 @@ export function renderExpressionEditor(
                   ? safeNode.value
                   : { operator: "!", target: null },
                 (v) => onChange({ ...safeNode, value: v }),
-                { ...opts, depth: depth + 1 },
+                { ...opts, depth: depth + 1, path: [...path, "value"] },
               )}
             </div>
           `
@@ -601,18 +707,147 @@ export function renderExpressionEditor(
             </div>
           `
         : nothing}
+      ${info.callArgs
+        ? html`
+            <div style="margin-top:4px">
+              ${renderFieldRow({
+                hasValue: false,
+                label: "Args",
+                prop: "value",
+                widget: nothing,
+              })}
+              ${renderSpliceArgsEditor(
+                safeNode.value as unknown[],
+                (v) => onChange({ ...safeNode, value: v }),
+                { ...opts, depth },
+                {
+                  fallbackLabel: "arg",
+                  labels: calleeParamLabels(safeNode.target, opts.stateEntries),
+                },
+              )}
+            </div>
+          `
+        : nothing}
+      ${info.switchCases
+        ? renderSwitchCasesEditor(safeNode, onChange, { ...opts, depth, path }, withBadge)
+        : nothing}
       ${info.needsInitial
         ? renderFieldRow({
             hasValue: false,
-            label: "Initial",
+            label: op === "?:" ? "Else" : "Initial",
             prop: "initial",
-            widget: renderOperandEditor(
-              safeNode.initial,
-              (v) => onChange({ ...safeNode, initial: v }),
-              { ...opts, depth, mustBeRef: false },
+            widget: withBadge(
+              renderOperandEditor(safeNode.initial, (v) => onChange({ ...safeNode, initial: v }), {
+                ...opts,
+                depth,
+                mustBeRef: false,
+                path: [...path, "initial"],
+              }),
+              sub("initial"),
             ),
           })
         : nothing}
+    </div>
+  `;
+}
+
+// ─── Switch Cases Editor ────────────────────────────────────────────────────
+
+/**
+ * Case rows for the `switch` operator: matched value → result operand, plus the default operand.
+ * Mirrors the element-level `$switch`/`cases` model (spec §19.4b).
+ */
+function renderSwitchCasesEditor(
+  safeNode: Record<string, unknown>,
+  onChange: (node: unknown) => void,
+  opts: {
+    stateDefs: string[];
+    allowEventRef: boolean;
+    depth: number;
+    preview?: EditorPreview | null;
+    path: (string | number)[];
+  },
+  withBadge: (widget: unknown, key: string) => TemplateResult,
+): TemplateResult {
+  const cases = isJsonObject(safeNode.cases)
+    ? (safeNode.cases as Record<string, unknown>)
+    : ({} as Record<string, unknown>);
+  const entries = Object.entries(cases);
+  const setCases = (next: Record<string, unknown>) => onChange({ ...safeNode, cases: next });
+
+  return html`
+    <div class="switch-cases" style="margin-top:4px">
+      ${entries.map(
+        ([key, operand]) => html`
+          <div style="display:flex;gap:4px;align-items:flex-start;margin-bottom:4px">
+            <sp-textfield
+              size="s"
+              style="width:80px;flex-shrink:0"
+              placeholder="value"
+              .value=${live(key)}
+              @change=${(e: Event) => {
+                const newKey = (e.target as HTMLInputElement).value;
+                if (newKey === key) {
+                  return;
+                }
+                const next: Record<string, unknown> = {};
+                for (const [k, v] of entries) {
+                  next[k === key ? newKey : k] = v;
+                }
+                setCases(next);
+              }}
+            ></sp-textfield>
+            ${withBadge(
+              renderOperandEditor(operand, (v) => setCases({ ...cases, [key]: v }), {
+                ...opts,
+                mustBeRef: false,
+                path: [...opts.path, "cases", key],
+              }),
+              [...opts.path, "cases", key].join("/"),
+            )}
+            <sp-action-button
+              quiet
+              size="xs"
+              @click=${() => {
+                const next = { ...cases };
+                delete next[key];
+                setCases(next);
+              }}
+            >
+              <sp-icon-delete slot="icon"></sp-icon-delete>
+            </sp-action-button>
+          </div>
+        `,
+      )}
+      <div style="display:flex;gap:4px;align-items:flex-start;margin-bottom:4px">
+        <span
+          style="width:80px;flex-shrink:0;font-size:10px;line-height:24px;color:var(--spectrum-gray-600, #808080)"
+          >default</span
+        >
+        ${withBadge(
+          renderOperandEditor(safeNode.default, (v) => onChange({ ...safeNode, default: v }), {
+            ...opts,
+            mustBeRef: false,
+            path: [...opts.path, "default"],
+          }),
+          [...opts.path, "default"].join("/"),
+        )}
+      </div>
+      <sp-action-button
+        quiet
+        size="s"
+        @click=${() => {
+          let n = entries.length + 1;
+          let key = `case ${n}`;
+          while (Object.hasOwn(cases, key)) {
+            n += 1;
+            key = `case ${n}`;
+          }
+          setCases({ ...cases, [key]: null });
+        }}
+      >
+        + Add case
+      </sp-action-button>
     </div>
   `;
 }

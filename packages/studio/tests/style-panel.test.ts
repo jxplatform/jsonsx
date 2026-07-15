@@ -182,6 +182,52 @@ describe("base style rows", () => {
   });
 });
 
+// ─── Style value dynamic slots (fx affordance) ───────────────────────────────
+
+describe("style value dynamic slots", () => {
+  test("style rows offer literal and template modes only (no $ref in JxStyle)", async () => {
+    setupTab({ display: "flex" });
+    const c = await renderPanel();
+    const mode = row(c, "display")!.querySelector(".dynamic-slot-mode")!;
+    const caps = [...mode.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
+    expect(caps).toEqual(["literal", "template"]);
+  });
+
+  test("switching to template mode seeds a state-based template string", async () => {
+    resetStudioState();
+    const doc = {
+      children: [{ style: { display: "flex" }, tagName: "section" }],
+      state: { mode: { default: "grid" } },
+      tagName: "div",
+    } as unknown as JxMutableNode;
+    const tab = resetWorkspaceWithTab(doc);
+    tab.session.selection = ["children", 0];
+    const c = await renderPanel();
+    const mode = row(c, "display")!.querySelector(".dynamic-slot-mode") as HTMLInputElement;
+    fire(mode, "change", "template");
+    expect(selectedNode().style?.display).toBe("${state.mode}");
+  });
+
+  test("template-valued style renders the ${} textfield and commits edits", async () => {
+    setupTab({ display: "${state.mode}" });
+    const c = await renderPanel();
+    const r = row(c, "display")!;
+    expect((r.querySelector(".dynamic-slot-mode") as HTMLInputElement).value).toBe("template");
+    const tf = r.querySelector("sp-textfield") as HTMLInputElement;
+    expect(tf.value).toBe("${state.mode}");
+    fire(tf, "change", "${state.other}");
+    expect(selectedNode().style?.display).toBe("${state.other}");
+  });
+
+  test("de-escalating a template value to literal clears the property", async () => {
+    setupTab({ display: "${state.mode}" });
+    const c = await renderPanel();
+    const mode = row(c, "display")!.querySelector(".dynamic-slot-mode") as HTMLInputElement;
+    fire(mode, "change", "literal");
+    expect(selectedNode().style).toBeUndefined();
+  });
+});
+
 // ─── Media tabs ──────────────────────────────────────────────────────────────
 
 describe("media tabs", () => {

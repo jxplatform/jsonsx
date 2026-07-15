@@ -395,6 +395,39 @@ describe("registerFunctionCompletions", () => {
     });
   });
 
+  test("appends blessed-global completions with catalog descriptions", () => {
+    view._completionRegistered = false;
+    registerFunctionCompletions();
+    const [, provider] = registerCompletionItemProvider.mock.calls.at(-1)! as any[];
+    const model = { getWordUntilPosition: () => ({ endColumn: 4, startColumn: 1 }) };
+    const { suggestions } = provider.provideCompletionItems(model, { lineNumber: 2 });
+    const byLabel = Object.fromEntries(suggestions.map((s: any) => [s.label, s]));
+    expect(byLabel["Math.max"].insertText).toBe("window.Math.max");
+    expect(byLabel["Math.max"].kind).toBe(1);
+    expect(byLabel["Math.max"].documentation).toContain("window#/Math/max");
+    expect(byLabel["JSON.parse"].insertText).toBe("window.JSON.parse");
+  });
+
+  test("named formulas complete as functions with their description as documentation", () => {
+    const tab = activeTab.value!;
+    (tab.doc.document as any).state.lineTotal = {
+      $expression: { operator: "*", target: { $ref: "$args/a" }, value: 2 },
+      description: "Multiplies by two.",
+      parameters: ["a"],
+    };
+    view._completionRegistered = false;
+    registerFunctionCompletions();
+    const [, provider] = registerCompletionItemProvider.mock.calls.at(-1)! as any[];
+    const model = { getWordUntilPosition: () => ({ endColumn: 4, startColumn: 1 }) };
+    const { suggestions } = provider.provideCompletionItems(model, { lineNumber: 2 });
+    const byLabel = Object.fromEntries(suggestions.map((s: any) => [s.label, s]));
+    expect(byLabel["state.lineTotal"].kind).toBe(1);
+    expect(byLabel["state.lineTotal"].documentation).toBe("Multiplies by two.");
+    // Plain signals stay undocumented variables
+    expect(byLabel["state.plain"].kind).toBe(4);
+    expect(byLabel["state.plain"].documentation).toBeUndefined();
+  });
+
   test("returns no suggestions without an active tab", () => {
     closeAllTabs();
     const [, provider] = registerCompletionItemProvider.mock.calls[0]! as any[];

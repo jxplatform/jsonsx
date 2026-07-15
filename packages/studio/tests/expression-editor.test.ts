@@ -109,6 +109,15 @@ describe("expressionHint", () => {
   test("unknown operator falls through to binary-style hint", () => {
     expect(expressionHint({ operator: "frobnicate", target: "x" })).toBe("x frobnicate …");
   });
+
+  test("call renders as callee(…) with pointer prefixes stripped", () => {
+    expect(expressionHint({ operator: "call", target: { $ref: "#/state/lineTotal" } })).toBe(
+      "lineTotal(…)",
+    );
+    expect(expressionHint({ operator: "call", target: { $ref: "window#/Math/max" } })).toBe(
+      "Math.max(…)",
+    );
+  });
 });
 
 // ─── Structure per operator category ─────────────────────────────────────────
@@ -188,6 +197,174 @@ describe("renderExpressionEditor structure", () => {
     const nested = container.querySelectorAll(".expression-editor")[1]!;
     expect(pickerValue(nested.querySelector('[data-prop="operator"] sp-picker'))).toBe("!");
     expect(container.querySelector('[data-prop="initial"]')).toBeNull();
+  });
+
+  test("operator menu offers call under a Function group", () => {
+    const { container } = mount(null);
+    const values = [...row(container, "operator").querySelectorAll("sp-menu-item")].map((i) =>
+      i.getAttribute("value"),
+    );
+    expect(values).toContain("call");
+    const headers = [...row(container, "operator").querySelectorAll("sp-menu-group span")].map(
+      (s) => s.textContent,
+    );
+    expect(headers).toContain("Function");
+  });
+});
+
+// ─── Call operator ───────────────────────────────────────────────────────────
+
+describe("call operator", () => {
+  const STATE_ENTRIES = {
+    lineTotal: {
+      $expression: {
+        operator: "*",
+        target: { $ref: "$args/price" },
+        value: { $ref: "$args/qty" },
+      },
+      parameters: [{ name: "price" }, { default: 1, name: "qty" }],
+    },
+  };
+
+  function argLabels(container: HTMLElement): string[] {
+    return [...container.querySelectorAll(".array-object-row > span")].map((s) =>
+      s.textContent!.trim(),
+    );
+  }
+
+  test("renders a Callee ref-only row and the positional args editor", () => {
+    const { container } = mount(
+      { operator: "call", target: { $ref: "#/state/lineTotal" }, value: [2, 3] },
+      { stateEntries: STATE_ENTRIES },
+    );
+    const target = row(container, "target");
+    expect(target.textContent).toContain("Callee");
+    // Callee must be a ref → single ref picker, no mode picker
+    expect(target.querySelectorAll("sp-picker").length).toBe(1);
+    expect(container.querySelector(".array-object-field")).not.toBeNull();
+    // Arg labels come from the named formula's catalog entry
+    expect(argLabels(container)).toEqual(["price", "qty"]);
+  });
+
+  test("unresolvable callee falls back to the generic arg label", () => {
+    const { container } = mount({
+      operator: "call",
+      target: { $ref: "#/state/missing" },
+      value: [1],
+    });
+    expect(argLabels(container)).toEqual(["arg"]);
+  });
+
+  test("editing an arg replaces only that index", () => {
+    const { container, changes } = mount(
+      { operator: "call", target: { $ref: "#/state/lineTotal" }, value: [2, 3] },
+      { stateEntries: STATE_ENTRIES },
+    );
+    const rows = container.querySelectorAll(".array-object-row");
+    changeValue(rows[1]!.querySelector("sp-number-field")!, "9");
+    expect(changes[0]).toEqual({
+      operator: "call",
+      target: { $ref: "#/state/lineTotal" },
+      value: [2, 9],
+    });
+  });
+
+  test("switching operator to call seeds a ref target and empty args array", () => {
+    const { container, changes } = mount({ operator: "+", target: 1, value: 2 });
+    changeValue(row(container, "operator").querySelector("sp-picker")!, "call");
+    expect(changes[0]).toEqual({ operator: "call", target: { $ref: "" }, value: [] });
+  });
+
+  test("switching to call keeps an existing args array and ref target", () => {
+    const { container, changes } = mount({
+      operator: "call",
+      target: { $ref: "#/state/lineTotal" },
+      value: [1],
+    });
+    changeValue(row(container, "operator").querySelector("sp-picker")!, "call");
+    expect(changes[0]).toEqual({
+      operator: "call",
+      target: { $ref: "#/state/lineTotal" },
+      value: [1],
+    });
+  });
+});
+
+// ─── Chips strip (depth 0) ───────────────────────────────────────────────────
+
+describe("chips strip", () => {
+  test("renders once at depth 0 above the form, not in nested editors", () => {
+    const { container } = mount({ operator: "+", target: { operator: "-", target: 4 }, value: 1 });
+    const strips = container.querySelectorAll(".formula-chips");
+    expect(strips.length).toBe(1);
+    const editors = container.querySelectorAll(".expression-editor");
+    expect(strips[0]!.closest(".expression-editor")).toBe(editors[0]!);
+  });
+
+  test("does not render when the editor starts at a nested depth", () => {
+    const { container } = mount({ operator: "!", target: null }, { depth: 1 });
+    expect(container.querySelector(".formula-chips")).toBeNull();
+  });
+
+  test("clicking a chip invokes the onChipSelect hook with the node path", () => {
+    const picks: unknown[] = [];
+    const { container, changes } = mount(
+      { operator: "!", target: { $ref: "#/state/count" } },
+      { onChipSelect: (p: unknown) => picks.push(p) },
+    );
+    const chip = container.querySelector(".formula-chip") as HTMLElement;
+    chip.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(picks).toEqual([["target"]]);
+    expect(changes.length).toBe(0);
+  });
+
+  test("chip clicks are a no-op without the hook", () => {
+    const { container, changes } = mount({ operator: "!", target: null });
+    container
+      .querySelector(".formula-chip")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(changes.length).toBe(0);
+  });
+});
+
+// ─── Browse catalog affordance ───────────────────────────────────────────────
+
+describe("browse catalog", () => {
+  test("button beside the operator picker opens the palette; picking inserts the entry", () => {
+    const { container, changes } = mount({ operator: "+", target: 1, value: 2 });
+    const btn = row(container, "operator").querySelector(".expr-browse-catalog") as HTMLElement;
+    expect(btn).not.toBeNull();
+    btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(document.querySelector(".formula-palette-overlay")).not.toBeNull();
+
+    const item = [...document.querySelectorAll(".quick-search-item")].find(
+      (i) => i.querySelector(".quick-search-name")?.textContent === "?:",
+    )!;
+    item.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(changes[0]).toEqual({ initial: null, operator: "?:", target: null, value: null });
+    expect(document.querySelector(".formula-palette-overlay")).toBeNull();
+  });
+
+  test("palette includes named formulas when stateEntries are provided", () => {
+    const { container } = mount(
+      { operator: "+", target: 1, value: 2 },
+      {
+        stateEntries: {
+          lineTotal: {
+            $expression: { operator: "*", target: { $ref: "$args/a" }, value: 2 },
+            parameters: ["a"],
+          },
+        },
+      },
+    );
+    const btn = row(container, "operator").querySelector(".expr-browse-catalog") as HTMLElement;
+    btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const names = [...document.querySelectorAll(".quick-search-name")].map((n) => n.textContent);
+    expect(names).toContain("lineTotal");
+    document
+      .querySelector(".formula-palette-overlay")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: false }));
+    expect(document.querySelector(".formula-palette-overlay")).toBeNull();
   });
 });
 

@@ -14,6 +14,7 @@ import { activeTab } from "../workspace/workspace";
 import { mutateUpdateDef, mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { view } from "../view";
 import { codeService, getFunctionArgs, setLintMarkers } from "../services/code-services";
+import { globalEntries, namedFormulaEntries } from "../ui/formula-catalog";
 
 import type { OxLintDiagnostic } from "../services/code-services";
 import type { JxMutableNode, JxPrototypeDef } from "@jxsuite/schema/types";
@@ -185,7 +186,10 @@ export function registerFunctionCompletions() {
   view._completionRegistered = true;
   monaco.languages.registerCompletionItemProvider("javascript", {
     provideCompletionItems(model, position) {
-      const defs = activeTab.value?.doc.document?.state || {};
+      if (!activeTab.value) {
+        return { suggestions: [] };
+      }
+      const defs = activeTab.value.doc.document?.state || {};
       const word = model.getWordUntilPosition(position);
       const range = {
         endColumn: word.endColumn,
@@ -194,23 +198,45 @@ export function registerFunctionCompletions() {
         startLineNumber: position.lineNumber,
       };
 
-      const suggestions = Object.entries(defs).map(([key, def]) => {
-        let kind = monaco.languages.CompletionItemKind.Variable;
-        if (
-          (def as JxPrototypeDef)?.$prototype === "Function" ||
-          (def as Record<string, unknown>)?.$handler
-        ) {
-          kind = monaco.languages.CompletionItemKind.Function;
-        } else if ((def as JxPrototypeDef)?.$prototype) {
-          kind = monaco.languages.CompletionItemKind.Property;
-        }
-        return {
-          insertText: `state.${key}`,
-          kind,
-          label: `state.${key}`,
+      // Named-formula catalog metadata enriches their completions with documentation.
+      const formulaDocs = new Map(namedFormulaEntries(defs).map((e) => [e.name, e.description]));
+
+      const suggestions: monaco.languages.CompletionItem[] = Object.entries(defs).map(
+        ([key, def]) => {
+          let kind = monaco.languages.CompletionItemKind.Variable;
+          if (
+            (def as JxPrototypeDef)?.$prototype === "Function" ||
+            (def as Record<string, unknown>)?.$handler ||
+            formulaDocs.has(key)
+          ) {
+            kind = monaco.languages.CompletionItemKind.Function;
+          } else if ((def as JxPrototypeDef)?.$prototype) {
+            kind = monaco.languages.CompletionItemKind.Property;
+          }
+          const item: monaco.languages.CompletionItem = {
+            insertText: `state.${key}`,
+            kind,
+            label: `state.${key}`,
+            range,
+          };
+          const documentation = formulaDocs.get(key);
+          if (documentation) {
+            item.documentation = documentation;
+          }
+          return item;
+        },
+      );
+
+      // Blessed pure globals from the formula catalog (Math.*, JSON.*, Object.*, …).
+      for (const entry of globalEntries()) {
+        suggestions.push({
+          documentation: entry.description,
+          insertText: `window.${entry.label}`,
+          kind: monaco.languages.CompletionItemKind.Function,
+          label: entry.label,
           range,
-        };
-      });
+        });
+      }
       return { suggestions };
     },
     triggerCharacters: ["."],

@@ -18,7 +18,13 @@ import type { Tab } from "../tabs/tab";
 import type { JxPath } from "../state";
 
 import type { JsonValue } from "../types";
-import type { JxEventBinding, JxMutableNode, JxStateObject, JxStyle } from "@jxsuite/schema/types";
+import type {
+  JxAttributeValue,
+  JxEventBinding,
+  JxMutableNode,
+  JxStateObject,
+  JxStyle,
+} from "@jxsuite/schema/types";
 import { ensureNestedStyle, getNestedStyle, isEventBinding } from "@jxsuite/schema/guards";
 
 const HISTORY_LIMIT = 100;
@@ -769,13 +775,13 @@ export function mutateUpdateStyle(tab: Tab, path: JxPath, prop: string, value: s
  * @param {Tab} tab
  * @param {JxPath} path
  * @param {string} attr
- * @param {string | undefined} value
+ * @param {JxAttributeValue | undefined} value — a literal, `$ref` binding, or `${}` template.
  */
 export function mutateUpdateAttribute(
   tab: Tab,
   path: JxPath,
   attr: string,
-  value?: string | undefined,
+  value?: JxAttributeValue | undefined,
 ) {
   const node = getNodeAtPath(tab.doc.document, path);
   const attrsBefore = cloneValue(node.attributes);

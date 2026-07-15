@@ -22,6 +22,7 @@ import {
 } from "../tabs/transact";
 import { inferInputType, propLabel } from "../utils/studio-utils";
 import { renderFieldRow } from "../ui/field-row";
+import { renderDynamicSlot } from "../ui/dynamic-slot";
 import { parseMediaEntries } from "../utils/canvas-media";
 import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
 import { computeInheritedStyle } from "../utils/inherited-style";
@@ -41,6 +42,7 @@ import { widgetForType } from "./style-inputs";
 
 import type { Tab } from "../tabs/tab";
 import type { JxPath } from "../state";
+import type { JsonValue } from "../types";
 import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 
 interface CssLonghand {
@@ -96,6 +98,7 @@ function renderStyleRow(
   isWarning: boolean,
   gridMode: boolean,
   inheritedValue: string | undefined,
+  templateSignals: string[] = [],
 ) {
   const type = inferInputType(entry);
   const hasVal = value !== undefined && value !== "";
@@ -106,7 +109,14 @@ function renderStyleRow(
     label: propLabel(entry, prop),
     hasValue: hasVal,
     onClear: onDelete,
-    widget: widgetForType(type, entry, prop, value, onCommit, { placeholder }),
+    // Style values are schema-legal at two rungs: literal and ${} template (no $ref in JxStyle).
+    widget: renderDynamicSlot({
+      caps: ["literal", "template"],
+      onChange: (v?: JsonValue) => onCommit(v === undefined || v === "" ? undefined : String(v)),
+      staticWidget: widgetForType(type, entry, prop, value, onCommit, { placeholder }),
+      stateDefs: templateSignals,
+      value,
+    }),
     ...(spanVal != null && { span: spanVal }),
     warning: isWarning,
   });
@@ -287,6 +297,14 @@ function styleSidebarTemplate(
   const tab = activeTab.value!;
   const sel = tab.session.selection as JxPath;
   const style = effectiveStyle || node.style || {};
+  // Signals seeding the ${} template default when a style value escalates (no $ref in JxStyle).
+  const templateSignals = Object.entries(tab.doc.document.state || {})
+    .filter(
+      ([, d]) =>
+        !(d as Record<string, unknown>)?.$handler &&
+        (d as Record<string, unknown>)?.$prototype !== "Function",
+    )
+    .map(([defName]) => defName);
   const { sizeBreakpoints } = parseMediaEntries(getEffectiveMedia(tab.doc.document.$media));
   const mediaNames = sizeBreakpoints.map((bp) => bp.name);
   const mediaTab = activeMediaTab || null;
@@ -660,6 +678,7 @@ function styleSidebarTemplate(
                 isWarning,
                 sec.$layout === "grid",
                 inheritedStyle[prop] as string | undefined,
+                templateSignals,
               ),
             );
           }
