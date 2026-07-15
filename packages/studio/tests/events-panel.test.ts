@@ -218,6 +218,20 @@ describe("eventsSidebarTemplate — editing bindings", () => {
     });
   });
 
+  test("open-in-formula-workspace button sets editingFormula ui state", async () => {
+    const container = await renderInto(eventsSidebarTemplate(notCustom));
+    const openBtn = container.querySelector(
+      ".event-body-row sp-action-button[title='Open in formula workspace']",
+    ) as HTMLElement;
+    openBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const tab = activeTab.value!;
+    expect(tab.session.ui.editingFormula).toEqual({
+      eventKey: "oninput",
+      path: ["children", 0],
+      type: "event",
+    });
+  });
+
   test("handler picker change sets a new ref", async () => {
     const container = await renderInto(eventsSidebarTemplate(notCustom));
     changeValue(picker(container, "event-handler"), "#/state/legacyHandler");
@@ -239,6 +253,122 @@ describe("eventsSidebarTemplate — editing bindings", () => {
     changeValue(opPicker, "push");
     const updated = selectedNode().oninput as { $expression?: { operator?: string } };
     expect(updated.$expression?.operator).toBe("push");
+  });
+});
+
+describe("eventsSidebarTemplate — inline body modes (spec §20)", () => {
+  beforeEach(() => {
+    const tab = resetWorkspaceWithTab(makeDoc());
+    tab.session.selection = ["children", 0];
+  });
+
+  test("string body renders the Code mode: toggle present, textarea shown", async () => {
+    const container = await renderInto(eventsSidebarTemplate(notCustom));
+    const toggle = container.querySelector(".body-mode-toggle");
+    expect(toggle).not.toBeNull();
+    expect(toggle?.querySelector(".body-mode-code")?.hasAttribute("selected")).toBe(true);
+    expect(toggle?.querySelector(".body-mode-statements")?.hasAttribute("selected")).toBe(false);
+    expect(container.querySelector(".event-body-row sp-textfield")).not.toBeNull();
+    expect(container.querySelector(".statement-editor")).toBeNull();
+  });
+
+  test("switching to Statements replaces the body with an empty array", async () => {
+    const container = await renderInto(eventsSidebarTemplate(notCustom));
+    const btn = container.querySelector(".body-mode-toggle .body-mode-statements") as HTMLElement;
+    btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(selectedNode().onclick).toEqual({
+      $prototype: "Function",
+      body: [],
+      parameters: [],
+    });
+  });
+
+  test("array body renders the statement editor and Statements is selected", async () => {
+    const tab = resetWorkspaceWithTab({
+      children: [
+        {
+          onclick: { $prototype: "Function", body: [{ dispatchEvent: "ping" }], parameters: [] },
+          tagName: "button",
+        },
+      ],
+      tagName: "div",
+    } as unknown as JxMutableNode);
+    tab.session.selection = ["children", 0];
+    const container = await renderInto(eventsSidebarTemplate(notCustom));
+    expect(
+      container.querySelector(".body-mode-toggle .body-mode-statements")?.hasAttribute("selected"),
+    ).toBe(true);
+    expect(container.querySelector(".statement-editor")).not.toBeNull();
+    expect(container.querySelector(".event-body-row sp-textfield")).toBeNull();
+  });
+
+  test("switching back to Code replaces the body with an empty string", async () => {
+    const tab = resetWorkspaceWithTab({
+      children: [
+        { onclick: { $prototype: "Function", body: [], parameters: [] }, tagName: "button" },
+      ],
+      tagName: "div",
+    } as unknown as JxMutableNode);
+    tab.session.selection = ["children", 0];
+    const container = await renderInto(eventsSidebarTemplate(notCustom));
+    const btn = container.querySelector(".body-mode-toggle .body-mode-code") as HTMLElement;
+    btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(selectedNode().onclick).toEqual({
+      $prototype: "Function",
+      body: "",
+      parameters: [],
+    });
+  });
+
+  test("re-clicking the active mode preserves the existing body", async () => {
+    const container = await renderInto(eventsSidebarTemplate(notCustom));
+    const btn = container.querySelector(".body-mode-toggle .body-mode-code") as HTMLElement;
+    btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect((selectedNode().onclick as { body: string }).body).toBe("doIt()");
+  });
+
+  test("statement editor edits write the inline binding through", async () => {
+    const tab = resetWorkspaceWithTab({
+      children: [
+        { onclick: { $prototype: "Function", body: [], parameters: [] }, tagName: "button" },
+      ],
+      tagName: "div",
+    } as unknown as JxMutableNode);
+    tab.session.selection = ["children", 0];
+    const container = await renderInto(eventsSidebarTemplate(notCustom));
+    const add = container.querySelector("sp-picker.statement-add") as HTMLElement & {
+      value: string;
+    };
+    add.value = "dispatch";
+    add.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(selectedNode().onclick).toEqual({
+      $prototype: "Function",
+      body: [{ dispatchEvent: "" }],
+      parameters: [],
+    });
+  });
+
+  test("dispatch statements offer the inline def's declared emits names", async () => {
+    const tab = resetWorkspaceWithTab({
+      children: [
+        {
+          onclick: {
+            $prototype: "Function",
+            body: [{ dispatchEvent: "" }],
+            emits: [{ name: "saved" }],
+            parameters: [],
+          },
+          tagName: "button",
+        },
+      ],
+      tagName: "div",
+    } as unknown as JxMutableNode);
+    tab.session.selection = ["children", 0];
+    const container = await renderInto(eventsSidebarTemplate(notCustom));
+    const combo = container.querySelector(".statement-dispatch-name");
+    expect(combo?.tagName.toLowerCase()).toBe("sp-combobox");
+    const names = [...combo!.querySelectorAll("sp-menu-item")].map((i) => i.getAttribute("value"));
+    expect(names).toEqual(["saved"]);
   });
 });
 

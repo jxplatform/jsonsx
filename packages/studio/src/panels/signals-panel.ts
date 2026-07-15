@@ -23,6 +23,8 @@ import {
 import { renderFieldRow } from "../ui/field-row";
 import { rawTextArea, spTextField } from "../ui/field-input";
 import { expressionHint, renderExpressionEditor } from "../ui/expression-editor";
+import { renderStatementEditor } from "./statement-editor";
+import { previewExpression } from "../services/preview-eval";
 import { renderMediaPicker } from "../ui/media-picker";
 import { registerFormControl, renderForm } from "../ui/schema-form";
 import { resolveContextPointer } from "../services/context-resolver";
@@ -32,6 +34,7 @@ import type {
   CemEvent,
   CemParameter,
   JxMutableNode,
+  JxStatement,
   JxStateDefinition,
 } from "@jxsuite/schema/types";
 import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services";
@@ -64,7 +67,7 @@ export interface SignalDef {
   $handler?: string;
   type?: string;
   default?: unknown;
-  body?: string;
+  body?: string | unknown[];
   parameters?: string[];
   timing?: string;
   description?: string;
@@ -234,6 +237,9 @@ export function defHint(_name: string, def: SignalDef | null | undefined) {
     return expressionHint(def.$expression);
   }
   if (def.$prototype === "Function") {
+    if (Array.isArray(def.body)) {
+      return `${def.body.length} statement${def.body.length === 1 ? "" : "s"}`;
+    }
     if (def.body) {
       return def.body.length > 20 ? `${def.body.slice(0, 20)}...` : def.body;
     }
@@ -819,6 +825,22 @@ function renderSignalEditorTemplate(
   } else if (cat === "expression") {
     const exprNode = def.$expression || { operator: "=", target: null };
     fields = html`
+      <div style="display:flex;align-items:center;gap:4px">
+        <span class="field-label" style="flex:1">Expression</span>
+        <sp-action-button
+          size="xs"
+          quiet
+          title="Open in formula workspace"
+          @click=${() => {
+            ctx.updateSession({
+              ui: { editingFormula: { defName: name, type: "def" } },
+            });
+            ctx.renderCanvas();
+          }}
+        >
+          <sp-icon-full-screen slot="icon"></sp-icon-full-screen>
+        </sp-action-button>
+      </div>
       ${renderExpressionEditor(
         exprNode,
         (newNode: unknown) =>
@@ -828,7 +850,9 @@ function renderSignalEditorTemplate(
           ),
         {
           allowEventRef: false,
+          preview: previewExpression(exprNode, activeTab.value?.session.canvas.scope),
           stateDefs: Object.keys(S.document.state || {}),
+          stateEntries: S.document.state || {},
         },
       )}
     `;
@@ -957,6 +981,42 @@ function renderFunctionFields(
     transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { description: v || undefined })),
   );
 
+  // Structured bodies (spec §20) are a body MODE of the function category, not a new entity:
+  // "Statements" renders the statement-card editor over `body: JxStatement[]`; "Code" is the
+  // Textarea/Monaco path over `body: string`. Switching modes replaces the body with the other
+  // Representation's empty seed — an explicit mode change, nothing is converted.
+  const bodyIsStatements = Array.isArray(def.body);
+  const bodyModeToggle = html`
+    <sp-action-group size="s" compact class="body-mode-toggle">
+      <sp-action-button
+        size="s"
+        class="body-mode-statements"
+        ?selected=${bodyIsStatements}
+        @click=${() => {
+          if (!bodyIsStatements) {
+            transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { body: [] }));
+            ctx.renderLeftPanel();
+          }
+        }}
+      >
+        Statements
+      </sp-action-button>
+      <sp-action-button
+        size="s"
+        class="body-mode-code"
+        ?selected=${!bodyIsStatements}
+        @click=${() => {
+          if (bodyIsStatements) {
+            transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { body: "" }));
+            ctx.renderLeftPanel();
+          }
+        }}
+      >
+        Code
+      </sp-action-button>
+    </sp-action-group>
+  `;
+
   const bodyField = def.$src
     ? html`
         ${signalFieldRow("Source", def.$src || "", (v: string) =>
@@ -971,29 +1031,52 @@ function renderFunctionFields(
     : html`
         <div style="display:flex;align-items:center;gap:4px">
           <span class="field-label" style="flex:1">Body</span>
-          <sp-action-button
-            size="xs"
-            quiet
-            title="Open in code editor"
-            @click=${() => {
-              ctx.updateSession({
-                ui: { editingFunction: { defName: name, type: "def" } },
-              });
-              ctx.renderCanvas();
-            }}
-          >
-            <sp-icon-code slot="icon"></sp-icon-code>
-          </sp-action-button>
+          ${bodyModeToggle}
+          ${bodyIsStatements
+            ? nothing
+            : html`
+                <sp-action-button
+                  size="xs"
+                  quiet
+                  title="Open in code editor"
+                  @click=${() => {
+                    ctx.updateSession({
+                      ui: { editingFunction: { defName: name, type: "def" } },
+                    });
+                    ctx.renderCanvas();
+                  }}
+                >
+                  <sp-icon-code slot="icon"></sp-icon-code>
+                </sp-action-button>
+              `}
         </div>
-        <textarea
-          class="field-input"
-          style="min-height:60px;font-family:var(--font-mono);font-size:var(--spectrum-font-size-50, 11px)"
-          .value=${def.body || ""}
-          @input=${(e: Event) => {
-            const v = (e.target as HTMLInputElement).value;
-            transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { body: v }));
-          }}
-        ></textarea>
+        ${bodyIsStatements
+          ? renderStatementEditor(
+              def.body as JxStatement[],
+              (next) => {
+                transactDoc(activeTab.value, (t) =>
+                  mutateUpdateDef(t, name, { body: next as unknown as JsonValue }),
+                );
+                ctx.renderLeftPanel();
+              },
+              {
+                allowEventRef: true,
+                emits: def.emits ?? [],
+                stateDefs: Object.keys(S.document.state || {}),
+                stateEntries: S.document.state || {},
+              },
+            )
+          : html`
+              <textarea
+                class="field-input"
+                style="min-height:60px;font-family:var(--font-mono);font-size:var(--spectrum-font-size-50, 11px)"
+                .value=${typeof def.body === "string" ? def.body : ""}
+                @input=${(e: Event) => {
+                  const v = (e.target as HTMLInputElement).value;
+                  transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { body: v }));
+                }}
+              ></textarea>
+            `}
       `;
 
   return html`

@@ -16,13 +16,18 @@ export const functionDefSchema = {
       type: "string",
     },
     body: {
-      description: "Inline function body string. First implicit parameter is state.",
+      description:
+        "Inline function body: an opaque JS source string (first implicit parameter is state), or a structured statement array (spec §20) — explicit structured function declaration, analyzable by tooling and editable visually. The escalation ladder within the shape is structured statements → JS string.",
       examples: [
         "state.count++",
         'state.items.push({ id: Date.now(), text: "", done: false })',
         'return state.score >= 90 ? "gold" : "silver"',
+        [
+          { operator: "push", target: { $ref: "#/state/cart" }, value: 1 },
+          { dispatchEvent: "cart-changed", detail: { $ref: "#/state/cart" } },
+        ],
       ],
-      type: "string",
+      oneOf: [{ type: "string" }, { $ref: "#/$defs/StatementList" }],
     },
     description: { type: "string" },
     emits: {

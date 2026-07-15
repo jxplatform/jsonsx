@@ -808,6 +808,98 @@ describe("function editor", () => {
   });
 });
 
+// ─── Function body mode (statements vs code, spec §20) ───────────────────────
+
+describe("function body mode", () => {
+  test("string body renders the Code mode: toggle present, textarea shown", async () => {
+    const h = setup({ fn: { $prototype: "Function", body: "doIt()", parameters: [] } });
+    const editor = await expand(h, "fn");
+    expect(editor.querySelector(".body-mode-toggle")).not.toBeNull();
+    expect(editor.querySelector(".body-mode-code")?.hasAttribute("selected")).toBe(true);
+    expect(editor.querySelector(".body-mode-statements")?.hasAttribute("selected")).toBe(false);
+    expect(editor.querySelector('textarea[style*="--font-mono"]')).not.toBeNull();
+    expect(editor.querySelector(".statement-editor")).toBeNull();
+  });
+
+  test("array body renders the Statements mode with the statement editor", async () => {
+    const h = setup({
+      fn: { $prototype: "Function", body: [{ dispatchEvent: "ping" }], parameters: [] },
+    });
+    const editor = await expand(h, "fn");
+    expect(editor.querySelector(".body-mode-statements")?.hasAttribute("selected")).toBe(true);
+    expect(editor.querySelector(".statement-editor")).not.toBeNull();
+    expect(editor.querySelector('textarea[style*="--font-mono"]')).toBeNull();
+    // The code-editor (Monaco) affordance only applies to string bodies
+    expect(editor.querySelector('sp-action-button[title="Open in code editor"]')).toBeNull();
+  });
+
+  test("switching to Statements seeds an empty array; switching back seeds an empty string", async () => {
+    const h = setup({ fn: { $prototype: "Function", body: "doIt()", parameters: [] } });
+    let editor = await expand(h, "fn");
+    pointer(editor.querySelector(".body-mode-statements") as Element, "click");
+    expect((docState().fn! as { body: unknown }).body).toEqual([] as never);
+
+    // The toggle re-renders the panel; the statement editor is now live
+    editor = h.container.querySelector(".signal-editor") as HTMLElement;
+    expect(editor.querySelector(".statement-editor")).not.toBeNull();
+
+    pointer(editor.querySelector(".body-mode-code") as Element, "click");
+    expect((docState().fn! as { body: unknown }).body).toBe("" as never);
+    editor = h.container.querySelector(".signal-editor") as HTMLElement;
+    expect(editor.querySelector(".statement-editor")).toBeNull();
+    expect(editor.querySelector('textarea[style*="--font-mono"]')).not.toBeNull();
+  });
+
+  test("re-clicking the active mode is a no-op", async () => {
+    const h = setup({ fn: { $prototype: "Function", body: "keep me", parameters: [] } });
+    const editor = await expand(h, "fn");
+    pointer(editor.querySelector(".body-mode-code") as Element, "click");
+    expect((docState().fn! as { body: unknown }).body).toBe("keep me" as never);
+  });
+
+  test("statement editor edits write the def body through mutateUpdateDef", async () => {
+    const h = setup({ fn: { $prototype: "Function", body: [], parameters: [] } });
+    const editor = await expand(h, "fn");
+    const add = editor.querySelector("sp-picker.statement-add") as HTMLElement & { value: string };
+    add.value = "set";
+    add.dispatchEvent(new Event("change", { bubbles: true }));
+    expect((docState().fn! as { body: unknown }).body).toEqual([
+      { operator: "=", target: { $ref: "" }, value: null },
+    ] as never);
+  });
+
+  test("dispatch statements offer the def's declared emits names", async () => {
+    const h = setup({
+      fn: {
+        $prototype: "Function",
+        body: [{ dispatchEvent: "" }],
+        emits: [{ name: "cart-changed" }],
+        parameters: [],
+      },
+    });
+    const editor = await expand(h, "fn");
+    const combo = editor.querySelector(".statement-dispatch-name");
+    expect(combo?.tagName.toLowerCase()).toBe("sp-combobox");
+    const names = [...combo!.querySelectorAll("sp-menu-item")].map((i) => i.getAttribute("value"));
+    expect(names).toEqual(["cart-changed"]);
+  });
+
+  test("row hint summarizes structured bodies by statement count", async () => {
+    const h = setup({
+      fn: { $prototype: "Function", body: [{ dispatchEvent: "a" }], parameters: [] },
+      fn2: { $prototype: "Function", body: [], parameters: [] },
+    });
+    const row = [...h.container.querySelectorAll(".signal-row")].find(
+      (r) => r.querySelector(".signal-name")?.textContent === "fn",
+    );
+    expect(row?.querySelector(".signal-hint")?.textContent).toBe("1 statement");
+    const row2 = [...h.container.querySelectorAll(".signal-row")].find(
+      (r) => r.querySelector(".signal-name")?.textContent === "fn2",
+    );
+    expect(row2?.querySelector(".signal-hint")?.textContent).toBe("0 statements");
+  });
+});
+
 // ─── Emits editor (custom elements) ──────────────────────────────────────────
 
 describe("emits editor", () => {
@@ -932,5 +1024,18 @@ describe("expression editor", () => {
     const editor = await expand(h, "$e");
     expect(editor.querySelector('[data-prop="operator"]')).not.toBeNull();
     expect(editor.querySelector('[data-prop="target"]')).not.toBeNull();
+  });
+
+  test("formula-workspace button updates the session and re-renders the canvas", async () => {
+    const h = setup({
+      $inc: { $expression: { operator: "=", target: { $ref: "#/state/$count" } } },
+    });
+    const editor = await expand(h, "$inc");
+    pointer(
+      editor.querySelector('sp-action-button[title="Open in formula workspace"]') as Element,
+      "click",
+    );
+    expect(h.calls.session).toEqual([{ ui: { editingFormula: { defName: "$inc", type: "def" } } }]);
+    expect(h.calls.canvas).toBe(1);
   });
 });

@@ -5,6 +5,8 @@ import { live } from "lit-html/directives/live.js";
 import { activeTab } from "../workspace/workspace";
 import { mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { renderExpressionEditor } from "../ui/expression-editor";
+import { renderStatementEditor } from "./statement-editor";
+import { previewExpression } from "../services/preview-eval";
 import {
   getEventBinding,
   isExpressionDef,
@@ -171,53 +173,131 @@ export function eventsSidebarTemplate(helpers: { isCustomElementDoc: () => boole
               </div>
               ${inlineFn
                 ? html`
-                    <div class="event-body-row">
-                      <sp-textfield
-                        size="s"
-                        multiline
-                        grows
-                        placeholder="// handler body"
-                        .value=${live(inlineFn?.body || "")}
-                        @input=${(e: Event) => {
-                          transactDoc(activeTab.value, (t) =>
-                            mutateUpdateProperty(t, selection, evKey, {
-                              $prototype: "Function",
-                              body: (e.target as HTMLInputElement).value,
-                              parameters: inlineFn?.parameters || [],
-                            }),
-                          );
-                        }}
-                      >
-                      </sp-textfield>
-                      <sp-action-button
-                        size="xs"
-                        quiet
-                        title="Open in editor"
-                        @click=${() => {
-                          tab.session.ui.editingFunction = {
-                            eventKey: evKey,
-                            path: selection,
-                            type: "event",
-                          };
-                        }}
-                      >
-                        <sp-icon-code slot="icon"></sp-icon-code>
-                      </sp-action-button>
+                    <div class="event-body-mode" style="display:flex;justify-content:flex-end">
+                      <sp-action-group size="s" compact class="body-mode-toggle">
+                        <sp-action-button
+                          size="s"
+                          class="body-mode-statements"
+                          ?selected=${Array.isArray(inlineFn.body)}
+                          @click=${() => {
+                            if (!Array.isArray(inlineFn.body)) {
+                              transactDoc(activeTab.value, (t) =>
+                                mutateUpdateProperty(t, selection, evKey, {
+                                  ...inlineFn,
+                                  body: [],
+                                }),
+                              );
+                            }
+                          }}
+                        >
+                          Statements
+                        </sp-action-button>
+                        <sp-action-button
+                          size="s"
+                          class="body-mode-code"
+                          ?selected=${!Array.isArray(inlineFn.body)}
+                          @click=${() => {
+                            if (Array.isArray(inlineFn.body)) {
+                              transactDoc(activeTab.value, (t) =>
+                                mutateUpdateProperty(t, selection, evKey, {
+                                  ...inlineFn,
+                                  body: "",
+                                }),
+                              );
+                            }
+                          }}
+                        >
+                          Code
+                        </sp-action-button>
+                      </sp-action-group>
                     </div>
+                    ${Array.isArray(inlineFn.body)
+                      ? renderStatementEditor(
+                          inlineFn.body,
+                          (next) =>
+                            transactDoc(activeTab.value, (t) =>
+                              mutateUpdateProperty(t, selection, evKey, {
+                                ...inlineFn,
+                                body: next,
+                              }),
+                            ),
+                          {
+                            allowEventRef: true,
+                            emits: inlineFn.emits ?? [],
+                            stateDefs: Object.keys(defs),
+                            stateEntries: defs,
+                          },
+                        )
+                      : html`
+                          <div class="event-body-row">
+                            <sp-textfield
+                              size="s"
+                              multiline
+                              grows
+                              placeholder="// handler body"
+                              .value=${live(typeof inlineFn.body === "string" ? inlineFn.body : "")}
+                              @input=${(e: Event) => {
+                                transactDoc(activeTab.value, (t) =>
+                                  mutateUpdateProperty(t, selection, evKey, {
+                                    $prototype: "Function",
+                                    body: (e.target as HTMLInputElement).value,
+                                    parameters: inlineFn?.parameters || [],
+                                  }),
+                                );
+                              }}
+                            >
+                            </sp-textfield>
+                            <sp-action-button
+                              size="xs"
+                              quiet
+                              title="Open in editor"
+                              @click=${() => {
+                                tab.session.ui.editingFunction = {
+                                  eventKey: evKey,
+                                  path: selection,
+                                  type: "event",
+                                };
+                              }}
+                            >
+                              <sp-icon-code slot="icon"></sp-icon-code>
+                            </sp-action-button>
+                          </div>
+                        `}
                   `
                 : expression
                   ? html`
                       <div class="event-body-row">
-                        ${renderExpressionEditor(
-                          expression,
-                          (newNode: unknown) =>
-                            transactDoc(activeTab.value, (t) =>
-                              mutateUpdateProperty(t, selection, evKey, {
-                                $expression: newNode,
-                              }),
-                            ),
-                          { allowEventRef: true, stateDefs: Object.keys(defs) },
-                        )}
+                        <div style="flex:1;min-width:0">
+                          ${renderExpressionEditor(
+                            expression,
+                            (newNode: unknown) =>
+                              transactDoc(activeTab.value, (t) =>
+                                mutateUpdateProperty(t, selection, evKey, {
+                                  $expression: newNode,
+                                }),
+                              ),
+                            {
+                              allowEventRef: true,
+                              preview: previewExpression(expression, tab.session.canvas.scope),
+                              stateDefs: Object.keys(defs),
+                              stateEntries: defs,
+                            },
+                          )}
+                        </div>
+                        <sp-action-button
+                          size="xs"
+                          quiet
+                          title="Open in formula workspace"
+                          @click=${() => {
+                            tab.session.ui.editingFormula = {
+                              eventKey: evKey,
+                              path: selection,
+                              type: "event",
+                            };
+                          }}
+                        >
+                          <sp-icon-full-screen slot="icon"></sp-icon-full-screen>
+                        </sp-action-button>
                       </div>
                     `
                   : html`
