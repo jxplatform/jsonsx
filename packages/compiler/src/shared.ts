@@ -8,11 +8,14 @@
 
 import { RESERVED_KEYS, camelToKebab, toCSSText } from "@jxsuite/runtime";
 import { evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
+import { runStatements } from "@jxsuite/runtime/statements";
 import {
   childrenContainArray,
+  hasStructuredBody,
   isExpressionDef,
   isFunctionDef,
   isMappedArray,
+  isNamedFormulaDef,
   isPrototypeDef,
   isRef,
   isSchemaOnlyDef as isSchemaOnly,
@@ -35,6 +38,28 @@ import type {
 // Re-export runtime utilities used by submodules
 export { RESERVED_KEYS, camelToKebab, toCSSText } from "@jxsuite/runtime";
 export { compileExpression, evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
+export { compileStatements, runStatements } from "@jxsuite/runtime/statements";
+
+/**
+ * Emit the JS source of a named formula's scope callable: positional arguments are mapped onto the
+ * declared parameter names (honoring CemParameter defaults) as the `_args` object the compiled
+ * body's `$args/` refs read from. Call sites stay positional, matching the interpreter.
+ */
+export function emitFormulaFn(def: { parameters?: unknown[] }, compiledBody: string): string {
+  const entries: string[] = [];
+  for (const [i, p] of (def.parameters ?? []).entries()) {
+    const name = typeof p === "string" ? p : ((p as { name?: string } | null)?.name ?? "");
+    if (!name) {
+      continue;
+    }
+    const hasDefault = typeof p === "object" && p !== null && "default" in p;
+    const arg = hasDefault
+      ? `_a[${i}] === undefined ? ${JSON.stringify((p as { default?: unknown }).default)} : _a[${i}]`
+      : `_a[${i}]`;
+    entries.push(`${JSON.stringify(name)}: ${arg}`);
+  }
+  return `(..._a) => { const _args = { ${entries.join(", ")} }; return ${compiledBody}; }`;
+}
 export type { ExpressionNode } from "@jxsuite/runtime/expression";
 
 // CDN defaults
@@ -283,7 +308,24 @@ export function buildInitialScope(
     }
     if (isExpressionDef(def)) {
       const node = def.$expression as ExpressionNode;
-      if (isMutating(node.operator)) {
+      if (isNamedFormulaDef(def)) {
+        // Named formula: callable, positional args mapped onto its declared parameters.
+        const params = def.parameters as (string | { name?: string; default?: unknown })[];
+        setOwnScopeValue(scope, key, (...argValues: unknown[]) => {
+          const args: Record<string, unknown> = {};
+          for (const [i, p] of params.entries()) {
+            const name = typeof p === "string" ? p : (p?.name ?? "");
+            if (!name) {
+              continue;
+            }
+            args[name] =
+              argValues[i] === undefined && typeof p === "object" && p !== null && "default" in p
+                ? p.default
+                : argValues[i];
+          }
+          return evaluateExpression(node, scope, null, { args });
+        });
+      } else if (isMutating(node.operator)) {
         setOwnScopeValue(scope, key, (s: Record<string, unknown>, event: Event) =>
           evaluateExpression(node, s, event),
         );
@@ -293,12 +335,19 @@ export function buildInitialScope(
       continue;
     }
     if (isFunctionDef(def)) {
-      if (def.body) {
+      if (hasStructuredBody(def)) {
+        // Structured body (spec §20): a side-effecting handler in the build-time scope.
+        const { body } = def;
+        setOwnScopeValue(scope, key, (s: Record<string, unknown>, event?: Event) => {
+          void runStatements(body, s ?? scope, event ?? null);
+        });
+      } else if (typeof def.body === "string") {
         const names = def.parameters ? paramNames(def.parameters) : (def.arguments ?? []);
-        const fn = new Function("state", ...names, def.body) as (
+        const { body } = def;
+        const fn = new Function("state", ...names, body) as (
           state: Record<string, unknown>,
         ) => unknown;
-        if (def.body.includes("return")) {
+        if (body.includes("return")) {
           defineLazyScopeValue(scope, key, () => fn(scope));
         } else {
           setOwnScopeValue(scope, key, fn);

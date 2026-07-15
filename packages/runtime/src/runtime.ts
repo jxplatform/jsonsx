@@ -26,15 +26,18 @@ import {
 import { evaluateExpression, isMutating } from "./expression.ts";
 import type { DynamicClass, JxEventHandler, JxPath, JxRenderOptions, JxScope } from "./types.ts";
 import {
+  hasStructuredBody,
   isExpressionDef,
   isFunctionDef,
   isJsonObject,
   isMappedArray,
+  isNamedFormulaDef,
   isPrototypeDef,
   isRef as isRefValue,
   isServerFnDef,
   paramNames,
 } from "@jxsuite/schema/guards";
+import { runStatements } from "./statements.ts";
 import type {
   JxAttributeValue,
   JxClassDef,
@@ -406,7 +409,24 @@ export async function buildScope(
   for (const [key, def] of Object.entries(defs)) {
     if (isExpressionDef(def)) {
       const node = def.$expression;
-      if (isMutating(node.operator)) {
+      if (isNamedFormulaDef(def)) {
+        // A named formula: callable with positional args mapped onto its declared parameters.
+        const params = def.parameters as (string | { name?: string; default?: unknown })[];
+        state[key] = (...argValues: unknown[]) => {
+          const args: Record<string, unknown> = {};
+          for (const [i, p] of params.entries()) {
+            const name = typeof p === "string" ? p : (p?.name ?? "");
+            if (!name) {
+              continue;
+            }
+            args[name] =
+              argValues[i] === undefined && typeof p === "object" && p !== null && "default" in p
+                ? p.default
+                : argValues[i];
+          }
+          return evaluateExpression(node, state, null, { args });
+        };
+      } else if (isMutating(node.operator)) {
         const handler: JxEventHandler = (s, event) => evaluateExpression(node, s, event);
         state[key] = handler;
       } else {
@@ -417,7 +437,33 @@ export async function buildScope(
 
   // Third pass: $prototype: "Function" entries
   for (const [key, def] of Object.entries(defs)) {
-    if (isFunctionDef(def)) {
+    if (hasStructuredBody(def)) {
+      // Structured body (spec §20): with parameters → a callable mapping positional args onto
+      // $args names (invoked via the call operator); without → an event handler.
+      const { body } = def;
+      if (Array.isArray(def.parameters) && def.parameters.length > 0) {
+        const params = def.parameters as (string | { name?: string; default?: unknown })[];
+        state[key] = (...argValues: unknown[]) => {
+          const args: Record<string, unknown> = {};
+          for (const [i, p] of params.entries()) {
+            const name = typeof p === "string" ? p : (p?.name ?? "");
+            if (!name) {
+              continue;
+            }
+            args[name] =
+              argValues[i] === undefined && typeof p === "object" && p !== null && "default" in p
+                ? p.default
+                : argValues[i];
+          }
+          return runStatements(body, state, null, { args });
+        };
+      } else {
+        const handler: JxEventHandler = (s, event) => {
+          void runStatements(body, s, event ?? null);
+        };
+        state[key] = handler;
+      }
+    } else if (isFunctionDef(def)) {
       state[key] = await resolveFunction(def, state, key, base);
     }
   }
@@ -526,7 +572,7 @@ async function resolveFunction(def: JxFunctionDef, state: JxScope, key: string, 
 
   let fn: ((...args: unknown[]) => unknown) | undefined;
 
-  if (def.body) {
+  if (typeof def.body === "string") {
     const params = resolveParamNames(def);
     fn = new Function(...params, def.body) as (...args: unknown[]) => unknown;
     Object.defineProperty(fn, "name", {
@@ -568,7 +614,7 @@ async function resolveFunction(def: JxFunctionDef, state: JxScope, key: string, 
   const hasParams = (def.parameters ?? def.arguments ?? []).length > 0;
   let isComputed = false;
   if (!hasParams) {
-    if (def.body) {
+    if (typeof def.body === "string") {
       isComputed = /\breturn\b/.test(def.body);
     } else if (fn) {
       isComputed = fn.length <= 1 && /\breturn\b/.test(fn.toString());
@@ -765,8 +811,17 @@ function applyProperties(el: HTMLElement, def: JxElement, state: JxScope) {
         }
         continue;
       }
+      // Event handler: inline $prototype: "Function" with a structured body (spec §20)
+      if (hasStructuredBody(val)) {
+        const { body } = val;
+        const scope = state;
+        el.addEventListener(key.slice(2), (e) => {
+          void runStatements(body, scope, e);
+        });
+        continue;
+      }
       // Event handler: inline $prototype: "Function"
-      if (isFunctionDef(val) && val.body) {
+      if (isFunctionDef(val) && typeof val.body === "string") {
         const params = resolveParamNames(val);
         const fn = new Function(...params, val.body) as (s: JxScope, e: Event) => unknown;
         const scope = state;

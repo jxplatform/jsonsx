@@ -379,3 +379,107 @@ describe("buildInitialScope — $expression", () => {
     expect(typeof scope.toggle).toBe("function");
   });
 });
+
+// ─── Named formulas (call operator, spec §19.4c) ─────────────────────────────
+
+describe("named formulas — compiler integration", () => {
+  const lineTotal = {
+    $expression: {
+      operator: "*",
+      target: { $ref: "$args/price" },
+      value: { $ref: "$args/qty" },
+    },
+    parameters: [{ name: "price" }, { name: "qty", default: 1 }],
+  };
+
+  test("compileElement emits a scope callable for a named formula", async () => {
+    const result = await compileElement({
+      children: [],
+      state: {
+        lineTotal,
+        total: {
+          $expression: {
+            operator: "call",
+            target: { $ref: "#/state/lineTotal" },
+            value: [3, 4],
+          },
+        },
+      },
+      tagName: "test-named-formula",
+    });
+    const { content } = result.files[0]!;
+    expect(content).toContain("this.state.lineTotal = (..._a) =>");
+    expect(content).toContain('"price": _a[0]');
+    expect(content).toContain('"qty": _a[1] === undefined ? 1 : _a[1]');
+    expect(content).toContain("this.state.total = computed(() => this.state.lineTotal(3, 4));");
+  });
+
+  test("buildInitialScope lowers a named formula to a callable; call sites evaluate", () => {
+    const scope = buildInitialScope({
+      lineTotal,
+      total: {
+        $expression: {
+          operator: "call",
+          target: { $ref: "#/state/lineTotal" },
+          value: [3, 4],
+        },
+      },
+    });
+    expect(typeof scope.lineTotal).toBe("function");
+    expect(scope.total).toBe(12);
+  });
+
+  test("buildInitialScope named formula honors parameter defaults", () => {
+    const scope = buildInitialScope({ lineTotal });
+    expect((scope.lineTotal as (...a: unknown[]) => unknown)(5)).toBe(5);
+  });
+});
+
+// ─── Structured function bodies (spec §20) — compiler integration ────────────
+
+describe("structured bodies — compileElement", () => {
+  test("statement-array body compiles to a handler with dispatchEvent on the instance", async () => {
+    const result = await compileElement({
+      children: [],
+      state: {
+        cart: { default: [] },
+        addToCart: {
+          $prototype: "Function",
+          body: [
+            { operator: "push", target: { $ref: "#/state/cart" }, value: 1 },
+            {
+              if: { operator: ">", target: { $ref: "#/state/cart/length" }, value: 2 },
+              // oxlint-disable-next-line unicorn/no-thenable -- `then` is the JSON Schema conditional keyword (spec §20), not a promise
+              then: [{ dispatchEvent: "cart-full" }],
+            },
+            { dispatchEvent: "cart-changed", detail: { $ref: "#/state/cart" }, bubbles: true },
+          ],
+        },
+      },
+      tagName: "test-structured-body",
+    });
+    const { content } = result.files[0]!;
+    expect(content).toContain("this.state.addToCart = (s, e) => {");
+    expect(content).toContain("this.state.cart.push(1);");
+    expect(content).toContain("if ((this.state.cart.length > 2)) {");
+    expect(content).toContain('this?.dispatchEvent(new CustomEvent("cart-full"));');
+    expect(content).toContain(
+      'this?.dispatchEvent(new CustomEvent("cart-changed", { detail: this.state.cart, bubbles: true }));',
+    );
+  });
+});
+
+describe("structured bodies — buildInitialScope", () => {
+  test("statement-array body lowers to a handler that mutates the scope", () => {
+    const scope = buildInitialScope({
+      count: 0,
+      bump: {
+        $prototype: "Function",
+        body: [{ operator: "+=", target: { $ref: "#/state/count" }, value: 5 }],
+      },
+    });
+    expect(typeof scope.bump).toBe("function");
+    (scope as any).bump(scope, null);
+    expect(scope.count).toBe(5);
+  });
+});

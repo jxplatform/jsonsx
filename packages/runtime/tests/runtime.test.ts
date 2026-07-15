@@ -2045,3 +2045,107 @@ describe("buildScope — $expression (Shape 5)", () => {
     expect(scope.on).toBe(true);
   });
 });
+
+// ─── Named formulas (call operator, spec §19.4c) ─────────────────────────────
+
+describe("buildScope — named formulas", () => {
+  const BASE = "http://localhost/";
+
+  test("parameterized pure entry becomes a callable, not a computed", async () => {
+    const state = await buildScope(
+      {
+        state: {
+          lineTotal: {
+            $expression: {
+              operator: "*",
+              target: { $ref: "$args/price" },
+              value: { $ref: "$args/qty" },
+            },
+            parameters: [{ name: "price" }, { name: "qty", default: 1 }],
+          },
+        },
+      },
+      {},
+      BASE,
+    );
+    expect(typeof state.lineTotal).toBe("function");
+    expect((state.lineTotal as (...a: unknown[]) => unknown)(3, 4)).toBe(12);
+    expect((state.lineTotal as (...a: unknown[]) => unknown)(5)).toBe(5);
+  });
+
+  test("call expression entries resolve scope callables reactively", async () => {
+    const state = await buildScope(
+      {
+        state: {
+          double: {
+            $expression: {
+              operator: "*",
+              target: { $ref: "$args/n" },
+              value: 2,
+            },
+            parameters: ["n"],
+          },
+          n: 10,
+          result: {
+            $expression: {
+              operator: "call",
+              target: { $ref: "#/state/double" },
+              value: [{ $ref: "#/state/n" }],
+            },
+          },
+        },
+      },
+      {},
+      BASE,
+    );
+    expect(state.result).toBe(20);
+    state.n = 21;
+    expect(state.result).toBe(42);
+  });
+});
+
+// ─── Structured function bodies (spec §20) ───────────────────────────────────
+
+describe("buildScope — structured function bodies", () => {
+  const BASE = "http://localhost/";
+
+  test("parameterless structured body becomes an event handler", async () => {
+    const state = await buildScope(
+      {
+        state: {
+          cart: [1],
+          addOne: {
+            $prototype: "Function",
+            body: [{ operator: "push", target: { $ref: "#/state/cart" }, value: 2 }],
+          },
+        },
+      },
+      {},
+      BASE,
+    );
+    expect(typeof state.addOne).toBe("function");
+    (state.addOne as (s: unknown, e: unknown) => void)(state, null);
+    expect(state.cart).toEqual([1, 2]);
+  });
+
+  test("parameterized structured body is callable with positional args", async () => {
+    const state = await buildScope(
+      {
+        state: {
+          cart: [],
+          addToCart: {
+            $prototype: "Function",
+            parameters: ["item"],
+            body: [
+              { operator: "push", target: { $ref: "#/state/cart" }, value: { $ref: "$args/item" } },
+            ],
+          },
+        },
+      },
+      {},
+      BASE,
+    );
+    await (state.addToCart as (...a: unknown[]) => Promise<void>)("apple");
+    expect(state.cart).toEqual(["apple"]);
+  });
+});

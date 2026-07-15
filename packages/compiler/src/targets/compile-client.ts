@@ -17,8 +17,10 @@ import {
   DEFAULT_REACTIVITY_SRC,
   buildAttrs,
   compileExpression,
+  compileStatements,
   compileStyles,
   createCompileContext,
+  emitFormulaFn,
   escapeHtml,
   isMutating,
   isRefObject,
@@ -27,10 +29,12 @@ import {
   resolveStaticValue,
 } from "../shared.ts";
 import {
+  hasStructuredBody,
   isExpandedSignal,
   isExpressionDef,
   isFunctionDef,
   isMappedArray,
+  isNamedFormulaDef,
   isPrototypeDef,
   paramNames,
 } from "@jxsuite/schema/guards";
@@ -124,7 +128,11 @@ export function compileClient(
         eventParam: "e",
         statePrefix: "state",
       });
-      if (isMutating(node.operator)) {
+      if (isNamedFormulaDef(def)) {
+        // Named formula → a scope callable mapping positional args onto declared parameters.
+        // Call sites stay positional, matching the interpreter.
+        initBlocks.push(`state[${JSON.stringify(key)}] = ${emitFormulaFn(def, compiled)};`);
+      } else if (isMutating(node.operator)) {
         onEntries.push([key, { args: ["state", "e"], body: compiled }]);
       } else {
         computedEntries.push([key, `() => ${compiled}`]);
@@ -135,7 +143,18 @@ export function compileClient(
     // $prototype: "Function"
     if (isFunctionDef(def)) {
       const args = def.parameters ? paramNames(def.parameters) : def.arguments;
-      if (def.$src) {
+      if (hasStructuredBody(def)) {
+        // Structured body (spec §20) → an event handler compiled from statements.
+        // With parameters, a positional callable like a named formula.
+        const compiled = compileStatements(def.body, { eventParam: "e", statePrefix: "state" });
+        if (def.parameters && def.parameters.length > 0) {
+          initBlocks.push(
+            `state[${JSON.stringify(key)}] = ${emitFormulaFn(def, `(() => {\n${compiled}\n})()`)};`,
+          );
+        } else {
+          onEntries.push([key, { args: ["state", "e"], body: compiled }]);
+        }
+      } else if (def.$src) {
         if (!srcImportMap.has(def.$src)) {
           srcImportMap.set(def.$src, new Set());
         }
@@ -143,12 +162,12 @@ export function compileClient(
 
         // $src functions always produce computed entries (they return values)
         computedEntries.push([key, `() => { return ${key}(state); }`]);
-      } else if (def.body && def.body.includes("return")) {
+      } else if (typeof def.body === "string" && def.body.includes("return")) {
         // Body contains return → computed
         computedEntries.push([key, `() => { ${def.body} }`]);
       } else {
         // No return → event handler
-        onEntries.push([key, { args: args ?? ["state"], body: def.body }]);
+        onEntries.push([key, { args: args ?? ["state"], body: def.body as string | undefined }]);
       }
       continue;
     }
@@ -335,13 +354,22 @@ function buildClientNode(
       const key = refToBindingKey(val.$ref);
       bindAttrs.push(`@${eventName}="${key}"`);
       needsBind = true;
+    } else if (hasStructuredBody(val)) {
+      const key = `_h${counter.h}`;
+      counter.h += 1;
+      bindAttrs.push(`@${eventName}="${key}"`);
+      handlers.set(key, {
+        args: ["state", "e"],
+        body: compileStatements(val.body, { eventParam: "e", statePrefix: "state" }),
+      });
+      needsBind = true;
     } else if (isFunctionDef(val)) {
       const key = `_h${counter.h}`;
       counter.h += 1;
       bindAttrs.push(`@${eventName}="${key}"`);
       handlers.set(key, {
         args: val.parameters ? paramNames(val.parameters) : (val.arguments ?? ["state", "event"]),
-        body: val.body,
+        body: val.body as string | undefined,
       });
       needsBind = true;
     } else if (isExpressionDef(val)) {
@@ -594,6 +622,9 @@ function emitLitMapTemplate(def: JxMutableNode | undefined) {
     if (isRefObject(val)) {
       const key = refToBindingKey((val as JxMutableNode).$ref as string);
       attrs += ` @${eventName}=\${(e) => { state.$map = { item, index }; on.${key}(e); }}`;
+    } else if (hasStructuredBody(val)) {
+      const compiled = compileStatements(val.body, { eventParam: "e", statePrefix: "state" });
+      attrs += ` @${eventName}=\${(e) => { state.$map = { item, index }; ${compiled} }}`;
     } else if (val && typeof val === "object" && (val as JxMutableNode).$prototype === "Function") {
       const body = mapRefsToLit((val as JxMutableNode).body as string);
       attrs += ` @${eventName}=\${(e) => { ${body} }}`;

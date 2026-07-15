@@ -9,15 +9,19 @@ import { RESERVED_KEYS, camelToKebab } from "@jxsuite/runtime";
 import {
   collectStyles,
   compileExpression,
+  compileStatements,
+  emitFormulaFn,
   escapeHtml,
   isMutating,
   isSchemaOnly,
   tagNameToClassName,
 } from "../shared.ts";
 import {
+  hasStructuredBody,
   isExpressionDef,
   isFunctionDef,
   isMappedArray,
+  isNamedFormulaDef,
   isRef,
   paramNames,
 } from "@jxsuite/schema/guards";
@@ -284,11 +288,14 @@ export function emitElementModule(doc: JxDocument, className: string, elementImp
   const computedEntries: [string, JxExpressionDef | JxFunctionDef][] = [];
   const functionEntries: [string, JxExpressionDef | JxFunctionDef][] = [];
 
+  const formulaEntries: [string, JxExpressionDef][] = [];
   for (const [key, def] of Object.entries(defs)) {
     const d = def as JxMutableNode;
     if (isExpressionDef(d)) {
       const node = d.$expression as ExpressionNode;
-      if (isMutating(node.operator)) {
+      if (isNamedFormulaDef(d)) {
+        formulaEntries.push([key, d]);
+      } else if (isMutating(node.operator)) {
         functionEntries.push([key, d]);
       } else {
         computedEntries.push([key, d]);
@@ -324,6 +331,16 @@ export function emitElementModule(doc: JxDocument, className: string, elementImp
         statePrefix: "s",
       });
       lines.push(`    this.state.${key} = (s, e) => { ${compiled}; };`);
+    } else if (hasStructuredBody(def)) {
+      // Structured body (spec §20) — statements compiled against this.state; dispatch target is
+      // The component instance itself (WHATWG dispatchEvent on the custom element).
+      const compiled = compileStatements(def.body, {
+        dispatchTarget: "this",
+        eventParam: "e",
+        indent: "      ",
+        statePrefix: "this.state",
+      });
+      lines.push(`    this.state.${key} = (s, e) => {`, compiled, "    };");
     } else {
       const args = def.parameters ? paramNames(def.parameters) : (def.arguments ?? ["state"]);
       const paramList = args.join(", ");
@@ -333,11 +350,21 @@ export function emitElementModule(doc: JxDocument, className: string, elementImp
       } else {
         lines.push(
           `    this.state.${key} = (${paramList}) => {`,
-          `      ${def.body ?? ""}`,
+          `      ${typeof def.body === "string" ? def.body : ""}`,
           "    };",
         );
       }
     }
+  }
+
+  // Emit named formulas — scope callables mapping positional args onto declared parameters
+  for (const [key, def] of formulaEntries) {
+    lines.push("");
+    const compiled = compileExpression(def.$expression as ExpressionNode, {
+      eventParam: "e",
+      statePrefix: "this.state",
+    });
+    lines.push(`    this.state.${key} = ${emitFormulaFn(def, compiled)};`);
   }
 
   // Emit computed signals — $src or inline body
@@ -353,7 +380,10 @@ export function emitElementModule(doc: JxDocument, className: string, elementImp
       lines.push(`    this.state.${key} = computed(() => ${key}(this.state));`);
     } else {
       lines.push(`    this.state.${key} = computed(() => {`);
-      const body = (def.body ?? "").replaceAll("state.", "this.state.");
+      const body = (typeof def.body === "string" ? def.body : "").replaceAll(
+        "state.",
+        "this.state.",
+      );
       lines.push(`      ${body}`, "    });");
     }
   }
@@ -765,7 +795,14 @@ function toLitTextContent(value: unknown) {
  * @returns {string}
  */
 function inlineHandlerBody(def: JxFunctionDef) {
-  const body = def.body ?? "";
+  if (hasStructuredBody(def)) {
+    return compileStatements(def.body, {
+      dispatchTarget: "e.currentTarget",
+      eventParam: "e",
+      statePrefix: "s",
+    });
+  }
+  const body = typeof def.body === "string" ? def.body : "";
   return body.replaceAll(/(?<!this\.)state\./g, "s.").replaceAll(/(?<!this\.)state(?!\.)/g, "s");
 }
 
