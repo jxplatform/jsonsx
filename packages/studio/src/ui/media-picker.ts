@@ -93,7 +93,7 @@ async function loadMediaCache() {
   // Re-render the host panels so the Browse button (gated on mediaCache.length) appears once the
   // Async listing resolves — including when an image value is already set, so the current image can
   // Be replaced. Mirrors loadLayoutEntries()'s renderOnly() in head-panel.
-  renderOnly("leftPanel", "rightPanel");
+  renderOnly("leftPanel", "rightPanel", "frontmatterPanel");
 }
 
 /** Force media cache reload (e.g. after upload). */

@@ -7,15 +7,13 @@
  */
 
 import { html, nothing } from "lit-html";
-import { live } from "lit-html/directives/live.js";
 import { renderFieldRow } from "../ui/field-row";
-import { spNumberField, spTextArea, spTextField } from "../ui/field-input";
+import { spTextArea, spTextField } from "../ui/field-input";
 import { renderMediaPicker } from "../ui/media-picker";
 import { projectState, renderOnly } from "../store";
-import type { DirEntry, JsonValue } from "../types";
+import type { DirEntry } from "../types";
 import { activeTab } from "../workspace/workspace";
-import { mutateUpdateFrontmatter, transactDoc } from "../tabs/transact";
-import { findContentTypeSchema } from "../utils/studio-utils";
+import { collectFmFields, renderFmField } from "./frontmatter-fields";
 import { isGoogleFontEntry, isGoogleFontPreconnect } from "../utils/google-fonts";
 import { invalidateLayoutCache } from "../site-context";
 import { getPlatform } from "../platform";
@@ -29,13 +27,6 @@ interface MetaField {
   key: string;
   multiline?: boolean;
   media?: boolean;
-}
-
-interface FmSchemaEntry {
-  type?: string;
-  enum?: string[];
-  format?: string;
-  properties?: Record<string, unknown>;
 }
 
 // ─── Layout picker ──────────────────────────────────────────────────────────
@@ -564,49 +555,13 @@ function renderFrontmatterSection() {
     return nothing;
   }
 
-  const fm = tab.doc.content?.frontmatter || {};
-  const col = findContentTypeSchema(tab.documentPath, projectState?.projectConfig);
-  const schema = col?.schema as
-    | { properties?: Record<string, FmSchemaEntry>; required?: string[] }
-    | undefined;
-  const schemaProps = schema?.properties;
-  const requiredFields = new Set(schema?.required || []);
+  const { collection, fields, hasSchema, requiredFields } = collectFmFields(
+    tab,
+    projectState?.projectConfig,
+    RESERVED_FM_KEYS,
+  );
 
-  /** @type {{ field: string; entry: FmSchemaEntry; value: JsonValue }[]} */
-  const fields = [];
-  if (schemaProps) {
-    for (const [field, fieldSchema] of Object.entries(
-      /** @type {Record<string, FmSchemaEntry>} */ schemaProps,
-    )) {
-      if (RESERVED_FM_KEYS.has(field)) {
-        continue;
-      }
-      fields.push({ entry: fieldSchema, field, value: fm[field] as JsonValue });
-    }
-    for (const [field, value] of Object.entries(fm)) {
-      if (schemaProps[field] || field.startsWith("$") || RESERVED_FM_KEYS.has(field)) {
-        continue;
-      }
-      fields.push({
-        entry: { type: typeof value === "boolean" ? "boolean" : "string" },
-        field,
-        value: /** @type {JsonValue} */ value,
-      });
-    }
-  } else {
-    for (const [field, value] of Object.entries(fm)) {
-      if (field.startsWith("$") || RESERVED_FM_KEYS.has(field)) {
-        continue;
-      }
-      fields.push({
-        entry: { type: typeof value === "boolean" ? "boolean" : "string" },
-        field,
-        value: /** @type {JsonValue} */ value,
-      });
-    }
-  }
-
-  if (fields.length === 0 && !schemaProps) {
+  if (fields.length === 0 && !hasSchema) {
     return nothing;
   }
 
@@ -614,131 +569,12 @@ function renderFrontmatterSection() {
     <div class="imports-section">
       <div class="imports-section-header">
         <span class="imports-section-title"
-          >${col ? `Frontmatter (${col.name})` : "Frontmatter"}</span
+          >${collection ? `Frontmatter (${collection.name})` : "Frontmatter"}</span
         >
       </div>
       <div class="head-section-body">
-        ${fields.map((f) => renderFmField(f.field, f.entry, f.value as JsonValue, requiredFields))}
+        ${fields.map((f) => renderFmField(f.field, f.entry, f.value, requiredFields))}
       </div>
     </div>
   `;
-}
-
-function renderFmField(
-  field: string,
-  entry: FmSchemaEntry,
-  value: JsonValue,
-  requiredFields: Set<string>,
-) {
-  const isRequired = requiredFields.has(field);
-  const label = field.replaceAll(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
-  const displayLabel = label + (isRequired ? " *" : "");
-  const hasVal = value !== undefined && value !== "" && value !== false;
-  const onClear = () => transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field));
-
-  if (entry.type === "boolean") {
-    return renderFieldRow({
-      hasValue: hasVal,
-      label: displayLabel,
-      onClear,
-      prop: field,
-      widget: html`
-        <sp-checkbox
-          size="s"
-          .checked=${live(Boolean(value))}
-          @change=${(e: Event) =>
-            transactDoc(activeTab.value, (t) =>
-              mutateUpdateFrontmatter(
-                t,
-                field,
-                (e.target as HTMLInputElement).checked || undefined,
-              ),
-            )}
-        ></sp-checkbox>
-      `,
-    });
-  }
-
-  if (entry.type === "array") {
-    const display = Array.isArray(value) ? value.join(", ") : (value as string) || "";
-    return renderFieldRow({
-      hasValue: hasVal,
-      label: displayLabel,
-      onClear,
-      prop: field,
-      widget: spTextField(
-        `fm:${field}`,
-        display,
-        (v: string) => {
-          const arr = v
-            ? v
-                .split(",")
-                .map((s: string) => s.trim())
-                .filter(Boolean)
-            : undefined;
-          transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, arr));
-        },
-        { placeholder: "comma, separated" },
-      ),
-    });
-  }
-
-  if (Array.isArray(entry.enum)) {
-    return renderFieldRow({
-      hasValue: hasVal,
-      label: displayLabel,
-      onClear,
-      prop: field,
-      widget: html`
-        <sp-picker
-          size="s"
-          .value=${live(value || "")}
-          @change=${(e: Event) =>
-            transactDoc(activeTab.value, (t) =>
-              mutateUpdateFrontmatter(t, field, (e.target as HTMLInputElement).value || undefined),
-            )}
-        >
-          ${entry.enum.map((opt: string) => html`<sp-menu-item value=${opt}>${opt}</sp-menu-item>`)}
-        </sp-picker>
-      `,
-    });
-  }
-
-  if (entry.format === "image") {
-    return renderFieldRow({
-      hasValue: hasVal,
-      label: displayLabel,
-      onClear,
-      prop: field,
-      widget: renderMediaPicker(field, value as string, (v: string) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
-      ),
-    });
-  }
-
-  if (entry.type === "number") {
-    return renderFieldRow({
-      hasValue: hasVal,
-      label: displayLabel,
-      onClear,
-      prop: field,
-      widget: spNumberField(value !== undefined ? Number(value) : undefined, (n) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, n)),
-      ),
-    });
-  }
-
-  return renderFieldRow({
-    hasValue: hasVal,
-    label: displayLabel,
-    onClear,
-    prop: field,
-    widget: spTextField(
-      `fm:${field}`,
-      (value as string) || "",
-      (v: string) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
-      { placeholder: entry.format === "date" ? "YYYY-MM-DD" : "" },
-    ),
-  });
 }

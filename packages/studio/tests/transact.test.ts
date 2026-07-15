@@ -340,13 +340,17 @@ describe("mutateUpdateProp", () => {
 });
 
 describe("mutateUpdateFrontmatter", () => {
-  test("sets and removes frontmatter field", () => {
-    const tab = createTab({
+  function makeFmTab(frontmatter: Record<string, unknown>) {
+    return createTab({
       document: { tagName: "main" },
       documentPath: "pages/index.md",
-      frontmatter: { title: "Home" },
+      frontmatter,
       id: "fm-test",
     });
+  }
+
+  test("sets and removes frontmatter field", () => {
+    const tab = makeFmTab({ title: "Home" });
 
     mutateUpdateFrontmatter(tab, "title", "New Title");
     expect(tab.doc.content.frontmatter.title).toBe("New Title");
@@ -354,6 +358,85 @@ describe("mutateUpdateFrontmatter", () => {
 
     mutateUpdateFrontmatter(tab, "title", "");
     expect(tab.doc.content.frontmatter.title).toBeUndefined();
+    disposeTab(tab);
+  });
+
+  test("undo reverts a frontmatter change and redo re-applies it", () => {
+    const tab = makeFmTab({ title: "Home" });
+
+    transactDoc(tab, (t) => mutateUpdateFrontmatter(t, "title", "Changed"));
+    expect(tab.history.index).toBe(1);
+
+    undo(tab);
+    expect(tab.doc.content.frontmatter.title).toBe("Home");
+    expect(tab.history.index).toBe(0);
+
+    redo(tab);
+    expect(tab.doc.content.frontmatter.title).toBe("Changed");
+    expect(tab.history.index).toBe(1);
+    disposeTab(tab);
+  });
+
+  test("undo of a field add deletes the key; undo of a delete restores the value", () => {
+    const tab = makeFmTab({ title: "Home" });
+
+    transactDoc(tab, (t) => mutateUpdateFrontmatter(t, "draft", true));
+    undo(tab);
+    expect("draft" in tab.doc.content.frontmatter).toBe(false);
+    redo(tab);
+    expect(tab.doc.content.frontmatter.draft).toBe(true);
+
+    transactDoc(tab, (t) => mutateUpdateFrontmatter(t, "title"));
+    expect("title" in tab.doc.content.frontmatter).toBe(false);
+    undo(tab);
+    expect(tab.doc.content.frontmatter.title).toBe("Home");
+    disposeTab(tab);
+  });
+
+  test("array values round-trip through undo/redo detached from live references", () => {
+    const tab = makeFmTab({ tags: ["a", "b"] });
+
+    transactDoc(tab, (t) => mutateUpdateFrontmatter(t, "tags", ["x", "y", "z"]));
+    (tab.doc.content.frontmatter.tags as string[]).push("mutated-live");
+
+    undo(tab);
+    expect(tab.doc.content.frontmatter.tags).toEqual(["a", "b"]);
+    redo(tab);
+    expect(tab.doc.content.frontmatter.tags).toEqual(["x", "y", "z"]);
+    disposeTab(tab);
+  });
+
+  test("sequential frontmatter edits undo step by step back to the original", () => {
+    const tab = makeFmTab({ title: "One" });
+
+    transactDoc(tab, (t) => mutateUpdateFrontmatter(t, "title", "Two"));
+    transactDoc(tab, (t) => mutateUpdateFrontmatter(t, "title", "Three"));
+
+    undo(tab);
+    expect(tab.doc.content.frontmatter.title).toBe("Two");
+    undo(tab);
+    expect(tab.doc.content.frontmatter.title).toBe("One");
+    expect(tab.history.index).toBe(0);
+    disposeTab(tab);
+  });
+
+  test("a transaction mixing doc and frontmatter mutations undoes both", () => {
+    const tab = makeFmTab({ title: "Home" });
+
+    transactDoc(tab, (t) => {
+      mutateInsertNode(t, [], 0, { tagName: "span" });
+      mutateUpdateFrontmatter(t, "title", "Changed");
+    });
+    expect(tab.doc.document.children).toHaveLength(1);
+    expect(tab.doc.content.frontmatter.title).toBe("Changed");
+
+    undo(tab);
+    expect(tab.doc.document.children ?? []).toHaveLength(0);
+    expect(tab.doc.content.frontmatter.title).toBe("Home");
+
+    redo(tab);
+    expect(tab.doc.document.children).toHaveLength(1);
+    expect(tab.doc.content.frontmatter.title).toBe("Changed");
     disposeTab(tab);
   });
 });

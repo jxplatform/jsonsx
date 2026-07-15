@@ -42,6 +42,7 @@ describe("parent → iframe patch wire format", () => {
           inverse: { index: 1, op: "remove-child", parentPath: [] },
         },
       ],
+      fmOps: [],
       invertible: true,
       ops: [
         { op: "set-style", path: ["children", 0] },
@@ -71,6 +72,7 @@ describe("parent → iframe patch wire format", () => {
     captured = null;
     applyPatchBatch({} as Tab, [{ op: "set-text", path: ["children", 0] }], {
       docOps: [],
+      fmOps: [],
       invertible: true,
       ops: [{ op: "set-text", path: ["children", 0] }],
     });

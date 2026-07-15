@@ -125,6 +125,7 @@ import { initShortcuts } from "./editor/shortcuts";
 import { renderActivityBar, mount as mountActivityBar } from "./panels/activity-bar";
 import * as toolbarPanel from "./panels/toolbar";
 import * as overlaysPanel from "./panels/overlays";
+import * as frontmatterPanelMod from "./panels/frontmatter-panel";
 import * as rightPanelMod from "./panels/right-panel";
 import * as chatPanelMod from "./panels/chat-panel";
 import { setProjectAdopter } from "./services/project-adoption";
@@ -583,6 +584,9 @@ rightPanelMod.mount({
   renderCanvas: () => renderCanvas(),
 });
 
+// Above-canvas frontmatter Properties panel (content-collection docs, edit mode).
+frontmatterPanelMod.mount({ getCanvasMode });
+
 // The persistent AI chat sidebar — mounts once, available with or without a project/document.
 chatPanelMod.mount(chatPanelEl);
 // The assistant's create_project tool adopts freshly scaffolded projects through the same
@@ -620,6 +624,7 @@ leftPanelMod.mount({
 registerRenderer("leftPanel", () => leftPanelMod.render());
 registerRenderer("canvas", () => renderCanvas());
 registerRenderer("rightPanel", () => rightPanelMod.render());
+registerRenderer("frontmatterPanel", () => frontmatterPanelMod.render());
 registerRenderer("chatPanel", () => chatPanelMod.render());
 registerRenderer("overlays", () => overlaysPanel.render());
 setStatusbarRenderer(() => renderStatusbar());

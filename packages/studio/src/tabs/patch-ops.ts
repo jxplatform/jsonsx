@@ -40,12 +40,26 @@ export type JxPatchOp =
 export type { JxDocOp } from "@jxsuite/collab/ops";
 export type { JxDocOpPair };
 
+/**
+ * A frontmatter key change, replayable in either direction. Frontmatter lives outside the document
+ * tree (`tab.doc.content.frontmatter`, split off by the format host), so these are studio-local and
+ * never enter the shared `JxDocOp` vocabulary the collab bridge and canvas iframe mirror.
+ * `undefined` means the key was/becomes absent.
+ */
+export interface JxFmOp {
+  field: string;
+  before?: unknown;
+  after?: unknown;
+}
+
 /** Everything recorded during one transaction. */
 export interface TransactionRecord {
   /** Canvas patch ops (path-only) for surgical DOM updates. */
   ops: JxPatchOp[];
   /** Replayable forward/inverse document ops for patch-based history. */
   docOps: JxDocOpPair[];
+  /** Replayable frontmatter key changes (content-mode docs) for history undo/redo. */
+  fmOps: JxFmOp[];
   /**
    * False when some mutation in the transaction could not produce a guaranteed-correct inverse
    * (e.g. a move whose parents' paths interact) — history falls back to a checkpoint snapshot.
@@ -86,12 +100,14 @@ export function getPatchConsumer(): PatchConsumer | null {
 
 let _recording: JxPatchOp[] | null = null;
 let _docOps: JxDocOpPair[] | null = null;
+let _fmOps: JxFmOp[] | null = null;
 let _invertible = true;
 
 /** Begin recording patch ops for a transaction. */
 export function beginRecording() {
   _recording = [];
   _docOps = [];
+  _fmOps = [];
   _invertible = true;
 }
 
@@ -109,6 +125,13 @@ export function recordDocOp(pair: JxDocOpPair) {
   }
 }
 
+/** Record a replayable frontmatter key change. No-op outside a transaction. */
+export function recordFmOp(op: JxFmOp) {
+  if (_fmOps) {
+    _fmOps.push(op);
+  }
+}
+
 /** Mark the current transaction as non-invertible — history stores a checkpoint instead. */
 export function markNonInvertible() {
   _invertible = false;
@@ -121,11 +144,13 @@ export function markNonInvertible() {
 export function endRecording(): TransactionRecord {
   const record: TransactionRecord = {
     docOps: _docOps ?? [],
+    fmOps: _fmOps ?? [],
     invertible: _invertible,
     ops: _recording ?? [],
   };
   _recording = null;
   _docOps = null;
+  _fmOps = null;
   _invertible = true;
   return record;
 }

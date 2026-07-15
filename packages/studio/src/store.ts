@@ -40,6 +40,7 @@ export let rightPanel = null as unknown as HTMLElement;
 export let chatPanelEl = null as unknown as HTMLElement;
 export let toolbarEl = null as unknown as HTMLElement;
 export let statusbarEl = null as unknown as HTMLElement;
+export let frontmatterPanelEl = null as unknown as HTMLElement;
 
 export function initShellRefs() {
   canvasWrap = document.querySelector("#canvas-wrap") as HTMLElement;
@@ -49,6 +50,7 @@ export function initShellRefs() {
   chatPanelEl = document.querySelector("#chat-panel") as HTMLElement;
   toolbarEl = document.querySelector("#toolbar") as HTMLElement;
   statusbarEl = document.querySelector("#statusbar") as HTMLElement;
+  frontmatterPanelEl = document.querySelector("#frontmatter-panel") as HTMLElement;
 }
 
 // ─── Shared containers (mutated in place by owner modules) ───────────────────

@@ -11,7 +11,7 @@ import type {
   InlineEditDef,
 } from "../types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
-import type { JxDocOp } from "./patch-ops";
+import type { JxDocOp, JxFmOp } from "./patch-ops";
 
 export interface TabUi {
   rightTab: string;
@@ -20,6 +20,8 @@ export interface TabUi {
   preview: boolean;
   /** Show elements inherited from the page's layout (pages with an effective layout only). */
   showLayout: boolean;
+  /** Above-canvas frontmatter Properties accordion expanded (content-collection docs, edit mode). */
+  frontmatterOpen: boolean;
   /** Chosen literal values for dynamic route params (e.g. { sku: "mini-trencher" }). */
   previewParams: Record<string, string>;
   zoom: number;
@@ -57,6 +59,8 @@ interface HistorySnapshot {
   forwardOps?: JxDocOp[] | null;
   /** Replayable ops transforming this state back into the previous one. */
   inverseOps?: JxDocOp[] | null;
+  /** Frontmatter key changes in this transaction (before/after values, replayed both ways). */
+  fmOps?: JxFmOp[] | null;
 }
 
 export interface Tab {
@@ -111,6 +115,7 @@ function createDefaultUi(canvasMode: string, preview = false) {
     canvasMode,
     editingFunction: null,
     featureToggles: {},
+    frontmatterOpen: true,
     gitBranches: null,
     gitCommitMessage: "",
     gitDiffState: null,

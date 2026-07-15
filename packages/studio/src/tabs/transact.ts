@@ -8,10 +8,11 @@ import {
   endRecording,
   getPatchConsumer,
   recordDocOp,
+  recordFmOp,
   recordPatch,
 } from "./patch-ops";
 
-import type { JxDocOp, JxDocOpPair, TransactionRecord } from "./patch-ops";
+import type { JxDocOp, JxDocOpPair, JxFmOp, TransactionRecord } from "./patch-ops";
 
 import type { Tab } from "../tabs/tab";
 import type { JxPath } from "../state";
@@ -205,10 +206,14 @@ function pushHistoryEntry(
   selectionBefore: JxPath | null,
 ) {
   const truncated = tab.history.snapshots.slice(0, tab.history.index + 1);
-  const useOps = patchHistoryEnabled() && record.invertible && record.docOps.length > 0;
+  const useOps =
+    patchHistoryEnabled() &&
+    record.invertible &&
+    (record.docOps.length > 0 || record.fmOps.length > 0);
   const needCheckpoint = !useOps || truncated.length % CHECKPOINT_INTERVAL === 0;
   truncated.push({
     document: needCheckpoint ? jsonClone(raw) : null,
+    fmOps: useOps && record.fmOps.length > 0 ? record.fmOps : null,
     forwardOps: useOps ? record.docOps.map((p) => p.forward) : null,
     inverseOps: useOps ? record.docOps.map((p) => p.inverse) : null,
     selection: tab.session.selection ? [...tab.session.selection] : null,
@@ -471,14 +476,23 @@ export function undo(tab: Tab) {
   }
   const entry = tab.history.snapshots[tab.history.index]!;
   const inverseOps = patchHistoryEnabled() ? entry.inverseOps : null;
-  if (inverseOps && inverseOps.length > 0) {
+  const fmOps = patchHistoryEnabled() ? entry.fmOps : null;
+  if ((inverseOps && inverseOps.length > 0) || (fmOps && fmOps.length > 0)) {
     // Surgical path: apply inverse ops through the normal transaction pipeline (the canvas
     // Patches in place when it can), in reverse recording order.
     transactDoc(
       tab,
       (t) => {
-        for (let i = inverseOps.length - 1; i >= 0; i--) {
-          applyDocOp(t, toRaw(inverseOps[i]) as JxDocOp);
+        if (inverseOps) {
+          for (let i = inverseOps.length - 1; i >= 0; i--) {
+            applyDocOp(t, toRaw(inverseOps[i]) as JxDocOp);
+          }
+        }
+        if (fmOps) {
+          for (let i = fmOps.length - 1; i >= 0; i--) {
+            const op = toRaw(fmOps[i]) as JxFmOp;
+            applyFmState(t, op.field, op.before);
+          }
         }
       },
       { origin: "history", skipHistory: true },
@@ -505,12 +519,21 @@ export function redo(tab: Tab) {
   }
   const entry = tab.history.snapshots[tab.history.index + 1]!;
   const forwardOps = patchHistoryEnabled() ? entry.forwardOps : null;
-  if (forwardOps && forwardOps.length > 0) {
+  const fmOps = patchHistoryEnabled() ? entry.fmOps : null;
+  if ((forwardOps && forwardOps.length > 0) || (fmOps && fmOps.length > 0)) {
     transactDoc(
       tab,
       (t) => {
-        for (const op of forwardOps) {
-          applyDocOp(t, toRaw(op) as JxDocOp);
+        if (forwardOps) {
+          for (const op of forwardOps) {
+            applyDocOp(t, toRaw(op) as JxDocOp);
+          }
+        }
+        if (fmOps) {
+          for (const op of fmOps) {
+            const raw = toRaw(op) as JxFmOp;
+            applyFmState(t, raw.field, raw.after);
+          }
         }
       },
       { origin: "history", skipHistory: true },
@@ -1196,10 +1219,28 @@ export function mutateRenameSwitchCase(tab: Tab, path: JxPath, oldName: string, 
  * @param {JsonValue} value
  */
 export function mutateUpdateFrontmatter(tab: Tab, field: string, value?: JsonValue) {
-  if (value === undefined || value === null || value === "") {
+  const fm = tab.doc.content.frontmatter;
+  const before = Object.hasOwn(fm, field) ? cloneValue(fm[field]) : undefined;
+  const deletes = value === undefined || value === null || value === "";
+  if (deletes) {
+    delete fm[field];
+  } else {
+    fm[field] = value;
+  }
+  const after = deletes ? undefined : cloneValue(value);
+  recordFmOp({ after, before, field });
+  tab.doc.dirty = true;
+}
+
+/**
+ * Restore a frontmatter key to a recorded history state: `undefined` means the key was absent.
+ * Unlike `mutateUpdateFrontmatter`, values like `""`/`false`/`null` are written verbatim (source
+ * round-trips can put them there) and no fm op is recorded — history replay must not re-record.
+ */
+function applyFmState(tab: Tab, field: string, value: unknown) {
+  if (value === undefined) {
     delete tab.doc.content.frontmatter[field];
   } else {
     tab.doc.content.frontmatter[field] = value;
   }
-  tab.doc.dirty = true;
 }

@@ -198,7 +198,7 @@
       /* ─── Layout ─────────────────────────────────── */
       #app {
         display: grid;
-        grid-template-rows: 36px auto auto minmax(0, 1fr) 24px;
+        grid-template-rows: 36px auto auto auto minmax(0, 1fr) 24px;
         grid-template-columns: 48px var(--panel-w-left) 1fr var(--panel-w-right) var(
             --panel-w-chat
           );
@@ -374,8 +374,35 @@
       #tab-bar:empty {
         display: none;
       }
+      /* Above-canvas frontmatter Properties panel (content-collection docs, edit mode) */
+      #frontmatter-panel {
+        grid-row: 4;
+        grid-column: 3;
+        overflow-y: auto;
+        max-height: 40vh;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+      }
+      #frontmatter-panel sp-accordion {
+        border: none;
+      }
+      #frontmatter-panel sp-accordion-item {
+        --spectrum-accordion-item-header-font-size: var(--spectrum-font-size-50, 11px);
+      }
+      #frontmatter-panel[hidden] {
+        display: none;
+      }
+      .fm-panel-body {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 2px 12px 8px;
+      }
+      .fm-panel-body .style-row > sp-textfield,
+      .fm-panel-body .style-row > .media-picker {
+        width: 100%;
+      }
       #activity-bar {
-        grid-row: 2 / 5;
+        grid-row: 2 / 6;
         grid-column: 1;
         display: flex;
         flex-direction: column;
@@ -383,21 +410,21 @@
         border-right: 1px solid var(--border);
       }
       #left-panel {
-        grid-row: 2 / 5;
+        grid-row: 2 / 6;
         grid-column: 2;
         overflow-y: auto;
         background: var(--bg-panel);
         border-right: 1px solid var(--border);
       }
       #canvas-wrap {
-        grid-row: 4;
+        grid-row: 5;
         grid-column: 3;
         position: relative;
         overflow: auto;
         background: var(--bg-panel);
       }
       #right-panel {
-        grid-row: 2 / 5;
+        grid-row: 2 / 6;
         grid-column: 4;
         overflow-y: auto;
         background: var(--bg);
@@ -406,7 +433,7 @@
       /* Persistent AI chat sidebar — always a flex column (the chat UI owns its
          own scrolling), unlike #right-panel which scrolls the whole panel. */
       #chat-panel {
-        grid-row: 2 / 5;
+        grid-row: 2 / 6;
         grid-column: 5;
         display: flex;
         flex-direction: column;
@@ -771,7 +798,7 @@
         margin-top: 6px;
       }
       #statusbar {
-        grid-row: 5;
+        grid-row: 6;
         grid-column: 1 / -1;
         display: flex;
         align-items: center;
@@ -868,7 +895,7 @@
 
       /* ─── Resize handles ─────────────────────────── */
       .resize-handle {
-        grid-row: 4;
+        grid-row: 5;
         width: 5px;
         margin-left: -3px;
         margin-right: -2px;
@@ -4592,6 +4619,7 @@
         <div id="toolbar"></div>
         <div id="tab-strip"></div>
         <div id="tab-bar"></div>
+        <div id="frontmatter-panel" hidden></div>
         <div id="activity-bar"></div>
         <div id="left-panel"></div>
         <div id="resize-left" class="resize-handle"></div>

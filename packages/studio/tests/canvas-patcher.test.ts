@@ -267,6 +267,7 @@ describe("iframe canvas host gating", () => {
             inverse: { key: "textContent", op: "set-key", path: ["children", 0], value: "hello" },
           },
         ],
+        fmOps: [],
         invertible: true,
         ops: [{ op: "set-text", path: ["children", 0] }],
       }),
