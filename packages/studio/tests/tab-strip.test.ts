@@ -3,7 +3,7 @@
  * (including the unsaved-changes confirm dialog).
  */
 import { flush } from "./harness";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mount, unmount } from "../src/panels/tab-strip";
 import { collabState } from "../src/collab/collab-state";
 import { closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
@@ -22,6 +22,26 @@ function open(id: string, documentPath: string | null = `/project/${id}.json`) {
 
 function tabs(): HTMLElement[] {
   return [...host.querySelectorAll(".tab-strip-tab")] as HTMLElement[];
+}
+
+function strip(): HTMLElement {
+  return host.querySelector(".tab-strip") as HTMLElement;
+}
+
+// Happy-dom performs no layout (scrollWidth/clientWidth are 0); stub them to fake overflow.
+function stubMetrics(el: HTMLElement, scrollWidth: number, clientWidth: number) {
+  Object.defineProperty(el, "scrollWidth", { configurable: true, value: scrollWidth });
+  Object.defineProperty(el, "clientWidth", { configurable: true, value: clientWidth });
+}
+
+function wheel(target: HTMLElement, init: WheelEventInit = {}) {
+  const e = new WheelEvent("wheel", { bubbles: true, cancelable: true, ...init });
+  // Happy-dom's WheelEvent constructor drops modifier-key init fields; force them.
+  if (init.ctrlKey) {
+    Object.defineProperty(e, "ctrlKey", { value: true });
+  }
+  target.dispatchEvent(e);
+  return e;
 }
 
 beforeEach(() => {
@@ -214,5 +234,94 @@ describe("tab strip interactions", () => {
     closeBtn.click();
     await flush();
     expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).toBeNull();
+  });
+});
+
+describe("tab strip wheel scrolling", () => {
+  test("vertical wheel scrolls the strip horizontally when tabs overflow", async () => {
+    open("a");
+    open("b");
+    await flush();
+    const el = strip();
+    stubMetrics(el, 500, 100);
+    el.scrollLeft = 0;
+    const e = wheel(el, { deltaY: 50 });
+    expect(el.scrollLeft).toBe(50);
+    expect(e.defaultPrevented).toBe(true);
+    wheel(el, { deltaY: -30 });
+    expect(el.scrollLeft).toBe(20);
+  });
+
+  test("the dominant axis wins when both deltas are present", async () => {
+    open("a");
+    await flush();
+    const el = strip();
+    stubMetrics(el, 500, 100);
+    el.scrollLeft = 0;
+    wheel(el, { deltaX: 80, deltaY: 10 });
+    expect(el.scrollLeft).toBe(80);
+  });
+
+  test("wheel is ignored when the strip does not overflow", async () => {
+    open("a");
+    await flush();
+    const el = strip();
+    stubMetrics(el, 100, 100);
+    el.scrollLeft = 0;
+    const e = wheel(el, { deltaY: 50 });
+    expect(el.scrollLeft).toBe(0);
+    expect(e.defaultPrevented).toBe(false);
+  });
+
+  test("ctrl+wheel (zoom gesture) is left alone", async () => {
+    open("a");
+    await flush();
+    const el = strip();
+    stubMetrics(el, 500, 100);
+    el.scrollLeft = 0;
+    const e = wheel(el, { ctrlKey: true, deltaY: 50 });
+    expect(el.scrollLeft).toBe(0);
+    expect(e.defaultPrevented).toBe(false);
+  });
+
+  test("a wheel event with no delta does nothing", async () => {
+    open("a");
+    await flush();
+    const el = strip();
+    stubMetrics(el, 500, 100);
+    el.scrollLeft = 0;
+    const e = wheel(el);
+    expect(el.scrollLeft).toBe(0);
+    expect(e.defaultPrevented).toBe(false);
+  });
+});
+
+describe("active tab reveal", () => {
+  test("activating a different tab scrolls it into view", async () => {
+    open("a");
+    open("b");
+    await flush();
+    const revealed: Element[] = [];
+    const spy = spyOn(Element.prototype, "scrollIntoView").mockImplementation(
+      function captureReveal(this: Element) {
+        revealed.push(this);
+      },
+    );
+    tabs()[0]!.click();
+    await flush();
+    expect(revealed.length).toBe(1);
+    expect(revealed[0]!.classList.contains("active")).toBe(true);
+    expect(revealed[0]!.querySelector(".tab-strip-label")!.textContent).toBe("a.json");
+    spy.mockRestore();
+  });
+
+  test("a re-render without an activation change does not re-reveal", async () => {
+    const a = open("a");
+    await flush();
+    const spy = spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+    a.doc.dirty = true;
+    await flush();
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

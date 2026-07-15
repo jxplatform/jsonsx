@@ -21,6 +21,8 @@ let _host: HTMLElement | null = null;
 
 let _scope: EffectScope | null = null;
 
+let _lastActiveId: string | null = null;
+
 /**
  * Mount the tab strip into the given host element.
  *
@@ -28,6 +30,7 @@ let _scope: EffectScope | null = null;
  */
 export function mount(host: HTMLElement) {
   _host = host;
+  _lastActiveId = null;
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -54,13 +57,14 @@ function render() {
   }
 
   if (workspace.tabOrder.length === 0) {
+    _lastActiveId = null;
     litRender(nothing, _host);
     return;
   }
 
   litRender(
     html`
-      <div class="tab-strip">
+      <div class="tab-strip" @wheel=${onWheel}>
         ${repeat(
           workspace.tabOrder,
           (id) => id,
@@ -103,6 +107,36 @@ function render() {
     `,
     _host,
   );
+
+  if (workspace.activeTabId !== _lastActiveId) {
+    _lastActiveId = workspace.activeTabId;
+    _host
+      .querySelector(".tab-strip-tab.active")
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+}
+
+/**
+ * Scroll the strip horizontally from wheel motion so overflowed tabs stay reachable — a plain mouse
+ * wheel only emits deltaY, which does nothing in an overflow-x container. The scrollbar is hidden
+ * by design, so the wheel is the primary way to reach off-screen tabs.
+ *
+ * @param {WheelEvent} e
+ */
+function onWheel(e: WheelEvent) {
+  if (e.ctrlKey) {
+    return;
+  }
+  const el = e.currentTarget as HTMLElement;
+  if (el.scrollWidth <= el.clientWidth) {
+    return;
+  }
+  const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+  if (!delta) {
+    return;
+  }
+  e.preventDefault();
+  el.scrollLeft += delta;
 }
 
 /**
