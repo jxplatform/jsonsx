@@ -12,6 +12,7 @@
 import { renderOnly, updateUi } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
 import { applyPanelCollapse, view } from "../view";
+import { setEditZoom as applyEditZoomLevel } from "../canvas/canvas-utils";
 import type { JxPath } from "../state";
 
 /** Callbacks injected from studio.ts (module-local helpers or imports kept out of this module). */
@@ -43,6 +44,7 @@ export interface AutomationApi {
   setStatus: (text: string) => void;
   setTheme: (color: string) => void;
   setZoom: (zoom: number) => void;
+  setEditZoom: (zoom: number) => void;
   waitForCanvasReady: (timeoutMs?: number) => Promise<void>;
 }
 
@@ -115,6 +117,11 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
     setZoom(zoom: number) {
       updateUi("zoom", zoom);
       deps.render();
+    },
+    setEditZoom(zoom: number) {
+      // Deliberately NOT deps.render(): live edit zoom must never re-render the canvas (it would
+      // Rebuild the iframe DOM) — setEditZoom applies bare style writes, matching production paths.
+      applyEditZoomLevel(zoom);
     },
     waitForCanvasReady(timeoutMs = 30_000) {
       return new Promise((resolve, reject) => {

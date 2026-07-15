@@ -85,7 +85,6 @@ const ctx = {
     return { panel, tpl: html`${element}` };
   },
   observeCenterUntilStable: mock(() => {}),
-  renderZoomIndicator: mock(() => {}),
   updateActivePanelHeaders: mock(() => {}),
 } as Parameters<typeof renderStylebookMode>[0];
 
@@ -104,12 +103,7 @@ beforeEach(() => {
   mounts.length = 0;
   pans.length = 0;
   view.renderGeneration = 7;
-  for (const key of [
-    "applyTransform",
-    "observeCenterUntilStable",
-    "renderZoomIndicator",
-    "updateActivePanelHeaders",
-  ]) {
+  for (const key of ["applyTransform", "observeCenterUntilStable", "updateActivePanelHeaders"]) {
     ctxMocks[key]!.mockClear();
   }
 });
@@ -135,7 +129,7 @@ describe("renderStylebookMode", () => {
     expect((mounts[0]!.generated.doc.attributes as Record<string, string>).class).toBe("sb-root");
     expect(mounts[0]!.generated.tagToCardPath.has("h1")).toBe(true);
     expect(ctxMocks.applyTransform).toHaveBeenCalled();
-    expect(ctxMocks.renderZoomIndicator).toHaveBeenCalled();
+    expect(ctxMocks.observeCenterUntilStable).toHaveBeenCalled();
   });
 
   test("$media breakpoints → base + one panel per breakpoint, SAME generated doc for all", () => {

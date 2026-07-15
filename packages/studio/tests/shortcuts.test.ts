@@ -5,7 +5,13 @@
  * exercises the shortcut dispatch logic itself: wheel zoom/pan, middle-mouse pan, and the
  * document-level keydown router.
  */
-import { flush, installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import {
+  flush,
+  installMockPlatform,
+  resetStudioState,
+  resetWorkspaceWithTab,
+  stubRect,
+} from "./harness";
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 // ─── Module mocks (must precede the shortcuts import) ─────────────────────────
@@ -19,6 +25,7 @@ const pasteNode = mock(async () => {});
 void mock.module("../src/editor/context-menu.js", () => ({ copyNode, cutNode, pasteNode }));
 
 const { initShortcuts } = await import("../src/editor/shortcuts");
+const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
 const store = await import("../src/store");
 const { initShellRefs } = store;
 const { activeTab, openTab, workspace } = await import("../src/workspace/workspace");
@@ -47,7 +54,6 @@ const setPan = mock((x: number, y: number) => {
   panY = y;
 });
 const applyTransform = mock(() => {});
-const positionZoomIndicator = mock(() => {});
 const saveFile = mock(() => {});
 const openProject = mock(() => {});
 
@@ -93,10 +99,20 @@ beforeAll(() => {
     openProject,
     panX,
     panY,
-    positionZoomIndicator,
     saveFile,
     setPan,
   }));
+  // The edit-zoom path (ctrl+wheel / Ctrl+0/+/- / resize in edit mode) runs the REAL canvas-utils
+  // ApplyEditZoom, which needs the module context initialized.
+  initCanvasUtils({
+    getCanvasMode: () => canvasMode,
+    getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
+    setZoomDirect: (z: number) => {
+      if (activeTab.value) {
+        activeTab.value.session.ui.zoom = z;
+      }
+    },
+  });
 });
 
 beforeEach(() => {
@@ -106,7 +122,6 @@ beforeEach(() => {
   for (const m of [
     setPan,
     applyTransform,
-    positionZoomIndicator,
     saveFile,
     openProject,
     openQuickSearch,
@@ -116,6 +131,7 @@ beforeEach(() => {
   ]) {
     m.mockClear();
   }
+  store.canvasPanels.length = 0;
   resetWorkspaceWithTab(freshDoc());
 });
 
@@ -221,12 +237,30 @@ describe("wheel handler", () => {
   });
 
   test("ctrl+wheel inside canvas is not blocked by the document handler", () => {
-    canvasMode = "edit"; // Canvas handler returns early; only the doc blocker could prevent
+    canvasMode = "manage"; // Canvas handler returns early; only the doc blocker could prevent
     const child = document.createElement("div");
     wrapEl().append(child);
     const e = wheel(child, { ctrlKey: true, deltaY: 10 });
     expect(e.defaultPrevented).toBe(false);
     child.remove();
+  });
+
+  test("ctrl+wheel in edit mode drives the content zoom, not pan or scroll", () => {
+    canvasMode = "edit";
+    const e = wheel(wrapEl(), { ctrlKey: true, deltaY: -100 });
+    expect(e.defaultPrevented).toBe(true);
+    // Delta = 0.5 → editZoom 1 * 1.5
+    expect(activeTab.value!.session.ui.editZoom).toBeCloseTo(1.5);
+    expect(activeTab.value!.session.ui.zoom).toBe(1);
+    expect(setPan).not.toHaveBeenCalled();
+  });
+
+  test("ctrl+wheel clamps editZoom to its range", () => {
+    canvasMode = "edit";
+    wheel(wrapEl(), { ctrlKey: true, deltaY: -10_000 });
+    expect(activeTab.value!.session.ui.editZoom).toBe(3);
+    wheel(wrapEl(), { ctrlKey: true, deltaY: 10_000 });
+    expect(activeTab.value!.session.ui.editZoom).toBe(0.25);
   });
 });
 
@@ -269,9 +303,35 @@ describe("middle-mouse panning", () => {
 
 // ─── Resize listener ──────────────────────────────────────────────────────────
 
-test("window resize repositions the zoom indicator", () => {
+test("window resize re-applies the edit zoom from the live column width", () => {
+  canvasMode = "edit";
+  activeTab.value!.session.ui.editZoom = 2;
+  const sc = document.createElement("div");
+  sc.className = "content-edit-canvas";
+  const column = document.createElement("div");
+  column.className = "content-edit-column";
+  const viewport = document.createElement("div");
+  const canvas = document.createElement("div");
+  const iframe = document.createElement("iframe");
+  canvas.append(iframe);
+  viewport.append(canvas);
+  column.append(viewport);
+  sc.append(column);
+  wrapEl().append(sc);
+  stubRect(column, { width: 600 });
+  store.canvasPanels.push({ _width: null, canvas, viewport } as never);
+
   window.dispatchEvent(new Event("resize"));
-  expect(positionZoomIndicator).toHaveBeenCalled();
+
+  // LayoutWidth = 600 / 2; the counter-scale restores the 600px footprint.
+  expect(canvas.style.transform).toBe("scale(2)");
+  expect(iframe.style.width).toBe("300px");
+  sc.remove();
+});
+
+test("window resize outside edit mode leaves the canvas untouched", () => {
+  canvasMode = "design";
+  expect(() => window.dispatchEvent(new Event("resize"))).not.toThrow();
 });
 
 // ─── Keydown: input/editing guards ────────────────────────────────────────────
@@ -455,13 +515,19 @@ describe("mod shortcuts", () => {
     expect(activeTab.value!.session.ui.zoom).toBeCloseTo(1);
   });
 
-  test("zoom shortcuts are inert in edit mode", () => {
+  test("zoom shortcuts drive the content zoom in edit mode", () => {
     canvasMode = "edit";
-    activeTab.value!.session.ui.zoom = 2;
-    pressDoc("0", { ctrlKey: true });
+    const tab = activeTab.value!;
+    tab.session.ui.zoom = 2;
     pressDoc("=", { ctrlKey: true });
+    expect(tab.session.ui.editZoom).toBeCloseTo(1.2);
     pressDoc("-", { ctrlKey: true });
-    expect(activeTab.value!.session.ui.zoom).toBe(2);
+    expect(tab.session.ui.editZoom).toBeCloseTo(1);
+    tab.session.ui.editZoom = 2.4;
+    pressDoc("0", { ctrlKey: true });
+    expect(tab.session.ui.editZoom).toBe(1);
+    // The design-mode zoom and pan are untouched by edit-mode zoom shortcuts.
+    expect(tab.session.ui.zoom).toBe(2);
     expect(setPan).not.toHaveBeenCalled();
   });
 

@@ -25,6 +25,11 @@ export interface TabUi {
   /** Chosen literal values for dynamic route params (e.g. { sku: "mini-trencher" }). */
   previewParams: Record<string, string>;
   zoom: number;
+  /**
+   * Edit-mode content zoom — browser-page-zoom semantics (content reflows at the zoomed effective
+   * width while the canvas footprint stays fixed), unlike `zoom` which pan/zooms the whole canvas.
+   */
+  editZoom: number;
   activeMedia: string | null;
   activeSelector: string | null;
   editingFunction: FunctionEditDef | null;
@@ -113,6 +118,7 @@ function createDefaultUi(canvasMode: string, preview = false) {
     activeMedia: null,
     activeSelector: null,
     canvasMode,
+    editZoom: 1,
     editingFunction: null,
     featureToggles: {},
     frontmatterOpen: true,

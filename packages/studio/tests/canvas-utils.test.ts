@@ -1,18 +1,21 @@
 import { renderInto, resetStudioState, resetWorkspaceWithTab, stubRect } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import {
+  applyEditZoom,
   applyTransform,
   canvasPanelTemplate,
   centerCanvas,
+  clampEditZoom,
+  EDIT_ZOOM_MAX,
+  EDIT_ZOOM_MIN,
   fitToScreen,
   initCanvasUtils,
   observeCenterUntilStable,
   panToElement,
   panToParentRect,
-  positionZoomIndicator,
-  renderZoomIndicator,
+  requestEditZoom,
   resetZoom,
-  resetZoomIndicator,
+  setEditZoom,
   updateActivePanelHeaders,
 } from "../src/canvas/canvas-utils";
 import { canvasPanels, canvasWrap, initShellRefs, registerRenderer } from "../src/store";
@@ -256,52 +259,146 @@ describe("resetZoom", () => {
   });
 });
 
-// ─── Zoom indicator ───────────────────────────────────────────────────────────
+// ─── Edit-mode content zoom ───────────────────────────────────────────────────
 
-describe("zoom indicator", () => {
-  test("renderZoomIndicator shows the rounded zoom percentage", () => {
-    zoom = 1.5;
-    renderZoomIndicator();
-    const label = document.querySelector(".zoom-indicator-label");
-    expect(label?.textContent).toBe("150%");
+/** Build the edit-mode panel DOM applyEditZoom operates on, with stubbed layout metrics. */
+function makeEditPanel(columnWidth = 800) {
+  const sc = document.createElement("div");
+  sc.className = "content-edit-canvas";
+  const column = document.createElement("div");
+  column.className = "content-edit-column";
+  const viewport = document.createElement("div");
+  viewport.className = "canvas-panel-viewport";
+  const canvas = document.createElement("div");
+  canvas.className = "canvas-panel-canvas";
+  const iframe = document.createElement("iframe");
+  canvas.append(iframe);
+  viewport.append(canvas);
+  column.append(viewport);
+  sc.append(column);
+  canvasWrap.append(sc);
+  stubRect(column, { width: columnWidth });
+  defineMetric(iframe, "offsetHeight", 500);
+  const panel = { _width: null, canvas, viewport } as unknown as CanvasPanel;
+  canvasPanels.push(panel as never);
+  return { canvas, column, iframe, panel, viewport };
+}
+
+describe("applyEditZoom", () => {
+  test("no-op outside edit mode", () => {
+    canvasMode = "design";
+    const tab = resetWorkspaceWithTab();
+    tab.session.ui.editZoom = 2;
+    const { canvas } = makeEditPanel();
+    applyEditZoom();
+    expect(canvas.style.transform).toBe("");
   });
 
-  test("reset action resets zoom to 100%", () => {
-    makePanzoomWrap();
-    zoom = 2;
-    renderZoomIndicator();
-    const reset = document.querySelector('[title="Reset to 100%"]') as HTMLElement;
-    reset.click();
-    expect(setZoomDirect).toHaveBeenCalledWith(1);
-    expect(zoom).toBe(1);
+  test("no-op without a mounted panel", () => {
+    canvasMode = "edit";
+    resetWorkspaceWithTab().session.ui.editZoom = 2;
+    expect(() => applyEditZoom()).not.toThrow();
   });
 
-  test("fit action triggers fitToScreen", () => {
-    const wrap = makePanzoomWrap();
-    stubRect(wrap, { height: 100 });
-    renderZoomIndicator();
-    const fit = document.querySelector('[title="Fit to screen"]') as HTMLElement;
-    fit.click();
-    expect(setZoomDirect).toHaveBeenCalled();
+  test("shrinks the iframe layout width and counter-scales back to the column footprint", () => {
+    canvasMode = "edit";
+    const tab = resetWorkspaceWithTab();
+    tab.session.ui.editZoom = 2;
+    const { canvas, iframe, panel, viewport } = makeEditPanel(800);
+
+    applyEditZoom();
+
+    // LayoutWidth = 800 / 2 = 400 → rendered footprint = 400 * scale(2) = 800 again.
+    expect(canvas.style.width).toBe("400px");
+    expect(canvas.style.transform).toBe("scale(2)");
+    expect(canvas.style.transformOrigin).toBe("top left");
+    expect(iframe.style.width).toBe("400px");
+    // The viewport (white page surface) is pinned to the SCALED content height.
+    expect(viewport.style.height).toBe("1000px");
+    expect(panel._width).toBe(400);
+    expect(overlaysRenderer).toHaveBeenCalled();
   });
 
-  test("positionZoomIndicator centers indicator over canvas-wrap", () => {
-    renderZoomIndicator();
-    stubRect(canvasWrap, { height: 600, left: 100, top: 0, width: 400 });
-    positionZoomIndicator();
-    const indicator = document.querySelector(".zoom-indicator") as HTMLElement;
-    expect(indicator.style.left).toBe("300px");
-    expect(indicator.style.top).toBe("568px");
-    expect(indicator.style.transform).toBe("translateX(-50%)");
+  test("zoom-out grows the layout width past the footprint", () => {
+    canvasMode = "edit";
+    resetWorkspaceWithTab().session.ui.editZoom = 0.5;
+    const { canvas, iframe } = makeEditPanel(600);
+    applyEditZoom();
+    expect(canvas.style.width).toBe("1200px");
+    expect(canvas.style.transform).toBe("scale(0.5)");
+    expect(iframe.style.width).toBe("1200px");
   });
 
-  test("resetZoomIndicator clears the indicator and disables positioning", () => {
-    renderZoomIndicator();
-    expect(document.querySelector(".zoom-indicator")).not.toBeNull();
-    resetZoomIndicator();
-    expect(document.querySelector(".zoom-indicator")).toBeNull();
-    // Early return when the indicator element is gone
-    expect(() => positionZoomIndicator()).not.toThrow();
+  test("editZoom 1 restores the fluid layout exactly", () => {
+    canvasMode = "edit";
+    const tab = resetWorkspaceWithTab();
+    tab.session.ui.editZoom = 2;
+    const { canvas, iframe, panel, viewport } = makeEditPanel();
+    applyEditZoom();
+
+    tab.session.ui.editZoom = 1;
+    applyEditZoom();
+
+    expect(canvas.style.width).toBe("");
+    expect(canvas.style.transform).toBe("");
+    expect(iframe.style.width).toBe("100%");
+    expect(viewport.style.height).toBe("");
+    expect(panel._width).toBeNull();
+  });
+
+  test("no-op when the column has no measurable width", () => {
+    canvasMode = "edit";
+    resetWorkspaceWithTab().session.ui.editZoom = 2;
+    const { canvas } = makeEditPanel(0);
+    applyEditZoom();
+    expect(canvas.style.transform).toBe("");
+  });
+});
+
+describe("setEditZoom / requestEditZoom", () => {
+  test("clampEditZoom bounds the range", () => {
+    expect(clampEditZoom(0.01)).toBe(EDIT_ZOOM_MIN);
+    expect(clampEditZoom(99)).toBe(EDIT_ZOOM_MAX);
+    expect(clampEditZoom(1.5)).toBe(1.5);
+  });
+
+  test("setEditZoom clamps, persists on the tab, and applies synchronously", () => {
+    canvasMode = "edit";
+    const tab = resetWorkspaceWithTab();
+    const { canvas } = makeEditPanel(600);
+    setEditZoom(99);
+    expect(tab.session.ui.editZoom).toBe(EDIT_ZOOM_MAX);
+    expect(canvas.style.transform).toBe(`scale(${EDIT_ZOOM_MAX})`);
+  });
+
+  test("setEditZoom without a tab is a no-op", () => {
+    expect(() => setEditZoom(2)).not.toThrow();
+  });
+
+  test("requestEditZoom writes state immediately but coalesces DOM work to one frame", () => {
+    canvasMode = "edit";
+    const tab = resetWorkspaceWithTab();
+    const { canvas } = makeEditPanel(600);
+    const frames: FrameRequestCallback[] = [];
+    globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
+      frames.push(cb);
+      return frames.length;
+    }) as typeof requestAnimationFrame;
+
+    requestEditZoom(2);
+    requestEditZoom(2.5);
+
+    // Both reactive writes landed, but only ONE frame was scheduled and no DOM write happened yet.
+    expect(tab.session.ui.editZoom).toBe(2.5);
+    expect(frames.length).toBe(1);
+    expect(canvas.style.transform).toBe("");
+
+    frames[0]!(0);
+    expect(canvas.style.transform).toBe("scale(2.5)");
+  });
+
+  test("requestEditZoom without a tab is a no-op", () => {
+    expect(() => requestEditZoom(2)).not.toThrow();
   });
 });
 

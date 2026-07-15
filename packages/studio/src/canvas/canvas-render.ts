@@ -20,11 +20,10 @@ import { formatByName, formatForPath } from "../format/format-host";
 import { renderWelcome } from "../panels/welcome-screen";
 import { projectState } from "../state";
 import {
+  applyEditZoom,
   applyTransform,
   canvasPanelTemplate,
   observeCenterUntilStable,
-  renderZoomIndicator,
-  resetZoomIndicator,
   updateActivePanelHeaders,
 } from "./canvas-utils";
 import { parseMediaEntries } from "../utils/canvas-media";
@@ -208,7 +207,6 @@ function resetCanvasView() {
   canvasWrap.style.flexDirection = "";
   canvasWrap.style.display = "";
   canvasWrap.style.overflow = "";
-  resetZoomIndicator();
   dismissBlockActionBar();
   dismissLinkPopover();
   dismissContextMenu();
@@ -373,9 +371,6 @@ export function renderCanvas() {
     canvasWrap.style.overflow = "";
     canvasWrap.style.overflow = "";
 
-    // Clear zoom indicator (only re-rendered by design/stylebook)
-    resetZoomIndicator();
-
     // Dismiss open popovers/toolbars that are no longer relevant
     dismissBlockActionBar();
     dismissLinkPopover();
@@ -391,7 +386,6 @@ export function renderCanvas() {
       applyTransform,
       canvasPanelTemplate,
       observeCenterUntilStable,
-      renderZoomIndicator,
       updateActivePanelHeaders,
     });
     return;
@@ -619,18 +613,15 @@ export function renderCanvas() {
     if (modeChanged) {
       observeCenterUntilStable();
     }
-    renderZoomIndicator();
     return;
   }
 
-  // Edit (content) mode — centered column, no panzoom, always 100%
+  // Edit (content) mode — centered column, no panzoom; `ui.editZoom` reflows content at the zoomed
+  // Effective width while the on-screen footprint stays fixed (browser-page-zoom semantics).
   if (canvasMode === "edit") {
     if (modeChanged) {
       canvasWrap.style.padding = "0";
       canvasWrap.style.overflow = "hidden";
-
-      // Remove zoom indicator left over from design mode
-      resetZoomIndicator();
     }
 
     const { baseWidth } = parseMediaEntries(getEffectiveMedia(S.document.$media));
@@ -653,6 +644,10 @@ export function renderCanvas() {
     litRender(editTpl, canvasWrap);
     canvasPanels.push(panel as unknown as CanvasPanel);
     renderCanvasIntoPanel(panel as unknown as CanvasPanel, S.ui.featureToggles);
+    // The column must exist in the DOM before the zoom's live width measurement — so the zoom is
+    // Applied after the render rather than baked into the template (the panel mounts fluid and is
+    // Immediately re-fitted; the iframe hasn't painted yet, so nothing visibly jumps).
+    applyEditZoom();
     return;
   }
 
@@ -704,7 +699,6 @@ export function renderCanvas() {
     if (modeChanged) {
       observeCenterUntilStable();
     }
-    renderZoomIndicator();
     return;
   }
 
@@ -767,9 +761,6 @@ export function renderCanvas() {
   if (modeChanged) {
     observeCenterUntilStable();
   }
-
-  // Floating zoom indicator
-  renderZoomIndicator();
 }
 
 /**

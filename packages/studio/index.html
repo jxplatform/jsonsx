@@ -959,6 +959,11 @@
       .tab-bar sp-picker.tab-bar-param {
         max-width: 200px;
       }
+      /* Zoom widget label: fixed floor so the row doesn't jitter as the % digits change. */
+      .tab-bar .tb-zoom-label {
+        min-width: 48px;
+        font-family: var(--font-mono);
+      }
       .source-editor {
         flex: 1;
         min-height: 0;
@@ -1067,39 +1072,6 @@
       /* Single-canvas fallback (no $media) */
       .canvas-panel.full-width {
         min-width: 0;
-      }
-      .zoom-indicator {
-        position: fixed;
-        z-index: 20;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 12px;
-        background: var(--bg-panel);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        font-size: var(--spectrum-font-size-50, 11px);
-        color: var(--fg);
-        font-family: var(--font-mono);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-        pointer-events: auto;
-      }
-      .zoom-indicator-label {
-        min-width: 28px;
-        text-align: center;
-      }
-      .zoom-indicator-action {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 22px;
-        height: 22px;
-        border-radius: var(--radius);
-        color: var(--fg-dim);
-        cursor: pointer;
-      }
-      .zoom-indicator-action:hover {
-        color: var(--accent);
       }
       .overlay-box {
         position: absolute;

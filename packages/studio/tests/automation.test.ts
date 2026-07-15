@@ -6,6 +6,7 @@ const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) 
 
 const { createAutomationApi, installAutomationHook, shouldInstallAutomation } =
   await import("../src/services/automation");
+const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
 const { view } = await import("../src/view");
 const { activeTab, closeAllTabs } = await import("../src/workspace/workspace");
 const { updateCanvas } = await import("../src/store");
@@ -32,6 +33,12 @@ function makeDeps(): AutomationDeps & {
 beforeEach(() => {
   closeAllTabs();
   delete (globalThis as Record<string, unknown>).__jxAutomation;
+  // SetEditZoom runs the real canvas-utils path, which needs the module context initialized.
+  initCanvasUtils({
+    getCanvasMode: () => "edit",
+    getZoom: () => 1,
+    setZoomDirect: () => {},
+  });
 });
 
 describe("shouldInstallAutomation", () => {
@@ -128,6 +135,18 @@ describe("createAutomationApi", () => {
       path: ["children", 1],
       type: "event",
     });
+  });
+
+  test("setEditZoom clamps and persists the edit zoom without re-rendering the canvas", () => {
+    resetWorkspaceWithTab();
+    const deps = makeDeps();
+    const api = createAutomationApi(deps);
+    api.setEditZoom(2);
+    expect(activeTab.value?.session.ui.editZoom).toBe(2);
+    api.setEditZoom(99);
+    expect(activeTab.value?.session.ui.editZoom).toBe(3);
+    // Live edit zoom must never re-render (it would rebuild the iframe DOM mid-edit).
+    expect(deps.render).not.toHaveBeenCalled();
   });
 
   test('setRightTab("assistant") opens the chat sidebar instead of a right-panel tab', () => {

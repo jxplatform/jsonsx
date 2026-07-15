@@ -50,6 +50,18 @@ describe("Tab primitive", () => {
     disposeTab(tab);
   });
 
+  test("a new tab opens at 100% for both zoom axes", () => {
+    const tab = createTab({
+      document: { tagName: "main" },
+      documentPath: "pages/index.md",
+      id: "test-zoom-defaults",
+    });
+
+    expect(tab.session.ui.zoom).toBe(1);
+    expect(tab.session.ui.editZoom).toBe(1);
+    disposeTab(tab);
+  });
+
   test("a tab opens in its first allowed mode, never a disabled one", () => {
     // Project.json excludes "edit" — it must not open in the hardcoded default.
     const tab = createTab({

@@ -4,7 +4,7 @@
  * template creation, centering, transform application, zoom indicator, and fit-to-screen.
  */
 
-import { html, render as litRender, nothing } from "lit-html";
+import { html, nothing } from "lit-html";
 import type { CanvasPanel } from "../types";
 import { ref } from "lit-html/directives/ref.js";
 import { classMap } from "lit-html/directives/class-map.js";
@@ -14,7 +14,6 @@ import { ifDefined } from "lit-html/directives/if-defined.js";
 import { canvasPanels, canvasWrap, renderOnly, updateUi } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import { getLayerSlot } from "../ui/layers";
 import { findCanvasElement, getActivePanel, panelMediaToActiveMedia } from "./canvas-helpers";
 import { rectOf } from "../utils/geometry";
 import type { TemplateResult } from "lit-html";
@@ -24,8 +23,6 @@ let _ctx: {
   getZoom: () => number;
   setZoomDirect: (zoom: number) => void;
 };
-
-let _zoomIndicatorEl: HTMLElement | null = null;
 
 /**
  * Initialize the canvas utils module.
@@ -162,10 +159,125 @@ export function applyTransform() {
   }
   const zoom = _ctx.getZoom();
   view.panzoomWrap.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${zoom})`;
-  renderZoomIndicator();
   // Overlays live INSIDE the scaled panzoom-wrap (iframe hosts draw there), so no per-mode redraw
-  // Is needed here — the flush only re-anchors the fixed block-action-bar.
+  // Is needed here — the flush only re-anchors the fixed block-action-bar. The tab-bar zoom widget
+  // Tracks `ui.zoom` reactively, so no explicit indicator refresh is needed either.
   renderOnly("overlays");
+}
+
+// ─── Edit-mode content zoom ──────────────────────────────────────────────────
+// Browser-page-zoom semantics: the canvas footprint stays fixed while the CONTENT reflows at the
+// Zoomed effective width — unlike design mode's panzoom, which visually scales a fixed layout.
+
+export const EDIT_ZOOM_MIN = 0.25;
+
+export const EDIT_ZOOM_MAX = 3;
+
+/** Clamp an edit-zoom value to the supported range. */
+export function clampEditZoom(zoom: number): number {
+  return Math.min(EDIT_ZOOM_MAX, Math.max(EDIT_ZOOM_MIN, zoom));
+}
+
+/**
+ * Apply the active tab's edit-mode content zoom to the single edit panel.
+ *
+ * Mechanism: a parent-side transform on the iframe never reflows the iframe's internal document (it
+ * is its own layout viewport), so genuine reflow requires resizing the iframe's REAL CSS width to
+ * `renderWidth / editZoom` — and a compensating `scale(editZoom)` on the canvas element brings the
+ * rendered footprint back to exactly `renderWidth`. The overlay layer (the iframe's DOM sibling
+ * inside the canvas element) inherits the transform, so overlay boxes stay drawn at scale 1 (D-2),
+ * and `hostDragGeometry`'s empirical `rect.width / clientWidth` evaluates to exactly `editZoom`
+ * with no bridge changes.
+ *
+ * `renderWidth` is measured live from `.content-edit-column` (already `min(baseWidth, available)`
+ * via normal block layout) — the nominal `$media["--"]` width would overflow a narrow studio
+ * window.
+ *
+ * HARD INVARIANT: never trigger a canvas re-render from here (`renderCanvas`/`mountIframeCanvas`) —
+ * a re-render rebuilds the iframe DOM and would destroy a live inline-edit session. Live zoom is
+ * bare style writes only; the iframe's own ResizeObserver re-posts `contentHeight` after the
+ * reflow, which also finalizes the viewport height.
+ */
+export function applyEditZoom() {
+  if (_ctx.getCanvasMode() !== "edit") {
+    return;
+  }
+  const [panel] = canvasPanels;
+  if (!panel?.canvas || !panel.viewport) {
+    return;
+  }
+  const canvasEl = panel.canvas;
+  const iframe = canvasEl.querySelector("iframe");
+  const editZoom = activeTab.value?.session.ui.editZoom ?? 1;
+  if (editZoom === 1) {
+    // Exactly today's fluid behavior — no inline width, no transform, auto viewport height.
+    panel._width = null;
+    canvasEl.style.width = "";
+    canvasEl.style.transform = "";
+    canvasEl.style.transformOrigin = "";
+    if (iframe) {
+      iframe.style.width = "100%";
+    }
+    panel.viewport.style.height = "";
+  } else {
+    const column = canvasWrap.querySelector<HTMLElement>(".content-edit-column");
+    if (!column) {
+      return;
+    }
+    // The column width is parent-driven (width:100%, max-width:baseWidth), so it is independent of
+    // The canvas content — measuring it mid-zoom is stable. No rounding: layoutWidth * editZoom
+    // Must equal renderWidth exactly.
+    const renderWidth = rectOf(column).width;
+    if (renderWidth <= 0) {
+      return;
+    }
+    const layoutWidth = renderWidth / editZoom;
+    panel._width = layoutWidth;
+    canvasEl.style.width = `${layoutWidth}px`;
+    canvasEl.style.transform = `scale(${editZoom})`;
+    canvasEl.style.transformOrigin = "top left";
+    if (iframe) {
+      iframe.style.width = `${layoutWidth}px`;
+      // Transforms don't affect an ancestor's auto-height, so the viewport (the white "page"
+      // Surface) needs its height pinned to the SCALED content height. offsetHeight is the
+      // Pre-measurement approximation; the next contentHeight message writes the exact value.
+      panel.viewport.style.height = `${iframe.offsetHeight * editZoom}px`;
+    }
+  }
+  // Re-anchor the fixed block-action-bar over the rescaled canvas.
+  renderOnly("overlays");
+}
+
+/** Set the active tab's edit zoom (clamped) and apply it synchronously. */
+export function setEditZoom(zoom: number) {
+  const tab = activeTab.value;
+  if (!tab) {
+    return;
+  }
+  tab.session.ui.editZoom = clampEditZoom(zoom);
+  applyEditZoom();
+}
+
+let _editZoomRaf = 0;
+
+/**
+ * Wheel-rate edit-zoom setter: the reactive `editZoom` write lands immediately (the tab-bar label
+ * tracks it), but the DOM work — an iframe width resize, i.e. a real reflow — is coalesced to one
+ * `applyEditZoom()` per animation frame so a fast ctrl+scroll burst doesn't thrash layout.
+ */
+export function requestEditZoom(zoom: number) {
+  const tab = activeTab.value;
+  if (!tab) {
+    return;
+  }
+  tab.session.ui.editZoom = clampEditZoom(zoom);
+  if (_editZoomRaf) {
+    return;
+  }
+  _editZoomRaf = requestAnimationFrame(() => {
+    _editZoomRaf = 0;
+    applyEditZoom();
+  });
 }
 
 /** Calculate zoom + pan to fit all panels within the viewport. */
@@ -209,12 +321,6 @@ export function resetZoom() {
   _ctx.setZoomDirect(1);
   centerCanvas();
   applyTransform();
-  renderZoomIndicator();
-}
-
-/** Reset the zoom indicator (clear its content). Called when switching to non-panzoom modes. */
-export function resetZoomIndicator() {
-  litRender(nothing, getLayerSlot("popover", "zoom-indicator"));
 }
 
 /**
@@ -284,66 +390,6 @@ export function panToElement(path: (string | number)[]) {
     return;
   }
   _panToEl(el, panel);
-}
-
-/**
- * Render the floating zoom indicator at the bottom center of canvas-wrap. Uses position: fixed,
- * computed from canvas-wrap bounds.
- */
-export function renderZoomIndicator() {
-  const zoom = _ctx.getZoom();
-  const host = getLayerSlot("popover", "zoom-indicator");
-  litRender(
-    html`
-      <div
-        class="zoom-indicator"
-        ${ref((el: Element | undefined) => {
-          _zoomIndicatorEl = (el as HTMLElement) || null;
-        })}
-      >
-        <span class="zoom-indicator-action" title="Reset to 100%" @click=${resetZoom}>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-          >
-            <circle cx="8" cy="8" r="5.5" />
-            <path d="M8 5.5v5M5.5 8h5" />
-          </svg>
-        </span>
-        <span class="zoom-indicator-label">${Math.round(zoom * 100)}%</span>
-        <span class="zoom-indicator-action" title="Fit to screen" @click=${fitToScreen}>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-          >
-            <rect x="2" y="2" width="12" height="12" rx="1" />
-            <path d="M2 6h12M6 2v12" />
-          </svg>
-        </span>
-      </div>
-    `,
-    host,
-  );
-  positionZoomIndicator();
-}
-
-/** Position the zoom indicator relative to canvas-wrap bounds. */
-export function positionZoomIndicator() {
-  if (!_zoomIndicatorEl) {
-    return;
-  }
-  const rect = rectOf(canvasWrap);
-  _zoomIndicatorEl.style.left = `${rect.left + rect.width / 2}px`;
-  _zoomIndicatorEl.style.top = `${rect.bottom - 32}px`;
-  _zoomIndicatorEl.style.transform = "translateX(-50%)";
 }
 
 /** Toggle "active" class on canvas panel headers based on activeMedia. */

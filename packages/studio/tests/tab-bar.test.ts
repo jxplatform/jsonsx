@@ -17,6 +17,7 @@ import type { Tab } from "../src/tabs/tab";
 
 const tabBar = await import("../src/panels/tab-bar");
 const { closeAllTabs } = await import("../src/workspace/workspace");
+const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,13 @@ beforeEach(() => {
   closeAllTabs();
   resetStudioState();
   installMockPlatform();
+  // The zoom widget's edit-mode actions run the real canvas-utils setEditZoom, which needs the
+  // Module context initialized (applyEditZoom then no-ops on the empty canvasPanels).
+  initCanvasUtils({
+    getCanvasMode: () => "edit",
+    getZoom: () => 1,
+    setZoomDirect: () => {},
+  });
   root = document.createElement("div");
   document.body.append(root);
 });
@@ -167,6 +175,82 @@ describe("view settings", () => {
     tabBar.mount(root, makeCtx());
     await flush();
     expect(hasBtn(root, "Layout")).toBe(false);
+  });
+});
+
+// ─── Zoom widget ──────────────────────────────────────────────────────────────
+
+describe("zoom widget", () => {
+  test("edit mode shows the content-zoom widget with the current percentage", async () => {
+    const tab = openTestTab();
+    tab.session.ui.editZoom = 1.5;
+    tabBar.mount(root, makeCtx());
+    await flush();
+    expect(root.querySelector(".tb-zoom")).not.toBeNull();
+    expect(root.querySelector(".tb-zoom-label")?.textContent?.trim()).toBe("150%");
+    // Edit mode has no panzoom surface to fit.
+    expect(hasBtn(root, "Fit")).toBe(false);
+  });
+
+  test("− / + step the edit zoom and the label tracks reactively", async () => {
+    const tab = openTestTab();
+    tabBar.mount(root, makeCtx());
+    await flush();
+
+    pointer(btn(root, "+"), "click");
+    await flush();
+    expect(tab.session.ui.editZoom).toBeCloseTo(1.2);
+    expect(root.querySelector(".tb-zoom-label")?.textContent?.trim()).toBe("120%");
+
+    pointer(btn(root, "−"), "click");
+    await flush();
+    expect(tab.session.ui.editZoom).toBeCloseTo(1);
+  });
+
+  test("clicking the percentage resets the edit zoom to 100%", async () => {
+    const tab = openTestTab();
+    tab.session.ui.editZoom = 2;
+    tabBar.mount(root, makeCtx());
+    await flush();
+    pointer(root.querySelector(".tb-zoom-label") as HTMLElement, "click");
+    await flush();
+    expect(tab.session.ui.editZoom).toBe(1);
+  });
+
+  test("design mode shows the panzoom variant with Fit and steps ui.zoom", async () => {
+    const tab = openTestTab();
+    tab.session.ui.zoom = 2;
+    tabBar.mount(root, makeCtx({ getCanvasMode: mock(() => "design") }));
+    await flush();
+
+    expect(root.querySelector(".tb-zoom-label")?.textContent?.trim()).toBe("200%");
+    expect(hasBtn(root, "Fit")).toBe(true);
+
+    pointer(btn(root, "+"), "click");
+    await flush();
+    expect(tab.session.ui.zoom).toBeCloseTo(2.4);
+    expect(tab.session.ui.editZoom).toBe(1);
+  });
+
+  test("stylebook mode also shows the panzoom variant", async () => {
+    openTestTab();
+    tabBar.mount(root, makeCtx({ getCanvasMode: mock(() => "stylebook") }));
+    await flush();
+    expect(root.querySelector(".tb-zoom")).not.toBeNull();
+    expect(hasBtn(root, "Fit")).toBe(true);
+  });
+
+  test("the widget is hidden in source mode and while the function editor is open", async () => {
+    const tab = openTestTab();
+    tabBar.mount(root, makeCtx({ getCanvasMode: mock(() => "source") }));
+    await flush();
+    expect(root.querySelector(".tb-zoom")).toBeNull();
+
+    tabBar.unmount();
+    tabBar.mount(root, makeCtx());
+    tab.session.ui.editingFunction = { defName: "greet", type: "def" };
+    await flush();
+    expect(root.querySelector(".tb-zoom")).toBeNull();
   });
 });
 

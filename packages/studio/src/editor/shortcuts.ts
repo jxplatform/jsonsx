@@ -16,6 +16,7 @@ import {
   undo as tabUndo,
   transactDoc,
 } from "../tabs/transact";
+import { applyEditZoom, requestEditZoom, setEditZoom } from "../canvas/canvas-utils";
 import { isEditing, stopEditing } from "./inline-edit";
 import { copyNode, cutNode, pasteNode } from "./context-menu";
 import { openQuickSearch } from "../panels/quick-search";
@@ -34,7 +35,6 @@ import type { JxPath } from "../state";
  *   panY: number;
  *   setPan: (x: number, y: number) => void;
  *   applyTransform: () => void;
- *   positionZoomIndicator: () => void;
  *   saveFile: () => void;
  *   openProject: () => void;
  * }} getContext
@@ -46,7 +46,6 @@ export function initShortcuts(
     panY: number;
     setPan: (x: number, y: number) => void;
     applyTransform: () => void;
-    positionZoomIndicator: () => void;
     saveFile: () => void;
     openProject: () => void;
   },
@@ -56,10 +55,18 @@ export function initShortcuts(
     "wheel",
     (e: WheelEvent) => {
       const { canvasMode, panX, panY, setPan, applyTransform } = getContext();
-      // Edit (content) mode: scroll the edit-mode container ourselves. The canvas iframe is sized to
-      // Its content (no internal scroll) and a cross-origin OOPIF doesn't bubble wheel to the parent,
-      // So the wheel reaches us forwarded (or over the canvas chrome) but never triggers native scroll.
+      // Edit (content) mode: ctrl/cmd+wheel drives the content zoom (browser-page-zoom semantics —
+      // The footprint stays fixed, content reflows); plain wheel scrolls the edit-mode container
+      // Ourselves. The canvas iframe is sized to its content (no internal scroll) and a cross-origin
+      // OOPIF doesn't bubble wheel to the parent, so the wheel reaches us forwarded (or over the
+      // Canvas chrome) but never triggers native scroll.
       if (canvasMode === "edit") {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const editZoom = activeTab.value?.session.ui.editZoom ?? 1;
+          requestEditZoom(editZoom * (1 + -e.deltaY * 0.005));
+          return;
+        }
         const sc = canvasWrap.querySelector<HTMLElement>(".content-edit-canvas");
         if (sc) {
           e.preventDefault();
@@ -126,8 +133,13 @@ export function initShortcuts(
     canvasWrap.addEventListener("pointerup", onUp);
   });
 
-  // Reposition zoom indicator on resize
-  window.addEventListener("resize", () => getContext().positionZoomIndicator());
+  // Re-fit the edit-mode content zoom on resize: its layout width derives from the LIVE column
+  // Width, which tracks the studio window.
+  window.addEventListener("resize", () => {
+    if (getContext().canvasMode === "edit") {
+      applyEditZoom();
+    }
+  });
 
   document.addEventListener("keydown", (e) => {
     const { canvasMode, setPan, applyTransform, saveFile, openProject } = getContext();
@@ -237,10 +249,11 @@ export function initShortcuts(
           break;
         }
         case "0": {
+          e.preventDefault();
           if (canvasMode === "edit") {
+            setEditZoom(1);
             break;
           }
-          e.preventDefault();
           activeTab.value!.session.ui.zoom = 1;
           setPan(16, 16);
           applyTransform();
@@ -248,19 +261,21 @@ export function initShortcuts(
         }
         case "=":
         case "+": {
+          e.preventDefault();
           if (canvasMode === "edit") {
+            setEditZoom((tab?.session.ui.editZoom ?? 1) * 1.2);
             break;
           }
-          e.preventDefault();
           activeTab.value!.session.ui.zoom = Math.min(5, (tab?.session.ui.zoom ?? 1) * 1.2);
           applyTransform();
           break;
         }
         case "-": {
+          e.preventDefault();
           if (canvasMode === "edit") {
+            setEditZoom((tab?.session.ui.editZoom ?? 1) / 1.2);
             break;
           }
-          e.preventDefault();
           activeTab.value!.session.ui.zoom = Math.max(0.05, (tab?.session.ui.zoom ?? 1) / 1.2);
           applyTransform();
           break;

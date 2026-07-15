@@ -51,6 +51,8 @@ type ParentRect = OverlayPlacement;
 
 interface HostState {
   iframe: HTMLIFrameElement;
+  /** The `.canvas-panel-canvas` element hosting the iframe + overlay (the WeakMap key). */
+  canvasEl: HTMLElement;
   channel: IframeChannel<ParentToIframe, IframeToParent>;
   /**
    * The resolved canvasUrl this iframe was built with — so a host built early with the default URL
@@ -264,6 +266,25 @@ export function hostDragGeometry(host: HostState): {
   const rect = rectOf(host.iframe);
   const scale = host.iframe.clientWidth > 0 ? rect.width / host.iframe.clientWidth : 1;
   return { rect, scale };
+}
+
+/**
+ * Pin the `.canvas-panel-viewport` (the white "page" surface, the canvas element's parent) to the
+ * SCALED content height when edit-mode content zoom is active. A `transform: scale()` on the canvas
+ * element rescales its painted box but never its ancestor's auto-height, so without this write the
+ * viewport background would stay sized to the UN-zoomed iframe height. The scale is read from the
+ * canvas element's own inline transform (written only by `applyEditZoom`) — NOT from
+ * {@link hostDragGeometry}, whose empirical ratio also reflects design mode's panzoom-wrap
+ * transform, where the viewport must keep its unscaled auto height.
+ */
+function syncEditZoomViewportHeight(state: HostState): void {
+  const viewport = state.canvasEl.parentElement;
+  if (!viewport) {
+    return;
+  }
+  const match = /scale\(([\d.]+)\)/.exec(state.canvasEl.style.transform);
+  const scale = match ? Number(match[1]!) : 1;
+  viewport.style.height = scale === 1 ? "" : `${state.iframe.offsetHeight * scale}px`;
 }
 
 /** Post a parent→iframe drag message to `host`'s channel (the coordinator builds it purely). */
@@ -665,6 +686,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
   });
 
   const state: HostState = {
+    canvasEl,
     canvasUrl,
     channel,
     editing: false,
@@ -926,6 +948,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // Component leaves dead space below — pages keep the floor and stay tall via #jx-canvas-root).
       state.iframe.style.height = `${msg.height}px`;
       state.iframe.style.minHeight = msg.fragment ? "0px" : "480px";
+      syncEditZoomViewportHeight(state);
       return;
     }
     case "dragOver": {
@@ -1444,7 +1467,10 @@ function hostForActivePanel(): HostState | null {
  * UNSCALED iframe-viewport px (D-2: the overlay draws them inside the scaled panzoom-wrap, so the
  * browser applies the zoom there); the fixed bar gets no such free ride, so scale by the live
  * empirical zoom ({@link hostDragGeometry}) and add the iframe's on-screen offset, whose GBCR
- * already bakes in pan + zoom + ancestor scroll. Edit mode has no transform → scale is 1.
+ * already bakes in pan + zoom + ancestor scroll. The empirical ratio covers BOTH scale sources:
+ * design mode's panzoom-wrap transform and edit mode's content-zoom counter-scale (where it
+ * evaluates to exactly `editZoom` — the iframe's layout width is `renderWidth / editZoom` while its
+ * rendered width is `renderWidth`).
  */
 export function getEditBarAnchorRect(): ParentRect | null {
   // The format toolbar follows the live caret/selection snapshot of the active edit session; the

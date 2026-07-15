@@ -37,7 +37,7 @@ import { effect } from "./reactivity";
 import { view } from "./view";
 
 import { isEditing } from "./editor/inline-edit";
-import { applyTransform, initCanvasUtils, positionZoomIndicator } from "./canvas/canvas-utils";
+import { applyTransform, initCanvasUtils } from "./canvas/canvas-utils";
 import {
   initCanvasRender,
   renderCanvas,
@@ -978,7 +978,6 @@ initShortcuts(() => ({
   openProject,
   panX: view.panX,
   panY: view.panY,
-  positionZoomIndicator,
   saveFile,
   setPan: (x, y) => {
     view.panX = x;

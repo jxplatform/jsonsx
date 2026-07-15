@@ -43,7 +43,6 @@ interface StylebookCtx {
   ) => { tpl: TemplateResult; panel: CanvasPanel };
   applyTransform: () => void;
   observeCenterUntilStable: () => void;
-  renderZoomIndicator: () => void;
   updateActivePanelHeaders: () => void;
 }
 
@@ -182,7 +181,6 @@ export function renderStylebookMode(ctx: StylebookCtx) {
 
   ctx.applyTransform();
   ctx.observeCenterUntilStable();
-  ctx.renderZoomIndicator();
 }
 
 /**

@@ -13,6 +13,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { projectState, updateUi } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
+import { applyTransform, fitToScreen, resetZoom, setEditZoom } from "../canvas/canvas-utils";
 import { getEffectiveLayoutPath, getEffectiveMedia } from "../site-context";
 import { dynamicRouteParams, loadParamValues, pagePathsDef } from "../page-params";
 import { mediaDisplayName } from "./shared";
@@ -67,11 +68,13 @@ export function mount(host: HTMLElement, ctx: TabBarCtx) {
         void tab.documentPath;
         void tab.session.documentStack.length;
         void tab.session.ui.canvasMode;
+        void tab.session.ui.editZoom;
         void tab.session.ui.editingFunction;
         void tab.session.ui.featureToggles;
         void tab.session.ui.preview;
         void tab.session.ui.previewParams;
         void tab.session.ui.showLayout;
+        void tab.session.ui.zoom;
       }
       render();
     });
@@ -147,6 +150,82 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
           ${S.documentPath?.split("/").pop() || S.document?.tagName || "document"}
         </span>
       </div>
+    `;
+  }
+
+  // ── Left region: zoom widget (every mode with a zoom concept) ──
+  // Gates on the EFFECTIVE mode: edit drives the content-reflow `editZoom`, while design /
+  // Stylebook / git-diff / preview all render on the panzoom surface and drive `ui.zoom` (with the
+  // Panzoom-only fit-to-screen action).
+  let zoomTpl: TemplateResult | typeof nothing = nothing;
+  if (!editing && canvasMode === "edit") {
+    const editZoom = S.ui.editZoom ?? 1;
+    zoomTpl = html`
+      <sp-action-group compact size="s" class="tb-zoom">
+        <sp-action-button
+          size="s"
+          title="Zoom out (Ctrl+-)"
+          @click=${() => setEditZoom((tab.session.ui.editZoom ?? 1) / 1.2)}
+        >
+          −
+        </sp-action-button>
+        <sp-action-button
+          size="s"
+          class="tb-zoom-label"
+          title="Reset to 100% (Ctrl+0)"
+          @click=${() => setEditZoom(1)}
+        >
+          ${Math.round(editZoom * 100)}%
+        </sp-action-button>
+        <sp-action-button
+          size="s"
+          title="Zoom in (Ctrl+=)"
+          @click=${() => setEditZoom((tab.session.ui.editZoom ?? 1) * 1.2)}
+        >
+          +
+        </sp-action-button>
+      </sp-action-group>
+    `;
+  } else if (
+    !editing &&
+    (canvasMode === "design" ||
+      canvasMode === "stylebook" ||
+      canvasMode === "git-diff" ||
+      canvasMode === "preview")
+  ) {
+    const zoom = S.ui.zoom ?? 1;
+    const setPanZoom = (next: number) => {
+      tab.session.ui.zoom = Math.min(5, Math.max(0.05, next));
+      applyTransform();
+    };
+    zoomTpl = html`
+      <sp-action-group compact size="s" class="tb-zoom">
+        <sp-action-button
+          size="s"
+          title="Zoom out (Ctrl+-)"
+          @click=${() => setPanZoom((tab.session.ui.zoom ?? 1) / 1.2)}
+        >
+          −
+        </sp-action-button>
+        <sp-action-button
+          size="s"
+          class="tb-zoom-label"
+          title="Reset to 100% (Ctrl+0)"
+          @click=${() => resetZoom()}
+        >
+          ${Math.round(zoom * 100)}%
+        </sp-action-button>
+        <sp-action-button
+          size="s"
+          title="Zoom in (Ctrl+=)"
+          @click=${() => setPanZoom((tab.session.ui.zoom ?? 1) * 1.2)}
+        >
+          +
+        </sp-action-button>
+        <sp-action-button size="s" title="Fit to screen" @click=${() => fitToScreen()}>
+          Fit
+        </sp-action-button>
+      </sp-action-group>
     `;
   }
 
@@ -241,7 +320,7 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
 
   return html`
     <div class="tab-bar">
-      ${navTpl}
+      ${navTpl} ${zoomTpl}
       <div class="tb-spacer"></div>
       ${settingsTpl} ${togglesTpl} ${exportTpl}
     </div>

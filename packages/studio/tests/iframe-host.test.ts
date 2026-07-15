@@ -1507,6 +1507,25 @@ describe("iframe canvas host viewport plumbing", () => {
     expect(iframe.style.minHeight).toBe("0px");
   });
 
+  test("contentHeight pins the viewport to the SCALED height under edit-mode content zoom", async () => {
+    const canvasEl = await mountReady();
+    const viewport = canvasEl.parentElement!;
+    const iframe = canvasEl.querySelector("iframe")!;
+    // The counter-scale applyEditZoom writes on the canvas element; the resolved iframe height is
+    // Read back via offsetHeight (happy-dom performs no layout, so define it).
+    canvasEl.style.transform = "scale(2)";
+    Object.defineProperty(iframe, "offsetHeight", { configurable: true, value: 900 });
+
+    channels[0]!.deliver({ fragment: false, height: 900, kind: "contentHeight" });
+    expect(viewport.style.height).toBe("1800px");
+
+    // Back at scale 1 (or design mode, where the transform lives on an ancestor instead) the
+    // Viewport returns to auto height.
+    canvasEl.style.transform = "";
+    channels[0]!.deliver({ fragment: false, height: 900, kind: "contentHeight" });
+    expect(viewport.style.height).toBe("");
+  });
+
   test("forwardWheel re-dispatches a wheel on canvasWrap with the deltas and mapped cursor", async () => {
     // RedispatchWheel reads { rect, scale } = hostDragGeometry(state): scale = rect.width /
     // Iframe.clientWidth = 600 / 300 = 2, and rect left/top = 10/20. So clientX = left + x*scale =

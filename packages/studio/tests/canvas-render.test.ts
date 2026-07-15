@@ -3,13 +3,13 @@
  * panel events, stylebook, editors, statusbar, overlays) are mocked via mock.module so the tests
  * can drive every renderCanvas dispatch path deterministically and assert the produced DOM.
  */
-import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import { flush, resetStudioState, resetWorkspaceWithTab, stubRect } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { canvasPanels, canvasWrap, initShellRefs, setProjectState } from "../src/store";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
 import { setFormats } from "../src/format/format-host";
-import { initCanvasUtils } from "../src/canvas/canvas-utils";
+import { initCanvasUtils, setEditZoom } from "../src/canvas/canvas-utils";
 import { MARKDOWN_FORMAT } from "./format-fixture";
 import type { CanvasPanel } from "../src/types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -844,6 +844,44 @@ describe("edit mode", () => {
     const column = canvasWrap.querySelector(".content-edit-column") as HTMLElement;
     expect(column.getAttribute("style")).toContain("max-width:600px");
   });
+
+  test("re-applies the persisted edit zoom after a render", async () => {
+    const tab = openSyncedTab();
+    setMode("edit");
+    renderCanvas();
+    await flush();
+    // The column now exists — give it a measurable width (happy-dom performs no layout), set the
+    // Persisted zoom, and re-render: the edit branch must re-fit from the LIVE column width.
+    const column = canvasWrap.querySelector(".content-edit-column") as HTMLElement;
+    stubRect(column, { width: 800 });
+    tab.session.ui.editZoom = 2;
+    renderCanvas();
+    await flush();
+
+    const panel = canvasPanels[0] as unknown as CanvasPanel;
+    expect(panel.canvas?.style.width).toBe("400px");
+    expect(panel.canvas?.style.transform).toBe("scale(2)");
+    expect(panel._width).toBe(400);
+  });
+
+  test("a zoom-only change never re-renders the canvas (live edit-session invariant)", async () => {
+    const tab = openSyncedTab();
+    setMode("edit");
+    renderCanvas();
+    await flush();
+    const gen = view.renderGeneration;
+    const mountSpy = mock(async () => {});
+    iframeImpl = mountSpy as never;
+
+    setEditZoom(1.5);
+    await flush();
+
+    // The zoom landed as bare style writes — no render generation bump, no iframe re-mount (which
+    // Would rebuild the iframe DOM and destroy a live inline-edit session).
+    expect(tab.session.ui.editZoom).toBe(1.5);
+    expect(view.renderGeneration).toBe(gen);
+    expect(mountSpy).not.toHaveBeenCalled();
+  });
 });
 
 // ─── Iframe render pipeline (success / staleness / rejection) ──────────────────
@@ -912,7 +950,6 @@ describe("design mode", () => {
     expect(panel.element?.classList.contains("full-width")).toBe(true);
     expect(canvasWrap.querySelector(".canvas-panel-header")).toBeNull();
     expect(view.panzoomWrap?.style.transform).toContain("scale(1)");
-    expect(document.querySelector(".zoom-indicator")).not.toBeNull();
     expect(panel.canvas?.querySelector("p")?.textContent).toBe("Hello");
   });
 
@@ -993,7 +1030,6 @@ describe("stylebook mode", () => {
       "applyTransform",
       "canvasPanelTemplate",
       "observeCenterUntilStable",
-      "renderZoomIndicator",
       "updateActivePanelHeaders",
     ]) {
       expect(typeof helpers[key]).toBe("function");
