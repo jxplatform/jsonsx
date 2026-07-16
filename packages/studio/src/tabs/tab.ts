@@ -10,6 +10,7 @@ import type {
   GitDiffState,
   GitStatusResult,
   InlineEditDef,
+  JsonValue,
 } from "../types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxDocOp, JxFmOp } from "./patch-ops";
@@ -25,6 +26,11 @@ export interface TabUi {
   frontmatterOpen: boolean;
   /** Chosen literal values for dynamic route params (e.g. { sku: "mini-trencher" }). */
   previewParams: Record<string, string>;
+  /**
+   * Chosen test values for a component doc's props (state entries), seeded into the canvas render
+   * so a non-instantiated component previews with real data (M6) — the previewParams mirror.
+   */
+  previewProps: Record<string, JsonValue> | null;
   zoom: number;
   /**
    * Edit-mode content zoom — browser-page-zoom semantics (content reflows at the zoomed effective
@@ -54,6 +60,18 @@ export interface TabUi {
   gitError: string | null;
   gitDiffState: GitDiffState | null;
   pendingInlineEdit: InlineEditDef | null;
+}
+
+/**
+ * A live (iframe-evaluated) expression preview retained per editing target (M6). Stored on
+ * `session.canvas` beside `scope` — plain wire data (path-key → display-string pairs), rebuilt into
+ * an ExpressionPreview by services/live-preview.ts on read.
+ */
+export interface StoredLivePreview {
+  /** Serialized expression + context the values were computed for (staleness check). */
+  key: string;
+  values: [string, string][];
+  error: string | null;
 }
 
 interface HistorySnapshot {
@@ -101,6 +119,9 @@ export interface Tab {
       // The bridge as a `dataScope` message and read by the data-explorer panel. Plain data now —
       // The old live `EffectScope` (with `.stop()`) moved into the iframe realm with buildScope.
       scope: Record<string, unknown> | null;
+      // Latest live (iframe-evaluated) expression previews keyed by editing-target id, stored
+      // Beside `scope` the same way (services/live-preview.ts owns reads/writes).
+      livePreviews: Record<string, StoredLivePreview> | null;
       error: string | null;
       pendingInlineEdit: InlineEditDef | null;
     };
@@ -136,6 +157,7 @@ function createDefaultUi(canvasMode: string, preview = false) {
     pendingInlineEdit: null,
     preview,
     previewParams: {},
+    previewProps: null,
     rightTab: "properties",
     settingsTab: "stylebook",
     showLayout: true,
@@ -219,6 +241,7 @@ export function createTab({
     session: reactive({
       canvas: {
         error: null,
+        livePreviews: null,
         pendingInlineEdit: null,
         scope: null,
         status: "idle",

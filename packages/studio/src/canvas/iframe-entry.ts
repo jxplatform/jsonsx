@@ -21,6 +21,7 @@ import { startIframeSlashBridge } from "./iframe-slash";
 import { startKeyForwarding } from "./iframe-keys";
 import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
+import { evaluateLiveExprs } from "./iframe-eval";
 import { serializeDataScope } from "./serialize-scope";
 import { getActivePath, isEditing, stopEditing } from "../editor/inline-edit";
 import { isAncestor } from "../state";
@@ -366,6 +367,22 @@ export function startCanvasIframe(opts: {
         kind: "geometry",
         reqId: msg.reqId,
       });
+      return;
+    }
+    if (msg.kind === "evalExpr") {
+      // Live expression preview (M6): evaluate against the LIVE render's resolved scope — but only
+      // The render the request targeted. A stale/ahead gen gets an empty reply (never values from
+      // The wrong scope); the parent additionally gen-gates the reply against its own state.
+      const results =
+        msg.gen === renderedGen && renderCtx && shadowDoc
+          ? evaluateLiveExprs(
+              msg.exprs,
+              renderCtx.defs as Record<string, unknown>,
+              shadowDoc,
+              msg.contextPath,
+            )
+          : [];
+      channel.post({ gen: msg.gen, kind: "evalResult", reqId: msg.reqId, results });
       return;
     }
     if (msg.kind === "patch") {

@@ -1,12 +1,12 @@
 /// <reference lib="dom" />
-import { getNodeAtPath } from "../store";
+import { getNodeAtPath, renderOnly } from "../store";
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { activeTab } from "../workspace/workspace";
 import { mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { renderExpressionEditor } from "../ui/expression-editor";
 import { renderStatementEditor } from "./statement-editor";
-import { previewExpression } from "../services/preview-eval";
+import { livePreviewExpression } from "../services/live-preview";
 import {
   getEventBinding,
   isExpressionDef,
@@ -278,7 +278,16 @@ export function eventsSidebarTemplate(helpers: { isCustomElementDoc: () => boole
                               ),
                             {
                               allowEventRef: true,
-                              preview: previewExpression(expression, tab.session.canvas.scope),
+                              // Live-context evaluation in the canvas iframe, snapshot fallback
+                              // (M6). The selection path is the context, so a binding inside a
+                              // Repeater template previews with the first item's $map scope.
+                              preview: livePreviewExpression(
+                                tab,
+                                `event:${JSON.stringify(selection)}:${evKey}`,
+                                expression,
+                                selection,
+                                () => renderOnly("rightPanel"),
+                              ),
                               stateDefs: Object.keys(defs),
                               stateEntries: defs,
                             },

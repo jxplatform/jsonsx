@@ -138,6 +138,8 @@ void mock.module("../src/canvas/iframe-host.js", () => ({
     widthPx?: number | null,
   ) => iframeImpl(gen, doc, canvas, widthPx),
   postApplyFormat: () => {},
+  // Live-preview seam (transitively imported via the panels) — no iframe in this suite.
+  requestCanvasEval: () => Promise.resolve(null),
   setToolbarRefresh: () => {},
 }));
 

@@ -32,6 +32,7 @@ import type {
   ApplyFormatIntent,
   CanvasMode,
   DragSrcKind,
+  EvalExprResult,
   IframeToParent,
   InsertZone,
   NodeHit,
@@ -44,7 +45,7 @@ import type { IframeChannel } from "./iframe-channel";
 import type { OverlayLayer, OverlayPlacement } from "./iframe-overlay";
 import type { SlashCommand } from "../editor/inline-edit";
 import type { Tab } from "../tabs/tab";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { JxExpressionNode, JxMutableNode } from "@jxsuite/schema/types";
 
 /** A rect in PARENT coordinates (overlay-local from {@link canvasRectToParent}, same field shape). */
 type ParentRect = OverlayPlacement;
@@ -179,6 +180,72 @@ export function sawIframeDragOver(seq: number): boolean {
   return (
     lastIframeDragOverSeq === seq && Date.now() - lastIframeDragOverAt <= IFRAME_DRAGOVER_FRESH_MS
   );
+}
+
+// ─── Live expression preview (M6) ───────────────────────────────────────────────
+// The parent asks a live iframe to evaluate expression nodes against its LIVE resolved scope and
+// Correlates the `evalResult` reply by reqId (the measure/geometry precedent), gen-gating it so a
+// Reply computed against a superseded render never paints badges.
+
+/** Monotonic eval request id (shared across hosts; stale replies carry an older/unknown id). */
+let evalReqId = 0;
+
+/** Pending eval resolvers keyed by reqId; a timeout or stale reply resolves null. */
+const pendingEvals = new Map<number, (results: EvalExprResult[] | null) => void>();
+
+/** How long (ms) the parent waits for an `evalResult` before falling back to the snapshot. */
+export const EVAL_TIMEOUT_MS = 300;
+
+/**
+ * Post an `evalExpr` request to the live, ready iframe host rendering `tabId`'s document and
+ * resolve with its results. Resolves `null` when no such host exists (caller falls back to the
+ * snapshot evaluator immediately), when no reply lands within `timeoutMs`, or when the reply's gen
+ * shows it was computed against a superseded render.
+ */
+export function requestCanvasEval(
+  tabId: string | null,
+  exprs: { id: string; node: unknown }[],
+  contextPath: (string | number)[] | null,
+  timeoutMs: number = EVAL_TIMEOUT_MS,
+): Promise<EvalExprResult[] | null> {
+  let target: HostState | null = null;
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    // Only a document host can answer (never a stylebook specimen catalog or a null-tab override
+    // Doc like git-diff), and only the one whose iframe DOM reflects this tab's document.
+    if (host.ready && !host.stylebook && tabId !== null && host.tabId === tabId) {
+      target = host;
+      break;
+    }
+  }
+  if (!target) {
+    return Promise.resolve(null);
+  }
+  evalReqId += 1;
+  const reqId = evalReqId;
+  // Expression nodes come off the reactive document — only plain values may cross postMessage.
+  // oxlint-disable-next-line unicorn/prefer-structured-clone
+  const wireExprs = JSON.parse(JSON.stringify(exprs)) as { id: string; node: JxExpressionNode }[];
+  target.channel.post({
+    contextPath: contextPath ? [...contextPath] : null,
+    exprs: wireExprs,
+    gen: target.lastRenderedGen,
+    kind: "evalExpr",
+    reqId,
+  });
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingEvals.delete(reqId);
+      resolve(null);
+    }, timeoutMs);
+    pendingEvals.set(reqId, (results) => {
+      clearTimeout(timer);
+      resolve(results);
+    });
+  });
 }
 
 /** The host backing a given canvas element (or null), for the coordinator's host resolution. */
@@ -899,6 +966,18 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
           state.lastSelectionRect = rect;
         }
       }
+      return;
+    }
+    case "evalResult": {
+      // A live expression-preview reply (M6). Resolve the pending request by reqId (unknown ids —
+      // Already timed out or from a torn-down request — are dropped), gen-gating it so values
+      // Computed against a superseded render resolve null (the caller keeps the snapshot preview).
+      const resolve = pendingEvals.get(msg.reqId);
+      if (!resolve) {
+        return;
+      }
+      pendingEvals.delete(msg.reqId);
+      resolve(msg.gen === state.lastRenderedGen ? msg.results : null);
       return;
     }
     case "renderComplete": {

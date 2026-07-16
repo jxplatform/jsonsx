@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { CANVAS_MODES, isCanvasMode } from "../src/canvas/iframe-protocol";
 import type {
   ApplyFormatIntent,
+  EvalExprResult,
   IframeToParent,
   InsertZone,
   InsertZonesMsg,
@@ -99,5 +100,56 @@ describe("4b-2 format-toolbar messages", () => {
     expect(link).toEqual({ command: "link", href: "https://x" });
     expect(removeLink.href).toBeNull();
     expect(insert).toEqual({ command: "insertData", token: "state.title" });
+  });
+});
+
+describe("M6 live expression-preview messages", () => {
+  test("evalExpr carries id-keyed expression nodes, a nullable contextPath, reqId and gen", () => {
+    const msg: ParentToIframe = {
+      contextPath: ["children", 0, "map"],
+      exprs: [
+        { id: "sum", node: { operator: "+", target: { $ref: "#/state/a" }, value: 2 } },
+        { id: "flag", node: { operator: "!", target: true } },
+      ],
+      gen: 4,
+      kind: "evalExpr",
+      reqId: 12,
+    };
+    expect(msg.kind).toBe("evalExpr");
+    expect(msg.exprs).toHaveLength(2);
+    expect(msg.exprs[0]!.id).toBe("sum");
+    // Root-scope evaluation passes a null context.
+    const rootScoped: ParentToIframe = { ...msg, contextPath: null };
+    expect(rootScoped.contextPath).toBeNull();
+  });
+
+  test("evalResult echoes reqId + gen and carries display-string pairs (postMessage-safe)", () => {
+    const result: EvalExprResult = {
+      id: "sum",
+      values: [
+        ["", "42"],
+        ["target", "40"],
+        ["value", "2"],
+      ],
+    };
+    const failed: EvalExprResult = { error: "unknown operator", id: "bad", values: [] };
+    const msg: IframeToParent = {
+      gen: 4,
+      kind: "evalResult",
+      reqId: 12,
+      results: [result, failed],
+    };
+    expect(msg.kind).toBe("evalResult");
+    expect(msg.reqId).toBe(12);
+    expect(msg.gen).toBe(4);
+    // Every value is a [pathKey, displayString] pair — plain strings cross the boundary.
+    for (const [path, display] of result.values) {
+      expect(typeof path).toBe("string");
+      expect(typeof display).toBe("string");
+    }
+    expect(failed.error).toBe("unknown operator");
+    // An empty results set is the stale-gen refusal shape.
+    const refused: IframeToParent = { gen: 3, kind: "evalResult", reqId: 11, results: [] };
+    expect(refused.results).toEqual([]);
   });
 });

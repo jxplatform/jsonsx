@@ -11,6 +11,9 @@
 
 import { evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
 import { toRaw } from "../reactivity";
+// Imported for local use AND re-exported below so existing consumers keep their import site.
+// oxlint-disable-next-line unicorn/prefer-export-from
+import { formatPreviewValue } from "../utils/preview-format";
 
 import type { ExpressionNode } from "@jxsuite/runtime/expression";
 
@@ -23,25 +26,10 @@ export interface ExpressionPreview {
   mutating: boolean;
 }
 
-const MAX_BADGE_LENGTH = 48;
-
-/** Format a runtime value as a short badge string. */
-export function formatPreviewValue(value?: unknown): string {
-  if (value === undefined) {
-    return "undefined";
-  }
-  let text: string;
-  try {
-    text =
-      typeof value === "string" ? JSON.stringify(value) : (JSON.stringify(value) ?? "undefined");
-  } catch {
-    text = String(value);
-  }
-  if (text.length > MAX_BADGE_LENGTH) {
-    text = `${text.slice(0, MAX_BADGE_LENGTH - 1)}…`;
-  }
-  return text;
-}
+// The formatter is shared with the in-iframe live evaluator: it lives in utils/preview-format.ts
+// (dependency-light, safe for the iframe bundle) and is re-exported here so existing consumers
+// Keep their import site.
+export { formatPreviewValue };
 
 /**
  * Evaluate `node` against a scope snapshot for display. Returns null when no snapshot is available

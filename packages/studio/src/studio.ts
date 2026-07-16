@@ -572,6 +572,7 @@ effect(() => {
     void tab.session.ui.featureToggles;
     void tab.session.ui.preview;
     void tab.session.ui.previewParams;
+    void tab.session.ui.previewProps;
     void tab.session.ui.settingsTab;
     void tab.session.ui.showLayout;
     void tab.session.ui.stylebookTab;

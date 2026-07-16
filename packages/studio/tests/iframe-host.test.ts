@@ -90,6 +90,7 @@ const {
   postDragMessage,
   postPatchToHosts,
   postStyleUpdateToStylebookHosts,
+  requestCanvasEval,
   sawIframeDragOver,
   setCanvasContextMenuHandler,
   setCanvasSlashHandler,
@@ -493,6 +494,85 @@ describe("iframe canvas dataScope bridge", () => {
 
     expect(activeTab.value!.session.canvas.scope).toBeNull();
     expect(leftRenders).toBe(0);
+  });
+});
+
+// ─── Live expression eval bridge (M6): evalExpr → evalResult over the channel ────
+
+describe("live expression eval bridge (requestCanvasEval)", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+  });
+
+  const EXPRS = [{ id: "0", node: { operator: "+", target: 1, value: 1 } }];
+
+  test("posts evalExpr (reqId + rendered gen) and resolves with the iframe's results", async () => {
+    await mountReady();
+    const tabId = activeTab.value!.id;
+    channels[0]!.posts.length = 0;
+
+    const promise = requestCanvasEval(tabId, EXPRS, ["children", 0]);
+    const posted = channels[0]!.posts.find((p) => p.kind === "evalExpr") as Msg;
+    expect(posted).toMatchObject({
+      contextPath: ["children", 0],
+      exprs: EXPRS,
+      gen: 1,
+      kind: "evalExpr",
+    });
+
+    channels[0]!.deliver({
+      gen: 1,
+      kind: "evalResult",
+      reqId: posted.reqId,
+      results: [{ id: "0", values: [["", "2"]] }],
+    });
+    expect(await promise).toEqual([{ id: "0", values: [["", "2"]] }]);
+  });
+
+  test("a STALE-gen reply resolves null (values from a superseded render never paint)", async () => {
+    await mountReady();
+    const tabId = activeTab.value!.id;
+    const promise = requestCanvasEval(tabId, EXPRS, null);
+    const posted = channels[0]!.posts.find((p) => p.kind === "evalExpr") as Msg;
+
+    // A newer render acks before the reply lands — the reply's gen is now stale.
+    channels[0]!.deliver({ gen: 2, kind: "renderComplete" });
+    channels[0]!.deliver({
+      gen: 1,
+      kind: "evalResult",
+      reqId: posted.reqId,
+      results: [{ id: "0", values: [["", "2"]] }],
+    });
+    expect(await promise).toBeNull();
+  });
+
+  test("resolves null when no live host renders the tab's document", async () => {
+    // No mount at all → immediate null (the caller falls back to the snapshot synchronously).
+    expect(await requestCanvasEval("test-tab", EXPRS, null)).toBeNull();
+    // A null tabId (override docs like git-diff) can never be eval-targeted.
+    await mountReady();
+    expect(await requestCanvasEval(null, EXPRS, null)).toBeNull();
+  });
+
+  test("resolves null when no reply lands within the timeout", async () => {
+    await mountReady();
+    const tabId = activeTab.value!.id;
+    const result = await requestCanvasEval(tabId, EXPRS, null, 10);
+    expect(result).toBeNull();
+    // A late reply after the timeout is dropped without effect (its resolver is gone).
+    const posted = channels[0]!.posts.find((p) => p.kind === "evalExpr") as Msg;
+    channels[0]!.deliver({
+      gen: 1,
+      kind: "evalResult",
+      reqId: posted.reqId,
+      results: [{ id: "0", values: [["", "2"]] }],
+    });
+  });
+
+  test("an unknown reqId reply is ignored", async () => {
+    await mountReady();
+    channels[0]!.deliver({ gen: 1, kind: "evalResult", reqId: 999_999, results: [] });
+    // Nothing to assert beyond "no throw" — no pending resolver existed.
   });
 });
 

@@ -195,6 +195,45 @@ describe("resolveCanvasDocument", () => {
     expect(state.entry!.id).toBe("intro");
   });
 
+  test("seeds component test props into renderDoc.state, leaving the source doc intact (M6)", async () => {
+    const tab = resetWorkspaceWithTab(
+      {
+        children: [{ tagName: "h3", textContent: "${state.title}" }],
+        state: {
+          count: { default: 3, type: "number" },
+          greet: { $prototype: "Function", body: "" },
+          title: "Hello",
+        },
+        tagName: "x-card",
+      } as unknown as JxMutableNode,
+      { documentPath: "components/x-card.json" },
+    ) as Tab;
+    tab.session.ui.previewProps = { count: 7, greet: "never", title: "Test drive" };
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+
+    const state = result.renderDoc.state as Record<string, unknown>;
+    // Literal entries take the value; signal defs seed through `default` (what buildScope reads);
+    // Behavioral entries are never overridden.
+    expect(state.title).toBe("Test drive");
+    expect(state.count).toEqual({ default: 7, type: "number" });
+    expect(state.greet).toEqual({ $prototype: "Function", body: "" });
+    // The tab's source document keeps its authored defaults (it is what gets edited and saved).
+    const srcState = (tab.doc.document as { state: Record<string, unknown> }).state;
+    expect(srcState.title).toBe("Hello");
+    expect(srcState.count).toEqual({ default: 3, type: "number" });
+  });
+
+  test("test props never touch a page document (previewParams territory)", async () => {
+    resetStudioState({ isSiteProject: true, projectConfig: {} });
+    const tab = resetWorkspaceWithTab(
+      { children: [], state: { title: "Hello" }, tagName: "div" } as unknown as JxMutableNode,
+      { documentPath: "pages/home.json" },
+    ) as Tab;
+    tab.session.ui.previewProps = { title: "nope" };
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    expect((result.renderDoc.state as Record<string, unknown>).title).toBe("Hello");
+  });
+
   test("auto-discovers project components in content mode and adds them to $elements", async () => {
     installMockPlatform({
       discoverComponents: async () => [

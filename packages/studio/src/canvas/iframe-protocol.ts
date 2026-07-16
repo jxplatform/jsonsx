@@ -11,7 +11,7 @@
 
 import type { JxDocOp } from "../tabs/patch-ops";
 import type { JxContentResult, SlashCommand } from "../editor/inline-edit";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { JxExpressionNode, JxMutableNode } from "@jxsuite/schema/types";
 
 /**
  * The wire form of a value-carrying document op (the `forward` half of a recorded
@@ -110,6 +110,21 @@ export type ParentToIframe =
         | { command: "link"; href: string | null } // Null/"" = remove
         | { command: "insertData"; token: string };
     }
+  // ─── Live expression preview (M6) ───────────────────────────────────────────
+  // Evaluate expression nodes against the iframe's LIVE resolved scope (real repeater items, real
+  // Window#/ globals) and post per-node display values back. `contextPath` is the document path of
+  // The node whose scope context the expressions bind to (null = the root scope); when it sits
+  // Inside a repeater template, the iframe binds the first rendered item's $map context. `reqId`
+  // Correlates the reply (measure/geometry precedent); `gen` is the render the request targets —
+  // The iframe refuses to evaluate against a different render, and the parent drops replies whose
+  // Gen no longer matches its last-rendered one.
+  | {
+      kind: "evalExpr";
+      exprs: { id: string; node: JxExpressionNode }[];
+      contextPath: (string | number)[] | null;
+      reqId: number;
+      gen: number;
+    }
   // ─── Cross-frame DnD (Phase 4c spike) ──────────────────────────────────────
   // Begin a drag session in the iframe: `src` is the realm-agnostic source kind, `dragSeq` is the
   // Per-session id (parent drops any reply with a different seq), `gen` is the render the session
@@ -124,6 +139,19 @@ export type ParentToIframe =
   | { kind: "dragEnd"; dragSeq: number }
   // The drag was cancelled (Escape/abort from the parent realm) — same teardown as dragEnd.
   | { kind: "dragCancel"; dragSeq: number };
+
+/**
+ * One expression's live evaluation outcome (M6). `values` are path-key → display-string pairs — the
+ * trace hook's per-node values, already formatted INSIDE the iframe (same truncation rules as the
+ * parent's snapshot preview) so only postMessage-safe strings cross the boundary. `error` carries
+ * the thrown message when this expression failed (its `values` then hold whatever nodes reported
+ * before the throw).
+ */
+export interface EvalExprResult {
+  id: string;
+  values: [string, string][];
+  error?: string;
+}
 
 /** A node's bounding box, in the iframe's own viewport coordinates. */
 export interface SerializableRect {
@@ -229,6 +257,10 @@ export type IframeToParent =
   // Response to `measure`: the rects of whichever requested paths resolved to a node (missing paths
   // Are simply omitted). `reqId` echoes the request so the parent can drop stale responses.
   | { kind: "geometry"; reqId: number; hits: NodeHit[] }
+  // Response to `evalExpr`: one result per requested expression (empty when the request's gen no
+  // Longer matches the live render — the iframe never evaluates against the wrong scope). `reqId`/
+  // `gen` echo the request so the parent can drop stale replies (measure/geometry precedent).
+  | { kind: "evalResult"; reqId: number; gen: number; results: EvalExprResult[] }
   // A patch applied cleanly (echoes gen so the host can re-measure the selection overlay).
   | { kind: "patchComplete"; gen: number }
   // A patch could not be applied surgically — the parent escalates to a full render.

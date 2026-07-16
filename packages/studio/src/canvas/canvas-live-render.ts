@@ -26,6 +26,7 @@ import {
   resolveParamBoundState,
   substitutePreviewParams,
 } from "../page-params";
+import { isComponentDoc, substitutePreviewProps } from "../component-props";
 
 import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
@@ -179,6 +180,17 @@ export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
       );
       renderDoc = substitutePreviewParams(renderDoc, previewParams, S.documentPath);
       await resolveParamBoundState(renderDoc, boundKeys, docBase);
+    }
+  }
+
+  // Component definition docs (non-page): seed chosen test-prop values into the render doc's state
+  // So a non-instantiated component previews with real data — templates, dataScope snapshots, and
+  // Live/snapshot expression previews all see the values (M6, the previewParams mirror). Pure
+  // Rebuild for the same reason as substitutePreviewParams above.
+  if (!isPage && tab && isComponentDoc(renderDoc)) {
+    const { previewProps } = tab.session.ui;
+    if (previewProps && Object.keys(previewProps).length > 0) {
+      renderDoc = substitutePreviewProps(renderDoc, previewProps);
     }
   }
 

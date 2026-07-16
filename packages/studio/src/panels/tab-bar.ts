@@ -16,10 +16,11 @@ import { activeTab } from "../workspace/workspace";
 import { applyTransform, fitToScreen, resetZoom, setEditZoom } from "../canvas/canvas-utils";
 import { getEffectiveLayoutPath, getEffectiveMedia } from "../site-context";
 import { dynamicRouteParams, loadParamValues, pagePathsDef } from "../page-params";
+import { componentPropEntries, isComponentDoc } from "../component-props";
 import { mediaDisplayName } from "./shared";
 import type { ParamValues } from "../page-params";
 import type { Tab } from "../tabs/tab";
-import type { DocumentStackEntry, FormulaEditDef, FunctionEditDef } from "../types";
+import type { DocumentStackEntry, FormulaEditDef, FunctionEditDef, JsonValue } from "../types";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
 
@@ -75,6 +76,7 @@ export function mount(host: HTMLElement, ctx: TabBarCtx) {
         void tab.session.ui.featureToggles;
         void tab.session.ui.preview;
         void tab.session.ui.previewParams;
+        void tab.session.ui.previewProps;
         void tab.session.ui.showLayout;
         void tab.session.ui.zoom;
       }
@@ -269,7 +271,8 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
   if (!takeover && (baseMode === "edit" || baseMode === "design")) {
     const canPreview = tab.capabilities.modes.includes("preview");
     const hasLayout = isPage && Boolean(getEffectiveLayoutPath(S.document?.$layout));
-    const pickersTpl = isPage ? paramPickersTpl(tab) : nothing;
+    // Pages get route-param pickers; component docs get test-prop fields (M6) — same slot.
+    const pickersTpl = isPage ? paramPickersTpl(tab) : propFieldsTpl(tab);
     const previewTpl = canPreview
       ? html`
           <sp-action-button
@@ -444,6 +447,66 @@ function paramPickersTpl(tab: Tab): TemplateResult | typeof nothing {
             (v: string) => html`<sp-menu-item value=${v}>${v}</sp-menu-item>`,
           )}
         </sp-picker>
+      `,
+    )}
+  `;
+}
+
+// ── Component test-prop fields (M6) ──────────────────────────────────────────
+// The previewParams mirror for component docs: one small field per prop entry (the doc's
+// Plain-data state entries), committed on change so typing never re-renders the bar mid-edit. A
+// Value parses as JSON when it can (numbers, booleans, arrays) and falls back to the raw string;
+// Clearing a field removes the override so the prop returns to its authored default.
+
+/**
+ * @param {string} raw
+ * @returns {JsonValue}
+ */
+function parsePropValue(raw: string): JsonValue {
+  try {
+    return JSON.parse(raw) as JsonValue;
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * @param {Tab} tab
+ * @returns {TemplateResult | typeof nothing}
+ */
+function propFieldsTpl(tab: Tab): TemplateResult | typeof nothing {
+  const doc = tab.doc.document;
+  if (!isComponentDoc(doc)) {
+    return nothing;
+  }
+  const entries = componentPropEntries(doc);
+  if (entries.length === 0) {
+    return nothing;
+  }
+  const { previewProps } = tab.session.ui;
+  const display = (v: JsonValue | undefined) =>
+    v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v);
+  return html`
+    ${entries.map(
+      ({ name }) => html`
+        <sp-textfield
+          size="s"
+          quiet
+          class="tab-bar-prop"
+          placeholder=${name}
+          title=${`Test value for ${name}`}
+          .value=${display(previewProps?.[name])}
+          @change=${(e: Event) => {
+            const raw = (e.target as HTMLInputElement).value;
+            const next = { ...tab.session.ui.previewProps };
+            if (raw === "") {
+              delete next[name];
+            } else {
+              next[name] = parsePropValue(raw);
+            }
+            updateUi("previewProps", Object.keys(next).length > 0 ? next : null);
+          }}
+        ></sp-textfield>
       `,
     )}
   `;

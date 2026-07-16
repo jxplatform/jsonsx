@@ -295,6 +295,84 @@ describe("param pickers", () => {
   });
 });
 
+// ─── Component test-prop fields (M6) ──────────────────────────────────────────
+
+describe("component test props", () => {
+  function openComponentTab(): Tab {
+    return resetWorkspaceWithTab(
+      {
+        children: [{ tagName: "h3", textContent: "${state.title}" }],
+        state: {
+          count: { default: 3, type: "number" },
+          greet: { $prototype: "Function", body: "" },
+          title: "Hello",
+        },
+        tagName: "x-card",
+      } as never,
+      { documentPath: "components/x-card.json", id: "comp-tab" },
+    );
+  }
+
+  test("renders one field per prop entry and commits parsed values on change", async () => {
+    const tab = openComponentTab();
+    tabBar.mount(root, makeCtx());
+    await flush();
+
+    const fields = [...root.querySelectorAll("sp-textfield.tab-bar-prop")] as (HTMLElement & {
+      value: string;
+    })[];
+    // Only the plain-data entries (count + title) are props; the Function entry is not.
+    expect(fields.map((f) => f.getAttribute("placeholder"))).toEqual(["count", "title"]);
+
+    fields[1]!.value = "Test drive";
+    fields[1]!.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    expect(tab.session.ui.previewProps).toEqual({ title: "Test drive" });
+
+    // JSON-parseable input becomes a typed value (a number, not the string "7").
+    const countField = root.querySelector("sp-textfield.tab-bar-prop") as HTMLElement & {
+      value: string;
+    };
+    countField.value = "7";
+    countField.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    expect(tab.session.ui.previewProps).toEqual({ count: 7, title: "Test drive" });
+  });
+
+  test("clearing a field removes the override; clearing all resets previewProps to null", async () => {
+    const tab = openComponentTab();
+    tab.session.ui.previewProps = { title: "Test drive" };
+    tabBar.mount(root, makeCtx());
+    await flush();
+
+    const field = [...root.querySelectorAll("sp-textfield.tab-bar-prop")].find(
+      (f) => f.getAttribute("placeholder") === "title",
+    ) as HTMLElement & { value: string };
+    expect(field.value).toBe("Test drive");
+    field.value = "";
+    field.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    expect(tab.session.ui.previewProps).toBeNull();
+  });
+
+  test("no prop fields for a page document or a component without prop entries", async () => {
+    resetStudioState({ isSiteProject: true });
+    resetWorkspaceWithTab({ children: [], tagName: "div" }, { documentPath: "pages/simple.json" });
+    tabBar.mount(root, makeCtx());
+    await flush();
+    expect(root.querySelector("sp-textfield.tab-bar-prop")).toBeNull();
+
+    tabBar.unmount();
+    tabBar.mount(root, makeCtx());
+    resetWorkspaceWithTab(
+      { children: [], state: { fn: { $prototype: "Function", body: "" } }, tagName: "x-bare" },
+      { documentPath: "components/x-bare.json" },
+    );
+    await flush();
+    expect(root.querySelector("sp-textfield.tab-bar-prop")).toBeNull();
+  });
+});
+
 // ─── Component navigation ───────────────────────────────────────────────────────
 
 describe("component navigation", () => {

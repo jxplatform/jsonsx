@@ -24,7 +24,7 @@ import { chipSummary, renderFormulaChips } from "../ui/formula-chips";
 import { renderExpressionEditor } from "../ui/expression-editor";
 import { formulaCatalog } from "../ui/formula-catalog";
 import { openFormulaPalette } from "../ui/formula-palette";
-import { previewExpression } from "../services/preview-eval";
+import { livePreviewExpression } from "../services/live-preview";
 import { dataTypeLabel, renderDataTreeTemplate, unwrapSignal } from "./data-explorer";
 
 import type { JxNodeValue } from "../tabs/transact";
@@ -213,7 +213,17 @@ function workspaceTemplate(tab: Tab, editing: FormulaEditDef): TemplateResult {
   }
 
   const { scope } = tab.session.canvas;
-  const preview = previewExpression(root, scope);
+  // Live-context evaluation in the canvas iframe with snapshot fallback (M6). While the workspace
+  // Owns canvasWrap the iframe is usually unmounted (immediate snapshot); when a live host exists
+  // (e.g. another panel's canvas), a landed result re-renders this workspace. An event target's
+  // Element path is the context, so repeater-template formulas bind the first item's $map scope.
+  const preview = livePreviewExpression(
+    tab,
+    `formula:${JSON.stringify(editing)}`,
+    root,
+    editing.type === "event" ? (editing.path ?? null) : null,
+    () => renderFormulaWorkspace(),
+  );
   const { node: selected, path: selectedPath } = resolveSelection(root, _selectedPath);
   const write = (next: unknown) => writeRoot(tab, editing, next);
   const writeSelected = (next: unknown) => write(replaceAtPath(root, selectedPath, next));

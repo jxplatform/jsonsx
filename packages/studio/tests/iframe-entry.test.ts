@@ -660,6 +660,152 @@ describe("startCanvasIframe — cross-frame drag (Phase 4c)", () => {
   });
 });
 
+// ─── Live expression eval (M6): evalExpr → evalResult against the LIVE scope ────
+
+describe("startCanvasIframe — live expression eval (M6)", () => {
+  async function bootWithState(gen: number, doc: unknown) {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.parent.post(renderMsg(gen, doc));
+    pair.flush();
+    await flush();
+    pair.flush();
+    return { acks, pair };
+  }
+
+  const evalResults = (acks: IframeToParent[]) =>
+    acks.filter((m) => m.kind === "evalResult") as {
+      gen: number;
+      reqId: number;
+      results: { id: string; values: [string, string][]; error?: string }[];
+    }[];
+
+  test("evaluates against the live resolved scope and replies with formatted per-node values", async () => {
+    const doc = {
+      children: [{ children: ["Hi"], tagName: "h1" }],
+      state: { count: 40 },
+      tagName: "div",
+    };
+    const { acks, pair } = await bootWithState(1, doc);
+    acks.length = 0;
+
+    pair.parent.post({
+      contextPath: null,
+      exprs: [{ id: "sum", node: { operator: "+", target: { $ref: "#/state/count" }, value: 2 } }],
+      gen: 1,
+      kind: "evalExpr",
+      reqId: 7,
+    });
+    pair.flush(); // Deliver the request into the entry.
+    pair.flush(); // Deliver the reply back to the parent.
+
+    const [reply] = evalResults(acks);
+    expect(reply).toMatchObject({ gen: 1, kind: "evalResult", reqId: 7 });
+    expect(reply!.results).toHaveLength(1);
+    const values = new Map(reply!.results[0]!.values);
+    expect(values.get("")).toBe("42");
+    expect(values.get("target")).toBe("40");
+  });
+
+  test("a stale-gen request gets an EMPTY reply (never values from the wrong scope)", async () => {
+    const { acks, pair } = await bootWithState(5, {
+      children: [],
+      state: { count: 1 },
+      tagName: "div",
+    });
+    acks.length = 0;
+
+    pair.parent.post({
+      contextPath: null,
+      exprs: [{ id: "x", node: { operator: "+", target: 1, value: 1 } }],
+      gen: 3, // The render this targeted was superseded.
+      kind: "evalExpr",
+      reqId: 9,
+    });
+    pair.flush();
+    pair.flush();
+
+    const [reply] = evalResults(acks);
+    expect(reply).toMatchObject({ gen: 3, reqId: 9, results: [] });
+  });
+
+  test("guards errors per expression and never mutates the live canvas state", async () => {
+    const doc = {
+      children: [{ children: ["Hi"], tagName: "h1" }],
+      state: { cart: [1, 2] },
+      tagName: "div",
+    };
+    const { acks, pair } = await bootWithState(1, doc);
+    acks.length = 0;
+
+    const push = { operator: "push", target: { $ref: "#/state/cart" }, value: 3 };
+    pair.parent.post({
+      contextPath: null,
+      exprs: [
+        { id: "bad", node: { operator: "bogus", target: 1 } },
+        { id: "mutate", node: push },
+      ],
+      gen: 1,
+      kind: "evalExpr",
+      reqId: 1,
+    });
+    pair.flush();
+    pair.flush();
+    // Evaluate the mutating expression AGAIN: were the live scope touched, cart would have grown
+    // And push would now report 4.
+    pair.parent.post({
+      contextPath: null,
+      exprs: [{ id: "mutate", node: push }],
+      gen: 1,
+      kind: "evalExpr",
+      reqId: 2,
+    });
+    pair.flush();
+    pair.flush();
+
+    const replies = evalResults(acks);
+    expect(replies[0]!.results[0]!.error).toContain("unknown operator");
+    expect(new Map(replies[0]!.results[1]!.values).get("")).toBe("3");
+    expect(new Map(replies[1]!.results[0]!.values).get("")).toBe("3"); // Same pre-mutation state.
+  });
+
+  test("binds the first rendered item's $map context for a repeater-template contextPath", async () => {
+    const doc = {
+      children: [
+        {
+          $prototype: "Array",
+          items: { $ref: "#/state/products" },
+          map: { children: [{ tagName: "h3" }], tagName: "li" },
+        },
+      ],
+      state: { products: [{ title: "Kubota U35" }, { title: "Other" }] },
+      tagName: "ul",
+    };
+    const { acks, pair } = await bootWithState(1, doc);
+    acks.length = 0;
+
+    pair.parent.post({
+      contextPath: ["children", 0, "map", "children", 0],
+      exprs: [
+        { id: "t", node: { operator: "??", target: { $ref: "$map/item/title" }, value: "?" } },
+      ],
+      gen: 1,
+      kind: "evalExpr",
+      reqId: 3,
+    });
+    pair.flush();
+    pair.flush();
+
+    const [reply] = evalResults(acks);
+    expect(reply!.results[0]!.error).toBeUndefined();
+    expect(new Map(reply!.results[0]!.values).get("")).toBe('"Kubota U35"');
+  });
+});
+
 describe("startCanvasIframe — content-height auto-sizing + wheel forwarding", () => {
   const freshH1 = () => ({ children: [{ children: ["Hi"], tagName: "h1" }], tagName: "div" });
 

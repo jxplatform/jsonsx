@@ -24,8 +24,9 @@ import { renderFieldRow } from "../ui/field-row";
 import { rawTextArea, spTextField } from "../ui/field-input";
 import { expressionHint, renderExpressionEditor } from "../ui/expression-editor";
 import { renderStatementEditor } from "./statement-editor";
-import { previewExpression } from "../services/preview-eval";
+import { livePreviewExpression } from "../services/live-preview";
 import { renderMediaPicker } from "../ui/media-picker";
+import { renderOnly } from "../store";
 import { registerFormControl, renderForm } from "../ui/schema-form";
 import { resolveContextPointer } from "../services/context-resolver";
 import type { JsonSchema } from "../ui/schema-form";
@@ -850,7 +851,11 @@ function renderSignalEditorTemplate(
           ),
         {
           allowEventRef: false,
-          preview: previewExpression(exprNode, activeTab.value?.session.canvas.scope),
+          // Live-context evaluation in the canvas iframe, snapshot fallback (M6). The signals
+          // Panel lives in the left panel — re-render it when a fresh live result lands.
+          preview: livePreviewExpression(activeTab.value, `def:${name}`, exprNode, null, () =>
+            renderOnly("leftPanel"),
+          ),
           stateDefs: Object.keys(S.document.state || {}),
           stateEntries: S.document.state || {},
         },

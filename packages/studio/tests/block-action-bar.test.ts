@@ -58,6 +58,8 @@ void mock.module("../src/canvas/iframe-host", () => ({
     snapshot: host.snapshot,
   }),
   postApplyFormat: (intent: ApplyFormatIntent) => host.posted.push(intent),
+  // Live-preview seam (transitively imported via the panels) — no iframe in this suite.
+  requestCanvasEval: () => Promise.resolve(null),
 }));
 
 const {
