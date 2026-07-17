@@ -8,6 +8,7 @@ code:
   - extensions/search/src/client.ts
   - extensions/search/src/search-state.ts
   - extensions/search/schemas/project.fragment.schema.json
+  - sites/jxsuite.com/components/site-search.json
 ---
 
 # Site search
@@ -78,8 +79,8 @@ Interactive components aren't lowered, so inside a compiled component you use th
   "searchResults": [],
   "searchReady": false,
   "searchActive": 0,
-  "searchInit": { "$prototype": "Function", "$src": "npm:@jxsuite/search/client", "parameters": [{ "identifier": "state" }] },
-  "runSearch": { "$prototype": "Function", "$src": "npm:@jxsuite/search/client", "parameters": [{ "identifier": "state" }, { "identifier": "e" }] },
+  "searchInit": { "$prototype": "Function", "$src": "npm:@jxsuite/search/client", "parameters": ["state"] },
+  "runSearch": { "$prototype": "Function", "$src": "npm:@jxsuite/search/client", "parameters": ["state", "e"] },
   "onMount": { "$prototype": "Function", "arguments": ["state"], "body": "state.searchInit(state);" }
 }
 ```

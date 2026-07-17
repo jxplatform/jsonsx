@@ -1,0 +1,234 @@
+{
+  "$schema": "../../../packages/schema/schema.json",
+  "$id": "SiteSearch",
+  "$description": "Docs search: a toolbar trigger opening a native-popover modal over the headless @jxsuite/search client (Cmd+K / Ctrl+K / '/'). Results group section hits under their page and deep-link to heading anchors.",
+
+  "state": {
+    "searchQuery": "",
+    "searchResults": [],
+    "searchReady": false,
+    "searchActive": 0,
+    "searchInit": {
+      "$prototype": "Function",
+      "$src": "npm:@jxsuite/search/client",
+      "parameters": ["state"]
+    },
+    "runSearch": {
+      "$prototype": "Function",
+      "$src": "npm:@jxsuite/search/client",
+      "parameters": ["state", "e"]
+    },
+    "onMount": {
+      "$prototype": "Function",
+      "arguments": ["state"],
+      "body": "state.searchInit(state); const host = this; if (!document.__jxSearchHotkeys) { document.__jxSearchHotkeys = true; document.addEventListener('keydown', (ev) => { const t = ev.target; const tag = t && t.tagName; const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable); if (((ev.metaKey || ev.ctrlKey) && ev.key === 'k') || (ev.key === '/' && !typing)) { ev.preventDefault(); const pop = host.querySelector('#site-search-modal'); if (pop) { pop.showPopover(); const inp = pop.querySelector('input'); if (inp) { inp.focus(); inp.select(); } } } }); }"
+    }
+  },
+
+  "tagName": "site-search",
+  "style": {
+    "display": "block",
+    ".search-result": {
+      "display": "block",
+      "padding": "0.6rem 0.9rem",
+      "borderRadius": "8px",
+      "textDecoration": "none",
+      "color": "var(--color-text-primary)"
+    },
+    ".search-result.is-active": {
+      "backgroundColor": "var(--color-bg-surface)"
+    },
+    ".search-result:hover": {
+      "backgroundColor": "var(--color-bg-surface)"
+    },
+    ".search-result-title": {
+      "fontSize": "0.9rem",
+      "fontWeight": "600"
+    },
+    ".search-result-description": {
+      "fontSize": "0.8rem",
+      "color": "var(--color-text-secondary)",
+      "overflow": "hidden",
+      "textOverflow": "ellipsis",
+      "whiteSpace": "nowrap"
+    },
+    ".search-hit": {
+      "display": "block",
+      "margin": "0.15rem 0 0 0.9rem",
+      "padding": "0.3rem 0.9rem",
+      "borderLeft": "2px solid var(--color-border)",
+      "fontSize": "0.8rem",
+      "color": "var(--color-text-secondary)",
+      "textDecoration": "none"
+    },
+    ".search-hit:hover": {
+      "color": "var(--color-text-primary)",
+      "borderLeftColor": "var(--color-accent)"
+    }
+  },
+
+  "children": [
+    {
+      "$title": "Search Trigger",
+      "tagName": "button",
+      "attributes": {
+        "popovertarget": "site-search-modal",
+        "aria-label": "Search docs"
+      },
+      "style": {
+        "display": "inline-flex",
+        "alignItems": "center",
+        "gap": "0.5rem",
+        "background": "var(--color-bg-surface)",
+        "border": "1px solid var(--color-border)",
+        "borderRadius": "var(--radius)",
+        "color": "var(--color-text-secondary)",
+        "cursor": "pointer",
+        "fontSize": "0.8125rem",
+        "padding": "0.35rem 0.65rem",
+        "transition": "color 0.15s, border-color 0.15s",
+        ":hover": {
+          "color": "var(--color-text-primary)",
+          "borderColor": "var(--color-text-secondary)"
+        }
+      },
+      "children": [
+        "Search",
+        {
+          "tagName": "kbd",
+          "textContent": "⌘K",
+          "style": {
+            "fontFamily": "inherit",
+            "fontSize": "0.6875rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "4px",
+            "padding": "0.05rem 0.3rem",
+            "color": "var(--color-text-secondary)"
+          }
+        }
+      ]
+    },
+    {
+      "$title": "Search Modal",
+      "tagName": "div",
+      "id": "site-search-modal",
+      "attributes": { "popover": "" },
+      "style": {
+        "width": "min(560px, 92vw)",
+        "margin": "12vh auto auto",
+        "padding": "0",
+        "backgroundColor": "var(--color-bg-secondary)",
+        "border": "1px solid var(--color-border)",
+        "borderRadius": "12px",
+        "boxShadow": "0 24px 64px rgba(0, 0, 0, 0.5)",
+        "opacity": "0",
+        "transform": "translateY(-8px)",
+        "transition": "opacity 0.15s ease, transform 0.15s ease, display 0.15s allow-discrete, overlay 0.15s allow-discrete",
+        ":popover-open": { "opacity": "1", "transform": "translateY(0)" },
+        "::backdrop": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": "0",
+          "transition": "opacity 0.15s ease, display 0.15s allow-discrete, overlay 0.15s allow-discrete"
+        },
+        "&:popover-open::backdrop": { "opacity": "1" },
+        "@starting-style": {
+          ":popover-open": { "opacity": "0", "transform": "translateY(-8px)" },
+          "&:popover-open::backdrop": { "opacity": "0" }
+        }
+      },
+      "children": [
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "search",
+            "name": "site-search-query",
+            "placeholder": "Search the docs…",
+            "aria-label": "Search the docs",
+            "autocomplete": "off"
+          },
+          "oninput": { "$ref": "#/state/runSearch" },
+          "onkeydown": {
+            "$prototype": "Function",
+            "arguments": ["state", "e"],
+            "body": "const r = state.searchResults || []; if (e.key === 'ArrowDown') { e.preventDefault(); state.searchActive = Math.min(state.searchActive + 1, r.length - 1); } else if (e.key === 'ArrowUp') { e.preventDefault(); state.searchActive = Math.max(state.searchActive - 1, 0); } else if (e.key === 'Enter') { const g = r[state.searchActive]; if (g) { location.href = g.url; } }"
+          },
+          "style": {
+            "width": "100%",
+            "boxSizing": "border-box",
+            "background": "transparent",
+            "border": "none",
+            "borderBottom": "1px solid var(--color-border)",
+            "outline": "none",
+            "color": "var(--color-text-primary)",
+            "fontSize": "1rem",
+            "padding": "0.9rem 1.1rem"
+          }
+        },
+        {
+          "$title": "Results",
+          "tagName": "div",
+          "style": {
+            "maxHeight": "55vh",
+            "overflowY": "auto",
+            "padding": "0.5rem"
+          },
+          "children": [
+            {
+              "$prototype": "Array",
+              "items": { "$ref": "#/state/searchResults" },
+              "map": {
+                "tagName": "div",
+                "children": [
+                  {
+                    "tagName": "a",
+                    "attributes": {
+                      "href": "${item.url}",
+                      "class": "search-result ${index === state.searchActive ? 'is-active' : ''}"
+                    },
+                    "children": [
+                      {
+                        "tagName": "span",
+                        "attributes": { "class": "search-result-title" },
+                        "textContent": "${item.title}"
+                      },
+                      {
+                        "tagName": "span",
+                        "attributes": { "class": "search-result-description" },
+                        "textContent": "${item.description ? ' — ' + item.description : ''}"
+                      }
+                    ]
+                  },
+                  {
+                    "$prototype": "Array",
+                    "items": { "$ref": "$map/item/hits" },
+                    "map": {
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "tagName": "a",
+                          "attributes": { "href": "${item.url}", "class": "search-hit" },
+                          "textContent": "# ${item.heading}"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$title": "Empty State",
+              "tagName": "div",
+              "textContent": "${state.searchQuery && (!state.searchResults || state.searchResults.length === 0) ? (state.searchReady ? 'No results for \"' + state.searchQuery + '\"' : 'Loading index…') : ''}",
+              "style": {
+                "color": "var(--color-text-secondary)",
+                "fontSize": "0.85rem",
+                "textAlign": "center",
+                "padding": "${state.searchQuery && (!state.searchResults || state.searchResults.length === 0) ? '1rem' : '0'}"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

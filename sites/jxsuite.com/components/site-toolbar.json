@@ -122,6 +122,7 @@
               },
               "children": ["Docs"]
             },
+            { "tagName": "site-search" },
             {
               "tagName": "a",
               "attributes": {

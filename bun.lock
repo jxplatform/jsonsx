@@ -366,6 +366,7 @@
       "dependencies": {
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/parser": "workspace:^",
+        "@jxsuite/search": "workspace:^",
       },
     },
   },

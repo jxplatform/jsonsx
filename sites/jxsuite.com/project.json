@@ -176,6 +176,15 @@
       "format": "json"
     }
   },
+  "search": {
+    "output": "/search-index.json",
+    "collections": {
+      "docs": {
+        "basePath": "/docs/",
+        "boost": { "title": 4, "heading": 2 }
+      }
+    }
+  },
   "redirects": {
     "/docs/get-studio": "/docs/start/install/",
     "/docs/getting-started": "/docs/start/first-project/",
@@ -199,5 +208,5 @@
     "outDir": "./dist",
     "trailingSlash": "always"
   },
-  "extensions": ["@jxsuite/parser"]
+  "extensions": ["@jxsuite/parser", "@jxsuite/search"]
 }

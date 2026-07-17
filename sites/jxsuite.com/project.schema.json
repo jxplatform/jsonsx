@@ -20,6 +20,9 @@
     },
     {
       "$ref": "./node_modules/@jxsuite/parser/schemas/project.fragment.schema.json"
+    },
+    {
+      "$ref": "./node_modules/@jxsuite/search/schemas/project.fragment.schema.json"
     }
   ],
   "type": "object",
