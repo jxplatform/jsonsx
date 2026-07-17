@@ -28,7 +28,7 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
-    "@vue/reactivity": "3.5.39"
+    "@vue/reactivity": "3.5.40"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.10.6"

@@ -82,7 +82,7 @@
     "@spectrum-web-components/toast": "^1.12.2",
     "@spectrum-web-components/tooltip": "^1.12.2",
     "@spectrum-web-components/underlay": "^1.12.2",
-    "@vue/reactivity": "3.5.39",
+    "@vue/reactivity": "3.5.40",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "lit": "^3.3.3",
@@ -97,7 +97,7 @@
     "@types/mdast": "^4.0.4",
     "@webref/css": "^8.7.0",
     "@webref/elements": "^2.7.1",
-    "@webref/idl": "^3.81.3"
+    "@webref/idl": "^3.82.0"
   },
   "//vue-reactivity": "Exact pin required — must match @jxsuite/runtime to avoid cross-boundary proxy bugs"
 }

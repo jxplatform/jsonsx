@@ -2,7 +2,7 @@
   "dependencies": {
     "@webref/css": "^8.7.0",
     "@webref/elements": "^2.7.1",
-    "@webref/idl": "^3.81.3",
+    "@webref/idl": "^3.82.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1"
   },
