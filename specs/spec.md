@@ -1807,7 +1807,7 @@ Conditional nodes compile to their ECMAScript equivalents: `?:` to a parenthesiz
 
 ### 19.9 Editor Evaluation Trace
 
-The interpreter accepts an optional **trace** — a `report(path, value)` callback — so a visual editor can badge every node of an expression with its live value against real component state. This mirrors the dual-mode evaluation pattern proven by Nordcraft's formula editor.
+The interpreter accepts an optional **trace** — a `report(path, value)` callback — so a visual editor can badge every node of an expression with its live value against real component state.
 
 - Every node and `$ref`/nested operand reports its evaluated value, keyed by its path within the expression tree (`["value", "target"]` etc.).
 - Branch-selecting operators (`?:`, `switch`) evaluate **all** branches under trace — the untaken branches' values are reported, then the semantically correct result is returned. (`&&`/`\|\|`/`??` already evaluate both operands eagerly; purity makes this observationally equivalent.)
