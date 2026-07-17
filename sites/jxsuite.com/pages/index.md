@@ -1,39 +1,42 @@
 ---
-title: "Jx Studio — the visual IDE for the web. Free & open source."
+title: Jx Studio — the visual IDE for the web. Free & open source.
 $head:
   - tagName: meta
     attributes:
       name: description
-      content: "Jx Studio is a free, open-source visual IDE for building real websites — design on a canvas, edit content, wire up logic, and commit to git. Every change saves as plain files you own forever."
+      content: Jx Studio is a free, open-source visual IDE for building real websites
+        — design on a canvas, edit content, wire up logic, and commit to git.
+        Every change saves as plain files you own forever.
   - tagName: meta
     attributes:
-      property: "og:title"
-      content: "Jx Studio — the visual IDE for the web."
+      property: og:title
+      content: Jx Studio — the visual IDE for the web.
   - tagName: meta
     attributes:
-      property: "og:description"
-      content: "Design, manage, and ship websites from one desktop app. Saves as plain JSON and Markdown. Open source. Zero lock-in."
+      property: og:description
+      content: Design, manage, and ship websites from one desktop app. Saves as plain
+        JSON and Markdown. Open source. Zero lock-in.
   - tagName: meta
     attributes:
-      property: "og:type"
+      property: og:type
       content: website
 $elements:
-  - "$ref": "../components/cta-button.json"
-  - "$ref": "../components/mode-card.json"
-  - "$ref": "../components/step-card.json"
-  - "$ref": "../components/check-item.json"
-  - "$ref": "../components/stat-card.json"
-  - "$ref": "../components/pillar-card.json"
-  - "$ref": "../components/section-label.json"
-  - "$ref": "../components/interactive-demo.json"
+  - $ref: ../components/cta-button.json
+  - $ref: ../components/mode-card.json
+  - $ref: ../components/step-card.json
+  - $ref: ../components/check-item.json
+  - $ref: ../components/stat-card.json
+  - $ref: ../components/pillar-card.json
+  - $ref: ../components/section-label.json
+  - $ref: ../components/interactive-demo.json
 ---
 
-::::::hero{style.padding="clamp(5rem, 12vw, 9rem) clamp(1rem, 3vw, 2rem) clamp(3rem, 6vw, 5rem)" style.textAlign="center" style.background="radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15), transparent)"}
-:::::div{style.maxWidth="960px" style.margin="0 auto"}
+:::::hero{style.padding="clamp(5rem, 12vw, 9rem) clamp(1rem, 3vw, 2rem) clamp(3rem, 6vw, 5rem)" style.textAlign="center" style.background="radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15), transparent)"}
+::::div{style.maxWidth="960px" style.margin="0 auto"}
 :::div{style.display="inline-flex" style.alignItems="center" style.gap="0.5rem" style.padding="0.375rem 0.875rem" style.borderRadius="999px" style.border="1px solid var(--color-border)" style.backgroundColor="var(--color-bg-surface)" style.fontSize="0.8125rem" style.color="var(--color-text-secondary)" style.marginBottom="2rem"}
 ::span{style.width="6px" style.height="6px" style.borderRadius="50%" style.backgroundColor="#22c55e" style.display="inline-block"}
 
-Free · Open source · macOS, Windows &amp; Linux
+Free · Open source · macOS, Windows & Linux
 :::
 
 :::h1{style.fontSize="clamp(2.5rem, 6vw, 4.5rem)" style.fontWeight="700" style.letterSpacing="-0.04em" style.lineHeight="1.05" style.margin="0 0 1.5rem" style.color="var(--color-text-primary)"}
@@ -49,21 +52,21 @@ Jx Studio is a desktop visual IDE for building real websites. Design on a canvas
 The feel of a visual builder. The power of a framework. The permanence of plain files.
 :::
 
-:::div{style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap" style.marginBottom="0.75rem"}
+:::div{style.gap="0.75rem" style.justifyContent="${}" style.flexWrap="wrap" style.marginBottom="0.75rem"}
 ::cta-button{props.href="/download" props.label="Download Studio" props.variant="primary"}
 
 ::cta-button{props.href="/docs/start/first-project" props.label="Install via CLI" props.variant="secondary"}
 :::
 
 :::p{style.fontSize="0.8125rem" style.color="var(--color-text-muted)" style.margin="0 0 3rem"}
-Free forever · macOS, Windows &amp; Linux · or `bun create @jxsuite my-site`
+Free forever · macOS, Windows & Linux · or `bun create @jxsuite my-site`
 :::
 
-::::div{style.maxWidth="960px" style.margin="0 auto"}
-:::img{src="/screenshots/hero.png" width="3840" height="2400" alt="Jx Studio editing a website — layers panel, live canvas, and element inspector" loading="eager" decoding="async" style.display="block" style.width="100%" style.height="auto" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)" style.boxShadow="0 24px 64px rgba(0, 0, 0, 0.45)"}
+:::div{style.maxWidth="960px" style.margin="0 auto"}
+::img{style.display="block" style.width="100%" style.height="auto" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)" style.boxShadow="0 24px 64px rgba(0, 0, 0, 0.45)" src="/screenshots/hero.png" width="3840" height="2400" alt="Jx Studio editing a website — layers panel, live canvas, and element inspector" loading="eager" decoding="async"}
+:::
 ::::
 :::::
-::::::
 
 ::::::studio-capabilities{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
 :::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
@@ -79,21 +82,11 @@ From the first file to the final commit — organize, write, design, and wire up
 :::
 ::::
 
-:::div{style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(min(420px, 100%), 1fr))" style.gap="1.5rem"}
-::mode-card{props.name="Manage" props.image="/screenshots/mode-manage.png" props.imageAlt="Jx Studio Manage Files modal with live previews of every page, component, and content file" props.description="Browse every page, component, and content type with live previews. Upload media, and build content models with schemas — the CMS layer, without the CMS."}
-
-::mode-card{props.name="Edit" props.image="/screenshots/mode-edit.png" props.imageAlt="Jx Studio editing markdown content inline with a WYSIWYG editor" props.description="Click any text and type. Slash commands for headings, lists, images, and tables. Frontmatter forms alongside. Saves as clean Markdown."}
-
-::mode-card{props.name="Design" props.image="/screenshots/mode-design.png" props.imageAlt="Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector" props.description="A live canvas for every breakpoint and a full CSS inspector — spacing, type, color, layout, hover states, and design tokens."}
-
-::mode-card{props.name="Script" props.image="/screenshots/mode-script.png" props.imageAlt="Jx Studio editing a component state function in the Monaco code editor" props.description="State, data, and events in structured panels, plus a Monaco editor for functions. Add a calculator, a form, or a live fetch — without ejecting."}
-:::
-
-:::div{style.textAlign="center" style.marginTop="2.5rem"}
-:::a{href="/studio" style.color="var(--color-accent)" style.textDecoration="none" style.fontWeight="600" style.fontSize="1rem"}
+::::div{style.textAlign="center" style.marginTop="2.5rem"}
+:::a{style.color="var(--color-accent)" style.textDecoration="none" style.fontWeight="600" style.fontSize="1rem" href="/studio"}
 Take the full tour of Studio →
 :::
-:::
+::::
 :::::
 ::::::
 
@@ -125,7 +118,7 @@ Most visual builders trap your work in a proprietary format you can't read, can'
 :::div{style.padding="1.5rem" style.borderRadius="var(--radius)" style.border="1px solid var(--color-border)" style.backgroundColor="var(--color-bg-surface)" style.fontFamily="var(--font-mono)" style.fontSize="0.8125rem" style.lineHeight="2" style.color="var(--color-text-secondary)"}
 :span[Workflow]{style.display="block" style.fontSize="0.6875rem" style.letterSpacing="0.1em" style.textTransform="uppercase" style.color="var(--color-accent)" style.marginBottom="0.5rem"}
 1\. Design in Studio\
-2\. Commit &amp; push from Studio's git panel\
+2\. Commit & push from Studio's git panel\
 3\. Your host builds on push\
 4\. Live on a CDN in seconds
 :::
@@ -152,23 +145,22 @@ Webflow and Wix give you a canvas but keep your work. Astro and Hugo give you th
 :::
 ::::
 
-::::div{style.overflowX="auto" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)"}
+:::div{style.overflowX="auto" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)"}
 
 |                    | Visual Builder | Low Maintenance | Fast Output   | No Lock-in |
 | ------------------ | -------------- | --------------- | ------------- | ---------- |
 | WordPress          | ✓              | ✗ Heavy         | ✗ Patchy      | ✗ High     |
-| Headless + Next.js | ✗ None         | ✗ Heavy         | ✓ Strong      | ~ Medium   |
+| Headless + Next.js | ✗ None         | ✗ Heavy         | ✓ Strong      | \~ Medium  |
 | Astro / Hugo       | ✗ None         | ✓ Light         | ✓ Strong      | ✓ Open     |
 | Webflow            | ✓ Yes          | ✓ Light         | ✓ Strong      | ✗ Total    |
 | Wix / Squarespace  | ✓ Yes          | ✓ Light         | ✗ Slow        | ✗ Total    |
 | **Jx Studio**      | **✓ Studio**   | **✓ Zero**      | **✓ Perfect** | **✓ MIT**  |
+| :::                |
+| :::::              |
+| ::::::             |
 
-::::
-:::::
-::::::
-
-::::::stats{style.padding="clamp(3rem, 6vw, 4rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
-:::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
+:::::stats{style.padding="clamp(3rem, 6vw, 4rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
+::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
 :::div{style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))" style.gap="1rem"}
 ::stat-card{props.value="100" props.label="Lighthouse score out of the box"}
 
@@ -178,8 +170,8 @@ Webflow and Wix give you a canvas but keep your work. Astro and Hugo give you th
 
 ::stat-card{props.value="<1s" props.label="Build time for a typical 50-page site"}
 :::
+::::
 :::::
-::::::
 
 ::::::under-the-hood{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
 :::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
@@ -195,7 +187,7 @@ Everything you design compiles from — and saves back to — plain JSON-DOM. Re
 :::
 ::::
 
-::interactive-demo{}
+::interactive-demo
 
 :::div{style.marginTop="3rem" style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(260px, 1fr))" style.gap="1rem"}
 ::pillar-card{props.icon="📄" props.title="File-Based CMS" props.description="JSON documents and Markdown content. No database, no admin panel. Git is your CMS — branch, merge, review, deploy." props.features="Content collections · Markdown + directives · Frontmatter schemas · Dynamic routes"}
@@ -205,13 +197,13 @@ Everything you design compiles from — and saves back to — plain JSON-DOM. Re
 ::pillar-card{props.icon="🚀" props.title="Static Generator" props.description="Compiles to pure HTML, CSS, and minimal JS. Deploy to any static host — Cloudflare Pages, GitHub Pages, Vercel, or a $5 VPS." props.features="Zero runtime · Image optimization · Code splitting · <100ms builds"}
 :::
 
-:::div{style.textAlign="center" style.marginTop="2.5rem" style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap" style.alignItems="center"}
+::::div{style.textAlign="center" style.marginTop="2.5rem" style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap" style.alignItems="center" style.flexDirection="column"}
 :::p{style.color="var(--color-text-muted)" style.fontSize="0.9375rem" style.margin="0" style.fontFamily="var(--font-mono)"}
 Rather script than click? `bun create @jxsuite my-site`
 :::
 
 ::cta-button{props.href="https://github.com/jxsuite/jx" props.label="View on GitHub" props.variant="secondary" props.newTab="true"}
-:::
+::::
 :::::
 ::::::
 
@@ -228,15 +220,15 @@ Three steps to production.
 :::div{style.display="grid" style.gridTemplateColumns="repeat(3, 1fr)" style.gap="2rem" style.--md.gridTemplateColumns="1fr"}
 ::step-card{props.number="1" props.title="Author" props.description="Design visually in Studio, or hand-write JSON and Markdown. Every format is a plain file in git."}
 
-::step-card{props.number="2" props.title="Commit &amp; push" props.description="Commit and sync straight from Studio's git panel — or the CLI. No deploy scripts, no origin server."}
+::step-card{props.number="2" props.title="Commit & push" props.description="Commit and sync straight from Studio's git panel — or the CLI. No deploy scripts, no origin server."}
 
 ::step-card{props.number="3" props.title="Go live" props.description="Your host builds on push — Cloudflare, GitHub Pages, a Node or Bun adapter, or any static server. Live on a CDN in seconds."}
 :::
 :::::
 ::::::
 
-::::::bottom-cta{style.padding="clamp(5rem, 10vw, 8rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)" style.textAlign="center" style.background="radial-gradient(ellipse 60% 50% at 50% 100%, rgba(59, 130, 246, 0.1), transparent)"}
-:::::div{style.maxWidth="640px" style.margin="0 auto"}
+:::::bottom-cta{style.padding="clamp(5rem, 10vw, 8rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)" style.textAlign="center" style.background="radial-gradient(ellipse 60% 50% at 50% 100%, rgba(59, 130, 246, 0.1), transparent)"}
+::::div{style.maxWidth="640px" style.margin="0 auto"}
 :::h2{style.fontSize="clamp(2rem, 4vw, 3rem)" style.fontWeight="700" style.letterSpacing="-0.03em" style.margin="0 0 1.5rem" style.lineHeight="1.1"}
 The websites of 2030\
 :span[are built in 2026.]{style.color="var(--color-accent)"}
@@ -251,5 +243,5 @@ No accounts, no subscriptions, no vendor approval. Download Studio, or clone the
 
 ::cta-button{props.href="/docs/start/first-project" props.label="Read the docs" props.variant="secondary"}
 :::
+::::
 :::::
-::::::
