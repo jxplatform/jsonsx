@@ -1007,9 +1007,27 @@
             "$ref": "#/$defs/ExpressionOperand"
           },
           "type": "array"
+        },
+        {
+          "description": "Plain-object literal (e.g. an Intl options bag). Objects carrying $ref or operator keys are pointers/nodes, never literals.",
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "$ref"
+                ]
+              },
+              {
+                "required": [
+                  "operator"
+                ]
+              }
+            ]
+          },
+          "type": "object"
         }
       ],
-      "description": "A non-reactive operand: scalar or array of operands."
+      "description": "A non-reactive operand: scalar, plain-object literal, or array of operands."
     },
     "ExpressionOperand": {
       "anyOf": [
@@ -1392,7 +1410,7 @@
           "title": "Pure method — genuine prototype methods; receiver in target, args in value"
         },
         {
-          "description": "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, Intl.*) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
+          "description": "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, and the Intl helpers Intl/formatNumber, Intl/formatDate, Intl/formatRelativeTime) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
           "not": {
             "required": [
               "initial"

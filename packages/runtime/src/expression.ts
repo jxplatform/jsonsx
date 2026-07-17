@@ -177,7 +177,35 @@ export const BLESSED_GLOBALS = new Set([
   // String
   "String/fromCharCode",
   "String/fromCodePoint",
+  // Intl (synthetic helpers — see BLESSED_HELPERS; Intl formatters are constructors,
+  // So the plain-function call shape wraps construct-then-format)
+  "Intl/formatNumber",
+  "Intl/formatDate",
+  "Intl/formatRelativeTime",
 ]);
+
+/**
+ * Synthetic blessed helpers (spec §19.4c): pure functions that have no direct `window` global
+ * because the underlying standard-library API is a constructor. The interpreter dispatches to
+ * these; the compiler emits the equivalent inline construct-then-format expression.
+ */
+const BLESSED_HELPERS: Record<string, (...a: unknown[]) => unknown> = {
+  "Intl/formatDate": (value, locale, options) =>
+    new Intl.DateTimeFormat(
+      locale as string | undefined,
+      options as Intl.DateTimeFormatOptions | undefined,
+    ).format(new Date(value as string | number | Date)),
+  "Intl/formatNumber": (value, locale, options) =>
+    new Intl.NumberFormat(
+      locale as string | undefined,
+      options as Intl.NumberFormatOptions | undefined,
+    ).format(value as number),
+  "Intl/formatRelativeTime": (value, unit, locale, options) =>
+    new Intl.RelativeTimeFormat(
+      locale as string | undefined,
+      options as Intl.RelativeTimeFormatOptions | undefined,
+    ).format(value as number, unit as Intl.RelativeTimeFormatUnit),
+};
 
 /** Whether a `window#/…` callee ref is on the blessed pure-globals list. */
 export function isBlessedGlobal(ref: string): boolean {
@@ -443,6 +471,10 @@ function evaluateNode(
         throw new Error(`$expression: "${calleeRef}" is not a blessed pure global`);
       }
       const globalPath = calleeRef.slice("window#/".length);
+      const helper = BLESSED_HELPERS[globalPath];
+      if (helper) {
+        return helper(...argValues);
+      }
       const fn = getPath(globalThis.window, globalPath) as (...a: unknown[]) => unknown;
       const lastSlash = globalPath.lastIndexOf("/");
       const thisArg =
@@ -845,6 +877,32 @@ function compileTarget(target: unknown, opts: CompileOpts): string {
  * @param {CompileOpts} [opts]
  * @returns {string}
  */
+/**
+ * Emit the inline JS for a synthetic blessed helper (see BLESSED_HELPERS), or null for ordinary
+ * globals that compile to a plain `window.<path>` call.
+ *
+ * @param {string} path - The `window#/`-stripped callee path (e.g. "Intl/formatNumber")
+ * @param {string[]} args - Already-compiled argument expressions
+ * @returns {string | null}
+ */
+function compileHelperCall(path: string, args: string[]): string | null {
+  const a = (i: number) => args[i] ?? "undefined";
+  switch (path) {
+    case "Intl/formatNumber": {
+      return `new Intl.NumberFormat(${a(1)}, ${a(2)}).format(${a(0)})`;
+    }
+    case "Intl/formatDate": {
+      return `new Intl.DateTimeFormat(${a(1)}, ${a(2)}).format(new Date(${a(0)}))`;
+    }
+    case "Intl/formatRelativeTime": {
+      return `new Intl.RelativeTimeFormat(${a(2)}, ${a(3)}).format(${a(0)}, ${a(1)})`;
+    }
+    default: {
+      return null;
+    }
+  }
+}
+
 export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}): string {
   const { operator, target, value, initial } = node;
 
@@ -866,6 +924,10 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
     if (calleeRef.startsWith("window#/")) {
       if (!isBlessedGlobal(calleeRef)) {
         throw new Error(`$expression: "${calleeRef}" is not a blessed pure global`);
+      }
+      const helperJs = compileHelperCall(calleeRef.slice("window#/".length), args);
+      if (helperJs) {
+        return helperJs;
       }
       return `window.${calleeRef.slice("window#/".length).replaceAll("/", ".")}(${args.join(", ")})`;
     }

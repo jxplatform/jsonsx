@@ -383,6 +383,19 @@ function pureMethodEntry(op: string): FormulaCatalogEntry {
 
 // ─── Blessed globals (derived) ──────────────────────────────────────────────
 
+/**
+ * Synthetic blessed helpers wrap constructor-shaped standard-library APIs (spec §19.4c); their
+ * catalog descriptions name the wrapped API rather than claiming a literal global exists.
+ */
+const HELPER_DESCRIPTIONS: Record<string, string> = {
+  "Intl/formatDate":
+    "Intl.formatDate(value, locale?, options?) — blessed helper wrapping new Intl.DateTimeFormat(locale, options).format(new Date(value)).",
+  "Intl/formatNumber":
+    "Intl.formatNumber(value, locale?, options?) — blessed helper wrapping new Intl.NumberFormat(locale, options).format(value).",
+  "Intl/formatRelativeTime":
+    "Intl.formatRelativeTime(value, unit, locale?, options?) — blessed helper wrapping new Intl.RelativeTimeFormat(locale, options).format(value, unit).",
+};
+
 /** Catalog entries derived from `BLESSED_GLOBALS`; grouped by namespace (bare → globalThis). */
 export function globalEntries(): FormulaCatalogEntry[] {
   const out: FormulaCatalogEntry[] = [];
@@ -391,7 +404,9 @@ export function globalEntries(): FormulaCatalogEntry[] {
     const group = slash === -1 ? "globalThis" : name.slice(0, slash);
     const label = name.replaceAll("/", ".");
     out.push({
-      description: `${label} — blessed pure global from the ECMAScript standard library, invoked via the call operator (window#/${name}).`,
+      description:
+        HELPER_DESCRIPTIONS[name] ??
+        `${label} — blessed pure global from the ECMAScript standard library, invoked via the call operator (window#/${name}).`,
       group,
       insert: () => ({ operator: "call", target: { $ref: `window#/${name}` }, value: [] }),
       kind: "global",

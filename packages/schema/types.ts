@@ -88,7 +88,9 @@ export type JxExpressionOperand =
   | number
   | boolean
   | null
-  | JxExpressionOperand[];
+  | JxExpressionOperand[]
+  // Plain-object literal (e.g. an Intl options bag); $ref/operator shapes are the members above.
+  | Record<string, JsonValue>;
 
 export interface JxExpressionNode {
   operator: string;

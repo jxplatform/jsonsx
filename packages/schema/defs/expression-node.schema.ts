@@ -19,8 +19,14 @@ export const expressionLiteralSchema = {
     { type: "boolean" },
     { type: "null" },
     { items: { $ref: "#/$defs/ExpressionOperand" }, type: "array" },
+    {
+      description:
+        "Plain-object literal (e.g. an Intl options bag). Objects carrying $ref or operator keys are pointers/nodes, never literals.",
+      not: { anyOf: [{ required: ["$ref"] }, { required: ["operator"] }] },
+      type: "object",
+    },
   ],
-  description: "A non-reactive operand: scalar or array of operands.",
+  description: "A non-reactive operand: scalar, plain-object literal, or array of operands.",
 } as const;
 
 export const expressionOperandSchema = {
@@ -193,7 +199,7 @@ export const expressionNodeSchema = {
     },
     {
       description:
-        "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, Intl.*) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
+        "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, and the Intl helpers Intl/formatNumber, Intl/formatDate, Intl/formatRelativeTime) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
       not: { required: ["initial"] },
       properties: {
         operator: { $ref: "#/$defs/CallOperator" },

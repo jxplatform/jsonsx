@@ -1044,6 +1044,69 @@ describe("call operator — named formulas and blessed globals", () => {
     ).toEqual(["a", "b"]);
   });
 
+  test("Intl helpers construct-then-format (spec §19.4c)", () => {
+    expect(
+      evaluateExpression(
+        {
+          operator: "call",
+          target: ref("window#/Intl/formatNumber"),
+          value: [1234.5, "en-US", { currency: "USD", style: "currency" }],
+        },
+        {},
+        null,
+      ),
+    ).toBe("$1,234.50");
+    expect(
+      evaluateExpression(
+        { operator: "call", target: ref("window#/Intl/formatNumber"), value: [1234.5, "en-US"] },
+        {},
+        null,
+      ),
+    ).toBe("1,234.5");
+    expect(
+      evaluateExpression(
+        {
+          operator: "call",
+          target: ref("window#/Intl/formatDate"),
+          value: ["2026-01-15T12:00:00Z", "en-US", { dateStyle: "medium", timeZone: "UTC" }],
+        },
+        {},
+        null,
+      ),
+    ).toBe("Jan 15, 2026");
+    expect(
+      evaluateExpression(
+        {
+          operator: "call",
+          target: ref("window#/Intl/formatRelativeTime"),
+          value: [-3, "day", "en-US"],
+        },
+        {},
+        null,
+      ),
+    ).toBe("3 days ago");
+  });
+
+  test("Intl helpers compile to inline construct-then-format JS", () => {
+    const js = compileExpression({
+      operator: "call",
+      target: ref("window#/Intl/formatNumber"),
+      value: [ref("#/state/total"), "en-US"],
+    });
+    expect(js).toBe('new Intl.NumberFormat("en-US", undefined).format(state.total)');
+    const fn = new Function("state", `return ${js}`) as (s: unknown) => string;
+    expect(fn({ total: 1234.5 })).toBe("1,234.5");
+
+    const dateJs = compileExpression({
+      operator: "call",
+      target: ref("window#/Intl/formatDate"),
+      value: [ref("#/state/when"), "en-US", { dateStyle: "medium", timeZone: "UTC" }],
+    });
+    expect(dateJs).toContain("new Intl.DateTimeFormat(");
+    const dateFn = new Function("state", `return ${dateJs}`) as (s: unknown) => string;
+    expect(dateFn({ when: "2026-01-15T12:00:00Z" })).toBe("Jan 15, 2026");
+  });
+
   test("non-blessed globals are rejected at evaluation", () => {
     expect(isBlessedGlobal("window#/Math/max")).toBe(true);
     expect(isBlessedGlobal("window#/alert")).toBe(false);
