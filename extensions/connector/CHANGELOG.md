@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/jxsuite/jx/compare/connector-v0.2.0...connector-v0.3.0) (2026-07-17)
+
+
+### Features
+
+* **studio:** spreadsheet grid editor — CSV grid tabs with batch save ([6736c02](https://github.com/jxsuite/jx/commit/6736c027d57fb438fb7aa0a9f333a41cc477e0a4))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.1.0
+
 ## [0.2.0](https://github.com/jxsuite/jx/compare/connector-v0.1.0...connector-v0.2.0) (2026-07-13)
 
 ### Features

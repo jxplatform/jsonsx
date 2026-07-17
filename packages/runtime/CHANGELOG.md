@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.1.0](https://github.com/jxsuite/jx/compare/runtime-v1.0.0...runtime-v1.1.0) (2026-07-17)
+
+
+### Features
+
+* **runtime,compiler:** named formulas — call operator, $args scheme, blessed globals ([24d516b](https://github.com/jxsuite/jx/commit/24d516bd3310fdd2630507b38d25a0a87d080e46))
+* **runtime,schema,formulas:** pure method operators and the composite formula catalog (spec §19.4d) ([58be3b1](https://github.com/jxsuite/jx/commit/58be3b1aac98ae50b7b1be543fa765c5c83adc46))
+* **runtime,schema,studio:** blessed Intl helpers and object-literal expression operands ([e77a1f2](https://github.com/jxsuite/jx/commit/e77a1f233d28221a9e7b7209c234914d7988ef4d))
+* **schema,runtime,studio:** structured function bodies and the statement editor (spec §20) ([1bc949a](https://github.com/jxsuite/jx/commit/1bc949ad6961513152066aee33d7a95f5a975fb2))
+* **schema,runtime:** conditional operators and editor evaluation trace (spec §19.4b, §19.9) ([7992624](https://github.com/jxsuite/jx/commit/79926245807f27773e55da61374c05aa5f33dbd4))
+* **studio:** inline editing of component property bound text ([898dbcb](https://github.com/jxsuite/jx/commit/898dbcbff5a9db6e1f4369515bec1f52baa2fa70))
+* **studio:** spreadsheet grid editor — CSV grid tabs with batch save ([6736c02](https://github.com/jxsuite/jx/commit/6736c027d57fb438fb7aa0a9f333a41cc477e0a4))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.1.0
+
 ## [1.0.0](https://github.com/jxsuite/jx/compare/runtime-v0.34.2...runtime-v1.0.0) (2026-07-13)
 
 ### ⚠ BREAKING CHANGES

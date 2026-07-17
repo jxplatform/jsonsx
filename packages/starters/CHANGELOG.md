@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0](https://github.com/jxsuite/jx/compare/starters-v1.0.0...starters-v1.1.0) (2026-07-17)
+
+
+### Features
+
+* **studio:** spreadsheet grid editor — CSV grid tabs with batch save ([6736c02](https://github.com/jxsuite/jx/commit/6736c027d57fb438fb7aa0a9f333a41cc477e0a4))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @jxsuite/schema bumped to 1.1.0
+
 ## [1.0.0](https://github.com/jxsuite/jx/compare/starters-v0.35.1...starters-v1.0.0) (2026-07-13)
 
 ### ⚠ BREAKING CHANGES

@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.0](https://github.com/jxsuite/jx/compare/protocol-v0.4.0...protocol-v0.5.0) (2026-07-17)
+
+
+### Features
+
+* **studio:** spreadsheet grid editor — CSV grid tabs with batch save ([6736c02](https://github.com/jxsuite/jx/commit/6736c027d57fb438fb7aa0a9f333a41cc477e0a4))
+
+
+### Bug Fixes
+
+* **studio,compiler,parser,protocol,auth:** keep the promises the docs audit surfaced ([03ac07f](https://github.com/jxsuite/jx/commit/03ac07ff3a53c125587050a277b3dfa7b0ce86b6))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.1.0
+
 ## [0.4.0](https://github.com/jxsuite/jx/compare/protocol-v0.3.1...protocol-v0.4.0) (2026-07-13)
 
 ### Features

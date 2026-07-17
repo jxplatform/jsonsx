@@ -1,5 +1,48 @@
 # Changelog
 
+## [1.1.0](https://github.com/jxsuite/jx/compare/studio-v1.0.0...studio-v1.1.0) (2026-07-17)
+
+
+### Features
+
+* **formulas:** packaging, docs, and studio copy-in consumption ([f5df14f](https://github.com/jxsuite/jx/commit/f5df14f125b2fca2224cce68aa4674b3c7d9071a))
+* **runtime,schema,formulas:** pure method operators and the composite formula catalog (spec §19.4d) ([58be3b1](https://github.com/jxsuite/jx/commit/58be3b1aac98ae50b7b1be543fa765c5c83adc46))
+* **runtime,schema,studio:** blessed Intl helpers and object-literal expression operands ([e77a1f2](https://github.com/jxsuite/jx/commit/e77a1f233d28221a9e7b7209c234914d7988ef4d))
+* **schema,runtime,studio:** structured function bodies and the statement editor (spec §20) ([1bc949a](https://github.com/jxsuite/jx/commit/1bc949ad6961513152066aee33d7a95f5a975fb2))
+* **studio:** collection grids with rich cells — bulk frontmatter editing ([28dc589](https://github.com/jxsuite/jx/commit/28dc58950e1d2d7f44ed0d876f51a47dc22c189f))
+* **studio:** consolidated field mode switcher ([0a135ed](https://github.com/jxsuite/jx/commit/0a135ed1a689d2c7fa6588833dc5c9da504a6a65))
+* **studio:** dedicated zoom level on editor mode ([72ec8b7](https://github.com/jxsuite/jx/commit/72ec8b768f536e8c502d6fb6ec388f931f7af272))
+* **studio:** dynamic-slot control and live expression value badges ([d7bd673](https://github.com/jxsuite/jx/commit/d7bd673b3fa1c07cf43b52902f3fa29616b234c8))
+* **studio:** formula catalog, search palette, chip pipeline, fx everywhere ([c588391](https://github.com/jxsuite/jx/commit/c5883918d04565d25098d9a3c812b6f14ee7a16b))
+* **studio:** full-screen formula workspace ([d6195eb](https://github.com/jxsuite/jx/commit/d6195eb160b5d07d86229fe532d444ab963a96d3))
+* **studio:** grid polish — find & replace, column layout persistence ([fe5f223](https://github.com/jxsuite/jx/commit/fe5f2232c5ea007ceb1e3e59a1b4328f8dc9525f))
+* **studio:** inline editing of component property bound text ([898dbcb](https://github.com/jxsuite/jx/commit/898dbcbff5a9db6e1f4369515bec1f52baa2fa70))
+* **studio:** live-context expression previews and component test props ([8e502c2](https://github.com/jxsuite/jx/commit/8e502c236be9538eb1a2ca1f8f2caec2ae50bc6b))
+* **studio:** pages + connector grid tabs; the modal data grid retires ([a341ab3](https://github.com/jxsuite/jx/commit/a341ab301ac6e03a9073517c7f49bce4e0eb9cd1))
+* **studio:** persistent ai sidebar + project bootstrap capabilities ([3d6f9eb](https://github.com/jxsuite/jx/commit/3d6f9ebf40c88a34939b9ed525618931b700a25c))
+* **studio:** properties panel for content type frontmatter/metadata ([2ef24f4](https://github.com/jxsuite/jx/commit/2ef24f4075653b2cee4ee361db0ad3fb6f733090))
+* **studio:** spreadsheet grid editor — CSV grid tabs with batch save ([6736c02](https://github.com/jxsuite/jx/commit/6736c027d57fb438fb7aa0a9f333a41cc477e0a4))
+* **studio:** wheel-scrollable tab strip + active-tab reveal ([09c5c3b](https://github.com/jxsuite/jx/commit/09c5c3bb500e8b1548b09e0996b73a130d8f2069))
+
+
+### Bug Fixes
+
+* **studio,compiler,parser,protocol,auth:** keep the promises the docs audit surfaced ([03ac07f](https://github.com/jxsuite/jx/commit/03ac07ff3a53c125587050a277b3dfa7b0ce86b6))
+* **studio:** component registry regression ([ac3ff48](https://github.com/jxsuite/jx/commit/ac3ff48719ca476b0f33510664fb375e4a7fd11e))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.4.0
+    * @jxsuite/create bumped to 1.1.0
+    * @jxsuite/formulas bumped to 0.0.2
+    * @jxsuite/markup bumped to 0.3.0
+    * @jxsuite/protocol bumped to 0.5.0
+    * @jxsuite/runtime bumped to 1.1.0
+    * @jxsuite/schema bumped to 1.1.0
+
 ## [1.0.0](https://github.com/jxsuite/jx/compare/studio-v0.37.1...studio-v1.0.0) (2026-07-13)
 
 ### ⚠ BREAKING CHANGES

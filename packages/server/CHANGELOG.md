@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.1.0](https://github.com/jxsuite/jx/compare/server-v1.0.0...server-v1.1.0) (2026-07-17)
+
+
+### Features
+
+* **compiler,server,create:** jx dev and jx preview — the scaffolded scripts now work ([c0ff0d9](https://github.com/jxsuite/jx/commit/c0ff0d9d36715886b3f819b8d7ceebd682593583))
+* **studio:** spreadsheet grid editor — CSV grid tabs with batch save ([6736c02](https://github.com/jxsuite/jx/commit/6736c027d57fb438fb7aa0a9f333a41cc477e0a4))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.4.0
+    * @jxsuite/compiler bumped to 1.1.0
+    * @jxsuite/create bumped to 1.1.0
+    * @jxsuite/import bumped to 0.37.0
+    * @jxsuite/protocol bumped to 0.5.0
+    * @jxsuite/runtime bumped to 1.1.0
+    * @jxsuite/schema bumped to 1.1.0
+    * @jxsuite/starters bumped to 1.1.0
+  * devDependencies
+    * @jxsuite/auth bumped to 0.3.0
+    * @jxsuite/connector bumped to 0.3.0
+    * @jxsuite/parser bumped to 1.1.0
+
 ## [1.0.0](https://github.com/jxsuite/jx/compare/server-v0.37.1...server-v1.0.0) (2026-07-13)
 
 ### ⚠ BREAKING CHANGES
