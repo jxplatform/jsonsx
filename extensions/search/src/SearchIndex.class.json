@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/search/SearchIndex.class.json",
+  "title": "SearchIndex",
+  "description": "Search project section for Jx: normalizes the project.json `search` section into _project.search and emits the site's search index into the build output",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./search-index.js",
+
+  "project": {
+    "key": "search",
+    "title": "Site Search",
+    "description": "Build-time search index generated from content collections"
+  },
+
+  "$studio": {
+    "settings": {
+      "icon": "sp-icon-search",
+      "label": "Site Search",
+      "order": 70,
+      "layout": "form"
+    }
+  },
+
+  "$defs": {
+    "returnTypes": {
+      "NormalizedSearchConfig": {
+        "type": "object",
+        "description": "The search section with schema defaults applied (engine, output, per-collection fields/boost/sections)"
+      },
+      "EmitFiles": {
+        "type": "array",
+        "description": "One emitted file: the search-index JSON envelope at the configured output path",
+        "items": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "content": { "type": "string" }
+          },
+          "required": ["path", "content"]
+        }
+      }
+    },
+
+    "methods": {
+      "projectData": {
+        "role": "projectData",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "projectData",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "sectionValue",
+            "type": { "type": "object" },
+            "description": "The project.json `search` section value"
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/NormalizedSearchConfig" },
+        "description": "Normalize the search section (defaults applied) into _project.search"
+      },
+      "emit": {
+        "role": "emit",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "emit",
+        "timing": ["compiler"],
+        "parameters": [
+          {
+            "identifier": "sectionValue",
+            "type": { "type": "object" },
+            "description": "The project.json `search` section value"
+          },
+          {
+            "identifier": "ctx",
+            "type": {
+              "type": "object",
+              "properties": {
+                "projectConfig": { "type": "object" },
+                "root": { "type": "string" },
+                "sections": { "type": "object" },
+                "routes": { "type": "array" }
+              }
+            },
+            "description": "Host context: { projectConfig, root, sections, routes } (extensions.md §8.4)"
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/EmitFiles" },
+        "description": "Build the search-index JSON from the loaded content collections; the host writes it into dist"
+      }
+    }
+  }
+}

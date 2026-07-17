@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schema/ext/search/project/v1",
+  "title": "Jx search section",
+  "description": "Site search: which content collections to index at build time and where the index is emitted",
+  "type": "object",
+  "properties": {
+    "search": {
+      "type": "object",
+      "description": "Build-time search index configuration (@jxsuite/search)",
+      "properties": {
+        "engine": {
+          "type": "string",
+          "enum": ["minisearch"],
+          "default": "minisearch",
+          "description": "Client search engine the emitted index targets"
+        },
+        "output": {
+          "type": "string",
+          "default": "/search-index.json",
+          "description": "Site-relative path of the emitted index file"
+        },
+        "collections": {
+          "type": "object",
+          "description": "Content collections to index, keyed by collection name",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "basePath": {
+                "type": "string",
+                "description": "URL prefix mapping entry ids to routes, e.g. \"/docs/\""
+              },
+              "fields": {
+                "type": "array",
+                "items": { "type": "string" },
+                "default": ["title", "heading", "text"],
+                "description": "Document fields the index searches"
+              },
+              "boost": {
+                "type": "object",
+                "additionalProperties": { "type": "number" },
+                "description": "Per-field score boosts, e.g. { \"title\": 4, \"heading\": 2 }"
+              },
+              "sections": {
+                "type": "boolean",
+                "default": true,
+                "description": "Also index one document per heading section with #anchor deep links"
+              },
+              "sectionDepth": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 6,
+                "default": 3,
+                "description": "Deepest heading level that starts its own section document"
+              }
+            },
+            "required": ["basePath"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["collections"],
+      "additionalProperties": false
+    }
+  }
+}

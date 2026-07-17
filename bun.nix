@@ -912,6 +912,7 @@
   "@jxsuite/protocol" = copyPathToStore ./packages/protocol;
   "@jxsuite/runtime" = copyPathToStore ./packages/runtime;
   "@jxsuite/schema" = copyPathToStore ./packages/schema;
+  "@jxsuite/search" = copyPathToStore ./extensions/search;
   "@jxsuite/server" = copyPathToStore ./packages/server;
   "@jxsuite/site-jxsuite.com" = copyPathToStore ./sites/jxsuite.com;
   "@jxsuite/starters" = copyPathToStore ./packages/starters;
@@ -3535,6 +3536,10 @@
   "minipass@7.1.3" = fetchurl {
     url = "https://registry.npmjs.org/minipass/-/minipass-7.1.3.tgz";
     hash = "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==";
+  };
+  "minisearch@7.2.0" = fetchurl {
+    url = "https://registry.npmjs.org/minisearch/-/minisearch-7.2.0.tgz";
+    hash = "sha512-dqT2XBYUOZOiC5t2HRnwADjhNS2cecp9u+TJRiJ1Qp/f5qjkeT5APcGPjHw+bz89Ms8Jp+cG4AlE+QZ/QnDglg==";
   };
   "mitt@3.0.1" = fetchurl {
     url = "https://registry.npmjs.org/mitt/-/mitt-3.0.1.tgz";

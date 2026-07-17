@@ -1,0 +1,46 @@
+{
+  "name": "@jxsuite/search",
+  "version": "0.1.0",
+  "description": "Static site search for Jx: build-time index emission from content collections and a headless MiniSearch browser client",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "extensions/search"
+  },
+  "files": [
+    "src/",
+    "dist",
+    "jx-extension.json",
+    "schemas/"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/search-index.ts",
+    "./client": "./src/client.ts",
+    "./search-state": "./src/search-state.ts",
+    "./shared": "./src/shared.ts",
+    "./jx-extension.json": "./jx-extension.json",
+    "./schemas/project.fragment.schema.json": "./schemas/project.fragment.schema.json",
+    "./SearchIndex.class.json": "./src/SearchIndex.class.json",
+    "./Search.class.json": "./src/Search.class.json"
+  },
+  "publishConfig": {
+    "provenance": true
+  },
+  "scripts": {
+    "prepare": "bun build src/search-index.ts src/search-state.ts --outdir=dist --format=esm --target=node",
+    "build": "bun run prepare",
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage",
+    "upgrade": "bunx npm-check-updates -u && bun install"
+  },
+  "dependencies": {
+    "@jxsuite/schema": "workspace:^",
+    "minisearch": "^7.2.0"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
+  },
+  "jx": "./jx-extension.json"
+}

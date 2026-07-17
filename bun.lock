@@ -95,6 +95,17 @@
         "ajv": "^8.20.0",
       },
     },
+    "extensions/search": {
+      "name": "@jxsuite/search",
+      "version": "0.1.0",
+      "dependencies": {
+        "@jxsuite/schema": "workspace:^",
+        "minisearch": "^7.2.0",
+      },
+      "devDependencies": {
+        "ajv": "^8.20.0",
+      },
+    },
     "packages/ai": {
       "name": "@jxsuite/ai",
       "version": "0.33.0",
@@ -824,6 +835,8 @@
     "@jxsuite/runtime": ["@jxsuite/runtime@workspace:packages/runtime"],
 
     "@jxsuite/schema": ["@jxsuite/schema@workspace:packages/schema"],
+
+    "@jxsuite/search": ["@jxsuite/search@workspace:extensions/search"],
 
     "@jxsuite/server": ["@jxsuite/server@workspace:packages/server"],
 
@@ -2000,6 +2013,8 @@
     "minimist-options": ["minimist-options@4.1.0", "", { "dependencies": { "arrify": "^1.0.1", "is-plain-obj": "^1.1.0", "kind-of": "^6.0.3" } }, "sha512-Q4r8ghd80yhO/0j1O3B2BjweX3fiHg9cdOwjJd2J76Q135c+NDxGCqdYKQ1SKBuFfgWbAUzBfvYjPUEeNgqN1A=="],
 
     "minipass": ["minipass@7.1.3", "", {}, "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="],
+
+    "minisearch": ["minisearch@7.2.0", "", {}, "sha512-dqT2XBYUOZOiC5t2HRnwADjhNS2cecp9u+TJRiJ1Qp/f5qjkeT5APcGPjHw+bz89Ms8Jp+cG4AlE+QZ/QnDglg=="],
 
     "mitt": ["mitt@3.0.1", "", {}, "sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw=="],
 

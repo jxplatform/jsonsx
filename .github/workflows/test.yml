@@ -30,6 +30,7 @@ jobs:
           - { dir: packages/protocol, flag: protocol }
           - { dir: packages/runtime, flag: runtime }
           - { dir: packages/schema, flag: schema }
+          - { dir: extensions/search, flag: search }
           - { dir: packages/server, flag: server }
           - { dir: packages/starters, flag: starters }
           - { dir: packages/studio, flag: studio }
