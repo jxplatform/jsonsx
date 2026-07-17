@@ -34,6 +34,24 @@ jobs:
         with:
           bun-version: latest
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-install-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-install-${{ runner.os }}-
+
+      # The compiler's image cache is content-addressed (contentHash:configHash) and
+      # self-invalidating, so this key only governs when a fresh snapshot is saved:
+      # any deploy-triggering change produces a new key, while restore-keys restores
+      # the most recent prior cache so only new/changed images get re-encoded.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm/jxsuite-images
+          key: jxsuite-images-${{ hashFiles('sites/jxsuite.com/**', 'docs/**', 'scripts/docs/**') }}
+          restore-keys: |
+            jxsuite-images-
+
       - run: bun install
 
       - run: bun run generate:schema

@@ -367,7 +367,9 @@ export async function buildSite(
 
   // ── 6b. Save image cache and copy variants to dist ──────────────────────
   if (imageCache && projectConfig.images.optimize) {
-    saveCache(projectRoot, imageCache);
+    // Prune only on fully successful builds — a route that failed to compile never
+    // Touched its images, and pruning would evict their still-valid entries.
+    saveCache(projectRoot, imageCache, { prune: errors.length === 0 });
     const cacheOptimizedDir = resolve(getImageCacheDir(projectRoot), "_optimized");
     if (existsSync(cacheOptimizedDir)) {
       const distOptimizedDir = resolve(outDir, "images/_optimized");

@@ -1081,6 +1081,7 @@ The optimizer caches processed images to avoid redundant re-encoding on subseque
 - **Cache key:** `{contentHash}:{configHash}` — MD5 of the source file contents combined with MD5 of the optimization config (`widths`, `formats`, `quality`)
 - **Invalidation:** A cache entry is invalidated when the source image changes (new content hash), the optimization config changes (new config hash), or the output variant files are missing from `dist/`
 - **Persistence:** The cache file survives `dist/` cleanup — only the variant files are regenerated
+- **Pruning:** After a build in which every route compiled without errors, entries not resolved during the build are removed and their variant files deleted (files shared with a surviving entry are kept), so a persisted cache — and the `dist/images/_optimized/` copy made from it — only contains images the current build uses
 
 The `.cache/` directory should be added to `.gitignore` but can optionally be committed for CI build speed.
 

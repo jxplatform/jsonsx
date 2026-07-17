@@ -150,7 +150,7 @@ describe("contentHash and configHash", () => {
 describe("image-cache", () => {
   test("loadCache returns empty manifest when no cache exists", () => {
     const cache = loadCache("/nonexistent/path");
-    expect(cache).toEqual({ entries: {}, version: 1 });
+    expect(cache).toEqual({ entries: {}, touched: new Set(), version: 1 });
   });
 
   test("saveCache and loadCache round-trip", () => {

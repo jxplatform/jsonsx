@@ -6,7 +6,7 @@
  * CI environments (e.g. Cloudflare Pages) can persist it via their npm cache layer.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -23,6 +23,7 @@ interface CacheEntry {
 export interface CacheManifest {
   version: number; // Cache format version
   entries: Record<string, CacheEntry>; // Cached entries keyed by content+config hash
+  touched?: Set<string>; // Keys resolved during this build — runtime only, never serialized
 }
 
 // ─── Cache directory resolution ──────────────────────────────────────────────
@@ -97,25 +98,73 @@ export function cacheKey(srcPath: string, config: ImageConfig) {
 export function loadCache(projectRoot: string): CacheManifest {
   const manifestPath = resolve(getImageCacheDir(projectRoot), "manifest.json");
   if (!existsSync(manifestPath)) {
-    return { entries: {}, version: 1 };
+    return { entries: {}, touched: new Set(), version: 1 };
   }
   try {
-    return JSON.parse(readFileSync(manifestPath, "utf8")) as CacheManifest;
+    const parsed = JSON.parse(readFileSync(manifestPath, "utf8")) as CacheManifest;
+    parsed.touched = new Set();
+    return parsed;
   } catch {
-    return { entries: {}, version: 1 };
+    return { entries: {}, touched: new Set(), version: 1 };
   }
 }
 
 /**
  * Save the cache manifest to disk.
  *
+ * With `prune: true`, entries whose key was never touched during this build (deleted/replaced
+ * sources, superseded configs) are dropped and their variant files deleted first, so a persisted
+ * cache — and the dist copy made from it — stays bounded to images the build actually uses.
+ *
  * @param {string} projectRoot
  * @param {CacheManifest} cache
+ * @param {{ prune?: boolean }} [options]
  */
-export function saveCache(projectRoot: string, cache: CacheManifest) {
+export function saveCache(
+  projectRoot: string,
+  cache: CacheManifest,
+  options: { prune?: boolean } = {},
+) {
+  if (options.prune && cache.touched) {
+    pruneStale(cache, cache.touched);
+  }
   const cacheDir = getImageCacheDir(projectRoot);
   mkdirSync(cacheDir, { recursive: true });
-  writeFileSync(resolve(cacheDir, "manifest.json"), JSON.stringify(cache, null, 2), "utf8");
+  writeFileSync(
+    resolve(cacheDir, "manifest.json"),
+    JSON.stringify({ entries: cache.entries, version: cache.version }, null, 2),
+    "utf8",
+  );
+}
+
+/**
+ * Remove entries (and their variant files) that were not touched during this build. A file shared
+ * with a surviving entry is kept — the same source under an older config produces overlapping
+ * width/format filenames, so deleting blindly would remove files a live entry still references.
+ *
+ * @param {CacheManifest} cache
+ * @param {Set<string>} touched
+ */
+function pruneStale(cache: CacheManifest, touched: Set<string>) {
+  const keep = new Set<string>();
+  for (const [key, entry] of Object.entries(cache.entries)) {
+    if (touched.has(key)) {
+      for (const variant of entry.manifest.variants ?? []) {
+        keep.add(variant.absolutePath);
+      }
+    }
+  }
+  for (const [key, entry] of Object.entries(cache.entries)) {
+    if (touched.has(key)) {
+      continue;
+    }
+    for (const variant of entry.manifest.variants ?? []) {
+      if (!keep.has(variant.absolutePath)) {
+        rmSync(variant.absolutePath, { force: true });
+      }
+    }
+    delete cache.entries[key];
+  }
 }
 
 // ─── Entry access ─────────────────────────────────────────────────────────────
@@ -128,6 +177,7 @@ export function saveCache(projectRoot: string, cache: CacheManifest) {
  * @returns {ImageManifest | null}
  */
 export function getCached(cache: CacheManifest, key: string) {
+  cache.touched?.add(key);
   const entry = cache.entries[key];
   if (!entry) {
     return null;
@@ -149,6 +199,7 @@ export function setCached(
   sourcePath: string,
   manifest: ImageManifest,
 ) {
+  cache.touched?.add(key);
   cache.entries[key] = {
     manifest,
     source: sourcePath,

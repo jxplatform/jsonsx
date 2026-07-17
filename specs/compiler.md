@@ -493,6 +493,7 @@ Processed images are cached to `.cache/images/manifest.json` to avoid redundant 
 - **Cache key:** `{contentHash}:{configHash}` — MD5 of source file contents + MD5 of optimization config (`widths`, `formats`, `quality`)
 - **Invalidation:** Source file changes, config changes, or missing variant files in `dist/`
 - **Persistence:** Cache survives `dist/` cleanup — only variant files are regenerated
+- **Pruning:** After an error-free build, entries whose key was never resolved during the build are removed at save time and their variant files deleted (a file shared with a surviving entry is kept), so a persisted cache — and the `dist/` copy made from it — stays bounded to images in use
 
 ### 7.6 Cloudflare Images Service
 
@@ -510,7 +511,7 @@ In `site-build`, the pipeline integrates at step 6 (per-route compilation):
 
 1. Cache loaded if `projectConfig.images.optimize === true` and `images.service` is `"build"`; in `"cloudflare"` mode a per-build dimension memo is used instead
 2. For each page, `transformImageNodes()` is called with the cache (or memo), config, project root, and output directory
-3. Cache saved to disk after all routes are compiled (`"build"` mode only)
+3. Cache saved to disk after all routes are compiled (`"build"` mode only); stale entries are pruned first when every route compiled without errors
 
 > **Status: Implemented.** `image-optimizer.js`, `image-transform.js`, `image-cache.js`, and `compile-image-endpoint.js` provide the full pipeline. Requires Sharp as a project dependency.
 

@@ -92,6 +92,8 @@ Individual images can override the global config through ordinary attributes:
 
 Variants are cached in `.cache/images/` (with a `manifest.json`) so unchanged images aren't re-encoded on the next build. The cache key combines the source file's content hash with a hash of the optimization config — changing either the image or the `widths`/`formats`/`quality` settings invalidates the entry, as do missing variant files. The cache survives `dist/` cleanup; add `.cache/` to `.gitignore`, or commit it to speed up CI builds.
 
+The cache is self-pruning: after a fully successful build, entries no build step touched (deleted or replaced source images, superseded configs) are dropped and their variant files deleted, so a persisted cache — and the `dist/images/_optimized/` copy made from it — stays bounded to the images the site actually uses, even when the cache lives forever (for example in a CI cache). Builds that end with errors skip pruning — a page that failed to compile never touched its images, and evicting them would force a pointless re-encode.
+
 ## The Cloudflare service
 
 Setting `"service": "cloudflare"` replaces the build-time pipeline with pure markup: eligible images get a `srcset` of `/cdn-cgi/image/...` transform URLs (one per configured width, `format=auto` so Cloudflare negotiates AVIF/WebP per browser, quality from `quality.webp`), and no variants are generated at build time. Remote `https` images from hostnames listed in `remoteDomains` get the same treatment.
