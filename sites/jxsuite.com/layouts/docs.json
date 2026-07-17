@@ -24,6 +24,45 @@
   "children": [
     { "tagName": "site-toolbar" },
     {
+      "$title": "Docs Mobile Nav Trigger",
+      "tagName": "div",
+      "style": {
+        "display": "none",
+        "position": "sticky",
+        "top": "3.5rem",
+        "zIndex": "90",
+        "alignItems": "center",
+        "gap": "0.5rem",
+        "padding": "0.6rem clamp(1rem, 3vw, 2rem)",
+        "backgroundColor": "rgba(10, 10, 10, 0.9)",
+        "backdropFilter": "blur(12px)",
+        "borderBottom": "1px solid var(--color-border)",
+        "@--md": { "display": "flex" }
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "popovertarget": "docs-mobile-nav",
+            "aria-label": "Open docs navigation"
+          },
+          "style": {
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "0.5rem",
+            "background": "none",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "color": "var(--color-text-secondary)",
+            "fontSize": "0.8125rem",
+            "padding": "0.4rem 0.75rem",
+            "cursor": "pointer"
+          },
+          "textContent": "☰  Docs menu"
+        }
+      ]
+    },
+    {
       "tagName": "div",
       "style": {
         "flex": "1",
@@ -93,6 +132,107 @@
             "padding": "clamp(1.5rem, 3vw, 2.5rem) clamp(1rem, 3vw, 2.5rem)"
           },
           "children": [{ "tagName": "slot" }]
+        }
+      ]
+    },
+    {
+      "$title": "Docs Mobile Nav Popover",
+      "tagName": "nav",
+      "id": "docs-mobile-nav",
+      "attributes": { "popover": "" },
+      "style": {
+        "inset": "0 auto 0 0",
+        "width": "min(300px, 82vw)",
+        "height": "100vh",
+        "backgroundColor": "var(--color-bg-secondary)",
+        "borderRight": "1px solid var(--color-border)",
+        "border": "none",
+        "margin": "0",
+        "padding": "4.5rem 0.5rem 2rem",
+        "overflowY": "auto",
+        "boxShadow": "8px 0 24px rgba(0, 0, 0, 0.4)",
+        "transform": "translateX(-100%)",
+        "transition": "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), display 0.3s allow-discrete, overlay 0.3s allow-discrete",
+        ":popover-open": { "transform": "translateX(0)" },
+        "::backdrop": {
+          "backgroundColor": "rgba(0, 0, 0, 0.5)",
+          "opacity": "0",
+          "transition": "opacity 0.3s ease, display 0.3s allow-discrete, overlay 0.3s allow-discrete"
+        },
+        "&:popover-open::backdrop": { "opacity": "1" },
+        "@starting-style": {
+          ":popover-open": { "transform": "translateX(-100%)" },
+          "&:popover-open::backdrop": { "opacity": "0" }
+        }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "justifyContent": "flex-end",
+            "padding": "0 0.75rem 0.5rem"
+          },
+          "children": [
+            {
+              "tagName": "button",
+              "attributes": {
+                "popovertarget": "docs-mobile-nav",
+                "popovertargetaction": "hide",
+                "aria-label": "Close docs navigation"
+              },
+              "style": {
+                "background": "none",
+                "border": "none",
+                "cursor": "pointer",
+                "padding": "0.5rem",
+                "fontSize": "1.25rem",
+                "lineHeight": "1",
+                "color": "var(--color-text-secondary)"
+              },
+              "textContent": "✕"
+            }
+          ]
+        },
+        {
+          "tagName": "docs-sidebar",
+          "children": [
+            {
+              "$prototype": "Array",
+              "items": { "$ref": "#/state/nav/data/sections" },
+              "map": {
+                "tagName": "div",
+                "attributes": { "class": "nav-section" },
+                "children": [
+                  {
+                    "tagName": "a",
+                    "attributes": {
+                      "class": "nav-section-label",
+                      "href": "/docs/${item.path}/",
+                      "popovertarget": "docs-mobile-nav",
+                      "popovertargetaction": "hide"
+                    },
+                    "textContent": "${item.label}"
+                  },
+                  {
+                    "$prototype": "Array",
+                    "items": { "$ref": "$map/item/children" },
+                    "map": {
+                      "tagName": "a",
+                      "attributes": {
+                        "class": "nav-link",
+                        "href": "/docs/${item.path}/",
+                        "aria-current": "${(state.$page.url.endsWith('/') ? state.$page.url.slice(0, -1) : state.$page.url) === '/docs/' + item.path ? 'page' : 'false'}",
+                        "popovertarget": "docs-mobile-nav",
+                        "popovertargetaction": "hide"
+                      },
+                      "textContent": "${item.label}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
         }
       ]
     },
