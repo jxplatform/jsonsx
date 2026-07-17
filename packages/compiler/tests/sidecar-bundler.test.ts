@@ -101,7 +101,7 @@ beforeAll(() => {
 `,
   );
 
-  // Interactive component with an npm: sidecar and a relative sidecar.
+  // Interactive component with npm:, relative, and absolute-URL sidecars.
   writeFile("components/demo-widget.json", {
     children: [
       { attributes: { onclick: { $ref: "#/state/bump" } }, tagName: "button", textContent: "+1" },
@@ -117,6 +117,11 @@ beforeAll(() => {
       greet: {
         $prototype: "Function",
         $src: "npm:tiny-lib",
+        parameters: [{ identifier: "state" }],
+      },
+      prebuilt: {
+        $prototype: "Function",
+        $src: "/lib/prebuilt.js",
         parameters: [{ identifier: "state" }],
       },
       who: "jx",
@@ -141,14 +146,17 @@ beforeAll(() => {
     tagName: "ghost-widget",
   });
 
-  // Dynamic page whose lowered state def registers a bundle via $bundle.
+  // Dynamic page whose lowered state def registers a bundle via $bundle, plus a page-level
+  // Relative sidecar (resolved against pages/).
   writeFile("pages/index.json", {
     children: [{ tagName: "p", textContent: "${state.magic}" }, { tagName: "demo-widget" }],
     state: {
       magic: { $prototype: "Stuff", timing: "client" },
+      pgHelper: { $prototype: "Function", $src: "./page-helpers.js", parameters: ["state"] },
     },
     tagName: "main",
   });
+  writeFile("pages/page-helpers.js", `export function pgHelper(state) { return state.who; }\n`);
 });
 
 afterAll(() => {
@@ -235,6 +243,18 @@ describe("buildSite sidecar bundling + emit", () => {
     expect(module).not.toContain("'./demo-widget-helpers.js'");
   });
 
+  test("absolute-URL $src specifiers are served as-is, never bundled", () => {
+    const module = readFileSync(resolve(TMP, "dist/components/demo-widget.js"), "utf8");
+    expect(module).toContain("from '/lib/prebuilt.js'");
+  });
+
+  test("page-level relative sidecars bundle under the pages/ slug and rewrite app.js", () => {
+    const appJs = readFileSync(resolve(TMP, "dist/app.js"), "utf8");
+    expect(appJs).toContain("from '/assets/pages-page-helpers.js'");
+    const bundled = readFileSync(resolve(TMP, "dist/assets/pages-page-helpers.js"), "utf8");
+    expect(bundled).toContain("state.who");
+  });
+
   test("$bundle hints from lowered defs register bundles without an importing document", () => {
     // The page's `magic` def lowers to an inline body; tiny-lib is bundled solely because
     // The lower() result named it in $bundle.
@@ -312,6 +332,78 @@ describe("buildSite emit gating and traversal guard", () => {
     expect(existsSync(resolve(GATED, "evil.txt"))).toBe(false);
     // In-bounds files earlier in the batch were already written when the bad path threw.
     expect(existsSync(resolve(GATED, "dist/stuff-index.json"))).toBe(true);
+  });
+});
+
+describe("buildSite sidecar/worker failure reporting", () => {
+  const ERRS = resolve(import.meta.dir, "__test-sidecar-errors__");
+
+  beforeAll(() => {
+    rmSync(ERRS, { force: true, recursive: true });
+    const write = (rel: string, content: string | object) => {
+      const abs = resolve(ERRS, rel);
+      mkdirSync(resolve(abs, ".."), { recursive: true });
+      writeFileSync(
+        abs,
+        typeof content === "string" ? content : JSON.stringify(content, null, 2),
+        "utf8",
+      );
+    };
+    write("project.json", {
+      build: { adapter: "cloudflare-workers", format: "directory", outDir: "./dist" },
+      name: "Sidecar Errors",
+    });
+    write("pages/index.json", { children: [{ tagName: "collide-widget" }], tagName: "main" });
+    // Two existing sidecar files whose project-relative paths slug to the same asset name.
+    write("components/collide-widget.json", {
+      children: [{ tagName: "span", textContent: "${state.n}" }],
+      state: {
+        aOne: { $prototype: "Function", $src: "./alpha-beta.js", parameters: ["state"] },
+        aTwo: { $prototype: "Function", $src: "./alpha/beta.js", parameters: ["state"] },
+        broken: { $prototype: "Function", $src: "./broken-helpers.js", parameters: ["state"] },
+        n: 0,
+      },
+      tagName: "collide-widget",
+    });
+    write("components/alpha-beta.js", "export function aOne(state) { return 1; }\n");
+    write("components/alpha/beta.js", "export function aTwo(state) { return 2; }\n");
+    // Exists (so it registers) but fails to parse at bundle time.
+    write("components/broken-helpers.js", "export {  // unterminated\n");
+    // A server function whose module imports an unresolvable package fails worker bundling.
+    write("components/mail-widget.json", {
+      children: [{ children: ["Mail"], tagName: "form" }],
+      state: {
+        sendMail: { $export: "sendMail", $src: "./mailer.server.js", timing: "server" },
+      },
+      tagName: "mail-widget",
+    });
+    write(
+      "components/mailer.server.js",
+      `import missing from "definitely-not-a-real-pkg-xyz";\nexport function sendMail() { return missing; }\n`,
+    );
+  });
+
+  afterAll(() => {
+    rmSync(ERRS, { force: true, recursive: true });
+  });
+
+  test("slug collisions, broken sidecars, and worker bundle failures land in errors[]", async () => {
+    const result = await buildSite(ERRS, { verbose: false });
+    // Collision between ./alpha-beta.js and ./alpha/beta.js on one asset slug.
+    expect(
+      result.errors.some((e) => e.includes("both bundle to /assets/components-alpha-beta.js")),
+    ).toBe(true);
+    // The colliding specifier and the broken sidecar keep their verbatim imports.
+    const module = readFileSync(resolve(ERRS, "dist/components/collide-widget.js"), "utf8");
+    expect(module).toContain("from '/assets/components-alpha-beta.js'");
+    expect(module).toContain("from './alpha/beta.js'");
+    // Registered-but-unparseable sidecar fails at bundle time, not silently.
+    expect(result.errors.some((e) => e.includes('bundling sidecar "./broken-helpers.js"'))).toBe(
+      true,
+    );
+    // Worker bundling failure is reported without aborting the build.
+    expect(result.errors.some((e) => e.includes("Error bundling dist/worker.js"))).toBe(true);
+    expect(existsSync(resolve(ERRS, "dist/index.html"))).toBe(true);
   });
 });
 
