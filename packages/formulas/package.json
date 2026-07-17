@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/formulas",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Composite pure formulas for Jx, authored as declarative $expression JSON",
   "license": "MIT",
   "repository": {
@@ -16,6 +16,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./catalog": "./src/catalog.ts"
+  },
+  "publishConfig": {
+    "provenance": true
   },
   "scripts": {
     "generate": "bun run bin/generate.ts",

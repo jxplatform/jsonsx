@@ -172,7 +172,7 @@
     },
     "packages/formulas": {
       "name": "@jxsuite/formulas",
-      "version": "1.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
@@ -290,6 +290,7 @@
         "@jxsuite/ai": "workspace:^",
         "@jxsuite/collab": "workspace:^",
         "@jxsuite/create": "workspace:^",
+        "@jxsuite/formulas": "workspace:^",
         "@jxsuite/markup": "workspace:^",
         "@jxsuite/protocol": "workspace:^",
         "@jxsuite/runtime": "workspace:^",

@@ -14,5 +14,6 @@
   "packages/studio": "1.0.0",
   "packages/desktop": "1.0.0",
   "packages/protocol": "0.4.0",
-  "packages/collab": "0.3.0"
+  "packages/collab": "0.3.0",
+  "packages/formulas": "0.0.1"
 }

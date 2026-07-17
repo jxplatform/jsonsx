@@ -856,6 +856,10 @@ function renderSignalEditorTemplate(
           preview: livePreviewExpression(activeTab.value, `def:${name}`, exprNode, null, () =>
             renderOnly("leftPanel"),
           ),
+          onInsertDef: (defName, vendored) =>
+            transactDoc(activeTab.value, (t) =>
+              mutateAddDef(t, defName, vendored as Record<string, JsonValue>),
+            ),
           stateDefs: Object.keys(S.document.state || {}),
           stateEntries: S.document.state || {},
         },

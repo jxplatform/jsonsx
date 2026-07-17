@@ -69,6 +69,12 @@
     "packages/collab": {
       "release-type": "node",
       "component": "collab"
+    },
+    "packages/formulas": {
+      "release-type": "node",
+      "component": "formulas",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true
     }
   }
 }

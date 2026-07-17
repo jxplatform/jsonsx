@@ -5,7 +5,7 @@ import { PURE_METHOD_OPS } from "@jxsuite/runtime/expression";
 import { isJsonObject, isRef } from "@jxsuite/schema/guards";
 import { renderFieldRow } from "./field-row";
 import { renderFormulaChips } from "./formula-chips";
-import { calleeEntry, formulaCatalog } from "./formula-catalog";
+import { applyCatalogPick, calleeEntry, formulaCatalog } from "./formula-catalog";
 import { openFormulaPalette } from "./formula-palette";
 
 import type {
@@ -578,6 +578,8 @@ export interface ExpressionEditorOpts {
   stateEntries?: Record<string, JxStateDefinition> | null;
   /** Chip-strip click hook (depth 0). No-op when absent. */
   onChipSelect?: (path: (string | number)[]) => void;
+  /** Vendors a packaged formula's state entry into the document on catalog pick. */
+  onInsertDef?: (name: string, def: JxStateDefinition) => void;
 }
 
 /**
@@ -686,7 +688,11 @@ export function renderExpressionEditor(
                 openFormulaPalette({
                   anchor: e.currentTarget as HTMLElement,
                   entries: formulaCatalog(opts.stateEntries),
-                  onPick: (entry) => onChange(entry.insert()),
+                  onPick: (entry) =>
+                    applyCatalogPick(entry, onChange, {
+                      onInsertDef: opts.onInsertDef,
+                      stateEntries: opts.stateEntries,
+                    }),
                 })}
             >
               <sp-icon-brackets slot="icon"></sp-icon-brackets>

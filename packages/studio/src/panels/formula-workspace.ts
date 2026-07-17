@@ -18,11 +18,11 @@ import { getEventBinding, isExpressionDef, isJsonObject } from "@jxsuite/schema/
 
 import { canvasPanels, canvasWrap, getNodeAtPath, updateUi } from "../store";
 import { activeTab } from "../workspace/workspace";
-import { mutateUpdateDef, mutateUpdateProperty, transactDoc } from "../tabs/transact";
+import { mutateAddDef, mutateUpdateDef, mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { view } from "../view";
 import { chipSummary, renderFormulaChips } from "../ui/formula-chips";
 import { renderExpressionEditor } from "../ui/expression-editor";
-import { formulaCatalog } from "../ui/formula-catalog";
+import { applyCatalogPick, formulaCatalog } from "../ui/formula-catalog";
 import { openFormulaPalette } from "../ui/formula-palette";
 import { livePreviewExpression } from "../services/live-preview";
 import { dataTypeLabel, renderDataTreeTemplate, unwrapSignal } from "./data-explorer";
@@ -254,7 +254,14 @@ function workspaceTemplate(tab: Tab, editing: FormulaEditDef): TemplateResult {
           openFormulaPalette({
             anchor: e.currentTarget as HTMLElement,
             entries: formulaCatalog(stateEntries),
-            onPick: (entry) => writeSelected(entry.insert()),
+            onPick: (entry) =>
+              applyCatalogPick(entry, writeSelected, {
+                onInsertDef: (name, def) =>
+                  transactDoc(activeTab.value, (t) =>
+                    mutateAddDef(t, name, def as Record<string, JsonValue>),
+                  ),
+                stateEntries,
+              }),
           })}
       >
         <sp-icon-brackets slot="icon"></sp-icon-brackets>

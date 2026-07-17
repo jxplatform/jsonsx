@@ -3,7 +3,7 @@ import { getNodeAtPath, renderOnly } from "../store";
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { activeTab } from "../workspace/workspace";
-import { mutateUpdateProperty, transactDoc } from "../tabs/transact";
+import { mutateAddDef, mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { renderExpressionEditor } from "../ui/expression-editor";
 import { renderStatementEditor } from "./statement-editor";
 import { livePreviewExpression } from "../services/live-preview";
@@ -288,6 +288,10 @@ export function eventsSidebarTemplate(helpers: { isCustomElementDoc: () => boole
                                 selection,
                                 () => renderOnly("rightPanel"),
                               ),
+                              onInsertDef: (defName, def) =>
+                                transactDoc(activeTab.value, (t) =>
+                                  mutateAddDef(t, defName, def as Record<string, JsonValue>),
+                                ),
                               stateDefs: Object.keys(defs),
                               stateEntries: defs,
                             },

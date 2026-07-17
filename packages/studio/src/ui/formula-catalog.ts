@@ -11,6 +11,7 @@
  */
 
 import { BLESSED_GLOBALS, BLESSED_OPERATORS, PURE_METHOD_OPS } from "@jxsuite/runtime/expression";
+import { catalog as packagedCatalog } from "@jxsuite/formulas";
 import { isJsonObject, isNamedFormulaDef } from "@jxsuite/schema/guards";
 
 import type {
@@ -41,6 +42,29 @@ export interface FormulaCatalogEntry {
   parameters: FormulaParameterInfo[];
   /** Factory for a fresh default expression node inserting this entry. */
   insert: () => JxExpressionNode;
+  /**
+   * A state entry this pick must copy into the document first (packaged formulas vendor their JSON
+   * in — the project owns the copy; no package resolution at build or run time).
+   */
+  ensure?: { name: string; def: JxStateDefinition };
+}
+
+/**
+ * Apply a palette pick: vendor the entry's state def in first when required (and not already
+ * present), then hand the fresh node to the caller. The single funnel every pick site uses.
+ */
+export function applyCatalogPick(
+  entry: FormulaCatalogEntry,
+  onChange: (node: JxExpressionNode) => void,
+  opts?: {
+    stateEntries?: Record<string, JxStateDefinition> | null | undefined;
+    onInsertDef?: ((name: string, def: JxStateDefinition) => void) | undefined;
+  },
+): void {
+  if (entry.ensure && !opts?.stateEntries?.[entry.ensure.name]) {
+    opts?.onInsertDef?.(entry.ensure.name, entry.ensure.def);
+  }
+  onChange(entry.insert());
 }
 
 // ─── Blessed operators (hand-authored) ──────────────────────────────────────
@@ -446,11 +470,59 @@ export function namedFormulaEntries(
 
 // ─── Merged registry ────────────────────────────────────────────────────────
 
-/** The full catalog: named formulas first (most specific), then operators, then globals. */
+// ─── Packaged formulas (@jxsuite/formulas, copy-in) ─────────────────────────
+
+/**
+ * Catalog entries for the packaged composite formulas. Picking one vendors its JSON state entry
+ * into the document via `ensure` and inserts a call node — projects stay self-contained; entries
+ * already present in state are skipped (the named-formula entry represents them instead).
+ */
+export function packagedFormulaEntries(
+  state?: Record<string, JxStateDefinition> | null,
+): FormulaCatalogEntry[] {
+  const out: FormulaCatalogEntry[] = [];
+  for (const formula of packagedCatalog) {
+    if (state?.[formula.name]) {
+      continue;
+    }
+    const parameters = formula.parameters
+      .map((p) => toParameterInfo(p))
+      .filter((p): p is FormulaParameterInfo => p !== null);
+    out.push({
+      description: formula.description,
+      ensure: {
+        def: {
+          $description: formula.description,
+          $expression: formula.expression,
+          parameters: formula.parameters,
+        },
+        name: formula.name,
+      },
+      group: "Formulas library",
+      insert: () => ({
+        operator: "call",
+        target: { $ref: `#/state/${formula.name}` },
+        value: parameters.map((p) => (p.default ?? null) as JxExpressionOperand),
+      }),
+      kind: "formula",
+      label: formula.name,
+      name: formula.name,
+      parameters,
+    });
+  }
+  return out;
+}
+
+/** The full catalog: named formulas first (most specific), then packaged, operators, globals. */
 export function formulaCatalog(
   state?: Record<string, JxStateDefinition> | null,
 ): FormulaCatalogEntry[] {
-  return [...namedFormulaEntries(state), ...operatorEntries(), ...globalEntries()];
+  return [
+    ...namedFormulaEntries(state),
+    ...packagedFormulaEntries(state),
+    ...operatorEntries(),
+    ...globalEntries(),
+  ];
 }
 
 /** Resolve a `call` callee pointer to its catalog entry, when resolvable. */

@@ -5,12 +5,15 @@
 import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
 import { BLESSED_GLOBALS, BLESSED_OPERATORS } from "@jxsuite/runtime/expression";
+import { catalog as packagedCatalog } from "@jxsuite/formulas";
 import {
+  applyCatalogPick,
   calleeEntry,
   formulaCatalog,
   globalEntries,
   namedFormulaEntries,
   operatorEntries,
+  packagedFormulaEntries,
 } from "../src/ui/formula-catalog";
 import type { JxStateDefinition } from "@jxsuite/schema/types";
 
@@ -181,18 +184,25 @@ describe("namedFormulaEntries", () => {
 // ─── Merged registry + callee resolution ──────────────────────────────────────
 
 describe("formulaCatalog", () => {
-  test("merges named formulas, operators, and globals", () => {
+  test("merges named formulas, packaged formulas, operators, and globals", () => {
     const entries = formulaCatalog(STATE);
     const kinds = new Set(entries.map((e) => e.kind));
     expect(kinds).toEqual(new Set(["formula", "operator", "global"]));
-    expect(entries.length).toBe(1 + BLESSED_OPERATORS.size + BLESSED_GLOBALS.size);
+    // STATE's `count` key shadows the packaged `count` formula — existing names never vendor.
+    const shadowed = packagedCatalog.filter((f) => f.name in STATE).length;
+    expect(shadowed).toBe(1);
+    expect(entries.length).toBe(
+      1 + (packagedCatalog.length - shadowed) + BLESSED_OPERATORS.size + BLESSED_GLOBALS.size,
+    );
     // Named formulas lead the list (most specific first)
     expect(entries[0]!.name).toBe("lineTotal");
   });
 
   test("works without a state map", () => {
     const entries = formulaCatalog();
-    expect(entries.length).toBe(BLESSED_OPERATORS.size + BLESSED_GLOBALS.size);
+    expect(entries.length).toBe(
+      packagedCatalog.length + BLESSED_OPERATORS.size + BLESSED_GLOBALS.size,
+    );
   });
 });
 
@@ -207,5 +217,58 @@ describe("calleeEntry", () => {
     expect(calleeEntry("window#/Math/random")).toBeUndefined();
     expect(calleeEntry("$args/x", STATE)).toBeUndefined();
     expect(calleeEntry("", STATE)).toBeUndefined();
+  });
+});
+
+describe("packagedFormulaEntries (@jxsuite/formulas copy-in)", () => {
+  test("every packaged formula appears with an ensure payload and a call insert", () => {
+    const entries = packagedFormulaEntries();
+    expect(entries.length).toBe(packagedCatalog.length);
+    const clamp = entries.find((e) => e.name === "clamp")!;
+    expect(clamp.kind).toBe("formula");
+    expect(clamp.group).toBe("Formulas library");
+    expect(clamp.ensure!.name).toBe("clamp");
+    expect(clamp.ensure!.def).toMatchObject({ parameters: expect.any(Array) });
+    expect(clamp.insert()).toMatchObject({
+      operator: "call",
+      target: { $ref: "#/state/clamp" },
+    });
+  });
+
+  test("formulas already vendored into state are skipped", () => {
+    const entries = packagedFormulaEntries({
+      clamp: { $expression: { operator: "??", target: null, value: 0 }, parameters: ["value"] },
+    });
+    expect(entries.some((e) => e.name === "clamp")).toBe(false);
+    expect(entries.length).toBe(packagedCatalog.length - 1);
+  });
+
+  test("applyCatalogPick vendors the def before inserting the call node", () => {
+    const entry = packagedFormulaEntries().find((e) => e.name === "sum");
+    const inserted: [string, unknown][] = [];
+    let node: unknown = null;
+    applyCatalogPick(entry!, (n) => (node = n), {
+      onInsertDef: (name, def) => inserted.push([name, def]),
+      stateEntries: {},
+    });
+    expect(inserted).toEqual([["sum", entry!.ensure!.def]]);
+    expect(node).toMatchObject({ operator: "call", target: { $ref: "#/state/sum" } });
+  });
+
+  test("applyCatalogPick skips vendoring when the def already exists", () => {
+    const entry = packagedFormulaEntries().find((e) => e.name === "sum");
+    const inserted: string[] = [];
+    applyCatalogPick(entry!, () => {}, {
+      onInsertDef: (name) => inserted.push(name),
+      stateEntries: { sum: entry!.ensure!.def },
+    });
+    expect(inserted).toEqual([]);
+  });
+
+  test("plain operator picks never vendor", () => {
+    const op = operatorEntries().find((e) => e.name === "??")!;
+    const inserted: string[] = [];
+    applyCatalogPick(op, () => {}, { onInsertDef: (name) => inserted.push(name) });
+    expect(inserted).toEqual([]);
   });
 });
