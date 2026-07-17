@@ -116,6 +116,42 @@ describe("mergeHead", () => {
     expect(canonical).toBeUndefined();
   });
 
+  test("auto-adds og:url and og:site_name", () => {
+    const result = mergeHead([], [], [], {
+      pageUrl: "/about",
+      siteName: "Example Site",
+      siteUrl: "https://example.com",
+    }) as any[];
+    const ogUrl = result.find((e) => e.attributes?.property === "og:url");
+    const ogSite = result.find((e) => e.attributes?.property === "og:site_name");
+    expect((ogUrl as any).attributes.content).toBe("https://example.com/about");
+    expect((ogSite as any).attributes.content).toBe("Example Site");
+  });
+
+  test("author-supplied og:url and og:site_name win over auto values", () => {
+    const page = [
+      {
+        attributes: { content: "https://canonical.example/", property: "og:url" },
+        tagName: "meta",
+      },
+      {
+        attributes: { content: "Custom Name", property: "og:site_name" },
+        tagName: "meta",
+      },
+    ];
+    const result = mergeHead([], [], page, {
+      pageUrl: "/about",
+      siteName: "Example Site",
+      siteUrl: "https://example.com",
+    }) as any[];
+    const ogUrl = result.filter((e) => e.attributes?.property === "og:url");
+    const ogSite = result.filter((e) => e.attributes?.property === "og:site_name");
+    expect(ogUrl).toHaveLength(1);
+    expect((ogUrl[0] as any).attributes.content).toBe("https://canonical.example/");
+    expect(ogSite).toHaveLength(1);
+    expect((ogSite[0] as any).attributes.content).toBe("Custom Name");
+  });
+
   test("respects custom charset from context", () => {
     const result = mergeHead([], [], [], { charset: "utf-16" }) as any[];
     const charset = result.find((e) => e.attributes?.charset);

@@ -524,6 +524,22 @@ describe("commit form", () => {
     expect(callNames()).toContain("gitStatus");
   });
 
+  test("Cmd+Enter commits on macOS", async () => {
+    seedRepoUi({ gitCommitMessage: "mac commit" });
+    const div = renderPanel();
+    const input = div.querySelector(".git-commit-input")!;
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "Enter",
+        metaKey: true,
+      }),
+    );
+    await flush();
+    expect(calls).toContainEqual(["gitCommit", "mac commit"]);
+  });
+
   test("Ctrl+Enter without a message does nothing", async () => {
     seedRepoUi();
     const div = renderPanel();

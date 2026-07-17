@@ -75,9 +75,19 @@ export const STUDIO_ROUTES = {
     "Starter templates (StarterInfo[])",
     "The New Project picker offers only blank/templates.",
   ),
+  importSite: route(
+    "POST",
+    "/__studio/import-site",
+    "Clone a live website into a project; streams NDJSON progress",
+    "The New Project Import tab is unavailable.",
+  ),
 
   // ─── Filesystem ───────────────────────────────────────────────────────────
-  files: route("GET", "/__studio/files", "List a directory (DirEntry[])"),
+  files: route(
+    "GET",
+    "/__studio/files",
+    "List a directory (DirEntry[]); with ?glob=<pattern>, search matching files project-wide",
+  ),
   fileRead: route("GET", "/__studio/file", "Read a file's text content"),
   fileWrite: route("PUT", "/__studio/file", "Write a file's text content"),
   fileDelete: route("DELETE", "/__studio/file", "Delete a file"),
@@ -132,6 +142,24 @@ export const STUDIO_ROUTES = {
     "/__studio/plugin-schema",
     "Extract a $studio schema from a class source",
     "Plugin property panels fall back to generic JSON editing.",
+  ),
+  codeFormat: route(
+    "POST",
+    "/__studio/code/format",
+    "Format posted source {code, path?} → {code, errors}",
+    "Code editors skip format-on-open/save (codeService returns null).",
+  ),
+  codeMinify: route(
+    "POST",
+    "/__studio/code/minify",
+    "Minify posted source {code} → {code}",
+    "Compiled-output minification is skipped.",
+  ),
+  codeLint: route(
+    "POST",
+    "/__studio/code/lint",
+    "Lint posted source {code, path?} → {diagnostics}",
+    "Code editors show no lint markers.",
   ),
 
   // ─── Packages ─────────────────────────────────────────────────────────────

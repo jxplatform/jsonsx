@@ -63,6 +63,19 @@ export function mergeHead(
       attributes: { href: canonical, rel: "canonical" },
       tagName: "link",
     });
+    // Auto OpenGraph identity (site-architecture §8.4) — author-supplied values win.
+    if (!merged.has("meta:og:url")) {
+      merged.set("meta:og:url", {
+        attributes: { content: canonical, property: "og:url" },
+        tagName: "meta",
+      });
+    }
+  }
+  if (context.siteName && !merged.has("meta:og:site_name")) {
+    merged.set("meta:og:site_name", {
+      attributes: { content: context.siteName, property: "og:site_name" },
+      tagName: "meta",
+    });
   }
 
   return [...merged.values()];

@@ -471,7 +471,7 @@ export function renderGitPanel(
         .value=${live(S.ui.gitCommitMessage || "")}
         @input=${(e: Event) => updateUi("gitCommitMessage", (e.target as HTMLInputElement).value)}
         @keydown=${(e: KeyboardEvent) => {
-          if (e.ctrlKey && e.key === "Enter") {
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
             e.preventDefault();
             void doCommit();
           }

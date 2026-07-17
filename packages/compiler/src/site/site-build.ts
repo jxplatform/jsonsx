@@ -441,7 +441,8 @@ export async function buildSite(
   // ── 7. Generate redirects ───────────────────────────────────────────────
   if (projectConfig.redirects && Object.keys(projectConfig.redirects).length > 0) {
     log("Generating redirects...");
-    const redirectFiles = generateRedirects(projectConfig.redirects, outDir);
+    const compiledUrls = new Set(routes.map((r) => r.urlPattern));
+    const redirectFiles = generateRedirects(projectConfig.redirects, outDir, compiledUrls);
     fileCount += redirectFiles;
   }
 
@@ -1315,14 +1316,18 @@ function routeToOutputPath(urlPattern: string, outDir: string, trailingSlash: st
  *
  * @param {Record<string, string | { destination: string; status?: number }>} redirects
  * @param {string} outDir
+ * @param {Set<string>} [compiledUrls] - URL patterns of compiled routes, for conflict warnings
  * @returns {number} Number of files written
  */
 function generateRedirects(
   redirects: Record<string, string | { destination: string; status?: number }>,
   outDir: string,
+  compiledUrls = new Set<string>(),
 ) {
   let count = 0;
   const redirectLines: string[] = [];
+  const normalizeUrl = (u: string) => (u.length > 1 && u.endsWith("/") ? u.slice(0, -1) : u);
+  const compiled = new Set([...compiledUrls].map((u) => normalizeUrl(u)));
 
   for (const [source, target] of Object.entries(redirects)) {
     const dest = typeof target === "object" ? target.destination : target;
@@ -1332,6 +1337,13 @@ function generateRedirects(
     if (source.includes(":") || source.includes("*")) {
       redirectLines.push(`${source} ${dest} ${status}`);
       continue;
+    }
+
+    if (compiled.has(normalizeUrl(source))) {
+      console.warn(
+        `Redirect "${source}" overwrites a compiled page at the same route — ` +
+          `remove the redirect or the page.`,
+      );
     }
 
     // Static redirect — emit an HTML file with meta refresh

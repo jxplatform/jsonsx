@@ -402,8 +402,7 @@ describe("image-transform", () => {
     expect(doc.innerHTML).toContain("srcset=");
     expect(doc.innerHTML).toContain("photo-320-abc.avif 320w");
     expect(doc.innerHTML).toContain("photo-640-abc.avif 640w");
-    expect(doc.innerHTML).not.toContain('width="1200"');
-    expect(doc.innerHTML).not.toContain('height="800"');
+    expect(doc.innerHTML).toContain('width="1200" height="800"');
     expect(doc.innerHTML).toContain('sizes="');
 
     teardown();

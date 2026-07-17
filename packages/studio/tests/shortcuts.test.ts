@@ -482,7 +482,8 @@ describe("mod shortcuts", () => {
     pressDoc("z", { ctrlKey: true });
     expect((tab.doc.document.children as unknown[]).length).toBe(3);
 
-    pressDoc("z", { ctrlKey: true, shiftKey: true });
+    // Real browsers report key "Z" (uppercase) while Shift is held.
+    pressDoc("Z", { ctrlKey: true, shiftKey: true });
     expect((tab.doc.document.children as unknown[]).length).toBe(4);
   });
 

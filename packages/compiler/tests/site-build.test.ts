@@ -2063,3 +2063,51 @@ describe("buildSite — sitemap options", () => {
     expect(existsSync(resolve(SM_TMP, "dist/robots.txt"))).toBe(false);
   });
 });
+
+// ── Redirect / page conflict warning ─────────────────────────────────────────
+
+describe("redirect conflict warnings", () => {
+  const RC_TMP = resolve(import.meta.dir, "__test-redirect-conflict__");
+
+  afterAll(() => {
+    rmSync(RC_TMP, { force: true, recursive: true });
+  });
+
+  it("warns when a redirect source collides with a compiled page route", async () => {
+    rmSync(RC_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(RC_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(RC_TMP, "project.json"),
+      JSON.stringify({
+        build: { outDir: "./dist" },
+        name: "RC",
+        redirects: { "/about": "/company/", "/gone": "/somewhere/" },
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(RC_TMP, "pages/index.json"),
+      JSON.stringify({ children: [{ children: ["Home"], tagName: "h1" }], title: "Home" }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(RC_TMP, "pages/about.json"),
+      JSON.stringify({ children: [{ children: ["About"], tagName: "h1" }], title: "About" }),
+      "utf8",
+    );
+
+    const warnings: string[] = [];
+    const origWarn = console.warn;
+    console.warn = (msg: string) => warnings.push(String(msg));
+    try {
+      await buildSite(RC_TMP, { verbose: false });
+    } finally {
+      console.warn = origWarn;
+    }
+
+    expect(warnings.some((w) => w.includes('Redirect "/about" overwrites a compiled page'))).toBe(
+      true,
+    );
+    expect(warnings.some((w) => w.includes('"/gone"'))).toBe(false);
+  });
+});

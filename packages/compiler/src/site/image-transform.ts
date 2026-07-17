@@ -318,6 +318,7 @@ async function transformImgNode(
   }
 
   let srcset;
+  let dims: { width: number; height: number } | null = null;
 
   if (remote) {
     // Original dimensions are unknown without fetching — emit every configured width and let
@@ -332,6 +333,7 @@ async function transformImgNode(
     if (config.service === "cloudflare") {
       const meta = await resolveCfMeta(absoluteSrc, metaCache);
       srcset = buildCloudflareSrcset(src, config, meta.width ?? Infinity, meta.hash);
+      dims = meta.width && meta.height ? { height: meta.height, width: meta.width } : null;
     } else {
       let manifest = imageRefs.get(absoluteSrc);
 
@@ -342,12 +344,22 @@ async function transformImgNode(
 
       const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0]!;
       srcset = buildSrcset(manifest.variants, preferredFormat);
+      dims =
+        manifest.original?.width && manifest.original.height
+          ? { height: manifest.original.height, width: manifest.original.width }
+          : null;
     }
   }
 
   if (srcset) {
     node.attributes.srcset = srcset;
     node.attributes.sizes ??= config.sizes;
+  }
+
+  // Intrinsic dimensions prevent layout shift; author-supplied values win.
+  if (dims && node.attributes.width === undefined && node.attributes.height === undefined) {
+    node.attributes.width = String(dims.width);
+    node.attributes.height = String(dims.height);
   }
 
   if (config.lazyLoad && node.attributes.loading !== "eager") {
@@ -412,12 +424,14 @@ async function transformInnerHtmlImages(
     }
 
     let srcset;
+    let dims: { width: number; height: number } | null = null;
 
     if (remote) {
       srcset = buildCloudflareSrcset(src, config, Infinity, null);
     } else if (config.service === "cloudflare") {
       const meta = await resolveCfMeta(absoluteSrc as string, metaCache);
       srcset = buildCloudflareSrcset(src, config, meta.width ?? Infinity, meta.hash);
+      dims = meta.width && meta.height ? { height: meta.height, width: meta.width } : null;
     } else {
       let manifest = imageRefs.get(absoluteSrc as string);
       if (!manifest) {
@@ -427,12 +441,19 @@ async function transformInnerHtmlImages(
 
       const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0]!;
       srcset = buildSrcset(manifest.variants, preferredFormat);
+      dims =
+        manifest.original?.width && manifest.original.height
+          ? { height: manifest.original.height, width: manifest.original.width }
+          : null;
     }
     if (!srcset) {
       continue;
     }
 
     let extra = ` srcset="${srcset}" sizes="${config.sizes}"`;
+    if (dims && !/\bwidth=/.test(attrs) && !/\bheight=/.test(attrs)) {
+      extra += ` width="${dims.width}" height="${dims.height}"`;
+    }
     if (config.lazyLoad && !/\bloading="eager"/.test(attrs)) {
       if (!/\bloading=/.test(attrs)) {
         extra += ` loading="lazy"`;

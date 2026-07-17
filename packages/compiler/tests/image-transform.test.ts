@@ -129,8 +129,8 @@ describe("image-transform", () => {
       expect(doc.attributes.srcset).toContain("/_optimized/hero-640-abc.avif 640w");
       expect(doc.attributes.srcset).toContain("/_optimized/hero-1200-abc.avif 1200w");
       expect(doc.attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
-      expect(doc.attributes.width).toBeUndefined();
-      expect(doc.attributes.height).toBeUndefined();
+      expect(doc.attributes.width).toBe("1200");
+      expect(doc.attributes.height).toBe("800");
       expect(doc.attributes.loading).toBe("lazy");
       expect(doc.attributes.decoding).toBe("async");
       expect(result.imageRefs.size).toBe(1);
@@ -230,8 +230,8 @@ describe("image-transform", () => {
 
       // ProcessImage should not have been called since cache hit
       expect(processImage).not.toHaveBeenCalled();
-      expect(doc.attributes.width).toBeUndefined();
-      expect(doc.attributes.height).toBeUndefined();
+      expect(doc.attributes.width).toBe("800");
+      expect(doc.attributes.height).toBe("600");
     });
 
     test("calls processImage when cached variants are missing from disk", async () => {
@@ -377,8 +377,7 @@ describe("image-transform", () => {
       expect(doc.innerHTML).toContain("sizes=");
       expect(doc.innerHTML).toContain('loading="lazy"');
       expect(doc.innerHTML).toContain('decoding="async"');
-      expect(doc.innerHTML).not.toContain('width="1200"');
-      expect(doc.innerHTML).not.toContain('height="800"');
+      expect(doc.innerHTML).toContain('width="1200" height="800"');
     });
 
     test("handles img node with src on node directly (not in attributes)", async () => {
@@ -507,8 +506,8 @@ describe("image-transform", () => {
       );
       expect(doc.attributes.src).toBe("/images/hero.png");
       expect(doc.attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
-      expect(doc.attributes.width).toBeUndefined();
-      expect(doc.attributes.height).toBeUndefined();
+      expect(doc.attributes.width).toBe("1200");
+      expect(doc.attributes.height).toBe("800");
       expect(doc.attributes.loading).toBe("lazy");
       expect(doc.attributes.decoding).toBe("async");
       expect(processImage).not.toHaveBeenCalled();
@@ -548,8 +547,9 @@ describe("image-transform", () => {
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
 
       expect(doc.attributes.srcset).toBeUndefined();
-      expect(doc.attributes.width).toBeUndefined();
-      expect(doc.attributes.height).toBeUndefined();
+      // Dimensions are still known and injected even when no srcset variant applies
+      expect(doc.attributes.width).toBe("320");
+      expect(doc.attributes.height).toBe("240");
       expect(doc.attributes.loading).toBe("lazy");
     });
 
@@ -619,8 +619,7 @@ describe("image-transform", () => {
         'srcset="/cdn-cgi/image/width=640,quality=75,fit=scale-down,format=auto/images/hero.png?v=abcd1234',
       );
       expect(doc.innerHTML).toContain('src="/images/hero.png"');
-      expect(doc.innerHTML).not.toContain('width="1200"');
-      expect(doc.innerHTML).not.toContain('height="800"');
+      expect(doc.innerHTML).toContain('width="1200" height="800"');
       expect(doc.innerHTML).toContain('loading="lazy"');
       expect(processImage).not.toHaveBeenCalled();
     });

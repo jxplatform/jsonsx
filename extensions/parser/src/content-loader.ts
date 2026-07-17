@@ -377,7 +377,7 @@ function refTargetName(ref: string | undefined): string | undefined {
  * field `$ref` is to-one: a blog post's `author: "jane-doe"` with a schema `$ref` of
  * `#/content/authors` gets replaced by the full author entry. An array field whose `items` carry
  * the `$ref` is to-many: each id in the stored array is replaced by its entry. Unresolvable ids are
- * left untouched.
+ * left untouched, with a warning naming the entry and the missing target.
  *
  * @param {Map<string, ContentLoaderEntry[]>} contentTypes - All loaded content types
  * @param {ContentSection} section - The `content` section value the types were loaded from
@@ -406,6 +406,9 @@ export function resolveContentTypeRefs(
       }
       const refEntries = contentTypes.get(target);
       if (!refEntries) {
+        console.warn(
+          `Content relationships: "${name}" field "${field}" references unknown content type "${target}"`,
+        );
         continue;
       }
 
@@ -415,11 +418,24 @@ export function resolveContentTypeRefs(
           const resolved = refEntries.find((e) => e.id === value);
           if (resolved) {
             entry.data[field] = resolved;
+          } else {
+            console.warn(
+              `Content relationships: "${name}/${entry.id}" field "${field}" references missing "${target}" entry "${value}"`,
+            );
           }
         } else if (toMany && Array.isArray(value)) {
-          entry.data[field] = value.map((id) =>
-            typeof id === "string" ? (refEntries.find((e) => e.id === id) ?? id) : id,
-          );
+          entry.data[field] = value.map((id) => {
+            if (typeof id !== "string") {
+              return id;
+            }
+            const resolved = refEntries.find((e) => e.id === id);
+            if (!resolved) {
+              console.warn(
+                `Content relationships: "${name}/${entry.id}" field "${field}" references missing "${target}" entry "${id}"`,
+              );
+            }
+            return resolved ?? id;
+          });
         }
       }
     }

@@ -128,7 +128,7 @@
           }
         ],
         "returnType": { "type": "object" },
-        "description": "Additive Better Auth system-table sync: { statements, applied, warnings, connection }"
+        "description": "Additive Better Auth system-table sync: { steps, applied, warnings, connection }"
       }
     }
   }

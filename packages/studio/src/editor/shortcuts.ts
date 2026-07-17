@@ -176,7 +176,7 @@ export function initShortcuts(
     if (mod) {
       // Grid mode: copy/paste/duplicate/zoom belong to the grid engine (Tabulator clipboard
       // Needs the native events); only tab/app-level chords pass through.
-      if (canvasMode === "grid" && !["o", "p", "s", "w", "z"].includes(e.key)) {
+      if (canvasMode === "grid" && !["o", "p", "s", "w", "z", "Z"].includes(e.key)) {
         return;
       }
       switch (e.key) {
@@ -216,7 +216,9 @@ export function initShortcuts(
           saveFile();
           break;
         }
-        case "z": {
+        // With Shift held e.key is "Z", so redo needs the uppercase case too.
+        case "z":
+        case "Z": {
           e.preventDefault();
           if (e.shiftKey) {
             tabRedo(activeTab.value!);

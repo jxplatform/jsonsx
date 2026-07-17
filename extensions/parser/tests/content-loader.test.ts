@@ -455,6 +455,42 @@ describe("resolveContentTypeRefs", () => {
     expect(contentTypes.get("present")?.[0]?.data.a).toBe(1);
   });
 
+  it("warns on dangling relationship ids and unknown target types", () => {
+    const warnings = captureWarnings();
+    const contentTypes = new Map<string, ContentLoaderEntry[]>([
+      [
+        "posts",
+        [{ body: null, data: { author: "ghost-author", reviewers: ["jane", "nobody"] }, id: "p1" }],
+      ],
+      ["authors", [{ body: null, data: { name: "Jane" }, id: "jane" }]],
+    ]);
+    resolveContentTypeRefs(contentTypes, {
+      posts: {
+        schema: {
+          properties: {
+            author: { $ref: "#/content/authors" },
+            category: { $ref: "#/content/categories" },
+            reviewers: { items: { $ref: "#/content/authors" }, type: "array" },
+          },
+        },
+        source: "./posts/",
+      },
+    });
+    expect(
+      warnings.some((w) => w.includes('references missing "authors" entry "ghost-author"')),
+    ).toBe(true);
+    expect(warnings.some((w) => w.includes('references missing "authors" entry "nobody"'))).toBe(
+      true,
+    );
+    expect(warnings.some((w) => w.includes('references unknown content type "categories"'))).toBe(
+      true,
+    );
+    // Resolvable id still resolves; dangling ids stay untouched
+    const reviewers = contentTypes.get("posts")?.[0]?.data.reviewers as unknown[];
+    expect((reviewers[0] as ContentLoaderEntry).id).toBe("jane");
+    expect(reviewers[1]).toBe("nobody");
+  });
+
   it("does not resolve legacy #/contentTypes/ pointers", () => {
     const contentTypes = new Map<string, ContentLoaderEntry[]>([
       ["posts", [{ body: null, data: { author: "jane" }, id: "p1" }]],
