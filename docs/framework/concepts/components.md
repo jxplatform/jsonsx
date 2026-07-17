@@ -3,7 +3,7 @@ title: "Components"
 description: "How Jx components work: self-describing JSON, state management, external sidecars, and custom elements."
 ---
 
-# Component Model
+# Components
 
 > **Studio writes this format for you.** This page documents the underlying JSON — useful when you want to hand-edit a file, review a diff, or understand what the visual tools produce.
 

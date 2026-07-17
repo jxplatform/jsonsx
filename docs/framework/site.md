@@ -1,15 +1,17 @@
 ---
 title: "Site architecture"
-description: "File-based routing, layouts, content collections, and static site generation in Jx."
+description: "How a Jx site is laid out on disk: pages, layouts, components, content collections, public assets, and the project.json that ties them together."
+spec:
+  - site-architecture.md#2
 ---
 
-# Site Architecture
+# Site architecture
 
-> **Studio manages this structure for you** — Manage maps to `pages/`, `components/`, and `content/`; the content-type builder writes the `content` section; the New Project deploy picker sets the adapter. This page documents the on-disk layout for reference.
+> **Studio manages this structure for you** — [Browse your project](/docs/studio/projects/browse) maps to `pages/`, `components/`, and `content/`; the [content-type builder](/docs/studio/projects/content-types) writes the `content` section; [Project settings](/docs/studio/projects/settings) edits `project.json`. This section documents the on-disk layout for reference.
 
-Jx sites follow a conventional directory structure for file-based routing, shared layouts, content collections, and static site generation.
+A Jx site is a folder of plain JSON and Markdown files with a conventional layout. Only `project.json` and `pages/` are required — everything else is optional and additive.
 
-## Project Structure
+## Project anatomy
 
 ```
 my-site/
@@ -26,112 +28,55 @@ my-site/
 ├── content/               # Content collections
 │   └── blog/
 │       └── hello-world.md
+├── data/                  # Static data files
 ├── public/                # Static assets (copied verbatim)
 └── dist/                  # Build output (generated)
 ```
 
-## File-Based Routing
+| Directory     | Purpose                                                        | Required  |
+| ------------- | -------------------------------------------------------------- | --------- |
+| `pages/`      | File-based routing. Each page file becomes a route.            | **Yes**   |
+| `layouts/`    | Layout components, referenced by pages via `$layout`.          | No        |
+| `components/` | Reusable components, referenced via `$ref` or `$elements`.     | No        |
+| `content/`    | Content collections with schema validation.                    | No        |
+| `data/`       | Static data files loaded at build time. No schema enforcement. | No        |
+| `public/`     | Static assets copied verbatim to `dist/`. No processing.       | No        |
+| `dist/`       | Build output. Ignored by git.                                  | Generated |
 
-Every `.json` file in `pages/` becomes a route automatically:
+Files and directories whose names start with `_` inside `pages/` are excluded from routing, so components can live next to the pages that use them (`pages/blog/_blog-card.json`).
 
-| File                        | URL           |
-| --------------------------- | ------------- |
-| `pages/index.json`          | `/`           |
-| `pages/about.json`          | `/about`      |
-| `pages/blog/[slug].json`    | `/blog/:slug` |
-| `pages/docs/[...path].json` | `/docs/*`     |
+## Configuration
+
+`project.json` at the project root is the only required configuration file. It names the site, sets the default layout and language, declares global `<head>` entries, breakpoints, and design tokens, and holds the `content`, `redirects`, `copy`, and `build` sections. Site-level `state` and `$defs` cascade into every page. See [project.json](/docs/framework/site/project-json).
+
+## Routing
+
+Every file in `pages/` becomes a route automatically: `pages/about.json` serves `/about`, `pages/blog/[slug].json` is a dynamic route with a `slug` parameter, and `pages/docs/[...path].json` catches everything under `/docs/`. Dynamic pages declare the concrete paths they generate with `$paths` — usually by pointing at a content collection. See [Routing](/docs/framework/site/routing).
 
 ## Layouts
 
-Layouts use HTML `<slot>` elements to mark where page content is injected. Components are
-registered via `$elements` (paths relative to the layout file) and used by tag name:
+Layouts are ordinary Jx documents that provide the shared page shell — navigation, footer, and the `<slot>` elements where page content lands. Pages opt in with `$layout`, or inherit the site default. Named slots, nesting, and state merging follow the same rules as custom elements. See [Layouts](/docs/framework/site/layouts).
 
-```json
-{
-  "$elements": [
-    { "$ref": "../components/site-header.json" },
-    { "$ref": "../components/site-footer.json" }
-  ],
-  "tagName": "html",
-  "children": [
-    {
-      "tagName": "body",
-      "children": [
-        { "tagName": "site-header" },
-        {
-          "tagName": "main",
-          "children": [{ "tagName": "slot" }]
-        },
-        { "tagName": "site-footer" }
-      ]
-    }
-  ]
-}
-```
+## Content collections
 
-Pages declare their layout with `$layout` — the path is resolved from the **project root**:
+The `content` section of `project.json` turns folders of Markdown, JSON, or CSV files into typed, queryable collections with JSON Schema validation. Pages query them with `ContentCollection` and `ContentEntry` state entries, and schema `$ref`s link entries across collections — see [Content collections](/docs/framework/site/content-collections) and [Relationships](/docs/framework/site/relationships).
 
-```json
-{
-  "$layout": "./layouts/base.json",
-  "children": [{ "tagName": "h1", "textContent": "About Us" }]
-}
-```
+## Markdown pages and content
 
-## Content Collections
+Markdown is a first-class authoring format: content entries and even whole pages (`pages/index.md`) can be written in Jx Markdown, with frontmatter for metadata and directives for embedding components. See [Jx Markdown](/docs/framework/site/jx-markdown).
 
-Define collections in the `content` section of your `project.json`, with JSON Schema validation. (In Studio, the content-type builder writes this for you.)
+## SEO and metadata
 
-```json
-{
-  "content": {
-    "blog": {
-      "source": "./content/blog/",
-      "format": "Markdown",
-      "schema": {
-        "type": "object",
-        "properties": {
-          "title": { "type": "string" },
-          "pubDate": { "type": "string", "format": "date" }
-        },
-        "required": ["title", "pubDate"]
-      }
-    }
-  }
-}
-```
+Pages declare `<head>` entries with `$head`, merged in a fixed order with layout- and site-level entries; titles, canonical URLs, sitemaps, and structured data are handled at build time. See [SEO and metadata](/docs/framework/site/seo).
 
-Query collections in pages via `$prototype`:
+## Images
 
-```json
-{
-  "state": {
-    "posts": {
-      "$prototype": "ContentCollection",
-      "contentType": "blog",
-      "sort": { "field": "pubDate", "order": "desc" }
-    }
-  }
-}
-```
+Images referenced from pages and content are optimized during the build — resized to multiple widths and re-encoded to modern formats, configured by the `images` section of `project.json`. See [Images](/docs/framework/site/images).
 
-## Build Pipeline
+## Redirects
 
-```
-project.json → Discover pages/ → Resolve routes → Compile each page → Emit dist/
-```
+The `redirects` map in `project.json` declares old-URL-to-new-URL rules, including `:param` patterns and per-rule HTTP status codes. See [Redirects](/docs/framework/site/redirects).
 
-Run it with `bunx jx build`. All output is static HTML, CSS, and minimal JS in `dist/` — deploy to any static host, no server runtime required. Studio doesn't run this step: it commits and pushes your source, and your host (or CI) builds on push. See [Git & publish](/docs/studio/publish).
+## Building and deploying
 
-## Deployment adapters
-
-Set an adapter in `project.json` (Studio's New Project dialog picks it for you) to package the build for your target:
-
-| Adapter        | Target                                               |
-| -------------- | ---------------------------------------------------- |
-| **Static**     | Plain `dist/` HTML/CSS/JS for any static host or CDN |
-| **Cloudflare** | Cloudflare Pages                                     |
-| **Node**       | A Node server bundle                                 |
-| **Bun**        | A Bun server bundle                                  |
-
-Switching hosts means switching the adapter — your source never changes.
+`bunx jx build` discovers routes, compiles each page, and emits static HTML, CSS, and minimal JS into `dist/` — deployable to any static host. Adapters package the output for specific targets such as Cloudflare Pages. See [the build pipeline](/docs/framework/build) and [Deployment](/docs/framework/site/deployment); Studio itself never runs this step — it [commits and pushes your source](/docs/studio/publish), and your host builds on push.

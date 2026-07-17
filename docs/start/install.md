@@ -34,6 +34,10 @@ bun run dev
 
 `bun run dev` starts the dev server and serves Studio at `http://localhost:3000`. Studio edits the files in your project folder directly; the dev server rebuilds on save. This is the same Studio as the desktop app — it just runs through your browser against the local server instead of as a native window.
 
+:::doc-warning
+The scaffolded `dev` script currently calls `jx dev`, which is not yet implemented in the `jx` CLI. Until it ships, start the dev server directly with `createDevServer` from `@jxsuite/server` — see [The dev server](/docs/framework/build/dev-server) — or use the desktop app, which needs no dev server.
+:::
+
 > Prefer npm or pnpm? Any package manager works; the examples use [Bun](https://bun.sh) because it's fastest. You'll need Bun installed for the dev server itself.
 
 ## Updating

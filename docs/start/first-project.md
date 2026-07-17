@@ -16,7 +16,7 @@ bun create @jxsuite my-site
 cd my-site && bun run dev
 ```
 
-There's no hosted Studio to sign into — it runs on your machine, against your files. Full details on both paths are in **[Get Studio](/docs/start/install)**.
+There's no hosted Studio to sign into — it runs on your machine, against your files. Full details on both paths — including a current caveat about the scaffolded `dev` script — are in **[Install Jx Studio](/docs/start/install)**. This tutorial uses the desktop app.
 
 ## 2. Create a project
 
