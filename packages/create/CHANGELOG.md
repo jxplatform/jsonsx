@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.0](https://github.com/jxsuite/jx/compare/create-v1.0.0...create-v1.1.0) (2026-07-17)
+
+
+### Features
+
+* **compiler,server,create:** jx dev and jx preview — the scaffolded scripts now work ([c0ff0d9](https://github.com/jxsuite/jx/commit/c0ff0d9d36715886b3f819b8d7ceebd682593583))
+* **studio:** spreadsheet grid editor — CSV grid tabs with batch save ([6736c02](https://github.com/jxsuite/jx/commit/6736c027d57fb438fb7aa0a9f333a41cc477e0a4))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/starters bumped to 1.1.0
+
 ## [1.0.0](https://github.com/jxsuite/jx/compare/create-v0.36.0...create-v1.0.0) (2026-07-13)
 
 ### ⚠ BREAKING CHANGES

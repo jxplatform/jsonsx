@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.1.0](https://github.com/jxsuite/jx/compare/compiler-v1.0.0...compiler-v1.1.0) (2026-07-17)
+
+
+### Features
+
+* **compiler,server,create:** jx dev and jx preview — the scaffolded scripts now work ([c0ff0d9](https://github.com/jxsuite/jx/commit/c0ff0d9d36715886b3f819b8d7ceebd682593583))
+* **docs,parser:** /docs platform — nested ids, nav sidebar, traceability, generated references ([6ecdcb5](https://github.com/jxsuite/jx/commit/6ecdcb505b7e61761369a12b76c51e27652df8e1))
+* image pruning for persistent site build cache + github ci cache ([b45096e](https://github.com/jxsuite/jx/commit/b45096ede609ecb5d640143af4b777fcb7f661b8))
+* **runtime,compiler:** named formulas — call operator, $args scheme, blessed globals ([24d516b](https://github.com/jxsuite/jx/commit/24d516bd3310fdd2630507b38d25a0a87d080e46))
+* **studio:** spreadsheet grid editor — CSV grid tabs with batch save ([6736c02](https://github.com/jxsuite/jx/commit/6736c027d57fb438fb7aa0a9f333a41cc477e0a4))
+
+
+### Bug Fixes
+
+* **studio,compiler,parser,protocol,auth:** keep the promises the docs audit surfaced ([03ac07f](https://github.com/jxsuite/jx/commit/03ac07ff3a53c125587050a277b3dfa7b0ce86b6))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.1.0
+    * @jxsuite/runtime bumped to 1.1.0
+    * @jxsuite/schema bumped to 1.1.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.3.0
+    * @jxsuite/parser bumped to 1.1.0
+
 ## [1.0.0](https://github.com/jxsuite/jx/compare/compiler-v0.35.0...compiler-v1.0.0) (2026-07-13)
 
 ### ⚠ BREAKING CHANGES

@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.1.0](https://github.com/jxsuite/jx/compare/desktop-v1.0.0...desktop-v1.1.0) (2026-07-17)
+
+
+### Features
+
+* **studio:** spreadsheet grid editor — CSV grid tabs with batch save ([6736c02](https://github.com/jxsuite/jx/commit/6736c027d57fb438fb7aa0a9f333a41cc477e0a4))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 1.1.0
+    * @jxsuite/create bumped to 1.1.0
+    * @jxsuite/parser bumped to 1.1.0
+    * @jxsuite/protocol bumped to 0.5.0
+    * @jxsuite/schema bumped to 1.1.0
+    * @jxsuite/server bumped to 1.1.0
+    * @jxsuite/starters bumped to 1.1.0
+    * @jxsuite/studio bumped to 1.1.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.3.0
+    * @jxsuite/server bumped to 1.1.0
+
 ## [1.0.0](https://github.com/jxsuite/jx/compare/desktop-v0.35.3...desktop-v1.0.0) (2026-07-13)
 
 ### ⚠ BREAKING CHANGES

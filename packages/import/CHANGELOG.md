@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.37.0](https://github.com/jxsuite/jx/compare/import-v0.36.0...import-v0.37.0) (2026-07-17)
+
+
+### Features
+
+* **studio:** spreadsheet grid editor — CSV grid tabs with batch save ([6736c02](https://github.com/jxsuite/jx/commit/6736c027d57fb438fb7aa0a9f333a41cc477e0a4))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.3.0
+    * @jxsuite/schema bumped to 1.1.0
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 1.1.0
+
 ## [0.36.0](https://github.com/jxsuite/jx/compare/import-v0.35.1...import-v0.36.0) (2026-07-13)
 
 ### Features
