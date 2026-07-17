@@ -1,5 +1,5 @@
 ---
-title: "Git & publish — Jx Suite"
+title: "Publish"
 description: "Commit, branch, and push from inside Jx Studio, publish to GitHub in a click, and let your host build the static site on every push."
 ---
 
@@ -37,4 +37,4 @@ The **deployment adapter** you picked when you created the project (Static, Clou
 
 ## Next
 
-- Understand the build and routing in **[Site architecture](/docs/site-architecture)**
+- Understand the build and routing in **[Site architecture](/docs/framework/site)**

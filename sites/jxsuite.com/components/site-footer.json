@@ -142,7 +142,7 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/docs/getting-started" },
+              "attributes": { "href": "/docs/start/first-project" },
               "style": {
                 "display": "block",
                 "color": "var(--color-text-muted)",
@@ -154,7 +154,7 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/docs/get-studio" },
+              "attributes": { "href": "/docs/start/install" },
               "style": {
                 "display": "block",
                 "color": "var(--color-text-muted)",
@@ -166,7 +166,7 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/docs/spec" },
+              "attributes": { "href": "/docs/framework" },
               "style": {
                 "display": "block",
                 "color": "var(--color-text-muted)",

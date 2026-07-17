@@ -8,6 +8,8 @@ on:
     # via workflow_dispatch when a core-package change needs to reach the site.
     paths:
       - "sites/jxsuite.com/**"
+      - "docs/**"
+      - "scripts/docs/**"
   workflow_dispatch:
 
 permissions:

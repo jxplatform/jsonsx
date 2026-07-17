@@ -1,5 +1,5 @@
 ---
-title: "Script & logic — Jx Suite"
+title: "Logic"
 description: "Add state, data sources, and event handlers in Jx Studio — the State, Data, Events, and Code surfaces that make components interactive."
 ---
 
@@ -33,5 +33,5 @@ When a handler needs real JavaScript, open it in the **Monaco** editor — full 
 
 ## Next
 
-- The reactivity model behind all of this is documented in **[Reactivity](/docs/reactivity)**
-- Ship your work in **[Git & publish](/docs/git-publish)**
+- The reactivity model behind all of this is documented in **[Reactivity](/docs/framework/concepts/reactivity)**
+- Ship your work in **[Git & publish](/docs/studio/publish)**

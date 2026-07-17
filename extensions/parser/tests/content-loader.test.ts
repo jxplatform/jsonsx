@@ -54,6 +54,15 @@ beforeAll(() => {
     JSON.stringify({ id: "jane", name: "Jane" }),
   );
 
+  // Nested markdown tree for path-based id derivation
+  mkdirSync(resolve(TMP, "content/tree/guides/nested"), { recursive: true });
+  writeFileSync(resolve(TMP, "content/tree/root.md"), "---\ntitle: Root\n---\n\nRoot.\n");
+  writeFileSync(resolve(TMP, "content/tree/guides/deep.md"), "---\ntitle: Deep\n---\n\nDeep.\n");
+  writeFileSync(
+    resolve(TMP, "content/tree/guides/nested/index.md"),
+    "---\ntitle: Nested\n---\n\nNested.\n",
+  );
+
   // Extension fixture: a manifest naming the package's real class descriptors
   mkdirSync(resolve(TMP, "ext"), { recursive: true });
   writeFileSync(
@@ -387,6 +396,26 @@ describe("loadContentSection", () => {
     const loadOptions = calls[0]?.args[1] as { directiveOptions?: { allowedNames?: string[] } };
     expect(loadOptions.directiveOptions?.allowedNames).toEqual(["my-widget", "./card.json"]);
   });
+
+  it("passes sourceRoot to load for directory sources but not single files", async () => {
+    const { calls, entry } = makeFakeEntry("FakeFmt", {
+      discoverResult: [resolve(TMP, "content/single.fake")],
+      loadImpl: () => [{ body: null, data: {}, id: "x" }],
+      withDiscover: true,
+    });
+    const section = { docs: { format: "FakeFmt", source: "./content/" } };
+    await loadContentSection(section, TMP, makeRegistry(entry));
+    const dirLoad = calls.find((c) => c.method === "load");
+    const dirOptions = dirLoad ? (dirLoad.args[1] as { sourceRoot?: string }) : undefined;
+    expect(dirOptions?.sourceRoot).toBe(resolve(TMP, "content"));
+
+    calls.length = 0;
+    const single = { one: { format: "FakeFmt", source: "./content/single.fake" } };
+    await loadContentSection(single, TMP, makeRegistry(entry));
+    const singleLoad = calls.find((c) => c.method === "load");
+    const singleOptions = singleLoad ? (singleLoad.args[1] as { sourceRoot?: string }) : undefined;
+    expect(singleOptions?.sourceRoot).toBeUndefined();
+  });
 });
 
 // ─── getContentTypeElements ──────────────────────────────────────────────────
@@ -555,6 +584,14 @@ describe("Content.projectData", () => {
     const reviewers = post.data.reviewers as unknown[];
     expect((reviewers[0] as ContentLoaderEntry).id).toBe("jane");
     expect(reviewers[1]).toBe("ghost");
+  });
+
+  it("derives path-based ids for markdown files in subdirectories of the source", async () => {
+    const registry = await buildFixtureRegistry();
+    const section: ContentSection = { tree: { format: "Markdown", source: "./content/tree/" } };
+    const data = await Content.projectData(section, { projectConfig: {}, registry, root: TMP });
+    const ids = (data.get("tree") as ContentLoaderEntry[]).map((e) => e.id).toSorted();
+    expect(ids).toEqual(["guides/deep", "guides/nested", "root"]);
   });
 
   it("returns an empty map for a nullish section value", async () => {

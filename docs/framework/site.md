@@ -1,5 +1,5 @@
 ---
-title: "Site Architecture — Jx Suite"
+title: "Site architecture"
 description: "File-based routing, layouts, content collections, and static site generation in Jx."
 ---
 
@@ -121,7 +121,7 @@ Query collections in pages via `$prototype`:
 project.json → Discover pages/ → Resolve routes → Compile each page → Emit dist/
 ```
 
-Run it with `bunx jx build`. All output is static HTML, CSS, and minimal JS in `dist/` — deploy to any static host, no server runtime required. Studio doesn't run this step: it commits and pushes your source, and your host (or CI) builds on push. See [Git & publish](/docs/git-publish).
+Run it with `bunx jx build`. All output is static HTML, CSS, and minimal JS in `dist/` — deploy to any static host, no server runtime required. Studio doesn't run this step: it commits and pushes your source, and your host (or CI) builds on push. See [Git & publish](/docs/studio/publish).
 
 ## Deployment adapters
 

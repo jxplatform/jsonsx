@@ -77,6 +77,11 @@ export interface ShotDefaults {
 export interface Shot extends ShotDefaults {
   actions?: ShotAction[];
   canvasMode?: string;
+  /**
+   * Docs-page slugs this shot illustrates (e.g. "studio/design"). Inert to capture;
+   * Scripts/docs/check-doc-refs.ts uses it to report shots no docs page references.
+   */
+  docs?: string[];
   file: string;
   name: string;
   regions?: ShotRegion[];

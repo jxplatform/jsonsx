@@ -78,7 +78,7 @@
                 {
                   "tagName": "cta-button",
                   "attributes": {
-                    "props.href": "/docs/getting-started",
+                    "props.href": "/docs/start/first-project",
                     "props.label": "Install via CLI",
                     "props.variant": "secondary"
                   }

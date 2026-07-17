@@ -140,8 +140,13 @@
   },
   "content": {
     "docs": {
-      "source": "./content/docs/",
+      "source": "../../docs",
       "format": "Markdown",
+      "$elements": [
+        { "$ref": "./components/doc-note.json" },
+        { "$ref": "./components/doc-warning.json" },
+        { "$ref": "./components/doc-tip.json" }
+      ],
       "schema": {
         "type": "object",
         "properties": {
@@ -150,11 +155,40 @@
           },
           "description": {
             "type": "string"
+          },
+          "spec": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "code": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "generated": {
+            "type": "boolean"
           }
         },
         "required": ["title"]
       }
+    },
+    "docsNav": {
+      "source": "../../docs/nav.json",
+      "format": "json"
     }
+  },
+  "redirects": {
+    "/docs/get-studio": "/docs/start/install/",
+    "/docs/getting-started": "/docs/start/first-project/",
+    "/docs/manage": "/docs/studio/projects/browse/",
+    "/docs/edit": "/docs/studio/editing/",
+    "/docs/design": "/docs/studio/design/",
+    "/docs/logic": "/docs/studio/logic/",
+    "/docs/git-publish": "/docs/studio/publish/",
+    "/docs/components": "/docs/framework/concepts/components/",
+    "/docs/reactivity": "/docs/framework/concepts/reactivity/",
+    "/docs/styling": "/docs/framework/concepts/styling/",
+    "/docs/site-architecture": "/docs/framework/site/",
+    "/docs/spec": "/docs/framework/"
   },
   "copy": {
     "../../packages/schema/schema.json": "schema/v1/index.json",

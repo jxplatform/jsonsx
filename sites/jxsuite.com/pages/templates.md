@@ -75,7 +75,7 @@ Choose a template in the New Project dialog, then design on the canvas, edit con
 :::div{style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap"}
 ::cta-button{props.href="/download" props.label="Download Studio" props.variant="primary"}
 
-::cta-button{props.href="/docs/getting-started" props.label="Read the docs" props.variant="secondary"}
+::cta-button{props.href="/docs/start/first-project" props.label="Read the docs" props.variant="secondary"}
 :::
 :::::
 ::::::

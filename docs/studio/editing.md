@@ -1,5 +1,5 @@
 ---
-title: "Edit — Jx Suite"
+title: "Edit mode"
 description: "The Edit surface in Jx Studio: WYSIWYG content authoring with slash commands and frontmatter forms, saved as clean Markdown."
 ---
 
@@ -27,5 +27,5 @@ Everything you write saves as standard Markdown with your frontmatter on top. Op
 
 ## Next
 
-- Organize content in **[Manage](/docs/manage)**
-- Design the components your content renders into, in **[Design](/docs/design)**
+- Organize content in **[Manage](/docs/studio/projects/browse)**
+- Design the components your content renders into, in **[Design](/docs/studio/design)**

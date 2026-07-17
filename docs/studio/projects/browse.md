@@ -1,5 +1,5 @@
 ---
-title: "Manage — Jx Suite"
+title: "Browse your project"
 description: "The Manage surface in Jx Studio: browse your project, create pages and content, upload media, and define content models."
 ---
 
@@ -25,9 +25,9 @@ Drag images, video, audio, PDFs, or fonts into Manage and Studio writes them to 
 
 ## Model your content
 
-Content types are your CMS schema. Studio's content-type builder lets you define a collection — its source folder, format, and a field schema — visually. Behind the scenes this is the `contentTypes` block in your `project.json`; see **[Site architecture](/docs/site-architecture)** for the underlying shape.
+Content types are your CMS schema. Studio's content-type builder lets you define a collection — its source folder, format, and a field schema — visually. Behind the scenes this is the `contentTypes` block in your `project.json`; see **[Site architecture](/docs/framework/site)** for the underlying shape.
 
 ## Next
 
-- Author content in **[Edit](/docs/edit)**
-- Design components in **[Design](/docs/design)**
+- Author content in **[Edit](/docs/studio/editing)**
+- Design components in **[Design](/docs/studio/design)**

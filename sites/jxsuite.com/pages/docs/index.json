@@ -1,0 +1,132 @@
+{
+  "$layout": "./layouts/docs.json",
+  "title": "Documentation — Jx Suite",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Jx Suite documentation — build visually with Jx Studio, learn the Jx framework, and extend it with your own packages."
+      }
+    }
+  ],
+  "children": [
+    {
+      "tagName": "article",
+      "style": { "maxWidth": "720px" },
+      "children": [
+        { "tagName": "h1", "textContent": "Documentation" },
+        {
+          "tagName": "p",
+          "textContent": "Jx Suite is a visual site builder, a JSON-native component format, and a static-site compiler — working on plain files you own. Pick a section to get going."
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gap": "1rem",
+            "marginTop": "2rem"
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/docs/start/" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "10px",
+                "textDecoration": "none",
+                ":hover": { "backgroundColor": "var(--color-bg-surface)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "color": "var(--color-text-primary)" },
+                  "textContent": "Start here"
+                },
+                {
+                  "tagName": "p",
+                  "style": { "color": "var(--color-text-secondary)", "margin": "0.375rem 0 0" },
+                  "textContent": "Install Jx Studio and publish your first site."
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/docs/studio/" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "10px",
+                "textDecoration": "none",
+                ":hover": { "backgroundColor": "var(--color-bg-surface)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "color": "var(--color-text-primary)" },
+                  "textContent": "Studio"
+                },
+                {
+                  "tagName": "p",
+                  "style": { "color": "var(--color-text-secondary)", "margin": "0.375rem 0 0" },
+                  "textContent": "The visual builder — editing, design, logic, and publishing."
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/docs/framework/" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "10px",
+                "textDecoration": "none",
+                ":hover": { "backgroundColor": "var(--color-bg-surface)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "color": "var(--color-text-primary)" },
+                  "textContent": "Framework"
+                },
+                {
+                  "tagName": "p",
+                  "style": { "color": "var(--color-text-secondary)", "margin": "0.375rem 0 0" },
+                  "textContent": "The JSON document format Studio writes — components, state, styling, and the site build."
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/docs/extending/" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "10px",
+                "textDecoration": "none",
+                ":hover": { "backgroundColor": "var(--color-bg-surface)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "color": "var(--color-text-primary)" },
+                  "textContent": "Extending"
+                },
+                {
+                  "tagName": "p",
+                  "style": { "color": "var(--color-text-secondary)", "margin": "0.375rem 0 0" },
+                  "textContent": "Write extensions, embed Studio, and integrate your own backend."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

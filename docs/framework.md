@@ -1,9 +1,9 @@
 ---
-title: "Spec Overview — Jx Suite"
+title: "Framework"
 description: "The Jx specification: a declarative DOM format using plain JSON with reactive state, web components, and standards alignment."
 ---
 
-# Spec Overview
+# Framework
 
 > This is the conceptual foundation beneath [Jx Studio](/studio). You never have to read it to build with Studio — but if you want to know exactly what the format is, start here.
 

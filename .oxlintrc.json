@@ -196,7 +196,11 @@
     // ─── Off: ES-downlevel restrictions (irrelevant on modern targets) ────────
     "oxc/no-async-await": "off",
     "oxc/no-optional-chaining": "off",
-    "oxc/no-rest-spread-properties": "off"
+    "oxc/no-rest-spread-properties": "off",
+
+    // ─── Docs traceability tags (scripts/docs/check-doc-refs.ts validates targets) ─
+    // `@docs <docs-page-path>` links code to its user-documentation page.
+    "jsdoc/check-tag-names": ["error", { "definedTags": ["docs"] }]
   },
   "settings": {
     "jsdoc": {

@@ -5,7 +5,7 @@
     "param": "slug",
     "field": "id"
   },
-  "title": "${state.page.data.title}",
+  "title": "${state.page.data.title} — Jx Suite",
   "$head": [
     {
       "tagName": "meta",
@@ -33,6 +33,17 @@
           "borderRadius": "8px",
           "border": "1px solid var(--color-border)",
           "margin": "1.75rem auto"
+        },
+        "& kbd": {
+          "display": "inline-block",
+          "padding": "0.125rem 0.375rem",
+          "fontSize": "0.8125rem",
+          "fontFamily": "var(--font-mono)",
+          "color": "var(--color-text-primary)",
+          "backgroundColor": "var(--color-bg-surface)",
+          "border": "1px solid var(--color-border)",
+          "borderBottomWidth": "2px",
+          "borderRadius": "4px"
         }
       },
       "children": "${state.page.$children ?? []}"

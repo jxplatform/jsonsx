@@ -29,6 +29,24 @@ describe("processMarkdown", () => {
     expect(processMarkdown("hi", "/a/b/my-post.md").path).toBe("/a/b/my-post.md");
   });
 
+  test("derives path-based slugs for files in subdirectories of sourceRoot", () => {
+    expect(processMarkdown("hi", "/docs/studio/canvas.md", { sourceRoot: "/docs" }).slug).toBe(
+      "studio/canvas",
+    );
+    expect(
+      processMarkdown("hi", "/docs/studio/canvas/index.md", { sourceRoot: "/docs" }).slug,
+    ).toBe("studio/canvas");
+    expect(
+      processMarkdown("hi", "/docs/framework/concepts/state.md", { sourceRoot: "/docs" }).slug,
+    ).toBe("framework/concepts/state");
+  });
+
+  test("keeps basename slugs at the sourceRoot itself and outside it", () => {
+    expect(processMarkdown("hi", "/docs/intro.md", { sourceRoot: "/docs" }).slug).toBe("intro");
+    expect(processMarkdown("hi", "/docs/index.md", { sourceRoot: "/docs" }).slug).toBe("index");
+    expect(processMarkdown("hi", "/elsewhere/post.md", { sourceRoot: "/docs" }).slug).toBe("post");
+  });
+
   test("extracts a table of contents with slugified ids", () => {
     const source = ["# Top Heading", "", "## What's New?", "", "### Multi  Spaced -- Title"].join(
       "\n",

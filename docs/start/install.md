@@ -1,5 +1,5 @@
 ---
-title: "Get Studio — Jx Suite"
+title: "Install Jx Studio"
 description: "Download the Jx Studio desktop app for macOS, Windows, or Linux, or install the CLI and run Studio locally."
 ---
 
@@ -20,7 +20,7 @@ Grab a signed installer for your platform from the [latest release](https://gith
 
 The macOS builds are notarized and the Windows installer is signed, so they open without security warnings. The [Download page](/download) has the same links plus checksums and release notes.
 
-Once installed, open Studio and either **create a new project**, **open an existing folder**, or **clone a repository** — see [Your first project](/docs/getting-started).
+Once installed, open Studio and either **create a new project**, **open an existing folder**, or **clone a repository** — see [Your first project](/docs/start/first-project).
 
 ## Install via the CLI
 
@@ -42,4 +42,4 @@ Studio checks your project's `@jxsuite/*` dependencies against the version it sh
 
 ## Next
 
-Ready to build something? Continue to **[Your first project](/docs/getting-started)**.
+Ready to build something? Continue to **[Your first project](/docs/start/first-project)**.

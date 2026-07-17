@@ -6,152 +6,347 @@
   },
   "defaults": {
     "project": "packages/starters/sites/real-estate",
-    "viewport": { "width": 1920, "height": 1000 },
+    "viewport": {
+      "width": 1920,
+      "height": 1000
+    },
     "deviceScaleFactor": 2,
     "theme": "dark",
-    "clip": { "selector": "#app" },
-    "waitFor": [{ "type": "canvasReady" }, { "type": "fonts" }, { "type": "settle", "frames": 2 }]
+    "clip": {
+      "selector": "#app"
+    },
+    "waitFor": [
+      {
+        "type": "canvasReady"
+      },
+      {
+        "type": "fonts"
+      },
+      {
+        "type": "settle",
+        "frames": 2
+      }
+    ]
   },
   "shots": [
     {
       "name": "hero",
+      "docs": [],
       "file": "pages/index.md",
-      "viewport": { "width": 1920, "height": 1200 },
+      "viewport": {
+        "width": 1920,
+        "height": 1200
+      },
       "canvasMode": "preview",
       "actions": [
-        { "do": "setActivity", "value": "layers" },
-        { "do": "select", "path": ["children", 0] },
-        { "do": "setRightTab", "value": "properties" },
-        { "do": "setStatus", "value": "Ready" }
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "select",
+          "path": ["children", 0]
+        },
+        {
+          "do": "setRightTab",
+          "value": "properties"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
       ]
     },
     {
       "name": "mode-manage",
+      "docs": ["studio/projects/browse"],
       "file": "pages/index.md",
       "canvasMode": "preview",
       "actions": [
-        { "do": "setActivity", "value": "files" },
-        { "do": "setStatus", "value": "Ready" },
-        { "do": "openBrowse" }
+        {
+          "do": "setActivity",
+          "value": "files"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "openBrowse"
+        }
       ],
       "waitFor": [
-        { "type": "selector", "selector": ".browse-modal" },
-        { "type": "fonts" },
-        { "type": "settle", "frames": 4 }
+        {
+          "type": "selector",
+          "selector": ".browse-modal"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
       ]
     },
     {
       "name": "mode-edit",
+      "docs": ["studio/editing"],
       "file": "pages/index.md",
       "project": "packages/starters/sites/restaurant",
       "canvasMode": "edit",
       "actions": [
-        { "do": "setActivity", "value": "files" },
-        { "do": "setStatus", "value": "Ready" }
+        {
+          "do": "setActivity",
+          "value": "files"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
       ]
     },
     {
       "name": "mode-design",
+      "docs": ["studio/design"],
       "project": "packages/starters/sites/event",
       "file": "components/ev-savedate.json",
       "canvasMode": "design",
       "actions": [
-        { "do": "setActivity", "value": "layers" },
-        { "do": "setZoom", "value": 0.6 },
-        { "do": "select", "path": ["children", 0] },
-        { "do": "setRightTab", "value": "style" },
-        { "do": "setStatus", "value": "Ready" }
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "setZoom",
+          "value": 0.6
+        },
+        {
+          "do": "select",
+          "path": ["children", 0]
+        },
+        {
+          "do": "setRightTab",
+          "value": "style"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
       ]
     },
     {
       "name": "mode-script",
+      "docs": ["studio/logic"],
       "file": "components/re-listings-filter.json",
       "canvasMode": "design",
       "actions": [
-        { "do": "setActivity", "value": "state" },
-        { "do": "editDef", "defName": "visibleCount" },
-        { "do": "setStatus", "value": "Ready" }
+        {
+          "do": "setActivity",
+          "value": "state"
+        },
+        {
+          "do": "editDef",
+          "defName": "visibleCount"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
       ],
       "waitFor": [
-        { "type": "selector", "selector": ".monaco-editor .view-lines" },
-        { "type": "fonts" },
-        { "type": "settle", "frames": 2 }
+        {
+          "type": "selector",
+          "selector": ".monaco-editor .view-lines"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 2
+        }
       ]
     },
     {
       "name": "new-project",
+      "docs": ["start/first-project"],
       "file": "pages/index.md",
       "canvasMode": "preview",
-      "actions": [{ "do": "openNewProject" }, { "do": "setStatus", "value": "Ready" }],
-      "waitFor": [
-        { "type": "selector", "selector": ".new-project-modal" },
-        { "type": "fonts" },
-        { "type": "timeout", "ms": 400 },
-        { "type": "settle", "frames": 3 }
+      "actions": [
+        {
+          "do": "openNewProject"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
       ],
-      "regions": [{ "name": "new-project-modal", "selector": ".new-project-modal", "padding": 24 }]
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".new-project-modal"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "timeout",
+          "ms": 400
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "regions": [
+        {
+          "name": "new-project-modal",
+          "selector": ".new-project-modal",
+          "padding": 24
+        }
+      ]
     },
     {
       "name": "git-panel",
+      "docs": ["studio/publish"],
       "file": "components/re-listings-filter.json",
       "canvasMode": "design",
       "actions": [
-        { "do": "setActivity", "value": "git" },
-        { "do": "setStatus", "value": "Ready" }
+        {
+          "do": "setActivity",
+          "value": "git"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
       ],
       "waitFor": [
-        { "type": "selector", "selector": ".git-panel" },
-        { "type": "fonts" },
-        { "type": "timeout", "ms": 1500 },
-        { "type": "settle", "frames": 3 }
+        {
+          "type": "selector",
+          "selector": ".git-panel"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "timeout",
+          "ms": 1500
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
       ],
       "clip": "none",
       "regions": [
-        { "name": "git-panel", "selector": "#left-panel", "padding": 0 },
-        { "name": "git-commit", "selector": ".git-commit-area", "padding": 16 }
+        {
+          "name": "git-panel",
+          "selector": "#left-panel",
+          "padding": 0
+        },
+        {
+          "name": "git-commit",
+          "selector": ".git-commit-area",
+          "padding": 16
+        }
       ]
     },
     {
       "name": "state-panel",
+      "docs": ["studio/logic"],
       "file": "components/re-listings-filter.json",
       "canvasMode": "design",
       "actions": [
-        { "do": "setActivity", "value": "state" },
-        { "do": "setStatus", "value": "Ready" }
+        {
+          "do": "setActivity",
+          "value": "state"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
       ]
     },
     {
       "name": "design-inspector",
+      "docs": ["studio/design"],
       "file": "components/re-listing-card.json",
       "canvasMode": "design",
       "actions": [
-        { "do": "setActivity", "value": "layers" },
-        { "do": "select", "path": ["children", 0] },
-        { "do": "setRightTab", "value": "style" },
-        { "do": "setStatus", "value": "Ready" }
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "select",
+          "path": ["children", 0]
+        },
+        {
+          "do": "setRightTab",
+          "value": "style"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
       ],
       "waitFor": [
-        { "type": "canvasReady" },
-        { "type": "selector", "selector": "#right-panel" },
-        { "type": "fonts" },
-        { "type": "settle", "frames": 3 }
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": "#right-panel"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
       ],
       "clip": "none",
-      "regions": [{ "name": "design-inspector", "selector": "#right-panel", "padding": 0 }]
+      "regions": [
+        {
+          "name": "design-inspector",
+          "selector": "#right-panel",
+          "padding": 0
+        }
+      ]
     },
     {
       "name": "stylebook",
+      "docs": ["studio/design"],
       "file": "components/re-listing-card.json",
       "canvasMode": "stylebook",
       "actions": [
-        { "do": "setZoom", "value": 0.6 },
-        { "do": "setStatus", "value": "Ready" }
+        {
+          "do": "setZoom",
+          "value": 0.6
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
       ],
       "waitFor": [
-        { "type": "canvasReady" },
-        { "type": "fonts" },
-        { "type": "timeout", "ms": 5000 },
-        { "type": "settle", "frames": 4 }
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "timeout",
+          "ms": 5000
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
       ]
     }
   ]

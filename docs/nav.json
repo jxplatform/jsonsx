@@ -1,0 +1,47 @@
+{
+  "id": "nav",
+  "sections": [
+    {
+      "path": "start",
+      "label": "Start here",
+      "children": [
+        { "path": "start/install", "label": "Install Jx Studio" },
+        { "path": "start/first-project", "label": "Your first project" }
+      ]
+    },
+    {
+      "path": "studio",
+      "label": "Studio",
+      "children": [
+        { "path": "studio/projects/browse", "label": "Browse your project" },
+        { "path": "studio/projects/starters", "label": "Starter templates" },
+        { "path": "studio/editing", "label": "Edit mode" },
+        { "path": "studio/design", "label": "Design mode" },
+        { "path": "studio/logic", "label": "Logic" },
+        { "path": "studio/publish", "label": "Publish" }
+      ]
+    },
+    {
+      "path": "framework",
+      "label": "Framework",
+      "children": [
+        { "path": "framework/concepts/components", "label": "Components" },
+        { "path": "framework/concepts/reactivity", "label": "Reactivity" },
+        { "path": "framework/concepts/styling", "label": "Styling" },
+        { "path": "framework/site", "label": "Site architecture" },
+        { "path": "framework/reference", "label": "Reference" },
+        { "path": "framework/reference/formulas", "label": "Formula catalog" },
+        { "path": "framework/reference/operators", "label": "Operator reference" }
+      ]
+    },
+    {
+      "path": "extending",
+      "label": "Extending",
+      "children": [
+        { "path": "extending/reference/studio-routes", "label": "Protocol routes" },
+        { "path": "extending/contributing/monorepo", "label": "Working in the monorepo" },
+        { "path": "extending/contributing/docs", "label": "Contributing to these docs" }
+      ]
+    }
+  ]
+}

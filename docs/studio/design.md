@@ -1,5 +1,5 @@
 ---
-title: "Design — Jx Suite"
+title: "Design mode"
 description: "The Design surface in Jx Studio: a live canvas at every breakpoint, a full CSS inspector, hover states, and design tokens."
 ---
 
@@ -31,5 +31,5 @@ Define your palette, fonts, and spacing scale as CSS custom properties once, and
 
 ## Next
 
-- Make it interactive in **[Script & logic](/docs/logic)**
-- The underlying style format is documented in **[Styling](/docs/styling)**
+- Make it interactive in **[Script & logic](/docs/studio/logic)**
+- The underlying style format is documented in **[Styling](/docs/framework/concepts/styling)**

@@ -52,7 +52,7 @@ The feel of a visual builder. The power of a framework. The permanence of plain 
 :::div{style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap" style.marginBottom="0.75rem"}
 ::cta-button{props.href="/download" props.label="Download Studio" props.variant="primary"}
 
-::cta-button{props.href="/docs/getting-started" props.label="Install via CLI" props.variant="secondary"}
+::cta-button{props.href="/docs/start/first-project" props.label="Install via CLI" props.variant="secondary"}
 :::
 
 :::p{style.fontSize="0.8125rem" style.color="var(--color-text-muted)" style.margin="0 0 3rem"}
@@ -249,7 +249,7 @@ No accounts, no subscriptions, no vendor approval. Download Studio, or clone the
 :::div{style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap"}
 ::cta-button{props.href="/download" props.label="Download Studio" props.variant="primary"}
 
-::cta-button{props.href="/docs/getting-started" props.label="Read the docs" props.variant="secondary"}
+::cta-button{props.href="/docs/start/first-project" props.label="Read the docs" props.variant="secondary"}
 :::
 :::::
 ::::::

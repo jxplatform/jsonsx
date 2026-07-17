@@ -26,6 +26,12 @@ export interface MarkdownLoadOptions {
   directiveOptions?: unknown;
   /** Enable remark-directive parsing. Implied by directiveOptions. */
   directives?: boolean;
+  /**
+   * Resolved content-source root directory. When set, entries in subdirectories get path-based ids
+   * (`studio/canvas` for `studio/canvas.md`, `/index` stripped); files directly at the root keep
+   * basename ids.
+   */
+  sourceRoot?: string;
 }
 
 /**
@@ -83,6 +89,7 @@ export class Markdown {
       ...(options.directiveOptions !== undefined && {
         directiveOptions: options.directiveOptions,
       }),
+      ...(options.sourceRoot !== undefined && { sourceRoot: options.sourceRoot }),
     });
     const _meta: ContentLoaderEntry["_meta"] = {};
     if (result.$excerpt != null) {

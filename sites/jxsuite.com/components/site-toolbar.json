@@ -113,7 +113,7 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/docs/getting-started" },
+              "attributes": { "href": "/docs/start/first-project" },
               "style": {
                 "color": "var(--color-text-secondary)",
                 "textDecoration": "none",

@@ -183,3 +183,6 @@ jobs:
       # Type-aware (tsgolint) pass — Flow-soundness rules in .oxlintrc.strict.json.
       # The tsgolint binary ships with the oxlint-tsgolint dev dep (installed above).
       - run: bun run lint:typecheck
+      # Docs: generated reference pages must match their sources (diff gate), and
+      # /docs frontmatter ↔ specs/code/screenshots/nav must agree.
+      - run: bun run docs:verify

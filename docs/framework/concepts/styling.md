@@ -1,11 +1,11 @@
 ---
-title: "Styling — Jx Suite"
+title: "Styling"
 description: "Inline styles, nested CSS selectors, and named media breakpoints in Jx."
 ---
 
 # Styling
 
-> **Studio writes this format for you.** The [Design](/docs/design) inspector and Stylebook produce everything below — this page documents the style model for hand-editing and reference.
+> **Studio writes this format for you.** The [Design](/docs/studio/design) inspector and Stylebook produce everything below — this page documents the style model for hand-editing and reference.
 
 Jx uses JSON objects for styling with camelCase CSS property names, nested selectors, and named media breakpoints.
 

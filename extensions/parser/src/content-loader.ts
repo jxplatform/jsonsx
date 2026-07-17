@@ -269,12 +269,15 @@ async function loadContentType(
       })) as string[])
     : [resolvedSource];
 
+  // Directory sources pass their resolved root so formats can derive path-based ids for nested files
+  const sourceRoot = extname(source) ? undefined : resolvedSource;
   const entries: ContentLoaderEntry[] = [];
   for (const filePath of files) {
     entries.push(
       ...((await entry.call("load", filePath, {
         directiveOptions,
         schema,
+        ...(sourceRoot !== undefined && { sourceRoot }),
       })) as ContentLoaderEntry[]),
     );
   }

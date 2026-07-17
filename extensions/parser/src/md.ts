@@ -18,7 +18,7 @@ import remarkParseFrontmatter from "remark-parse-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkDirective from "remark-directive";
 import { readFileSync } from "node:fs";
-import { basename, extname, resolve as resolvePath } from "node:path";
+import { basename, extname, relative, resolve as resolvePath } from "node:path";
 import { globSync } from "glob";
 import { mdastNodeToJx } from "./transpile.ts";
 import type { MarkdownFileResult, MdastNode, TocEntry, UnifiedProcessor } from "./types.ts";
@@ -134,6 +134,30 @@ function extractExcerpt(tree: MdastNode) {
 }
 
 /**
+ * Derive an entry slug from a file path. Without a source root (or for files directly at the root),
+ * the slug is the basename — the historical behavior every flat collection relies on. Files in
+ * subdirectories of the root get path-based slugs with POSIX separators and a trailing `/index`
+ * stripped, so `studio/canvas.md` and `studio/canvas/index.md` both yield `studio/canvas`.
+ *
+ * @param {string} filePath - Absolute path to the markdown file
+ * @param {string} [sourceRoot] - Resolved content-source root directory
+ * @returns {string} The entry slug
+ */
+function deriveSlug(filePath: string, sourceRoot?: string): string {
+  if (sourceRoot) {
+    const rel = relative(sourceRoot, filePath).split("\\").join("/");
+    if (rel && !rel.startsWith("..") && rel.includes("/")) {
+      let slug = rel.slice(0, rel.length - extname(rel).length);
+      if (slug.endsWith("/index")) {
+        slug = slug.slice(0, -"/index".length);
+      }
+      return slug;
+    }
+  }
+  return basename(filePath, extname(filePath));
+}
+
+/**
  * Process a single markdown source string into a MarkdownFileResult.
  *
  * Converts the MDAST directly to JX nodes via mdastNodeToJx — no rehype/HTML intermediary.
@@ -143,6 +167,7 @@ function extractExcerpt(tree: MdastNode) {
  * @param {object} config - Processing options
  * @param {boolean} [config.directives] - Enable directive support
  * @param {unknown} [config.directiveOptions] - Directive plugin options
+ * @param {string} [config.sourceRoot] - Content-source root; files below it get path-based slugs
  * @returns {MarkdownFileResult}
  */
 export function processMarkdown(
@@ -151,6 +176,7 @@ export function processMarkdown(
   config: {
     directives?: boolean;
     directiveOptions?: unknown;
+    sourceRoot?: string;
   } = {},
 ) {
   let processor = (unified as unknown as () => UnifiedProcessor)()
@@ -173,7 +199,7 @@ export function processMarkdown(
   const plainText = mdastToString(mdTree);
   const toc = extractToc(tree);
   const excerpt = extractExcerpt(tree);
-  const slug = basename(filePath, extname(filePath));
+  const slug = deriveSlug(filePath, config.sourceRoot);
 
   const bodyNodes = tree.children!.filter(
     (n: MdastNode) => n.type !== "yaml" && n.type !== "toml",

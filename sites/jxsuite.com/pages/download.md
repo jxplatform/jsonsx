@@ -113,6 +113,6 @@ $
 :span[$]{style.color="var(--color-text-muted)"} cd my-site &amp;&amp; bun run dev
 ::::
 
-::cta-button{props.href="/docs/getting-started" props.label="Read the quickstart" props.variant="secondary"}
+::cta-button{props.href="/docs/start/first-project" props.label="Read the quickstart" props.variant="secondary"}
 :::::
 ::::::
