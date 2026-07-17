@@ -1,7 +1,16 @@
 /** Site-build.test.js — Tests for the Phase 1 site build pipeline */
 
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { loadProjectConfig } from "../src/site/site-loader";
 import { discoverPages } from "../src/site/pages-discovery";
@@ -362,14 +371,41 @@ describe("buildSite — server worker", () => {
     expect(content).toContain("sendForm");
   });
 
-  it("copies server source files into dist/components/", async () => {
+  it("inlines server function sources into the bundled worker (no dist/components copy)", async () => {
     await buildSite(SERVER_TMP, { verbose: false });
 
-    const copied = resolve(SERVER_TMP, "dist/components/contact.server.js");
-    expect(existsSync(copied)).toBe(true);
+    // Self-contained worker (compiler.md §12): the source is bundled in, not copied beside it.
+    expect(existsSync(resolve(SERVER_TMP, "dist/components/contact.server.js"))).toBe(false);
+    const worker = readFileSync(resolve(SERVER_TMP, "dist/worker.js"), "utf8");
+    expect(worker).toContain("function sendForm");
+    expect(worker).not.toMatch(/from\s*["']\.\/components\//);
+  });
 
-    const content = readFileSync(copied, "utf8");
-    expect(content).toContain("export function sendForm");
+  it("the bundled worker runs from a directory with no node_modules in scope", async () => {
+    await buildSite(SERVER_TMP, { verbose: false });
+
+    // Portability by construction: copy the worker outside the workspace and invoke it.
+    const portableDir = mkdtempSync(join(tmpdir(), "jx-worker-portability-"));
+    try {
+      const portable = join(portableDir, "worker.mjs");
+      copyFileSync(resolve(SERVER_TMP, "dist/worker.js"), portable);
+      const mod = (await import(portable)) as {
+        default: { fetch: (req: Request, env: unknown) => Promise<Response> };
+      };
+      expect(typeof mod.default.fetch).toBe("function");
+
+      const response = await mod.default.fetch(
+        new Request("http://localhost/_jx/server/sendForm", {
+          body: JSON.stringify({ args: {} }),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+        }),
+        {},
+      );
+      expect(response.status).toBe(200);
+    } finally {
+      rmSync(portableDir, { force: true, recursive: true });
+    }
   });
 });
 
@@ -438,10 +474,11 @@ describe("buildSite — cloudflare-pages adapter", () => {
     expect(existsSync(workerPath)).toBe(true);
 
     const content = readFileSync(workerPath, "utf8");
-    expect(content).toContain("app.post('/_jx/server/sendMail'");
-    expect(content).toContain("sendMail(args, c.env)");
+    // Route and handler survive bundling (string quoting/identifiers may be normalized).
+    expect(content).toContain("/_jx/server/sendMail");
+    expect(content).toContain("function sendMail");
     // Advanced mode intercepts all requests — unmatched paths fall through to assets
-    expect(content).toContain("c.env.ASSETS.fetch(c.req.raw)");
+    expect(content).toContain("ASSETS.fetch");
   });
 
   it("limits worker invocation to /_jx/* via _routes.json", async () => {
@@ -451,12 +488,12 @@ describe("buildSite — cloudflare-pages adapter", () => {
     expect(routes).toEqual({ exclude: [], include: ["/_jx/*"], version: 1 });
   });
 
-  it("copies server source files into dist/components/", async () => {
+  it("inlines server function sources into the bundled worker (no dist/components copy)", async () => {
     await buildSite(PAGES_TMP, { verbose: false });
 
-    const copied = resolve(PAGES_TMP, "dist/components/mailer.server.js");
-    expect(existsSync(copied)).toBe(true);
-    expect(readFileSync(copied, "utf8")).toContain("export function sendMail");
+    expect(existsSync(resolve(PAGES_TMP, "dist/components/mailer.server.js"))).toBe(false);
+    const worker = readFileSync(resolve(PAGES_TMP, "dist/_worker.js"), "utf8");
+    expect(worker).toContain("function sendMail");
   });
 });
 

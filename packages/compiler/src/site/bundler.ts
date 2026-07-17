@@ -11,7 +11,7 @@
  * registry's `importImplementation` path.
  */
 
-import { writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { isNpmSpecifier, NPM_SPECIFIER_PREFIX } from "@jxsuite/schema/asset-paths";
@@ -62,11 +62,45 @@ export interface BundleRequest {
   outfile: string;
 }
 
+/** Resolution/runtime targets: client sidecars use "browser"; the site worker uses the rest. */
+export type BundleTargetName = "browser" | "node" | "bun" | "workerd";
+
 export interface BundleOptions {
-  /** Resolution/runtime target. Client sidecars use "browser"; the worker (follow-up) adds more. */
-  target: "browser";
+  target: BundleTargetName;
   /** Bare specifiers left unresolved in the output. */
   external?: string[];
+  /** Package.json export conditions for resolution (e.g. ["workerd", "worker"]). */
+  conditions?: string[];
+}
+
+/**
+ * Per-adapter bundle options for the generated site worker (WinterTC runtimes). Cloudflare resolves
+ * with workerd conditions and keeps `cloudflare:*`/`node:*` imports external (nodejs_compat
+ * provides node builtins at runtime); node/bun bundle platform-native with builtins external by
+ * construction.
+ */
+export function workerBundleOptions(adapter: string): BundleOptions {
+  if (adapter === "cloudflare-workers" || adapter === "cloudflare-pages") {
+    return {
+      conditions: ["workerd", "worker"],
+      external: ["cloudflare:*", "node:*"],
+      target: "workerd",
+    };
+  }
+  return { target: adapter === "bun" ? "bun" : "node" };
+}
+
+/** Map a bundle target to esbuild's platform (conditions carry the workerd specifics). */
+function esbuildPlatform(target: BundleTargetName): "browser" | "node" {
+  return target === "node" || target === "bun" ? "node" : "browser";
+}
+
+/** Map a bundle target to Bun.build's target. */
+function bunTarget(target: BundleTargetName): "browser" | "node" | "bun" {
+  if (target === "workerd") {
+    return "browser";
+  }
+  return target;
 }
 
 /**
@@ -81,23 +115,25 @@ export async function bundleEntry(request: BundleRequest, opts: BundleOptions): 
     const esbuild = await import("esbuild");
     await esbuild.build({
       bundle: true,
+      ...(opts.conditions ? { conditions: opts.conditions } : {}),
       entryPoints: [request.entryPath],
       external,
       format: "esm",
       logLevel: "silent",
       minify: false,
       outfile: request.outfile,
-      platform: opts.target,
+      platform: esbuildPlatform(opts.target),
     });
     return;
   }
 
   const result = await Bun.build({
+    ...(opts.conditions ? { conditions: opts.conditions } : {}),
     entrypoints: [request.entryPath],
     external,
     format: "esm",
     minify: false,
-    target: opts.target,
+    target: bunTarget(opts.target),
     throw: false,
   });
   if (!result.success || result.outputs.length === 0) {
@@ -105,4 +141,47 @@ export async function bundleEntry(request: BundleRequest, opts: BundleOptions): 
     throw new Error(`Bun.build failed for ${request.entryPath}:\n${logs}`);
   }
   writeFileSync(request.outfile, await result.outputs[0]!.text(), "utf8");
+}
+
+/**
+ * Bundle generated worker source (a string, not a file) into a self-contained module for the
+ * adapter's runtime. Bare and relative specifiers resolve from the project root — exactly how the
+ * unbundled source would have resolved when served from within the project.
+ */
+export async function bundleWorkerSource(
+  source: string,
+  { projectRoot, outfile, adapter }: { projectRoot: string; outfile: string; adapter: string },
+): Promise<void> {
+  const opts = workerBundleOptions(adapter);
+
+  if (useNodeFallback()) {
+    const esbuild = await import("esbuild");
+    await esbuild.build({
+      bundle: true,
+      ...(opts.conditions ? { conditions: opts.conditions } : {}),
+      external: opts.external ?? [],
+      format: "esm",
+      logLevel: "silent",
+      minify: false,
+      outfile,
+      platform: esbuildPlatform(opts.target),
+      stdin: {
+        contents: source,
+        loader: "js",
+        resolveDir: projectRoot,
+        sourcefile: "jx-worker-entry.js",
+      },
+    });
+    return;
+  }
+
+  // Bun.build has no stdin input — write a transient entry at the project root so resolution
+  // Matches the stdin/resolveDir behavior, and always remove it.
+  const entryPath = join(projectRoot, ".jx-worker-entry.mjs");
+  writeFileSync(entryPath, source, "utf8");
+  try {
+    await bundleEntry({ entryPath, outfile }, opts);
+  } finally {
+    rmSync(entryPath, { force: true });
+  }
 }

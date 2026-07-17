@@ -122,6 +122,19 @@ beforeAll(() => {
     `export function bump(state) { state.count += 1; }\n`,
   );
 
+  // Component declaring a sidecar that does not exist on disk (historical permissive case).
+  writeFile("components/ghost-widget.json", {
+    children: [
+      { attributes: { onclick: { $ref: "#/state/spook" } }, tagName: "button", textContent: "?" },
+      { tagName: "span", textContent: "${state.n}" },
+    ],
+    state: {
+      n: 0,
+      spook: { $prototype: "Function", $src: "./ghost-helpers.js", parameters: ["state"] },
+    },
+    tagName: "ghost-widget",
+  });
+
   // Dynamic page whose lowered state def registers a bundle via $bundle.
   writeFile("pages/index.json", {
     children: [{ tagName: "p", textContent: "${state.magic}" }, { tagName: "demo-widget" }],
@@ -223,6 +236,14 @@ describe("buildSite sidecar bundling + emit", () => {
     const appJs = readFileSync(resolve(TMP, "dist/app.js"), "utf8");
     expect(appJs).toContain("return 1;");
     expect(appJs).not.toContain("$bundle");
+  });
+
+  test("a declared-but-absent relative sidecar warns and keeps its verbatim import", () => {
+    // No build error (see the errors assertion above); the emitted module falls back to the
+    // Historical unbundled import instead of a /assets/ URL.
+    const module = readFileSync(resolve(TMP, "dist/components/ghost-widget.js"), "utf8");
+    expect(module).toContain("from './ghost-helpers.js'");
+    expect(existsSync(resolve(TMP, "dist/assets/components-ghost-helpers.js"))).toBe(false);
   });
 
   test("extension emit writes section-gated assets into dist", () => {

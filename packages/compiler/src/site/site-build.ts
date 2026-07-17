@@ -9,7 +9,6 @@
  */
 
 import {
-  copyFileSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -22,7 +21,13 @@ import {
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isMappedArray, isRef } from "@jxsuite/schema/guards";
 import { isNpmSpecifier, sidecarAssetPath } from "@jxsuite/schema/asset-paths";
-import { CLIENT_EXTERNALS, bundleEntry, isBundleableSrc, resolveSidecarEntry } from "./bundler.ts";
+import {
+  CLIENT_EXTERNALS,
+  bundleEntry,
+  bundleWorkerSource,
+  isBundleableSrc,
+  resolveSidecarEntry,
+} from "./bundler.ts";
 import { loadProjectConfig } from "./site-loader.ts";
 import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
 import { buildProjectExtensionRegistry } from "./format-host.ts";
@@ -118,6 +123,13 @@ export async function buildSite(
     }
     try {
       const entryPath = resolveSidecarEntry(specifier, docDir ?? projectRoot, projectRoot);
+      // A declared-but-absent relative sidecar keeps its verbatim import (the historical
+      // Behavior) with a warning — the doc may only ever run interpreted. Unresolvable npm
+      // Specifiers stay hard errors: a missing dependency should fail the build.
+      if (!isNpmSpecifier(specifier) && !existsSync(entryPath)) {
+        console.warn(`Sidecar "${specifier}" not found at ${entryPath} — emitting unbundled`);
+        return specifier;
+      }
       // Relative specifiers key on their project-relative resolved path so `./x.js` declared in
       // Two directories cannot collide on one slug; npm specifiers are location-independent.
       const assetKey = isNpmSpecifier(specifier)
@@ -446,10 +458,23 @@ export async function buildSite(
       : compileSiteServer([...deduped.values()], { adapter, connectors, mounts });
 
     if (workerSource) {
+      // Bundle the worker self-contained for the adapter's runtime (compiler.md §12): mount
+      // Modules, connectors, hono, and user server functions are inlined, so dist deploys
+      // Without node_modules or deploy-time bundling.
       const workerName = adapter === "cloudflare-pages" ? "_worker.js" : "worker.js";
-      writeFileSync(resolve(outDir, workerName), workerSource, "utf8");
-      fileCount += 1;
-      log(`  Generated dist/${workerName} (${deduped.size} server function(s))`);
+      try {
+        await bundleWorkerSource(workerSource, {
+          adapter,
+          outfile: resolve(outDir, workerName),
+          projectRoot,
+        });
+        fileCount += 1;
+        log(`  Generated dist/${workerName} (bundled, ${deduped.size} server function(s))`);
+      } catch (error) {
+        const msg = `Error bundling dist/${workerName}: ${(error as Error).message}`;
+        errors.push(msg);
+        console.error(msg);
+      }
 
       if (adapter === "cloudflare-pages") {
         // Only invoke the worker for server routes; everything else stays static.
@@ -459,17 +484,6 @@ export async function buildSite(
           "utf8",
         );
         fileCount += 1;
-      }
-
-      // Copy server source files into dist/components/ so worker imports resolve
-      const distComponentsDir = resolve(outDir, "components");
-      mkdirSync(distComponentsDir, { recursive: true });
-      for (const { src } of deduped.values()) {
-        const srcFile = resolve(projectRoot, src.replace(/^\.\//, ""));
-        const destFile = resolve(distComponentsDir, src.replace(/^\.\/components\//, ""));
-        if (existsSync(srcFile)) {
-          copyFileSync(srcFile, destFile);
-        }
       }
     }
   }

@@ -1321,7 +1321,13 @@ For each route:
     Compile             → existing compiler routes (static/dynamic/custom-element)
     ↓
 Bundle server entries   → dist/worker.js, or dist/_worker.js + _routes.json for
-                          cloudflare-pages (if adapter set, else per-route _server.js)
+                          cloudflare-pages (if adapter set, else per-route _server.js).
+                          The worker is bundled SELF-CONTAINED per adapter (compiler.md
+                          §12): hono, extension mounts, connectors, and user server
+                          modules are inlined — dist deploys without node_modules.
+                          Cloudflare resolves with workerd/worker conditions and keeps
+                          cloudflare:*/node:* external (nodejs_compat); node/bun bundle
+                          platform-native.
     ↓
 Bundle client sidecars  → dist/assets/<slug>.js — one self-contained ESM bundle per
                           bundleable Function `$src` specifier (npm:…, ./relative;

@@ -614,8 +614,16 @@ The site build bundles Function-def `$src` modules for the browser
 - **Bundling** runs once after routes, components, and the worker are
   generated: one self-contained ESM bundle per unique specifier, with
   `@vue/reactivity` and `lit-html` left external (the page importmap provides
-  them). `timing: "compiler"` code is never bundled; server-timing functions
-  belong to the worker pipeline (§6).
+  them). `timing: "compiler"` code is never bundled.
+- **The server target**: when `build.adapter` is set, the generated worker
+  entry (§6) is bundled self-contained through the same backend —
+  `workerBundleOptions(adapter)` maps cloudflare adapters to
+  `workerd`/`worker` resolution conditions with `cloudflare:*`/`node:*`
+  external (nodejs_compat provides builtins), and node/bun to platform-native
+  bundling. Extension mounts, connectors, hono, and user server modules are
+  inlined, so `dist/` deploys and runs without `node_modules` — verified by
+  importing the bundled worker from an empty directory in tests. The former
+  copy of server sources into `dist/components/` is gone.
 - **Backends**: `Bun.build` when the build runs under Bun; esbuild
   (dynamically imported, a `@jxsuite/compiler` dependency) under plain Node.
   Options are minimal and identical (`format: esm`, browser target, no
