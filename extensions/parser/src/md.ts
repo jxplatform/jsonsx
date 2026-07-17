@@ -20,8 +20,8 @@ import remarkDirective from "remark-directive";
 import { readFileSync } from "node:fs";
 import { basename, extname, relative, resolve as resolvePath } from "node:path";
 import { globSync } from "glob";
-import { mdastNodeToJx } from "./transpile.ts";
-import type { MarkdownFileResult, MdastNode, TocEntry, UnifiedProcessor } from "./types.ts";
+import { assignHeadingIds, mdastNodeToJx } from "./transpile.ts";
+import type { MarkdownFileResult, MdastNode, UnifiedProcessor } from "./types.ts";
 import type { JxElement } from "@jxsuite/schema/types";
 
 // ─── Tree utilities (inline to avoid Bun ESM resolution issues with unist-util-*) ──
@@ -90,28 +90,6 @@ function mdastToString(node: MdastNode): string {
 function readingTime(text: string) {
   const words = text.split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.ceil(words / 200));
-}
-
-/**
- * Extract table of contents entries from an mdast tree.
- *
- * @param {object} tree - Mdast AST
- * @returns {{ depth: number; text: string; id: string }[]}
- */
-function extractToc(tree: MdastNode) {
-  /** @type {{ depth: number; text: string; id: string }[]} */
-  const entries: TocEntry[] = [];
-  visit(tree, "heading", (node: MdastNode) => {
-    const text = mdastToString(node);
-    const id = text
-      .toLowerCase()
-      .replaceAll(/[^\w\s-]/g, "")
-      .replaceAll(/\s+/g, "-")
-      .replaceAll(/-+/g, "-")
-      .replaceAll(/^-|-$/g, "");
-    entries.push({ depth: node.depth as number, id, text });
-  });
-  return entries;
 }
 
 /**
@@ -197,7 +175,6 @@ export function processMarkdown(
   const frontmatter = (vfileData.frontmatter ?? {}) as Record<string, unknown>;
   const mdTree = tree as unknown as MdastNode;
   const plainText = mdastToString(mdTree);
-  const toc = extractToc(tree);
   const excerpt = extractExcerpt(tree);
   const slug = deriveSlug(filePath, config.sourceRoot);
 
@@ -208,6 +185,10 @@ export function processMarkdown(
     | JxElement
     | string
   )[];
+
+  // One walk assigns deduplicated heading ids AND builds $toc, so rendered anchors and the
+  // Table of contents agree by construction (specs/parser.md).
+  const toc = assignHeadingIds($children);
 
   return {
     $children,

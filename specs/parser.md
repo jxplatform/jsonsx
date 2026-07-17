@@ -50,13 +50,13 @@ A single class carrying every capability (`Markdown.class.json`):
 }
 ```
 
-| Capability  | Scope    | Timing                   | Behavior                                                                                                                                     |
-| ----------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `parse`     | static   | compiler, server, client | `transpileJxMarkdown(source)` → Jx JSON document (frontmatter → top-level keys, body → children)                                             |
-| `serialize` | static   | compiler, server, client | `serializeJxMarkdown(doc, options)` — see §5                                                                                                 |
-| `discover`  | static   | compiler, server         | List `.md` entry files for a content-type source (file or directory)                                                                         |
-| `load`      | static   | compiler, server         | One file → `ContentLoaderEntry[]` (frontmatter as `data`, raw source as `body`, `$children`, `_meta` with excerpt/toc/readingTime/wordCount) |
-| `resolve`   | instance | runtime                  | `{ "$prototype": "Markdown", "src": "./post.md" }` → `MarkdownFileResult`                                                                    |
+| Capability  | Scope    | Timing                   | Behavior                                                                                                                                                                     |
+| ----------- | -------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parse`     | static   | compiler, server, client | `transpileJxMarkdown(source)` → Jx JSON document (frontmatter → top-level keys, body → children)                                                                             |
+| `serialize` | static   | compiler, server, client | `serializeJxMarkdown(doc, options)` — see §5                                                                                                                                 |
+| `discover`  | static   | compiler, server         | List `.md` entry files for a content-type source (file or directory)                                                                                                         |
+| `load`      | static   | compiler, server         | One file → `ContentLoaderEntry[]` (frontmatter as `data`, raw source as `body`, `$children` with deduplicated heading `id`s, `_meta` with excerpt/toc/readingTime/wordCount) |
+| `resolve`   | instance | runtime                  | `{ "$prototype": "Markdown", "src": "./post.md" }` → `MarkdownFileResult`                                                                                                    |
 
 `$studio` declares the full editing control surface: editor modes, `documentMode` (content by default; component when frontmatter `tagName` matches `.+-.+`), `newFileTemplate`, and the element allowlist + nesting constraints that gate structural editing. The element sets are asserted in tests to match `MD_ELEMENTS` in `serialize.ts` (the source of truth).
 
@@ -86,6 +86,16 @@ A single class carrying every capability (`Markdown.class.json`):
 | `$toc`         | `array`  | Table of contents (heading id, text, depth) |
 | `$readingTime` | `number` | Estimated reading time in minutes           |
 | `$wordCount`   | `number` | Word count                                  |
+
+**Heading anchors.** `processMarkdown` assigns every `h1`–`h6` in `$children`
+a slug `id` (`slugifyHeading` in `transpile.ts`: lowercase, punctuation
+stripped, spaces → hyphens) with document-order deduplication — the first
+occurrence is unsuffixed, repeats get `-2`, `-3`, …. `$toc` entries are built
+from the same walk (`assignHeadingIds`), so rendered anchors and `$toc[i].id`
+always agree; pre-existing ids are respected and still claim their slug.
+Rendered pages are therefore deep-linkable to sections
+(`/docs/<slug>/#<heading-id>`), which site search and TOC UIs rely on.
+`transpileJxMarkdown` (the component path) is unaffected.
 
 ---
 

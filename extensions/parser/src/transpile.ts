@@ -19,7 +19,13 @@ import remarkGfm from "remark-gfm";
 import remarkDirective from "remark-directive";
 import { htmlToJx } from "@jxsuite/markup/html-to-jx";
 import type { MdastNode, UnifiedProcessor } from "./types.ts";
-import type { JsonValue, JxAttributeValue, JxDocument, JxElement } from "@jxsuite/schema/types";
+import type {
+  JsonValue,
+  JxAttributeValue,
+  JxDocument,
+  JxElement,
+  TocEntry,
+} from "@jxsuite/schema/types";
 
 export { htmlToJx } from "@jxsuite/markup/html-to-jx";
 
@@ -704,4 +710,89 @@ export function transpileJxMarkdown(source: string) {
   }
 
   return doc;
+}
+
+// ─── Heading anchors ─────────────────────────────────────────────────────────
+
+/**
+ * Slugify a heading's text into an anchor id: lowercase, punctuation stripped, spaces collapsed to
+ * single hyphens. The one algorithm behind rendered heading `id`s, `$toc` entries, and search deep
+ * links (specs/parser.md).
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function slugifyHeading(text: string) {
+  return text
+    .toLowerCase()
+    .replaceAll(/[^\w\s-]/g, "")
+    .replaceAll(/\s+/g, "-")
+    .replaceAll(/-+/g, "-")
+    .replaceAll(/^-|-$/g, "");
+}
+
+const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
+
+/**
+ * Concatenated text of a Jx node: own textContent plus string/element children, depth-first.
+ *
+ * @param {JxElement | string} node
+ * @returns {string}
+ */
+function jxNodeText(node: JxElement | string): string {
+  if (typeof node === "string") {
+    return node;
+  }
+  let out = typeof node.textContent === "string" ? node.textContent : "";
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      out += jxNodeText(child as JxElement | string);
+    }
+  }
+  return out;
+}
+
+/**
+ * Assign deduplicated slug ids to `h1`–`h6` elements (depth-first, document order) and return the
+ * matching table-of-contents entries. The first occurrence of a slug is unsuffixed; repeats get
+ * `-2`, `-3`, …. Pre-existing ids are respected and still claim their slug. Because ids and entries
+ * come from one walk, rendered anchors and `$toc` agree by construction.
+ *
+ * @param {(JxElement | string)[] | undefined} children - Jx nodes, mutated in place
+ * @returns {TocEntry[]}
+ */
+export function assignHeadingIds(children?: (JxElement | string)[]): TocEntry[] {
+  const entries: TocEntry[] = [];
+  const seen = new Map<string, number>();
+
+  function walk(nodes: (JxElement | string)[]) {
+    for (const node of nodes) {
+      if (typeof node !== "object" || node === null) {
+        continue;
+      }
+      const tag = node.tagName;
+      if (tag && HEADING_TAGS.has(tag)) {
+        const text = jxNodeText(node).trim();
+        let id = typeof node.id === "string" && node.id.length > 0 ? node.id : "";
+        if (id) {
+          seen.set(id, (seen.get(id) ?? 0) + 1);
+        } else {
+          const base = slugifyHeading(text) || "section";
+          const count = seen.get(base) ?? 0;
+          id = count === 0 ? base : `${base}-${count + 1}`;
+          seen.set(base, count + 1);
+          node.id = id;
+        }
+        entries.push({ depth: Number(tag.slice(1)), id, text });
+      }
+      if (Array.isArray(node.children)) {
+        walk(node.children as (JxElement | string)[]);
+      }
+    }
+  }
+
+  if (children) {
+    walk(children);
+  }
+  return entries;
 }

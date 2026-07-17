@@ -73,9 +73,17 @@ For each custom element, the compiler emits a self-contained ES module:
 
 1. Imports for `@vue/reactivity` and `lit-html`
 2. Imports for `$elements` dependencies (sub-component registrations)
-3. `class extends HTMLElement` with reactive state and lit-html template
-4. Static CSS extracted to a `<style>` block
-5. `customElements.define()` registration call
+3. Imports for Function-def `$src` sidecars — in site builds, bundleable
+   specifiers (`npm:…`, `./relative`) are rewritten to their `/assets/`
+   bundle URL (spec.md §5.3 "Compiled-site delivery")
+4. `class extends HTMLElement` with reactive state and lit-html template
+5. Static CSS extracted to a `<style>` block
+6. `customElements.define()` registration call
+
+Lifecycle conformance (spec.md §16.4): `connectedCallback` invokes
+`state.onMount(state)` on a microtask after the first render, and
+`disconnectedCallback` invokes `state.onUnmount(state)` — the same contract as
+the runtime's interpreted elements.
 
 ### 4.2 Example
 
@@ -585,6 +593,38 @@ See the [Site Architecture Specification](site-architecture.md) for the full mul
 ### `processImage(srcPath, config, outDir)` — Generate responsive variants for a single image via Sharp
 
 > **Status: Implemented.** Shared utilities in `shared.js`; image pipeline in `image-optimizer.js`, `image-transform.js`, `image-cache.js`.
+
+---
+
+## 12. Sidecar Bundling
+
+The site build bundles Function-def `$src` modules for the browser
+(`packages/compiler/src/site/bundler.ts`; behavior contract in spec.md §5.3
+"Compiled-site delivery"):
+
+- **Collection**: during page/component/island emission, every bundleable
+  `$src` specifier (`npm:<pkg>[/subpath]`, `./relative` — `.ts` allowed) is
+  rewritten to its deterministic `/assets/<slug>.js` URL and registered;
+  lowered defs contribute additional specifiers via `$bundle`
+  (extensions.md §8.3). Relative specifiers resolve against their declaring
+  document's directory and key on the project-relative resolved path; two
+  distinct entries colliding on one slug is a build error. Non-Function
+  `$src` (`.class.json` descriptors) and absolute/URL specifiers are never
+  touched.
+- **Bundling** runs once after routes, components, and the worker are
+  generated: one self-contained ESM bundle per unique specifier, with
+  `@vue/reactivity` and `lit-html` left external (the page importmap provides
+  them). `timing: "compiler"` code is never bundled; server-timing functions
+  belong to the worker pipeline (§6).
+- **Backends**: `Bun.build` when the build runs under Bun; esbuild
+  (dynamically imported, a `@jxsuite/compiler` dependency) under plain Node.
+  Options are minimal and identical (`format: esm`, browser target, no
+  minify). `JX_BUNDLER=esbuild` forces the fallback. Byte-level output may
+  differ between backends — a repo tracking `dist/` should build with one
+  backend consistently.
+
+> **Status: Implemented** via `site-build` steps 6d (bundling) and 6e
+> (extension `emit`, extensions.md §8.4).
 
 ---
 

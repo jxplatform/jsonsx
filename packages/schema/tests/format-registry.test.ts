@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { FormatEntry, buildFormatRegistry } from "../src/format-registry";
+import { EXTENSION_CAPABILITIES, FormatEntry, buildFormatRegistry } from "../src/format-registry";
 import type { FormatHostIO } from "../src/format-registry";
+
+describe("EXTENSION_CAPABILITIES", () => {
+  test("includes the build-time emit role", () => {
+    expect(EXTENSION_CAPABILITIES).toContain("emit");
+  });
+});
 
 const MARKDOWN_CLASS = {
   $defs: {

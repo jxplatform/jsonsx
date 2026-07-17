@@ -423,6 +423,8 @@ A function with only `body` (no `arguments`) and no event binding acts as a comp
 
 `parameters` entries may be bare string names (`["item"]`, as in §20.1's example), CEM-compatible parameter objects (`{ "name": "id", "type": { "text": "number" }, "default": 1 }`), or a mix — the schema and runtime accept both forms, and the runtime normalizes every entry to its name. Prefer objects when tooling metadata (types, defaults, descriptions) matters; bare names suffice otherwise.
 
+**Compiled-site delivery.** In compiled sites, bundleable `$src` specifiers — `npm:<pkg>[/subpath]` and project-relative `./…` files (TypeScript included) — are bundled per the entry's `timing`. Client-timing functions compile to self-contained ESM bundles under `/assets/` with deterministic, hash-free names (relative specifiers key on their project-relative path); emitted page and element modules import the bundle URL instead of the raw specifier, so external libraries work on purely static hosts with no `node_modules/` at runtime. `timing: "compiler"` functions are never bundled — they execute in the build host. Absolute URL specifiers (`/lib/x.js`, `https://…`) are emitted verbatim and served as-is. Server-timing functions are imported by the generated site worker (server.md §6). The bundler backend is `Bun.build` under Bun and esbuild under Node (see compiler.md).
+
 ##### 4e — Data Source (External Class)
 
 ```json

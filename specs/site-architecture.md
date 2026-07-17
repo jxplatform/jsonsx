@@ -1323,10 +1323,22 @@ For each route:
 Bundle server entries   → dist/worker.js, or dist/_worker.js + _routes.json for
                           cloudflare-pages (if adapter set, else per-route _server.js)
     ↓
+Bundle client sidecars  → dist/assets/<slug>.js — one self-contained ESM bundle per
+                          bundleable Function `$src` specifier (npm:…, ./relative;
+                          spec.md §5.3) collected from pages, components, islands,
+                          and lowered-def $bundle hints (extensions.md §8.3).
+                          Backend: Bun.build under Bun, esbuild under Node.
+    ↓
+Extension emit          → section-owner classes with an `emit` capability write
+                          derived assets (search indexes, feeds) via the host
+                          (extensions.md §8.4); shadowed by same-named public/ files
+    ↓
 Emit dist/
     ├── index.html
     ├── about/index.html
     ├── blog/hello-world/index.html
+    ├── assets/
+    │   └── jxsuite-search-client.js    (bundled $src sidecars)
     ├── components/
     │   ├── site-header.js
     │   └── site-header.css
@@ -1641,5 +1653,5 @@ This spec builds on existing Jx primitives wherever possible:
 - [ ] Internationalization routing (locale prefix, default locale handling)
 - [ ] Content localization (per-locale content directories)
 - [ ] Pagination helpers
-- [ ] RSS/Atom feed generation
-- [ ] Search index generation
+- [ ] RSS/Atom feed generation (unblocked by the `emit` capability, extensions.md §8.4)
+- [x] Search index generation — via the extension `emit` capability (extensions.md §8.4)

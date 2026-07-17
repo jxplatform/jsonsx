@@ -19,8 +19,10 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isMappedArray, isRef } from "@jxsuite/schema/guards";
+import { isNpmSpecifier, sidecarAssetPath } from "@jxsuite/schema/asset-paths";
+import { CLIENT_EXTERNALS, bundleEntry, isBundleableSrc, resolveSidecarEntry } from "./bundler.ts";
 import { loadProjectConfig } from "./site-loader.ts";
 import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
 import { buildProjectExtensionRegistry } from "./format-host.ts";
@@ -105,6 +107,36 @@ export async function buildSite(
   const pagesDir = resolve(projectRoot, "pages");
   const publicDir = resolve(projectRoot, "public");
   const trailingSlash = projectConfig.build.trailingSlash ?? "always";
+
+  // Client sidecar bundles: bundleable Function-def `$src` specifiers (and lowered-def `$bundle`
+  // Hints) are rewritten to their /assets/ URL during compilation, registered here, and bundled
+  // In step 6d (spec.md §12). Keyed by asset path so duplicate specifiers bundle once.
+  const sidecarBundles = new Map<string, { entryPath: string; specifier: string }>();
+  const rewriteSidecarSrc = (specifier: string, docDir: string | null): string => {
+    if (!isBundleableSrc(specifier)) {
+      return specifier;
+    }
+    try {
+      const entryPath = resolveSidecarEntry(specifier, docDir ?? projectRoot, projectRoot);
+      // Relative specifiers key on their project-relative resolved path so `./x.js` declared in
+      // Two directories cannot collide on one slug; npm specifiers are location-independent.
+      const assetKey = isNpmSpecifier(specifier)
+        ? specifier
+        : `./${relative(projectRoot, entryPath)}`;
+      const assetPath = sidecarAssetPath(assetKey);
+      const existing = sidecarBundles.get(assetPath);
+      if (existing && existing.entryPath !== entryPath) {
+        throw new Error(
+          `"${specifier}" and "${existing.specifier}" both bundle to ${assetPath} — rename one`,
+        );
+      }
+      sidecarBundles.set(assetPath, { entryPath, specifier });
+      return assetPath;
+    } catch (error) {
+      errors.push(`Sidecar "${specifier}": ${(error as Error).message}`);
+      return specifier;
+    }
+  };
 
   // ── 1b. Build the extension registry from project.json#/extensions ─────
   const registry = await buildProjectExtensionRegistry(projectRoot, projectConfig);
@@ -194,6 +226,7 @@ export async function buildSite(
         const result = await compileElement(componentPath, {
           ...(projectConfig.$media ? { $media: projectConfig.$media } : {}),
           formats: formatRegistry,
+          rewriteSrc: rewriteSidecarSrc,
         });
         for (const f of result.files) {
           // Reduce the emitted path (an absolute source path with .json swapped to .js) to a bare
@@ -277,6 +310,7 @@ export async function buildSite(
         imageMetaCache,
         formatRegistry,
         registry,
+        rewriteSidecarSrc,
       );
 
       // Determine which component tags are fully static (for script omission)
@@ -440,6 +474,68 @@ export async function buildSite(
     }
   }
 
+  // ── 6d. Bundle client sidecar modules (spec.md §12) ─────────────────────
+  if (sidecarBundles.size > 0) {
+    log(`Bundling ${sidecarBundles.size} client sidecar module(s)...`);
+    for (const [assetPath, bundle] of sidecarBundles) {
+      try {
+        const outfile = resolve(outDir, assetPath.replace(/^\//, ""));
+        mkdirSync(dirname(outfile), { recursive: true });
+        await bundleEntry(
+          { entryPath: bundle.entryPath, outfile },
+          { external: CLIENT_EXTERNALS, target: "browser" },
+        );
+        fileCount += 1;
+        log(`  ${bundle.specifier} → ${assetPath}`);
+      } catch (error) {
+        const msg = `Error bundling sidecar "${bundle.specifier}": ${(error as Error).message}`;
+        errors.push(msg);
+        console.error(msg);
+      }
+    }
+  }
+
+  // ── 6e. Extension-emitted assets (extensions.md §8.4) ───────────────────
+  // Section-owner classes with an `emit` capability contribute derived build artifacts
+  // (search indexes, feeds, …). The host writes the returned files so extensions stay pure;
+  // Paths are outDir-relative and guarded against traversal. Note the `public/` copy (7c)
+  // Runs later and can shadow emitted files — same semantics as sitemap.xml.
+  for (const entry of registry.emitters()) {
+    const sectionKey = entry.project?.key;
+    const sectionValue = sectionKey
+      ? (projectConfig as unknown as Record<string, unknown>)[sectionKey]
+      : undefined;
+    if (
+      sectionKey &&
+      (sectionValue == null ||
+        (typeof sectionValue === "object" && Object.keys(sectionValue).length === 0))
+    ) {
+      continue; // Section owner with nothing declared — same gating as sections/mounts
+    }
+    try {
+      const emitted = (await entry.call("emit", sectionValue ?? null, {
+        projectConfig,
+        root: projectRoot,
+        routes,
+        sections,
+      })) as { path: string; content: string | Uint8Array }[] | null;
+      for (const file of emitted ?? []) {
+        const target = resolve(outDir, file.path.replace(/^\//, ""));
+        if (!target.startsWith(outDir + sep)) {
+          throw new Error(`emit path escapes outDir: ${file.path}`);
+        }
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, file.content);
+        fileCount += 1;
+        log(`  ${entry.name} emitted ${file.path}`);
+      }
+    } catch (error) {
+      const msg = `Error in ${entry.name}.emit: ${(error as Error).message}`;
+      errors.push(msg);
+      console.error(msg);
+    }
+  }
+
   // ── 7. Generate redirects ───────────────────────────────────────────────
   if (projectConfig.redirects && Object.keys(projectConfig.redirects).length > 0) {
     log("Generating redirects...");
@@ -517,6 +613,7 @@ async function compilePage(
   imageMetaCache: ImageMetaCache | null = null,
   formatRegistry?: FormatRegistry,
   registry?: ExtensionRegistry,
+  rewriteSidecarSrc?: (specifier: string, docDir: string | null) => string,
 ) {
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
@@ -541,6 +638,13 @@ async function compilePage(
     config: projectConfig,
     sections,
     ...(registry === undefined ? {} : { registry }),
+    ...(rewriteSidecarSrc === undefined
+      ? {}
+      : {
+          registerBundle: (specifier: string) => {
+            rewriteSidecarSrc(specifier, null);
+          },
+        }),
   });
 
   // Build scope from resolved state so template strings in title/$head can be evaluated
@@ -624,6 +728,12 @@ async function compilePage(
   const result = await compile(layoutDoc, {
     lang: projectConfig.defaults?.lang ?? "en",
     projectStyle: projectConfig.style ?? null,
+    ...(rewriteSidecarSrc === undefined
+      ? {}
+      : {
+          rewriteSrc: (specifier: string) =>
+            rewriteSidecarSrc(specifier, dirname(route.sourcePath as string)),
+        }),
     title,
   });
 

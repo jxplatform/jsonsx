@@ -371,6 +371,7 @@ implementation class without constructing an instance. The instance
 | `projectData`    | `project`   | `(sectionValue, { projectConfig, root, registry, io }) → unknown`           | compiler site build, dev server resolve — result stored as `_project[<key>]` |
 | `resolvePaths`   | `project`   | `(pathsDef, { data, projectConfig, root }) → Record<string, unknown>[]`     | pages discovery (`$paths` expansion), studio preview                         |
 | `lower`          | any         | `(def, context) → JxStateDefinition`                                        | compiler — rewrites a state def into a core shape for client output          |
+| `emit`           | `project`   | `(sectionValue, { projectConfig, root, sections, routes }) → EmitFile[]`    | compiler site build — writes derived assets into the build output (§8.4)     |
 | `mount`          | `server`    | `(options, ctx) → (request: Request, env) => Promise<Response>`             | generated site worker, dev server                                            |
 | `dialect`        | `connector` | `(connection, env) → Kysely Dialect`                                        | data mounts, auth, deploy                                                    |
 | `deploySchema`   | `connector` | `(tables, connection, { env, dryRun }) → { statements, applied, warnings }` | `jx db push`, studio push                                                    |
@@ -410,6 +411,47 @@ timing excludes the compiler, the compiler checks the class descriptor for a
 returned core-shape def (`Request`, `Function`, …). This is how dynamic-data
 queries become plain reactive fetches in compiled sites with no extension
 code shipped to the browser.
+
+A lowered def may carry a `$bundle: string[]` key naming client modules it
+depends on (typically `npm:` specifiers, e.g. a browser client the def
+dynamic-imports). The compiler registers each specifier with the sidecar
+bundler (spec.md §5.3 "Compiled-site delivery") and strips `$bundle` from the
+def — it is host metadata, never part of the emitted core shape. The def
+obtains its bundle URL from the shared deterministic mapping
+(`@jxsuite/schema/asset-paths` `sidecarAssetPath`), so extension and compiler
+agree on the path without coordination at lower time.
+
+### 8.4 `emit`
+
+`emit` lets a section-owner class contribute derived build artifacts — search
+indexes, feeds, export manifests — to the compiled site:
+
+```
+emit(sectionValue, { projectConfig, root, sections, routes })
+  → { path: string, content: string | Uint8Array }[]
+```
+
+- **Timing** is `["compiler"]`; the site build invokes it after routes,
+  components, and the worker are generated, before redirects and the
+  `public/` copy.
+- **Gating**: when the class owns a project section (`project.key`), `emit`
+  runs only if the project declares a non-empty value for that key — the same
+  gating as section loading and server mounts. Classes without a `project`
+  block always run.
+- **The host writes the files.** `path` is outDir-relative (a leading `/` is
+  tolerated); the host creates directories, guards against path traversal
+  (a path escaping the build output is a build error), and counts the files
+  in the build summary. Extensions return data and never touch the
+  filesystem, keeping `emit` pure and testable.
+- **Errors** from one emitter are collected like route errors — they fail the
+  build report without aborting other emitters. Files earlier in a returned
+  batch are already written when a later path is rejected.
+- **Ordering**: the `public/` copy runs after `emit`, so a same-named file in
+  `public/` shadows an emitted file — the same semantics as `sitemap.xml`.
+- **Context**: `sections` holds the loaded project sections (e.g. the
+  parser's content collections keyed by collection name), `routes` the
+  expanded route table. Emitters derive their output from this loaded data
+  rather than re-reading source files.
 
 ---
 
