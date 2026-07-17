@@ -131,7 +131,7 @@ Most visual builders trap your work in a proprietary format you can't read, can'
 :::::
 ::::::
 
-::::::comparison{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
+:::::::comparison{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
 :::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
 ::::div{style.textAlign="center" style.marginBottom="3rem"}
 ::section-label{props.text="The Landscape"}
@@ -157,7 +157,6 @@ Webflow and Wix give you a canvas but keep your work. Astro and Hugo give you th
 | **Jx Studio**      | **✓ Studio**   | **✓ Zero**      | **✓ Perfect** | **✓ MIT**  |
 | :::                |
 | :::::              |
-| ::::::             |
 
 :::::stats{style.padding="clamp(3rem, 6vw, 4rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
 ::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
@@ -206,6 +205,7 @@ Rather script than click? `bun create @jxsuite my-site`
 ::::
 :::::
 ::::::
+:::::::
 
 ::::::workflow{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
 :::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
