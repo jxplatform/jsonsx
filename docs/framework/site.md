@@ -5,7 +5,7 @@ description: "File-based routing, layouts, content collections, and static site 
 
 # Site Architecture
 
-> **Studio manages this structure for you** — Manage maps to `pages/`, `components/`, and `content/`; the content-type builder writes `contentTypes`; the New Project deploy picker sets the adapter. This page documents the on-disk layout for reference.
+> **Studio manages this structure for you** — Manage maps to `pages/`, `components/`, and `content/`; the content-type builder writes the `content` section; the New Project deploy picker sets the adapter. This page documents the on-disk layout for reference.
 
 Jx sites follow a conventional directory structure for file-based routing, shared layouts, content collections, and static site generation.
 
@@ -80,11 +80,11 @@ Pages declare their layout with `$layout` — the path is resolved from the **pr
 
 ## Content Collections
 
-Define collections in the `contentTypes` block of your `project.json`, with JSON Schema validation. (In Studio, the content-type builder writes this for you.)
+Define collections in the `content` section of your `project.json`, with JSON Schema validation. (In Studio, the content-type builder writes this for you.)
 
 ```json
 {
-  "contentTypes": {
+  "content": {
     "blog": {
       "source": "./content/blog/",
       "format": "Markdown",

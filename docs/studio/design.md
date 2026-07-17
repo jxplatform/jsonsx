@@ -1,35 +1,39 @@
 ---
 title: "Design mode"
-description: "The Design surface in Jx Studio: a live canvas at every breakpoint, a full CSS inspector, hover states, and design tokens."
+description: "Design mode in Jx Studio: a live canvas for every breakpoint plus panels for structure, style, tokens, components, and repeaters."
+code:
+  - packages/studio/src/canvas/canvas-render.ts
+  - packages/studio/src/canvas/canvas-utils.ts
 ---
 
-# Design
+# Design mode
 
-Design is the visual canvas. Open a component or page and Studio renders it with the real runtime — pixel-identical to production — while you edit its structure and style directly.
+Design is the visual canvas — the mode for shaping structure and style. Switch to it with the **Design** button in the mode switcher on the right side of the toolbar, and Studio renders the open page or component with the real runtime, exactly as it will render in production, while you edit it directly.
 
 ![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](/screenshots/mode-design.png)
 
 ## A canvas per breakpoint
 
-Instead of one canvas you resize, Design shows a live panel for **every breakpoint** your project defines. Your `@media` rules evaluate for real, side by side, so you see the phone, tablet, and desktop layouts at once. Pan and zoom to fit.
+Instead of one canvas you resize, Design shows a live panel for **every breakpoint** your project defines — phone, tablet, and desktop side by side, each labeled with its name and width. Your responsive rules evaluate for real in each panel, so a change that only applies on small screens shows up only in the small-screen panel. Click a panel's header to make that breakpoint the active one for styling, and pan and zoom the surface to fit — see **[The canvas](/docs/studio/interface/canvas)** for the controls.
 
-## The style inspector
+Breakpoints themselves — where they come from and how overrides cascade — are covered in **[Breakpoints](/docs/studio/design/breakpoints)**.
 
-Select any element and the inspector gives you real controls — spacing, typography, color, layout, borders, backgrounds — grouped into sections with unit pickers and a color selector. Breakpoint tabs let you set a value for the base and override it per screen size.
+## The panels around the canvas
 
-![Jx Studio style inspector with spacing, typography, and color controls for a selected element](/screenshots/design-inspector.png)
+Design mode is the canvas plus a set of panels, each with its own page:
 
-## Hover and pseudo-states
-
-Style `:hover`, `:focus`, `:active`, `::before`, `::after`, `::placeholder`, and more — the same nested selectors you'd write by hand, edited visually and previewed live.
-
-## Design tokens and the Stylebook
-
-Define your palette, fonts, and spacing scale as CSS custom properties once, and reference them everywhere. **Stylebook** mode is a catalog of your elements with their default styles, so you can set the look of every `h1`, `button`, or `a` in one place — rendered through the real canvas at each breakpoint.
-
-![Jx Studio Stylebook mode showing element defaults across breakpoints](/screenshots/stylebook.png)
+- **[Layers panel](/docs/studio/design/layers)** — the page's structure as a tree: select, rename, reorder, and act on any element.
+- **[Elements panel](/docs/studio/design/elements)** — insert HTML elements and your components by click or drag.
+- **[Properties panel](/docs/studio/design/properties)** — attributes, link targets, component props, and page settings for the selection.
+- **[Style inspector](/docs/studio/design/style-inspector)** — visual CSS controls for the selection, section by section.
+- **[Hover states and selectors](/docs/studio/design/states-and-selectors)** — style `:hover`, `:focus`, and selectors of your own.
+- **[Design tokens](/docs/studio/design/tokens)** — name your colors, fonts, and sizes once and reuse them everywhere.
+- **[Stylebook](/docs/studio/design/stylebook)** — set the default look of every heading, button, and link in one catalog.
+- **[Working with components](/docs/studio/design/components)** — turn a selection into a reusable component, wire props and slots.
+- **[Repeaters](/docs/studio/design/repeaters)** — turn one element into a repeating, data-bound list.
 
 ## Next
 
+- Learn the shared canvas interactions — selection, drag and drop, the context menu — in **[The canvas](/docs/studio/interface/canvas)**
 - Make it interactive in **[Script & logic](/docs/studio/logic)**
 - The underlying style format is documented in **[Styling](/docs/framework/concepts/styling)**
