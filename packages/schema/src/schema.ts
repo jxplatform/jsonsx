@@ -674,6 +674,24 @@ async function runSchemaCli() {
     writeFileSync(resolve(schemaDir, "schemas", "project.fields.schema.json"), fieldsStr, "utf8");
     writeFileSync(resolve(schemaDir, "schemas", "document.paths.schema.json"), pathsStr, "utf8");
     writeFileSync(resolve(schemaDir, "extension-manifest.schema.json"), manifestStr, "utf8");
+    // The schemas/ fragments are oxfmt-managed (unlike packages/schema/*.json, which .oxfmtrc
+    // Ignores), so emit them formatted — otherwise every `bun run generate:schema` reintroduces
+    // Raw-stringify formatting and dirties the tree.
+    const fmt = Bun.spawnSync(
+      [
+        "bunx",
+        "oxfmt",
+        resolve(schemaDir, "schemas", "project.core.schema.json"),
+        resolve(schemaDir, "schemas", "project.fields.schema.json"),
+        resolve(schemaDir, "schemas", "document.paths.schema.json"),
+      ],
+      { cwd: schemaDir },
+    );
+    if (fmt.exitCode !== 0) {
+      throw new Error(
+        `oxfmt failed on generated schemas: ${fmt.stderr.toString() || fmt.stdout.toString()}`,
+      );
+    }
     console.error("Generated:");
     console.error("  schema.json (component)");
     console.error("  project-schema.json");
