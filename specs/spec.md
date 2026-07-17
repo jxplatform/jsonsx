@@ -2,7 +2,7 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 2.0.0-draft
+**Version:** 2.0.1-draft
 **Status:** In Progress
 **License:** MIT
 
@@ -406,20 +406,22 @@ A function with only `body` (no `arguments`) and no event binding acts as a comp
 
 ##### 4d — Function Properties
 
-| Property      | Required     | Description                                                            |
-| ------------- | ------------ | ---------------------------------------------------------------------- |
-| `$prototype`  | Yes          | Must be `"Function"`                                                   |
-| `body`        | If no `$src` | Raw function body string                                               |
-| `arguments`   | No           | Array of parameter name strings. Default: `[]`                         |
-| `parameters`  | No           | Array of CEM-compatible parameter objects (alternative to `arguments`) |
-| `returns`     | No           | JSON Schema describing the return value type                           |
-| `name`        | No           | Explicit function name. Default: the `state` key name                  |
-| `$src`        | If no `body` | External module specifier                                              |
-| `$export`     | No           | Named export in `$src` module. Default: `state` key name               |
-| `description` | No           | Documentation string                                                   |
-| `emits`       | No           | Array of CEM `Event` objects this function dispatches                  |
+| Property      | Required     | Description                                                                                                     |
+| ------------- | ------------ | --------------------------------------------------------------------------------------------------------------- |
+| `$prototype`  | Yes          | Must be `"Function"`                                                                                            |
+| `body`        | If no `$src` | Function body: raw JS source string, or a structured statement array (§20)                                      |
+| `arguments`   | No           | Array of parameter name strings. Default: `[]`                                                                  |
+| `parameters`  | No           | Array of parameter entries — bare string names or CEM-compatible parameter objects (alternative to `arguments`) |
+| `type`        | No           | Return type for tooling — JSON Schema or CEM `{ text }` format                                                  |
+| `name`        | No           | Explicit function name. Default: the `state` key name                                                           |
+| `$src`        | If no `body` | External module specifier                                                                                       |
+| `$export`     | No           | Named export in `$src` module. Default: `state` key name                                                        |
+| `description` | No           | Documentation string                                                                                            |
+| `emits`       | No           | Array of CEM `Event` objects this function dispatches                                                           |
 
 `body` and `$src` are mutually exclusive. Declaring both is a compile-time error.
+
+`parameters` entries may be bare string names (`["item"]`, as in §20.1's example), CEM-compatible parameter objects (`{ "name": "id", "type": { "text": "number" }, "default": 1 }`), or a mix — the schema and runtime accept both forms, and the runtime normalizes every entry to its name. Prefer objects when tooling metadata (types, defaults, descriptions) matters; bare names suffice otherwise.
 
 ##### 4e — Data Source (External Class)
 
@@ -482,7 +484,7 @@ State entries prefixed with `#` are private. They are never exposed to the studi
 }
 ```
 
-> **Status: Pending.** Private state convention is defined but not yet enforced in the runtime or studio.
+> **Status: Partially implemented.** The studio enforces the convention: `#` entries are excluded from the editable prop list (`componentPropEntries`) and skipped during CEM extraction (`cem-export`), so they never surface in the property panel or the exported manifest. The runtime does not yet enforce it — `#` entries build into scope like any other state entry, and a `$props` write against a `#` name is not blocked.
 
 ### 5.7 Shape Detection Algorithm
 
@@ -615,11 +617,12 @@ When a `$ref` resolves to a reactive state property or computed, the binding is 
 
 1. `$map/` — iteration context (highest priority)
 2. `$reduce/acc` — fold accumulator (reduce per-item expression only)
-3. `event#/` — handler event context (handler position only)
-4. `#/state/` — current component scope
-5. `parent#/` — explicitly passed props
-6. `window#/` — global window properties
-7. `document#/` — global document properties
+3. `$args/` — named-formula parameters (callable body only, §19.4c)
+4. `event#/` — handler event context (handler position only)
+5. `#/state/` — current component scope
+6. `parent#/` — explicitly passed props
+7. `window#/` — global window properties
+8. `document#/` — global document properties
 
 > **Status: Implemented.** Runtime `resolveRef` handles all schemes.
 
@@ -915,7 +918,9 @@ Web APIs are accessed via `$prototype` in a `state` entry:
 | ------------ | ------------------------------------------------------ | --------------- |
 | `"client"`   | Resolved at runtime in the browser (default)           | **Implemented** |
 | `"server"`   | Resolved at runtime on the server via RPC              | **Implemented** |
-| `"compiler"` | Resolved at build time; result baked into emitted HTML | **Pending**     |
+| `"compiler"` | Resolved at build time; result baked into emitted HTML | **Implemented** |
+
+> **Status: Implemented.** The site build resolves `timing: "compiler"` entries at build time (`prototype-resolver`) and bakes the resolved data into the compiled tree; the resolved entries are then stripped from emitted output. The compiler's `isDynamic` check skips them, so a component whose only state is compiler-timed compiles as fully static HTML.
 
 ### 11.4 Server Timing — RPC Function Boundary
 
@@ -1054,17 +1059,17 @@ For **third-party or project-local** classes, `$src` on any `state` entry with a
 2. `instance.value` — synchronous getter or property
 3. `instance` itself — fallback
 
-**Return type declaration:** Methods in a `.class.json` definition may declare a `returns` field containing a JSON Schema type descriptor. This allows tooling (visual builders, type checkers, autocomplete) to reason about a method's output without executing it:
+**Return type declaration:** Methods in a `.class.json` definition may declare a `returnType` field containing a JSON Schema type descriptor. This allows tooling (visual builders, type checkers, autocomplete) to reason about a method's output without executing it:
 
 ```json
 "resolve": {
   "role": "method",
   "$prototype": "Function",
-  "returns": { "type": "array", "items": { "$ref": "#/$defs/ContentLoaderEntry" } }
+  "returnType": { "type": "array", "items": { "$ref": "#/$defs/ContentLoaderEntry" } }
 }
 ```
 
-The `returns` value is a standard JSON Schema object (`type`, `items`, `properties`, `$ref`, etc.). It may reference local `$defs` within the same `.class.json` file. For classes whose `resolve()` returns an array, this signals to tooling that instances are valid sources for mapped iteration (§10).
+The `returnType` value is a standard JSON Schema object (`type`, `items`, `properties`, `$ref`, etc.). It may reference local `$defs` within the same `.class.json` file; named return types conventionally live under the `returnTypes` `$defs` category (compiler spec §5.3) and are referenced as `{ "$ref": "#/$defs/returnTypes/<Name>" }`. For classes whose `resolve()` returns an array, this signals to tooling that instances are valid sources for mapped iteration (§10).
 
 **Reactivity (optional):**
 
@@ -1095,18 +1100,20 @@ All non-Function external classes **must** use a `.class.json` file as their `$s
       "resolve": {
         "role": "method",
         "$prototype": "Function",
-        "returns": {
+        "returnType": {
           "type": "array",
-          "items": { "$ref": "#/$defs/ForecastDay" }
+          "items": { "$ref": "#/$defs/returnTypes/ForecastDay" }
         }
       }
     },
-    "ForecastDay": {
-      "type": "object",
-      "properties": {
-        "date": { "type": "string" },
-        "high": { "type": "number" },
-        "low": { "type": "number" }
+    "returnTypes": {
+      "ForecastDay": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string" },
+          "high": { "type": "number" },
+          "low": { "type": "number" }
+        }
       }
     }
   },
@@ -1116,7 +1123,7 @@ All non-Function external classes **must** use a `.class.json` file as their `$s
 
 When `$src` points to a `.class.json` file, the runtime reads the schema and follows `$implementation` to instantiate the class from the JS module. If no `$implementation` is present, the runtime dynamically constructs a class from the schema definition (self-contained mode).
 
-The `returns` field on a method uses standard JSON Schema to describe the output type. It may use `$ref` to reference `$defs` entries within the same class definition. Tooling uses this metadata to determine capabilities — for example, a method whose `returns` declares `"type": "array"` indicates the class is a valid data source for mapped iteration (§10).
+The `returnType` field on a method uses standard JSON Schema to describe the output type. It may use `$ref` to reference `$defs` entries within the same class definition — by convention named schemas under the `returnTypes` category. Tooling uses this metadata to determine capabilities — for example, a method whose `returnType` declares `"type": "array"` indicates the class is a valid data source for mapped iteration (§10).
 
 > **Status: Implemented.** Runtime enforces `.class.json` entrypoint for all non-Function external prototypes. `$implementation` in the schema optionally redirects to a JS module. Dev server handles resolution via proxy. Compiler emits `.class.json` → ES class.
 
@@ -1226,7 +1233,18 @@ Signal scope is bounded at the component (custom element) level. Child component
 }
 ```
 
-> **Status: Implemented.** Runtime `renderSwitch()` handles reactive case switching.
+**Container element.** A `$switch` node always renders a container element — its `tagName` if declared, else `div`. Properties, `style` (including `$media` breakpoints, §9.4), and `attributes` declared on the switch node apply to this container, exactly as on any element definition (§8). The active case renders as the container's children; when the discriminant changes, the container is emptied and the new case rendered in its place.
+
+**Case forms.** Each `cases` value is one of:
+
+- **An external component `$ref`** (`"./views/home.json"`) — the referenced document is fetched and rendered asynchronously; a stale load (the discriminant changed again before it resolved) is discarded.
+- **An inline element definition** — any element object (§8), rendered synchronously.
+
+**Scope.** The two forms differ in scope, mirroring §13/§15: an inline case renders in the parent component's scope, so parent `state` is directly visible to its bindings. An external case builds an isolated scope from the referenced document — a component boundary with no `$props` pass-through, so parent state is not visible inside it.
+
+**Matching.** The resolved discriminant is matched against `cases` keys by its string form (JSON object keys are strings — the same normalization the expression-level `switch` operator applies, §19.4b). No matching case leaves the container empty.
+
+> **Status: Implemented.** Runtime `renderSwitch()` creates the container, applies properties/style/attributes to it, and reactively re-renders the active case — inline definitions in the parent scope, external `$ref` cases in an isolated scope.
 
 ---
 
@@ -1369,8 +1387,8 @@ Custom elements may carry annotations compatible with the Custom Elements Manife
 | `default`            | Initial value for typed state entries                             |
 | `body`               | Inline function body                                              |
 | `arguments`          | Function parameter names (string array)                           |
-| `parameters`         | CEM-compatible function parameter objects                         |
-| `returns`            | JSON Schema describing a function/method return type              |
+| `parameters`         | Function parameter entries — bare names or CEM-compatible objects |
+| `returnType`         | JSON Schema describing a `.class.json` method's return type       |
 | `name`               | Inline function explicit name                                     |
 | `description`        | Documentation string                                              |
 | `observedAttributes` | HTML attributes the custom element watches                        |
@@ -1444,6 +1462,8 @@ An `$expression` entry is an object containing a single `$expression` key whose 
 | `value`    | By operator arity | The right-hand operand. A `$ref`, a literal, an array, or a nested node |
 
 **Operand resolution.** `target` and `value` are resolved with the same rules as any `$ref` (§7.4). Consistent with §2.3, all references to state use explicit JSON Pointer `$ref` — never a raw `state.x` string. A `target` of `{ "$ref": "$map/item/qty" }` therefore resolves through map context exactly as elsewhere in the document.
+
+**Operand literals.** A literal operand is a scalar (a string not containing `${`, a number, a boolean, `null`), an array of operands, or a **plain object**. An object carrying neither a `$ref` nor an `operator` key is a literal value passed through as-is — the form an `Intl` options bag takes as a `call` argument (§19.4c). Objects with those keys remain pointers and nested nodes respectively, never literals.
 
 **Recursion.** A `value` or `target` may itself be an expression node (no `$expression` wrapper required on nested nodes — the wrapper appears only at the `state` entry or handler boundary). This permits compound expressions such as `counter = counter + 1`:
 
@@ -1602,7 +1622,7 @@ In production evaluation `?:` and `switch` evaluate only the taken branch. Under
 
 ### 19.4c Named Formulas and the `call` Operator
 
-A **named formula** is a Shape 5 expression entry with `parameters` (the same CEM-compatible convention as Function entries): a pure, reusable computation. Parameterless pure entries remain computed values exactly as before; the presence of `parameters` makes the entry **callable** instead.
+A **named formula** is a Shape 5 expression entry with `parameters` (the same convention as Function entries, §5.3 4d — bare names or CEM parameter objects): a pure, reusable computation. Parameterless pure entries remain computed values exactly as before; the presence of `parameters` makes the entry **callable** instead.
 
 ```json
 {
@@ -1634,13 +1654,31 @@ Inside a formula body, parameters resolve via the **`$args/` scheme** — a cont
 }
 ```
 
-**Blessed globals.** A callee may also be a pure standard-library function through the existing `window#/` scheme, gated by the closed `BLESSED_GLOBALS` allowlist (`Math.*`, `JSON.*`, `Object.keys/values/entries/fromEntries`, `Number.*`, `Array.from/isArray/of`, `Intl` formatters to follow, …). Every entry is a genuine ECMAScript or WHATWG function with no side effects; anything off the list is an error at compile time and evaluation time alike. Impure platform functions (`fetch`, `alert`, `Math.random`, `Date.now`) are deliberately absent — side effects belong to Function entries.
+**Blessed globals.** A callee may also be a pure standard-library function through the existing `window#/` scheme, gated by the closed `BLESSED_GLOBALS` allowlist (`Math.*`, `JSON.*`, `Object.keys/values/entries/fromEntries`, `Number.*`, `Array.from/isArray/of`, `String.fromCharCode/fromCodePoint`, the `Intl` helpers below, …). Every entry is a genuine ECMAScript or WHATWG function with no side effects; anything off the list is an error at compile time and evaluation time alike. Impure platform functions (`fetch`, `alert`, `Math.random`, `Date.now`) are deliberately absent — side effects belong to Function entries.
 
 ```json
 {
   "operator": "call",
   "target": { "$ref": "window#/Math/max" },
   "value": [{ "$ref": "#/state/a" }, { "$ref": "#/state/b" }, 0]
+}
+```
+
+**Intl helpers.** The `Intl` formatters are constructors, not plain functions, so they cannot join the allowlist directly. Three **synthetic helpers** wrap construct-then-format as pure calls:
+
+| Helper                    | Signature                          | Wraps                                                              |
+| ------------------------- | ---------------------------------- | ------------------------------------------------------------------ |
+| `Intl/formatNumber`       | `(value, locale?, options?)`       | `new Intl.NumberFormat(locale, options).format(value)`             |
+| `Intl/formatDate`         | `(value, locale?, options?)`       | `new Intl.DateTimeFormat(locale, options).format(new Date(value))` |
+| `Intl/formatRelativeTime` | `(value, unit, locale?, options?)` | `new Intl.RelativeTimeFormat(locale, options).format(value, unit)` |
+
+The interpreter dispatches these through a helpers table (`BLESSED_HELPERS`); the compiler emits the equivalent inline construct-then-format expression. An `options` argument is a plain-object literal operand (§19.2):
+
+```json
+{
+  "operator": "call",
+  "target": { "$ref": "window#/Intl/formatNumber" },
+  "value": [{ "$ref": "#/state/price" }, "en-US", { "style": "currency", "currency": "USD" }]
 }
 ```
 

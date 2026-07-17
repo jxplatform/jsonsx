@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 1.0.0-draft
+**Version:** 1.0.1-draft
 **Status:** Proposed
 **License:** MIT
 
@@ -81,9 +81,8 @@ my-site/
 │   ├── header.json
 │   ├── footer.json
 │   └── nav.json
-├── content/                     # Content collections
-│   ├── project.json `collections`      # Collection schemas
-│   ├── blog/                    # "blog" collection
+├── content/                     # Content collections (see project.json `content`)
+│   ├── blog/                    # "blog" content type
 │   │   ├── hello-world.md
 │   │   ├── second-post.md
 │   │   └── images/
@@ -182,10 +181,7 @@ The `project.json` file at the project root defines site-wide settings. It is th
     ]
   },
 
-  "imports": {
-    "MarkdownCollection": "@jxsuite/parser",
-    "MarkdownFile": "@jxsuite/parser"
-  },
+  "extensions": ["@jxsuite/parser"],
 
   "redirects": {
     "/old-blog": "/blog",
@@ -202,21 +198,26 @@ The `project.json` file at the project root defines site-wide settings. It is th
 
 ### 3.1 Configuration Properties
 
-| Property           | Type     | Description                                                         |
-| ------------------ | -------- | ------------------------------------------------------------------- |
-| `name`             | `string` | Site name, used in default `<title>` and meta tags                  |
-| `url`              | `string` | Production URL, used for canonical URLs and sitemap generation      |
-| `defaults.layout`  | `string` | Default layout applied to all pages that don't specify `$layout`    |
-| `defaults.lang`    | `string` | Default `<html lang>` attribute                                     |
-| `defaults.charset` | `string` | Default charset (always `utf-8`)                                    |
-| `$head`            | `array`  | Global `<head>` elements injected into every page                   |
-| `$media`           | `object` | Named media query breakpoints, available to all components          |
-| `style`            | `object` | Root-level CSS custom properties and global styles                  |
-| `state`            | `object` | Site-wide state accessible to all pages and components              |
-| `redirects`        | `object` | Static redirect rules (see §11)                                     |
-| `imports`          | `object` | Import map: `$prototype` name → `.class.json` path (see spec §12.4) |
-| `build`            | `object` | Build output configuration (see §14)                                |
-| `images`           | `object` | Image optimization settings (see §9.2)                              |
+| Property           | Type     | Description                                                                                               |
+| ------------------ | -------- | --------------------------------------------------------------------------------------------------------- |
+| `name`             | `string` | Site name, used in default `<title>` and meta tags                                                        |
+| `url`              | `string` | Production URL, used for canonical URLs and sitemap generation                                            |
+| `defaults.layout`  | `string` | Default layout applied to all pages that don't specify `$layout`                                          |
+| `defaults.lang`    | `string` | Default `<html lang>` attribute                                                                           |
+| `defaults.charset` | `string` | Default charset (always `utf-8`)                                                                          |
+| `$head`            | `array`  | Global `<head>` elements injected into every page                                                         |
+| `$media`           | `object` | Named media query breakpoints, available to all components                                                |
+| `style`            | `object` | Root-level CSS custom properties and global styles                                                        |
+| `state`            | `object` | Site-wide state accessible to all pages and components                                                    |
+| `redirects`        | `object` | Static redirect rules (see §11)                                                                           |
+| `imports`          | `object` | Import map: `$prototype` name → `.class.json` path (see spec §12.4)                                       |
+| `extensions`       | `array`  | Extension packages (bare npm names or relative paths) providing formats, connectors, and project sections |
+| `content`          | `object` | Content type definitions: name → `source`/`format`/`schema` (see §6)                                      |
+| `copy`             | `object` | Declarative file copy map: source path (project-root relative) → destination path (relative to `outDir`)  |
+| `$defs`            | `object` | Global type definitions available to all pages                                                            |
+| `$elements`        | `array`  | Global custom element dependencies (`$ref` objects or npm specifier strings)                              |
+| `build`            | `object` | Build output configuration (see §14)                                                                      |
+| `images`           | `object` | Image optimization settings (see §9.2)                                                                    |
 
 ### 3.2 Inheritance
 
@@ -321,15 +322,24 @@ When multiple routes could match a URL, priority follows Astro's rules:
 
 ### 4.5 Route Params at Runtime
 
-Inside a dynamic page, route parameters are available via `$params`:
+Inside a dynamic page, route parameters surface in two places:
 
 ```json
 {
-  "textContent": "Viewing post: ${$params.slug}"
+  "state": {
+    "post": {
+      "$prototype": "ContentEntry",
+      "contentType": "blog",
+      "id": { "$ref": "#/$params/slug" }
+    }
+  }
 }
 ```
 
-`$params` is a read-only object injected by the compiler. In static builds, template strings referencing `$params` are resolved at compile time to literal values.
+1. **State references** — `{ "$ref": "#/$params/<name>" }` inside a state entry resolves to the parameter value at build time (e.g. a `ContentEntry` id, as above).
+2. **`$page.params`** — the compiler injects the resolved parameters into page state as `$page.params`, alongside `$page.url` and `$page.title` (§5.5).
+
+There is no bare `${$params.…}` template binding. Parameters are resolved at compile time — each expanded route is compiled with its own literal values, so nothing param-related ships to the browser.
 
 ---
 
@@ -379,7 +389,7 @@ Pages declare their layout via `$layout`:
 
 ```json
 {
-  "$layout": "../layouts/base.json",
+  "$layout": "./layouts/base.json",
   "$head": [
     { "tagName": "title", "textContent": "About Us" },
     {
@@ -401,6 +411,8 @@ Pages declare their layout via `$layout`:
 ```
 
 The page's `children` are injected at the layout's `<slot>` position via the same `distributeSlots()` algorithm already implemented for custom elements — just run at compile time instead of DOM time. The page's `$head` entries merge with the layout's and site's head entries.
+
+`$layout` paths — like `defaults.layout` — are resolved against the **project root**, not the referencing file. The same `"./layouts/base.json"` works from a page at any directory depth.
 
 If a page omits `$layout`, it uses the default layout from `project.json`. If `$layout` is explicitly set to `false`, no layout wraps the page (useful for standalone pages like landing pages or embeds).
 
@@ -430,7 +442,7 @@ Pages target named slots via the standard `slot` attribute — the same mechanis
 
 ```json
 {
-  "$layout": "../layouts/docs.json",
+  "$layout": "./layouts/docs.json",
   "children": [
     {
       "tagName": "nav",
@@ -453,7 +465,7 @@ Layouts can reference other layouts, enabling composition:
 
 ```json
 {
-  "$layout": "./base.json",
+  "$layout": "./layouts/base.json",
   "children": [
     {
       "tagName": "div",
@@ -505,12 +517,12 @@ Content collections are the data layer for content-driven sites. They bring stru
 
 ### 6.1 Defining Collections
 
-Collections are defined in `the `collections` key in project.json`:
+Collections are defined in the `content` key of `project.json`. Each key names a content type:
 
 ```json
 {
   "$schema": "https://jxsuite.com/schema/project/v1",
-  "contentTypes": {
+  "content": {
     "blog": {
       "source": "./content/blog/",
       "format": "Markdown",
@@ -521,7 +533,7 @@ Collections are defined in `the `collections` key in project.json`:
           "description": { "type": "string" },
           "pubDate": { "type": "string", "format": "date" },
           "updatedDate": { "type": "string", "format": "date" },
-          "author": { "$ref": "#/collections/authors" },
+          "author": { "$ref": "#/content/authors" },
           "tags": {
             "type": "array",
             "items": { "type": "string" }
@@ -534,7 +546,7 @@ Collections are defined in `the `collections` key in project.json`:
     },
 
     "authors": {
-      "source": "./authors/",
+      "source": "./content/authors/",
       "format": "json",
       "schema": {
         "type": "object",
@@ -558,7 +570,7 @@ Collections are defined in `the `collections` key in project.json`:
     },
 
     "products": {
-      "source": "./products/catalog.csv",
+      "source": "./content/products/catalog.csv",
       "schema": {
         "type": "object",
         "properties": {
@@ -576,12 +588,13 @@ Collections are defined in `the `collections` key in project.json`:
 
 ### 6.2 Collection Shapes
 
-| Format | File Type                 | Entry ID               | Notes                                |
-| ------ | ------------------------- | ---------------------- | ------------------------------------ |
-| `md`   | Markdown with frontmatter | Filename (slugified)   | Body parsed to Jx tree (`$children`) |
-| `json` | JSON objects              | `id` field or filename | Direct data access                   |
-| `csv`  | CSV rows                  | Row index or ID column | Parsed via built-in CSV parser       |
-| `yaml` | YAML documents            | `id` field or filename | Parsed via built-in YAML parser      |
+`format` values are **format class names** provided by enabled extensions (§6.5) — `"json"` is the only native built-in. There is no YAML format class.
+
+| Format     | File Type                 | Entry ID                               | Notes                                                        |
+| ---------- | ------------------------- | -------------------------------------- | ------------------------------------------------------------ |
+| `Markdown` | Markdown with frontmatter | Filename (path-based for nested files) | Body parsed to Jx tree (`$children`); from `@jxsuite/parser` |
+| `json`     | JSON objects              | `id` field or filename                 | Native built-in — direct data access                         |
+| `Csv`      | CSV rows                  | Row index or ID column                 | From `@jxsuite/parser`; supports remote (`https`) sources    |
 
 ### 6.3 Schema Validation
 
@@ -589,10 +602,10 @@ Collection schemas are standard JSON Schema. The `@jxsuite/schema` package alrea
 
 At build time:
 
-- Every content entry is validated against its collection schema
-- Missing required fields produce compile errors with file path and line number
-- Type mismatches are reported with expected vs actual types
-- The `$ref` between collections (e.g., `author` referencing `authors` collection) is resolved and validated
+- Every content entry is validated against its collection schema as it loads
+- Missing required fields log a **warning** keyed by content type and entry id (e.g. `"blog/hello-world" missing required field "title"`); the build continues
+- Type mismatches warn with the expected vs actual type — these are console warnings, not compile errors, and no line numbers are reported
+- The `$ref` between collections (e.g., `author` referencing the `authors` collection) is resolved at load time; ids that match no entry in the target collection log a warning and are **left unresolved** in the entry data
 
 In Studio:
 
@@ -674,11 +687,11 @@ A `ContentEntry` resolves to:
 
 #### Collection References
 
-The `$ref` syntax in schemas creates cross-collection links:
+The `$ref` syntax in schemas creates cross-collection links. Relationship pointers use the `#/content/<type>` prefix:
 
 ```json
 {
-  "author": { "$ref": "#/collections/authors" }
+  "author": { "$ref": "#/content/authors" }
 }
 ```
 
@@ -691,20 +704,19 @@ author: jane-doe
 ---
 ```
 
-The value `"jane-doe"` is resolved at build time to the matching entry in the `authors` collection by its `id`. Templates can then access `state.post.data.author.data.name`.
+The value `"jane-doe"` is resolved at build time to the matching entry in the `authors` collection by its `id`. Templates can then access `state.post.data.author.data.name`. An id that matches no entry is left as the bare string, with a build warning (§6.3).
 
 ### 6.5 Filesystem Correlation
 
 The filesystem structure directly mirrors the logical model:
 
 ```
-content/
-├── project.json `collections`          # Schema definitions for all collections
+content/                         # Schemas live in project.json `content`
 ├── blog/                        # "blog" collection
 │   ├── hello-world.md           # Entry: id = "hello-world"
 │   ├── second-post.md           # Entry: id = "second-post"
 │   └── images/                  # Co-located media for blog posts
-│       ├── hello-hero.jpg       # Referenced as "./images/hello-hero.jpg"
+│       ├── hello-hero.jpg       # Referenced as "./content/blog/images/hello-hero.jpg"
 │       └── second-hero.png
 ├── authors/                     # "authors" collection
 │   └── authors.json             # All author entries in one file
@@ -720,7 +732,7 @@ content/
 - For directory-based collections, the format class's `discover` capability lists entry files; each file is one entry
 - For file-based collections (single CSV or JSON file as `source`), one file contains many entries
 - Media can be co-located next to content entries
-- The collection directory name matches the key in `project.json `collections``
+- The collection directory name matches the key in the `content` section of `project.json`
 
 ---
 
@@ -862,7 +874,7 @@ Pages declare metadata via `$head`. The compiler resolves these into `<head>` el
 
 ### 8.2 Templated Metadata
 
-Metadata values support template strings referencing state and `$params`:
+Metadata values support template strings referencing state, `$site`, and `$page`:
 
 ```json
 {
@@ -879,7 +891,7 @@ Metadata values support template strings referencing state and `$params`:
     {
       "tagName": "link",
       "rel": "canonical",
-      "href": "${$site.url}/blog/${$params.slug}"
+      "href": "${$site.url}/blog/${$page.params.slug}"
     }
   ]
 }
@@ -901,13 +913,16 @@ Later entries can override earlier entries. If both site and page define a `<tit
 
 The compiler automatically generates certain tags if not explicitly declared:
 
-| Auto-generated                   | Condition                              |
-| -------------------------------- | -------------------------------------- |
-| `<link rel="canonical">`         | Always, from `$site.url` + page path   |
-| `<meta property="og:url">`       | Always, matches canonical              |
-| `<meta property="og:site_name">` | From `$site.name`                      |
-| `<html lang>`                    | From page or site `lang`               |
-| `sitemap.xml` entry              | Every page, when `url` is set (§8.4.1) |
+| Auto-generated                   | Condition                                            |
+| -------------------------------- | ---------------------------------------------------- |
+| `<meta charset>`                 | Always (from `defaults.charset`)                     |
+| `<meta name="viewport">`         | Always, unless the author supplies one               |
+| `<title>`                        | Always — page title, falling back to the site `name` |
+| `<link rel="canonical">`         | When `url` is set, from `$site.url` + page path      |
+| `<meta property="og:url">`       | With the canonical; an author-supplied value wins    |
+| `<meta property="og:site_name">` | From `$site.name`; an author-supplied value wins     |
+| `<html lang>`                    | From page or site `lang`                             |
+| `sitemap.xml` entry              | Every page, when `url` is set (§8.4.1)               |
 
 #### 8.4.1 Sitemap & `robots.txt`
 
@@ -1017,7 +1032,7 @@ When `optimize: true`, the compiler processes every `<img>` node during page com
 4. **Attribute injection** — The compiler mutates the `<img>` node to add:
    - `srcset` — responsive variant list (e.g., `hero-320-a1b2.avif 320w, hero-640-a1b2.avif 640w, ...`)
    - `sizes` — from config (unless the node already specifies one)
-   - `width` and `height` — original image dimensions (prevents layout shift)
+   - `width` and `height` — the original image's intrinsic dimensions (prevents layout shift). Skipped when the author already sets either attribute, and for remote sources or images whose dimensions cannot be read
    - `loading="lazy"` and `decoding="async"` — when `lazyLoad: true` (unless `loading="eager"` is already set)
 
 Up to 4 variants are processed concurrently per image.
@@ -1087,7 +1102,7 @@ In Jx documents:
 ```json
 {
   "tagName": "img",
-  "src": "../content/blog/images/hero.jpg",
+  "src": "./content/blog/images/hero.jpg",
   "alt": "A hero image"
 }
 ```
@@ -1095,16 +1110,16 @@ In Jx documents:
 In Markdown frontmatter:
 
 ```yaml
-heroImage: ./images/hero.jpg
+heroImage: ./content/blog/images/hero.jpg
 ```
 
 In Markdown body:
 
 ```markdown
-![Alt text](./images/diagram.png)
+![Alt text](./content/blog/images/diagram.png)
 ```
 
-All paths are relative to the referring file. The compiler resolves them to final output URLs.
+The compiler resolves image `src` paths against the **project root**, not the referring file: root-relative paths (`/…`) resolve into the `public/` directory, and relative paths resolve from the project root (e.g. `./content/blog/images/hero.jpg`).
 
 ### 9.4 Studio Media Browser
 
@@ -1219,7 +1234,7 @@ This follows the natural CSS cascade — more specific sources override less spe
 
 ## 11. Redirect & Rewrite Management
 
-> **Standards note:** Redirect pattern strings use [URLPattern pathname syntax](https://urlpattern.spec.whatwg.org/#pattern-strings) (`:param` named groups, `*` wildcards, `?` optional modifiers). The compiler validates all patterns via `new URLPattern({ pathname: source })` at build time.
+> **Standards note:** Redirect pattern strings use [URLPattern pathname syntax](https://urlpattern.spec.whatwg.org/#pattern-strings) (`:param` named groups, `*` wildcards). Patterns are passed through to the `_redirects` file verbatim — the compiler does not validate them.
 
 ### 11.1 Static Redirects
 
@@ -1235,7 +1250,12 @@ Defined in `project.json`:
 }
 ```
 
-The compiler outputs redirect pages as HTML files with `<meta http-equiv="refresh">` tags, and also generates a redirect map file (`_redirects` for Netlify, `vercel.json` for Vercel, etc.) based on the build target.
+The compiler emits two outputs:
+
+- **HTML meta-refresh pages** — every literal (pattern-free) source compiles to an HTML file with a `<meta http-equiv="refresh">` tag and a `<link rel="canonical">` to the destination. A literal source that collides with a compiled page logs a build **warning** (the redirect file overwrites the page — remove one or the other).
+- **`_redirects` file** — every rule (literal and pattern) is written to `dist/_redirects` in the Netlify/Cloudflare format. Sources containing `:param` or `*` cannot be expressed as static HTML, so they appear **only** here, for platforms that process it.
+
+No `vercel.json` or other platform-specific redirect map is generated.
 
 ### 11.2 Dynamic Parameters
 
@@ -1306,9 +1326,9 @@ Emit dist/
     ├── index.html
     ├── about/index.html
     ├── blog/hello-world/index.html
-    ├── _assets/
-    │   ├── styles.css
-    │   └── client.js
+    ├── components/
+    │   ├── site-header.js
+    │   └── site-header.css
     ├── images/
     │   └── _optimized/         (responsive image variants)
     ├── sitemap.xml
@@ -1320,16 +1340,21 @@ dist/worker.js              (inside dist/, if adapter set)
 
 ```bash
 # Development
-jx dev                   # Start dev server with live reload
+jx dev                   # Build, then serve with live reload (rebuilds before each reload)
 
 # Production build
 jx build                 # Full static site build
 
 # Preview production build
-jx preview               # Serve dist/ locally
+jx preview               # Serve an already-built dist/ (default port 4173)
+
+# Tooling
+jx schema                # Generate project.schema.json + document.schema.json from extensions
+jx validate              # Validate project.json against its generated schema
+jx db push               # Sync the data section's tables to their connections (additive-only)
 ```
 
-These are thin wrappers around `@jxsuite/server` (dev) and a new `@jxsuite/build` entry point that will invoke the compiler in multi-page mode.
+`jx build`, `jx preview`, `jx schema`, `jx validate`, and `jx db push` run inside the `jx` CLI itself (`@jxsuite/compiler`). `jx dev` resolves the project's `@jxsuite/server/dev` entry and spawns it under **Bun** — the dev server builds the site up front, serves the built pages from `dist/` ahead of the static-source fallback, and rebuilds before each live-reload broadcast so the browser always reloads into fresh output. It requires `@jxsuite/server` in the project's dependencies and Bun on the PATH. `jx preview` is a plain static file server over `dist/`. Both accept `--port` (defaults: 3000 for dev, 4173 for preview).
 
 ### 12.3 Incremental Builds
 
@@ -1337,12 +1362,12 @@ The build system tracks dependencies between files. When a content entry changes
 
 ### 12.4 Asset Pipeline
 
-Static assets are collected and deduplicated:
+Static assets are emitted per component, with page styles inlined:
 
-- **CSS:** All page and component styles are extracted, concatenated, and minified into one or more CSS files
-- **JS:** Client-side reactive code is bundled per-page (code-splitting at page boundaries)
-- **Images:** Optimized images are placed in `_assets/` with content-hash filenames for caching
-- **Fonts:** Copied from `public/` or optimized (subset, convert to woff2)
+- **CSS:** Page and layout styles are inlined into each page's `<style>` block; each compiled component ships its own `dist/components/<tag>.css`, linked only by pages that use it
+- **JS:** Each interactive component ships its own module (`dist/components/<tag>.js`), loaded via `<script type="module">` only by pages that use it; fully static components ship no script
+- **Images:** Optimized variants are written to `dist/images/_optimized/` with content-hash-suffixed filenames for caching
+- **Fonts:** Copied verbatim from `public/`
 
 ---
 
@@ -1438,13 +1463,13 @@ Configured in `project.json`:
 
 #### 14.1.1 `build.adapter` Properties
 
-| Property        | Type             | Default       | Description                                                                         |
-| --------------- | ---------------- | ------------- | ----------------------------------------------------------------------------------- |
-| `outDir`        | `string`         | `"./dist"`    | Output directory for static assets                                                  |
-| `format`        | `string`         | `"directory"` | URL format: `"directory"` (trailing slash) or `"file"`                              |
-| `trailingSlash` | `string`         | `"always"`    | `"always"` or `"never"`                                                             |
-| `sitemap`       | `boolean`        | `true`        | Generate `sitemap.xml` from the route table (requires `url`; §8.4.1)                |
-| `adapter`       | `string \| null` | `null`        | Deployment adapter: `"cloudflare-workers"`, `"cloudflare-pages"`, `"node"`, `"bun"` |
+| Property        | Type             | Default       | Description                                                                                                                                   |
+| --------------- | ---------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `outDir`        | `string`         | `"./dist"`    | Output directory for static assets                                                                                                            |
+| `format`        | `string`         | `"directory"` | **Reserved; currently unused.** Accepted for forward compatibility with single-file output — the build emits per-route directories regardless |
+| `trailingSlash` | `string`         | `"always"`    | `"always"` or `"never"`                                                                                                                       |
+| `sitemap`       | `boolean`        | `true`        | Generate `sitemap.xml` from the route table (requires `url`; §8.4.1)                                                                          |
+| `adapter`       | `string \| null` | `null`        | Deployment adapter: `"cloudflare-workers"`, `"cloudflare-pages"`, `"node"`, `"bun"`                                                           |
 
 When `adapter` is set and the site contains `timing: "server"` entries, the compiler:
 
@@ -1464,7 +1489,7 @@ When `images.service` is `"cloudflare"` (§9.2.6), no additional adapter output 
 
 ```
 dist/
-├── index.html                   # Static HTML page
+├── index.html                   # Static HTML page (page styles inlined in <style>)
 ├── about/
 │   └── index.html
 ├── blog/
@@ -1473,14 +1498,13 @@ dist/
 │   │   └── index.html
 │   └── second-post/
 │       └── index.html
-├── _assets/
-│   ├── style.a1b2c3.css         # Hashed for cache busting
-│   ├── client.d4e5f6.js
-│   └── images/
-│       ├── hero.g7h8i9.webp
-│       └── hero.g7h8i9.avif
+├── components/                  # Per-component modules + styles
+│   ├── site-header.js
+│   ├── site-header.css
+│   ├── cta-button.js
+│   └── cta-button.css
 ├── images/
-│   └── _optimized/              # Responsive image variants
+│   └── _optimized/              # Responsive image variants (content-hashed)
 │       ├── hero-320-a1b2c3d4.webp
 │       ├── hero-640-a1b2c3d4.webp
 │       ├── hero-320-a1b2c3d4.avif
@@ -1492,6 +1516,8 @@ dist/
 └── worker.js                    # Server worker (when adapter set + server entries exist;
                                  # named _worker.js + paired with _routes.json on cloudflare-pages)
 ```
+
+Page and layout styles are inlined into each page's `<style>` block — there is no site-wide bundled stylesheet and no hashed `_assets/` directory. Pages reference the components they use via `<link rel="stylesheet" href="/components/<tag>.css">` and `<script type="module" src="/components/<tag>.js">` (the script is omitted for fully static components).
 
 ---
 
@@ -1532,17 +1558,17 @@ Jx elements support `$title` and `$description` as developer-facing annotation m
 
 This spec introduces the following new reserved keywords:
 
-| Keyword             | Context            | Purpose                                   |
-| ------------------- | ------------------ | ----------------------------------------- |
-| `$layout`           | Page root          | Specifies the layout wrapping this page   |
-| `$paths`            | Page root          | Dynamic route parameter generation        |
-| `$params`           | Template string    | Route parameters (read-only)              |
-| `$page`             | Template string    | Page metadata context                     |
-| `$site`             | Template string    | Site metadata context                     |
-| `$head`             | Page/site root     | `<head>` element declarations             |
-| `$sitemap`          | Page root          | Set `false` to exclude from `sitemap.xml` |
-| `ContentCollection` | `$prototype` value | Collection query                          |
-| `ContentEntry`      | `$prototype` value | Single entry access                       |
+| Keyword             | Context             | Purpose                                          |
+| ------------------- | ------------------- | ------------------------------------------------ |
+| `$layout`           | Page root           | Specifies the layout wrapping this page          |
+| `$paths`            | Page root           | Dynamic route parameter generation               |
+| `$params`           | State `$ref` target | Route parameters (`#/$params/<name>`, read-only) |
+| `$page`             | Template string     | Page metadata context                            |
+| `$site`             | Template string     | Site metadata context                            |
+| `$head`             | Page/site root      | `<head>` element declarations                    |
+| `$sitemap`          | Page root           | Set `false` to exclude from `sitemap.xml`        |
+| `ContentCollection` | `$prototype` value  | Collection query                                 |
+| `ContentEntry`      | `$prototype` value  | Single entry access                              |
 
 **Reused existing primitives (no new keywords needed):**
 
@@ -1582,7 +1608,7 @@ This spec builds on existing Jx primitives wherever possible:
 ### Phase 2: Content
 
 - [x] Content collection loader (Markdown, JSON, CSV)
-- [x] `project.json` `collections` schema validation
+- [x] `project.json` `content` schema validation
 - [x] `ContentCollection` and `ContentEntry` prototypes
 - [x] `$paths` dynamic route expansion
 - [x] Collection reference resolution (`$ref` between collections)

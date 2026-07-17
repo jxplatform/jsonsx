@@ -2,66 +2,98 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 2.0.0-draft
-**Status:** In Progress
+**Version:** 2.1.0
+**Status:** Implemented
 **License:** MIT
 
 ---
 
 ## 1. Overview
 
-`@jxsuite/server` is a Bun-native development server for Jx projects. It provides live reload, `$src`/`$prototype` proxy resolution, `timing: "server"` function execution, a filesystem API for Studio, and OXC-powered code services.
+`@jxsuite/server` is a Bun-native development server for Jx projects. Its TypeScript modules live in `src/` (`server.ts`, `dev.ts`, `watch.ts`, `build.ts`, `resolve.ts`, `studio-api.ts`, `code-api.ts`, `ai-api.ts`, `import-api.ts`, `collab.ts`, `jx-mounts.ts`, `data-api.ts`, `dev-vars.ts`, `packages.ts`, `project-server.ts`, `refactor/`). It provides:
+
+- Live reload over SSE, driven by a chokidar file watcher
+- `$src`/`$prototype` proxy resolution and `timing: "server"` function execution (`/__jx_resolve__`, `/__jx_server__`)
+- Registry-driven extension server mounts under `/_jx/*` (specs/extensions.md §11)
+- The Studio Backend Protocol under `/__studio/*` — the reference implementation of the `STUDIO_ROUTES` table in `@jxsuite/protocol` (~60 routes), including realtime co-editing over WebSocket
+- OXC-powered code services for Studio's function-body editors
+- A CLI entry, `@jxsuite/server/dev`, that `jx dev` spawns
+- A shared loopback project-server factory (`project-server.ts`) reused by the desktop launchers
 
 ---
 
 ## 2. Entry Point
 
-```js
+```ts
 import { createDevServer } from "@jxsuite/server";
 
-createDevServer({
+await createDevServer({
   root: "./my-project",
   port: 3000,
-  buildOptions: { entrypoints: ["./index.html"] },
+  builds: [{ entrypoints: ["./src/app.js"], outdir: "./dist", match: /src/, label: "app" }],
 });
 ```
 
-> **Status: Implemented.**
+Options (`src/server.ts`):
+
+| Option       | Type                                                                | Default | Description                                                                                                                                                |
+| ------------ | ------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `root`       | `string` (required)                                                 | —       | Project root, absolute or relative.                                                                                                                        |
+| `port`       | `number`                                                            | `3000`  | Listen port (`0` = ephemeral).                                                                                                                             |
+| `builds`     | `{ entrypoints, outdir, match?, label? }[]`                         | `[]`    | `Bun.build` entries; `match` (RegExp or predicate) scopes which file changes trigger a rebuild of that entry.                                              |
+| `watch`      | `boolean \| { ignore?, debounce?, reloadOnAnyChange?, preReload? }` | `true`  | File watching + SSE. `preReload(filename)` runs before each reload broadcast (this is how `jx dev` rebuilds the site); `false` disables watching entirely. |
+| `studio`     | `boolean`                                                           | `true`  | Enable the `/__studio/*` API (including the collab WebSocket).                                                                                             |
+| `middleware` | `(req, url) => Response \| null \| Promise<...>`                    | —       | Custom route handler consulted after the built-in APIs, before static files.                                                                               |
+
+Returns the `Bun.serve` server object (`idleTimeout: 120` so SSE heartbeats and long AI streams survive).
+
+**`@jxsuite/server/dev` — the `jx dev` entry (`src/dev.ts`).** `jx dev` (implemented in `@jxsuite/compiler`'s `dev-command.ts`) resolves `@jxsuite/server/dev` from the _project's_ node_modules and spawns it under Bun: `bun <entry> [--root <dir>] [--port <n>]` (the jx bin runs under Node; the server is Bun-native). For a site project (a `project.json` at the root) the entry:
+
+1. Builds the site up front via `@jxsuite/compiler/site` `buildSite()` (build errors print, the server still starts)
+2. Serves the built pages from `dist/` via a middleware (`createDistMiddleware`) ahead of the static-source fallback, mapping directory URLs to their `index.html` and injecting the SSE live-reload client into built HTML
+3. Passes `watch: { preReload: () => rebuild(), reloadOnAnyChange: true }` so every change rebuilds the site **before** the reload broadcast — the browser always reloads into fresh output
+
+A non-site root gets a plain `createDevServer`. `parseDevArgs` and `createDistMiddleware` are exported for tests; the boot runs only under `import.meta.main`.
 
 ---
 
 ## 3. Core Endpoints
 
+The request path is matched in this order (`src/server.ts`):
+
+1. `GET /__reload` — SSE live reload (when watching)
+2. `POST /__jx_resolve__` — `$prototype`/`$src` proxy
+3. `POST /__jx_server__` — `timing: "server"` function proxy
+4. `/_jx/*` — extension server mounts
+5. `/__studio/*` — Studio API (collab WebSocket/probe, activate, AI proxy, site import, code services, then the main studio handler)
+6. Custom `middleware`
+7. Static files — server root, then the active project root, then its `public/` (mirroring production), then npm bare specifiers resolved through `node_modules` and bundled on demand with `Bun.build`. Served HTML gets the live-reload client injected (except the Studio shell, which manages its own state); all responses carry `Cache-Control: no-cache`.
+
+**Extension mounts (`/_jx/*`, `src/jx-mounts.ts`).** Extension classes with a `server` block mount the same fetch-style handlers here that the generated site worker mounts in production — one shared context per project, handlers built via the static `mount(options, ctx)` capability and dispatched by `basePath` prefix. Dev conveniences: `env` is `process.env` merged under the project's `.dev.vars` plus `JX_PROJECT_ROOT`; connector classes with `local: "<provider>"` are stood in by the registry's local provider (e.g. D1 → sqlite at `.jx/data/<connection>.sqlite`); `autoSync: true` syncs table schemas additively on first touch. The per-project runtime is cached and invalidated when `project.json` changes on disk.
+
 ### 3.1 Live Reload (`/__reload`)
 
-SSE (Server-Sent Events) endpoint. The server watches the project directory via `chokidar` and pushes change events to connected browsers. The runtime injects a small SSE client that triggers page reload on change.
+SSE (Server-Sent Events) endpoint backed by `src/watch.ts`. A chokidar watcher observes the project root, ignoring `node_modules/`, `dist/`, `.cache/`, `.git/`, `.jx/`, `.devenv/`, `.direnv/`, Bun lockfiles, and transient `__test-*` directories by default (override via `watch.ignore`). On a debounced change the watcher:
 
-> **Status: Implemented.** `watch.js` handles file watching + SSE broadcasting.
+1. Runs the `preReload` hook, if configured (e.g. `jx dev`'s site rebuild)
+2. Selectively rebuilds any `builds` entries whose `match` covers the changed file, broadcasting a reload on success
+3. Otherwise broadcasts a reload only when `reloadOnAnyChange` is set
+
+Two event streams share the connection: the default (unnamed) `reload` message that the injected client (`injectSSE`) turns into `location.reload()`, and named `fs` events — coalesced structured filesystem events that the Studio shell subscribes to for its sidebar while the preview iframe ignores them. Heartbeats every 15 s keep connections alive.
 
 ### 3.2 `$prototype`/`$src` Proxy (`POST /__jx_resolve__`)
 
-When the runtime encounters an external `$prototype` with `$src` during development, it sends a POST request to the dev server for server-side resolution. The server:
+When the runtime encounters an external `$prototype` with `$src` during development, it POSTs to the dev server for server-side resolution. The server:
 
-1. Reads the module at `$src` (supports `.js`, `.class.json`)
-2. For `.class.json`: reads the schema, follows `$implementation`, imports the JS module
-3. For `.js`: imports directly and extracts the named export
-4. Instantiates the class with the provided config
-5. Calls `resolve()` or reads `.value`
-6. Returns the resolved value as JSON
+1. Resolves the module at `$src` (supports `.js`/`.ts`, `.class.json`, and bare package specifiers via the project's `node_modules`)
+2. For `.class.json`: parses the schema, follows `$implementation`, imports the JS module; without one, constructs the class dynamically from the schema (`classFromSchema`)
+3. For plain modules: imports directly and extracts the named export
+4. Instantiates the class with the provided config — with the project context (`project.json` plus extension-loaded sections such as `content`) available, so registry classes like `ContentEntry` resolve against real project data
+5. Calls `resolve()` or reads `.value` and returns the result as JSON
 
-This avoids CORS issues, enables Node.js-only dependencies (e.g. `glob`, `fs`), and provides a consistent resolution path for all `$src` specifiers.
+This avoids CORS issues, enables Node.js-only dependencies (e.g. `glob`, `fs`), and provides a consistent resolution path for all `$src` specifiers. Manifest-registered extension classes resolve by `$prototype` name alone — the project's extension registry maps the name to its `.class.json`.
 
-#### `.class.json` Resolution
-
-When `$src` points to a `.class.json` file:
-
-1. Read the JSON schema
-2. Check for `$implementation` key
-3. If present: import the implementation module, use its exported class
-4. If absent: dynamically construct a class from the schema (`classFromSchema`)
-5. Instantiate with config and resolve
-
-> **Status: Implemented.** `resolve.js` handles full resolution pipeline.
+> **Status: Implemented.** `src/resolve.ts` handles the full resolution pipeline (project-context cache keyed on `project.json` mtime). The loopback project server (`src/project-server.ts`) serves the same route token-gated for the desktop shells.
 
 ### 3.3 Server Function Proxy (`POST /__jx_server__`)
 
@@ -75,40 +107,52 @@ Executes `timing: "server"` functions during development. The runtime sends:
 }
 ```
 
-The server imports the module, calls the exported function with the provided arguments, and returns the result as JSON.
+The server imports the module, calls the exported function with the arguments object (a single object argument, not a positional array), and returns the result as JSON. Reactive re-execution (`signal: true`) is driven runtime-side via `effect()`.
 
-> **Status: Implemented.** `resolve.js` `handleServerFunction()`.
+> **Status: Implemented.** `src/resolve.ts` `handleServerFunction()`.
 
 ---
 
-## 4. Studio Filesystem API (`/__studio/*`)
+## 4. Studio API (`/__studio/*`)
 
-A REST API for the Studio visual builder to manage project files.
+The reference implementation of the Studio Backend Protocol, serving Studio's Platform Abstraction Layer (specs/desktop.md §3, §5).
 
 ### 4.1 Endpoints
 
-| Method | Path                    | Description                                           | Status          |
-| ------ | ----------------------- | ----------------------------------------------------- | --------------- |
-| GET    | `/__studio/project`     | Project metadata (name, root)                         | **Implemented** |
-| GET    | `/__studio/files`       | Directory listing with glob support                   | **Implemented** |
-| GET    | `/__studio/file`        | Read file contents                                    | **Implemented** |
-| PUT    | `/__studio/file`        | Write file contents                                   | **Implemented** |
-| DELETE | `/__studio/file`        | Delete file                                           | **Implemented** |
-| POST   | `/__studio/file/rename` | Rename/move file                                      | **Implemented** |
-| GET    | `/__studio/components`  | Custom element discovery (hyphenated `tagName` files) | **Implemented** |
-| GET    | `/__studio/search`      | Search file contents                                  | **Implemented** |
+The canonical endpoint list is the `STUDIO_ROUTES` table in `@jxsuite/protocol` (`packages/protocol/src/routes.ts`) — roughly 60 routes, each with method, path, core-vs-optional flag, contract summary, and degradation note. A generated reference lives in the docs (`docs/extending/embedding/backend-protocol.md`). This spec no longer enumerates them; the families are:
+
+- **Session / project** — activate, project metadata/probing, site enumeration, project creation, starters, AI-guided site import (NDJSON progress stream)
+- **Filesystem** — directory listing and project-wide search on one route (`files?dir=` / `files?glob=`), file CRUD, upload, rename (with refactor report), locate
+- **Realtime co-editing** — `GET /__studio/collab`: a WebSocket upgrade speaking the `@jxsuite/collab` wire envelope (one socket per project, documents multiplexed by path); a plain GET answers the capability probe. Implemented in `src/collab.ts`: rooms seed from the file on disk, persistence is explicit (flush on save, plus graceful shutdown), and genuinely external file changes bump the doc epoch and reset subscribers.
+- **Documents / components / formats** — component discovery, CEM extraction, the project's format/extension registry, generated project schemas, format parse/serialize dispatch, plugin schemas, code services (§5)
+- **Packages** — dependency list/add/remove/install, staleness and outdated checks, bulk version updates
+- **Git** — status, branches, log, stage/unstage, commit, push/pull/fetch, checkout, branch, diff/show, discard, init, remotes, clone, PR
+- **Data surface + secrets** — connector connections, connection test, additive schema push, row paging/CRUD, secret env-var names (never values)
+- **AI proxy** — SSE chat proxy and model catalogue
+- **Cloudflare publish** — allowlisted API passthrough
+
+Handlers are dispatched inside the `/__studio/*` branch in this order: collab → activate → AI (`ai-api.ts`) → import-site (`import-api.ts`) → code services (`code-api.ts`) → the main studio handler (`studio-api.ts`).
+
+> **Status: Implemented.** `src/studio-api.ts` and companions.
 
 ### 4.2 Security
 
-All file operations are constrained to the project root via `assertUnderRoot()` — path traversal attempts are rejected.
+Two layers, depending on how the server is exposed:
 
-> **Status: Implemented.** `studio-api.js` with full CRUD and path traversal protection.
+**Dev server (two-root activation model).** Every file operation passes `assertAccessible(filePath, root, activeProjectRoot)`: the path must sit under the server root **or** under the active project root that Studio explicitly bound via `POST /__studio/activate`. This permits editing an external project that the user deliberately opened while still rejecting path traversal.
+
+**Loopback project server (`src/project-server.ts`, used by the desktop launchers).** Layered controls:
+
+- **Loopback bind** (`127.0.0.1`) is the primary control — other local processes and LAN pages cannot read a loopback page's location, so they cannot steal the URL token
+- A **per-server token** is the hard gate on every privileged surface: the WebSocket RPC upgrade, the RCE-capable `/__jx_resolve__` / `/__jx_server__` routes (both do dynamic `import()`), and the site-import route
+- **Origin/Host checks** are best-effort defense-in-depth: a loopback (or absent) Origin is accepted; privileged routes additionally reject a non-loopback Host header (anti-DNS-rebinding)
+- File serving is contained with a lexical `relative()` check **plus a realpath re-check**, so a symlink inside the tree cannot point outside it; over-encoded paths are rejected after a single decode
 
 ---
 
 ## 5. Code Services (`/__studio/code/*`)
 
-OXC-powered code quality services for the Studio's function body editor.
+OXC-powered code quality services for Studio's function-body editors.
 
 | Endpoint                     | Tool             | Description                                | Status          |
 | ---------------------------- | ---------------- | ------------------------------------------ | --------------- |
@@ -116,38 +160,43 @@ OXC-powered code quality services for the Studio's function body editor.
 | `POST /__studio/code/minify` | `Bun.Transpiler` | Minify JavaScript snippet                  | **Implemented** |
 | `POST /__studio/code/lint`   | `oxlint`         | Lint JavaScript snippet (JSON diagnostics) | **Implemented** |
 
-> **Status: Implemented.** `code-api.js` with diagnostic remapping.
+Snippets are function _bodies_: the handler wraps them in a synthetic function before formatting/linting, unwraps the result, and remaps diagnostic line/column positions back to the snippet.
+
+> **Status: Implemented.** `src/code-api.ts` (oxfmt via its Node API, oxlint via its CLI binary, minification via `Bun.Transpiler`).
 
 ---
 
 ## 6. Build Pipeline
 
-### 6.1 `buildAll(options)`
+### 6.1 `buildAll(builds)`
 
-Uses `Bun.build` to bundle entrypoints. Supports:
+Runs `Bun.build` for each configured entry (`entrypoints`, `outdir`, optional `label` for logging). Called once at startup when `builds` is non-empty.
 
-- Multiple entrypoints
-- Selective rebuild (only changed files)
-- Watch mode integration with live reload
+### 6.2 `rebuild(builds, changedPath)`
 
-### 6.2 `rebuild(changedPath)`
+Incremental rebuild triggered by the file watcher: only entries whose `match` (RegExp or predicate) covers the changed path are rebuilt, and a successful rebuild triggers the reload broadcast.
 
-Incremental rebuild triggered by file watcher. Only reprocesses affected entrypoints.
-
-> **Status: Implemented.** `build.js`.
+> **Status: Implemented.** `src/build.ts`.
 
 ---
 
 ## 7. Dependencies
 
-| Package    | Purpose                              |
-| ---------- | ------------------------------------ |
-| `chokidar` | File watching for live reload        |
-| `oxfmt`    | JavaScript formatting (via code API) |
-| `oxlint`   | JavaScript linting (via code API)    |
+| Package                                 | Purpose                                                       |
+| --------------------------------------- | ------------------------------------------------------------- |
+| `chokidar`                              | File watching for live reload                                 |
+| `kysely`                                | SQL building for the connector data surface                   |
+| `zod`                                   | Request validation                                            |
+| `@jxsuite/protocol`                     | The canonical `STUDIO_ROUTES` table and wire types            |
+| `@jxsuite/collab`                       | Realtime co-editing rooms and wire envelope                   |
+| `@jxsuite/compiler`                     | Site builds, extension/format registry host, project sections |
+| `@jxsuite/schema`                       | Class parsing, project schemas, extension registry            |
+| `@jxsuite/create` / `@jxsuite/starters` | Project scaffolding and starter templates                     |
+| `@jxsuite/import`                       | AI-guided site import pipeline                                |
+| `@jxsuite/runtime`                      | Shared runtime types                                          |
 
-Bun built-ins: `Bun.serve`, `Bun.build`, `Bun.Transpiler`.
+`oxfmt` and `oxlint` are resolved from the workspace for the code services. Bun built-ins: `Bun.serve`, `Bun.build`, `Bun.Transpiler`, `Bun.file`, `Bun.Glob`.
 
 ---
 
-_`@jxsuite/server` Specification v2.0.0-draft_
+_`@jxsuite/server` Specification v2.1.0_

@@ -190,8 +190,13 @@ not define behavior — behavior lives in the class descriptors it points to.
 
 ### 5.2 Generated entry documents
 
-`jx schema` (also run by `jx dev` on startup/watch of `extensions`, and by
-studio on settings save) writes two committed files into the project root:
+`jx schema` writes two committed files into the project root. `jx dev` does
+not run it on startup (it builds the site); live regeneration happens **on
+demand** instead: the dev server's `GET /__studio/project-schemas` endpoint
+(behind the studio's `fetchProjectSchemas` PAL member) regenerates entry
+documents that are missing or older than `project.json` before bundling them
+for the editor — so a studio settings save (which rewrites `project.json`) is
+picked up on the next fetch. The two files:
 
 **`<project>/project.schema.json`**
 
@@ -235,10 +240,10 @@ instead of the shipped default. Inside an embed, all refs are canonical URIs
 (a `$ref` inside a resource with an absolute `$id` resolves against that
 `$id`, never the file location).
 
-| Resource $id                                   | Position                                                                                                                               | Shipped default → entry-document union                                                                                    |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `https://jxsuite.com/schema/project/fields/v2` | Field-schema values inside section entry schemas (content frontmatter fields, table columns) — recursive through `properties`/`items`. | Default: core `JxFieldSchema` + `RelationshipRef`. Entry adds extension field extras (e.g. connector column shapes).      |
-| `https://jxsuite.com/schema/document/paths/v2` | Values of `$paths` in documents.                                                                                                       | Default: permissive. Entry unions each extension's paths shape (parser's `ContentPathsSource`, connector's table source). |
+| Resource $id                                   | Position                                                                                                                               | Shipped default → entry-document union                                                                                               |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `https://jxsuite.com/schema/project/fields/v2` | Field-schema values inside section entry schemas (content frontmatter fields, table columns) — recursive through `properties`/`items`. | Default: core `JxFieldSchema` + `RelationshipRef`. Entry adds extension field extras (e.g. connector column shapes).                 |
+| `https://jxsuite.com/schema/document/paths/v2` | Values of `$paths` in documents.                                                                                                       | Default: permissive. Entry unions each extension's paths shape (parser's `ContentPathsSource`; a connector table source is planned). |
 
 Fragments write `{ "$ref": "https://jxsuite.com/schema/project/fields/v2" }`
 at field positions — no local fallbacks needed. Standalone validation
@@ -373,8 +378,10 @@ implementation class without constructing an instance. The instance
 | `testConnection` | `connector` | `(connection, env) → { ok, error? }`                                        | studio connections UI, CLI                                                   |
 
 `resolvePaths` methods declare a `"discriminator"` — the `$paths` key that
-routes to them (parser: `contentType`; connector: `table`). Hosts dispatch on
-which discriminator key is present in the `$paths` value.
+routes to them (parser: `contentType`). Hosts dispatch on which discriminator
+key is present in the `$paths` value. A connector `table` discriminator
+(dynamic-table-driven page paths) is **planned**; no connector descriptor
+declares one today — `contentType` is the only registered discriminator.
 
 ### 8.1 `timing`
 
@@ -572,15 +579,22 @@ A class provides database connections iff it has a top-level `connector`
 object plus the connector capabilities (§8):
 
 ```json
-"connector": { "provider": "d1", "kind": "sqlite", "local": "sqlite", "serve": "@jxsuite/connector/worker" }
+"connector": {
+  "provider": "d1",
+  "kind": "sqlite",
+  "local": "sqlite",
+  "serve": "@jxsuite/connector/worker",
+  "module": "@jxsuite/connector/d1"
+}
 ```
 
-| Key        | Meaning                                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------------------------- |
-| `provider` | Identifier for the backing service (`d1`, `supabase`, `sqlite`).                                              |
-| `kind`     | SQL dialect family: `"sqlite"` \| `"postgres"`. Consumed by dependents needing a dialect type (e.g. auth).    |
-| `local`    | When `"sqlite"`, the dev server stands this connector in with a local SQLite file (auto-synced on first use). |
-| `serve`    | The data-mount module serving this connector's tables.                                                        |
+| Key        | Meaning                                                                                                                                                                                                                                                                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `provider` | Identifier for the backing service (`d1`, `supabase`, `sqlite`).                                                                                                                                                                                                                                                                                        |
+| `kind`     | SQL dialect family: `"sqlite"` \| `"postgres"`. Consumed by dependents needing a dialect type (e.g. auth).                                                                                                                                                                                                                                              |
+| `local`    | When `"sqlite"`, the dev server stands this connector in with a local SQLite file (auto-synced on first use).                                                                                                                                                                                                                                           |
+| `serve`    | The data-mount module serving this connector's tables.                                                                                                                                                                                                                                                                                                  |
+| `module`   | Bare import specifier for the provider's implementation. The generated site worker imports the provider class from it statically (`import { D1 } from "@jxsuite/connector/d1"`) and hands it to mounts via `options.connectors`; required for a deployable build when any section entry names this `provider` (Workers cannot import filesystem paths). |
 
 ---
 
@@ -727,13 +741,25 @@ extensions as dependencies.
    whose fragment schema defines `{ table, moderation }`; the section class
    declares `project: { "key": "guestbook" }` with a `$studio.settings` form
    (`layout: "form"`).
-2. **Table** — its `projectData` capability materializes a `data` table
-   definition (columns `name`, `message`; `permissions: { read: "public",
-insert: "authenticated" }`) so entries flow through the connector's
-   standard mount and DDL sync — no custom SQL.
+2. **Table** — the section class declares a section-owner `deploySchema`
+   capability (§11.1) contributing the guestbook table's migration steps
+   (columns `name`, `message`) to `jx db push` — the same channel the auth
+   extension uses for its Better Auth system tables; the steps land as
+   `kind: "guestbook"` in the push plan.
+
+   > **Open design note.** There is no registry hook yet by which a
+   > non-connector section could _materialize_ a `data`-section table
+   > definition — one that would ride the connector's own DDL sync,
+   > standard data mount, and permission rules (`permissions: { read:
+"public", insert: "authenticated" }`) without declaring its own
+   > `deploySchema`. Until that hook is designed, the section-owner
+   > `deploySchema` channel is today's supported mechanism for
+   > extension-owned tables.
+
 3. **Mount** — a `server` block (`/_jx/guestbook`, order 30) with a `mount`
    returning a fetch handler that reads `ctx.auth` for session lookups and
-   proxies moderated writes into `/_jx/data/guestbook`.
+   performs moderated guestbook reads/writes against the connection through
+   the shared connector providers (`options.connectors`).
 4. **Page** — a form posting via a lowered `TableInsert` action; a
    `TableQuery` state entry listing approved entries.
 

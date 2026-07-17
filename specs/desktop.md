@@ -70,150 +70,66 @@ Studio must run in Chrome during its own development (the current workflow). It 
 
 ## 3. Platform Abstraction Layer
 
-The PAL is a plain JavaScript object conforming to a `StudioPlatform` interface. It is registered once at startup and accessed through a module-level getter.
+The PAL is a plain JavaScript object conforming to a `StudioPlatform` interface. It is registered once at startup on `globalThis` (§3.3) and accessed through `getPlatform()`.
 
 ### 3.1 Interface
 
-```typescript
-interface StudioPlatform {
-  /** Unique identifier for this platform */
-  id: "desktop" | "devserver" | "cloud";
+The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — roughly 70 members today. This spec deliberately does not duplicate it; the summary below names the member families and the model that governs them. The transport-level view of the same contract is the `STUDIO_ROUTES` table in `@jxsuite/protocol` (§5.1).
 
-  /**
-   * Open a project.
-   * Presents a platform-appropriate dialog (native file dialog, browser
-   * directory picker, or cloud project selector) filtered to project.json.
-   * Returns the parsed project.json config and an opaque project handle,
-   * or null if the user cancelled.
-   */
-  openProject(): Promise<{
-    config: SiteConfig;
-    handle: ProjectHandle;
-  } | null>;
+| Family                   | Representative members                                                                                                                                            |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Session / project**    | `id`, `projectRoot`, `activate`, `openProject`, `probeRootProject`, `createProject`, `listStarters?`, `importSite?`, `listProjects?`, recent-projects persistence |
+| **Filesystem**           | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `createDirectory`, `locateFile`, `searchFiles`, `subscribeFileEvents?`        |
+| **Documents / formats**  | `discoverComponents`, `listFormats?`, `listExtensions?`, `fetchProjectSchemas?`, `formatAction?`, `fetchPluginSchema`                                             |
+| **Packages**             | `listPackages`, `addPackage`, `removePackage`, `installDependencies?`, `outdatedPackages?`, `setPackageVersions?`                                                 |
+| **Git**                  | `gitStatus`, `gitCommit`, `gitPush`, `gitPull`, `gitDiff`, `gitCheckout`, `gitClone?`, `createPullRequest?`, …                                                    |
+| **Collab**               | `collab?` (realtime co-editing handle per document)                                                                                                               |
+| **Data / secrets**       | `dataConnections?`, `dataRows?`, row CRUD, `dataPush?`, `listSecrets?`, `setSecrets?`                                                                             |
+| **Publish / identity**   | `getUser?`, `getAccountStatus?`, `listRepos?`, `importProject?`, `cfConnection?`, `cfApi?`                                                                        |
+| **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                |
+| **Multi-window / shell** | `openProjectInNewWindow?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                        |
 
-  /**
-   * List directory contents relative to the project root.
-   * Returns entries with name, path (project-relative), type, size, modified.
-   */
-  listDirectory(dir: string): Promise<DirEntry[]>;
-
-  /** Read a file's contents as text, relative to project root. */
-  readFile(path: string): Promise<string>;
-
-  /** Write text content to a file, relative to project root. */
-  writeFile(path: string, content: string): Promise<void>;
-
-  /** Delete a file, relative to project root. */
-  deleteFile(path: string): Promise<void>;
-
-  /** Rename or move a file within the project. */
-  renameFile(from: string, to: string): Promise<void>;
-
-  /** Create a directory, relative to project root. */
-  createDirectory(path: string): Promise<void>;
-
-  /**
-   * Discover all custom element components in the project.
-   * Returns component metadata (tagName, path, state schema, etc.)
-   * scoped to the given directory (defaults to project root).
-   */
-  discoverComponents(dir?: string): Promise<ComponentMeta[]>;
-
-  /**
-   * Search file contents within the project.
-   * Returns matching files with line/column context.
-   */
-  searchFiles?(query: string, glob?: string): Promise<SearchResult[]>;
-
-  /**
-   * Format, lint, or minify a code snippet.
-   * Only available on platforms with server-side code tooling.
-   */
-  codeService?(action: "format" | "lint" | "minify", code: string): Promise<CodeServiceResult>;
-
-  /**
-   * Resolve a $prototype/$src entry server-side.
-   * Only available on platforms with a Bun/Node backend.
-   */
-  resolvePrototype?(payload: ResolvePayload): Promise<any>;
-
-  /**
-   * Execute a timing: "server" function.
-   * Only available on platforms with a Bun/Node backend.
-   */
-  executeServerFunction?(payload: ServerFunctionPayload): Promise<any>;
-}
-```
+**Core vs. optional, and degradation.** Required members are the minimal backend every platform implements. Optional members (marked `?` in the interface) each back an optional protocol route; Studio feature-detects them and degrades gracefully when they are absent — hiding the corresponding UI or falling back to a client-side path. Each optional route's `degradation` note in `STUDIO_ROUTES` records exactly what turns off (e.g. no `collab` → Studio edits solo with file-level saves; no `importSite` → the New Project modal hides its Import tab).
 
 ### 3.2 Types
 
-```typescript
-interface DirEntry {
-  name: string;
-  path: string; // Project-relative
-  type: "file" | "directory";
-  size?: number;
-  modified?: string; // ISO 8601
-}
-
-interface ComponentMeta {
-  tagName: string;
-  path: string; // Project-relative
-  state?: Record<string, any>;
-  $defs?: Record<string, any>;
-}
-
-interface ProjectHandle {
-  /** Project root identifier. Filesystem path for local, project ID for cloud. */
-  root: string;
-  /** Display name, from project.json `name` field. */
-  name: string;
-  /** The parsed project.json content. */
-  projectConfig: SiteConfig;
-}
-
-interface SiteConfig {
-  name?: string;
-  url?: string;
-  defaults?: Record<string, any>;
-  $head?: any[];
-  $media?: Record<string, string>;
-  style?: Record<string, any>;
-  state?: Record<string, any>;
-  redirects?: Record<string, any>;
-  build?: Record<string, any>;
-}
-```
+The wire shapes the interface exchanges (`DirEntry`, `ComponentMeta`, `GitStatusResult`, `DataRowsQuery`, `StarterInfo`, …) live in `@jxsuite/protocol` and are re-exported from `packages/studio/src/types.ts`, so every backend serializes the same JSON the dev server does. Project configuration is the `ProjectConfig` type from `@jxsuite/schema/types` (the parsed `project.json`). `openProject()` resolves to `{ config, handle }`, where the handle is `{ root, name, projectConfig }` — `root` is a filesystem path locally and a project ID on cloud.
 
 ### 3.3 Registration
 
-```javascript
-// packages/studio/platform.js
-let _platform = null;
+Registration lives in `packages/studio/src/platform.ts` and stores the adapter on `globalThis.__jxPlatform` — a global rather than a module-level variable, so a separate init bundle (e.g. the desktop `init.js`) can register the platform **before** the studio bundle loads, without needing to share module instances with it:
 
-export function registerPlatform(platform) {
-  _platform = platform;
+```typescript
+// packages/studio/src/platform.ts
+const g = globalThis as unknown as { __jxPlatform?: StudioPlatform };
+
+export function registerPlatform(platform: StudioPlatform) {
+  g.__jxPlatform = platform;
 }
 
 export function getPlatform() {
-  if (!_platform)
+  if (!g.__jxPlatform) {
     throw new Error("No platform registered. Call registerPlatform() before starting Studio.");
-  return _platform;
+  }
+  return g.__jxPlatform;
+}
+
+export function hasPlatform() {
+  return g.__jxPlatform != null;
 }
 ```
 
-Each deployment target calls `registerPlatform()` before Studio initializes:
+Each deployment target calls `registerPlatform()` before Studio initializes. The desktop init bundle registers the RPC-backed adapter; the studio entry itself registers the dev-server adapter only when nothing else has:
 
 ```javascript
-// Desktop (ElectroBun main view init)
-import { registerPlatform } from "@jxsuite/studio/platform.js";
-import { createDesktopPlatform } from "@jxsuite/studio-desktop";
+// Desktop (init bundle, loaded before studio.js)
+import { registerPlatform } from "@jxsuite/studio/platform";
 registerPlatform(createDesktopPlatform());
 
-// Dev server (browser, served by @jxsuite/server)
-import { registerPlatform } from "@jxsuite/studio/platform.js";
-import { createDevServerPlatform } from "@jxsuite/studio/platforms/devserver.js";
-registerPlatform(createDevServerPlatform());
+// Studio entry (studio.ts) — dev-server fallback
+if (!hasPlatform()) {
+  registerPlatform(createDevServerPlatform());
+}
 ```
 
 ### 3.4 Studio Startup Sequence
@@ -273,6 +189,8 @@ Studio initializes project state:
 
 ### 4.3 Single File Mode
 
+> **Status: Specified, not yet exposed.** Current builds have no user-facing entry point into standalone single-file editing — Studio always opens a project (`project.json`), and documents open inside that project context. The `build.format: "single"` project option is reserved for this workflow but currently unused. The behavior below is the design target.
+
 When a user opens an individual `.json` file (via "Open File" or by double-clicking in an already-open project tree), Studio enters **single file mode**:
 
 - The canvas loads the document as a standalone component
@@ -303,19 +221,29 @@ projectState = {
 
 ## 5. Backend API Contract
 
-The Backend API Contract defines the operations that any Studio backend must support. The current `@jxsuite/server` endpoints map directly to these operations. Future backends (ElectroBun Bun process, cloud API) implement the same operations through their own transport.
+The Backend API Contract defines the operations that any Studio backend must support. The current `@jxsuite/server` endpoints map directly to these operations. Other backends (ElectroBun Bun process, cloud API) implement the same operations through their own transport.
 
-### 5.1 File Operations
+### 5.1 Canonical Route Table
+
+The canonical, complete list of backend operations is the `STUDIO_ROUTES` table in `packages/protocol/src/routes.ts` — roughly 60 routes, each carrying its method, literal dev-server path, core-vs-optional flag, one-line contract summary, and (for optional routes) a `degradation` note. A generated human-readable reference is published in the docs (`docs/extending/embedding/backend-protocol.md`). This spec no longer duplicates the table.
+
+Conventions:
+
+- Paths are the dev server's literal `/__studio/*` endpoints; transport-mapped backends (RPC bridges, gateway prefixes) preserve the sub-path and the request/response shapes, which live in `@jxsuite/protocol` alongside the table.
+- `STUDIO_PROTOCOL_VERSION` bumps when a route's shape changes incompatibly.
+- File search has no dedicated endpoint: `GET /__studio/files?glob=<pattern>` searches matching files project-wide (the same route that lists a directory with `?dir=`), backing `searchFiles()`.
+
+A few illustrative rows (see the table for the rest):
 
 | Operation           | `@jxsuite/server` endpoint      | PAL method                 |
 | ------------------- | ------------------------------- | -------------------------- |
 | List directory      | `GET /__studio/files?dir=`      | `listDirectory(dir)`       |
+| Search contents     | `GET /__studio/files?glob=`     | `searchFiles(query, exts)` |
 | Read file           | `GET /__studio/file?path=`      | `readFile(path)`           |
 | Write file          | `PUT /__studio/file?path=`      | `writeFile(path, content)` |
-| Delete file         | `DELETE /__studio/file?path=`   | `deleteFile(path)`         |
 | Rename file         | `POST /__studio/file/rename`    | `renameFile(from, to)`     |
 | Discover components | `GET /__studio/components?dir=` | `discoverComponents(dir)`  |
-| Search contents     | `GET /__studio/search?q=`       | `searchFiles(query, glob)` |
+| Realtime co-editing | `GET /__studio/collab` (WS)     | `collab(docPath)`          |
 
 ### 5.2 Project Operations
 
@@ -324,27 +252,31 @@ The Backend API Contract defines the operations that any Studio backend must sup
 | Open project     | N/A (client-side dialog)   | `openProject()`              |
 | Project metadata | `GET /__studio/project`    | Derived from `ProjectHandle` |
 
-### 5.3 Code Services (Optional)
+### 5.3 Code Services
 
-| Operation   | `@jxsuite/server` endpoint   | PAL method                    |
-| ----------- | ---------------------------- | ----------------------------- |
-| Format code | `POST /__studio/code/format` | `codeService("format", code)` |
-| Lint code   | `POST /__studio/code/lint`   | `codeService("lint", code)`   |
-| Minify code | `POST /__studio/code/minify` | `codeService("minify", code)` |
+| Operation   | `@jxsuite/server` endpoint   | PAL method                       |
+| ----------- | ---------------------------- | -------------------------------- |
+| Format code | `POST /__studio/code/format` | `codeService("format", payload)` |
+| Lint code   | `POST /__studio/code/lint`   | `codeService("lint", payload)`   |
+| Minify code | `POST /__studio/code/minify` | `codeService("minify", payload)` |
 
-### 5.4 Runtime Services (Optional)
+`codeService(action, payload)` is a **required** member of the real interface, but it is null-returning: platforms without server-side code tooling implement it as a stub that resolves `null`, and callers treat a null result as "no service available" (editors skip format-on-open/save and show no lint markers). The three routes are correspondingly optional in `STUDIO_ROUTES`, with those degradations recorded on each entry.
 
-| Operation               | `@jxsuite/server` endpoint | PAL method                       |
-| ----------------------- | -------------------------- | -------------------------------- |
-| Resolve $prototype/$src | `POST /__jx_resolve__`     | `resolvePrototype(payload)`      |
-| Execute server function | `POST /__jx_server__`      | `executeServerFunction(payload)` |
+### 5.4 Runtime Services
 
-Optional methods may not exist on all platforms. Studio must check for their presence before calling:
+| Operation               | `@jxsuite/server` endpoint | Caller                    |
+| ----------------------- | -------------------------- | ------------------------- |
+| Resolve $prototype/$src | `POST /__jx_resolve__`     | The runtime (direct POST) |
+| Execute server function | `POST /__jx_server__`      | The runtime (direct POST) |
+
+These are **not** PAL methods — the runtime POSTs to `/__jx_resolve__` and `/__jx_server__` directly, on every platform. The dev server and the loopback project server (which token-gates them) serve the routes as plain HTTP. In the ElectroBun shell there is no HTTP backend for the webview, so the desktop adapter bridges them by patching `window.fetch` (`packages/desktop/src/platform.ts`): POSTs to those two paths are intercepted and forwarded over RPC to the Bun process (`jxResolve` / `jxServerFunction` handlers), and every other request falls through to the original fetch. The only PAL member in this area is the optional `resolveClass?`, which **Studio itself** (not the runtime) uses to resolve class-prototype configs through the same `/__jx_resolve__` pipeline (e.g. the tab-bar's route-param picker).
+
+Optional PAL members may not exist on all platforms. Studio feature-detects them by presence before calling:
 
 ```javascript
 const platform = getPlatform();
-if (platform.codeService) {
-  const result = await platform.codeService("format", code);
+if (platform.collab) {
+  const handle = await platform.collab(docPath);
 }
 ```
 
