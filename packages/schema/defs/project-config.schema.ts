@@ -110,7 +110,8 @@ export const projectConfigSchema = {
         },
         format: {
           default: "directory",
-          description: "Output format.",
+          description:
+            "Reserved; currently unused. Accepted for forward compatibility with single-file output (desktop single-file mode) — the build emits per-route directories regardless.",
           enum: ["directory", "single"],
           type: "string",
         },

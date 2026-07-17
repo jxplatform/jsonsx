@@ -10,6 +10,7 @@ import type { FsEventPayload } from "./refactor/fs-events.ts";
 const DEFAULT_IGNORE = [
   "**/node_modules/**",
   "**/dist/**",
+  "**/.cache/**",
   "**/.git/**",
   "**/.jx/**",
   "**/.devenv/**",
@@ -62,7 +63,12 @@ export function injectSSE(html: string) {
  *
  * @param {string} root - Absolute path to watch
  * @param {BuildEntry[]} builds - Build entries (for selective rebuild)
- * @param {{ ignore?: string[]; debounce?: number; reloadOnAnyChange?: boolean }} [opts]
+ * @param {{
+ *   ignore?: string[];
+ *   debounce?: number;
+ *   reloadOnAnyChange?: boolean;
+ *   preReload?: (filename: string) => Promise<void> | void;
+ * }} [opts]
  * @returns {{
  *   broadcast: () => void;
  *   handleSSE: () => Response;
@@ -76,11 +82,14 @@ export function createWatcher(
     ignore?: string[];
     debounce?: number;
     reloadOnAnyChange?: boolean;
+    /** Runs before the reload broadcast — e.g. `jx dev` rebuilds the site here. */
+    preReload?: (filename: string) => Promise<void> | void;
   } = {},
 ) {
   const ignore = opts.ignore ?? DEFAULT_IGNORE;
   const debounceMs = opts.debounce ?? 50;
   const reloadOnAnyChange = opts.reloadOnAnyChange ?? false;
+  const { preReload } = opts;
 
   const clients = new Set<(msg: string) => void>();
   const encoder = new TextEncoder();
@@ -172,6 +181,13 @@ export function createWatcher(
 
     clearTimeout(timer ?? undefined);
     timer = setTimeout(async () => {
+      if (preReload) {
+        try {
+          await preReload(filename);
+        } catch (error) {
+          console.error(`[watch] preReload failed: ${(error as Error).message}`);
+        }
+      }
       if (builds.length > 0) {
         const result = await rebuild(builds, filename);
         if (!result.success) {

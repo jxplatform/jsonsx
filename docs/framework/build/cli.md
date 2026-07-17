@@ -57,6 +57,34 @@ jx build [root] [--verbose] [--no-clean]
 
 Prints a summary (`Done: 12 routes → 34 files`) on success; lists route errors and exits `1` if any page failed to compile.
 
+## `jx dev`
+
+Start the dev server for a project: builds the site, serves the built pages with live reload (edits rebuild before the browser refreshes), and exposes the Studio backend API. Requires [Bun](https://bun.sh) and `@jxsuite/server` in the project's devDependencies — both part of every scaffolded project; `jx dev` prints an install hint when either is missing.
+
+```
+jx dev [root] [--port <n>]
+```
+
+| Flag         | What it does                        |
+| ------------ | ----------------------------------- |
+| `--port <n>` | Port to listen on (default `3000`). |
+
+See [The dev server](/docs/framework/build/dev-server) for what runs underneath.
+
+## `jx preview`
+
+Serve an already-built `dist/` directory — a dependency-free static server for checking the production build locally. Run `jx build` first.
+
+```
+jx preview [root] [--port <n>]
+```
+
+| Flag         | What it does                        |
+| ------------ | ----------------------------------- |
+| `--port <n>` | Port to listen on (default `4173`). |
+
+Directory URLs map to their `index.html` (with or without a trailing slash) and `404.html` is served for missing routes when present.
+
 ## `jx schema`
 
 Generate the project's JSON Schema entry documents — `project.schema.json` and `document.schema.json` — by composing the core schemas with the fragments shipped by each extension in `project.json`'s `extensions`. The outputs are written into the project root as committed artifacts with project-relative refs. No flags.
@@ -98,11 +126,8 @@ The sync is additive-only — it creates missing tables and columns and never dr
 | -------------------------- | ------------------------------------------------ |
 | `bun run build`            | `jx build`                                       |
 | `bun run dev`              | `jx dev`                                         |
+| `bun run preview`          | `jx preview`                                     |
 | `bun run deploy` (CF only) | `wrangler deploy` / `wrangler pages deploy dist` |
-
-:::doc-warning
-`jx dev` is referenced by the scaffolded `dev` script but is not implemented in the current `jx` CLI — running it prints `Unknown command: dev` and exits `1`. There is no `jx preview` either. To work on a project locally, start the dev server directly with `createDevServer` from `@jxsuite/server` — see [The dev server](/docs/framework/build/dev-server).
-:::
 
 ## Related
 

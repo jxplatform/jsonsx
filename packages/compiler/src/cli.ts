@@ -23,6 +23,8 @@ async function main() {
 
 Commands:
   build [root]     Build a Jx site to dist/
+  dev [root]       Start the dev server (requires @jxsuite/server and Bun)
+  preview [root]   Serve an already-built dist/ directory
   schema [root]    Generate project.schema.json + document.schema.json from project.json#/extensions
   validate [root]  Validate project.json against its generated project.schema.json
   db push [root]   Sync the data section's tables to their connections (additive-only)
@@ -30,6 +32,7 @@ Commands:
 Options:
   --verbose      Print detailed build progress
   --no-clean     Don't clean outDir before building
+  --port <n>     dev/preview: port to listen on (default 3000 / 4173)
   --dry-run      db push: print the statements without executing them
   --connection   db push: restrict to one connection name`);
     process.exit(0);
@@ -42,11 +45,18 @@ Options:
   const flags = new Set<string>();
   const positionals: string[] = [];
   let connectionArg: string | undefined;
+  let portArg: number | undefined;
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index]!;
     if (arg === "--connection") {
       index += 1;
       connectionArg = rest[index];
+    } else if (arg === "--port") {
+      index += 1;
+      const parsed = Math.trunc(Number(rest[index] ?? ""));
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        portArg = parsed;
+      }
     } else if (arg.startsWith("--")) {
       flags.add(arg);
     } else {
@@ -118,6 +128,26 @@ Options:
       console.error(`Build failed: ${err.message}`);
       process.exit(1);
     }
+  } else if (command === "dev") {
+    try {
+      const { runDev } = await import("./site/dev-command.ts");
+      runDev(projectRoot, portArg);
+    } catch (error) {
+      const err = error as Error;
+      console.error(err.message);
+      process.exit(1);
+    }
+  } else if (command === "preview") {
+    const { existsSync } = await import("node:fs");
+    const distDir = resolve(projectRoot, "dist");
+    if (!existsSync(distDir)) {
+      console.error(`No build output at ${distDir} — run \`jx build\` first.`);
+      process.exit(1);
+    }
+    const { startPreviewServer } = await import("./site/preview-server.ts");
+    const port = portArg ?? 4173;
+    startPreviewServer(distDir, port);
+    console.log(`Previewing ${distDir} at http://localhost:${port}`);
   } else if (command === "schema") {
     try {
       const { writeProjectSchemas } = await import("./site/schema-command.ts");

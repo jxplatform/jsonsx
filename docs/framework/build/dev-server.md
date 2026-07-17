@@ -43,7 +43,7 @@ Run it with `bun run server.js` and open `http://localhost:3000/`. The full opti
 | `middleware` | —          | `(req, url) => Response \| null` — your own routes, checked before static file serving.                                                          |
 
 :::doc-note
-Scaffolded projects wire `bun run dev` to `jx dev`, but that subcommand is not part of the current `jx` CLI (see [CLI commands](/docs/framework/build/cli)). Until it lands, start the dev server with a `server.js` like the one above — the Jx monorepo's own `bun run dev` does exactly this.
+For a site project, [`jx dev`](/docs/framework/build/cli) is the front door: it runs this server under Bun with a site-aware wrapper that builds the project up front, serves the built pages from `dist/`, and rebuilds before each live-reload broadcast. A hand-written `server.js` like the one above is for embedding the server with custom options.
 :::
 
 ## Live reload

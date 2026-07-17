@@ -14,6 +14,7 @@
   "type": "module",
   "exports": {
     ".": "./src/server.ts",
+    "./dev": "./src/dev.ts",
     "./ai-api": "./src/ai-api.ts",
     "./data": "./src/data-api.ts",
     "./import-api": "./src/import-api.ts",

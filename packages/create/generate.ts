@@ -341,8 +341,7 @@ function buildProjectJson({ name, description, url, adapter, template = "blank" 
     });
   }
 
-  const build: { outDir: string; format: string; trailingSlash: string; adapter?: string } = {
-    format: "directory",
+  const build: { outDir: string; trailingSlash: string; adapter?: string } = {
     outDir: "./dist",
     trailingSlash: "always",
   };
@@ -400,11 +399,14 @@ function buildPackageJson({
   const devDependencies: Record<string, string> = {
     "@jxsuite/compiler": "^0.19.0",
     "@jxsuite/runtime": "^0.19.0",
+    // The `dev` script spawns @jxsuite/server's dev entry (see jx dev in the compiler CLI)
+    "@jxsuite/server": "^1.0.0",
   };
 
   const scripts: Record<string, string> = {
     build: "jx build",
     dev: "jx dev",
+    preview: "jx preview",
   };
 
   if (adapter && adapter !== "static") {
