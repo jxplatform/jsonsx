@@ -71,7 +71,7 @@ describe("Search resolve", () => {
     (globalThis as Record<string, unknown>).document = {};
     const preload = mock(async () => {});
     const query = mock(() => [{ slug: "hit" }]);
-    mock.module(CLIENT_URL, () => ({ preload, query }));
+    await mock.module(CLIENT_URL, () => ({ preload, query }));
 
     const search = new Search({ index: "/custom.json", limit: 5, query: "docs" });
     const results = await search.resolve();

@@ -12,7 +12,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { bundleEntry, isBundleableSrc, resolveSidecarEntry } from "../src/site/bundler";
+import {
+  bundleEntry,
+  bundleWorkerSource,
+  isBundleableSrc,
+  resolveSidecarEntry,
+  workerBundleOptions,
+} from "../src/site/bundler";
 import { buildSite } from "../src/site/site-build";
 import { compileElement } from "../src/targets/compile-element";
 import type { JxDocument } from "@jxsuite/schema/types";
@@ -332,6 +338,45 @@ describe("bundleEntry esbuild fallback", () => {
     const bundled = readFileSync(outfile, "utf8");
     expect(bundled).toContain("hello-");
     expect(bundled).toContain("export");
+  });
+});
+
+describe("workerBundleOptions", () => {
+  test("cloudflare adapters resolve with workerd conditions and keep platform imports external", () => {
+    for (const adapter of ["cloudflare-workers", "cloudflare-pages"]) {
+      expect(workerBundleOptions(adapter)).toEqual({
+        conditions: ["workerd", "worker"],
+        external: ["cloudflare:*", "node:*"],
+        target: "workerd",
+      });
+    }
+  });
+
+  test("node and bun adapters bundle platform-native", () => {
+    expect(workerBundleOptions("node")).toEqual({ target: "node" });
+    expect(workerBundleOptions("bun")).toEqual({ target: "bun" });
+  });
+});
+
+describe("bundleWorkerSource esbuild fallback", () => {
+  test("JX_BUNDLER=esbuild bundles worker source via stdin, resolving from the project root", async () => {
+    const outfile = resolve(TMP, "dist-esbuild-check/worker-out.js");
+    mkdirSync(resolve(TMP, "dist-esbuild-check"), { recursive: true });
+    const source = `import { greet } from "tiny-lib";\nexport default { fetch: () => new Response(greet({})) };\n`;
+    const { JX_BUNDLER: prev } = process.env;
+    process.env.JX_BUNDLER = "esbuild";
+    try {
+      await bundleWorkerSource(source, { adapter: "node", outfile, projectRoot: TMP });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.JX_BUNDLER;
+      } else {
+        process.env.JX_BUNDLER = prev;
+      }
+    }
+    const bundled = readFileSync(outfile, "utf8");
+    expect(bundled).toContain("hello-");
+    expect(bundled).not.toMatch(/from\s*["']tiny-lib["']/);
   });
 });
 
