@@ -1,0 +1,12 @@
+{
+  "name": "@jxsuite/search",
+  "title": "Search",
+  "description": "Build-time search index emission from content collections (MiniSearch) with section-level deep links and a headless browser client",
+  "classes": {
+    "SearchIndex": "./src/SearchIndex.class.json",
+    "Search": "./src/Search.class.json"
+  },
+  "schemas": {
+    "project": "./schemas/project.fragment.schema.json"
+  }
+}

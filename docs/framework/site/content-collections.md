@@ -3,9 +3,11 @@ title: "Content collections"
 description: "The content section of project.json: sources, formats, entry ids, ContentCollection queries, ContentEntry lookups, and schema validation."
 spec:
   - site-architecture.md#6
+  - parser.md#3.2
 code:
   - extensions/parser/src/content-loader.ts
   - extensions/parser/src/content.ts
+  - extensions/parser/src/md.ts
 ---
 
 # Content collections
@@ -114,6 +116,8 @@ A resolved entry has this shape:
 ```
 
 Frontmatter and data fields live under `data` (`${state.post.data.title}`); for Markdown entries, `body` is the raw source and `$children` is the parsed Jx tree, rendered with `"children": "${state.post.$children ?? []}"`.
+
+Markdown headings in `$children` carry automatic anchor `id`s — the heading text lowercased, punctuation stripped, spaces hyphenated, with `-2`, `-3` suffixes deduplicating repeats in document order. The entry's table of contents (`_meta.toc`: `depth`, `text`, `id` per heading) uses the same ids, so TOC links, search results, and hand-written `#fragment` URLs all land on the rendered section.
 
 ## Schema validation
 

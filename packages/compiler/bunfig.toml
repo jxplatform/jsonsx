@@ -4,6 +4,10 @@ coverageSkipTestFiles = true
 coveragePathIgnorePatterns = [
   "**/tests/**",
   "./result/**",
+  # Transient /tmp modules some tests import (portability worker copy, importImplementation
+  # fixtures) — loaded artifacts, not compiler source.
+  "**/jx-worker-portability-*/**",
+  "**/jx-import-impl-*/**",
   "../../extensions/**",
   "../create/**",
   "../desktop/**",

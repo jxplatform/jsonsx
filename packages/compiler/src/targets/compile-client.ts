@@ -238,6 +238,7 @@ export function compileClient(
     srcImportMap,
     counter,
     reactivitySrc,
+    opts.rewriteSrc as ((specifier: string) => string) | undefined,
   );
 
   // Build importmap entries — always include lit-html since compiled custom elements need it
@@ -757,6 +758,7 @@ function emitClientModule(
     needsLit: boolean;
   },
   _reactivitySrc: string,
+  rewriteSrc?: (specifier: string) => string,
 ) {
   const lines: string[] = [];
   const { needsLit } = counter;
@@ -776,9 +778,11 @@ function emitClientModule(
     lines.push("import { html, render } from 'lit-html';");
   }
 
-  // $src imports
+  // $src imports — bundleable specifiers (npm:…, ./relative) are rewritten to their /assets/
+  // Bundle URL; the site build bundles them after all documents compile (spec.md §12).
   for (const [src, names] of srcImportMap) {
-    lines.push(`import { ${[...names].join(", ")} } from '${src}';`);
+    const importPath = rewriteSrc ? rewriteSrc(src) : src;
+    lines.push(`import { ${[...names].join(", ")} } from '${importPath}';`);
   }
 
   // State — reactive state

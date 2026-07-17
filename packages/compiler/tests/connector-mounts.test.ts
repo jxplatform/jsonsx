@@ -149,19 +149,23 @@ describe("compileSiteServer with mounts", () => {
 // ─── buildSite integration ───────────────────────────────────────────────────
 
 describe("buildSite with the connector extension", () => {
-  test("generates dist/worker.js with the data mount and inlined manifest", async () => {
+  test("generates a self-contained bundled dist/worker.js with the data mount", async () => {
     const result = await buildSite(TMP, { clean: true });
     expect(result.errors).toEqual([]);
 
     const workerPath = resolve(TMP, "dist/worker.js");
     expect(existsSync(workerPath)).toBe(true);
     const worker = readFileSync(workerPath, "utf8");
-    expect(worker).toContain("import { Data } from '@jxsuite/connector/worker'");
-    expect(worker).toContain("import { D1 } from '@jxsuite/connector/d1'");
-    expect(worker).toContain("app.all('/_jx/data/*'");
-    expect(worker).toContain(`"databaseId":"d1-uuid"`);
-    expect(worker).toContain(`"connections"`);
-    expect(worker).toContain("app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))");
+    // Behavioral surface survives bundling: mount route, inlined manifest, asset fallthrough.
+    expect(worker).toContain("/_jx/data/*");
+    expect(worker).toContain("d1-uuid");
+    expect(worker).toContain("connections");
+    expect(worker).toContain("ASSETS.fetch");
+    // Self-contained (compiler.md §12): no unresolved workspace/hono imports remain — kysely,
+    // The mount module, and hono are inlined, so dist deploys without node_modules.
+    expect(worker).not.toMatch(/from\s*["']@jxsuite\//);
+    expect(worker).not.toMatch(/from\s*["']hono["']/);
+    expect(worker).not.toMatch(/from\s*["']kysely["']/);
   });
 
   test("static adapter + data tables is a clear build error", async () => {
@@ -473,19 +477,16 @@ describe("buildSite with the auth extension", () => {
       expect(result.errors).toEqual([]);
       const worker = readFileSync(resolve(dir, "dist/worker.js"), "utf8");
 
-      expect(worker).toContain("import { Auth } from '@jxsuite/auth/worker'");
-      expect(worker).toContain("import { Data } from '@jxsuite/connector/worker'");
-      // One shared ctx, auth mounted first (order 10 < 20), both wired through it.
-      const ctxAt = worker.indexOf("const jxCtx = {}");
-      const authAt = worker.indexOf("Auth.mount(");
-      const dataAt = worker.indexOf("Data.mount(");
-      expect(ctxAt).toBeGreaterThan(-1);
-      expect(authAt).toBeGreaterThan(ctxAt);
-      expect(dataAt).toBeGreaterThan(authAt);
-      expect(worker).toContain("app.all('/_jx/auth/*'");
-      expect(worker).toContain("app.all('/_jx/data/*'");
+      // Both mounts wired; better-auth and the mount modules are inlined (self-contained).
+      expect(worker).toContain("/_jx/auth/*");
+      expect(worker).toContain("/_jx/data/*");
+      expect(worker).not.toMatch(/from\s*["']@jxsuite\//);
+      expect(worker).not.toMatch(/from\s*["']better-auth/);
+      // Auth (order 10) registers its route before data (order 20); statement order survives
+      // Bundling of the entry module.
+      expect(worker.indexOf("/_jx/auth/*")).toBeLessThan(worker.lastIndexOf("/_jx/data/*"));
       // The inlined section manifest carries the auth section — identifiers only, no secrets.
-      expect(worker).toContain('"auth":{"connection":"main"}');
+      expect(worker).toContain('"connection"');
       expect(worker).not.toContain("BETTER_AUTH_SECRET=");
     } finally {
       rmSync(dir, { force: true, recursive: true });

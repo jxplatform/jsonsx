@@ -1,7 +1,7 @@
 // Emits LLM/agent-friendly exports of the docs corpus into the built site:
 //   Dist/llms.txt — nav-ordered index (llms.txt convention)
 //   Dist/docs/full-docs.json — the whole corpus as structured entries
-//   Dist/docs/search-index.json — slug/title/description/headings/text for client search
+// (The client search index is emitted by @jxsuite/search during `jx build`.)
 //
 // Runs as a post-build step of the jxsuite.com site build (see its package.json)
 // So nothing derived is committed.
@@ -100,20 +100,4 @@ writeFileSync(join(DIST, "llms.txt"), `${llms.join("\n").trimEnd()}\n`, "utf8");
 mkdirSync(join(DIST, "docs"), { recursive: true });
 writeFileSync(join(DIST, "docs/full-docs.json"), JSON.stringify(entries, null, 2), "utf8");
 
-// ── search-index.json ─────────────────────────────────────────────────────────
-const searchIndex = entries.map((entry) => ({
-  description: entry.description,
-  headings: [...entry.markdown.matchAll(/^#{1,4}\s+(.+)$/gm)].map((m) => m[1]!),
-  section: entry.section,
-  slug: entry.slug,
-  text: entry.markdown
-    .replaceAll(/```[\s\S]*?```/g, " ")
-    .replaceAll(/[#*`[\]()|>-]/g, " ")
-    .replaceAll(/\s+/g, " ")
-    .trim(),
-  title: entry.title,
-  url: `/docs/${entry.slug}/`,
-}));
-writeFileSync(join(DIST, "docs/search-index.json"), JSON.stringify(searchIndex), "utf8");
-
-console.log(`llm export: ${entries.length} pages → llms.txt, full-docs.json, search-index.json`);
+console.log(`llm export: ${entries.length} pages → llms.txt, full-docs.json`);

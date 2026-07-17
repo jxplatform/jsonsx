@@ -17,6 +17,7 @@ const MD_CLASS = {
 const TABLES_CLASS = {
   $defs: {
     methods: {
+      emit: { identifier: "emit", role: "emit", scope: "static", timing: ["compiler"] },
       projectData: { identifier: "projectData", role: "projectData", scope: "static" },
       resolvePaths: {
         discriminator: "table",
@@ -294,6 +295,12 @@ describe("ExtensionRegistry accessors", () => {
     const reg = await standardRegistry();
     expect(reg.serverMounts().map((e) => e.name)).toEqual(["AuthMount", "DataMount"]);
     expect(reg.connectors().map((e) => e.name)).toEqual(["D1"]);
+  });
+
+  test("emitters filters to classes with an emit capability", async () => {
+    const reg = await standardRegistry();
+    expect(reg.emitters().map((e) => e.name)).toEqual(["Tables"]);
+    expect(reg.byName("Tables")?.capabilities.emit?.timing).toEqual(["compiler"]);
   });
 
   test("mounts without an order default to 100 and tie-break by name", async () => {

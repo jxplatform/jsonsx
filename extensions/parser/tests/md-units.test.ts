@@ -262,3 +262,45 @@ describe("MarkdownCollection", () => {
     expect(result?.path).toEndWith("third.md");
   });
 });
+
+// ─── Heading anchor ids (specs/parser.md) ─────────────────────────────────────
+
+describe("processMarkdown heading ids", () => {
+  test("rendered headings carry slug ids matching $toc", () => {
+    const source = "# Getting Started\n\n## Install Steps\n\ntext";
+    const { $children, $toc } = processMarkdown(source, "/t.md");
+    const h1 = $children[0] as JxElement;
+    const h2 = $children[1] as JxElement;
+    expect(h1.id).toBe("getting-started");
+    expect(h2.id).toBe("install-steps");
+    expect($toc).toEqual([
+      { depth: 1, id: "getting-started", text: "Getting Started" },
+      { depth: 2, id: "install-steps", text: "Install Steps" },
+    ]);
+  });
+
+  test("duplicate headings dedupe deterministically with -2, -3 suffixes", () => {
+    const source = "## Setup\n\n## Setup\n\n## Setup";
+    const { $children, $toc } = processMarkdown(source, "/t.md");
+    const ids = ($children as JxElement[]).map((el) => el.id ?? "");
+    expect(ids).toEqual(["setup", "setup-2", "setup-3"]);
+    expect($toc.map((e) => e.id)).toEqual(ids);
+  });
+
+  test("headings with rich inline content slug their concatenated text", () => {
+    const { $children, $toc } = processMarkdown("## Using `jx build` **fast**", "/t.md");
+    expect(($children[0] as JxElement).id).toBe("using-jx-build-fast");
+    expect($toc[0]?.text).toBe("Using jx build fast");
+  });
+
+  test("headings nested in block content are anchored and included in $toc", () => {
+    const { $toc } = processMarkdown("> ## Quoted Heading\n\n## Top", "/t.md");
+    expect($toc.map((e) => e.id)).toEqual(["quoted-heading", "top"]);
+  });
+
+  test("punctuation-only headings fall back to a stable anchor", () => {
+    const { $children } = processMarkdown("## !!!\n\n## !!!", "/t.md");
+    const ids = ($children as JxElement[]).map((el) => el.id);
+    expect(ids).toEqual(["section", "section-2"]);
+  });
+});

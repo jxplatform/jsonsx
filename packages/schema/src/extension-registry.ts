@@ -151,6 +151,11 @@ export class ExtensionRegistry {
     return this.#classes.find((e) => e.capabilities.resolvePaths?.discriminator === key);
   }
 
+  /** Classes declaring an `emit` capability (build-time asset emission), in declaration order. */
+  emitters(): FormatEntry[] {
+    return this.#classes.filter((e) => e.capabilities.emit !== undefined);
+  }
+
   /** Server-mount classes, sorted by `server.order` (ascending; default 100), then name. */
   serverMounts(): FormatEntry[] {
     return this.#classes

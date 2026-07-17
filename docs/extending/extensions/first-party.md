@@ -1,23 +1,25 @@
 ---
 title: "First-party extensions"
-description: "What @jxsuite/parser, @jxsuite/connector, and @jxsuite/auth each contribute: sections, formats, classes, server mounts, and Studio settings."
+description: "What @jxsuite/parser, @jxsuite/connector, @jxsuite/auth, and @jxsuite/search each contribute: sections, formats, classes, mounts, and settings."
 spec:
   - extensions.md#2
 code:
   - extensions/parser/jx-extension.json
   - extensions/connector/jx-extension.json
   - extensions/auth/jx-extension.json
+  - extensions/search/jx-extension.json
 ---
 
 # First-party extensions
 
-Three extensions ship with Jx, and they are deliberately unprivileged: each is wired through the same manifest, admission blocks, and capability roles available to any third-party package. That makes them two things at once — the batteries most projects start with, and the reference implementations to crib from when you build your own. This page maps what each one contributes; follow the links for the mechanics.
+Four extensions ship with Jx, and they are deliberately unprivileged: each is wired through the same manifest, admission blocks, and capability roles available to any third-party package. That makes them two things at once — the batteries most projects start with, and the reference implementations to crib from when you build your own. This page maps what each one contributes; follow the links for the mechanics.
 
 | Package              | Sections              | Formats       | Server mounts          | Connector providers  |
 | -------------------- | --------------------- | ------------- | ---------------------- | -------------------- |
 | `@jxsuite/parser`    | `content`             | Markdown, CSV | —                      | —                    |
 | `@jxsuite/connector` | `connections`, `data` | —             | `/_jx/data` (order 20) | D1, Supabase, Sqlite |
 | `@jxsuite/auth`      | `auth`                | —             | `/_jx/auth` (order 10) | —                    |
+| `@jxsuite/search`    | `search`              | —             | —                      | —                    |
 
 ## @jxsuite/parser — content and Markdown
 
@@ -55,9 +57,21 @@ Better Auth behind the connector's tables, and the reference for mount cooperati
 
 User-level docs: [Auth and secrets](/docs/studio/data/auth-and-secrets).
 
+## @jxsuite/search — build-time site search
+
+Headless full-text search, and the reference for the [`emit` capability](/docs/extending/extensions/search).
+
+- **Section**: `search` — which content collections to index, per-collection fields/boosts, and the output path. `projectData` normalizes it into `_project.search`.
+- **Emit**: builds `/search-index.json` at build time from the loaded content collections — page-level documents plus per-heading section documents with `#anchor` deep links (heading ids come from the parser).
+- **Classes**: `Search` — reactive query results in page state, [lowered](/docs/extending/extensions/capabilities) to a core `Function` computed that lazy-loads the bundled MiniSearch client. Defaults to client timing via `$studio.stateDefaults`.
+- **Client**: `@jxsuite/search/client`, a headless browser module (`preload`/`query` plus `$src` state conventions) bundled into `/assets/` by the site build; sites author their own search UI over it.
+- **Studio settings**: the **Site Search** section (`layout: "form"`).
+
+User-level docs: [Site search](/docs/framework/site/search).
+
 ## How they depend on each other
 
-Auth depends on the connector (its dialect seam and permission types); both may depend on core packages; core packages never depend on any of them. That direction is CI-enforced, and it is what guarantees the claim these pages keep making: anything the first-party extensions do, yours can do too.
+Auth depends on the connector (its dialect seam and permission types); search reads what the parser loads but depends only on core; all of them may depend on core packages; core packages never depend on any of them. That direction is CI-enforced, and it is what guarantees the claim these pages keep making: anything the first-party extensions do, yours can do too.
 
 ## Related
 

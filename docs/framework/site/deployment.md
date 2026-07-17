@@ -63,6 +63,7 @@ Without an adapter (the **Static** choice in Studio), the build is just `dist/` 
 Details worth knowing:
 
 - Server functions are collected from every component and page, deduplicated by export name, and bundled once — there are no per-route server files when an adapter is set.
+- The worker is **self-contained**: hono, extension mounts, database connectors, and your server modules are inlined at build time, so `dist/` deploys and runs with no `node_modules` and no deploy-time bundling step.
 - On Cloudflare Pages, `_routes.json` limits worker invocation to `/_jx/*`, so static assets are served without waking the worker. A Pages site with no server functions gets no worker at all — the deployment stays purely static.
 - A project with dynamic sections (connection-backed tables served by extension mounts) **must** set a server-capable adapter; the build fails on static, since a static site can't serve live data.
 - Switching hosts means switching the adapter — your source never changes.

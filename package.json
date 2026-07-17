@@ -15,9 +15,10 @@
   "type": "module",
   "scripts": {
     "all-the-things": "bun run build && bun run test && bun run lint && bun run typecheck",
-    "build": "bun run build:parser && bun run build:compiler && bun run build:runtime && bun run build:studio && bun run generate:schema",
+    "build": "bun run build:parser && bun run build:search && bun run build:compiler && bun run build:runtime && bun run build:studio && bun run generate:schema",
     "build:compiler": "bun run --cwd packages/compiler build",
     "build:parser": "bun run --cwd extensions/parser build",
+    "build:search": "bun run --cwd extensions/search build",
     "build:runtime": "bun run --cwd packages/runtime build",
     "build:studio": "bun run --cwd packages/studio build",
     "desktop": "bun run --cwd packages/desktop dev",

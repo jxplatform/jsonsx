@@ -20,9 +20,20 @@ const PAGES: Record<string, () => string> = {
   "docs/studio/projects/starters.md": generateStarters,
 };
 
+const written: string[] = [];
 for (const [relPath, generate] of Object.entries(PAGES)) {
   const path = join(ROOT, relPath);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, generate(), "utf8");
+  written.push(path);
   console.log(`wrote ${relPath}`);
+}
+
+// Format the generated pages so their committed form is oxfmt-stable: `docs:verify` diffs the
+// Regenerated output against the committed pages, and the repo-wide `bun run format` must not
+// Change them afterward — both require generator output to already be formatted.
+const fmt = Bun.spawnSync(["bunx", "oxfmt", ...written], { cwd: ROOT });
+if (fmt.exitCode !== 0) {
+  console.error(fmt.stderr.toString() || fmt.stdout.toString());
+  process.exit(fmt.exitCode);
 }

@@ -9,6 +9,7 @@
   "description": "JSON Schema 2020-12 meta-schema generator for Jx documents",
   "exports": {
     ".": "./src/schema.ts",
+    "./asset-paths": "./src/asset-paths.ts",
     "./extension-registry": "./src/extension-registry.ts",
     "./format-registry": "./src/format-registry.ts",
     "./project-schemas": "./src/project-schemas.ts",

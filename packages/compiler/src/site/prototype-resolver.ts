@@ -79,6 +79,7 @@ export async function resolvePrototypes(
     config?: Record<string, unknown>;
     sections?: Record<string, unknown>;
     registry?: ExtensionRegistry;
+    registerBundle?: (specifier: string) => void;
   } = {},
 ) {
   const imports = doc.imports ?? {};
@@ -107,6 +108,20 @@ export async function resolvePrototypes(
             root: projectRoot,
             route,
           });
+          // A lowered def may name client modules it depends on via `$bundle`
+          // (extensions.md §8.3): the site build bundles each specifier for the browser.
+          // The key is host metadata, not part of the core def shape — strip it.
+          if (lowered && typeof lowered === "object" && !Array.isArray(lowered)) {
+            const bundles = (lowered as JsonObject).$bundle;
+            if (Array.isArray(bundles)) {
+              for (const specifier of bundles) {
+                if (typeof specifier === "string") {
+                  projectContext.registerBundle?.(specifier);
+                }
+              }
+            }
+            delete (lowered as JsonObject).$bundle;
+          }
           state[key] = lowered as JxStateDefinition;
         } catch (error) {
           console.warn(

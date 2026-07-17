@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/search/Search.class.json",
+  "title": "Search",
+  "description": "Reactive site-search results for a query — lazily loads the bundled headless client in browsers and lowers to a core Function computed in compiled sites",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./search-state.js",
+
+  "$studio": {
+    "stateDefaults": { "timing": "client" }
+  },
+
+  "$defs": {
+    "parameters": {
+      "query": {
+        "identifier": "query",
+        "type": { "type": "string" },
+        "description": "Query text: a literal string or a $ref into page state (e.g. #/state/q)"
+      },
+      "limit": {
+        "identifier": "limit",
+        "type": { "type": "integer", "default": 8 },
+        "description": "Maximum result groups returned"
+      },
+      "group": {
+        "identifier": "group",
+        "type": { "type": "boolean", "default": true },
+        "description": "Group section hits under their page"
+      },
+      "index": {
+        "identifier": "index",
+        "type": { "type": "string" },
+        "description": "Index URL override (defaults to the project's search.output)"
+      }
+    },
+    "constructor": {
+      "role": "constructor",
+      "parameters": [
+        { "$ref": "#/$defs/parameters/query" },
+        { "$ref": "#/$defs/parameters/limit" },
+        { "$ref": "#/$defs/parameters/group" },
+        { "$ref": "#/$defs/parameters/index" }
+      ],
+      "body": ["this.config = config;"]
+    },
+    "methods": {
+      "resolve": {
+        "role": "method",
+        "scope": "instance",
+        "identifier": "resolve",
+        "returnType": { "type": "array" },
+        "description": "Grouped search results for the configured query (browser only; [] under node)"
+      },
+      "lower": {
+        "role": "lower",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "lower",
+        "timing": ["compiler"],
+        "parameters": [
+          { "identifier": "def", "type": { "type": "object" } },
+          { "identifier": "context", "type": { "type": "object" } }
+        ],
+        "returnType": { "type": "object" },
+        "description": "Rewrite into a core Function computed that lazy-imports the bundled client, preloads the index, and queries reactively; registers the client bundle via $bundle"
+      }
+    }
+  }
+}

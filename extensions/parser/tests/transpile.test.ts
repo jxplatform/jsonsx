@@ -10,6 +10,7 @@ import type { JxElement } from "@jxsuite/schema/types";
 import type { MdastNode } from "../src/types";
 import {
   applyStyleKeyMapping,
+  assignHeadingIds,
   collapseDotPaths,
   collapseStylePaths,
   convertChildren,
@@ -20,6 +21,7 @@ import {
   jxKey,
   mdKey,
   mdastNodeToJx,
+  slugifyHeading,
   transpileJxMarkdown,
 } from "../src/transpile";
 
@@ -878,5 +880,44 @@ describe("transpileJxMarkdown", () => {
     const doc = transpileJxMarkdown('::my-widget{--title="Widget Title"}\n');
     const [widget] = doc.children as JxElement[];
     expect(widget!.$title).toBe("Widget Title");
+  });
+});
+
+// ─── assignHeadingIds / slugifyHeading units ──────────────────────────────────
+
+describe("assignHeadingIds", () => {
+  test("mutates headings depth-first and returns matching toc entries", () => {
+    const tree = [
+      { tagName: "h2", textContent: "One" },
+      { children: [{ tagName: "h3", textContent: "Nested" }], tagName: "section" },
+      "loose text",
+    ] as (JxElement | string)[];
+    const toc = assignHeadingIds(tree);
+    expect((tree[0] as JxElement).id).toBe("one");
+    expect(toc).toEqual([
+      { depth: 2, id: "one", text: "One" },
+      { depth: 3, id: "nested", text: "Nested" },
+    ]);
+  });
+
+  test("pre-existing ids are respected and still claim their slug", () => {
+    const tree = [
+      { id: "custom", tagName: "h2", textContent: "Setup" },
+      { tagName: "h2", textContent: "Setup" },
+    ] as JxElement[];
+    const toc = assignHeadingIds(tree);
+    expect(toc.map((e) => e.id)).toEqual(["custom", "setup"]);
+    expect((tree[1] as JxElement).id).toBe("setup");
+  });
+
+  test("missing children yield no entries", () => {
+    expect(assignHeadingIds()).toEqual([]);
+  });
+});
+
+describe("slugifyHeading", () => {
+  test("lowercases, strips punctuation, and collapses whitespace", () => {
+    expect(slugifyHeading("The `emit` Capability!")).toBe("the-emit-capability");
+    expect(slugifyHeading("  spaced   out  ")).toBe("spaced-out");
   });
 });
