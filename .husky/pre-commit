@@ -1,1 +1,3 @@
 bunx nano-staged
+# Advisory (never blocks): staged source files whose docs/specs aren't in the commit
+bun scripts/docs/check-doc-sync.ts --staged || true

@@ -29,6 +29,7 @@
     "dev": "bun run server.js",
     "docs:check": "bun scripts/docs/check-doc-refs.ts",
     "docs:generate": "bun scripts/docs/generate-reference.ts",
+    "docs:sync": "bun scripts/docs/check-doc-sync.ts",
     "docs:verify": "bun run docs:generate && git diff --exit-code -- docs && bun run docs:check",
     "eval": "bun run --cwd packages/studio eval",
     "eval:headless": "bun run --cwd packages/studio eval:headless",

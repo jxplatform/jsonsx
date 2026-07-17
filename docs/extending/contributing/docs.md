@@ -3,6 +3,7 @@ title: "Contributing to these docs"
 description: "How the Jx documentation is written, structured, screenshotted, and checked — the style guide for every page in /docs."
 code:
   - scripts/docs/check-doc-refs.ts
+  - scripts/docs/check-doc-sync.ts
   - scripts/docs/generate-reference.ts
   - scripts/screenshots/manifest.json
 ---
@@ -28,6 +29,8 @@ code:
 ```
 
 In the other direction, code comments may carry `@docs <slug>` tags (e.g. `@docs framework/concepts/reactivity`) pointing at the page that documents them — also validated.
+
+These associations also power `bun run docs:sync`: given your working diff, it lists the pages and spec sections tied to the source files you changed. It runs automatically as a pre-commit advisory (and as an agent stop-check), so behavior changes and their documentation land together. It never blocks — a pure refactor needs no doc update.
 
 ## Voice and style
 

@@ -37,3 +37,34 @@ Conventions:
   `electrobun/bun` must always be mocked (sharp is unloadable on NixOS).
 - Check per-file coverage with `bun test --isolate --coverage` from the
   package directory; the table prints to stderr.
+
+## Specs & User-Documentation Policy
+
+Specs (`/specs`, §-numbered) are the source of truth; user docs (`/docs`,
+published at jxsuite.com/docs) must track shipped behavior. Every plan for a
+behavior-changing task MUST include a "Specs & docs" step, and the change set
+must land code, spec edits, and docs-page updates together.
+
+- **Before implementing**: consult the relevant spec; update it first when the
+  user's request changes contracts (AGENTS.md rule). Edit spec sections IN
+  PLACE — never renumber or remove numbered headings; docs `spec:` frontmatter
+  anchors them and `bun run docs:check` fails on broken anchors.
+- **Find what a change affects**: `bun run docs:sync` maps the working diff to
+  the docs pages/spec sections associated with the changed source files (via
+  docs `code:` frontmatter and `@docs <slug>` tags in code). A Stop hook and a
+  pre-commit advisory run the same check; treat the report as a prompt to
+  update or to state explicitly that no update is needed (pure refactors).
+- **Docs conventions**: pages carry `title` + `description ≤155 chars` and
+  optionally `spec:`/`code:` frontmatter; every page needs a `docs/nav.json`
+  entry (CI enforces bijection); `:::doc-note/tip/warning` callouts,
+  `:kbd[...]` keys; style guide lives at
+  `docs/extending/contributing/docs.md`. Screenshots come only from
+  `scripts/screenshots` (never hand-taken).
+- **Generated pages** (formula catalog, operators, protocol routes, starters)
+  are regenerated via `bun run docs:generate` — never hand-edited; CI diffs
+  them. Adding routes/formulas/operators means regenerating in the same PR.
+- **Tag new public behavior**: add `@docs <slug>` to the implementing source
+  file and list the file in the page's `code:` frontmatter so future changes
+  trigger the sync check. `@since` is available for versioned additions.
+- **Gates**: `bun run docs:check` (associations), `bun run docs:verify`
+  (generated-page drift, clean tree only) — both must stay green.
