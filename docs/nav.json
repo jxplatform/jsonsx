@@ -6,19 +6,35 @@
       "label": "Start here",
       "children": [
         { "path": "start/install", "label": "Install Jx Studio" },
-        { "path": "start/first-project", "label": "Your first project" }
+        { "path": "start/first-project", "label": "Your first project" },
+        { "path": "start/studio-tour", "label": "A tour of Jx Studio" }
       ]
     },
     {
       "path": "studio",
       "label": "Studio",
       "children": [
+        { "path": "studio/interface", "label": "The workspace" },
+        { "path": "studio/interface/welcome-screen", "label": "Welcome screen" },
+        { "path": "studio/interface/modes", "label": "Modes and preview" },
+        { "path": "studio/interface/canvas", "label": "The canvas" },
+        { "path": "studio/interface/tabs", "label": "Tabs and files" },
+        { "path": "studio/interface/quick-access", "label": "Quick Access" },
+        { "path": "studio/interface/shortcuts", "label": "Keyboard shortcuts" },
+        { "path": "studio/projects", "label": "Projects" },
+        { "path": "studio/projects/create", "label": "Create a project" },
+        {
+          "path": "studio/projects/pages-layouts-components",
+          "label": "Pages, layouts, components"
+        },
         { "path": "studio/projects/browse", "label": "Browse your project" },
         { "path": "studio/projects/starters", "label": "Starter templates" },
         { "path": "studio/editing", "label": "Edit mode" },
         { "path": "studio/design", "label": "Design mode" },
         { "path": "studio/logic", "label": "Logic" },
-        { "path": "studio/publish", "label": "Publish" }
+        { "path": "studio/publish", "label": "Publish" },
+        { "path": "studio/publish/source-control", "label": "Source control" },
+        { "path": "studio/publish/github", "label": "GitHub" }
       ]
     },
     {
