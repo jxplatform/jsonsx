@@ -17,6 +17,7 @@ import {
   renderPropertiesPanelTemplate,
 } from "../src/panels/properties-panel";
 import { componentRegistry } from "../src/files/components";
+import { resetSlotModeMemory } from "../src/ui/dynamic-slot";
 import { view } from "../src/view";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -76,6 +77,7 @@ beforeEach(() => {
   componentRegistry.length = 0;
   invalidateLayoutPickerCache();
   invalidatePageRouteCache();
+  resetSlotModeMemory();
   resetStudioState();
   installMockPlatform();
 });
@@ -306,12 +308,11 @@ describe("repeater section", () => {
     openDoc(repeaterDoc(), ["children", 0]);
     const c = await renderPanel();
     const row = fieldRowByLabel(c, "Items")!;
-    const mode = row.querySelector(".dynamic-slot-mode") as HTMLInputElement;
+    const mode = row.querySelector(".dynamic-slot-mode")!;
     expect(mode).not.toBeNull();
     expect(row.querySelector("sp-picker")).not.toBeNull();
 
-    mode.value = "literal";
-    mode.dispatchEvent(new Event("change", { bubbles: true }));
+    pointer(mode, "click");
     // Default is an array → JSON stringified static value
     expect((docNow().children as any[])[0].items).toBe('["a"]');
   });
@@ -320,9 +321,7 @@ describe("repeater section", () => {
     openDoc(repeaterDoc({ items: "static" }), ["children", 0]);
     const c = await renderPanel();
     const row = fieldRowByLabel(c, "Items")!;
-    const mode = row.querySelector(".dynamic-slot-mode") as HTMLInputElement;
-    mode.value = "ref";
-    mode.dispatchEvent(new Event("change", { bubbles: true }));
+    pointer(row.querySelector(".dynamic-slot-mode")!, "click");
     expect((docNow().children as any[])[0].items).toEqual({ $ref: "#/state/posts" });
   });
 
@@ -355,7 +354,7 @@ describe("repeater section", () => {
       ["children", 0],
     );
     const c = await renderPanel();
-    // First picker is the ref widget; the trailing mode menu is a separate picker.
+    // The row's only picker is the ref widget (the mode control is a button, not a picker).
     const items = [
       ...fieldRowByLabel(c, "Items")!.querySelector("sp-picker")!.querySelectorAll("sp-menu-item"),
     ].map((m) => m.textContent?.trim());
@@ -389,11 +388,7 @@ describe("repeater section", () => {
       ["children", 0],
     );
     const c = await renderPanel();
-    const mode = fieldRowByLabel(c, "Items")!.querySelector(
-      ".dynamic-slot-mode",
-    ) as HTMLInputElement;
-    mode.value = "literal";
-    mode.dispatchEvent(new Event("change", { bubbles: true }));
+    pointer(fieldRowByLabel(c, "Items")!.querySelector(".dynamic-slot-mode")!, "click");
     expect((docNow().children as any[])[0].items).toBeUndefined();
   });
 
@@ -407,11 +402,7 @@ describe("repeater section", () => {
       ["children", 0],
     );
     const c = await renderPanel();
-    const mode = fieldRowByLabel(c, "Items")!.querySelector(
-      ".dynamic-slot-mode",
-    ) as HTMLInputElement;
-    mode.value = "literal";
-    mode.dispatchEvent(new Event("change", { bubbles: true }));
+    pointer(fieldRowByLabel(c, "Items")!.querySelector(".dynamic-slot-mode")!, "click");
     expect((docNow().children as any[])[0].items).toBeUndefined();
   });
 });
@@ -469,10 +460,9 @@ describe("switch section", () => {
     openDoc(switchDoc(), ["children", 0, "map"]);
     let c = await renderPanel();
     const row = fieldRowByLabel(section(c, "Switch")!, "Expression")!;
-    // No state defs → ref mode falls through to the extra $map signals
-    const mode = row.querySelector(".dynamic-slot-mode") as HTMLInputElement;
-    mode.value = "ref";
-    mode.dispatchEvent(new Event("change", { bubbles: true }));
+    // The Expression row has no literal rung, so the template value cycles straight to ref.
+    // Without state defs the ref rung falls through to the extra $map signals.
+    pointer(row.querySelector(".dynamic-slot-mode")!, "click");
     expect((docNow().children as any[])[0].map.$switch).toEqual({ $ref: "$map/item" });
 
     c = await renderPanel();
@@ -607,20 +597,38 @@ describe("component props section", () => {
     expect((docNow().children as JxMutableNode[])[0]!.$props!.published).toBe("2026-06-12");
   });
 
-  test("bind toggle binds a prop to the first signal and back to its default", async () => {
+  test("mode button cycles literal → ref → template → back to the stashed literal", async () => {
     registerCard();
     openDoc(cardDoc({ title: "Hi" }), ["children", 0]);
     let c = await renderPanel();
-    let row = section(c, "Component Props")!.querySelector('[data-prop="title"]')!;
-    pointer(row.querySelector("sp-action-button")!, "click");
+    const modeBtn = () =>
+      section(c, "Component Props")!.querySelector('[data-prop="title"] .dynamic-slot-mode')!;
+    pointer(modeBtn(), "click");
     expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toEqual({
       $ref: "#/state/username",
     });
 
     c = await renderPanel();
-    row = section(c, "Component Props")!.querySelector('[data-prop="title"]')!;
-    expect(row.querySelector("sp-action-button")!.getAttribute("title")).toContain("Unbind");
-    pointer(row.querySelector("sp-action-button")!, "click");
+    expect(modeBtn().getAttribute("title")).toContain("signal binding");
+    pointer(modeBtn(), "click");
+    expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toBe("${state.username}");
+
+    c = await renderPanel();
+    pointer(modeBtn(), "click");
+    expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toBe("Hi");
+  });
+
+  test("a prop opened already-bound de-escalates to the signal's declared default", async () => {
+    registerCard();
+    openDoc(cardDoc({ title: { $ref: "#/state/username" } }), ["children", 0]);
+    let c = await renderPanel();
+    const modeBtn = () =>
+      section(c, "Component Props")!.querySelector('[data-prop="title"] .dynamic-slot-mode')!;
+    pointer(modeBtn(), "click");
+    expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toBe("${state.username}");
+
+    c = await renderPanel();
+    pointer(modeBtn(), "click");
     expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toBe("kevin");
   });
 
@@ -679,6 +687,30 @@ describe("component props section", () => {
     expect(kvAdd(section(c, "Component Props")!, "Edit definition")).toBeUndefined();
   });
 
+  test("npm prop cycled to ref stores a real $ref object in attributes", async () => {
+    componentRegistry.push({
+      props: [{ name: "label", type: "string" }],
+      source: "npm",
+      tagName: "sl-button",
+    } as never);
+    openDoc(
+      {
+        children: [{ attributes: { label: "Hi" }, tagName: "sl-button" }],
+        state: { username: { default: "kevin" } },
+        tagName: "div",
+      },
+      ["children", 0],
+    );
+    const c = await renderPanel();
+    pointer(
+      section(c, "Component Props")!.querySelector('[data-prop="label"] .dynamic-slot-mode')!,
+      "click",
+    );
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.label).toEqual({
+      $ref: "#/state/username",
+    });
+  });
+
   test("inside a map template, props bind to $map signals when no state defs exist", async () => {
     registerCard();
     openDoc(
@@ -687,7 +719,7 @@ describe("component props section", () => {
     );
     let c = await renderPanel();
     let row = section(c, "Component Props")!.querySelector('[data-prop="title"]')!;
-    pointer(row.querySelector("sp-action-button")!, "click");
+    pointer(row.querySelector(".dynamic-slot-mode")!, "click");
     expect((docNow().children as any[])[0].map.$props.title).toEqual({ $ref: "$map/item" });
 
     c = await renderPanel();
@@ -793,20 +825,19 @@ describe("attribute dynamic slots", () => {
     return c.querySelector('[data-prop="href"]') as HTMLElement;
   }
 
-  test("attribute rows offer literal, ref, and template modes", async () => {
+  test("attribute rows carry a mode button beside the label", async () => {
     openDoc(linkDoc(), ["children", 0]);
     const c = await renderPanel();
-    const mode = hrefRow(c).querySelector(".dynamic-slot-mode")!;
-    const caps = [...mode.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
-    expect(caps).toEqual(["literal", "ref", "template"]);
+    const mode = hrefRow(c).querySelector(".style-row-label .dynamic-slot-mode")!;
+    expect(mode).not.toBeNull();
+    expect(mode.textContent!.trim()).toBe("abc");
+    expect(mode.getAttribute("title")).toBe("Field mode: static — click for signal binding");
   });
 
   test("switching to ref mode binds the first signal; the picker rebinds", async () => {
     openDoc(linkDoc(), ["children", 0]);
     let c = await renderPanel();
-    const mode = hrefRow(c).querySelector(".dynamic-slot-mode") as HTMLInputElement;
-    mode.value = "ref";
-    mode.dispatchEvent(new Event("change", { bubbles: true }));
+    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
     expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toEqual({
       $ref: "#/state/alt",
     });
@@ -820,20 +851,39 @@ describe("attribute dynamic slots", () => {
     });
   });
 
-  test("de-escalating a bound attribute to literal clears it", async () => {
+  test("de-escalating a bound attribute cycles through template and clears at literal", async () => {
     openDoc(linkDoc({ $ref: "#/state/url" }), ["children", 0]);
-    const c = await renderPanel();
-    const mode = hrefRow(c).querySelector(".dynamic-slot-mode") as HTMLInputElement;
-    mode.value = "literal";
-    mode.dispatchEvent(new Event("change", { bubbles: true }));
+    let c = await renderPanel();
+    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("${state.alt}");
+
+    c = await renderPanel();
+    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
     expect((docNow().children as JxMutableNode[])[0]!.attributes?.href).toBeUndefined();
+  });
+
+  test("cycling around restores the attribute's former literal value", async () => {
+    openDoc(linkDoc(), ["children", 0]);
+    let c = await renderPanel();
+    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toEqual({
+      $ref: "#/state/alt",
+    });
+
+    c = await renderPanel();
+    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("${state.alt}");
+
+    c = await renderPanel();
+    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("/x");
   });
 
   test("template-valued attribute renders the template textfield and commits edits", async () => {
     openDoc(linkDoc("${state.url}/feed"), ["children", 0]);
     const c = await renderPanel();
-    const mode = hrefRow(c).querySelector(".dynamic-slot-mode") as HTMLInputElement;
-    expect(mode.value).toBe("template");
+    const mode = hrefRow(c).querySelector(".dynamic-slot-mode")!;
+    expect(mode.textContent!.trim()).toBe("${}");
     const tf = hrefRow(c).querySelector("sp-textfield") as HTMLInputElement;
     expect(tf.value).toBe("${state.url}/feed");
     tf.value = "${state.alt}/feed";
@@ -841,7 +891,7 @@ describe("attribute dynamic slots", () => {
     expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("${state.alt}/feed");
   });
 
-  test("boolean attribute rows carry the mode menu and bind via ref", async () => {
+  test("boolean attribute rows carry the mode button and bind via ref", async () => {
     openDoc(
       {
         children: [{ attributes: { required: "required" }, tagName: "input" }],
@@ -852,10 +902,9 @@ describe("attribute dynamic slots", () => {
     );
     const c = await renderPanel();
     const rowEl = section(c, "Form")!.querySelector('[data-prop="required"]')!;
-    const mode = rowEl.querySelector(".dynamic-slot-mode") as HTMLInputElement;
+    const mode = rowEl.querySelector(".dynamic-slot-mode")!;
     expect(mode).not.toBeNull();
-    mode.value = "ref";
-    mode.dispatchEvent(new Event("change", { bubbles: true }));
+    pointer(mode, "click");
     expect((docNow().children as JxMutableNode[])[0]!.attributes!.required).toEqual({
       $ref: "#/state/mandatory",
     });
@@ -871,12 +920,9 @@ describe("attribute dynamic slots", () => {
       ["children", 0],
     );
     let c = await renderPanel();
-    const mode = c.querySelector(
-      '[data-prop="textContent"] .dynamic-slot-mode',
-    ) as HTMLInputElement;
+    const mode = c.querySelector('[data-prop="textContent"] .dynamic-slot-mode')!;
     expect(mode).not.toBeNull();
-    mode.value = "ref";
-    mode.dispatchEvent(new Event("change", { bubbles: true }));
+    pointer(mode, "click");
     expect((docNow().children as JxMutableNode[])[0]!.textContent).toEqual({
       $ref: "#/state/msg",
     });

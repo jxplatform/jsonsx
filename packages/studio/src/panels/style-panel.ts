@@ -99,24 +99,28 @@ function renderStyleRow(
   gridMode: boolean,
   inheritedValue: string | undefined,
   templateSignals: string[] = [],
+  fieldKey: string = prop,
 ) {
   const type = inferInputType(entry);
   const hasVal = value !== undefined && value !== "";
   const placeholder = !hasVal && inheritedValue ? String(inheritedValue) : "";
   const spanVal = gridMode && (entry as Record<string, unknown>).$span === 2 ? 2 : undefined;
+  // Style values are schema-legal at two rungs: literal and ${} template (no $ref in JxStyle).
+  const slot = renderDynamicSlot({
+    caps: ["literal", "template"],
+    fieldKey,
+    onChange: (v?: JsonValue) => onCommit(v === undefined || v === "" ? undefined : String(v)),
+    staticWidget: widgetForType(type, entry, prop, value, onCommit, { placeholder }),
+    stateDefs: templateSignals,
+    value,
+  });
   return renderFieldRow({
     prop,
     label: propLabel(entry, prop),
     hasValue: hasVal,
     onClear: onDelete,
-    // Style values are schema-legal at two rungs: literal and ${} template (no $ref in JxStyle).
-    widget: renderDynamicSlot({
-      caps: ["literal", "template"],
-      onChange: (v?: JsonValue) => onCommit(v === undefined || v === "" ? undefined : String(v)),
-      staticWidget: widgetForType(type, entry, prop, value, onCommit, { placeholder }),
-      stateDefs: templateSignals,
-      value,
-    }),
+    widget: slot.widget,
+    labelExtra: slot.modeButton,
     ...(spanVal != null && { span: spanVal }),
     warning: isWarning,
   });
@@ -679,6 +683,7 @@ function styleSidebarTemplate(
                 sec.$layout === "grid",
                 inheritedStyle[prop] as string | undefined,
                 templateSignals,
+                `style|${sel.join("/")}|${mediaTab ?? ""}|${activeSelector ?? ""}|${prop}`,
               ),
             );
           }

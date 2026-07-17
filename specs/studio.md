@@ -306,7 +306,7 @@ When a Jx component is selected, the property panel renders its declared `state`
 | `"date"`  | Text field with `placeholder="YYYY-MM-DD"`              |
 | `"color"` | Color picker (reuses style panel `renderColorSelector`) |
 
-Each prop also supports signal binding via a toggle button — when bound, the widget is replaced by a signal picker dropdown listing available `state` entries.
+Each prop also supports dynamic values via the shared dynamic-slot mode button beside its label (caps: literal / `$ref` / `${}` template). Cycling to `$ref` replaces the widget with a signal picker listing available `state` entries; each mode's former value is remembered for the session, so cycling back restores it.
 
 ### 6.2 Style Sidebar (Metadata-Driven)
 

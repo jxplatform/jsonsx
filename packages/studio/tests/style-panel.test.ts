@@ -22,6 +22,7 @@ void mock.module("../src/panels/stylebook-panel", () => ({
 const { _fieldRow, renderStylePanelTemplate } = await import("../src/panels/style-panel");
 const { initCssData } = await import("../src/panels/style-utils");
 const { getNodeAtPath } = await import("../src/store");
+const { resetSlotModeMemory } = await import("../src/ui/dynamic-slot");
 
 // Happy-dom may not provide requestAnimationFrame in all versions.
 (globalThis as Record<string, unknown>).requestAnimationFrame ??= (cb: (t: number) => void) =>
@@ -86,6 +87,7 @@ beforeEach(() => {
     ],
   });
   selectStylebookTagMock.mockClear();
+  resetSlotModeMemory();
 });
 
 afterEach(() => {
@@ -185,12 +187,13 @@ describe("base style rows", () => {
 // ─── Style value dynamic slots (fx affordance) ───────────────────────────────
 
 describe("style value dynamic slots", () => {
-  test("style rows offer literal and template modes only (no $ref in JxStyle)", async () => {
+  test("style rows cycle between literal and template only (no $ref in JxStyle)", async () => {
     setupTab({ display: "flex" });
     const c = await renderPanel();
-    const mode = row(c, "display")!.querySelector(".dynamic-slot-mode")!;
-    const caps = [...mode.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
-    expect(caps).toEqual(["literal", "template"]);
+    const mode = row(c, "display")!.querySelector(".style-row-label .dynamic-slot-mode")!;
+    expect(mode).not.toBeNull();
+    expect(mode.textContent!.trim()).toBe("abc");
+    expect(mode.getAttribute("title")).toBe("Field mode: static — click for template literal");
   });
 
   test("switching to template mode seeds a state-based template string", async () => {
@@ -203,8 +206,7 @@ describe("style value dynamic slots", () => {
     const tab = resetWorkspaceWithTab(doc);
     tab.session.selection = ["children", 0];
     const c = await renderPanel();
-    const mode = row(c, "display")!.querySelector(".dynamic-slot-mode") as HTMLInputElement;
-    fire(mode, "change", "template");
+    click(row(c, "display")!.querySelector(".dynamic-slot-mode"));
     expect(selectedNode().style?.display).toBe("${state.mode}");
   });
 
@@ -212,7 +214,7 @@ describe("style value dynamic slots", () => {
     setupTab({ display: "${state.mode}" });
     const c = await renderPanel();
     const r = row(c, "display")!;
-    expect((r.querySelector(".dynamic-slot-mode") as HTMLInputElement).value).toBe("template");
+    expect(r.querySelector(".dynamic-slot-mode")!.textContent!.trim()).toBe("${}");
     const tf = r.querySelector("sp-textfield") as HTMLInputElement;
     expect(tf.value).toBe("${state.mode}");
     fire(tf, "change", "${state.other}");
@@ -222,9 +224,19 @@ describe("style value dynamic slots", () => {
   test("de-escalating a template value to literal clears the property", async () => {
     setupTab({ display: "${state.mode}" });
     const c = await renderPanel();
-    const mode = row(c, "display")!.querySelector(".dynamic-slot-mode") as HTMLInputElement;
-    fire(mode, "change", "literal");
+    click(row(c, "display")!.querySelector(".dynamic-slot-mode"));
     expect(selectedNode().style).toBeUndefined();
+  });
+
+  test("cycling back to literal restores the stashed style value", async () => {
+    setupTab({ display: "flex" });
+    let c = await renderPanel();
+    click(row(c, "display")!.querySelector(".dynamic-slot-mode"));
+    expect(selectedNode().style?.display).toBe("${}");
+
+    c = await renderPanel();
+    click(row(c, "display")!.querySelector(".dynamic-slot-mode"));
+    expect(selectedNode().style?.display).toBe("flex");
   });
 });
 

@@ -18,6 +18,7 @@ import { classMap } from "lit-html/directives/class-map.js";
  *   hasValue: boolean;
  *   onClear?: () => void;
  *   widget: unknown;
+ *   labelExtra?: unknown;
  *   span?: number;
  *   warning?: boolean;
  * }} opts
@@ -29,6 +30,7 @@ export function renderFieldRow({
   hasValue,
   onClear,
   widget,
+  labelExtra,
   span,
   warning,
 }: {
@@ -37,6 +39,8 @@ export function renderFieldRow({
   hasValue: boolean;
   onClear?: () => void;
   widget: unknown;
+  /** Rendered after the label inside the label cell (e.g. the dynamic-slot mode button). */
+  labelExtra?: unknown;
   span?: number;
   warning?: boolean;
 }) {
@@ -58,6 +62,7 @@ export function renderFieldRow({
             ></span>`
           : nothing}
         <sp-field-label size="s" title=${prop}>${label}</sp-field-label>
+        ${labelExtra ?? nothing}
       </div>
       ${widget}
     </div>

@@ -69,13 +69,13 @@ The panel now shows a **State** section with one row: an **S** badge and the nam
 Now point the paragraph at the value instead of typing fixed text:
 
 1. Select the paragraph on the canvas.
-2. In the **Properties** tab, find the **Text Content** row. At its right edge sits a small mode menu reading **abc** — the sign that the value is static.
-3. Open the menu and choose **${}** — the template mode.
+2. In the **Properties** tab, find the **Text Content** row. Beside its label sits a small mode button reading **abc** — the sign that the value is static.
+3. Click the button until it reads **${}** — the template mode. Each click steps to the next mode; the tooltip names the one a click will switch to.
 4. Studio pre-fills the field with your first state entry: `${state.count}`. Keep it, or mix in words: `Clicked ${state.count} times`.
 
-<!-- TODO(screenshot): counter-text-binding — the Text Content row in template mode holding ${state.count}, with the mode menu accent-colored -->
+<!-- TODO(screenshot): counter-text-binding — the Text Content row in template mode holding ${state.count}, with the mode button accent-colored -->
 
-The mode menu takes on the accent color: this value is now dynamic, and the paragraph will always show the current count. The full ladder of dynamic values — **abc**, **$ref**, **${}**, **fx** — is explained in **[Formulas and expressions](/docs/studio/logic/formulas)**.
+The mode button takes on the accent color: this value is now dynamic, and the paragraph will always show the current count. The full ladder of dynamic values — **abc**, **$ref**, **${}**, **fx** — is explained in **[Formulas and expressions](/docs/studio/logic/formulas)**.
 
 ## 7. Make the button count
 

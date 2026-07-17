@@ -33,11 +33,11 @@ Anything not covered lives in the **Custom** section: click **+ Add attribute** 
 
 ## Component props
 
-When the selection is a component instance, a **Component Props** section lists the options the component exposes — see **[Working with components](/docs/studio/design/components)**. Each prop gets a control matched to its type: a checkbox for on/off props, a number field, a dropdown for a fixed set of choices, a media picker for images, a color control for colors. The button beside each label binds the prop to a state value instead of a fixed one, and **→ Edit definition** opens the component itself.
+When the selection is a component instance, a **Component Props** section lists the options the component exposes — see **[Working with components](/docs/studio/design/components)**. Each prop gets a control matched to its type: a checkbox for on/off props, a number field, a dropdown for a fixed set of choices, a media picker for images, a color control for colors. The mode button beside each label switches the prop between a fixed value, a state binding, and a template, and **→ Edit definition** opens the component itself.
 
 ## Make any value dynamic
 
-Most fields carry a small mode menu at their right edge. **abc** is a plain value; **$ref** points the field at a state value; **${}** builds the value from a template that mixes text and data. Switching modes swaps the field's editor in place. The state values on offer come from the document's **State** panel — see **[Script & logic](/docs/studio/logic)**.
+Most fields carry a small mode button beside their label showing the current mode's glyph. Clicking it steps to the field's next mode — **abc** is a plain value; **$ref** points the field at a state value; **${}** builds the value from a template that mixes text and data — and wraps back around, swapping the field's editor in place. Studio remembers each mode's value for the session, so cycling back restores what you had there. The state values on offer come from the document's **State** panel — see **[Script & logic](/docs/studio/logic)**.
 
 ## Page and root settings
 

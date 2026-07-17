@@ -21,7 +21,7 @@ import { view } from "../view";
 import { componentRegistry } from "../files/components";
 import { widgetForType } from "./style-inputs";
 import { renderFieldRow } from "../ui/field-row";
-import { renderDynamicSlot } from "../ui/dynamic-slot";
+import { renderDynamicSlot, slotMode } from "../ui/dynamic-slot";
 import { spTextArea, spTextField } from "../ui/field-input";
 import {
   attrLabel,
@@ -48,6 +48,7 @@ import type {
   JxStateDefinition,
   JxStateObject,
 } from "@jxsuite/schema/types";
+import type { SlotMode } from "../ui/dynamic-slot";
 import type { JxPath } from "../state";
 import type { SignalDef } from "./signals-panel.js";
 
@@ -115,11 +116,13 @@ function bindableFieldRow(
   onChange: (v?: JsonValue) => void,
   filterFn: ((d: SignalDef) => boolean) | null = null,
   extraSignals: SignalOption[] | null = null,
+  fieldKey = `prop:${label}`,
+  caps: SlotMode[] = ["literal", "ref"],
 ) {
   const tab = activeTab.value;
   const defs = tab!.doc.document.state || {};
   const boundRef = isRef(rawValue) ? rawValue.$ref : null;
-  const isBound = boundRef !== null;
+  const isDynamic = slotMode(rawValue) !== "literal";
 
   const signalDefs = Object.entries(defs).filter(([, d]) =>
     filterFn
@@ -128,17 +131,17 @@ function bindableFieldRow(
         (d as JxPrototypeDef)?.$prototype !== "Function",
   );
 
-  const staticVal = isBound ? "" : (rawValue ?? "");
-  const fieldKey = `prop:${label}`;
+  const staticVal = isDynamic ? "" : (rawValue ?? "");
+  const draftKey = `prop:${label}`;
   const staticTpl =
     type === "textarea"
-      ? spTextArea(fieldKey, String(staticVal), (v: string) => onChange(v))
+      ? spTextArea(draftKey, String(staticVal), (v: string) => onChange(v))
       : type === "checkbox"
         ? html`<sp-checkbox
             ?checked=${Boolean(staticVal)}
             @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
           ></sp-checkbox>`
-        : spTextField(fieldKey, String(staticVal), (v: string) => onChange(v));
+        : spTextField(draftKey, String(staticVal), (v: string) => onChange(v));
 
   // De-escalating to literal restores the bound signal's declared default (old unbind behavior).
   const literalDefault = boundRef
@@ -146,18 +149,20 @@ function bindableFieldRow(
       undefined
     : undefined;
 
+  const slot = renderDynamicSlot({
+    caps,
+    extraSignals,
+    fieldKey,
+    literalDefault,
+    onChange,
+    staticWidget: staticTpl,
+    stateDefs: signalDefs.map(([defName]) => defName),
+    value: rawValue,
+  });
   return html`
     <div class="field-row">
       <sp-field-label size="s">${label}</sp-field-label>
-      ${renderDynamicSlot({
-        caps: ["literal", "ref"],
-        extraSignals,
-        literalDefault,
-        onChange,
-        staticWidget: staticTpl,
-        stateDefs: signalDefs.map(([defName]) => defName),
-        value: rawValue,
-      })}
+      ${slot.modeButton} ${slot.widget}
     </div>
   `;
 }
@@ -229,21 +234,42 @@ function renderRepeaterFieldsTemplate(
   _mapSignals: SignalOption[] | null,
 ) {
   return html`
-    ${bindableFieldRow("Items", "text", node.items, (v: JsonValue) =>
-      transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "items", v)),
+    ${bindableFieldRow(
+      "Items",
+      "text",
+      node.items,
+      (v: JsonValue) =>
+        transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "items", v)),
+      null,
+      null,
+      `prop|${path.join("/")}|items`,
     )}
     ${node.filter
-      ? bindableFieldRow("Filter", "text", node.filter, (v: JsonValue) =>
-          transactDoc(activeTab.value, (t) =>
-            mutateUpdateProperty(t, path, "filter", v || undefined),
-          ),
+      ? bindableFieldRow(
+          "Filter",
+          "text",
+          node.filter,
+          (v: JsonValue) =>
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateProperty(t, path, "filter", v || undefined),
+            ),
+          null,
+          null,
+          `prop|${path.join("/")}|filter`,
         )
       : nothing}
     ${node.sort
-      ? bindableFieldRow("Sort", "text", node.sort, (v: JsonValue) =>
-          transactDoc(activeTab.value, (t) =>
-            mutateUpdateProperty(t, path, "sort", v || undefined),
-          ),
+      ? bindableFieldRow(
+          "Sort",
+          "text",
+          node.sort,
+          (v: JsonValue) =>
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateProperty(t, path, "sort", v || undefined),
+            ),
+          null,
+          null,
+          `prop|${path.join("/")}|sort`,
         )
       : nothing}
     <div style="display:flex;gap:8px;margin-top:4px">
@@ -299,6 +325,10 @@ function renderSwitchFieldsTemplate(
         transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "$switch", v)),
       null,
       mapSignals,
+      `prop|${path.join("/")}|$switch`,
+      // No literal rung: a $switch is inherently dynamic.
+      // De-escalating to literal would delete the key and demote the node mid-cycle.
+      ["ref", "template"],
     )}
     <div
       style="font-size:var(--spectrum-font-size-50, 11px);font-weight:600;color:var(--fg-dim);margin:8px 0 4px;text-transform:uppercase;letter-spacing:0.05em"
@@ -378,7 +408,12 @@ function renderComponentPropsFieldsTemplate(
   const updateFn = isNpm
     ? (name: string, v?: JsonValue) =>
         transactDoc(activeTab.value, (t) =>
-          mutateUpdateAttribute(t, path, name, v === "" ? undefined : (v as string | undefined)),
+          mutateUpdateAttribute(
+            t,
+            path,
+            name,
+            v === "" ? undefined : (v as JxAttributeValue | undefined),
+          ),
         )
     : (name: string, v?: JsonValue) =>
         transactDoc(activeTab.value, (t) => mutateUpdateProp(t, path, name, v));
@@ -397,58 +432,21 @@ function renderComponentPropsFieldsTemplate(
       ) => {
         const rawValue = currentVals[prop.name];
         const boundRef = isRef(rawValue) ? rawValue.$ref : null;
-        const isBound = boundRef !== null;
         const hasVal = rawValue !== undefined && rawValue !== null;
         const parsed = parseCemType(prop.type);
         const onChange = (v?: JsonValue) => updateFn(prop.name, v);
-        const staticVal = isBound ? "" : String(rawValue ?? "");
+        const staticVal = slotMode(rawValue) === "literal" ? String(rawValue ?? "") : "";
 
         const clearProp = (e: Event) => {
           e.stopPropagation();
           updateFn(prop.name);
         };
 
-        const onToggleBind = () => {
-          if (boundRef !== null) {
-            const defName = boundRef.startsWith("#/state/") ? boundRef.slice(8) : boundRef;
-            const staticDefault = defaultAsString(defs[defName]);
-            onChange(staticDefault || undefined);
-          } else if (signalDefs.length > 0) {
-            onChange({ $ref: `#/state/${signalDefs[0]![0]}` });
-          } else if (extraSignals && extraSignals.length > 0) {
-            onChange({ $ref: extraSignals[0]!.value });
-          }
-        };
-
-        const boundTpl = html`
-          <sp-picker
-            size="s"
-            quiet
-            placeholder="— select signal —"
-            value=${boundRef ?? nothing}
-            @change=${(e: Event) => {
-              if ((e.target as HTMLInputElement).value) {
-                onChange({ $ref: (e.target as HTMLInputElement).value });
-              } else {
-                onChange();
-              }
-            }}
-          >
-            ${signalDefs.map(
-              ([defName]) =>
-                html`<sp-menu-item value=${`#/state/${defName}`}>${defName}</sp-menu-item>`,
-            )}
-            ${extraSignals
-              ? html`
-                  <sp-menu-divider></sp-menu-divider>
-                  ${extraSignals.map(
-                    (sig: SignalOption) =>
-                      html`<sp-menu-item value=${sig.value}>${sig.label}</sp-menu-item>`,
-                  )}
-                `
-              : nothing}
-          </sp-picker>
-        `;
+        // De-escalating to literal restores the bound signal's declared default (old unbind behavior).
+        const literalDefault = boundRef
+          ? defaultAsString(defs[boundRef.startsWith("#/state/") ? boundRef.slice(8) : boundRef]) ||
+            undefined
+          : undefined;
 
         /** @type {ReturnType<typeof setTimeout> | undefined} */
         let debounce: ReturnType<typeof setTimeout> | undefined;
@@ -500,6 +498,16 @@ function renderComponentPropsFieldsTemplate(
           );
         }
 
+        const slot = renderDynamicSlot({
+          caps: ["literal", "ref", "template"],
+          extraSignals,
+          fieldKey: `cprop|${path.join("/")}|${prop.name}`,
+          literalDefault,
+          onChange,
+          staticWidget: widgetTpl,
+          stateDefs: signalDefs.map(([defName]) => defName),
+          value: rawValue,
+        });
         return html`
           <div class="style-row" data-prop=${prop.name}>
             <div class="style-row-label">
@@ -509,15 +517,9 @@ function renderComponentPropsFieldsTemplate(
               <sp-field-label size="s" title=${prop.description || prop.name}
                 >${camelToLabel(prop.name)}</sp-field-label
               >
-              <sp-action-button
-                size="xs"
-                quiet
-                title=${isBound ? "Unbind (switch to static)" : "Bind to signal"}
-                @click=${onToggleBind}
-                >${isBound ? "\u26A1" : "\u2194"}</sp-action-button
-              >
+              ${slot.modeButton}
             </div>
-            ${isBound ? boundTpl : widgetTpl}
+            ${slot.widget}
           </div>
         `;
       },
@@ -1164,6 +1166,7 @@ export function renderPropertiesPanelTemplate(ctx: {
       renderDynamicSlot({
         caps: ["literal", "ref", "template"],
         extraSignals: mapSignals,
+        fieldKey: `attr|${path.join("/")}|${attr}`,
         onChange: commitAttr,
         staticWidget,
         stateDefs: bindableSignals,
@@ -1180,12 +1183,14 @@ export function renderPropertiesPanelTemplate(ctx: {
         >
         </sp-checkbox>
       `;
+      const slot = attrSlot(checkboxWidget);
       return renderFieldRow({
         hasValue: hasVal,
         label: attrLabel(entry, attr),
+        labelExtra: slot.modeButton,
         onClear: () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr)),
         prop: attr,
-        widget: attrSlot(checkboxWidget),
+        widget: slot.widget,
       });
     }
 
@@ -1196,12 +1201,14 @@ export function renderPropertiesPanelTemplate(ctx: {
       isRef(value) ? "" : String(value || ""),
       (v: string) => commitAttr(v || undefined),
     );
+    const slot = attrSlot(literalWidget);
     return renderFieldRow({
       hasValue: hasVal,
       label: attrLabel(entry, attr),
+      labelExtra: slot.modeButton,
       onClear: () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr)),
       prop: attr,
-      widget: attrSlot(literalWidget),
+      widget: slot.widget,
     });
   }
 
@@ -1270,6 +1277,24 @@ export function renderPropertiesPanelTemplate(ctx: {
   }
 
   // ── Build section templates ─────────────────────────────────────────
+
+  const textSlot = renderDynamicSlot({
+    caps: ["literal", "ref", "template"],
+    extraSignals: mapSignals,
+    fieldKey: `prop|${path.join("/")}|textContent`,
+    onChange: (v?: JsonValue) =>
+      transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "textContent", v)),
+    staticWidget: spTextArea(
+      "prop:textContent",
+      typeof node.textContent === "string" ? node.textContent : "",
+      (v: string) =>
+        transactDoc(activeTab.value, (t) =>
+          mutateUpdateProperty(t, path, "textContent", v || undefined),
+        ),
+    ),
+    stateDefs: bindableSignals,
+    value: node.textContent,
+  });
 
   const elemT = html`
     <sp-accordion-item
@@ -1356,25 +1381,9 @@ export function renderPropertiesPanelTemplate(ctx: {
                       ></span>`
                     : nothing}
                   <sp-field-label size="s">Text Content</sp-field-label>
+                  ${textSlot.modeButton}
                 </div>
-                ${renderDynamicSlot({
-                  caps: ["literal", "ref", "template"],
-                  extraSignals: mapSignals,
-                  onChange: (v?: JsonValue) =>
-                    transactDoc(activeTab.value, (t) =>
-                      mutateUpdateProperty(t, path, "textContent", v),
-                    ),
-                  staticWidget: spTextArea(
-                    "prop:textContent",
-                    typeof node.textContent === "string" ? node.textContent : "",
-                    (v: string) =>
-                      transactDoc(activeTab.value, (t) =>
-                        mutateUpdateProperty(t, path, "textContent", v || undefined),
-                      ),
-                  ),
-                  stateDefs: bindableSignals,
-                  value: node.textContent,
-                })}
+                ${textSlot.widget}
               </div>
             `
           : nothing}

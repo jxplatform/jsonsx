@@ -8,7 +8,7 @@ spec:
 
 # References
 
-> **Studio writes this format for you.** Picking the link mode from the fx menu on any bindable field ([Formulas and expressions](/docs/studio/logic/formulas)) writes the `$ref` objects on this page.
+> **Studio writes this format for you.** Switching any bindable field to **$ref** mode with its field-mode button ([Formulas and expressions](/docs/studio/logic/formulas)) writes the `$ref` objects on this page.
 
 A reference is an object with a single `$ref` key whose string value points at something declared elsewhere — a state entry, a global, an iteration item, or another file. References follow the JSON Reference convention (JSON Pointer, RFC 6901), so a Jx binding looks like any other `$ref` in the JSON Schema world.
 

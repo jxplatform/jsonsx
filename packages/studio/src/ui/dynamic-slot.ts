@@ -2,15 +2,18 @@
 /**
  * Dynamic-slot — the shared "make this dynamic" control for any bindable document position.
  *
- * Renders the panel-provided static widget alongside an fx mode menu that escalates the value up
+ * Renders the panel-provided static widget plus a label-side mode button that cycles the value up
  * the Rule of Least Power ladder (spec §2.2): literal → $ref pointer → ${} template → $expression.
  * Capability-driven: each slot offers only the modes its schema position allows, so panels stay
- * decoupled from which rungs are blessed where.
+ * decoupled from which rungs are blessed where. Each mode's last value is remembered per field for
+ * the session, so cycling back to an earlier mode restores what the user had there.
  */
 
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { isRef, isTemplateString } from "@jxsuite/schema/guards";
+import { cloneValue } from "../tabs/doc-op-apply";
+import { activeTab } from "../workspace/workspace";
 import { renderExpressionEditor } from "./expression-editor";
 
 import type { TemplateResult } from "lit-html";
@@ -27,12 +30,42 @@ const MODE_LABELS: Record<SlotMode, string> = {
   template: "${}",
 };
 
+const MODE_NOUNS: Record<SlotMode, string> = {
+  expression: "expression",
+  literal: "static",
+  ref: "signal binding",
+  template: "template literal",
+};
+
+/*
+ * Session memory of each field's last value per mode, so cycling modes round-trips user input.
+ * Keyed `${tabId}|${fieldKey}|${mode}`; the mode key is derived from the value at stash time, so a
+ * restore always lands a value whose slotMode() matches the target mode. `undefined` is a
+ * legitimate stash (cleared literal), hence Map.has() discrimination on recall.
+ */
+const slotModeMemory = new Map<string, JsonValue | undefined>();
+
+/** Test hook: drop all remembered per-mode field values. */
+export function resetSlotModeMemory(): void {
+  slotModeMemory.clear();
+}
+
+function memoryKey(fieldKey: string, mode: SlotMode): string {
+  return `${activeTab.value?.id ?? "-"}|${fieldKey}|${mode}`;
+}
+
+function hasRefOptions(opts: DynamicSlotOpts): boolean {
+  return opts.stateDefs.length > 0 || Boolean(opts.extraSignals?.length);
+}
+
 export interface SignalOption {
   value: string;
   label: string;
 }
 
 export interface DynamicSlotOpts {
+  /** Stable identity for per-mode value memory; must incorporate the node path. */
+  fieldKey: string;
   /** Current raw document value at this position. */
   value: unknown;
   /** Write-through to the document; `undefined` clears the position. */
@@ -132,15 +165,83 @@ function renderTemplateWidget(value: unknown, opts: DynamicSlotOpts) {
   `;
 }
 
+export interface DynamicSlotParts {
+  /** Label-side mode-cycle button. */
+  modeButton: TemplateResult;
+  /** Active-mode widget, sized to fill the row's widget column. */
+  widget: TemplateResult;
+}
+
 /**
- * Render a bindable slot: the active mode's widget plus the trailing fx mode menu. The menu is
- * quiet/gray while static and accent-tinted once the value is dynamic — the "everything can be
- * dynamic" affordance without visual noise on static rows.
+ * The label-side field-mode button. Shows the current mode's glyph — quiet/gray while static and
+ * accent-tinted once the value is dynamic — and each click cycles to the next capped mode, stashing
+ * the outgoing mode's value and restoring the incoming mode's remembered one.
  */
-export function renderDynamicSlot(opts: DynamicSlotOpts): TemplateResult {
+function renderModeButton(mode: SlotMode, caps: SlotMode[], opts: DynamicSlotOpts): TemplateResult {
+  const color =
+    mode !== "literal"
+      ? "color:var(--spectrum-accent-content-color-default, #5c9dff)"
+      : "color:var(--spectrum-gray-600, #808080)";
+  // A ref rung with nothing to point at is a dead end — drop it rather than trap the cycle there.
+  const cycle = caps.filter((m) => m !== "ref" || hasRefOptions(opts));
+  if (cycle.length < 2) {
+    const hint = `Field mode: ${MODE_NOUNS[mode]} (no other modes available)`;
+    return html`
+      <sp-action-button
+        size="xs"
+        quiet
+        disabled
+        class="dynamic-slot-mode"
+        style=${color}
+        title=${hint}
+        aria-label=${hint}
+        >${MODE_LABELS[mode]}</sp-action-button
+      >
+    `;
+  }
+  // An uncapped current mode indexes to -1, so its next stop is cycle[0] (literal).
+  const next = cycle[(cycle.indexOf(mode) + 1) % cycle.length]!;
+  const hint = `Field mode: ${MODE_NOUNS[mode]} — click for ${MODE_NOUNS[next]}`;
+  return html`
+    <sp-action-button
+      size="xs"
+      quiet
+      class="dynamic-slot-mode"
+      style=${color}
+      title=${hint}
+      aria-label=${hint}
+      @click=${() => {
+        slotModeMemory.set(
+          memoryKey(opts.fieldKey, mode),
+          cloneValue(opts.value as JsonValue | undefined),
+        );
+        // Leaving ref seeds an empty literal stash with the signal's declared default.
+        // Unbind-restores-default thus survives multi-hop cycles (ref → template → literal).
+        if (mode === "ref" && opts.literalDefault !== undefined) {
+          const litKey = memoryKey(opts.fieldKey, "literal");
+          if (!slotModeMemory.has(litKey)) {
+            slotModeMemory.set(litKey, cloneValue(opts.literalDefault));
+          }
+        }
+        const key = memoryKey(opts.fieldKey, next);
+        opts.onChange(
+          slotModeMemory.has(key)
+            ? cloneValue(slotModeMemory.get(key))
+            : defaultForSlotMode(next, opts),
+        );
+      }}
+      >${MODE_LABELS[mode]}</sp-action-button
+    >
+  `;
+}
+
+/**
+ * Render a bindable slot as two parts the panel places independently: the active mode's widget for
+ * the row's value column, and the mode-cycle button for the label side.
+ */
+export function renderDynamicSlot(opts: DynamicSlotOpts): DynamicSlotParts {
   const caps: SlotMode[] = opts.caps.length > 0 ? opts.caps : ["literal", "ref"];
   const mode = slotMode(opts.value);
-  const dynamic = mode !== "literal";
 
   const widget =
     mode === "ref"
@@ -160,32 +261,12 @@ export function renderDynamicSlot(opts: DynamicSlotOpts): TemplateResult {
             )
           : opts.staticWidget;
 
-  return html`
-    <div
-      class="dynamic-slot"
-      style="display:flex;gap:4px;align-items:${mode === "expression"
-        ? "flex-start"
-        : "center"};flex:1;min-width:0"
-    >
-      <div style="flex:1;min-width:0">${widget}</div>
-      <sp-picker
-        size="s"
-        quiet
-        class="dynamic-slot-mode"
-        title="Value mode"
-        style=${dynamic
-          ? "color:var(--spectrum-accent-content-color-default, #5c9dff);flex-shrink:0;width:56px"
-          : "color:var(--spectrum-gray-600, #808080);flex-shrink:0;width:56px"}
-        .value=${live(mode)}
-        @change=${(e: Event) => {
-          const newMode = (e.target as HTMLInputElement).value as SlotMode;
-          if (newMode !== mode) {
-            opts.onChange(defaultForSlotMode(newMode, opts));
-          }
-        }}
-      >
-        ${caps.map((m) => html`<sp-menu-item value=${m}>${MODE_LABELS[m]}</sp-menu-item>`)}
-      </sp-picker>
-    </div>
-  `;
+  return {
+    modeButton: renderModeButton(mode, caps, opts),
+    widget: html`
+      <div class="dynamic-slot" style="display:flex;flex:1;min-width:0">
+        <div style="flex:1;min-width:0">${widget}</div>
+      </div>
+    `,
+  };
 }

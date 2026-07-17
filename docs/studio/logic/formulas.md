@@ -1,6 +1,6 @@
 ---
 title: "Formulas and expressions"
-description: "Build dynamic values without code: the fx menu on bindable fields, the formula editor, chip pipeline, live value badges, and the formula palette."
+description: "Build dynamic values without code: the field-mode button on bindable fields, the formula editor, chip pipeline, live value badges, and the formula palette."
 code:
   - packages/studio/src/ui/dynamic-slot.ts
   - packages/studio/src/ui/expression-editor.ts
@@ -13,18 +13,18 @@ code:
 
 A formula is a value Studio calculates instead of one you type — a price times a quantity, a name in uppercase, a label that switches on a condition. Formulas aren't confined to one panel: nearly every value field in Studio can become one, and while you build it, Studio shows the live result computed from your page's real data.
 
-## The fx menu: any value can be dynamic
+## The field-mode button: any value can be dynamic
 
-Bindable value rows in the **Properties** and **Style** tabs end in a small mode menu. It stays gray while the value is static and takes on the accent color once it's dynamic, and it offers up to four modes:
+Bindable value rows in the **Properties** and **Style** tabs carry a small mode button beside their label. It shows the current mode's glyph — gray while the value is static, accent-colored once it's dynamic — and each click steps to the next mode, wrapping back around at the end:
 
 - **abc** — a fixed value you type. The default.
 - **$ref** — follow a state value: pick an entry from the **[State panel](/docs/studio/logic/state)** and the field always shows its current value.
 - **${}** — a template mixing fixed text and values, like `Hello ${state.$name}`.
 - **fx** — a full formula, edited right in the row.
 
-Each position only offers the modes it supports, and switching back to **abc** restores a plain value. Prefer the earliest mode that does the job — a `$ref` is easier to read (and to revisit) than a formula that only fetches one value.
+Each position only offers the modes it supports (the button's tooltip names the mode a click will switch to), and Studio remembers what you had in each mode for the rest of your session — cycle away and back and your value is restored, not reset. Prefer the earliest mode that does the job — a `$ref` is easier to read (and to revisit) than a formula that only fetches one value.
 
-<!-- TODO(screenshot): fx-mode-menu — a Properties value row with the mode menu open showing abc, $ref, ${}, and fx -->
+<!-- TODO(screenshot): field-mode-button — a Properties value row with the mode button beside its label showing the ${} glyph in accent color -->
 
 Formulas also appear as their own state entries (_+ Add… > Expression_ in the State panel) and as event handlers (the **$expression** mode in the **[Events panel](/docs/studio/logic/events)**).
 

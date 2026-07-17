@@ -30,7 +30,7 @@ To open a component from an instance, right-click the instance and choose **Edit
 
 Props are the knobs an instance can turn — the card's title, its image, whether it's featured. A component's props come from its state: every plain value you declare in the component's **State** panel becomes a prop, with that value as its default. See **[Script & logic](/docs/studio/logic)** for declaring state.
 
-On an instance, the [Properties panel](/docs/studio/design/properties) shows a **Component Props** section with a fitting control per prop — checkbox, number field, dropdown, media or color picker. Each prop can also be _bound_: click the bind button beside its label and point it at one of the page's state values, so the instance follows live data instead of a fixed setting.
+On an instance, the [Properties panel](/docs/studio/design/properties) shows a **Component Props** section with a fitting control per prop — checkbox, number field, dropdown, media or color picker. Each prop can also be _bound_: click the mode button beside its label to switch the prop to a state binding (or a template) and point it at one of the page's state values, so the instance follows live data instead of a fixed setting.
 
 ## Slots: openings for content
 

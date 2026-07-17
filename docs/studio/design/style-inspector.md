@@ -45,7 +45,7 @@ Each property gets a control built for it:
 
 Shorthand rows like **Padding** and **Margin** take a combined value, or expand with their chevron into per-side fields; border rows expand into width, style, and color. Studio recombines the sides into the shortest form when it writes the value.
 
-When a value comes from somewhere earlier in the cascade — the Base tab, an earlier breakpoint — it shows as a dimmed placeholder rather than a set value, so you always know what you'd be overriding. Style values also accept the **${}** dynamic mode from their mode menu, so a property can follow your data — see **[Script & logic](/docs/studio/logic)**.
+When a value comes from somewhere earlier in the cascade — the Base tab, an earlier breakpoint — it shows as a dimmed placeholder rather than a set value, so you always know what you'd be overriding. Style values also accept the **${}** dynamic mode from their mode button, so a property can follow your data — see **[Script & logic](/docs/studio/logic)**.
 
 ## Custom and relative styling
 
