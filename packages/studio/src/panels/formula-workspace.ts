@@ -100,7 +100,7 @@ function replaceAtPath(node: unknown, path: NodePath, value: unknown): unknown {
   }
   const [head, ...rest] = path as [string | number, ...NodePath];
   if (Array.isArray(node)) {
-    const copy = [...node];
+    const copy = [...(node as unknown[])];
     copy[Number(head)] = replaceAtPath(copy[Number(head)], rest, value);
     return copy;
   }

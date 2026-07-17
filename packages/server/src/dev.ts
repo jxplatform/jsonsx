@@ -90,8 +90,19 @@ export function createDistMiddleware(
   };
 }
 
-if (import.meta.main) {
-  const { port, root } = parseDevArgs(process.argv.slice(2));
+export interface DevServerHandle {
+  port: number;
+  stop: () => void;
+}
+
+/**
+ * Boot the dev server for a root. Site projects (a project.json at the root) are built up front and
+ * rebuilt before every live-reload broadcast, with built pages served from dist/.
+ *
+ * @param {DevArgs} args - Resolved root and port
+ * @returns {Promise<DevServerHandle>} The listening server
+ */
+export async function startDev({ port, root }: DevArgs): Promise<DevServerHandle> {
   const isSite = existsSync(join(root, "project.json"));
 
   let building = Promise.resolve();
@@ -113,13 +124,18 @@ if (import.meta.main) {
     await rebuild();
   }
 
-  const server = (await createDevServer({
+  return (await createDevServer({
     port,
     root,
     ...(isSite && {
       middleware: createDistMiddleware(root),
       watch: { preReload: () => rebuild(), reloadOnAnyChange: true },
     }),
-  })) as { port: number };
+  })) as DevServerHandle;
+}
+
+if (import.meta.main) {
+  const { port, root } = parseDevArgs(process.argv.slice(2));
+  const server = await startDev({ port, root });
   console.log(`Jx dev server running at http://localhost:${server.port} (root: ${root})`);
 }

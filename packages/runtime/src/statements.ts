@@ -58,7 +58,7 @@ export async function runStatements(
       case "expression": {
         const result = evaluateExpression(statement as ExpressionNode, state, event, iterCtx);
         if (result && typeof (result as PromiseLike<unknown>).then === "function") {
-          await result;
+          await (result as PromiseLike<unknown>);
         }
         break;
       }

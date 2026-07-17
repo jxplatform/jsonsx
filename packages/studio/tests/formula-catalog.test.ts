@@ -5,7 +5,8 @@
 import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
 import { BLESSED_GLOBALS, BLESSED_OPERATORS } from "@jxsuite/runtime/expression";
-import { catalog as packagedCatalog } from "@jxsuite/formulas";
+import { catalog as packagedCatalog, formulaEntries } from "@jxsuite/formulas";
+import { isNamedFormulaDef } from "@jxsuite/schema/guards";
 import {
   applyCatalogPick,
   calleeEntry,
@@ -270,5 +271,25 @@ describe("packagedFormulaEntries (@jxsuite/formulas copy-in)", () => {
     const inserted: string[] = [];
     applyCatalogPick(op, () => {}, { onInsertDef: (name) => inserted.push(name) });
     expect(inserted).toEqual([]);
+  });
+});
+
+describe("formulaEntries (@jxsuite/formulas state entries)", () => {
+  test("returns one ready-to-merge state entry per catalog formula, keyed by name", () => {
+    const entries = formulaEntries();
+    expect(Object.keys(entries).toSorted()).toEqual(packagedCatalog.map((f) => f.name).toSorted());
+    for (const formula of packagedCatalog) {
+      expect(entries[formula.name]).toEqual({
+        $description: formula.description,
+        $expression: formula.expression,
+        parameters: formula.parameters,
+      });
+    }
+  });
+
+  test("every entry passes the named-formula guard, so it is callable once merged", () => {
+    for (const def of Object.values(formulaEntries())) {
+      expect(isNamedFormulaDef(def)).toBe(true);
+    }
   });
 });

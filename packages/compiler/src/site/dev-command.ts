@@ -32,18 +32,26 @@ export function resolveDevEntry(projectRoot: string): string {
   }
 }
 
+/** The slice of `process` runDev touches — injectable for tests. */
+export interface ProcessLike {
+  on: (event: string, handler: () => void) => unknown;
+  exitCode?: number | string | undefined;
+}
+
 /**
  * Spawn the dev server under Bun with inherited stdio.
  *
  * @param {string} projectRoot - Absolute project root
  * @param {number | undefined} port - Optional port override
  * @param {typeof spawn} [spawnImpl] - Injectable for tests
+ * @param {ProcessLike} [proc] - Injectable for tests
  * @returns {ChildProcess} The spawned Bun process
  */
 export function runDev(
   projectRoot: string,
   port: number | undefined,
   spawnImpl: typeof spawn = spawn,
+  proc: ProcessLike = process as unknown as ProcessLike,
 ): ChildProcess {
   const entry = resolveDevEntry(projectRoot);
   const args = [entry, "--root", projectRoot];
@@ -60,17 +68,17 @@ export function runDev(
     } else {
       console.error(`Failed to start the dev server: ${error.message}`);
     }
-    process.exitCode = 1;
+    proc.exitCode = 1;
   });
   // Ctrl+C reaches the child through the shared process group; also mirror explicit kills.
-  process.on("SIGINT", () => {
+  proc.on("SIGINT", () => {
     child.kill("SIGINT");
   });
-  process.on("SIGTERM", () => {
+  proc.on("SIGTERM", () => {
     child.kill("SIGTERM");
   });
   child.on("exit", (code) => {
-    process.exitCode = code ?? 0;
+    proc.exitCode = code ?? 0;
   });
   return child;
 }

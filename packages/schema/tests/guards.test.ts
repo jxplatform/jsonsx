@@ -10,8 +10,10 @@ import {
   isClassDef,
   isEventBinding,
   isExpandedSignal,
+  hasStructuredBody,
   isExpressionDef,
   isFunctionDef,
+  isNamedFormulaDef,
   isJsonObject,
   isMappedArray,
   isNestedStyle,
@@ -80,6 +82,39 @@ describe("isExpressionDef", () => {
     expect(isExpressionDef({ $expression: null })).toBe(false);
     expect(isExpressionDef({})).toBe(false);
     expect(isExpressionDef(7)).toBe(false);
+  });
+});
+
+describe("isNamedFormulaDef", () => {
+  const body = { operator: "+", target: 1, value: 2 };
+
+  test("accepts an expression entry with non-empty parameters", () => {
+    expect(isNamedFormulaDef({ $expression: body, parameters: ["a"] })).toBe(true);
+    expect(isNamedFormulaDef({ $expression: body, parameters: [{ name: "a" }] })).toBe(true);
+  });
+
+  test("rejects empty/missing parameters and non-expressions", () => {
+    expect(isNamedFormulaDef({ $expression: body })).toBe(false);
+    expect(isNamedFormulaDef({ $expression: body, parameters: [] })).toBe(false);
+    expect(isNamedFormulaDef({ $expression: body, parameters: "a" })).toBe(false);
+    expect(isNamedFormulaDef({ parameters: ["a"] })).toBe(false);
+  });
+});
+
+describe("hasStructuredBody", () => {
+  test("accepts a Function entry whose body is a statement array", () => {
+    expect(
+      hasStructuredBody({
+        $prototype: "Function",
+        body: [{ operator: "=", target: { $ref: "#/state/n" }, value: 1 }],
+      }),
+    ).toBe(true);
+  });
+
+  test("rejects string bodies, missing bodies, and non-Function entries", () => {
+    expect(hasStructuredBody({ $prototype: "Function", body: "state.n = 1" })).toBe(false);
+    expect(hasStructuredBody({ $prototype: "Function" })).toBe(false);
+    expect(hasStructuredBody({ $prototype: "Request", body: [] })).toBe(false);
   });
 });
 

@@ -1,8 +1,9 @@
 // oxlint-disable unicorn/no-thenable -- `then` is the JSON Schema conditional keyword (spec §20), not a promise
 /** Tests for src/panels/statement-editor.ts — structured function body (spec §20) editing UI. */
-import "./harness";
-import { describe, expect, test } from "bun:test";
+import { flush, stubRect } from "./harness";
+import { describe, expect, mock, test } from "bun:test";
 import { render } from "lit-html";
+import { extractInstruction } from "@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item";
 import {
   laneListAt,
   renderStatementEditor,
@@ -11,6 +12,38 @@ import {
 } from "../src/panels/statement-editor";
 
 import type { JxStatement } from "@jxsuite/schema/types";
+
+// ─── DnD adapter mock ────────────────────────────────────────────────────────
+/**
+ * RegisterStatementsDnD imports the pragmatic-drag-and-drop element adapter dynamically inside its
+ * rAF callback, so mocking here — after the static import of the module under test — still
+ * intercepts every registration. The tree-item hitbox and combine stay real.
+ */
+
+type AnyRec = Record<string, any>;
+
+const draggables: AnyRec[] = [];
+const dropTargets: AnyRec[] = [];
+const previewsDisabled: AnyRec[] = [];
+
+void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
+  draggable: (cfg: AnyRec) => {
+    draggables.push(cfg);
+    return () => {};
+  },
+  dropTargetForElements: (cfg: AnyRec) => {
+    dropTargets.push(cfg);
+    return () => {};
+  },
+}));
+
+// The real helper is inert under the harness (its 1x1 image is only created when `window` exists
+// At npm-module evaluation time, which precedes happy-dom registration) — record calls instead.
+void mock.module("@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview", () => ({
+  disableNativeDragPreview: (args: AnyRec) => {
+    previewsDisabled.push(args);
+  },
+}));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -445,5 +478,177 @@ describe("dispatch statement", () => {
     (composed as unknown as { checked: boolean }).checked = false;
     composed.dispatchEvent(new Event("change", { bubbles: false }));
     expect(on.changes[0]).toEqual([{ bubbles: true, dispatchEvent: "x" }]);
+  });
+});
+
+// ─── Drag-reorder (registerStatementsDnD) ────────────────────────────────────
+
+describe("drag reorder", () => {
+  const raf = () =>
+    new Promise((resolve) => {
+      requestAnimationFrame(resolve);
+    });
+
+  /** Mount and wait for the rAF-deferred DnD registration to land. */
+  async function mountDnD(statements: JxStatement[]) {
+    const mounted = mount(statements);
+    await raf();
+    await flush();
+    return mounted;
+  }
+
+  const dragFor = (el: Element) => draggables.find((d) => d.element === el)!;
+  const dropFor = (el: Element) => dropTargets.find((d) => d.element === el)!;
+
+  /** Real tree-item hitbox data for a drag hovering the row at `clientY` (row rect 0–32px). */
+  function dropDataFor(row: HTMLElement, clientY: number): AnyRec {
+    stubRect(row, { height: 32, top: 0 });
+    return dropFor(row).getData({ element: row, input: { clientX: 10, clientY } });
+  }
+
+  const three: JxStatement[] = [
+    { dispatchEvent: "a" },
+    { dispatchEvent: "b" },
+    { dispatchEvent: "c" },
+  ];
+
+  test("registers per-row draggables carrying index/lane data, handle, and a hidden preview", async () => {
+    const { container } = await mountDnD(three);
+    const rows = cards(container);
+    expect(dragFor(rows[1]!).getInitialData()).toEqual({ index: 1, lane: "[]", type: "statement" });
+    expect(dragFor(rows[0]!).dragHandle).toBe(rows[0]!.querySelector(".statement-drag-handle")!);
+
+    // Generating a preview routes the native setter through disableNativeDragPreview.
+    const before = previewsDisabled.length;
+    const setter = () => {};
+    dragFor(rows[0]!).onGenerateDragPreview({ nativeSetDragImage: setter });
+    expect(previewsDisabled.length).toBe(before + 1);
+    expect(previewsDisabled.at(-1)).toEqual({ nativeSetDragImage: setter });
+  });
+
+  test("dragging toggles the row's dragging class", async () => {
+    const { container } = await mountDnD(three);
+    const row = cards(container)[0]!;
+    dragFor(row).onDragStart();
+    expect(row.classList.contains("dragging")).toBe(true);
+    dragFor(row).onDrop();
+    expect(row.classList.contains("dragging")).toBe(false);
+  });
+
+  test("canDrop accepts only statements from the same lane", async () => {
+    const { container } = await mountDnD([
+      { if: { $ref: "#/state/count" }, then: [{ dispatchEvent: "x" }] },
+    ]);
+    const rows = cards(container);
+    expect(rows[1]!.dataset.stmtLane).toBe('[0,"then"]');
+    const topDrop = dropFor(rows[0]!);
+    expect(topDrop.canDrop({ source: { data: { lane: "[]", type: "statement" } } })).toBe(true);
+    expect(topDrop.canDrop({ source: { data: { lane: '[0,"then"]', type: "statement" } } })).toBe(
+      false,
+    );
+    expect(topDrop.canDrop({ source: { data: { lane: "[]", type: "block" } } })).toBe(false);
+  });
+
+  test("getData attaches the tree-item hitbox instruction with make-child blocked", async () => {
+    const { container } = await mountDnD(three);
+    const row = cards(container)[1]!;
+    const above = dropDataFor(row, 4);
+    expect(above.index).toBe(1);
+    expect(extractInstruction(above)?.type).toBe("reorder-above");
+    expect(extractInstruction(dropDataFor(row, 30))?.type).toBe("reorder-below");
+    // The middle zone would be make-child — blocked for statement rows.
+    expect(extractInstruction(dropDataFor(row, 16))?.type).toBe("instruction-blocked");
+  });
+
+  test("onDrag shows the reorder edge; onDragLeave and onDrop clear it", async () => {
+    const { container, changes } = await mountDnD(three);
+    const row = cards(container)[1]!;
+    const drop = dropFor(row);
+    drop.onDrag({ self: { data: dropDataFor(row, 4) } });
+    expect(row.classList.contains("drop-above")).toBe(true);
+    expect(row.classList.contains("drop-below")).toBe(false);
+    drop.onDrag({ self: { data: dropDataFor(row, 30) } });
+    expect(row.classList.contains("drop-above")).toBe(false);
+    expect(row.classList.contains("drop-below")).toBe(true);
+    drop.onDragLeave();
+    expect(row.classList.contains("drop-below")).toBe(false);
+    // A drop without an instruction still clears the edge markers, then bails.
+    drop.onDrag({ self: { data: dropDataFor(row, 4) } });
+    drop.onDrop({ self: { data: {} }, source: { data: { index: 0, lane: "[]" } } });
+    expect(row.classList.contains("drop-above")).toBe(false);
+    expect(changes).toHaveLength(0);
+  });
+
+  test("dropping above/below reorders the top-level lane immutably", async () => {
+    const { container, changes } = await mountDnD(three);
+    const rows = cards(container);
+    // C dropped above a → [c, a, b]
+    dropFor(rows[0]!).onDrop({
+      self: { data: dropDataFor(rows[0]!, 4) },
+      source: { data: { index: 2, lane: "[]", type: "statement" } },
+    });
+    expect(changes[0]).toEqual([
+      { dispatchEvent: "c" },
+      { dispatchEvent: "a" },
+      { dispatchEvent: "b" },
+    ]);
+    // A dropped below c → [b, c, a]
+    dropFor(rows[2]!).onDrop({
+      self: { data: dropDataFor(rows[2]!, 30) },
+      source: { data: { index: 0, lane: "[]", type: "statement" } },
+    });
+    expect(changes[1]).toEqual([
+      { dispatchEvent: "b" },
+      { dispatchEvent: "c" },
+      { dispatchEvent: "a" },
+    ]);
+    // The mounted list itself was never mutated.
+    expect(three.map((s) => (s as { dispatchEvent: string }).dispatchEvent)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+  });
+
+  test("no-op drops: blocked instruction, same row, and a same-position reorder", async () => {
+    const { container, changes } = await mountDnD(three);
+    const rows = cards(container);
+    // Blocked (middle-zone) instruction
+    dropFor(rows[1]!).onDrop({
+      self: { data: dropDataFor(rows[1]!, 16) },
+      source: { data: { index: 0, lane: "[]", type: "statement" } },
+    });
+    // Dropping a row onto itself
+    dropFor(rows[1]!).onDrop({
+      self: { data: dropDataFor(rows[1]!, 4) },
+      source: { data: { index: 1, lane: "[]", type: "statement" } },
+    });
+    // A reorder that lands where it started: b below a
+    dropFor(rows[0]!).onDrop({
+      self: { data: dropDataFor(rows[0]!, 30) },
+      source: { data: { index: 1, lane: "[]", type: "statement" } },
+    });
+    expect(changes).toHaveLength(0);
+  });
+
+  test("reorder inside a branch lane writes through the statement tree", async () => {
+    const stmt: JxStatement = {
+      if: { $ref: "#/state/count" },
+      then: [{ dispatchEvent: "x" }, { dispatchEvent: "y" }],
+    };
+    const { container, changes } = await mountDnD([stmt]);
+    const nested = cards(container).filter((c) => c.dataset.stmtLane === '[0,"then"]');
+    expect(nested).toHaveLength(2);
+    dropFor(nested[0]!).onDrop({
+      self: { data: dropDataFor(nested[0]!, 4) },
+      source: { data: { index: 1, lane: '[0,"then"]', type: "statement" } },
+    });
+    expect(changes[0]).toEqual([
+      { if: { $ref: "#/state/count" }, then: [{ dispatchEvent: "y" }, { dispatchEvent: "x" }] },
+    ]);
+    expect((stmt as { then: JxStatement[] }).then).toEqual([
+      { dispatchEvent: "x" },
+      { dispatchEvent: "y" },
+    ]);
   });
 });

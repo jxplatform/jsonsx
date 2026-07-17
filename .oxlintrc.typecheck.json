@@ -26,9 +26,11 @@
   "overrides": [
     {
       // Tests and dev scripts stub external shapes with `any` by design
-      // (no-explicit-any is off for them in .oxlintrc.json). The no-unsafe-*
-      // family is therefore src-only; promise safety still applies everywhere.
-      "files": ["**/tests/**/*.*", "**/*.test.*", "**/scripts/**/*.*"],
+      // (no-explicit-any is off for them in .oxlintrc.json). Package bin/
+      // codegen scripts sit outside the tsconfig project (tsc skips them), so
+      // tsgolint sees error-types for their imports. The no-unsafe-* family is
+      // therefore src-only; promise safety still applies everywhere.
+      "files": ["**/tests/**/*.*", "**/*.test.*", "**/scripts/**/*.*", "**/bin/**/*.*"],
       "rules": {
         "typescript/no-unsafe-assignment": "off",
         "typescript/no-unsafe-call": "off",

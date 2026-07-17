@@ -118,6 +118,15 @@ describe("expressionHint", () => {
       "Math.max(…)",
     );
   });
+
+  test("conditional renders as test ? … : … and switch as switch(target)", () => {
+    expect(expressionHint({ operator: "?:", target: { $ref: "#/state/flag" } })).toBe(
+      "flag ? … : …",
+    );
+    expect(expressionHint({ operator: "switch", target: { $ref: "#/state/kind" } })).toBe(
+      "switch(kind)",
+    );
+  });
 });
 
 // ─── Structure per operator category ─────────────────────────────────────────
@@ -197,6 +206,25 @@ describe("renderExpressionEditor structure", () => {
     const nested = container.querySelectorAll(".expression-editor")[1]!;
     expect(pickerValue(nested.querySelector('[data-prop="operator"] sp-picker'))).toBe("!");
     expect(container.querySelector('[data-prop="initial"]')).toBeNull();
+  });
+
+  test("zero-arg pure methods render no value row; argument-taking ones do", () => {
+    const zero = mount({ operator: "toUpperCase", target: { $ref: "#/state/name" } });
+    expect(zero.container.querySelector('[data-prop="value"]')).toBeNull();
+
+    const one = mount({ operator: "split", target: { $ref: "#/state/name" }, value: "," });
+    expect(one.container.querySelector('[data-prop="value"]')).toBeTruthy();
+    // The receiver is any operand (not ref-only) → mode picker + ref picker
+    expect(row(one.container, "target").querySelectorAll("sp-picker").length).toBe(2);
+  });
+
+  test("depth-0 preview error renders above the form", () => {
+    const { container } = mount(
+      { operator: "+", target: 1, value: 2 },
+      { preview: { error: "boom: bad operand", mutating: false, values: new Map() } },
+    );
+    const editor = container.querySelector(".expression-editor")!;
+    expect(editor.textContent).toContain("boom: bad operand");
   });
 
   test("operator menu offers call under a Function group", () => {
@@ -511,6 +539,28 @@ describe("operator change", () => {
     changeValue(row(container, "operator").querySelector("sp-picker")!, "mystery");
     expect(changes[0]).toEqual({ operator: "mystery", target: 1 });
   });
+
+  test("switching to switch seeds empty cases and drops value", () => {
+    const { container, changes } = mount({ operator: "+", target: 1, value: 2 });
+    changeValue(row(container, "operator").querySelector("sp-picker")!, "switch");
+    expect(changes[0]).toEqual({ cases: {}, operator: "switch", target: 1 });
+  });
+
+  test("switching to switch keeps existing cases and default", () => {
+    const { container, changes } = mount({
+      cases: { one: "a" },
+      default: "d",
+      operator: "switch",
+      target: { $ref: "#/state/count" },
+    });
+    changeValue(row(container, "operator").querySelector("sp-picker")!, "switch");
+    expect(changes[0]).toEqual({
+      cases: { one: "a" },
+      default: "d",
+      operator: "switch",
+      target: { $ref: "#/state/count" },
+    });
+  });
 });
 
 // ─── Operand mode picker ─────────────────────────────────────────────────────
@@ -591,6 +641,14 @@ describe("literal editor", () => {
     (cb as unknown as { checked: boolean }).checked = false;
     cb.dispatchEvent(new Event("change", { bubbles: false }));
     expect(changes[0]).toEqual({ operator: "+", target: false, value: null });
+  });
+
+  test("object operand without $ref or operator falls back to the literal editor", () => {
+    const { container } = mount({ operator: "+", target: {}, value: 1 });
+    const modePicker = row(container, "target").querySelectorAll("sp-picker")[0]!;
+    expect(pickerValue(modePicker)).toBe("literal");
+    // A plain object has no dedicated widget — it stringifies into the string editor
+    expect(row(container, "target").querySelector("sp-textfield")).toBeTruthy();
   });
 
   test("null literal renders the inert null label", () => {
@@ -699,5 +757,69 @@ describe("aggregate value and initial editing", () => {
     const nf = row(container, "initial").querySelector("sp-number-field")!;
     changeValue(nf, "42");
     expect((changes[0] as { initial: number }).initial).toBe(42);
+  });
+});
+
+// ─── Switch cases editor ─────────────────────────────────────────────────────
+
+describe("switch cases editor", () => {
+  function mountSwitch(cases: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+    return mount({
+      cases,
+      default: null,
+      operator: "switch",
+      target: { $ref: "#/state/count" },
+      ...extra,
+    });
+  }
+
+  test("renders a key field per case, the default row, and add-case", () => {
+    const { container } = mountSwitch({ a: { $ref: "#/state/count" }, b: null });
+    const keys = [...container.querySelectorAll(".switch-cases sp-textfield")].map(
+      (tf) => (tf as unknown as { value: string }).value,
+    );
+    expect(keys).toEqual(["a", "b"]);
+    expect(container.querySelector(".switch-cases")!.textContent).toContain("default");
+  });
+
+  test("case rename preserves order and operands; same-key rename is a no-op", () => {
+    const { container, changes } = mountSwitch({ a: { $ref: "#/state/count" }, b: null });
+    const keyField = container.querySelector(".switch-cases sp-textfield")!;
+    changeValue(keyField, "a");
+    expect(changes.length).toBe(0);
+    changeValue(keyField, "z");
+    const { cases } = changes[0] as { cases: Record<string, unknown> };
+    expect(cases).toEqual({ b: null, z: { $ref: "#/state/count" } });
+    expect(Object.keys(cases)).toEqual(["z", "b"]);
+  });
+
+  test("editing a case operand writes through that key only", () => {
+    const { container, changes } = mountSwitch({ a: 1, b: 2 });
+    const firstRow = container.querySelector(".switch-cases > div")!;
+    changeValue(firstRow.querySelector("sp-number-field")!, "9");
+    expect((changes[0] as { cases: unknown }).cases).toEqual({ a: 9, b: 2 });
+  });
+
+  test("the delete button removes exactly that case", () => {
+    const { container, changes } = mountSwitch({ a: 1, b: 2 });
+    const delBtn = container.querySelector(".switch-cases sp-action-button")!;
+    delBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect((changes[0] as { cases: unknown }).cases).toEqual({ b: 2 });
+  });
+
+  test("editing the default operand writes the default key", () => {
+    const { container, changes } = mountSwitch({}, { default: 5 });
+    const defaultRow = [...container.querySelectorAll(".switch-cases > div")].at(-1)!;
+    changeValue(defaultRow.querySelector("sp-number-field")!, "7");
+    expect((changes[0] as { default: number }).default).toBe(7);
+  });
+
+  test("add case generates a fresh key past collisions, seeded null", () => {
+    const { container, changes } = mountSwitch({ "case 2": null });
+    const addBtn = [...container.querySelectorAll(".switch-cases sp-action-button")].at(-1)!;
+    expect(addBtn.textContent).toContain("+ Add case");
+    addBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    // One existing entry → tries "case 2" (taken) → lands on "case 3"
+    expect((changes[0] as { cases: unknown }).cases).toEqual({ "case 2": null, "case 3": null });
   });
 });

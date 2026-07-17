@@ -1,9 +1,9 @@
-/** Tests for src/dev.ts — the `jx dev` entry's argument parsing and dist middleware. */
+/** Tests for src/dev.ts — the `jx dev` entry: arg parsing, dist middleware, startDev boot. */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { createDistMiddleware, parseDevArgs } from "../src/dev.ts";
+import { createDistMiddleware, parseDevArgs, startDev } from "../src/dev.ts";
 
 describe("parseDevArgs", () => {
   test("defaults to cwd and port 3000", () => {
@@ -70,10 +70,93 @@ describe("createDistMiddleware", () => {
   test("falls through for missing files, traversal, and non-GET", async () => {
     expect(await get("/nope/")).toBeNull();
     expect(await get("/../secret")).toBeNull();
+    // A relative pathname survives normalize() with its leading ".." intact
+    const sneaky = await middleware(new Request("http://localhost/x"), {
+      pathname: "../secret",
+    } as URL);
+    expect(sneaky).toBeNull();
     const post = await middleware(
       new Request("http://localhost/", { method: "POST" }),
       new URL("http://localhost/"),
     );
     expect(post).toBeNull();
+  });
+});
+
+describe("startDev", () => {
+  const SITE = resolve(import.meta.dir, "__test-dev-site__");
+  const PLAIN = resolve(import.meta.dir, "__test-dev-plain__");
+  const servers: { stop: () => void }[] = [];
+
+  beforeAll(() => {
+    for (const dir of [SITE, PLAIN]) {
+      rmSync(dir, { force: true, recursive: true });
+    }
+    mkdirSync(join(SITE, "pages"), { recursive: true });
+    writeFileSync(
+      join(SITE, "project.json"),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Dev Site" }),
+      "utf8",
+    );
+    writeFileSync(
+      join(SITE, "pages/index.json"),
+      JSON.stringify({
+        children: [{ children: ["Hello startDev"], tagName: "h1" }],
+        title: "Home",
+      }),
+      "utf8",
+    );
+    mkdirSync(PLAIN, { recursive: true });
+    writeFileSync(join(PLAIN, "readme.txt"), "plain root", "utf8");
+  });
+
+  afterAll(() => {
+    for (const server of servers) {
+      server.stop();
+    }
+    for (const dir of [SITE, PLAIN]) {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
+  test("builds a site project and serves its pages with the reload client", async () => {
+    const server = await startDev({ port: 0, root: SITE });
+    servers.push(server);
+    const res = await fetch(`http://localhost:${server.port}/`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Hello startDev");
+    expect(html).toContain("EventSource('/__reload')");
+  });
+
+  test("prints build errors but still boots", async () => {
+    const BROKEN = resolve(import.meta.dir, "__test-dev-broken__");
+    rmSync(BROKEN, { force: true, recursive: true });
+    mkdirSync(join(BROKEN, "pages"), { recursive: true });
+    writeFileSync(
+      join(BROKEN, "project.json"),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Broken" }),
+      "utf8",
+    );
+    writeFileSync(join(BROKEN, "pages/index.json"), "{ not json", "utf8");
+    const errors: string[] = [];
+    const origError = console.error;
+    console.error = (msg: string) => errors.push(String(msg));
+    try {
+      const server = await startDev({ port: 0, root: BROKEN });
+      servers.push(server);
+    } finally {
+      console.error = origError;
+      rmSync(BROKEN, { force: true, recursive: true });
+    }
+    expect(errors.some((e) => e.includes("build error:"))).toBe(true);
+  });
+
+  test("boots a non-site root without the dist middleware", async () => {
+    const server = await startDev({ port: 0, root: PLAIN });
+    servers.push(server);
+    const res = await fetch(`http://localhost:${server.port}/readme.txt`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("plain root");
   });
 });

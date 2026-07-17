@@ -129,6 +129,30 @@ void mock.module("../src/site/db-push.ts", () => ({
   },
 }));
 
+export const runDevCalls: { root: string; port: number | undefined }[] = [];
+
+let runDevImpl: (root: string, port?: number) => unknown = () => ({});
+
+export function setRunDev(impl: typeof runDevImpl) {
+  runDevImpl = impl;
+}
+
+void mock.module("../src/site/dev-command.ts", () => ({
+  runDev: (root: string, port?: number) => {
+    runDevCalls.push({ port, root });
+    return runDevImpl(root, port);
+  },
+}));
+
+export const previewCalls: { distDir: string; port: number }[] = [];
+
+void mock.module("../src/site/preview-server.ts", () => ({
+  startPreviewServer: (distDir: string, port: number) => {
+    previewCalls.push({ distDir, port });
+    return { close: () => {} };
+  },
+}));
+
 const originalArgv = process.argv;
 
 /**
