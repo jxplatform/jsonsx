@@ -7,7 +7,14 @@
       "children": [
         { "path": "start/install", "label": "Install Jx Studio" },
         { "path": "start/first-project", "label": "Your first project" },
-        { "path": "start/studio-tour", "label": "A tour of Jx Studio" }
+        { "path": "start/studio-tour", "label": "A tour of Jx Studio" },
+        { "path": "start/first-component", "label": "Tutorial: interactive component" },
+        { "path": "start/first-collection", "label": "Tutorial: blog with collections" },
+        { "path": "start/coming-from-wordpress", "label": "Coming from WordPress" },
+        { "path": "start/coming-from-webflow", "label": "Coming from Webflow or Framer" },
+        { "path": "start/coming-from-wix", "label": "Coming from Wix or Squarespace" },
+        { "path": "start/coming-from-ai-builders", "label": "Coming from AI builders" },
+        { "path": "start/videos", "label": "Video tutorials" }
       ]
     },
     {
@@ -58,11 +65,21 @@
         { "path": "studio/logic/data-explorer", "label": "Data explorer" },
         { "path": "studio/logic/data-sources", "label": "Data sources" },
         { "path": "studio/logic/code", "label": "Code editing" },
+        { "path": "studio/data", "label": "Databases" },
+        { "path": "studio/data/connections", "label": "Connections" },
+        { "path": "studio/data/tables", "label": "Data tables" },
+        { "path": "studio/data/grid", "label": "Data grid" },
+        { "path": "studio/data/auth-and-secrets", "label": "Auth and secrets" },
+        { "path": "studio/ai", "label": "AI assistant" },
+        { "path": "studio/ai/chat", "label": "The AI sidebar" },
+        { "path": "studio/ai/document-assistant", "label": "Document assistant" },
         { "path": "studio/publish", "label": "Publish" },
         { "path": "studio/publish/source-control", "label": "Source control" },
         { "path": "studio/publish/github", "label": "GitHub" },
         { "path": "studio/publish/cloudflare", "label": "Cloudflare Pages" },
-        { "path": "studio/publish/other-hosts", "label": "Other hosts" }
+        { "path": "studio/publish/other-hosts", "label": "Other hosts" },
+        { "path": "studio/publish/collaboration", "label": "Real-time collaboration" },
+        { "path": "studio/desktop", "label": "The desktop app" }
       ]
     },
     {

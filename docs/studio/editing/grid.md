@@ -21,7 +21,7 @@ Grid turns tabular content into a spreadsheet on the canvas: rows and columns, r
 - **A CSV file** — open it from **Files** (or Quick Access); spreadsheet files open straight into Grid.
 - **A content collection** — right-click the collection's folder in **Files** and choose **Edit Collection in Grid**.
 - **All pages** — right-click the `pages` folder and choose **Edit Pages in Grid**.
-- **From the Data activity** — click **Open Data Grid** for a picker that lists pages, every collection, and connected database tables in one place.
+- **From Project settings** — the **Open Data Grid** button in the data sections opens a picker that lists pages, every collection, and connected database tables in one place.
 
 ## Edit cells
 
