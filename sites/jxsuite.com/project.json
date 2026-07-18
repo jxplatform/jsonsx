@@ -46,25 +46,62 @@
     "--": "1280px",
     "--lg": "(max-width: 1024px)",
     "--md": "(max-width: 768px)",
-    "--sm": "(max-width: 640px)"
+    "--sm": "(max-width: 640px)",
+    "--dark": "(prefers-color-scheme: dark)"
   },
   "style": {
-    "--color-bg-primary": "#0a0a0a",
-    "--color-bg-secondary": "#111111",
-    "--color-bg-surface": "#1a1a1a",
-    "--color-bg-surface-hover": "#222222",
-    "--color-border": "#222222",
-    "--color-border-subtle": "#1a1a1a",
-    "--color-text-primary": "#fafafa",
-    "--color-text-secondary": "#a1a1aa",
-    "--color-text-muted": "#71717a",
+    "--color-bg-primary": "#ffffff",
+    "--color-bg-secondary": "#fafafa",
+    "--color-bg-surface": "#f4f4f5",
+    "--color-bg-surface-hover": "#e4e4e7",
+    "--color-border": "#d4d4d8",
+    "--color-border-subtle": "#e4e4e7",
+    "--color-text-primary": "#18181b",
+    "--color-text-secondary": "#52525b",
+    "--color-text-muted": "#5f5f68",
     "--color-brand": "#1a1a2e",
-    "--color-accent": "#3b82f6",
-    "--color-accent-hover": "#60a5fa",
+    "--color-accent": "#2563eb",
+    "--color-accent-hover": "#1d4ed8",
+    "--color-accent-solid": "#2563eb",
+    "--color-backdrop": "rgba(255, 255, 255, 0.85)",
+    "--color-backdrop-strong": "rgba(255, 255, 255, 0.92)",
+    "--color-shadow": "rgba(0, 0, 0, 0.12)",
+    "--color-shadow-strong": "rgba(0, 0, 0, 0.18)",
+    "--color-success": "#047857",
+    "--color-warning": "#b45309",
+    "--color-highlight-bg": "#eef2ff",
+    "--color-highlight-text": "#1e1b4b",
+    "--color-highlight-border": "#c7d2fe",
     "--font-mono": "'JetBrains Mono', 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace",
     "--radius": "8px",
     "--radius-lg": "12px",
     "--max-width": "1200px",
+    "@--dark": {
+      "--color-bg-primary": "#0a0a0a",
+      "--color-bg-secondary": "#111111",
+      "--color-bg-surface": "#1a1a1a",
+      "--color-bg-surface-hover": "#222222",
+      "--color-border": "#222222",
+      "--color-border-subtle": "#1a1a1a",
+      "--color-text-primary": "#fafafa",
+      "--color-text-secondary": "#a1a1aa",
+      "--color-text-muted": "#8b8b94",
+      "--color-accent": "#3b82f6",
+      "--color-accent-hover": "#60a5fa",
+      "--color-backdrop": "rgba(10, 10, 10, 0.8)",
+      "--color-backdrop-strong": "rgba(10, 10, 10, 0.9)",
+      "--color-shadow": "rgba(0, 0, 0, 0.4)",
+      "--color-shadow-strong": "rgba(0, 0, 0, 0.5)",
+      "--color-success": "#059669",
+      "--color-warning": "#d97706",
+      "--color-highlight-bg": "rgba(255, 255, 255, 0.97)",
+      "--color-highlight-text": "#1a1a2e",
+      "--color-highlight-border": "rgba(0, 0, 0, 0.08)"
+    },
+    ":focus-visible": {
+      "outline": "2px solid var(--color-accent)",
+      "outlineOffset": "2px"
+    },
     "margin": "0",
     "padding": "0",
     "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
@@ -113,10 +150,10 @@
             "borderLeft": "none"
           },
           ":last-child": {
-            "color": "#1a1a2e",
+            "color": "var(--color-highlight-text)",
             "fontWeight": "600",
-            "borderLeftColor": "rgba(0, 0, 0, 0.08)",
-            "backgroundColor": "rgba(255, 255, 255, 0.97)"
+            "borderLeftColor": "var(--color-highlight-border)",
+            "backgroundColor": "var(--color-highlight-bg)"
           }
         },
         "th": {
@@ -129,10 +166,10 @@
             "borderLeft": "none"
           },
           ":last-child": {
-            "color": "#1a1a2e",
+            "color": "var(--color-highlight-text)",
             "fontWeight": "600",
-            "borderLeftColor": "rgba(0, 0, 0, 0.08)",
-            "backgroundColor": "rgba(255, 255, 255, 0.97)"
+            "borderLeftColor": "var(--color-highlight-border)",
+            "backgroundColor": "var(--color-highlight-bg)"
           }
         }
       }

@@ -44,6 +44,31 @@
           "border": "1px solid var(--color-border)",
           "borderBottomWidth": "2px",
           "borderRadius": "4px"
+        },
+        "& pre": {
+          "backgroundColor": "var(--color-bg-surface)",
+          "border": "1px solid var(--color-border)",
+          "borderRadius": "var(--radius)",
+          "padding": "1rem 1.25rem",
+          "overflowX": "auto",
+          "fontSize": "0.875rem",
+          "lineHeight": "1.6"
+        },
+        "& code": {
+          "fontFamily": "var(--font-mono)",
+          "fontSize": "0.875em"
+        },
+        "& p code": {
+          "backgroundColor": "var(--color-bg-surface)",
+          "border": "1px solid var(--color-border-subtle)",
+          "borderRadius": "4px",
+          "padding": "0.1rem 0.3rem"
+        },
+        "& li code": {
+          "backgroundColor": "var(--color-bg-surface)",
+          "border": "1px solid var(--color-border-subtle)",
+          "borderRadius": "4px",
+          "padding": "0.1rem 0.3rem"
         }
       },
       "children": "${state.page.$children ?? []}"

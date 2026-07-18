@@ -14,9 +14,30 @@
     { "$ref": "../components/site-footer.json" }
   ],
   "children": [
+    {
+      "$title": "Skip Link",
+      "tagName": "a",
+      "attributes": { "href": "#main-content" },
+      "style": {
+        "position": "absolute",
+        "left": "-9999px",
+        "zIndex": "200",
+        "padding": "0.75rem 1.25rem",
+        "backgroundColor": "var(--color-bg-surface)",
+        "color": "var(--color-text-primary)",
+        "borderRadius": "var(--radius)",
+        "textDecoration": "none",
+        ":focus": {
+          "left": "1rem",
+          "top": "1rem"
+        }
+      },
+      "children": ["Skip to content"]
+    },
     { "tagName": "site-toolbar" },
     {
       "tagName": "main",
+      "id": "main-content",
       "style": { "flex": "1" },
       "children": [{ "tagName": "slot" }]
     },
