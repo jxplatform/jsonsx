@@ -679,7 +679,11 @@ async function runSchemaCli() {
     writeFileSync(resolve(schemaDir, "extension-manifest.schema.json"), manifestStr, "utf8");
     // The schemas/ fragments are oxfmt-managed (unlike packages/schema/*.json, which .oxfmtrc
     // Ignores), so emit them formatted — otherwise every `bun run generate:schema` reintroduces
-    // Raw-stringify formatting and dirties the tree.
+    // Raw-stringify formatting and dirties the tree. This is a dev-hygiene step only: the JSON
+    // Above is already written and valid, and oxfmt just prettifies it (e.g. collapsing short enum
+    // Arrays onto one line). Inside a sandboxed/offline build (e.g. `nix build`) oxfmt exits
+    // Non-zero with no diagnostic output, so treat a failure as non-fatal and keep the valid JSON
+    // Rather than aborting the build over cosmetic formatting.
     const fmt = Bun.spawnSync(
       [
         "bunx",
@@ -691,9 +695,11 @@ async function runSchemaCli() {
       { cwd: schemaDir },
     );
     if (fmt.exitCode !== 0) {
-      throw new Error(
-        `oxfmt failed on generated schemas: ${fmt.stderr.toString() || fmt.stdout.toString()}`,
-      );
+      const detail =
+        fmt.stderr.toString() ||
+        fmt.stdout.toString() ||
+        `exit ${fmt.exitCode ?? "null"}${fmt.signalCode ? `, signal ${fmt.signalCode}` : ""}`;
+      console.error(`Warning: skipped oxfmt reformat of generated schemas (${detail})`);
     }
     console.error("Generated:");
     console.error("  schema.json (component)");
