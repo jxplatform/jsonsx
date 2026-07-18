@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.1.1](https://github.com/jxsuite/jx/compare/server-v1.1.0...server-v1.1.1) (2026-07-18)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.4.1
+    * @jxsuite/compiler bumped to 1.2.0
+    * @jxsuite/create bumped to 1.1.1
+    * @jxsuite/import bumped to 0.37.1
+    * @jxsuite/protocol bumped to 0.5.1
+    * @jxsuite/runtime bumped to 1.2.0
+    * @jxsuite/schema bumped to 1.2.0
+    * @jxsuite/starters bumped to 1.1.1
+  * devDependencies
+    * @jxsuite/auth bumped to 0.3.1
+    * @jxsuite/connector bumped to 0.3.1
+    * @jxsuite/parser bumped to 1.2.0
+
 ## [1.1.0](https://github.com/jxsuite/jx/compare/server-v1.0.0...server-v1.1.0) (2026-07-17)
 
 

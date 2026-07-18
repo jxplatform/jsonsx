@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.0](https://github.com/jxsuite/jx/compare/schema-v1.1.0...schema-v1.2.0) (2026-07-18)
+
+
+### Features
+
+* color scheme support ([0f380c6](https://github.com/jxsuite/jx/commit/0f380c61a16c7bf0061628d0c7ccac5e3e045f4a))
+* **compiler:** sidecar bundling, extension emit capability, heading anchors ([07e28bc](https://github.com/jxsuite/jx/commit/07e28bc37f3d96ffdc2d42a7f3fa4d5ceb9eb3de))
+* search package ([9262c68](https://github.com/jxsuite/jx/commit/9262c68e5797ed1c4c2b9103e0f73e676a30ef39))
+* **styling:** forced color-scheme contract — dual emission, color-scheme triplet, pre-paint script ([e629684](https://github.com/jxsuite/jx/commit/e629684da928ff18f710857601741c9c7db7585d))
+
+
+### Bug Fixes
+
+* nix build ([96987cd](https://github.com/jxsuite/jx/commit/96987cd8abc4e6058702bca8beed37d1ff80795f))
+* **schema:** don't polute tree on schema generation ([9c96c85](https://github.com/jxsuite/jx/commit/9c96c85226fb785920853f2b713b301606d49f21))
+
 ## [1.1.0](https://github.com/jxsuite/jx/compare/schema-v1.0.0...schema-v1.1.0) (2026-07-17)
 
 

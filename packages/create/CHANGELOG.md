@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1](https://github.com/jxsuite/jx/compare/create-v1.1.0...create-v1.1.1) (2026-07-18)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/starters bumped to 1.1.1
+
 ## [1.1.0](https://github.com/jxsuite/jx/compare/create-v1.0.0...create-v1.1.0) (2026-07-17)
 
 

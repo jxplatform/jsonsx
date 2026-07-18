@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.1.1](https://github.com/jxsuite/jx/compare/desktop-v1.1.0...desktop-v1.1.1) (2026-07-18)
+
+
+### Bug Fixes
+
+* enable notarization in electrobun configuration ([cbd613d](https://github.com/jxsuite/jx/commit/cbd613dc350abbd282bb9e8c87ec7b1430d1091e))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 1.2.0
+    * @jxsuite/create bumped to 1.1.1
+    * @jxsuite/parser bumped to 1.2.0
+    * @jxsuite/protocol bumped to 0.5.1
+    * @jxsuite/schema bumped to 1.2.0
+    * @jxsuite/server bumped to 1.1.1
+    * @jxsuite/starters bumped to 1.1.1
+    * @jxsuite/studio bumped to 1.2.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.3.1
+    * @jxsuite/server bumped to 1.1.1
+
 ## [1.1.0](https://github.com/jxsuite/jx/compare/desktop-v1.0.0...desktop-v1.1.0) (2026-07-17)
 
 
