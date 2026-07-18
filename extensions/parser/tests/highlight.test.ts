@@ -4,6 +4,9 @@ import { highlightCodeBlocks, highlightFence } from "../src/highlight";
 import { processMarkdown } from "../src/md";
 import type { JxElement } from "@jxsuite/schema/types";
 
+/** Read an element's children as a concrete array (these tests never build a JxMappedArray). */
+const kids = (el: JxElement) => el.children as (JxElement | string)[];
+
 // ─── highlightFence ───────────────────────────────────────────────────────────
 
 describe("highlightFence", () => {
@@ -60,19 +63,19 @@ describe("highlightCodeBlocks", () => {
   test("replaces fence text with token spans and marks the code element", () => {
     const tree: (JxElement | string)[] = [fence("json", '{ "a": 1 }')];
     highlightCodeBlocks(tree);
-    const code = (tree[0] as JxElement).children![0] as JxElement;
+    const code = kids(tree[0] as JxElement)[0] as JxElement;
     expect(code.className).toBe("language-json shiki");
     expect(code.textContent).toBeUndefined();
     expect(Array.isArray(code.children)).toBe(true);
-    expect((code.children![0] as JxElement).tagName).toBe("span");
+    expect((kids(code)[0] as JxElement).tagName).toBe("span");
   });
 
   test("leaves unknown languages and bare fences untouched", () => {
     const unknown = fence("cobol", "PRINT 1");
     const bare = fence(null, "plain text");
     highlightCodeBlocks([unknown, bare]);
-    expect((unknown.children![0] as JxElement).textContent).toBe("PRINT 1");
-    expect((bare.children![0] as JxElement).textContent).toBe("plain text");
+    expect((kids(unknown)[0] as JxElement).textContent).toBe("PRINT 1");
+    expect((kids(bare)[0] as JxElement).textContent).toBe("plain text");
   });
 
   test("recurses into nested containers", () => {
@@ -80,15 +83,15 @@ describe("highlightCodeBlocks", () => {
       { children: ["intro", fence("json", "{}")], tagName: "div" },
     ];
     highlightCodeBlocks(tree);
-    const pre = (tree[0] as JxElement).children![1] as JxElement;
-    const code = pre.children![0] as JxElement;
+    const pre = kids(tree[0] as JxElement)[1] as JxElement;
+    const code = kids(pre)[0] as JxElement;
     expect(code.className).toContain("shiki");
   });
 
   test("ignores strings and empty code elements", () => {
     const empty = fence("json", "");
     highlightCodeBlocks(["hello", empty]);
-    expect((empty.children![0] as JxElement).textContent).toBe("");
+    expect((kids(empty)[0] as JxElement).textContent).toBe("");
   });
 });
 
@@ -101,15 +104,15 @@ describe("processMarkdown highlighting", () => {
     expect(result.$children[0]).toEqual({ tagName: "p", textContent: "Some prose." });
     const pre = result.$children[1] as JxElement;
     expect(pre.tagName).toBe("pre");
-    const code = pre.children![0] as JxElement;
+    const code = kids(pre)[0] as JxElement;
     expect(code.className).toBe("language-json shiki");
-    expect((code.children![0] as JxElement).style).toHaveProperty("--shiki-light");
+    expect((kids(code)[0] as JxElement).style).toHaveProperty("--shiki-light");
   });
 
   test("unknown fence languages keep plain text output", () => {
     const source = ["```cobol", "PRINT 1", "```", ""].join("\n");
     const result = processMarkdown(source, "/x.md");
-    const code = (result.$children[0] as JxElement).children![0] as JxElement;
+    const code = kids(result.$children[0] as JxElement)[0] as JxElement;
     expect(code.className).toBe("language-cobol");
     expect(code.textContent).toBe("PRINT 1");
   });

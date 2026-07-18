@@ -1146,6 +1146,7 @@ describe("patchDisturbsActiveEdit", () => {
 describe("startCanvasIframe — stylebook mode", () => {
   function stylebookMsg(gen: number, doc: unknown): ParentToIframe {
     return {
+      colorScheme: null,
       doc,
       docBase: "http://localhost:3000/",
       gen,
