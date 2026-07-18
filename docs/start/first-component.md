@@ -11,7 +11,7 @@ In this tutorial you build a `counter-card` component: a button and a line of te
 
 **About 15 minutes.** Before you start:
 
-- Have Jx Studio running — **[Install Jx Studio](/docs/start/install)** covers the desktop app and the CLI.
+- Have Jx Studio running — see **[Install Jx Studio](/docs/start/install)**.
 - If Studio is completely new to you, skim **[Your first project](/docs/start/first-project)** first — this tutorial starts where it ends, with a project open.
 
 ## 1. Open a project

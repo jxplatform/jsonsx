@@ -9,14 +9,7 @@ In about ten minutes you'll create a site in Jx Studio, design a page, add a bit
 
 ## 1. Get Studio
 
-Download the desktop app for [macOS, Windows, or Linux](/docs/start/install), or install the CLI and run Studio locally:
-
-```bash
-bun create @jxsuite my-site
-cd my-site && bun run dev
-```
-
-There's no hosted Studio to sign into — it runs on your machine, against your files. Full details on both paths are in **[Install Jx Studio](/docs/start/install)**. This tutorial uses the desktop app.
+Download the desktop app for [macOS, Windows, or Linux](/docs/start/install) — there's no hosted Studio to sign into, it runs on your machine, against your files. Full details are in **[Install Jx Studio](/docs/start/install)**.
 
 ## 2. Create a project
 
@@ -26,13 +19,7 @@ Then pick a **template**. Start from **Blank** for an empty project, or clone on
 
 ![Jx Studio New Project dialog — template gallery, name, directory, production URL, and deployment adapter picker](/screenshots/new-project-modal.png)
 
-Prefer the terminal? The CLI takes the same templates:
-
-```bash
-bun create @jxsuite my-site --template restaurant
-```
-
-Already have a Jx project? Use **Open Project** to point Studio at a folder on disk, or **Clone** to pull one from git.
+Already have a Jx project? Use **Open Project** to point Studio at a folder on disk, or **Clone** to pull one from git. (Developers who'd rather scaffold from a terminal can use `bun create @jxsuite` instead — see [CLI commands](/docs/framework/build/cli) — then open the result in Studio.)
 
 ## 3. Manage, edit, design
 
