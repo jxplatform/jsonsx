@@ -187,15 +187,16 @@ When a property has an explicit value, show a small accent dot to the left of th
 
 ### 4.3 Input Components
 
-| Component              | When to Use                                                    |
-| ---------------------- | -------------------------------------------------------------- |
-| `sp-textfield`         | Free-text string values                                        |
-| `sp-number-field`      | Numeric values with optional min/max/step                      |
-| `sp-picker`            | Fixed option sets (enums)                                      |
-| `sp-checkbox`          | Boolean toggles                                                |
-| `sp-switch`            | On/off feature toggles                                         |
-| `jx-styled-combobox`   | Hybrid: fixed options with styled preview + free-text fallback |
-| `textarea.field-input` | Multi-line text (code, JSON, expressions)                      |
+| Component                                   | When to Use                                                                                      |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `sp-textfield`                              | Free-text string values                                                                          |
+| `sp-number-field`                           | Numeric values with optional min/max/step                                                        |
+| `sp-picker`                                 | Fixed option sets (enums)                                                                        |
+| `sp-checkbox`                               | Boolean toggles                                                                                  |
+| `sp-switch`                                 | On/off feature toggles                                                                           |
+| `sp-action-group` (compact, toggle buttons) | Small mutually-exclusive mode sets in bar chrome (e.g. the Auto/Light/Dark color-scheme preview) |
+| `jx-styled-combobox`                        | Hybrid: fixed options with styled preview + free-text fallback                                   |
+| `textarea.field-input`                      | Multi-line text (code, JSON, expressions)                                                        |
 
 ### 4.4 Debounce Pattern
 

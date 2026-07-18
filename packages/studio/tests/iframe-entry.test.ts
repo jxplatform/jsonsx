@@ -15,6 +15,7 @@ const WIRE_CTX: WireMapperCtx = {
 
 function renderMsg(gen: number, doc: unknown, shadowDoc: unknown = doc): ParentToIframe {
   return {
+    colorScheme: null,
     doc,
     docBase: "http://localhost:3000/",
     gen,
@@ -53,6 +54,42 @@ describe("startCanvasIframe", () => {
 
     expect((container.querySelector("h1") as HTMLElement)?.dataset.jxPath).toBe('["children",0]');
     expect(fromIframe).toContainEqual({ gen: 1, kind: "renderComplete" });
+  });
+
+  test("setColorScheme flips the root attribute without a render", async () => {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const fromIframe: IframeToParent[] = [];
+    pair.parent.onMessage((m) => fromIframe.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.flush();
+
+    pair.parent.post({ kind: "setColorScheme", scheme: "dark" });
+    pair.flush();
+    expect(document.documentElement.dataset.colorScheme).toBe("dark");
+    // No render was triggered — only the ready announcement crossed back.
+    expect(fromIframe.map((m) => m.kind)).toEqual(["ready"]);
+
+    pair.parent.post({ kind: "setColorScheme", scheme: null });
+    pair.flush();
+    expect(document.documentElement.dataset.colorScheme).toBeUndefined();
+  });
+
+  test("a render message applies its colorScheme to the root", async () => {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.flush();
+
+    const msg = renderMsg(1, { children: [{ children: ["Hi"], tagName: "h1" }], tagName: "div" });
+    (msg as { colorScheme: "light" | "dark" | null }).colorScheme = "light";
+    pair.parent.post(msg);
+    pair.flush();
+    await flush();
+    expect(document.documentElement.dataset.colorScheme).toBe("light");
+    delete document.documentElement.dataset.colorScheme;
   });
 
   test("posts a serialized dataScope right AFTER renderComplete (resolved $defs cross to the parent)", async () => {

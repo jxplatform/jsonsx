@@ -43,6 +43,12 @@ export interface TabUi {
   /** Full-screen formula workspace target ($expression editing); editingFunction wins if both set. */
   editingFormula: FormulaEditDef | null;
   featureToggles: Record<string, boolean>;
+  /**
+   * Canvas color-scheme preview: follow the OS ("auto") or force a scheme. Drives the
+   * data-color-scheme attribute on the canvas iframe root (spec §9.5) and, in the style sidebar,
+   * which scheme layer edits target.
+   */
+  previewColorScheme: "auto" | "light" | "dark";
   styleSections: Record<string, boolean>;
   inspectorSections: Record<string, boolean>;
   styleShorthands: Record<string, boolean>;
@@ -156,6 +162,7 @@ function createDefaultUi(canvasMode: string, preview = false) {
     inspectorSections: {},
     pendingInlineEdit: null,
     preview,
+    previewColorScheme: "auto" as const,
     previewParams: {},
     previewProps: null,
     rightTab: "properties",

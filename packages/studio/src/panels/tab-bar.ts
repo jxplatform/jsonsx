@@ -15,6 +15,7 @@ import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import { applyTransform, fitToScreen, resetZoom, setEditZoom } from "../canvas/canvas-utils";
 import { getEffectiveLayoutPath, getEffectiveMedia } from "../site-context";
+import { isSchemeQuery } from "../utils/canvas-media";
 import { dynamicRouteParams, loadParamValues, pagePathsDef } from "../page-params";
 import { componentPropEntries, isComponentDoc } from "../component-props";
 import { mediaDisplayName } from "./shared";
@@ -75,6 +76,7 @@ export function mount(host: HTMLElement, ctx: TabBarCtx) {
         void tab.session.ui.editingFunction;
         void tab.session.ui.featureToggles;
         void tab.session.ui.preview;
+        void tab.session.ui.previewColorScheme;
         void tab.session.ui.previewParams;
         void tab.session.ui.previewProps;
         void tab.session.ui.showLayout;
@@ -308,13 +310,46 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
     }
   }
 
-  // ── Right region: media feature toggles ──
+  // ── Right region: color-scheme preview (projects that declare a scheme query, spec §9.5) ──
+  // One switch per tab: drives the canvas data-color-scheme attribute and (in the style
+  // Sidebar) which scheme layer edits target. Ungated — works in every canvas mode.
   const { featureQueries } = ctx.parseMediaEntries(getEffectiveMedia(S.document?.$media));
+  const schemeQueries = featureQueries.filter(({ query }) => isSchemeQuery(query));
+  const plainQueries = featureQueries.filter(({ query }) => !isSchemeQuery(query));
+  const scheme = S.ui.previewColorScheme ?? "auto";
+  const schemeTpl =
+    schemeQueries.length > 0
+      ? html`
+          <sp-action-group compact size="s" class="tb-scheme">
+            ${(
+              [
+                ["auto", "Auto", "Follow the OS color scheme"],
+                ["light", "Light", "Force the light scheme"],
+                ["dark", "Dark", "Force the dark scheme"],
+              ] as const
+            ).map(
+              ([value, label, title]) => html`
+                <sp-action-button
+                  toggles
+                  size="s"
+                  title=${title}
+                  ?selected=${scheme === value}
+                  @click=${() => updateUi("previewColorScheme", value)}
+                >
+                  ${label}
+                </sp-action-button>
+              `,
+            )}
+          </sp-action-group>
+        `
+      : nothing;
+
+  // ── Right region: media feature toggles (non-scheme queries) ──
   const togglesTpl =
-    featureQueries.length > 0
+    plainQueries.length > 0
       ? html`
           <sp-action-group compact size="s">
-            ${featureQueries.map(
+            ${plainQueries.map(
               ({ name, query }: { name: string; query: string }) => html`
                 <sp-action-button
                   toggles
@@ -352,7 +387,7 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
     <div class="tab-bar">
       ${navTpl} ${zoomTpl}
       <div class="tb-spacer"></div>
-      ${settingsTpl} ${togglesTpl} ${exportTpl}
+      ${settingsTpl} ${schemeTpl} ${togglesTpl} ${exportTpl}
     </div>
   `;
 }
