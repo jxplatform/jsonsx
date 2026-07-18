@@ -48,7 +48,7 @@ export default {
       },
       codesign: true,
       defaultRenderer: "cef",
-      notarize: false,
+      notarize: true,
     },
     linux: {
       bundleCEF: true,
