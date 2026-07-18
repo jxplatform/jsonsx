@@ -41,7 +41,7 @@
     "@jxsuite/connector": "workspace:^",
     "@jxsuite/schema": "workspace:^",
     "better-auth": "1.6.23",
-    "kysely": "^0.29.3"
+    "kysely": "^0.29.4"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.10.6",
