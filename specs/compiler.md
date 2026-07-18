@@ -584,6 +584,19 @@ See the [Site Architecture Specification](site-architecture.md) for the full mul
 
 ### `compileStyles(def)` — CSS extraction from component tree
 
+Project-level emission order is: base `:root` (custom properties) and `body` (direct
+properties) rules first, then conditional `@`-blocks, so equal-specificity overrides win by
+source order. Inside a project-level `@`-block, custom properties land on `:root`, direct
+properties on `body`, and selector-keyed sub-objects on their own selector. Blocks keyed by a
+pure `prefers-color-scheme` query dual-emit per the forced-scheme contract (spec §9.5): a
+media-guarded copy (`:where(:root:not([data-color-scheme]))`) plus an unconditional forced
+copy (`:root:where([data-color-scheme="…"])`), both specificity-neutral via `:where()`.
+When any `$media` value is a pure scheme query, `compileStyles` also emits the `color-scheme`
+declaration triplet on `:root` (suppressed when the author sets `colorScheme` in project
+style), and the compilation targets inject the pre-paint scheme-restore `<script>`
+(`colorSchemePrePaintScript()`) into `<head>` ahead of all style blocks — the site pipeline
+does this via the merged head (`prePaintScheme: false` disables the target-level copy).
+
 ### `collectServerEntries(doc)` — Find all `timing: "server"` entries
 
 ### `buildRoute(exportName, baseUrl)` — Emit a single Hono POST route with try/catch and `c.env` passing

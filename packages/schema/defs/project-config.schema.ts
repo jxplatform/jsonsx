@@ -54,9 +54,15 @@ export const projectConfigSchema = {
       additionalProperties: { type: "string" },
       description:
         "Named media breakpoints following CSS @custom-media convention. " +
-        "Available in all component style objects.",
+        "Available in all component style objects. Declaring a pure color-scheme " +
+        'query (e.g. "--dark": "(prefers-color-scheme: dark)") additionally opts the ' +
+        "site into the forced-scheme contract: @--dark style blocks are dual-emitted " +
+        "so a data-color-scheme attribute on <html> overrides the OS preference, " +
+        "color-scheme is declared on :root, and a pre-paint script restores the " +
+        "visitor's persisted choice (spec §9.5).",
       examples: [
         {
+          "--dark": "(prefers-color-scheme: dark)",
           "--lg": "(min-width: 1024px)",
           "--md": "(min-width: 768px)",
           "--sm": "(min-width: 640px)",

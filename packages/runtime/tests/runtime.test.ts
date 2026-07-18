@@ -15,6 +15,10 @@ import {
   RESERVED_KEYS,
   Jx,
   setSkipServerFunctions,
+  pureSchemeOf,
+  schemeSelectors,
+  COLOR_SCHEME_ATTR,
+  COLOR_SCHEME_STORAGE_KEY,
 } from "../src/runtime";
 import { evaluateExpression, isMutating } from "../src/expression";
 import type { JxDocument, JxElement } from "@jxsuite/schema/types";
@@ -687,6 +691,111 @@ describe("applyStyle", () => {
     applyStyle(el, { "--accent": "green", color: "blue" });
     expect(el.style.color).toBe("blue");
     expect(el.style.getPropertyValue("--accent")).toBe("green");
+  });
+});
+
+// ─── Color-scheme helpers + dual emission ─────────────────────────────────────
+
+describe("color-scheme helpers", () => {
+  test("normative constants", () => {
+    expect(COLOR_SCHEME_ATTR).toBe("data-color-scheme");
+    expect(COLOR_SCHEME_STORAGE_KEY).toBe("jx-color-scheme");
+  });
+
+  test("pureSchemeOf recognizes pure scheme queries", () => {
+    expect(pureSchemeOf("(prefers-color-scheme: dark)")).toBe("dark");
+    expect(pureSchemeOf("(prefers-color-scheme: light)")).toBe("light");
+    expect(pureSchemeOf("  ( prefers-color-scheme :dark )  ")).toBe("dark");
+  });
+
+  test("pureSchemeOf rejects compound and non-scheme queries", () => {
+    expect(pureSchemeOf("(prefers-color-scheme: dark) and (min-width: 768px)")).toBeNull();
+    expect(pureSchemeOf("(min-width: 768px)")).toBeNull();
+    expect(pureSchemeOf("(prefers-color-scheme: no-preference)")).toBeNull();
+    expect(pureSchemeOf("--dark")).toBeNull();
+  });
+
+  test("schemeSelectors for root selectors", () => {
+    expect(schemeSelectors(":root", "dark")).toEqual({
+      auto: ":root:where(:not([data-color-scheme]))",
+      forced: ':root:where([data-color-scheme="dark"])',
+    });
+    expect(schemeSelectors("html", "light").forced).toBe('html:where([data-color-scheme="light"])');
+  });
+
+  test("schemeSelectors for scoped selectors", () => {
+    expect(schemeSelectors('[data-jx="jx-abc"]', "dark")).toEqual({
+      auto: ':where(:root:not([data-color-scheme])) [data-jx="jx-abc"]',
+      forced: ':where(:root[data-color-scheme="dark"]) [data-jx="jx-abc"]',
+    });
+  });
+});
+
+describe("applyStyle color-scheme dual emission", () => {
+  let el: HTMLElement;
+  beforeEach(() => {
+    el = document.createElement("div");
+    for (const s of document.head.querySelectorAll("style")) {
+      s.remove();
+    }
+  });
+
+  test("@--dark scheme block emits guarded media copy plus forced copy", () => {
+    applyStyle(el, { "@--dark": { color: "white" } }, { "--dark": "(prefers-color-scheme: dark)" });
+    const uid = el.dataset.jx;
+    const css = (document.head.querySelector("style") as HTMLStyleElement).textContent!;
+    expect(css).toContain(
+      `@media (prefers-color-scheme: dark) { :where(:root:not([data-color-scheme])) [data-jx="${uid}"] { color: white } }`,
+    );
+    expect(css).toContain(
+      `:where(:root[data-color-scheme="dark"]) [data-jx="${uid}"] { color: white }`,
+    );
+  });
+
+  test("literal @(prefers-color-scheme: light) dual-emits too", () => {
+    applyStyle(el, { "@(prefers-color-scheme: light)": { color: "black" } });
+    const css = (document.head.querySelector("style") as HTMLStyleElement).textContent!;
+    expect(css).toContain(
+      "@media (prefers-color-scheme: light) { :where(:root:not([data-color-scheme]))",
+    );
+    expect(css).toContain(':where(:root[data-color-scheme="light"])');
+  });
+
+  test("nested selector inside scheme block gets both copies", () => {
+    applyStyle(
+      el,
+      { "@--dark": { "&.active": { borderColor: "red" }, color: "white" } },
+      { "--dark": "(prefers-color-scheme: dark)" },
+    );
+    const uid = el.dataset.jx;
+    const css = (document.head.querySelector("style") as HTMLStyleElement).textContent!;
+    expect(css).toContain(
+      `@media (prefers-color-scheme: dark) { :where(:root:not([data-color-scheme])) [data-jx="${uid}"].active { border-color: red } }`,
+    );
+    expect(css).toContain(
+      `:where(:root[data-color-scheme="dark"]) [data-jx="${uid}"].active { border-color: red }`,
+    );
+  });
+
+  test("compound scheme query keeps plain single emission", () => {
+    applyStyle(el, { "@(prefers-color-scheme: dark) and (min-width: 600px)": { color: "white" } });
+    const css = (document.head.querySelector("style") as HTMLStyleElement).textContent!;
+    expect(css).toContain("@media (prefers-color-scheme: dark) and (min-width: 600px)");
+    expect(css).not.toContain("data-color-scheme");
+  });
+
+  test("base prop overridden by a scheme block moves to the stylesheet", () => {
+    applyStyle(
+      el,
+      { "@--dark": { color: "white" }, color: "black" },
+      {
+        "--dark": "(prefers-color-scheme: dark)",
+      },
+    );
+    const uid = el.dataset.jx;
+    expect(el.style.color).toBe("");
+    const css = (document.head.querySelector("style") as HTMLStyleElement).textContent!;
+    expect(css).toContain(`[data-jx="${uid}"] { color: black }`);
   });
 });
 

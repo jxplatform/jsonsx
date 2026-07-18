@@ -819,7 +819,56 @@ Within any `style` object, `@--name` keys reference named breakpoints. `@(condit
 
 `$media` declarations propagate through the component scope.
 
+A `$media` entry whose value is a _pure_ `prefers-color-scheme` query — exactly
+`(prefers-color-scheme: light)` or `(prefers-color-scheme: dark)`, no other conditions — is a
+**scheme query**. Scheme queries participate in the forced-scheme contract defined in §9.5.
+
 > **Status: Implemented.** Runtime `applyStyle` handles nested selectors, media breakpoints, and scoped style generation.
+
+### 9.5 Color-Scheme Variants and Forced Schemes
+
+Declaring a scheme query in `$media` opts a document (or site) into the color-scheme contract.
+Two normative constants define the visitor-facing override mechanism:
+
+- **`data-color-scheme`** — attribute on the root element (`<html>`). Value `"light"` or
+  `"dark"` forces that scheme; an absent attribute means _auto_ (follow the OS
+  `prefers-color-scheme`).
+- **`jx-color-scheme`** — `localStorage` key a site switcher persists the visitor's forced
+  scheme under. Values `"light"` or `"dark"`; absent means auto.
+
+**Dual emission.** Every style block keyed by a scheme query (`@--dark { … }` or a literal
+`@(prefers-color-scheme: …) { … }`) is emitted twice:
+
+1. a media-guarded copy that applies only while no scheme is forced — root-level rules are
+   guarded as `:root:where(:not([data-color-scheme]))`, scoped rules as
+   `:where(:root:not([data-color-scheme])) <selector>`;
+2. an unconditional forced copy under the attribute — `:root:where([data-color-scheme="dark"])`
+   for root-level rules, `:where(:root[data-color-scheme="dark"]) <selector>` for scoped rules.
+
+All guards are wrapped in `:where()` so specificity matches the unguarded selector and source
+order decides the cascade: base rules are always emitted **before** conditional blocks.
+At the project level, custom properties inside a scheme block land on `:root` and direct
+properties on `body`, mirroring the base emission.
+
+**Compound-query limitation.** A query that combines `prefers-color-scheme` with any other
+condition (e.g. `(prefers-color-scheme: dark) and (min-width: 768px)`) is _not_ a scheme query:
+it keeps plain `@media` emission and does not respond to the forced attribute.
+
+**`color-scheme` declaration.** When a scheme query is declared, the compiler emits
+`:root { color-scheme: light dark }` plus per-attribute overrides
+(`:root:where([data-color-scheme="light"]) { color-scheme: light }` and the dark equivalent) so
+native widgets, scrollbars, and form controls follow the forced scheme. Authors who set
+`colorScheme` in the project `style` suppress this emission.
+
+**Pre-paint script.** Site and standalone compilation targets inject a small synchronous inline
+`<script>` into `<head>` — ahead of all style blocks — that reads `jx-color-scheme` from
+`localStorage` and sets `data-color-scheme` on the root element, eliminating any flash of the
+wrong scheme on load. Declaring a scheme query is the sole opt-in; no other configuration
+exists.
+
+> **Status: Implemented.** `pureSchemeOf`/`schemeSelectors` (runtime, re-exported by the
+> compiler) define the shared selector contract; `applyStyle`, `compileStyles`, and the site
+> pipeline all dual-emit through them.
 
 ---
 

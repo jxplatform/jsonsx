@@ -7,10 +7,12 @@
 
 import {
   buildAttrs,
+  colorSchemePrePaintScript,
   compileStyles,
   createCompileContext,
   escapeHtml,
   isNodeDynamic,
+  pureSchemeOf,
   resolveStaticValue,
   SELF_CLOSING,
 } from "../shared.ts";
@@ -31,6 +33,7 @@ export function compileStaticPage(
     reactivitySrc?: string;
     litHtmlSrc?: string;
     projectStyle?: JxStyle | null;
+    prePaintScheme?: boolean;
     [key: string]: unknown;
   },
 ) {
@@ -78,13 +81,20 @@ export function compileStaticPage(
       .join("\n  ");
   }
 
+  // Forced-scheme contract (spec §9.5): restore the persisted scheme before any styles apply
+  const prePaint =
+    opts.prePaintScheme !== false &&
+    Object.values(raw.$media ?? {}).some((q) => pureSchemeOf(String(q)) !== null)
+      ? `<script>${colorSchemePrePaintScript()}</script>\n  `
+      : "";
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
-  ${importMap}
+  ${prePaint}${importMap}
   ${styleBlock}
 </head>
 <body>

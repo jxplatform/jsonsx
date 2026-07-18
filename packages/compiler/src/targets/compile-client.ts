@@ -16,6 +16,7 @@ import {
   DEFAULT_LIT_HTML_SRC,
   DEFAULT_REACTIVITY_SRC,
   buildAttrs,
+  colorSchemePrePaintScript,
   compileExpression,
   compileStatements,
   compileStyles,
@@ -26,6 +27,7 @@ import {
   isRefObject,
   isSchemaOnly,
   isTemplateString,
+  pureSchemeOf,
   resolveStaticValue,
 } from "../shared.ts";
 import {
@@ -76,6 +78,7 @@ export function compileClient(
     litHtmlSrc?: string;
     modulePath?: string;
     projectStyle?: JxStyle | null;
+    prePaintScheme?: boolean;
     [key: string]: unknown;
   },
 ) {
@@ -247,13 +250,20 @@ export function compileClient(
     `      "lit-html": "${litHtmlSrc}"`,
   ];
 
+  // Forced-scheme contract (spec §9.5): restore the persisted scheme before any styles apply
+  const prePaint =
+    opts.prePaintScheme !== false &&
+    Object.values(raw.$media ?? {}).some((q) => pureSchemeOf(String(q)) !== null)
+      ? `<script>${colorSchemePrePaintScript()}</script>\n  `
+      : "";
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
-  <script type="importmap">
+  ${prePaint}<script type="importmap">
   {
     "imports": {
 ${importmapEntries.join(",\n")}

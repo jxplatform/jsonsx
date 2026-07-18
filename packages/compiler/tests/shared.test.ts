@@ -7,6 +7,7 @@ import {
   cloneValue,
   collectServerEntries,
   collectSrcImports,
+  colorSchemePrePaintScript,
   compileStyles,
   createCompileContext,
   escapeHtml,
@@ -645,6 +646,16 @@ describe("buildComponentCSS", () => {
     expect(buildComponentCSS("my-comp", null)).toBe("");
     expect(buildComponentCSS("my-comp")).toBe("");
   });
+
+  test("dual-emits scheme blocks scoped to the component tag", () => {
+    const css = buildComponentCSS("my-comp", { "@--dark": { color: "#fff" } }, null, {
+      "--dark": "(prefers-color-scheme: dark)",
+    });
+    expect(css).toContain(
+      "@media (prefers-color-scheme: dark) { :where(:root:not([data-color-scheme])) my-comp { color: #fff } }",
+    );
+    expect(css).toContain(':where(:root[data-color-scheme="dark"]) my-comp { color: #fff }');
+  });
 });
 
 // ─── buildAttrs ────────────────────────────────────────────────────────────
@@ -853,14 +864,103 @@ describe("compileStyles", () => {
     expect(result).toContain("margin: 0");
   });
 
-  test("emits projectStyle media blocks on body", () => {
+  test("dual-emits projectStyle scheme blocks: guarded media copy + forced copy", () => {
     const doc = { children: [], tagName: "div" };
     const projectStyle = {
       "@(prefers-color-scheme: dark)": { backgroundColor: "#111" },
     };
     const result = compileStyles(doc, {}, projectStyle);
-    expect(result).toContain("@media (prefers-color-scheme: dark)");
-    expect(result).toContain("body {");
+    expect(result).toContain(
+      "@media (prefers-color-scheme: dark) { :where(:root:not([data-color-scheme])) body { background-color: #111 } }",
+    );
+    expect(result).toContain(
+      ':where(:root[data-color-scheme="dark"]) body { background-color: #111 }',
+    );
+  });
+
+  test("scheme-block custom properties land on :root after the base rules", () => {
+    const doc = { children: [], tagName: "div" };
+    const projectStyle = {
+      "--bg": "#fff",
+      "@--dark": { "--bg": "#000", ".card": { borderColor: "#333" }, color: "#eee" },
+    };
+    const result = compileStyles(doc, { "--dark": "(prefers-color-scheme: dark)" }, projectStyle);
+    expect(result).toContain(
+      "@media (prefers-color-scheme: dark) { :root:where(:not([data-color-scheme])) { --bg: #000 } }",
+    );
+    expect(result).toContain(':root:where([data-color-scheme="dark"]) { --bg: #000 }');
+    expect(result).toContain(':where(:root[data-color-scheme="dark"]) body { color: #eee }');
+    expect(result).toContain(
+      ':where(:root[data-color-scheme="dark"]) .card { border-color: #333 }',
+    );
+    // Ordering regression: base :root precedes the conditional overrides
+    expect(result.indexOf(":root { --bg: #fff")).toBeLessThan(
+      result.indexOf("@media (prefers-color-scheme: dark)"),
+    );
+  });
+
+  test("non-scheme project media blocks route tokens to :root, unguarded, after base", () => {
+    const doc = { children: [], tagName: "div" };
+    const projectStyle = { "--pad": "1rem", "@--md": { "--pad": "2rem", margin: "0" } };
+    const result = compileStyles(doc, { "--md": "(min-width: 768px)" }, projectStyle);
+    expect(result).toContain("@media (min-width: 768px) { :root { --pad: 2rem } }");
+    expect(result).toContain("@media (min-width: 768px) { body { margin: 0 } }");
+    expect(result).not.toContain("data-color-scheme");
+    expect(result.indexOf(":root { --pad: 1rem")).toBeLessThan(
+      result.indexOf("@media (min-width: 768px)"),
+    );
+  });
+
+  test("compound scheme queries keep plain single emission", () => {
+    const doc = { children: [], tagName: "div" };
+    const projectStyle = {
+      "@(prefers-color-scheme: dark) and (min-width: 600px)": { "--x": "1" },
+    };
+    const result = compileStyles(doc, {}, projectStyle);
+    expect(result).toContain(
+      "@media (prefers-color-scheme: dark) and (min-width: 600px) { :root { --x: 1 } }",
+    );
+    expect(result).not.toContain("data-color-scheme");
+  });
+
+  test("scoped element scheme blocks dual-emit (including nested selectors)", () => {
+    const doc = {
+      children: [],
+      id: "hero",
+      style: { "@--dark": { ":hover": { color: "#ccc" }, color: "#fff" } },
+      tagName: "div",
+    };
+    const result = compileStyles(doc, { "--dark": "(prefers-color-scheme: dark)" });
+    expect(result).toContain(
+      "@media (prefers-color-scheme: dark) { :where(:root:not([data-color-scheme])) #hero { color: #fff } }",
+    );
+    expect(result).toContain(':where(:root[data-color-scheme="dark"]) #hero { color: #fff }');
+    expect(result).toContain(':where(:root[data-color-scheme="dark"]) #hero:hover { color: #ccc }');
+  });
+
+  test("emits the color-scheme triplet when a pure scheme query is declared", () => {
+    const doc = { children: [], tagName: "div" };
+    const result = compileStyles(doc, { "--dark": "(prefers-color-scheme: dark)" }, null);
+    expect(result).toContain(":root { color-scheme: light dark }");
+    expect(result).toContain(':root:where([data-color-scheme="light"]) { color-scheme: light }');
+    expect(result).toContain(':root:where([data-color-scheme="dark"]) { color-scheme: dark }');
+  });
+
+  test("author-set colorScheme suppresses the triplet", () => {
+    const doc = { children: [], tagName: "div" };
+    const result = compileStyles(
+      doc,
+      { "--dark": "(prefers-color-scheme: dark)" },
+      { colorScheme: "dark light" },
+    );
+    expect(result).not.toContain("color-scheme: light dark");
+    expect(result).toContain("color-scheme: dark light");
+  });
+
+  test("no scheme query — no color-scheme rules", () => {
+    const doc = { children: [], tagName: "div" };
+    const result = compileStyles(doc, { "--md": "(min-width: 768px)" }, { "--bg": "#000" });
+    expect(result).not.toContain("color-scheme");
   });
 
   test("emits projectStyle standalone selectors", () => {
@@ -898,6 +998,17 @@ describe("compileStyles", () => {
     expect(result).toContain("font-size: 14px;");
     expect(result).toContain("@media (min-width: 768px)");
     expect(result).toContain("font-size: 18px");
+  });
+});
+
+// ─── colorSchemePrePaintScript ─────────────────────────────────────────────
+
+describe("colorSchemePrePaintScript", () => {
+  test("reads the storage key and sets the forced attribute before paint", () => {
+    const js = colorSchemePrePaintScript();
+    expect(js).toContain('localStorage.getItem("jx-color-scheme")');
+    expect(js).toContain('"data-color-scheme"');
+    expect(js).toContain('s==="light"||s==="dark"');
   });
 });
 

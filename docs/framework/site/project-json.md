@@ -69,7 +69,7 @@ A page's own `$head` appends to (and, for singletons like `<title>`, overrides) 
 
 ## Breakpoints and style tokens
 
-`$media` names media queries once so every component can respond to `"@--md"` without redeclaring the query. `style` holds the global stylesheet: `--`-prefixed keys compile to `:root {}` custom properties, plain camelCase properties style the page root, and nested objects are element selectors applied site-wide.
+`$media` names media queries once so every component can respond to `"@--md"` without redeclaring the query. `style` holds the global stylesheet: `--`-prefixed keys compile to `:root {}` custom properties, plain camelCase properties style the page root, and nested objects are element selectors applied site-wide. Declaring a scheme query like `"--dark": "(prefers-color-scheme: dark)"` additionally enables the visitor-forced [color-scheme contract](/docs/framework/concepts/color-schemes) — `@--dark` token overrides in `style` become the dark variant of the design.
 
 ```json
 {

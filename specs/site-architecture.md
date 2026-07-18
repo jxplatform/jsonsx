@@ -225,7 +225,7 @@ Site-level declarations cascade to all pages:
 
 - `$head` entries are prepended to every page's `<head>`
 - `$media` breakpoints are available in every component's style objects
-- `style` properties prefixed with `--` are compiled to `:root {}` automatically; element selectors use nested objects
+- `style` properties prefixed with `--` are compiled to `:root {}` automatically — including inside conditional `@--name` blocks (spec §9.5); element selectors use nested objects
 - `state` entries are available to every page (read-only from the page's perspective)
 - `imports` entries cascade to all pages; page-level entries take precedence on collision
 
@@ -1223,13 +1223,21 @@ Individual file `$media`, `$style`, and `$elements` merge on top of site-level d
 
 The global stylesheet is emitted in this order:
 
-1. Site-level `:root` custom properties (from `--`-prefixed keys in `style`)
-2. Site-level responsive (`@--dark`, etc.) overrides
-3. Layout-level styles
-4. Page-level styles
-5. Component-level styles (scoped to custom element shadow DOM or via class namespacing)
+1. Site-level `:root` custom properties (from `--`-prefixed keys in `style`) and `body` direct
+   properties
+2. Site-level conditional (`@--dark`, `@--md`, etc.) overrides — custom properties on `:root`,
+   direct properties on `body`; scheme-query blocks dual-emitted as a media-guarded copy plus a
+   forced `data-color-scheme` copy (spec §9.5)
+3. The `color-scheme` declaration triplet, when a scheme query is declared
+4. Layout-level styles
+5. Page-level styles
+6. Component-level styles (scoped to custom element shadow DOM or via class namespacing)
 
-This follows the natural CSS cascade — more specific sources override less specific ones.
+This follows the natural CSS cascade — more specific sources override less specific ones, and
+base rules always precede their conditional overrides so equal-specificity variants win by
+source order. When a scheme query is declared, the pre-paint scheme-restore `<script>` is
+injected into the merged `<head>` immediately after the charset/viewport defaults — ahead of
+every style block.
 
 ---
 
