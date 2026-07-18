@@ -48,6 +48,11 @@ export interface CompileOptions {
   formats?: FormatRegistry;
   /** Rewrite Function-def `$src` specifiers to served URLs (see CompileElementOptions). */
   rewriteSrc?: (specifier: string) => string;
+  /**
+   * Inject the color-scheme pre-paint script when `$media` declares a pure scheme query (default
+   * true). The site pipeline disables this and injects via the merged <head> instead.
+   */
+  prePaintScheme?: boolean;
   [key: string]: unknown;
 }
 
@@ -109,6 +114,7 @@ export async function compile(sourcePath: string | JxDocument, opts: CompileOpti
       litHtmlSrc,
       projectStyle,
       reactivitySrc,
+      ...(opts.prePaintScheme === false ? { prePaintScheme: false } : {}),
       ...(opts.rewriteSrc ? { rewriteSrc: opts.rewriteSrc } : {}),
       title,
     });
@@ -156,6 +162,7 @@ export async function compile(sourcePath: string | JxDocument, opts: CompileOpti
     litHtmlSrc,
     projectStyle,
     reactivitySrc,
+    ...(opts.prePaintScheme === false ? { prePaintScheme: false } : {}),
     ...(opts.rewriteSrc ? { rewriteSrc: opts.rewriteSrc } : {}),
     title,
   });

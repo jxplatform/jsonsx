@@ -1,6 +1,11 @@
 ---
 title: "Styling"
 description: "Inline styles, nested CSS selectors, and named media breakpoints in Jx."
+spec:
+  - spec.md#9
+code:
+  - packages/runtime/src/runtime.ts
+  - packages/compiler/src/shared.ts
 ---
 
 # Styling
@@ -74,6 +79,10 @@ Use `@--name` keys in any style object:
 ```
 
 `@--name` references named breakpoints. `@(condition)` is a literal inline media query.
+
+## Color-Scheme Variants
+
+A `$media` entry whose value is exactly a `prefers-color-scheme` query (like `--dark` above) is a _scheme query_: its `@--dark` blocks respond both to the OS preference and to a visitor-forced scheme, and the compiler wires up `color-scheme` and no-flash persistence automatically. See [Color schemes](/docs/framework/concepts/color-schemes) for the full contract and how to build a switcher.
 
 ## Static Style Extraction
 

@@ -304,6 +304,65 @@ describe("buildSite", () => {
     expect(robots).toContain("User-agent: *"); // Preserved from public/robots.txt
     expect(robots).toContain("Sitemap: https://test.com/sitemap.xml");
   });
+
+  it("omits the color-scheme pre-paint script when no scheme query is declared", async () => {
+    await buildSite(TMP, { verbose: false });
+
+    const html = readFileSync(resolve(TMP, "dist/index.html"), "utf8");
+    expect(html).not.toContain("jx-color-scheme");
+    expect(html).not.toContain("data-color-scheme");
+  });
+});
+
+// ── Color-scheme contract ────────────────────────────────────────────────────
+
+describe("buildSite — color scheme", () => {
+  const SCHEME_TMP = resolve(import.meta.dir, "__test-site-scheme__");
+
+  beforeAll(async () => {
+    rmSync(SCHEME_TMP, { force: true, recursive: true });
+    const write = (path: string, obj: unknown) => {
+      mkdirSync(resolve(SCHEME_TMP, ...path.split("/").slice(0, -1)), { recursive: true });
+      writeFileSync(resolve(SCHEME_TMP, path), JSON.stringify(obj, null, 2), "utf8");
+    };
+    write("project.json", {
+      $media: { "--dark": "(prefers-color-scheme: dark)" },
+      build: { outDir: "./dist" },
+      defaults: { lang: "en", layout: "./layouts/base.json" },
+      name: "Scheme Site",
+      style: { "--bg": "#fff", "@--dark": { "--bg": "#000" } },
+    });
+    write("layouts/base.json", {
+      children: [{ children: [{ tagName: "slot" }], tagName: "main" }],
+      tagName: "div",
+    });
+    write("pages/index.json", {
+      children: [{ children: ["Hello"], tagName: "h1" }],
+      title: "Home",
+    });
+    await buildSite(SCHEME_TMP, { verbose: false });
+  });
+
+  afterAll(() => {
+    rmSync(SCHEME_TMP, { force: true, recursive: true });
+  });
+
+  it("injects the pre-paint script exactly once, before the first <style>", () => {
+    const html = readFileSync(resolve(SCHEME_TMP, "dist/index.html"), "utf8");
+    const marker = 'localStorage.getItem("jx-color-scheme")';
+    expect(html).toContain(marker);
+    expect(html.indexOf(marker)).toBe(html.lastIndexOf(marker));
+    expect(html.indexOf(marker)).toBeLessThan(html.indexOf("<style>"));
+  });
+
+  it("dual-emits scheme token overrides and the color-scheme triplet", () => {
+    const html = readFileSync(resolve(SCHEME_TMP, "dist/index.html"), "utf8");
+    expect(html).toContain(
+      "@media (prefers-color-scheme: dark) { :root:where(:not([data-color-scheme])) { --bg: #000 } }",
+    );
+    expect(html).toContain(':root:where([data-color-scheme="dark"]) { --bg: #000 }');
+    expect(html).toContain(":root { color-scheme: light dark }");
+  });
 });
 
 // ── Server worker generation ─────────────────────────────────────────────────

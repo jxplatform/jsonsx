@@ -6,7 +6,15 @@
  * compilation targets (static, client, element, server).
  */
 
-import { RESERVED_KEYS, camelToKebab, toCSSText } from "@jxsuite/runtime";
+import {
+  COLOR_SCHEME_ATTR,
+  COLOR_SCHEME_STORAGE_KEY,
+  RESERVED_KEYS,
+  camelToKebab,
+  pureSchemeOf,
+  schemeSelectors,
+  toCSSText,
+} from "@jxsuite/runtime";
 import { evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
 import { runStatements } from "@jxsuite/runtime/statements";
 import {
@@ -36,7 +44,15 @@ import type {
 } from "@jxsuite/schema/types";
 
 // Re-export runtime utilities used by submodules
-export { RESERVED_KEYS, camelToKebab, toCSSText } from "@jxsuite/runtime";
+export {
+  COLOR_SCHEME_ATTR,
+  COLOR_SCHEME_STORAGE_KEY,
+  RESERVED_KEYS,
+  camelToKebab,
+  pureSchemeOf,
+  schemeSelectors,
+  toCSSText,
+} from "@jxsuite/runtime";
 export { compileExpression, evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
 export { compileStatements, runStatements } from "@jxsuite/runtime/statements";
 
@@ -643,6 +659,94 @@ export function buildInner(
 // ─── CSS extraction ───────────────────────────────────────────────────────────
 
 /**
+ * The inline pre-paint script injected into <head> when a project declares a pure color-scheme
+ * media query: restores the visitor's persisted forced scheme before first paint (no FOUC).
+ *
+ * @returns {string}
+ * @docs framework/concepts/color-schemes
+ */
+export function colorSchemePrePaintScript(): string {
+  const key = JSON.stringify(COLOR_SCHEME_STORAGE_KEY);
+  const attr = JSON.stringify(COLOR_SCHEME_ATTR);
+  return `(function(){try{var s=localStorage.getItem(${key});if(s==="light"||s==="dark"){document.documentElement.setAttribute(${attr},s)}}catch(e){}})()`;
+}
+
+/**
+ * Resolve an `@`-prefixed style key into an emit function that pushes conditional rules. Pure
+ * color-scheme queries dual-emit per the forced-scheme contract (spec §9.5): a media-guarded copy
+ * that applies while no scheme is forced plus an unconditional copy under the forced root
+ * attribute.
+ *
+ * @param {string} atKey
+ * @param {Record<string, string>} mediaQueries
+ * @param {string[]} rules
+ * @returns {(selector: string, props: string) => void}
+ * @docs framework/concepts/color-schemes
+ */
+function conditionalRuleEmitter(
+  atKey: string,
+  mediaQueries: Record<string, string>,
+  rules: string[],
+): (selector: string, props: string) => void {
+  const query = atKey.startsWith("@--")
+    ? (mediaQueries[atKey.slice(1)] ?? atKey.slice(1))
+    : atKey.startsWith("@(")
+      ? atKey.slice(1)
+      : null;
+  const atRule = query === null ? atKey : `@media ${query}`;
+  const scheme = query === null ? null : pureSchemeOf(query);
+  return (selector: string, props: string) => {
+    if (!props) {
+      return;
+    }
+    if (scheme) {
+      const { auto, forced } = schemeSelectors(selector, scheme);
+      rules.push(`${atRule} { ${auto} { ${props} } }`, `${forced} { ${props} }`);
+    } else {
+      rules.push(`${atRule} { ${selector} { ${props} } }`);
+    }
+  };
+}
+
+/**
+ * Push the rules for one `@`-prefixed style block scoped to `selector`: flat props plus one level
+ * of nested selectors, routed through conditionalRuleEmitter (scheme-aware).
+ *
+ * @param {string[]} rules
+ * @param {string} atKey
+ * @param {Record<string, string>} mediaQueries
+ * @param {string} selector
+ * @param {Record<string, unknown>} obj
+ */
+function pushConditionalRule(
+  rules: string[],
+  atKey: string,
+  mediaQueries: Record<string, string>,
+  selector: string,
+  obj: Record<string, unknown>,
+) {
+  if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
+    return;
+  }
+  const emit = conditionalRuleEmitter(atKey, mediaQueries, rules);
+  emit(selector, toCSSText(obj));
+  for (const [sel, sub] of Object.entries(obj)) {
+    if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
+      continue;
+    }
+    if (sel.startsWith("@")) {
+      continue;
+    }
+    const resolved = sel.startsWith("&")
+      ? sel.replace("&", selector)
+      : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
+        ? `${selector}${sel}`
+        : `${selector} ${sel}`;
+    emit(resolved, toCSSText(sub));
+  }
+}
+
+/**
  * Walk the entire document tree and collect all static nested CSS rules.
  *
  * @param {JxElement | JxMutableNode} doc
@@ -671,30 +775,7 @@ export function compileStyles(
           continue;
         }
         if (key.startsWith("@")) {
-          const atRule = key.startsWith("@--")
-            ? `@media ${mediaQueries[key.slice(1)] ?? key.slice(1)}`
-            : key;
-          const mProps = toCSSText(val);
-          if (mProps) {
-            rules.push(`${atRule} { ${selector} { ${mProps} } }`);
-          }
-          for (const [sel, sub] of Object.entries(val as Record<string, unknown>)) {
-            if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
-              continue;
-            }
-            if (sel.startsWith("@")) {
-              continue;
-            }
-            const resolved = sel.startsWith("&")
-              ? sel.replace("&", selector)
-              : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
-                ? `${selector}${sel}`
-                : `${selector} ${sel}`;
-            const subProps = toCSSText(sub);
-            if (subProps) {
-              rules.push(`${atRule} { ${resolved} { ${subProps} } }`);
-            }
-          }
+          pushConditionalRule(rules, key, mediaQueries, selector, val as Record<string, unknown>);
           continue;
         }
         const resolved = key.startsWith("&")
@@ -706,27 +787,6 @@ export function compileStyles(
       }
     };
 
-    for (const [key, val] of Object.entries(projectStyle)) {
-      if (key.startsWith(":") || key.startsWith(".") || key.startsWith("[")) {
-        emitProjectRules(key, val as Record<string, unknown>);
-      } else if (
-        val !== null &&
-        typeof val === "object" &&
-        !Array.isArray(val) &&
-        !key.startsWith("@") &&
-        !key.startsWith("--")
-      ) {
-        emitProjectRules(key, val as Record<string, unknown>);
-      } else if (key.startsWith("@")) {
-        // @media block at top level
-        const atRule = key.startsWith("@--")
-          ? `@media ${mediaQueries[key.slice(1)] ?? key.slice(1)}`
-          : key.startsWith("@(")
-            ? `@media ${key.slice(1)}`
-            : key;
-        rules.push(`${atRule} { body { ${toCSSText(val as Record<string, unknown>)} } }`);
-      }
-    }
     // Collect CSS custom properties into :root {}
     const rootProps: Record<string, unknown> = {};
     // Collect direct CSS properties into body {}
@@ -749,6 +809,7 @@ export function compileStyles(
         bodyProps[key] = val;
       }
     }
+    // Base rules precede conditional blocks so equal-specificity overrides win by source order.
     const rootCSS = toCSSText(rootProps);
     if (rootCSS) {
       rules.push(`:root { ${rootCSS} }`);
@@ -757,6 +818,62 @@ export function compileStyles(
     if (bodyCSS) {
       rules.push(`body { ${bodyCSS} }`);
     }
+
+    for (const [key, val] of Object.entries(projectStyle)) {
+      if (key.startsWith(":") || key.startsWith(".") || key.startsWith("[")) {
+        emitProjectRules(key, val as Record<string, unknown>);
+      } else if (
+        val !== null &&
+        typeof val === "object" &&
+        !Array.isArray(val) &&
+        !key.startsWith("@") &&
+        !key.startsWith("--")
+      ) {
+        emitProjectRules(key, val as Record<string, unknown>);
+      } else if (
+        key.startsWith("@") &&
+        val !== null &&
+        typeof val === "object" &&
+        !Array.isArray(val)
+      ) {
+        // Conditional block at project top level: custom properties override :root, direct
+        // Properties override body, selector-keyed sub-objects their own selector.
+        const emit = conditionalRuleEmitter(key, mediaQueries, rules);
+        const condRoot: Record<string, unknown> = {};
+        const condBody: Record<string, unknown> = {};
+        const condSubs: [string, Record<string, unknown>][] = [];
+        for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
+          if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+            if (!k.startsWith("@")) {
+              condSubs.push([k, v as Record<string, unknown>]);
+            }
+            continue;
+          }
+          if (k.startsWith("--")) {
+            condRoot[k] = v;
+          } else {
+            condBody[k] = v;
+          }
+        }
+        emit(":root", toCSSText(condRoot));
+        emit("body", toCSSText(condBody));
+        for (const [sel, sub] of condSubs) {
+          emit(sel, toCSSText(sub));
+        }
+      }
+    }
+  }
+
+  // Forced-scheme UA hint: native widgets follow the forced attribute, not only the OS scheme.
+  if (
+    Object.values(mediaQueries).some((q) => pureSchemeOf(q) !== null) &&
+    !(projectStyle && typeof projectStyle === "object" && "colorScheme" in projectStyle)
+  ) {
+    rules.push(
+      ":root { color-scheme: light dark }",
+      `:root:where([${COLOR_SCHEME_ATTR}="light"]) { color-scheme: light }`,
+      `:root:where([${COLOR_SCHEME_ATTR}="dark"]) { color-scheme: dark }`,
+    );
   }
 
   const counter = { n: 0 };
@@ -790,32 +907,7 @@ function emitNestedElement(
       continue;
     }
     if (key.startsWith("@")) {
-      const atRule = key.startsWith("@--")
-        ? `@media ${mediaQueries[key.slice(1)] ?? key.slice(1)}`
-        : key.startsWith("@(")
-          ? `@media ${key.slice(1)}`
-          : key;
-      const mProps = toCSSText(val);
-      if (mProps) {
-        rules.push(`${atRule} { ${selector} { ${mProps} } }`);
-      }
-      for (const [sel, sub] of Object.entries(val as Record<string, unknown>)) {
-        if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
-          continue;
-        }
-        if (sel.startsWith("@")) {
-          continue;
-        }
-        const resolved = sel.startsWith("&")
-          ? sel.replace("&", selector)
-          : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
-            ? `${selector}${sel}`
-            : `${selector} ${sel}`;
-        const subProps = toCSSText(sub);
-        if (subProps) {
-          rules.push(`${atRule} { ${resolved} { ${subProps} } }`);
-        }
-      }
+      pushConditionalRule(rules, key, mediaQueries, selector, val as Record<string, unknown>);
       continue;
     }
     const resolved = key.startsWith("&")
@@ -887,35 +979,7 @@ export function collectStyles(
         continue;
       }
       if (prop.startsWith("@")) {
-        const atRule = prop.startsWith("@--")
-          ? `@media ${mediaQueries[prop.slice(1)] ?? prop.slice(1)}`
-          : prop.startsWith("@(")
-            ? `@media ${prop.slice(1)}`
-            : prop;
-        const atBaseProps = toCSSText(val);
-        if (atBaseProps) {
-          rules.push(`${atRule} { ${selector} { ${atBaseProps} } }`);
-        }
-        for (const [sel, nestedRules] of Object.entries(
-          /** @type {Record<string, unknown>} */ val,
-        )) {
-          if (
-            nestedRules === null ||
-            typeof nestedRules !== "object" ||
-            Array.isArray(nestedRules)
-          ) {
-            continue;
-          }
-          if (sel.startsWith("@")) {
-            continue;
-          }
-          const resolved = sel.startsWith("&")
-            ? sel.replace("&", selector)
-            : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
-              ? `${selector}${sel}`
-              : `${selector} ${sel}`;
-          rules.push(`${atRule} { ${resolved} { ${toCSSText(nestedRules)} } }`);
-        }
+        pushConditionalRule(rules, prop, mediaQueries, selector, val as Record<string, unknown>);
       } else {
         const resolved = prop.startsWith("&")
           ? prop.replace("&", selector)
@@ -1325,12 +1389,7 @@ export function buildComponentCSS(
 
     for (const [prop, val] of Object.entries(styleDef)) {
       if (prop.startsWith("@")) {
-        const atRule = prop.startsWith("@--")
-          ? `@media ${mediaQueries[prop.slice(1)] ?? prop.slice(1)}`
-          : prop.startsWith("@(")
-            ? `@media ${prop.slice(1)}`
-            : prop;
-        rules.push(`${atRule} { ${tagName} { ${toCSSText(val as Record<string, unknown>)} } }`);
+        pushConditionalRule(rules, prop, mediaQueries, tagName, val as Record<string, unknown>);
       } else if (
         prop.startsWith(":") ||
         prop.startsWith(".") ||

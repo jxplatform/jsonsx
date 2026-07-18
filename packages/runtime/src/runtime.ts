@@ -1030,14 +1030,25 @@ export function applyStyle(
     if (key === "@--") {
       continue;
     } // Base canvas width, not a real media query
-    const atRule = key.startsWith("@--")
-      ? `@media ${mediaQueries[key.slice(1)] ?? key.slice(1)}`
+    const query = key.startsWith("@--")
+      ? (mediaQueries[key.slice(1)] ?? key.slice(1))
       : key.startsWith("@(")
-        ? `@media ${key.slice(1)}`
-        : key;
+        ? key.slice(1)
+        : null;
+    const atRule = query === null ? key : `@media ${query}`;
     const scope = `[data-jx="${uid}"]`;
-    css += `${atRule} { ${scope} { ${toCSSText(rules)} } }\n`;
-    emitMediaNested(atRule, scope, rules);
+    const scheme = query === null ? null : pureSchemeOf(query);
+    if (scheme) {
+      // Dual-emit scheme rules: a media-guarded copy for auto plus a forced-attribute copy.
+      // The forced root attribute wins over the OS preference.
+      const { auto, forced } = schemeSelectors(scope, scheme);
+      css += `${atRule} { ${auto} { ${toCSSText(rules)} } }\n`;
+      emitMediaNested(atRule, auto, rules);
+      emitNested(forced, rules);
+    } else {
+      css += `${atRule} { ${scope} { ${toCSSText(rules)} } }\n`;
+      emitMediaNested(atRule, scope, rules);
+    }
   }
 
   const tag = document.createElement("style");
@@ -2081,6 +2092,64 @@ export function toCSSText(rules: Record<string, unknown> | object) {
     .filter(([k, v]) => !isNestedSelector(k) && (v === null || typeof v !== "object"))
     .map(([p, v]) => `${camelToKebab(p)}: ${transposeCanvasUnits(String(v))}`)
     .join("; ");
+}
+
+// ─── Color Schemes ────────────────────────────────────────────────────────────
+
+/**
+ * Attribute on the root element (`<html>`) that forces a color scheme. Absent = auto (follow the OS
+ * `prefers-color-scheme`). Values: "light" | "dark".
+ *
+ * @docs framework/concepts/color-schemes
+ */
+export const COLOR_SCHEME_ATTR = "data-color-scheme";
+
+/**
+ * The localStorage key a site switcher persists the visitor's forced scheme under; read by the
+ * compiler-injected pre-paint script. Values: "light" | "dark" (absent = auto).
+ *
+ * @docs framework/concepts/color-schemes
+ */
+export const COLOR_SCHEME_STORAGE_KEY = "jx-color-scheme";
+
+/**
+ * The scheme a _pure_ `prefers-color-scheme` media query targets. Compound queries (any other
+ * conditions attached) return null — they are not eligible for forced-scheme dual emission.
+ *
+ * @param {string} query
+ * @returns {"light" | "dark" | null}
+ * @docs framework/concepts/color-schemes
+ */
+export function pureSchemeOf(query: string): "light" | "dark" | null {
+  const m = /^\(\s*prefers-color-scheme\s*:\s*(light|dark)\s*\)$/.exec(query.trim());
+  return (m?.[1] as "light" | "dark") ?? null;
+}
+
+/**
+ * Selector pair for a scheme-conditional rule: `auto` applies inside the scheme's media query only
+ * while no scheme is forced; `forced` applies unconditionally when the root attribute forces the
+ * scheme. Guards are wrapped in `:where()` so specificity matches the unguarded selector and source
+ * order decides the cascade.
+ *
+ * @param {string} selector
+ * @param {"light" | "dark"} scheme
+ * @returns {{ auto: string; forced: string }}
+ * @docs framework/concepts/color-schemes
+ */
+export function schemeSelectors(
+  selector: string,
+  scheme: "light" | "dark",
+): { auto: string; forced: string } {
+  if (selector === ":root" || selector === "html") {
+    return {
+      auto: `${selector}:where(:not([${COLOR_SCHEME_ATTR}]))`,
+      forced: `${selector}:where([${COLOR_SCHEME_ATTR}="${scheme}"])`,
+    };
+  }
+  return {
+    auto: `:where(:root:not([${COLOR_SCHEME_ATTR}])) ${selector}`,
+    forced: `:where(:root[${COLOR_SCHEME_ATTR}="${scheme}"]) ${selector}`,
+  };
 }
 
 // ─── Custom Element Registration ──────────────────────────────────────────────

@@ -338,7 +338,10 @@ export async function generateSchema() {
         additionalProperties: { type: "string" },
         description:
           "Named media breakpoints following CSS @custom-media convention. " +
-          "Keys use the CSS custom property -- prefix.",
+          "Keys use the CSS custom property -- prefix. Pure color-scheme queries " +
+          '(e.g. "--dark": "(prefers-color-scheme: dark)") are dual-emitted so a ' +
+          "data-color-scheme attribute on the root element forces the scheme " +
+          "regardless of the OS preference (spec §9.5).",
         examples: [
           {
             "--dark": "(prefers-color-scheme: dark)",

@@ -97,6 +97,7 @@
         { "path": "framework/concepts/statements", "label": "Statements" },
         { "path": "framework/concepts/functions", "label": "Functions and sidecars" },
         { "path": "framework/concepts/styling", "label": "Styling" },
+        { "path": "framework/concepts/color-schemes", "label": "Color schemes" },
         { "path": "framework/concepts/lists", "label": "Lists and iteration" },
         { "path": "framework/concepts/data-prototypes", "label": "Data prototypes" },
         { "path": "framework/concepts/timing", "label": "Timing" },

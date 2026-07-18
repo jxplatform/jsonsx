@@ -31,6 +31,23 @@ describe("compileStaticPage", () => {
     expect(html).toContain("viewport");
   });
 
+  test("injects the pre-paint script when a pure scheme query is declared", () => {
+    const doc = {
+      $media: { "--dark": "(prefers-color-scheme: dark)" },
+      children: [{ tagName: "p", textContent: "Hi" }],
+    } as JxDocument;
+    const { html } = compileStaticPage(doc, baseOpts);
+    const marker = 'localStorage.getItem("jx-color-scheme")';
+    expect(html).toContain(marker);
+    expect(html.indexOf(marker)).toBeLessThan(html.indexOf("<style>"));
+  });
+
+  test("omits the pre-paint script without a scheme query", () => {
+    const doc = { $media: { "--md": "(min-width: 768px)" }, children: [] } as JxDocument;
+    const { html } = compileStaticPage(doc, baseOpts);
+    expect(html).not.toContain("jx-color-scheme");
+  });
+
   test("renders nested static elements", () => {
     const doc = {
       children: [

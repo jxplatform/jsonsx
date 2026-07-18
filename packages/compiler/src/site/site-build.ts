@@ -47,10 +47,12 @@ import {
   buildInitialScope,
   collectServerEntries,
   collectStyles,
+  colorSchemePrePaintScript,
   evaluateStaticTemplate,
   isComponentFullyStatic,
   isTemplateString,
   preRenderComponentHtml,
+  pureSchemeOf,
   renderStaticNode,
   resolveRefValue,
   resolveStaticValue,
@@ -727,6 +729,13 @@ async function compilePage(
     layoutDoc.$media = { ...projectConfig.$media, ...layoutDoc.$media };
   }
 
+  // Declaring a pure color-scheme query opts the page into the forced-scheme contract: restore
+  // The visitor's persisted scheme before first paint (spec §9.5). Injected after the
+  // Charset/viewport defaults and ahead of every preserved <style> block.
+  if (Object.values(layoutDoc.$media ?? {}).some((q) => pureSchemeOf(String(q)) !== null)) {
+    mergedHead.splice(2, 0, { tagName: "script", textContent: colorSchemePrePaintScript() });
+  }
+
   // Transform <img> nodes for responsive image optimization
   if (projectConfig.images?.optimize && (imageCache || imageMetaCache)) {
     await transformImageNodes(
@@ -741,6 +750,7 @@ async function compilePage(
   // Compile the document using the existing compiler
   const result = await compile(layoutDoc, {
     lang: projectConfig.defaults?.lang ?? "en",
+    prePaintScheme: false, // Injected via the merged <head> above, not the target template
     projectStyle: projectConfig.style ?? null,
     ...(rewriteSidecarSrc === undefined
       ? {}
