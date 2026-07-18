@@ -363,6 +363,17 @@ Standard markdown nodes map to Jx elements:
 | `---`          | `hr`                                         |
 | Table          | `table` > `thead`/`tbody` > `tr` > `th`/`td` |
 
+Fenced code with a known language tag is syntax-highlighted at compile time in the node-side
+markdown path (`processMarkdown`): the `code` element's text is replaced by token `span`
+children, each carrying its light and dark colors as `--shiki-light` / `--shiki-dark` CSS
+custom properties, and the `code` element gains a `shiki` class alongside `language-<lang>`.
+The page stylesheet chooses which variable paints (typically via the color-scheme contract,
+spec.md §9.5). Grammars: json, typescript, javascript, markdown, html, shellscript, css, yaml
+(plus their registered aliases — `ts`, `js`, `bash`, `sh`, `md`, `yml`, …). Unknown languages
+and bare fences keep plain `textContent`. The browser-safe transpile module
+(`@jxsuite/parser/transpile`) never highlights — Studio and other browser callers see plain
+fences.
+
 ## Limitations
 
 1. **No runtime format** — `.md` always transpiles to JSON before compilation or rendering

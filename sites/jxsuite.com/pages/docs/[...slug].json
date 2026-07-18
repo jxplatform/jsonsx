@@ -54,6 +54,12 @@
           "fontSize": "0.875rem",
           "lineHeight": "1.6"
         },
+        "& pre span": {
+          "color": "var(--shiki-light)"
+        },
+        "@--dark": {
+          "& pre span": { "color": "var(--shiki-dark)" }
+        },
         "& code": {
           "fontFamily": "var(--font-mono)",
           "fontSize": "0.875em"

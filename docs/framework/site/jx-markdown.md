@@ -6,6 +6,7 @@ spec:
 code:
   - extensions/parser/src/transpile.ts
   - extensions/parser/src/serialize.ts
+  - extensions/parser/src/highlight.ts
 ---
 
 # Jx Markdown
@@ -140,6 +141,8 @@ An [array repeater](/docs/studio/design/repeaters) has no `tagName`, so it seria
 ## Standard Markdown
 
 Plain Markdown maps to the elements you'd expect: headings to `h1`–`h6`, paragraphs to `p`, emphasis to `em`/`strong`, links to `a`, images to `img`, lists to `ul`/`ol` + `li`, fenced code to `pre` > `code`, tables to `table` structures. Mixing prose and directives in one file is the normal case, not a special one.
+
+Fenced code with a recognized language tag (`json`, `ts`, `js`, `bash`, `html`, `css`, `yaml`, `md`, and their aliases) is syntax-highlighted at build time: each token becomes a `span` carrying its light and dark colors as `--shiki-light`/`--shiki-dark` CSS variables, so highlighting follows the site's [color scheme](/docs/framework/concepts/color-schemes) automatically. Unknown languages fall back to plain text — no fence ever breaks.
 
 :::doc-note
 These docs are themselves Jx Markdown: every aside like this one is a container directive (`:::doc-note`, `:::doc-tip`, `:::doc-warning`) rendered by a component the docs site registers via `$elements` on its content collection.
