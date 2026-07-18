@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { basename, extname, relative, resolve as resolvePath } from "node:path";
 import { globSync } from "glob";
 import { assignHeadingIds, mdastNodeToJx } from "./transpile.ts";
+import { highlightCodeBlocks } from "./highlight.ts";
 import type { MarkdownFileResult, MdastNode, UnifiedProcessor } from "./types.ts";
 import type { JxElement } from "@jxsuite/schema/types";
 
@@ -185,6 +186,9 @@ export function processMarkdown(
     | JxElement
     | string
   )[];
+
+  // Build-time syntax highlighting: fence text becomes dual-theme token spans in place.
+  highlightCodeBlocks($children);
 
   // One walk assigns deduplicated heading ids AND builds $toc, so rendered anchors and the
   // Table of contents agree by construction (specs/parser.md).

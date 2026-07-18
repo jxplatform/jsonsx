@@ -119,6 +119,8 @@ Frontmatter and data fields live under `data` (`${state.post.data.title}`); for 
 
 Markdown headings in `$children` carry automatic anchor `id`s — the heading text lowercased, punctuation stripped, spaces hyphenated, with `-2`, `-3` suffixes deduplicating repeats in document order. The entry's table of contents (`_meta.toc`: `depth`, `text`, `id` per heading) uses the same ids, so TOC links, search results, and hand-written `#fragment` URLs all land on the rendered section.
 
+Fenced code blocks in `$children` arrive syntax-highlighted: recognized languages become token spans carrying `--shiki-light`/`--shiki-dark` color variables that follow the site's [color scheme](/docs/framework/concepts/color-schemes). See [Jx Markdown](/docs/framework/site/jx-markdown) for the language set.
+
 ## Schema validation
 
 Every entry is validated against its content type's `schema` when collections load — at build time and on the dev server. Missing required fields and type mismatches are reported with the content type and entry id, so a bad frontmatter key fails loudly instead of rendering an empty spot. The same schema drives Studio's [frontmatter forms](/docs/studio/editing/frontmatter) and the content-type builder's field editor.
