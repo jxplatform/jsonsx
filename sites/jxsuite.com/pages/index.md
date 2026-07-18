@@ -52,7 +52,7 @@ Jx Studio is a desktop visual IDE for building real websites. Design on a canvas
 The feel of a visual builder. The power of a framework. The permanence of plain files.
 :::
 
-:::div{style.gap="0.75rem" style.justifyContent="${}" style.flexWrap="wrap" style.marginBottom="0.75rem"}
+:::div{style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap" style.marginBottom="0.75rem"}
 ::cta-button{props.href="/download" props.label="Download Studio" props.variant="primary"}
 
 ::cta-button{props.href="/docs/start/first-project" props.label="Install via CLI" props.variant="secondary"}

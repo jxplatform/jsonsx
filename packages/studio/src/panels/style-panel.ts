@@ -23,7 +23,7 @@ import {
 import { inferInputType, propLabel } from "../utils/studio-utils";
 import { renderFieldRow } from "../ui/field-row";
 import { renderDynamicSlot } from "../ui/dynamic-slot";
-import { parseMediaEntries } from "../utils/canvas-media";
+import { parseMediaEntries, schemeOfQuery } from "../utils/canvas-media";
 import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
 import { computeInheritedStyle } from "../utils/inherited-style";
 import { mediaDisplayName } from "./shared";
@@ -313,6 +313,20 @@ function styleSidebarTemplate(
   const mediaNames = sizeBreakpoints.map((bp) => bp.name);
   const mediaTab = activeMediaTab || null;
 
+  // ── Scheme-layer routing (spec §9.5) ────────────────────────────────────────
+  // With the tab-bar scheme control forcing a scheme that has a matching declared scheme query,
+  // Base-context edits target that scheme's `@--name` block — no extra sidebar tabs. Breakpoint
+  // Tabs stay breakpoint-scoped (scheme × breakpoint compound blocks are unsupported).
+  const forcedScheme = tab.session.ui.previewColorScheme;
+  const schemeLayer =
+    mediaTab === null && (forcedScheme === "light" || forcedScheme === "dark")
+      ? (Object.entries(getEffectiveMedia(tab.doc.document.$media) ?? {}).find(
+          ([, q]) => schemeOfQuery(String(q)) === forcedScheme,
+        )?.[0] ?? null)
+      : null;
+  // The media context edits actually target: a valid breakpoint tab, else the scheme layer.
+  const editMedia = mediaTab && mediaNames.length > 0 ? mediaTab : schemeLayer;
+
   // ── Media tabs template ──────────────────────────────────────────────────
   const mediaTabsT =
     mediaNames.length > 0
@@ -337,7 +351,9 @@ function styleSidebarTemplate(
       : nothing;
 
   // ── Selector dropdown ──────────────────────────────────────────────────────
-  const contextStyle = mediaTab ? (style[`@${mediaTab}`] as Record<string, unknown>) || {} : style;
+  const contextStyle = editMedia
+    ? (style[`@${editMedia}`] as Record<string, unknown>) || {}
+    : style;
   const existingSelectors = Object.keys(contextStyle).filter((s) => isNestedSelector(s));
   const existingSet = new Set(existingSelectors);
   const commonSet = new Set(COMMON_SELECTORS);
@@ -413,10 +429,21 @@ function styleSidebarTemplate(
     </sp-picker>
   `;
 
-  // ── Combined toolbar (media tabs + selector) ───────────────────────────────
+  // ── Combined toolbar (media tabs + scheme badge + selector) ────────────────
+  // No scheme tabs — the tab-bar control is the one switch; the badge shows where edits land.
+  const schemeBadgeT = schemeLayer
+    ? html`
+        <span
+          class="style-scheme-badge"
+          title="Edits target the @${schemeLayer} variant — set the tab-bar scheme control to Auto to edit base styles"
+        >
+          ${mediaDisplayName(schemeLayer)} variant
+        </span>
+      `
+    : nothing;
   const toolbarT = html`
     <div class="style-toolbar">
-      <div class="style-toolbar-tabs">${mediaTabsT}</div>
+      <div class="style-toolbar-tabs">${mediaTabsT} ${schemeBadgeT}</div>
       ${selectorT}
     </div>
   `;
@@ -450,15 +477,15 @@ function styleSidebarTemplate(
   // ── Determine the active style object ──────────────────────────────────────
   let activeStyle: JxStyle;
   let commitMutate: StyleMutateFn;
-  if (activeSelector && isTagPath(activeSelector) && mediaTab && mediaNames.length > 0) {
-    const mediaObj = getNestedStyle(style, `@${mediaTab}`) ?? {};
+  if (activeSelector && isTagPath(activeSelector) && editMedia) {
+    const mediaObj = getNestedStyle(style, `@${editMedia}`) ?? {};
     activeStyle = resolveNestedTagStyle(mediaObj, activeSelector);
     const stylePath = activeSelector.split(" ");
     commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
       mutateUpdateMediaNestedStylePath(
         t,
         sel,
-        mediaTab,
+        editMedia,
         stylePath,
         prop,
         val as string | undefined,
@@ -468,14 +495,14 @@ function styleSidebarTemplate(
     const stylePath = activeSelector.split(" ");
     commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
       mutateUpdateNestedStylePath(t, sel, stylePath, prop, val as string | undefined);
-  } else if (activeSelector && mediaTab && mediaNames.length > 0) {
-    const mediaObj = getNestedStyle(style, `@${mediaTab}`) ?? {};
+  } else if (activeSelector && editMedia) {
+    const mediaObj = getNestedStyle(style, `@${editMedia}`) ?? {};
     activeStyle = getNestedStyle(mediaObj, activeSelector) ?? {};
     commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
       mutateUpdateMediaNestedStyle(
         t,
         sel,
-        mediaTab,
+        editMedia,
         activeSelector,
         prop,
         val as string | undefined,
@@ -486,29 +513,32 @@ function styleSidebarTemplate(
       mutateUpdateNestedStyle(t, sel, activeSelector, prop, val as string | undefined);
   } else {
     activeStyle = {};
-    const inMediaTab = mediaTab !== null && mediaNames.length > 0;
-    const flatSource = inMediaTab ? (getNestedStyle(style, `@${mediaTab}`) ?? {}) : style;
+    const inMediaCtx = editMedia !== null;
+    const flatSource = inMediaCtx ? (getNestedStyle(style, `@${editMedia}`) ?? {}) : style;
     for (const [p, v] of Object.entries(flatSource)) {
       if (typeof v !== "object") {
         activeStyle[p] = v;
       }
     }
-    commitMutate = inMediaTab
+    commitMutate = inMediaCtx
       ? (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
-          mutateUpdateMediaStyle(t, sel, mediaTab, prop, val as string | undefined)
+          mutateUpdateMediaStyle(t, sel, editMedia, prop, val as string | undefined)
       : (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
           mutateUpdateStyle(t, sel, prop, val as string | undefined);
   }
   const commitStyle = (prop: string, val?: string | Record<string, unknown> | undefined) =>
     transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
 
-  // ── Compute inherited style from higher breakpoints ──────────────────────
-  const inheritedStyle: Record<string, string | number> = computeInheritedStyle(
-    style,
-    mediaNames,
-    mediaTab,
-    activeSelector,
-  );
+  // ── Compute inherited style ────────────────────────────────────────────────
+  // Scheme layer: the base styles show through as inherited (placeholders); breakpoint tabs
+  // Inherit from higher breakpoints as before.
+  const inheritedStyle: Record<string, string | number> = schemeLayer
+    ? (Object.fromEntries(
+        Object.entries(
+          activeSelector ? (getNestedStyle(style, activeSelector) ?? {}) : style,
+        ).filter(([, v]) => typeof v !== "object"),
+      ) as Record<string, string | number>)
+    : computeInheritedStyle(style, mediaNames, mediaTab, activeSelector);
 
   // Auto-open sections that have properties
   const newSections = autoOpenSections({ style: activeStyle }, tab.session.ui.styleSections);
@@ -683,7 +713,7 @@ function styleSidebarTemplate(
                 sec.$layout === "grid",
                 inheritedStyle[prop] as string | undefined,
                 templateSignals,
-                `style|${sel.join("/")}|${mediaTab ?? ""}|${activeSelector ?? ""}|${prop}`,
+                `style|${sel.join("/")}|${editMedia ?? ""}|${activeSelector ?? ""}|${prop}`,
               ),
             );
           }

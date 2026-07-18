@@ -69,6 +69,13 @@ export type ParentToIframe =
   // Flip the forced color-scheme preview on the iframe root without re-rendering — a document-level
   // Idempotent attribute write, deliberately gen-less (like endEdit).
   | { kind: "setColorScheme"; scheme: "light" | "dark" | null }
+  // Replace the injected site-style sheet in place (live design-token editing) — idempotent and
+  // Render-free; the superseding render carries the same style via its own siteStyle.
+  | {
+      kind: "siteStyleUpdate";
+      siteStyle: Record<string, unknown> | null;
+      media: Record<string, string>;
+    }
   // Ask the iframe to measure the given document paths and post their current rects back. Used to
   // Draw the selection overlay regardless of where the selection change originated (canvas click,
   // Layers panel, keyboard) — the parent can't measure iframe nodes itself (cross-origin bridge).

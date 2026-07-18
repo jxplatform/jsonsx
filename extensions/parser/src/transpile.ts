@@ -464,6 +464,16 @@ export function mdastNodeToJx(node: MdastNode) {
 
     case "table": {
       const rows = convertChildren(node.children ?? []);
+      // GFM's first table row is the header row, but mdast does not mark its cells — retag them
+      // To <th> so the <thead> carries real column headers (assistive tech relies on this).
+      const [headerRow] = rows;
+      if (headerRow && typeof headerRow === "object" && Array.isArray(headerRow.children)) {
+        for (const cell of headerRow.children) {
+          if (cell && typeof cell === "object" && (cell as JxElement).tagName === "td") {
+            (cell as JxElement).tagName = "th";
+          }
+        }
+      }
       const thead = rows.length > 0 ? { children: [rows[0]], tagName: "thead" } : null;
       const tbody = rows.length > 1 ? { children: rows.slice(1), tagName: "tbody" } : null;
       el.children = [thead, tbody].filter(Boolean) as JxElement[];

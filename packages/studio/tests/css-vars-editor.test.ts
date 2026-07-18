@@ -307,3 +307,81 @@ describe("other section", () => {
     expect(style()["--z-index-modal"]).toBe("100");
   });
 });
+
+// ─── Scheme-aware color tokens (spec §9.5) ───────────────────────────────────
+
+describe("color scheme overrides", () => {
+  const SCHEME_MEDIA = { "--dark": "(prefers-color-scheme: dark)" };
+
+  test("scheme rows render per color token with the current override or an inherits placeholder", () => {
+    const { container } = setup(
+      { ...baseStyle(), "@--dark": { "--color-primary": "#111111" } },
+      SCHEME_MEDIA,
+    );
+    const colors = groupByTitle(container, "Colors");
+    const schemeRows = [...colors.querySelectorAll(".css-var-scheme-row")];
+    // One Dark row per color token (accent + primary).
+    expect(schemeRows).toHaveLength(2);
+    expect(schemeRows[0]!.querySelector(".css-var-media-label")?.textContent?.trim()).toBe("Dark");
+    const values = schemeRows.map(
+      (r) => (r.querySelector("sp-textfield") as HTMLInputElement).value,
+    );
+    expect(values).toContain("#111111");
+    expect(values).toContain("");
+  });
+
+  test("editing a scheme row writes the token into the @--dark block", () => {
+    const { container } = setup(baseStyle(), SCHEME_MEDIA);
+    const colors = groupByTitle(container, "Colors");
+    const darkRow = colors.querySelector(".css-var-scheme-row")!;
+    setAndFire(darkRow.querySelector("sp-textfield")!, "#0a0a0a");
+    expect((style()["@--dark"] as AnyConfig)["--color-accent"]).toBe("#0a0a0a");
+  });
+
+  test("clearing a scheme override deletes the key and drops the emptied block", () => {
+    const { container } = setup(
+      { ...baseStyle(), "@--dark": { "--color-accent": "#0a0a0a" } },
+      SCHEME_MEDIA,
+    );
+    const colors = groupByTitle(container, "Colors");
+    const darkRow = [...colors.querySelectorAll(".css-var-scheme-row")].find(
+      (r) => (r.querySelector("sp-textfield") as HTMLInputElement).value === "#0a0a0a",
+    )!;
+    setAndFire(darkRow.querySelector("sp-textfield")!, "");
+    expect(style()["@--dark"]).toBeUndefined();
+  });
+
+  test("scheme queries are excluded from size-token media overrides", () => {
+    const { container } = setup(
+      { ...baseStyle(), "@--dark": { "--size-gap": "4px" } },
+      { "--dark": "(prefers-color-scheme: dark)", "--sm": "(max-width: 600px)" },
+    );
+    const sizes = groupByTitle(container, "Sizes & Spacing");
+    const labels = [...sizes.querySelectorAll(".css-var-media-label")].map((l) =>
+      l.textContent?.trim(),
+    );
+    expect(labels).toContain("@--sm");
+    expect(labels).not.toContain("@--dark");
+  });
+
+  test("Enable dark scheme writes the scheme query into $media", async () => {
+    const { container } = setup(baseStyle(), { "--sm": "(max-width: 600px)" });
+    const colors = groupByTitle(container, "Colors");
+    expect(colors.querySelectorAll(".css-var-scheme-row")).toHaveLength(0);
+    pointer(colors.querySelector(".css-vars-enable-dark")!, "click");
+    await flush();
+    expect((projectState as AnyConfig).projectConfig.$media["--dark"]).toBe(
+      "(prefers-color-scheme: dark)",
+    );
+    // The editor re-rendered with the scheme rows now visible.
+    expect(
+      groupByTitle(container, "Colors").querySelectorAll(".css-var-scheme-row").length,
+    ).toBeGreaterThan(0);
+  });
+
+  test("no scheme UI without a declared scheme query", () => {
+    const { container } = setup(baseStyle(), { "--sm": "(max-width: 600px)" });
+    expect(container.querySelectorAll(".css-var-scheme-row")).toHaveLength(0);
+    expect(container.querySelector(".css-vars-enable-dark")).not.toBeNull();
+  });
+});

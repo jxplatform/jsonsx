@@ -8,6 +8,7 @@
 import { postMessageChannel } from "./iframe-channel";
 import {
   applyPreviewColorScheme,
+  applySiteStyle,
   installCanvasImageRetry,
   renderResolvedDocument,
 } from "./iframe-render";
@@ -489,6 +490,11 @@ export function startCanvasIframe(opts: {
     if (msg.kind === "setColorScheme") {
       // Document-level attribute flip — deliberately patch-free (no render, no gen).
       applyPreviewColorScheme(container.ownerDocument, msg.scheme);
+      return;
+    }
+    if (msg.kind === "siteStyleUpdate") {
+      // Live design-token edit: swap the site-style sheet in place, no re-render.
+      applySiteStyle(msg.siteStyle, msg.media);
       return;
     }
     if (msg.kind !== "render" || msg.gen < latestGen) {

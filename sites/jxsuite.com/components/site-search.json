@@ -72,8 +72,7 @@
       "$title": "Search Trigger",
       "tagName": "button",
       "attributes": {
-        "popovertarget": "site-search-modal",
-        "aria-label": "Search docs"
+        "popovertarget": "site-search-modal"
       },
       "style": {
         "display": "inline-flex",

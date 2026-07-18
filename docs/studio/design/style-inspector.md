@@ -19,6 +19,7 @@ The Style inspector is the **Style** tab of the right panel — a full set of vi
 Two controls sit above the sections:
 
 - **Breakpoint tabs** — **Base** plus one tab per breakpoint. Base values apply everywhere; a breakpoint tab edits overrides for that screen size only. See **[Breakpoints](/docs/studio/design/breakpoints)**.
+- **Scheme layer** — no extra tab: when the tab bar's Auto/Light/Dark control forces a scheme the project declares, Base-context edits target that scheme's overrides instead, and a "Dark variant"-style badge appears beside the tabs. Base values show through as dimmed placeholders. Switch back to **Auto** to edit base styles; breakpoint tabs always stay breakpoint-scoped.
 - **The selector menu** — style the element's `:hover`, `:focus`, and other states, or a selector of your own. See **[Hover states and selectors](/docs/studio/design/states-and-selectors)**.
 
 Below them, the filter bar narrows the property list: type part of a property's name, or switch on **Active** to show only properties that have values. While filtering, every matching section stays open.

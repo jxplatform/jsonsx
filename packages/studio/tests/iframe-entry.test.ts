@@ -76,6 +76,32 @@ describe("startCanvasIframe", () => {
     expect(document.documentElement.dataset.colorScheme).toBeUndefined();
   });
 
+  test("siteStyleUpdate replaces the site-style sheet in place without a render", async () => {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const fromIframe: IframeToParent[] = [];
+    pair.parent.onMessage((m) => fromIframe.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.flush();
+
+    pair.parent.post({
+      kind: "siteStyleUpdate",
+      media: { "--dark": "(prefers-color-scheme: dark)" },
+      siteStyle: { "--brand": "#0f0", "@--dark": { "--brand": "#111" } },
+    });
+    pair.flush();
+    const css = document.head.querySelector("#jx-site-style")!.textContent!;
+    expect(css).toContain(":root { --brand: #0f0 }");
+    expect(css).toContain(':root:where([data-color-scheme="dark"]) { --brand: #111 }');
+    // No render happened — only the ready announcement crossed back.
+    expect(fromIframe.map((m) => m.kind)).toEqual(["ready"]);
+
+    pair.parent.post({ kind: "siteStyleUpdate", media: {}, siteStyle: null });
+    pair.flush();
+    expect(document.head.querySelector("#jx-site-style")).toBeNull();
+  });
+
   test("a render message applies its colorScheme to the root", async () => {
     const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
     const container = document.createElement("div");
