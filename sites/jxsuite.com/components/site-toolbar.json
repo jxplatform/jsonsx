@@ -5,7 +5,7 @@
     "position": "sticky",
     "top": "0",
     "zIndex": "100",
-    "backgroundColor": "rgba(10, 10, 10, 0.8)",
+    "backgroundColor": "var(--color-backdrop)",
     "backdropFilter": "blur(12px)",
     "borderBottom": "1px solid var(--color-border)",
     "padding": "0 clamp(1rem, 3vw, 2rem)"
@@ -13,6 +13,7 @@
   "children": [
     {
       "tagName": "nav",
+      "attributes": { "aria-label": "Main" },
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
@@ -123,6 +124,7 @@
               "children": ["Docs"]
             },
             { "tagName": "site-search" },
+            { "tagName": "theme-toggle" },
             {
               "tagName": "a",
               "attributes": {
@@ -146,7 +148,7 @@
               "style": {
                 "display": "inline-flex",
                 "alignItems": "center",
-                "backgroundColor": "var(--color-accent)",
+                "backgroundColor": "var(--color-accent-solid)",
                 "color": "white",
                 "textDecoration": "none",
                 "fontSize": "0.875rem",
@@ -215,7 +217,7 @@
           "$title": "Mobile Menu Popover",
           "tagName": "nav",
           "id": "site-mobile-menu",
-          "attributes": { "popover": "" },
+          "attributes": { "popover": "", "aria-label": "Site menu" },
           "style": {
             "inset": "0 0 0 auto",
             "width": "min(300px, 80vw)",
@@ -225,7 +227,7 @@
             "border": "none",
             "margin": "0",
             "padding": "4.5rem 0 2rem",
-            "boxShadow": "-8px 0 24px rgba(0, 0, 0, 0.4)",
+            "boxShadow": "-8px 0 24px var(--color-shadow)",
             "display": "flex",
             "flexDirection": "column",
             "transform": "translateX(100%)",
@@ -240,6 +242,12 @@
             "@starting-style": {
               ":popover-open": { "transform": "translateX(100%)" },
               "&:popover-open::backdrop": { "opacity": "0" }
+            },
+            "@(prefers-reduced-motion: reduce)": {
+              "transition": "none",
+              "transform": "none",
+              ":popover-open": { "transform": "none" },
+              "::backdrop": { "transition": "none" }
             }
           },
           "children": [
@@ -382,6 +390,21 @@
               "children": ["GitHub"]
             },
             {
+              "$title": "Mobile Scheme Row",
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "padding": "0.9rem 1.5rem",
+                "color": "var(--color-text-primary)",
+                "fontSize": "1rem",
+                "fontWeight": "500",
+                "borderBottom": "1px solid var(--color-border-subtle)"
+              },
+              "children": ["Color scheme", { "tagName": "theme-toggle" }]
+            },
+            {
               "tagName": "a",
               "attributes": {
                 "href": "/download",
@@ -392,7 +415,7 @@
                 "display": "block",
                 "margin": "1.25rem 1.5rem 0",
                 "padding": "0.75rem 1.5rem",
-                "backgroundColor": "var(--color-accent)",
+                "backgroundColor": "var(--color-accent-solid)",
                 "color": "white",
                 "textDecoration": "none",
                 "fontSize": "1rem",

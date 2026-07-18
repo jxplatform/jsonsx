@@ -27,7 +27,7 @@
         "fontWeight": "600",
         "fontSize": "0.9375rem",
         "transition": "background-color 0.15s, border-color 0.15s, color 0.15s",
-        "backgroundColor": "${state.isPrimary ? 'var(--color-accent)' : 'transparent'}",
+        "backgroundColor": "${state.isPrimary ? 'var(--color-accent-solid)' : 'transparent'}",
         "color": "${state.isPrimary ? 'white' : 'var(--color-text-secondary)'}",
         "border": "${state.isPrimary ? '1px solid transparent' : '1px solid var(--color-border)'}"
       },
