@@ -288,6 +288,69 @@ describe("media tabs", () => {
   });
 });
 
+// ─── Color-scheme layer routing (spec §9.5) ──────────────────────────────────
+
+describe("color-scheme layer routing", () => {
+  const SCHEME_MEDIA = { "--dark": "(prefers-color-scheme: dark)", ...MEDIA };
+
+  function setupSchemeTab(
+    style: JxStyle | undefined,
+    media: Record<string, string> = SCHEME_MEDIA,
+  ) {
+    resetStudioState();
+    const doc = {
+      $media: media,
+      children: [{ ...(style ? { style } : {}), tagName: "section" }],
+      tagName: "div",
+    } as unknown as JxMutableNode;
+    const tab = resetWorkspaceWithTab(doc);
+    tab.session.selection = ["children", 0];
+    return tab;
+  }
+
+  test("forced Dark shows the variant badge and routes base-context edits into @--dark", async () => {
+    const tab = setupSchemeTab({ "@--dark": { textTransform: "uppercase" }, color: "blue" });
+    tab.session.ui.previewColorScheme = "dark";
+    const c = await renderPanel();
+    expect(c.querySelector(".style-scheme-badge")?.textContent).toContain("Dark variant");
+    // The scheme block is the active context: its props render, and clearing edits it in place.
+    const r = row(c, "textTransform");
+    expect(r).not.toBeNull();
+    click(r!.querySelector(".set-dot"));
+    expect(selectedNode().style?.["@--dark"]).toBeUndefined();
+    expect(selectedNode().style?.color).toBe("blue");
+  });
+
+  test("Auto keeps base-context editing and shows no badge", async () => {
+    const tab = setupSchemeTab({ color: "blue" });
+    tab.session.ui.previewColorScheme = "auto";
+    const c = await renderPanel();
+    expect(c.querySelector(".style-scheme-badge")).toBeNull();
+    click(row(c, "color")!.querySelector(".set-dot"));
+    expect(selectedNode().style?.color).toBeUndefined();
+  });
+
+  test("a breakpoint tab stays breakpoint-scoped even while a scheme is forced", async () => {
+    const tab = setupSchemeTab({ "@sm": { textTransform: "uppercase" }, color: "blue" });
+    tab.session.ui.previewColorScheme = "dark";
+    tab.session.ui.activeMedia = "sm";
+    const c = await renderPanel();
+    expect(c.querySelector(".style-scheme-badge")).toBeNull();
+    click(row(c, "textTransform")!.querySelector(".set-dot"));
+    expect(selectedNode().style?.["@sm"]).toBeUndefined();
+    expect(selectedNode().style?.color).toBe("blue");
+  });
+
+  test("no declared scheme query — forced scheme falls back to base routing", async () => {
+    const tab = setupSchemeTab({ color: "blue" }, MEDIA);
+    tab.session.ui.previewColorScheme = "dark";
+    const c = await renderPanel();
+    expect(c.querySelector(".style-scheme-badge")).toBeNull();
+    click(row(c, "color")!.querySelector(".set-dot"));
+    expect(selectedNode().style?.color).toBeUndefined();
+  });
+});
+
 // ─── Selector modes ──────────────────────────────────────────────────────────
 
 describe("selector style editing", () => {

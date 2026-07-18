@@ -24,7 +24,15 @@ import { clearDragGhost, moveDragGhost } from "../panels/drag-ghost";
 import { applyDropInstruction } from "../panels/dnd";
 import { rectOf } from "../utils/geometry";
 import { effect, effectScope } from "../reactivity";
-import { canvasPanels, canvasWrap, pathsEqual, renderOnly, updateCanvas, updateUi } from "../store";
+import {
+  canvasPanels,
+  canvasWrap,
+  pathsEqual,
+  projectState,
+  renderOnly,
+  updateCanvas,
+  updateUi,
+} from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
 import { collabState } from "../collab/collab-state";
 import { getPlatform, hasPlatform } from "../platform";
@@ -1463,6 +1471,35 @@ export function postColorSchemeToLiveHosts(scheme: "light" | "dark" | null): voi
     }
     if (host.ready) {
       host.channel.post({ kind: "setColorScheme", scheme });
+    }
+  }
+}
+
+/**
+ * Push the project's current site style to every ready PAGE host as an in-place sheet replace (live
+ * design-token editing — stylebook hosts pre-merge site style into the specimen doc and are
+ * skipped). Render-free; the next full render carries the same style via its own siteStyle.
+ */
+export function postSiteStyleToLiveHosts(): void {
+  const config = projectState?.projectConfig;
+  if (!config) {
+    return;
+  }
+  // Site config comes off a reactive store — only plain values may cross postMessage.
+  // oxlint-disable-next-line unicorn/prefer-structured-clone
+  const siteStyle = JSON.parse(JSON.stringify(config.style ?? null)) as Record<
+    string,
+    unknown
+  > | null;
+  // oxlint-disable-next-line unicorn/prefer-structured-clone
+  const media = JSON.parse(JSON.stringify(config.$media ?? {})) as Record<string, string>;
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    if (host.ready && !host.stylebook) {
+      host.channel.post({ kind: "siteStyleUpdate", media, siteStyle });
     }
   }
 }

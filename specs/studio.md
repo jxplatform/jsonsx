@@ -405,6 +405,8 @@ Properties conditionally appear based on other property values (e.g. flex proper
 
 Tabs for each `$media` breakpoint, allowing responsive style editing per breakpoint. The media tabs and pseudo-selector share a single compact toolbar row — tabs on the left, selector picker on the right (quiet `sp-picker`).
 
+Color-scheme variants add **no extra tabs**: the tab-bar Auto/Light/Dark control (§4.1) is the one scheme switch per tab. While a scheme with a matching declared scheme query is forced, Base-context reads and commits target that scheme's `@--name` block through the same media-style mutations, a "… variant" badge beside the tabs marks the active layer, and base values show through as inherited placeholders. Size-breakpoint tabs stay breakpoint-scoped regardless of the toggle — scheme × breakpoint compound blocks are not supported (spec.md §9.5's pure-query limitation).
+
 #### Nested Selector Context
 
 Nested CSS selectors (`:hover`, `:focus`, `:active`, `& childTag`) are editable as separate style contexts. The selector picker is inline in the media tabs toolbar bar, right-aligned.
@@ -469,7 +471,9 @@ Selection works from both the layers panel (click row) and the canvas (click ele
 
 ### 7.4 Style Editing
 
-Editing styles in stylebook mode writes nested CSS rules (`& tag`) to the document's root `$style` object. Media breakpoint tabs allow responsive token editing.
+Editing styles in stylebook mode writes nested CSS rules (`& tag`) to the document's root `$style` object. Media breakpoint tabs allow responsive token editing. Scheme-layer routing applies here exactly as in the style sidebar (§6.2): a forced scheme routes edits into the corresponding `@--name` block, which the live `styleUpdate` path re-applies through the runtime's dual emission.
+
+The site-settings design-token editor is scheme-aware for color tokens: each color row carries a per-scheme override field writing into the project style's scheme block, and an "Enable dark scheme" affordance declares the `--dark` scheme query in `$media` for projects that have none — the opt-in that lights up every scheme control in Studio. Token edits push to live page canvases as an in-place site-style sheet replace (no re-render).
 
 ---
 

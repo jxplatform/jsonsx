@@ -1,6 +1,6 @@
 import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
+import { flush, resetStudioState, resetWorkspaceWithTab, stubRect } from "./harness";
 import { activeTab } from "../src/workspace/workspace";
 import { reactive } from "../src/reactivity";
 import { canvasPanels, canvasWrap, initShellRefs, registerRenderer } from "../src/store";
@@ -89,6 +89,7 @@ const {
   postApplyFormat,
   postColorSchemeToLiveHosts,
   postDragMessage,
+  postSiteStyleToLiveHosts,
   postPatchToHosts,
   postStyleUpdateToStylebookHosts,
   requestCanvasEval,
@@ -144,6 +145,26 @@ describe("mountIframeCanvas", () => {
     activeTab.value!.session.ui.previewColorScheme = "dark";
     await mountIframeCanvas(2, { tagName: "div" } as never, canvasEl);
     expect(channels[0]!.posts[1]).toMatchObject({ colorScheme: "dark", kind: "render" });
+  });
+
+  test("postSiteStyleToLiveHosts pushes the project style to ready page hosts", async () => {
+    resetStudioState({
+      projectConfig: {
+        $media: { "--dark": "(prefers-color-scheme: dark)" },
+        style: { "--brand": "#0f0" },
+      } as never,
+    });
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    channels[0]!.deliver({ kind: "ready" });
+
+    postSiteStyleToLiveHosts();
+    expect(channels[0]!.posts.at(-1)).toEqual({
+      kind: "siteStyleUpdate",
+      media: { "--dark": "(prefers-color-scheme: dark)" },
+      siteStyle: { "--brand": "#0f0" },
+    });
   });
 
   test("postColorSchemeToLiveHosts posts setColorScheme to ready hosts only", async () => {

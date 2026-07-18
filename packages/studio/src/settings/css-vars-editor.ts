@@ -1,16 +1,25 @@
 /// <reference lib="dom" />
 /**
- * CSS Variables editor — form-based editor for managing design tokens. Colors and fonts are NOT
- * media-aware; sizes/spacing are media-aware.
+ * CSS Variables editor — form-based editor for managing design tokens. Colors are scheme-aware
+ * (per-scheme overrides in `@--dark`-style blocks, spec §9.5); sizes/spacing are media-aware; fonts
+ * are neither.
  */
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import { projectState } from "../store";
 import { getEffectiveMedia, updateSiteConfig } from "../site-context";
+import { postSiteStyleToLiveHosts } from "../canvas/iframe-host";
+import { isSchemeQuery, schemeOfQuery } from "../utils/canvas-media";
 import { friendlyNameToVar, varDisplayName } from "../utils/studio-utils";
 
 import type { JxStyle } from "@jxsuite/schema/types";
+
+/** A declared scheme query in $media: the block key name plus the scheme it targets. */
+export interface SchemeEntry {
+  name: string;
+  scheme: "light" | "dark";
+}
 
 /** @param {HTMLElement} container */
 export function renderCssVarsEditor(container: HTMLElement) {
@@ -50,15 +59,54 @@ export function renderCssVarsEditor(container: HTMLElement) {
     }
   }
 
-  const mediaNames = media ? Object.keys(media).filter((m) => m !== "--") : [];
+  const mediaNames = media
+    ? Object.keys(media).filter((m) => m !== "--" && !isSchemeQuery(String(media[m])))
+    : [];
+  const schemeEntries: SchemeEntry[] = media
+    ? Object.entries(media).flatMap(([name, query]) => {
+        const scheme = schemeOfQuery(String(query));
+        return scheme ? [{ name, scheme }] : [];
+      })
+    : [];
 
   const save = () => {
     void updateSiteConfig({ style: { ...rootStyle } });
+    // Live canvas feedback: replace the site-style sheet in place — no re-render needed.
+    postSiteStyleToLiveHosts();
   };
 
   const updateVar = (name: string, val: string) => {
     rootStyle[name] = val;
     save();
+  };
+
+  // Write/clear a per-scheme token override in the scheme's `@--name` block (spec §9.5). An empty
+  // Value clears the override (and drops the block when it empties) — the token inherits the base.
+  const updateSchemeVar = (schemeName: string, varName: string, val: string) => {
+    const key = `@${schemeName}`;
+    if (val) {
+      const block = (rootStyle[key] ??= {}) as Record<string, unknown>;
+      block[varName] = val;
+    } else {
+      const block = rootStyle[key];
+      if (block && typeof block === "object") {
+        delete (block as Record<string, unknown>)[varName];
+        if (Object.keys(block).length === 0) {
+          delete rootStyle[key];
+        }
+      }
+    }
+    save();
+    renderCssVarsEditor(container);
+  };
+
+  // Without a declared scheme query nothing ever shows the scheme UI (here or in the tab bar) —
+  // This is the opt-in affordance for existing projects. Re-render after the async config update
+  // Lands (unlike style edits, $media is not mutated in place).
+  const enableDarkScheme = () => {
+    void updateSiteConfig({
+      $media: { ...config.$media, "--dark": "(prefers-color-scheme: dark)" },
+    }).then(() => renderCssVarsEditor(container));
   };
 
   const deleteVar = (name: string) => {
@@ -81,7 +129,16 @@ export function renderCssVarsEditor(container: HTMLElement) {
     <div class="settings-section">
       <h3 class="settings-section-title">CSS Variables</h3>
 
-      ${renderColorSection(groups.color, updateVar, deleteVar, addVar)}
+      ${renderColorSection(
+        groups.color,
+        updateVar,
+        deleteVar,
+        addVar,
+        rootStyle,
+        schemeEntries,
+        updateSchemeVar,
+        enableDarkScheme,
+      )}
       ${renderFontSection(groups.font, updateVar, deleteVar, addVar)}
       ${renderSizeSection(groups.size, updateVar, deleteVar, addVar, rootStyle, mediaNames)}
       ${groups.other.length > 0
@@ -104,6 +161,10 @@ function renderColorSection(
   updateVar: (name: string, val: string) => void,
   deleteVar: (name: string) => void,
   addVar: (prefix: string, friendlyName: string, val: string) => void,
+  rootStyle: JxStyle,
+  schemeEntries: SchemeEntry[],
+  updateSchemeVar: (schemeName: string, varName: string, val: string) => void,
+  enableDarkScheme: () => void,
 ) {
   return html`
     <div class="css-vars-group">
@@ -129,9 +190,66 @@ function renderColorSection(
               <sp-icon-delete slot="icon"></sp-icon-delete>
             </sp-action-button>
           </div>
+          ${schemeEntries.map((entry) =>
+            renderSchemeOverride(name, rootStyle, entry, updateSchemeVar),
+          )}
         `,
       )}
       ${renderAddRow("--color-", "Primary Blue", "#3b82f6", addVar)}
+      ${schemeEntries.length === 0
+        ? html`
+            <sp-action-button
+              size="s"
+              class="css-vars-enable-dark"
+              title="Add a dark color scheme: declares --dark in $media so every color token can carry a dark value"
+              @click=${enableDarkScheme}
+            >
+              Enable dark scheme
+            </sp-action-button>
+          `
+        : nothing}
+    </div>
+  `;
+}
+
+/**
+ * One per-scheme override row under a color token: swatch + field bound to the scheme block's
+ * value. Empty shows "inherits" (the base value applies); clearing deletes the override.
+ *
+ * @param {string} varName
+ * @param {JxStyle} rootStyle
+ * @param {SchemeEntry} entry
+ * @param {(schemeName: string, varName: string, val: string) => void} updateSchemeVar
+ */
+function renderSchemeOverride(
+  varName: string,
+  rootStyle: JxStyle,
+  entry: SchemeEntry,
+  updateSchemeVar: (schemeName: string, varName: string, val: string) => void,
+) {
+  const block = rootStyle[`@${entry.name}`];
+  const current =
+    block && typeof block === "object" ? (block as Record<string, unknown>)[varName] : undefined;
+  const label = entry.scheme === "dark" ? "Dark" : "Light";
+  return html`
+    <div class="css-var-media-row css-var-scheme-row">
+      <span class="css-var-media-label">${label}</span>
+      <div class="css-var-swatch" style="background:${current ?? "transparent"}">
+        <input
+          type="color"
+          .value=${current && String(current).startsWith("#") ? String(current) : "#111111"}
+          @input=${(e: Event) =>
+            updateSchemeVar(entry.name, varName, (e.target as HTMLInputElement).value)}
+        />
+      </div>
+      <sp-textfield
+        size="s"
+        placeholder="inherits"
+        .value=${current == null ? "" : String(current)}
+        @change=${(e: Event) =>
+          updateSchemeVar(entry.name, varName, (e.target as HTMLInputElement).value)}
+        style="flex:1;max-width:160px"
+      ></sp-textfield>
     </div>
   `;
 }

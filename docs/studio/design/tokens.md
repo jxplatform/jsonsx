@@ -20,7 +20,7 @@ A design token is a named value — **Primary Blue** instead of `#3b82f6`, **Bod
 
 Tokens are grouped by what they name:
 
-- **Colors** — each row has a color swatch (click it for a native picker), the token's name, and its value.
+- **Colors** — each row has a color swatch (click it for a native picker), the token's name, and its value. When the project declares a [color scheme](/docs/framework/concepts/color-schemes), each color token also carries a per-scheme row (e.g. **Dark**) — leave it empty to inherit the base value, or set it to give the token a scheme-specific value. Projects without a scheme get an **Enable dark scheme** button that declares one. Edits appear on the canvas immediately.
 - **Fonts** — each font renders a preview sentence in its own face below the row.
 - **Sizes & Spacing** — widths, gaps, and radii. When a size token has a different value at a breakpoint, the override appears beneath it for editing.
 - **Other** — anything that doesn't fit the groups above.
