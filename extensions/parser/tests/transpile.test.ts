@@ -802,9 +802,9 @@ describe("transpileJxMarkdown", () => {
             children: [
               {
                 children: [
-                  // Remark-gfm does not mark header cells with isHeader in this pipeline
-                  { tagName: "td", textContent: "Name" },
-                  { tagName: "td", textContent: "Age" },
+                  // The first GFM row is the header row — its cells are retagged to <th>
+                  { tagName: "th", textContent: "Name" },
+                  { tagName: "th", textContent: "Age" },
                 ],
                 tagName: "tr",
               },
