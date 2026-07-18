@@ -166,7 +166,9 @@ describe("buildSite with the connector extension", () => {
     expect(worker).not.toMatch(/from\s*["']@jxsuite\//);
     expect(worker).not.toMatch(/from\s*["']hono["']/);
     expect(worker).not.toMatch(/from\s*["']kysely["']/);
-  });
+    // Cold-bundles kysely + hono via Bun.build (~1s+ unloaded); headroom over the 5s default so a
+    // Heavily parallel `bun test --isolate` run can't time it out under filesystem load.
+  }, 30_000);
 
   test("static adapter + data tables is a clear build error", async () => {
     const staticDir = `${TMP}-static`;
@@ -491,5 +493,7 @@ describe("buildSite with the auth extension", () => {
     } finally {
       rmSync(dir, { force: true, recursive: true });
     }
-  });
+    // Cold-bundles better-auth via Bun.build (~2s unloaded); headroom over the 5s default keeps a
+    // Heavily parallel `bun test --isolate` run from timing it out under filesystem load.
+  }, 30_000);
 });
