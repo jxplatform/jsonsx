@@ -11,7 +11,9 @@
   fetchgit,
 }:
 let
-  version = (lib.importJSON ../../package.json).version;
+  # Version comes from the desktop package (the app this derivation actually builds), not the
+  # monorepo root — they drift independently.
+  version = (lib.importJSON ./package.json).version;
 
   # Import the bun2nix-generated package set, but wrap each fetcher so we learn
   # which entries are plain registry tarballs (the only ones the offline
