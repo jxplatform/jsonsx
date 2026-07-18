@@ -6,6 +6,7 @@ import {
   setStampPropBindings,
 } from "@jxsuite/runtime";
 import {
+  applyPreviewColorScheme,
   applySiteStyle,
   EDIT_PLACEHOLDER_CSS,
   EDIT_PLACEHOLDER_STYLE_ID,
@@ -215,17 +216,18 @@ describe("canvas transpose + anchor de-link flags", () => {
   test("applySiteStyle transposes viewport units to container units", () => {
     setCanvasViewportTranspose(true);
     applySiteStyle({ "--hero-h": "50vw", minHeight: "100vh" });
-    // Plain property goes on <body>, with vh → cqh.
-    expect(document.body.style.minHeight).toContain("cqh");
-    expect(document.body.style.minHeight).toBe("100cqh");
-    // `--`-prefixed var goes on documentElement (:root), with vw → cqw.
-    expect(document.documentElement.style.getPropertyValue("--hero-h")).toBe("50cqw");
+    const css = document.head.querySelector("#jx-site-style")!.textContent!;
+    // Plain property goes in the body rule, with vh → cqh.
+    expect(css).toContain("body { min-height: 100cqh }");
+    // `--`-prefixed var goes in the :root rule, with vw → cqw.
+    expect(css).toContain(":root { --hero-h: 50cqw }");
   });
 
   test("applySiteStyle leaves viewport units untouched when the flag is off", () => {
     // Flag defaults to false here (reset in afterEach); no transpose should happen.
     applySiteStyle({ minHeight: "100vh" });
-    expect(document.body.style.minHeight).toBe("100vh");
+    const css = document.head.querySelector("#jx-site-style")!.textContent!;
+    expect(css).toContain("body { min-height: 100vh }");
   });
 
   test("renderResolvedDocument de-links <a href> in edit mode but keeps it live in preview", async () => {
@@ -428,21 +430,60 @@ describe("component-definition root vs a registered custom element (cross-tab re
 
 describe("applySiteStyle", () => {
   afterEach(() => {
-    document.documentElement.removeAttribute("style");
-    document.body.removeAttribute("style");
+    document.head.querySelector("#jx-site-style")?.remove();
+    delete document.documentElement.dataset.colorScheme;
   });
 
-  test("sets custom properties on :root and plain properties on <body>", () => {
+  test("emits a stylesheet: custom properties on :root, plain properties on body", () => {
     applySiteStyle({ "--brand": "#0f0", color: "red", margin: {} as unknown });
-    expect(document.documentElement.style.getPropertyValue("--brand")).toBe("#0f0");
-    expect(document.body.style.color).toBe("red");
-    // Nested object values (selector rules) are skipped.
-    expect(document.body.style.margin).toBe("");
+    const css = document.head.querySelector("#jx-site-style")!.textContent!;
+    expect(css).toContain(":root { --brand: #0f0 }");
+    expect(css).toContain("body { color: red }");
+    // Nested non-@ object values are page-content styling — not part of the site sheet.
+    expect(css).not.toContain("margin");
   });
 
-  test("is a no-op for null/non-object", () => {
+  test("replaces the sheet in place — stale tokens cannot linger", () => {
+    applySiteStyle({ "--brand": "#0f0" });
+    applySiteStyle({ "--accent": "#00f" });
+    const tags = document.head.querySelectorAll("#jx-site-style");
+    expect(tags).toHaveLength(1);
+    expect(tags[0]!.textContent).toContain("--accent: #00f");
+    expect(tags[0]!.textContent).not.toContain("--brand");
+  });
+
+  test("dual-emits scheme blocks and declares color-scheme", () => {
+    applySiteStyle(
+      { "--bg": "#fff", "@--dark": { "--bg": "#000" } },
+      { "--dark": "(prefers-color-scheme: dark)" },
+    );
+    const css = document.head.querySelector("#jx-site-style")!.textContent!;
+    expect(css).toContain(
+      "@media (prefers-color-scheme: dark) { :root:where(:not([data-color-scheme])) { --bg: #000 } }",
+    );
+    expect(css).toContain(':root:where([data-color-scheme="dark"]) { --bg: #000 }');
+    expect(css).toContain(":root { color-scheme: light dark }");
+  });
+
+  test("removes the sheet for null/non-object", () => {
+    applySiteStyle({ "--brand": "#0f0" });
     expect(() => applySiteStyle(null)).not.toThrow();
-    expect(document.documentElement.getAttribute("style")).toBeNull();
+    expect(document.head.querySelector("#jx-site-style")).toBeNull();
+  });
+});
+
+describe("applyPreviewColorScheme", () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.colorScheme;
+  });
+
+  test("sets and clears the forced-scheme attribute on the root element", () => {
+    applyPreviewColorScheme(document, "dark");
+    expect(document.documentElement.dataset.colorScheme).toBe("dark");
+    applyPreviewColorScheme(document, "light");
+    expect(document.documentElement.dataset.colorScheme).toBe("light");
+    applyPreviewColorScheme(document, null);
+    expect(document.documentElement.dataset.colorScheme).toBeUndefined();
   });
 });
 

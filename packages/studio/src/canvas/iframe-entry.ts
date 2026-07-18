@@ -6,7 +6,11 @@
  */
 
 import { postMessageChannel } from "./iframe-channel";
-import { installCanvasImageRetry, renderResolvedDocument } from "./iframe-render";
+import {
+  applyPreviewColorScheme,
+  installCanvasImageRetry,
+  renderResolvedDocument,
+} from "./iframe-render";
 import { measureHits, startInteraction } from "./iframe-interaction";
 import {
   AUTO_SCROLL_STEP,
@@ -482,9 +486,15 @@ export function startCanvasIframe(opts: {
       clearIframeDrag();
       return;
     }
+    if (msg.kind === "setColorScheme") {
+      // Document-level attribute flip — deliberately patch-free (no render, no gen).
+      applyPreviewColorScheme(container.ownerDocument, msg.scheme);
+      return;
+    }
     if (msg.kind !== "render" || msg.gen < latestGen) {
       return;
     }
+    applyPreviewColorScheme(container.ownerDocument, msg.colorScheme ?? null);
     // A render replaces the DOM under a live edit session — COMMIT it first (never discard). The
     // Resulting editCommit/editEnd post synchronously here, so on the FIFO channel they precede
     // This render's renderComplete and the parent routes them by the host's not-yet-flipped tab

@@ -1,6 +1,27 @@
 import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
-import { activeBreakpointsForWidth, parseMediaEntries } from "../src/utils/canvas-media";
+import {
+  activeBreakpointsForWidth,
+  isSchemeQuery,
+  parseMediaEntries,
+  schemeOfQuery,
+} from "../src/utils/canvas-media";
+
+// ─── Scheme-query classification ────────────────────────────────────────────
+
+describe("isSchemeQuery / schemeOfQuery", () => {
+  test("recognizes pure prefers-color-scheme queries", () => {
+    expect(isSchemeQuery("(prefers-color-scheme: dark)")).toBe(true);
+    expect(schemeOfQuery("(prefers-color-scheme: dark)")).toBe("dark");
+    expect(schemeOfQuery("(prefers-color-scheme: light)")).toBe("light");
+  });
+
+  test("rejects compound and non-scheme queries", () => {
+    expect(isSchemeQuery("(prefers-color-scheme: dark) and (min-width: 768px)")).toBe(false);
+    expect(isSchemeQuery("(prefers-reduced-motion: reduce)")).toBe(false);
+    expect(schemeOfQuery("(min-width: 768px)")).toBeNull();
+  });
+});
 
 // ─── parseMediaEntries ──────────────────────────────────────────────────────
 

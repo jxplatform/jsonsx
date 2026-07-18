@@ -54,6 +54,7 @@ Below the tab strip, a second row carries the controls for the active tab:
 - **Back** and a breadcrumb trail, when you've drilled from a page into one of its components — click any crumb to jump back up.
 - The zoom controls for the current mode, including **Fit** on the pannable canvases.
 - The **Preview** toggle, the **Layout** toggle, and the preview pickers described in [Modes and the preview toggle](/docs/studio/interface/modes).
+- The **Auto / Light / Dark** color-scheme control, when the project declares a `prefers-color-scheme` breakpoint — it forces the canvas into either scheme (or follows your OS in Auto) without re-rendering. See [Breakpoints](/docs/studio/design/breakpoints).
 - Mode-specific actions, like **Export** in **Code** mode.
 
 ## Next

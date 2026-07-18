@@ -48,6 +48,7 @@ import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patch
 import {
   commitActiveEditSession,
   getEditSnapshot,
+  postColorSchemeToLiveHosts,
   setCanvasContextMenuHandler,
   setCanvasSlashHandler,
   setIframePatchEscalation,
@@ -580,6 +581,12 @@ effect(() => {
     void tab.session.ui.stylebookCustomizedOnly;
   }
   scheduleCanvasRender();
+});
+// Color-scheme preview is a document-level attribute flip inside the iframe — deliberately its
+// Own effect, never part of the ui-effect above: flipping the scheme must not re-render.
+effect(() => {
+  const s = activeTab.value?.session.ui.previewColorScheme;
+  postColorSchemeToLiveHosts(s === "light" || s === "dark" ? s : null);
 });
 
 rightPanelMod.mount({

@@ -87,6 +87,7 @@ const {
   mountStylebookCanvas,
   panToStylebookTag,
   postApplyFormat,
+  postColorSchemeToLiveHosts,
   postDragMessage,
   postPatchToHosts,
   postStyleUpdateToStylebookHosts,
@@ -130,6 +131,36 @@ describe("mountIframeCanvas", () => {
     channels[0]!.deliver({ kind: "ready" });
     expect(channels[0]!.posts).toHaveLength(1);
     expect(channels[0]!.posts[0]).toMatchObject({ gen: 1, kind: "render", mode: "design" });
+  });
+
+  test("the render message carries the active tab's forced preview scheme (auto → null)", async () => {
+    resetWorkspaceWithTab();
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    channels[0]!.deliver({ kind: "ready" });
+    expect(channels[0]!.posts[0]).toMatchObject({ colorScheme: null, kind: "render" });
+
+    activeTab.value!.session.ui.previewColorScheme = "dark";
+    await mountIframeCanvas(2, { tagName: "div" } as never, canvasEl);
+    expect(channels[0]!.posts[1]).toMatchObject({ colorScheme: "dark", kind: "render" });
+  });
+
+  test("postColorSchemeToLiveHosts posts setColorScheme to ready hosts only", async () => {
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+
+    // Not ready yet — nothing posts.
+    postColorSchemeToLiveHosts("dark");
+    expect(channels[0]!.posts).toHaveLength(0);
+
+    channels[0]!.deliver({ kind: "ready" });
+    postColorSchemeToLiveHosts("dark");
+    expect(channels[0]!.posts.at(-1)).toEqual({ kind: "setColorScheme", scheme: "dark" });
+
+    postColorSchemeToLiveHosts(null);
+    expect(channels[0]!.posts.at(-1)).toEqual({ kind: "setColorScheme", scheme: null });
   });
 
   test("uses the platform's canvasUrl when set, default otherwise", async () => {

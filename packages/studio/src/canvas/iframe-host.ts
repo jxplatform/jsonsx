@@ -1370,6 +1370,7 @@ export async function mountIframeCanvas(
   // oxlint-disable-next-line unicorn/prefer-structured-clone
   const cloneableShadow = JSON.parse(JSON.stringify(doc)) as unknown;
   const message: ParentToIframe = {
+    colorScheme: activeSchemeWire(),
     doc: cloneableDoc,
     docBase: resolved.docBase ?? `${canvasBaseOrigin()}/`,
     gen,
@@ -1419,6 +1420,7 @@ export function mountStylebookCanvas(
   // oxlint-disable-next-line unicorn/prefer-structured-clone
   const cloneableShadow = JSON.parse(JSON.stringify(generated.doc)) as unknown;
   const message: ParentToIframe = {
+    colorScheme: activeSchemeWire(),
     doc: cloneableDoc,
     docBase: `${canvasBaseOrigin()}/`,
     gen,
@@ -1440,6 +1442,28 @@ export function mountStylebookCanvas(
     state.channel.post(message);
   } else {
     state.pending = message;
+  }
+}
+
+/** The active tab's forced preview scheme as wire data (auto → null). */
+function activeSchemeWire(): "light" | "dark" | null {
+  const s = activeTab.value?.session.ui.previewColorScheme;
+  return s === "light" || s === "dark" ? s : null;
+}
+
+/**
+ * Flip the color-scheme preview on every ready host (page and stylebook alike — both render
+ * scheme-aware CSS). A pure attribute write iframe-side: no render, no patch, no gen.
+ */
+export function postColorSchemeToLiveHosts(scheme: "light" | "dark" | null): void {
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    if (host.ready) {
+      host.channel.post({ kind: "setColorScheme", scheme });
+    }
   }
 }
 

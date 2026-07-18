@@ -2,6 +2,29 @@
 /// <reference lib="dom.iterable" />
 /** Canvas media/breakpoint utilities — pure functions extracted for testability. */
 
+import { pureSchemeOf } from "@jxsuite/runtime";
+
+/**
+ * True when a feature query participates in the forced-scheme contract (spec §9.5) — a pure
+ * prefers-color-scheme query. These surface as the Auto/Light/Dark control, not generic toggles.
+ *
+ * @param {string} query
+ * @returns {boolean}
+ */
+export function isSchemeQuery(query: string): boolean {
+  return pureSchemeOf(query) !== null;
+}
+
+/**
+ * The scheme a feature query targets ("light" | "dark"), or null for non-scheme queries.
+ *
+ * @param {string} query
+ * @returns {"light" | "dark" | null}
+ */
+export function schemeOfQuery(query: string): "light" | "dark" | null {
+  return pureSchemeOf(query);
+}
+
 /**
  * Classify $media entries into size breakpoints (get a canvas each) and feature queries (rendered
  * as toolbar toggles).

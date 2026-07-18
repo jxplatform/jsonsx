@@ -530,7 +530,7 @@ describe("export", () => {
 // ─── Media feature toggles ──────────────────────────────────────────────────────
 
 describe("media feature toggles", () => {
-  test("render from media queries and flip session toggles", async () => {
+  test("a scheme query renders the Auto/Light/Dark control, not a generic toggle", async () => {
     const tab = openTestTab();
     const ctx = makeCtx({
       parseMediaEntries: mock(() => ({
@@ -542,30 +542,63 @@ describe("media feature toggles", () => {
     tabBar.mount(root, ctx);
     await flush();
 
+    // No generic toggle for the scheme query
+    expect(root.querySelector("sp-action-button[title='(prefers-color-scheme: dark)']")).toBeNull();
+
+    const group = root.querySelector(".tb-scheme") as HTMLElement;
+    expect(group).not.toBeNull();
+    const labels = [...group.querySelectorAll("sp-action-button")].map((b) =>
+      b.textContent?.trim(),
+    );
+    expect(labels).toEqual(["Auto", "Light", "Dark"]);
+
+    const schemeBtn = (label: string) =>
+      [...group.querySelectorAll("sp-action-button")].find(
+        (b) => b.textContent?.trim() === label,
+      ) as HTMLElement;
+    expect(schemeBtn("Auto").hasAttribute("selected")).toBe(true);
+
+    pointer(schemeBtn("Dark"), "click");
+    await flush();
+    expect(tab.session.ui.previewColorScheme).toBe("dark");
+    expect(schemeBtn("Dark").hasAttribute("selected")).toBe(true);
+    expect(schemeBtn("Auto").hasAttribute("selected")).toBe(false);
+
+    pointer(schemeBtn("Auto"), "click");
+    await flush();
+    expect(tab.session.ui.previewColorScheme).toBe("auto");
+  });
+
+  test("non-scheme feature queries keep their generic toggles", async () => {
+    const tab = openTestTab();
+    const ctx = makeCtx({
+      parseMediaEntries: mock(() => ({
+        baseWidth: 1200,
+        featureQueries: [
+          { name: "--dark-mode", query: "(prefers-color-scheme: dark)" },
+          { name: "--reduced-motion", query: "(prefers-reduced-motion: reduce)" },
+        ],
+        sizeBreakpoints: [],
+      })),
+    });
+    tabBar.mount(root, ctx);
+    await flush();
+
     const toggle = root.querySelector(
-      "sp-action-button[title='(prefers-color-scheme: dark)']",
+      "sp-action-button[title='(prefers-reduced-motion: reduce)']",
     ) as HTMLElement;
-    expect(toggle.textContent).toContain("Dark Mode");
-    expect(toggle.hasAttribute("selected")).toBe(false);
+    expect(toggle.textContent).toContain("Reduced Motion");
 
     pointer(toggle, "click");
     await flush();
-    expect(tab.session.ui.featureToggles["--dark-mode"]).toBe(true);
-    expect(
-      root
-        .querySelector("sp-action-button[title='(prefers-color-scheme: dark)']")
-        ?.hasAttribute("selected"),
-    ).toBe(true);
-
-    pointer(root.querySelector("sp-action-button[title='(prefers-color-scheme: dark)']")!, "click");
-    await flush();
-    expect(tab.session.ui.featureToggles["--dark-mode"]).toBe(false);
+    expect(tab.session.ui.featureToggles["--reduced-motion"]).toBe(true);
   });
 
-  test("no media toggle group when the document has no feature queries", async () => {
+  test("no scheme group and no toggles when the document has no feature queries", async () => {
     openTestTab();
     tabBar.mount(root, makeCtx());
     await flush();
+    expect(root.querySelector(".tb-scheme")).toBeNull();
     // Only the settings-cluster Preview toggle remains — no media feature toggles.
     const toggles = [...root.querySelectorAll("sp-action-button[toggles]")];
     expect(toggles.map((b) => b.textContent?.trim())).toEqual(["Preview"]);

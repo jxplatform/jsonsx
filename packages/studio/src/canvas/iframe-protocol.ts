@@ -61,8 +61,14 @@ export type ParentToIframe =
       docBase: string;
       mapperCtx: WireMapperCtx;
       siteStyle: Record<string, unknown> | null;
+      // Forced color-scheme preview (spec §9.5): "light"/"dark" sets data-color-scheme on the
+      // Iframe root, null clears it (auto — follow the OS).
+      colorScheme: "light" | "dark" | null;
       gen: number;
     }
+  // Flip the forced color-scheme preview on the iframe root without re-rendering — a document-level
+  // Idempotent attribute write, deliberately gen-less (like endEdit).
+  | { kind: "setColorScheme"; scheme: "light" | "dark" | null }
   // Ask the iframe to measure the given document paths and post their current rects back. Used to
   // Draw the selection overlay regardless of where the selection change originated (canvas click,
   // Layers panel, keyboard) — the parent can't measure iframe nodes itself (cross-origin bridge).

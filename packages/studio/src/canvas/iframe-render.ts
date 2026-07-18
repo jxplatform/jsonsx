@@ -24,6 +24,7 @@ import {
   transposeCanvasUnits,
 } from "@jxsuite/runtime";
 import { classifyRenderNode, serializeJxPath } from "./path-mapping";
+import { SITE_STYLE_ID, buildSiteStyleCSS } from "./site-style-css";
 import type { CanvasMode } from "./iframe-protocol";
 import type { JxDocument } from "@jxsuite/schema/types";
 import type { PathMapCtx } from "./path-mapping";
@@ -294,22 +295,42 @@ export function syncStylebookCss(doc: Document, mode: CanvasMode): void {
   doc.head.append(style);
 }
 
-/** Apply the project's site style: custom properties on :root, plain properties on <body>. */
-export function applySiteStyle(siteStyle: Record<string, unknown> | null | undefined): void {
+/**
+ * Apply the project's site style as a real stylesheet (replace-in-place): custom properties on
+ * `:root`, plain properties on `body`, conditional blocks dual-emitted per the forced-scheme
+ * contract. A stylesheet — not inline root properties — so `:root[data-color-scheme]` override
+ * selectors can win (spec §9.5), and so removed tokens can't linger on reused iframes.
+ */
+export function applySiteStyle(
+  siteStyle: Record<string, unknown> | null | undefined,
+  mediaQueries: Record<string, string> = {},
+): void {
+  const existing = document.head.querySelector(`#${SITE_STYLE_ID}`);
   if (!siteStyle || typeof siteStyle !== "object") {
+    existing?.remove();
     return;
   }
-  const rootStyle = document.documentElement.style;
-  const bodyStyle = document.body.style as unknown as Record<string, string>;
-  for (const [key, value] of Object.entries(siteStyle)) {
-    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-      continue;
-    }
-    if (key.startsWith("--")) {
-      rootStyle.setProperty(key, transposeCanvasUnits(String(value)));
-    } else {
-      bodyStyle[key] = transposeCanvasUnits(String(value));
-    }
+  const css = buildSiteStyleCSS(siteStyle, mediaQueries, transposeCanvasUnits);
+  if (existing) {
+    existing.textContent = css;
+    return;
+  }
+  const tag = document.createElement("style");
+  tag.id = SITE_STYLE_ID;
+  tag.textContent = css;
+  document.head.append(tag);
+}
+
+/**
+ * Force or clear the color-scheme preview on the iframe's root element (the platform's
+ * data-color-scheme contract, spec §9.5). Survives re-renders and patches — renders only replace
+ * the container's children, never the root element.
+ */
+export function applyPreviewColorScheme(doc: Document, scheme: "light" | "dark" | null): void {
+  if (scheme) {
+    doc.documentElement.dataset.colorScheme = scheme;
+  } else {
+    delete doc.documentElement.dataset.colorScheme;
   }
 }
 
@@ -443,7 +464,7 @@ export async function renderResolvedDocument(opts: {
   // Iframe clears it (page-level templates are inert in design/edit via prepareForEditMode, so only
   // Component internals get stamped).
   setStampPropBindings(opts.mode === "design" || opts.mode === "edit");
-  applySiteStyle(opts.siteStyle);
+  applySiteStyle(opts.siteStyle, (opts.doc as { $media?: Record<string, string> }).$media ?? {});
   injectHead(opts.doc);
   syncEditModeCss(opts.container.ownerDocument, opts.mode);
   syncStylebookCss(opts.container.ownerDocument, opts.mode);
