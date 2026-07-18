@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1](https://github.com/jxsuite/jx/compare/starters-v1.1.0...starters-v1.1.1) (2026-07-18)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @jxsuite/schema bumped to 1.2.0
+
 ## [1.1.0](https://github.com/jxsuite/jx/compare/starters-v1.0.0...starters-v1.1.0) (2026-07-17)
 
 

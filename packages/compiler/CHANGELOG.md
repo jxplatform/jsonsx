@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.2.0](https://github.com/jxsuite/jx/compare/compiler-v1.1.0...compiler-v1.2.0) (2026-07-18)
+
+
+### Features
+
+* color scheme support ([0f380c6](https://github.com/jxsuite/jx/commit/0f380c61a16c7bf0061628d0c7ccac5e3e045f4a))
+* **compiler:** bundle the site worker self-contained per adapter ([4096ba1](https://github.com/jxsuite/jx/commit/4096ba1280d68e1e7915b1d24cab65784bf3f22a))
+* **compiler:** sidecar bundling, extension emit capability, heading anchors ([07e28bc](https://github.com/jxsuite/jx/commit/07e28bc37f3d96ffdc2d42a7f3fa4d5ceb9eb3de))
+* search package ([9262c68](https://github.com/jxsuite/jx/commit/9262c68e5797ed1c4c2b9103e0f73e676a30ef39))
+* **styling:** forced color-scheme contract — dual emission, color-scheme triplet, pre-paint script ([e629684](https://github.com/jxsuite/jx/commit/e629684da928ff18f710857601741c9c7db7585d))
+
+
+### Bug Fixes
+
+* **ci:** green the Test workflow — type-aware lint, coverage gates, docs drift ([78b3c17](https://github.com/jxsuite/jx/commit/78b3c170a656296b8b76655a289a25471376d6ca))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.1.1
+    * @jxsuite/runtime bumped to 1.2.0
+    * @jxsuite/schema bumped to 1.2.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.3.1
+    * @jxsuite/parser bumped to 1.2.0
+
 ## [1.1.0](https://github.com/jxsuite/jx/compare/compiler-v1.0.0...compiler-v1.1.0) (2026-07-17)
 
 

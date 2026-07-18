@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.2.0](https://github.com/jxsuite/jx/compare/studio-v1.1.0...studio-v1.2.0) (2026-07-18)
+
+
+### Features
+
+* **studio:** color-scheme canvas preview — Auto/Light/Dark tab-bar control ([a5f96ba](https://github.com/jxsuite/jx/commit/a5f96ba6f28918b4bd3540ddeb979df3cac5336a))
+* **studio:** color-scheme canvas preview — Auto/Light/Dark tab-bar control ([ccdc1d3](https://github.com/jxsuite/jx/commit/ccdc1d3ec72b3903f9a976b2556d64a6380f2b7c))
+* **studio:** scheme-variant editing — token overrides, scheme-layer routing, live feedback ([49f0c52](https://github.com/jxsuite/jx/commit/49f0c525c47b130cd773cfdf8501eb3cc4c329f2))
+
+
+### Bug Fixes
+
+* **tests:** tsc errors — typed children access in highlight tests, colorScheme in stylebook message ([767215e](https://github.com/jxsuite/jx/commit/767215e3f776b0894b13cfc2e04190b7e2824464))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.4.1
+    * @jxsuite/create bumped to 1.1.1
+    * @jxsuite/formulas bumped to 0.0.3
+    * @jxsuite/markup bumped to 0.3.1
+    * @jxsuite/protocol bumped to 0.5.1
+    * @jxsuite/runtime bumped to 1.2.0
+    * @jxsuite/schema bumped to 1.2.0
+
 ## [1.1.0](https://github.com/jxsuite/jx/compare/studio-v1.0.0...studio-v1.1.0) (2026-07-17)
 
 

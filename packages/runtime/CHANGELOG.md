@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.0](https://github.com/jxsuite/jx/compare/runtime-v1.1.0...runtime-v1.2.0) (2026-07-18)
+
+
+### Features
+
+* color scheme support ([0f380c6](https://github.com/jxsuite/jx/commit/0f380c61a16c7bf0061628d0c7ccac5e3e045f4a))
+* **styling:** forced color-scheme contract — dual emission, color-scheme triplet, pre-paint script ([e629684](https://github.com/jxsuite/jx/commit/e629684da928ff18f710857601741c9c7db7585d))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.2.0
+
 ## [1.1.0](https://github.com/jxsuite/jx/compare/runtime-v1.0.0...runtime-v1.1.0) (2026-07-17)
 
 

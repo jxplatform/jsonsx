@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.2.0](https://github.com/jxsuite/jx/compare/parser-v1.1.0...parser-v1.2.0) (2026-07-18)
+
+
+### Features
+
+* **compiler:** sidecar bundling, extension emit capability, heading anchors ([07e28bc](https://github.com/jxsuite/jx/commit/07e28bc37f3d96ffdc2d42a7f3fa4d5ceb9eb3de))
+* **parser:** build-time syntax highlighting for markdown code fences ([8cf14ae](https://github.com/jxsuite/jx/commit/8cf14ae19c2b2d23e72e829b689b2c21c8b23803))
+* **parser:** build-time syntax highlighting for markdown code fences ([b2e7a56](https://github.com/jxsuite/jx/commit/b2e7a5617ddb15c7fd2f3b9c75626c5cc7817c9e))
+* search package ([9262c68](https://github.com/jxsuite/jx/commit/9262c68e5797ed1c4c2b9103e0f73e676a30ef39))
+
+
+### Bug Fixes
+
+* **tests:** tsc errors — typed children access in highlight tests, colorScheme in stylebook message ([767215e](https://github.com/jxsuite/jx/commit/767215e3f776b0894b13cfc2e04190b7e2824464))
+* verification findings — real &lt;th&gt; table headers, search-button name, dead hero binding ([6d9e5a3](https://github.com/jxsuite/jx/commit/6d9e5a3de788e93896ac152712171e11079fe08e))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.3.1
+    * @jxsuite/schema bumped to 1.2.0
+  * devDependencies
+    * @jxsuite/runtime bumped to 1.2.0
+
 ## [1.1.0](https://github.com/jxsuite/jx/compare/parser-v1.0.0...parser-v1.1.0) (2026-07-17)
 
 
