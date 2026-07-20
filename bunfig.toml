@@ -13,4 +13,9 @@ linker = "hoisted"
 pathIgnorePatterns = ["**/result/**"]
 coverageReporter = ["text"]
 coverageSkipTestFiles = true
-coveragePathIgnorePatterns = ["**/dist/**", "**/tests/**", "./result/**"]
+coveragePathIgnorePatterns = [
+	"./result/**",
+	"**/dist/**",
+	"**/tests/**",
+	"**/tmp/**",
+]
