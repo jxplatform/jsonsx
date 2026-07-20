@@ -169,8 +169,37 @@ async function runAction(page: Page, action: ShotAction): Promise<void> {
       await hook(page, "openBrowse");
       return;
     }
+    case "openDataGrid": {
+      await hook(page, "openDataGrid", {
+        table: action.table,
+        ...(action.connection ? { connection: action.connection } : {}),
+      });
+      return;
+    }
     case "openNewProject": {
       await hook(page, "openNewProject");
+      return;
+    }
+    case "seedAssistant": {
+      await hook(page, "seedAssistant", { messages: action.messages });
+      return;
+    }
+    case "seedCollab": {
+      await hook(page, "seedCollab", { peers: action.peers });
+      return;
+    }
+    case "seedPublish": {
+      await hook(page, "seedPublish", { deployment: action.deployment });
+      return;
+    }
+    case "dispatchDragOver": {
+      await page.evaluate((selector) => {
+        const el = document.querySelector(selector);
+        if (!el) {
+          throw new Error(`dispatchDragOver: no element matches ${selector}`);
+        }
+        el.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true }));
+      }, action.selector);
       return;
     }
     case "select": {

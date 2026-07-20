@@ -2703,6 +2703,660 @@
           "padding": 0
         }
       ]
+    },
+    {
+      "name": "ai-sidebar",
+      "docs": ["studio/ai"],
+      "file": "pages/index.md",
+      "canvasMode": "edit",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Right Panel']"
+        },
+        {
+          "do": "setRightTab",
+          "value": "assistant"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "seedAssistant",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Can you make the hero headline feel more welcoming?"
+            },
+            {
+              "role": "assistant",
+              "content": "Done — I rewrote the hero headline to \"Find the home that fits your life on the north shore.\" and softened the subheading to match. Want me to warm up the call-to-action button too?"
+            }
+          ]
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": "#chat-panel .ai-msg-assistant"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "ai-sidebar-chat",
+      "docs": ["studio/ai/chat"],
+      "file": "pages/index.md",
+      "canvasMode": "edit",
+      "viewport": {
+        "width": 1920,
+        "height": 680
+      },
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "setRightTab",
+          "value": "assistant"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "seedAssistant",
+          "messages": [
+            {
+              "role": "user",
+              "content": "What does this page show above the fold?"
+            },
+            {
+              "role": "assistant",
+              "content": "The hero pairs the headline with a search card — visitors can filter by price, beds, and baths before they scroll. Below it, a stats band builds trust with the agency's track record."
+            },
+            {
+              "role": "user",
+              "content": "Make this headline a little shorter.\n\n---- attached context ----\nPage: pages/index.md\nSelected element at [\"children\",0]: <re-hero> \"Find the home that fits your life…\""
+            },
+            {
+              "role": "assistant",
+              "content": "Trimmed it to \"Find the home that fits your life.\" — still warm, but it now sits on two lines above the search card.",
+              "toolCalls": [
+                {
+                  "name": "set_property",
+                  "arguments": "{\"path\":[\"children\",0],\"name\":\"heading\",\"value\":\"Find the home that fits your life.\"}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": "#chat-panel .ai-tool-chip"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "ai-sidebar-chat",
+          "selector": "#chat-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "ai-document-assistant",
+      "docs": ["studio/ai/document-assistant"],
+      "file": "pages/index.md",
+      "canvasMode": "edit",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Right Panel']"
+        },
+        {
+          "do": "setRightTab",
+          "value": "assistant"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "seedAssistant",
+          "messages": [
+            {
+              "role": "user",
+              "content": "Add a short welcome line under the stats band and make the eyebrow text easier to read.\n\n---- attached context ----\nPage: pages/index.md"
+            },
+            {
+              "role": "assistant",
+              "content": "Done — I added a one-line welcome under the stats band and bumped the eyebrow's contrast. Both edits are on the canvas now; undo works as usual if you want to step back.",
+              "toolCalls": [
+                {
+                  "name": "add_child",
+                  "arguments": "{\"parentPath\":[\"children\",1],\"tagName\":\"p\"}"
+                },
+                {
+                  "name": "set_text",
+                  "arguments": "{\"path\":[\"children\",1,\"children\",2],\"text\":\"Welcome home — let's find yours.\"}"
+                },
+                {
+                  "name": "set_style",
+                  "arguments": "{\"path\":[\"children\",0],\"property\":\"opacity\",\"value\":\"0.95\"}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": "#chat-panel .ai-tool-chip"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "data-tables-shot",
+      "docs": ["studio/data", "studio/data/tables"],
+      "project": "scripts/screenshots/fixtures/data",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "viewport": {
+        "width": 1920,
+        "height": 900
+      },
+      "actions": [
+        {
+          "do": "openSettings",
+          "section": "data"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"settings-list-panel\")]//sp-action-button[normalize-space()=\"comments\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".settings-editor-panel"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "data-tables-section",
+          "selector": ".settings-modal",
+          "padding": 0
+        },
+        {
+          "name": "data-table-editor",
+          "selector": ".settings-editor-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "connections-section",
+      "docs": ["studio/data/connections"],
+      "project": "scripts/screenshots/fixtures/data",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "viewport": {
+        "width": 1920,
+        "height": 720
+      },
+      "actions": [
+        {
+          "do": "openSettings",
+          "section": "connections"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"settings-list-panel\")]//sp-action-button[normalize-space()=\"main\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".settings-editor-panel"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "connections-section",
+          "selector": ".settings-modal",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "data-grid",
+      "docs": ["studio/data/grid"],
+      "project": "scripts/screenshots/fixtures/data",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "actions": [
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "setActivity",
+          "value": "files"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Right Panel']"
+        },
+        {
+          "do": "openDataGrid",
+          "connection": "main",
+          "table": "comments"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".tabulator"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
+      ]
+    },
+    {
+      "name": "data-source-request",
+      "docs": ["studio/logic/data-sources"],
+      "project": "examples",
+      "file": "components/fetch-demo.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "state"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"signal-row\")][.//span[contains(@class,\"signal-name\")][normalize-space()=\"allPosts\"]]"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".signal-editor"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "data-source-request",
+          "selector": "#left-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "publish-panel",
+      "docs": ["studio/publish/cloudflare"],
+      "project": "scripts/screenshots/fixtures/data",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "actions": [
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "seedPublish",
+          "deployment": {
+            "id": "3f2a9c1d-8f47-4a10-9d55-6b8f2f6f2b31",
+            "url": "https://main.bistro-cafe.pages.dev",
+            "environment": "production",
+            "stage": "deploy",
+            "status": "success",
+            "createdOn": "2026-07-17T14:02:00Z"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".publish-modal"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "publish-panel",
+          "selector": ".publish-modal",
+          "padding": 24
+        }
+      ]
+    },
+    {
+      "name": "collab-presence",
+      "docs": ["studio/publish/collaboration"],
+      "file": "pages/index.md",
+      "canvasMode": "edit",
+      "viewport": {
+        "width": 1920,
+        "height": 1200
+      },
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "select",
+          "path": ["children", 0]
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "seedCollab",
+          "peers": [
+            {
+              "clientId": 101,
+              "state": {
+                "user": {
+                  "login": "maya",
+                  "name": "Maya",
+                  "color": "#30a46c"
+                },
+                "structuralSelection": ["children", 1, "children", 0]
+              }
+            },
+            {
+              "clientId": 102,
+              "state": {
+                "user": {
+                  "login": "jon",
+                  "name": "Jon",
+                  "color": "#f5a524"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": ".jx-presence-chip"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "media-upload",
+      "docs": ["studio/projects/media"],
+      "project": "packages/starters/sites/restaurant",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "actions": [
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "openBrowse"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"browse-filter-bar\")]//sp-action-button[normalize-space()=\"Media\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "dispatchDragOver",
+          "selector": ".browse-view"
+        },
+        {
+          "do": "wait",
+          "ms": 200
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".browse-view.browse-drop-active"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "media-upload",
+          "selector": ".browse-view",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "properties-bar",
+      "docs": ["studio/editing/frontmatter"],
+      "project": "packages/starters/sites/blog",
+      "file": "content/posts/designing-for-slowness.md",
+      "canvasMode": "edit",
+      "viewport": {
+        "width": 1920,
+        "height": 1400
+      },
+      "actions": [
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": "#frontmatter-panel sp-accordion-item"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "properties-bar",
+          "selector": "#frontmatter-panel",
+          "padding": 8
+        }
+      ]
     }
   ]
 }

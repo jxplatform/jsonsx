@@ -1,0 +1,55 @@
+{
+  "name": "Bistro & Café",
+  "url": "https://bistro-cafe.pages.dev",
+  "defaults": {
+    "lang": "en"
+  },
+  "$media": {
+    "--": "1280px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "build": {
+    "deploy": {
+      "provider": "cloudflare-pages",
+      "accountId": "6f1e0d2c3b4a59687766554433221100",
+      "projectName": "bistro-cafe",
+      "productionUrl": "https://bistro-cafe.pages.dev"
+    }
+  },
+  "connections": {
+    "main": {
+      "provider": "sqlite",
+      "file": "./data/main.sqlite"
+    }
+  },
+  "data": {
+    "comments": {
+      "connection": "main",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "author": { "type": "string", "title": "Author" },
+          "body": { "type": "string", "title": "Comment" },
+          "posted": { "type": "string", "format": "date", "title": "Posted" }
+        },
+        "required": ["author", "body"]
+      },
+      "permissions": { "read": "public", "insert": "public" }
+    },
+    "reservations": {
+      "connection": "main",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "title": "Name" },
+          "party_size": { "type": "integer", "title": "Party size" },
+          "date": { "type": "string", "format": "date", "title": "Date" }
+        },
+        "required": ["name", "date"]
+      }
+    }
+  },
+  "extensions": ["@jxsuite/parser", "@jxsuite/connector"]
+}

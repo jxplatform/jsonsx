@@ -7,7 +7,7 @@ import { flush, installMockPlatform, pointer, resetStudioState } from "./harness
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import type { DeployConfig } from "@jxsuite/schema/types";
 
-const { openPublishPanel } = await import("../src/publish/publish-panel");
+const { openPublishPanel, seedPublishConnected } = await import("../src/publish/publish-panel");
 const { initLayers } = await import("../src/ui/layers");
 const { setCfToken } = await import("../src/services/cf-settings");
 
@@ -224,6 +224,34 @@ describe("openPublishPanel — connect form", () => {
     await flush();
     expect(bodyText()).toContain("GitHub app is not installed");
     expect(panel()?.querySelector('a[href*="cloudflare-pages/installations"]')).toBeTruthy();
+  });
+});
+
+describe("seedPublishConnected — automation seam", () => {
+  test("opens the connected status view without touching the Cloudflare API", async () => {
+    resetStudioState({
+      projectConfig: { build: { adapter: "cloudflare-pages", deploy: DEPLOY }, name: "My Site" },
+    });
+    const cfConnection = mock(() => Promise.resolve(null));
+    const cfApi = cfApiMock({});
+    installMockPlatform({ cfApi, cfConnection });
+    seedPublishConnected({
+      deployment: {
+        createdOn: "2026-07-06T00:00:00Z",
+        environment: "production",
+        id: "d1",
+        stage: "deploy",
+        status: "success",
+        url: "https://main.my-site.pages.dev",
+      },
+    });
+    await flush();
+    expect(bodyText()).toContain("Connected to Pages project");
+    expect(bodyText()).toContain("my-site");
+    expect(bodyText()).toContain("deploy: success");
+    // The seam bypasses loadConnection entirely — no Cloudflare traffic.
+    expect(cfConnection).not.toHaveBeenCalled();
+    expect(cfApi).not.toHaveBeenCalled();
   });
 });
 

@@ -83,8 +83,13 @@ void mock.module("../src/services/document-assistant", () => ({
   }),
 }));
 
-const { bindAiPanelHost, mountAiPanel, renderAiPanelTemplate, seedAssistantPrompt } =
-  await import("../src/panels/ai-panel");
+const {
+  bindAiPanelHost,
+  mountAiPanel,
+  renderAiPanelTemplate,
+  seedAssistantMessages,
+  seedAssistantPrompt,
+} = await import("../src/panels/ai-panel");
 
 // The panel renders into its bound host via the rAF loop, exactly as in the app.
 const host = document.createElement("div");
@@ -320,5 +325,34 @@ describe("ai-panel", () => {
     // Both render paths flow through this single export; the right-panel test renders
     // It directly, so here we just assert it reflects the module's current view state.
     expect(renderAiPanelTemplate()).toBeDefined();
+  });
+
+  test("seedAssistantMessages stages a canned conversation and opens the key gate", async () => {
+    globalThis.localStorage.clear();
+    chatState.messages.length = 0;
+    await flush(3); // With no key the gate is up again.
+    expect(q(".ai-creds-form")).not.toBeNull();
+
+    seedAssistantMessages([
+      {
+        content:
+          'Make the hero friendlier\n\n---- attached context ----\nPage: pages/index.md\nSelected element at ["children",0]: <h1>',
+        role: "user",
+      },
+      {
+        content: "Done — I softened the headline.",
+        role: "assistant",
+        toolCalls: [{ arguments: '{"path":["children",0]}', name: "set_text" }],
+      },
+    ]);
+    await flush(3);
+    // The inert demo key opened the gate (localStorage only — no request fires)…
+    expect(globalThis.localStorage.getItem("jx.ai.openaiKey")).toBe("sk-demo");
+    expect(q(".ai-creds-form")).toBeNull();
+    // …and the canned transcript renders with context chips and tool chips.
+    expect(q(".ai-msg-user")!.textContent).toContain("Make the hero friendlier");
+    expect(q(".ai-context-chip")!.textContent).toContain("Page: pages/index.md");
+    expect(q(".ai-msg-assistant")!.textContent).toContain("softened the headline");
+    expect(q(".ai-tool-chip")!.textContent).toContain('set_text: ["children",0]');
   });
 });

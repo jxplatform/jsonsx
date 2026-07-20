@@ -16,17 +16,24 @@ import { activeTab, closeAllTabs, workspace } from "../workspace/workspace";
 import type { ProjectListEntry } from "../types";
 import { applyPanelCollapse, view } from "../view";
 import { setEditZoom as applyEditZoomLevel } from "../canvas/canvas-utils";
+import { collabState } from "../collab/collab-state";
+import type { PeerPresence } from "../collab/collab-state";
+import type { SeededAssistantMessage } from "../panels/ai-panel";
+import type { PagesDeploymentInfo } from "../publish/pages-service";
 import type { JxPath } from "../state";
 
 /** Callbacks injected from studio.ts (module-local helpers or imports kept out of this module). */
 export interface AutomationDeps {
   getCanvasMode: () => string;
   openBrowseModal: () => void;
+  openConnectorGrid: (connection: string | undefined, table: string) => void;
   openNewProjectModal: () => void;
   openQuickSearchPalette: () => void;
   openSettingsModal: (section?: string) => void;
   render: () => void;
   renderActivityBar: () => void;
+  seedAssistantMessages: (messages: SeededAssistantMessage[]) => void;
+  seedPublishConnected: (options: { accountId?: string; deployment: PagesDeploymentInfo }) => void;
   setCanvasMode: (mode: string) => void;
   statusMessage: (text: string) => void;
 }
@@ -35,9 +42,13 @@ export interface AutomationApi {
   editDef: (defName: string) => void;
   editFunction: (path: JxPath, eventKey: string) => void;
   openBrowse: () => void;
+  openDataGrid: (options: { connection?: string; table: string }) => void;
   openNewProject: () => void;
   openQuickSearch: () => void;
   openSettings: (section?: string) => void;
+  seedAssistant: (options: { messages: SeededAssistantMessage[] }) => void;
+  seedCollab: (options: { peers: PeerPresence[] }) => void;
+  seedPublish: (options: { accountId?: string; deployment: PagesDeploymentInfo }) => void;
   showWelcome: (options?: { projects?: ProjectListEntry[] }) => void;
   getState: () => {
     activeTabId: string | null;
@@ -74,6 +85,9 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
     openBrowse() {
       deps.openBrowseModal();
     },
+    openDataGrid(options: { connection?: string; table: string }) {
+      deps.openConnectorGrid(options.connection, options.table);
+    },
     openNewProject() {
       deps.openNewProjectModal();
     },
@@ -82,6 +96,31 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
     },
     openSettings(section?: string) {
       deps.openSettingsModal(section);
+    },
+    seedAssistant(options: { messages: SeededAssistantMessage[] }) {
+      deps.seedAssistantMessages(options.messages);
+    },
+    seedCollab(options: { peers: PeerPresence[] }) {
+      // Stage a live co-editing session on the active tab: the toolbar's presence chips and the
+      // Canvas peer-selection boxes both read this same reactive store.
+      const tab = activeTab.value;
+      if (!tab) {
+        return;
+      }
+      const state = collabState(tab);
+      state.status = "synced";
+      state.active = true;
+      state.peers = options.peers.map((peer) => ({
+        ...peer,
+        state: {
+          ...peer.state,
+          focusedPath: peer.state.focusedPath ?? tab.documentPath,
+        },
+      }));
+      deps.render();
+    },
+    seedPublish(options: { accountId?: string; deployment: PagesDeploymentInfo }) {
+      deps.seedPublishConnected(options);
     },
     showWelcome(options?: { projects?: ProjectListEntry[] }) {
       // The devserver platform auto-opens the repo-root project on boot; the welcome

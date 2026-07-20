@@ -19,13 +19,47 @@ export type WaitCondition =
   | { selector: string; timeoutMs?: number; type: "selector" }
   | { ms: number; type: "timeout" };
 
+/** A canned chat message for the `seedAssistant` action (ai-panel seedAssistantMessages). */
+export interface SeededChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  /** Rendered as tool chips on assistant messages; `arguments` is a JSON string. */
+  toolCalls?: { name: string; arguments: string }[];
+}
+
+/** A canned Pages deployment for the `seedPublish` action (publish-panel seedPublishConnected). */
+export interface SeededDeployment {
+  id: string;
+  url: string;
+  environment: string;
+  stage: string;
+  status: string;
+  createdOn: string;
+}
+
+/** A canned collab peer for the `seedCollab` action (collabState on the active tab). */
+export interface SeededPeer {
+  clientId: number;
+  state: {
+    user: { login: string; name?: string; color: string; avatarUrl?: string };
+    /** Defaults to the active tab's documentPath inside the seedCollab verb. */
+    focusedPath?: string | null;
+    structuralSelection?: (string | number)[] | null;
+    mode?: "structure" | "source";
+  };
+}
+
 export type ShotAction =
   | { defName: string; do: "editDef" }
   | { do: "editFunction"; eventKey: string; path: (string | number)[] }
   | { do: "openBrowse" }
+  | { connection?: string; do: "openDataGrid"; table: string }
   | { do: "openNewProject" }
   | { do: "openQuickSearch" }
   | { do: "openSettings"; section?: string }
+  | { do: "seedAssistant"; messages: SeededChatMessage[] }
+  | { do: "seedCollab"; peers: SeededPeer[] }
+  | { deployment: SeededDeployment; do: "seedPublish" }
   | { do: "showWelcome"; projects?: { name: string; root: string; description?: string }[] }
   | { do: "select"; path: (string | number)[] | null }
   | { do: "setActivity"; value: string }
@@ -37,6 +71,8 @@ export type ShotAction =
   // Generic DOM interactions (main frame). Selectors may use puppeteer handlers
   // Like `pierce/` to reach into Spectrum shadow DOM.
   | { button?: "left" | "right"; do: "click"; selector: string }
+  // Synthetic dragover on a main-frame element (e.g. the browse drop zone's highlight state).
+  | { do: "dispatchDragOver"; selector: string }
   | { do: "hover"; selector: string }
   | { do: "type"; selector: string; text: string }
   // Canvas-iframe interactions — real clicks/keys inside the preview document,
@@ -136,13 +172,18 @@ const ACTION_KINDS = new Set([
   "canvasKey",
   "canvasType",
   "click",
+  "dispatchDragOver",
   "editDef",
   "editFunction",
   "hover",
   "openBrowse",
+  "openDataGrid",
   "openNewProject",
   "openQuickSearch",
   "openSettings",
+  "seedAssistant",
+  "seedCollab",
+  "seedPublish",
   "select",
   "setActivity",
   "setCanvasMode",

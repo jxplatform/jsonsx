@@ -96,6 +96,9 @@ import { renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
 import { installAutomationHook } from "./services/automation";
 import { openBrowseModal } from "./browse/browse-modal";
+import { seedAssistantMessages } from "./panels/ai-panel";
+import { seedPublishConnected } from "./publish/publish-panel";
+import { openConnectorGrid } from "./grid/grid-open";
 
 import { getPlatform, hasPlatform, registerPlatform } from "./platform";
 import { parseMediaEntries } from "./utils/canvas-media";
@@ -392,11 +395,14 @@ if (!hasPlatform()) {
 installAutomationHook({
   getCanvasMode,
   openBrowseModal,
+  openConnectorGrid,
   openNewProjectModal,
   openQuickSearchPalette: openQuickSearch,
   openSettingsModal,
   render,
   renderActivityBar,
+  seedAssistantMessages,
+  seedPublishConnected,
   setCanvasMode,
   statusMessage,
 });

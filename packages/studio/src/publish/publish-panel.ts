@@ -339,6 +339,23 @@ function render(): void {
   }
 }
 
+/**
+ * Automation-only seam (scripts/screenshots): open the modal directly in its connected state with a
+ * canned deployment, bypassing {@link loadConnection} so no Cloudflare request ever fires. The
+ * active project's `build.deploy` block still supplies the connected project/URL line.
+ */
+export function seedPublishConnected(options: {
+  accountId?: string;
+  deployment: PagesDeploymentInfo;
+}): void {
+  _connection = { accountId: options.accountId ?? "demo-account", connected: true };
+  _accounts = [];
+  _deployment = options.deployment;
+  _error = "";
+  _busy = false;
+  render();
+}
+
 /** Open the publish modal for the active project. */
 export function openPublishPanel(): void {
   const config = currentConfig();

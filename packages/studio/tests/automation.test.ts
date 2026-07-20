@@ -13,22 +13,28 @@ const { updateCanvas } = await import("../src/store");
 
 function makeDeps(): AutomationDeps & {
   openBrowseModal: ReturnType<typeof mock>;
+  openConnectorGrid: ReturnType<typeof mock>;
   openNewProjectModal: ReturnType<typeof mock>;
   openQuickSearchPalette: ReturnType<typeof mock>;
   openSettingsModal: ReturnType<typeof mock>;
   render: ReturnType<typeof mock>;
   renderActivityBar: ReturnType<typeof mock>;
+  seedAssistantMessages: ReturnType<typeof mock>;
+  seedPublishConnected: ReturnType<typeof mock>;
   setCanvasMode: ReturnType<typeof mock>;
   statusMessage: ReturnType<typeof mock>;
 } {
   return {
     getCanvasMode: () => "design",
     openBrowseModal: mock(() => {}),
+    openConnectorGrid: mock(() => {}),
     openNewProjectModal: mock(() => {}),
     openQuickSearchPalette: mock(() => {}),
     openSettingsModal: mock(() => {}),
     render: mock(() => {}),
     renderActivityBar: mock(() => {}),
+    seedAssistantMessages: mock(() => {}),
+    seedPublishConnected: mock(() => {}),
     setCanvasMode: mock(() => {}),
     statusMessage: mock(() => {}),
   };
@@ -201,6 +207,84 @@ describe("createAutomationApi", () => {
     const deps = makeDeps();
     createAutomationApi(deps).openNewProject();
     expect(deps.openNewProjectModal).toHaveBeenCalledTimes(1);
+  });
+
+  test("openDataGrid delegates connection and table to the connector-grid opener", () => {
+    const deps = makeDeps();
+    const api = createAutomationApi(deps);
+    api.openDataGrid({ connection: "main", table: "comments" });
+    api.openDataGrid({ table: "posts" });
+    expect(deps.openConnectorGrid.mock.calls).toEqual([
+      ["main", "comments"],
+      [undefined, "posts"],
+    ]);
+  });
+
+  test("seedAssistant delegates the canned transcript to the ai-panel seam", () => {
+    const deps = makeDeps();
+    const messages = [
+      { content: "hello", role: "user" as const },
+      {
+        content: "done",
+        role: "assistant" as const,
+        toolCalls: [{ arguments: '{"path":["children",0]}', name: "set_text" }],
+      },
+    ];
+    createAutomationApi(deps).seedAssistant({ messages });
+    expect(deps.seedAssistantMessages).toHaveBeenCalledWith(messages);
+  });
+
+  test("seedPublish delegates the canned deployment to the publish-panel seam", () => {
+    const deps = makeDeps();
+    const options = {
+      deployment: {
+        createdOn: "2026-07-01T00:00:00Z",
+        environment: "production",
+        id: "d1",
+        stage: "deploy",
+        status: "success",
+        url: "https://demo.pages.dev",
+      },
+    };
+    createAutomationApi(deps).seedPublish(options);
+    expect(deps.seedPublishConnected).toHaveBeenCalledWith(options);
+  });
+
+  test("seedCollab marks the active tab synced with peers, defaulting focusedPath", async () => {
+    const { collabState } = await import("../src/collab/collab-state");
+    const tab = resetWorkspaceWithTab(undefined, { documentPath: "pages/index.md" });
+    const deps = makeDeps();
+    createAutomationApi(deps).seedCollab({
+      peers: [
+        {
+          clientId: 7,
+          state: {
+            focusedPath: null,
+            structuralSelection: ["children", 0],
+            user: { color: "#30a46c", login: "maya" },
+          },
+        },
+        {
+          clientId: 8,
+          state: { focusedPath: "pages/about.md", user: { color: "#f5a524", login: "jon" } },
+        },
+      ],
+    });
+    const state = collabState(tab);
+    expect(state.status).toBe("synced");
+    expect(state.active).toBe(true);
+    expect(state.peers).toHaveLength(2);
+    expect(state.peers[0]!.state.focusedPath).toBe("pages/index.md");
+    expect(state.peers[1]!.state.focusedPath).toBe("pages/about.md");
+    expect(deps.render).toHaveBeenCalledTimes(1);
+  });
+
+  test("seedCollab without a tab is a no-op", () => {
+    const deps = makeDeps();
+    expect(() => {
+      createAutomationApi(deps).seedCollab({ peers: [] });
+    }).not.toThrow();
+    expect(deps.render).not.toHaveBeenCalled();
   });
 
   test("setStatus delegates to statusMessage", () => {

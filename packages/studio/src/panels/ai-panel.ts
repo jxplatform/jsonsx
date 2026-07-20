@@ -21,7 +21,7 @@ import type { TemplateResult } from "lit-html";
 import { getPlatform } from "../platform";
 import { effect, effectScope } from "../reactivity";
 import { createDocumentAssistant } from "../services/document-assistant";
-import { hasOpenAiKey } from "../services/ai-settings";
+import { hasOpenAiKey, setOpenAiKey } from "../services/ai-settings";
 import { fetchAvailableModels, isManagedProxy, isProxyConfigured } from "../services/ai-models";
 import { createAiCredentialsForm } from "../ui/ai-credentials-form";
 import { clearMarkdownCache } from "./ai-chat/chat-markdown";
@@ -261,6 +261,58 @@ async function handleAssistantSend(text: string) {
  */
 export async function seedAssistantPrompt(text: string): Promise<void> {
   await handleAssistantSend(text);
+}
+
+// ─── Automation seeding (screenshot runner) ─────────────────────────────────
+
+/** A canned tool-call chip for {@link seedAssistantMessages}. */
+export interface SeededToolCall {
+  name: string;
+  /** JSON-encoded arguments, e.g. `{"path":["children",0],"text":"…"}`. */
+  arguments: string;
+}
+
+/** A canned transcript entry for {@link seedAssistantMessages}. */
+export interface SeededAssistantMessage {
+  role: "user" | "assistant";
+  content: string;
+  toolCalls?: SeededToolCall[];
+}
+
+let seededCount = 0;
+
+/**
+ * Automation-only seam (scripts/screenshots): stage a canned conversation without ever invoking a
+ * model. Stores an inert demo key so the key gate opens (localStorage-only on the dev server — no
+ * request fires), switches to the chat view, and pushes fully-formed messages straight into the
+ * reactive chat state — the same path session restore uses — so the panel repaints through its
+ * normal watcher.
+ */
+export function seedAssistantMessages(messages: SeededAssistantMessage[]): void {
+  setOpenAiKey("sk-demo");
+  keyEditing = false;
+  view = "chat";
+  stickToBottom = true;
+  for (const msg of messages) {
+    seededCount += 1;
+    const seq = seededCount;
+    assistant.chatState.messages.push({
+      content: msg.content,
+      id: `seeded_${seq}`,
+      role: msg.role,
+      timestamp: seq,
+      ...(msg.toolCalls
+        ? {
+            toolCalls: msg.toolCalls.map((tc, i) => ({
+              arguments: tc.arguments,
+              id: `seeded_${seq}_tc${i}`,
+              name: tc.name,
+            })),
+          }
+        : {}),
+    });
+  }
+  scheduleAiRender();
 }
 
 // ─── Controls ─────────────────────────────────────────────────────────────────
