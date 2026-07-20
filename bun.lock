@@ -42,7 +42,7 @@
     },
     "extensions/auth": {
       "name": "@jxsuite/auth",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@jxsuite/connector": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -56,7 +56,7 @@
     },
     "extensions/connector": {
       "name": "@jxsuite/connector",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "kysely": "^0.29.4",
@@ -72,7 +72,7 @@
     },
     "extensions/parser": {
       "name": "@jxsuite/parser",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "dependencies": {
         "@jxsuite/markup": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -121,7 +121,7 @@
     },
     "packages/collab": {
       "name": "@jxsuite/collab",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "lib0": "^0.2.99",
@@ -131,7 +131,7 @@
     },
     "packages/compiler": {
       "name": "@jxsuite/compiler",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "bin": {
         "jx": "./bin/jx.js",
       },
@@ -152,7 +152,7 @@
     },
     "packages/create": {
       "name": "@jxsuite/create",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "bin": {
         "create-jxsuite": "./index.ts",
       },
@@ -162,7 +162,7 @@
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "dependencies": {
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
@@ -187,7 +187,7 @@
     },
     "packages/formulas": {
       "name": "@jxsuite/formulas",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
@@ -197,7 +197,7 @@
     },
     "packages/import": {
       "name": "@jxsuite/import",
-      "version": "0.37.0",
+      "version": "0.37.1",
       "bin": {
         "jx-import": "./src/cli.ts",
       },
@@ -218,7 +218,7 @@
     },
     "packages/markup": {
       "name": "@jxsuite/markup",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "hast-util-from-html": "^2.0.3",
@@ -237,14 +237,14 @@
     },
     "packages/protocol": {
       "name": "@jxsuite/protocol",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
     },
     "packages/runtime": {
       "name": "@jxsuite/runtime",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "@vue/reactivity": "^3.5.40",
@@ -255,7 +255,7 @@
     },
     "packages/schema": {
       "name": "@jxsuite/schema",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "dependencies": {
         "@webref/css": "^8.7.0",
         "@webref/elements": "^2.7.1",
@@ -269,7 +269,7 @@
     },
     "packages/server": {
       "name": "@jxsuite/server",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "dependencies": {
         "@jxsuite/collab": "workspace:^",
         "@jxsuite/compiler": "workspace:^",
@@ -291,14 +291,14 @@
     },
     "packages/starters": {
       "name": "@jxsuite/starters",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "devDependencies": {
         "@jxsuite/schema": "workspace:^",
       },
     },
     "packages/studio": {
       "name": "@jxsuite/studio",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.0.0",
