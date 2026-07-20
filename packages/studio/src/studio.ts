@@ -144,7 +144,8 @@ import {
   renderBlockActionBar,
 } from "./panels/block-action-bar";
 import { initCssData } from "./panels/style-utils";
-import { initQuickSearch } from "./panels/quick-search";
+import { initQuickSearch, openQuickSearch } from "./panels/quick-search";
+import { openSettingsModal } from "./settings/settings-modal";
 import { hydrateAccountStatus } from "./account-status";
 import { hydrateProjectList } from "./project-list";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
@@ -391,6 +392,8 @@ installAutomationHook({
   getCanvasMode,
   openBrowseModal,
   openNewProjectModal,
+  openQuickSearchPalette: openQuickSearch,
+  openSettingsModal,
   render,
   renderActivityBar,
   setCanvasMode,

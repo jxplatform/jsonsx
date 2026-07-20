@@ -348,6 +348,301 @@
           "frames": 4
         }
       ]
+    },
+    {
+      "name": "welcome-screen",
+      "docs": ["studio/interface/welcome-screen"],
+      "noProject": true,
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".welcome-screen"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "actions": [
+        {
+          "do": "showWelcome",
+          "projects": [
+            {
+              "name": "Bistro & Caf\u00e9",
+              "root": "~/Sites/bistro",
+              "description": "~/Sites/bistro"
+            },
+            {
+              "name": "Northshore Realty",
+              "root": "~/Sites/northshore",
+              "description": "~/Sites/northshore"
+            },
+            {
+              "name": "The Long Field",
+              "root": "~/Sites/long-field",
+              "description": "~/Sites/long-field"
+            },
+            {
+              "name": "Horizon Conf 2026",
+              "root": "~/Sites/horizon-conf",
+              "description": "~/Sites/horizon-conf"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "settings-modal",
+      "docs": ["studio/projects/settings"],
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "actions": [
+        {
+          "do": "openSettings"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".settings-modal"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "css-variables-shot",
+      "docs": ["studio/design/tokens"],
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "clip": "none",
+      "actions": [
+        {
+          "do": "openSettings",
+          "section": "css-variables"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".settings-modal"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "regions": [
+        {
+          "name": "css-variables",
+          "selector": ".settings-modal",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "quick-access",
+      "docs": ["studio/interface/quick-access"],
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "actions": [
+        {
+          "do": "openQuickSearch"
+        },
+        {
+          "do": "type",
+          "selector": ".quick-search-input",
+          "text": "list"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "elements-panel-shot",
+      "docs": ["studio/design/elements"],
+      "file": "pages/index.md",
+      "canvasMode": "design",
+      "clip": "none",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "blocks"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "regions": [
+        {
+          "name": "elements-panel",
+          "selector": "#left-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "layers-panel-shot",
+      "docs": ["studio/design/layers"],
+      "project": "packages/starters/sites/event",
+      "file": "components/ev-savedate.json",
+      "canvasMode": "design",
+      "clip": "none",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "select",
+          "path": ["children", 0]
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "regions": [
+        {
+          "name": "layers-panel",
+          "selector": "#left-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "imports-panel-shot",
+      "docs": ["studio/projects/dependencies"],
+      "project": "packages/starters/sites/shop",
+      "file": "project.json",
+      "clip": "none",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "imports"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
+      ],
+      "regions": [
+        {
+          "name": "imports-panel",
+          "selector": "#left-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "document-panel-shot",
+      "docs": ["studio/editing/frontmatter"],
+      "project": "packages/starters/sites/blog",
+      "file": "content/posts/designing-for-slowness.md",
+      "canvasMode": "edit",
+      "clip": "none",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "head"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "regions": [
+        {
+          "name": "document-panel",
+          "selector": "#left-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "data-explorer-shot",
+      "docs": ["studio/logic/data-explorer"],
+      "file": "components/re-listings-filter.json",
+      "canvasMode": "design",
+      "clip": "none",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "data"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        }
+      ],
+      "regions": [
+        {
+          "name": "data-explorer",
+          "selector": "#left-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "grid-mode",
+      "docs": ["studio/editing/grid"],
+      "file": "content/listings.csv",
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".tabulator"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
+      ],
+      "actions": [
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "noCanvas": true
     }
   ]
 }

@@ -14,6 +14,8 @@ const { updateCanvas } = await import("../src/store");
 function makeDeps(): AutomationDeps & {
   openBrowseModal: ReturnType<typeof mock>;
   openNewProjectModal: ReturnType<typeof mock>;
+  openQuickSearchPalette: ReturnType<typeof mock>;
+  openSettingsModal: ReturnType<typeof mock>;
   render: ReturnType<typeof mock>;
   renderActivityBar: ReturnType<typeof mock>;
   setCanvasMode: ReturnType<typeof mock>;
@@ -23,6 +25,8 @@ function makeDeps(): AutomationDeps & {
     getCanvasMode: () => "design",
     openBrowseModal: mock(() => {}),
     openNewProjectModal: mock(() => {}),
+    openQuickSearchPalette: mock(() => {}),
+    openSettingsModal: mock(() => {}),
     render: mock(() => {}),
     renderActivityBar: mock(() => {}),
     setCanvasMode: mock(() => {}),
@@ -176,6 +180,21 @@ describe("createAutomationApi", () => {
     const deps = makeDeps();
     createAutomationApi(deps).openBrowse();
     expect(deps.openBrowseModal).toHaveBeenCalledTimes(1);
+  });
+
+  test("openQuickSearch delegates to the palette opener", () => {
+    const deps = makeDeps();
+    createAutomationApi(deps).openQuickSearch();
+    expect(deps.openQuickSearchPalette).toHaveBeenCalledTimes(1);
+  });
+
+  test("openSettings delegates with the optional section", () => {
+    const deps = makeDeps();
+    const api = createAutomationApi(deps);
+    api.openSettings();
+    api.openSettings("css-variables");
+    expect(deps.openSettingsModal).toHaveBeenCalledTimes(2);
+    expect(deps.openSettingsModal.mock.calls).toEqual([[undefined], ["css-variables"]]);
   });
 
   test("openNewProject delegates to the new-project modal opener", () => {

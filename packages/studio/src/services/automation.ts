@@ -10,7 +10,10 @@
  */
 
 import { renderOnly, updateUi } from "../store";
-import { activeTab, workspace } from "../workspace/workspace";
+import { setProjectState } from "../state";
+import { seedProjectList } from "../project-list";
+import { activeTab, closeAllTabs, workspace } from "../workspace/workspace";
+import type { ProjectListEntry } from "../types";
 import { applyPanelCollapse, view } from "../view";
 import { setEditZoom as applyEditZoomLevel } from "../canvas/canvas-utils";
 import type { JxPath } from "../state";
@@ -20,6 +23,8 @@ export interface AutomationDeps {
   getCanvasMode: () => string;
   openBrowseModal: () => void;
   openNewProjectModal: () => void;
+  openQuickSearchPalette: () => void;
+  openSettingsModal: (section?: string) => void;
   render: () => void;
   renderActivityBar: () => void;
   setCanvasMode: (mode: string) => void;
@@ -31,6 +36,9 @@ export interface AutomationApi {
   editFunction: (path: JxPath, eventKey: string) => void;
   openBrowse: () => void;
   openNewProject: () => void;
+  openQuickSearch: () => void;
+  openSettings: (section?: string) => void;
+  showWelcome: (options?: { projects?: ProjectListEntry[] }) => void;
   getState: () => {
     activeTabId: string | null;
     canvasMode: string;
@@ -68,6 +76,25 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
     },
     openNewProject() {
       deps.openNewProjectModal();
+    },
+    openQuickSearch() {
+      deps.openQuickSearchPalette();
+    },
+    openSettings(section?: string) {
+      deps.openSettingsModal(section);
+    },
+    showWelcome(options?: { projects?: ProjectListEntry[] }) {
+      // The devserver platform auto-opens the repo-root project on boot; the welcome
+      // Screen only renders with no project and no tabs, so stage that state directly.
+      // A staged catalogue replaces the real one (screenshots must not leak local paths).
+      closeAllTabs();
+      setProjectState(null);
+      if (options?.projects) {
+        seedProjectList(options.projects);
+      }
+      view.chatPanelCollapsed = true;
+      applyPanelCollapse();
+      deps.render();
     },
     getState() {
       return {

@@ -103,10 +103,54 @@ async function runWaits(page: Page, waits: WaitCondition[]): Promise<void> {
   }
 }
 
+/** The canvas preview iframe — Studio's only child frame. */
+function canvasFrame(page: Page): Frame {
+  const frame = page.frames().find((f) => f !== page.mainFrame());
+  if (!frame) {
+    throw new Error("canvas iframe not found");
+  }
+  return frame;
+}
+
 async function runAction(page: Page, action: ShotAction): Promise<void> {
   switch (action.do) {
     case "click": {
       await page.click(action.selector);
+      return;
+    }
+    case "hover": {
+      await page.hover(action.selector);
+      return;
+    }
+    case "type": {
+      await page.click(action.selector);
+      await page.keyboard.type(action.text, { delay: 10 });
+      return;
+    }
+    case "canvasClick": {
+      const frame = canvasFrame(page);
+      const el = await frame.waitForSelector(action.selector, { timeout: 15_000 });
+      await el!.click({ clickCount: action.clickCount ?? 1 });
+      return;
+    }
+    case "canvasType": {
+      await page.keyboard.type(action.text, { delay: 15 });
+      return;
+    }
+    case "canvasKey": {
+      await page.keyboard.press(action.key as Parameters<Page["keyboard"]["press"]>[0]);
+      return;
+    }
+    case "openQuickSearch": {
+      await hook(page, "openQuickSearch");
+      return;
+    }
+    case "showWelcome": {
+      await hook(page, "showWelcome", action.projects ? { projects: action.projects } : undefined);
+      return;
+    }
+    case "openSettings": {
+      await hook(page, "openSettings", action.section);
       return;
     }
     case "editDef": {
@@ -337,12 +381,11 @@ export async function executeShot(
   });
   await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
 
-  const projectAbs = resolve(ctx.repoRoot, shot.project);
-  const params = new URLSearchParams({
-    automation: "1",
-    file: shot.file,
-    project: projectAbs,
-  });
+  const params = new URLSearchParams({ automation: "1" });
+  if (!shot.noProject) {
+    params.set("file", shot.file!);
+    params.set("project", resolve(ctx.repoRoot, shot.project));
+  }
   const url = `${ctx.serverUrl}${ctx.studioPath}?${params}`;
   ctx.log(`[shot:${shot.name}] ${url}`);
 
@@ -350,12 +393,18 @@ export async function executeShot(
   await page.waitForFunction(() => Boolean(window.__jxAutomation), { timeout: 30_000 });
 
   // Baseline readiness before driving state; the shot's own waitFor runs after actions (it may
-  // Reference UI the actions create, e.g. the Monaco function editor).
-  await runWaits(page, [
-    { timeoutMs: 60_000, type: "canvasReady" },
-    { type: "fonts" },
-    { frames: 2, type: "settle" },
-  ]);
+  // Reference UI the actions create, e.g. the Monaco function editor). Without a project there
+  // Is no canvas to wait on.
+  await runWaits(
+    page,
+    shot.noProject || shot.noCanvas
+      ? [{ type: "fonts" }, { frames: 2, type: "settle" }]
+      : [
+          { timeoutMs: 60_000, type: "canvasReady" },
+          { type: "fonts" },
+          { frames: 2, type: "settle" },
+        ],
+  );
   for (const frame of page.frames()) {
     await freezeFrame(frame);
   }
