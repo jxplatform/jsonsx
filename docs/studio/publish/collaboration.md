@@ -14,7 +14,7 @@ code:
 
 When two people open the same file through the same Studio backend, the tab becomes a shared session: everyone sees everyone's edits as they happen, on the canvas and in the code. There's nothing to turn on — if your setup supports it (see below), co-editing starts by itself the moment a second person opens the file, and a file opened alone behaves exactly as always.
 
-<!-- TODO(screenshot): collab-presence — a co-edited tab with the Live status pill, two presence chips, and a peer's colored selection box on the canvas -->
+![A co-edited tab with the Live status pill, two presence chips, and a peer's colored selection box on the canvas](/screenshots/collab-presence.png)
 
 ## What you see
 

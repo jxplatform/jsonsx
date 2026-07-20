@@ -12,7 +12,7 @@ code:
 
 Studio has a built-in AI assistant: a chat sidebar that doesn't just talk about your project but works on it — it creates pages and components, edits the page on the canvas while you watch, and answers questions about what it finds in your files. It runs against an AI provider **you** connect; Studio ships no account, no hosted AI, and sends nothing anywhere until you do.
 
-<!-- TODO(screenshot): ai-sidebar — the assistant sidebar open beside a page on the canvas, mid-conversation -->
+![The assistant sidebar open beside a page on the canvas, mid-conversation](/screenshots/ai-sidebar.png)
 
 Open it with the **Toggle Assistant** chat-bubble button at the right end of the toolbar. The sidebar is always available — before you open a project, with a project open, and with a page on the canvas — and what the assistant can do grows with each of those states.
 

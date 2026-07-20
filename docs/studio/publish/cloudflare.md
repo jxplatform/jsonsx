@@ -10,7 +10,7 @@ code:
 
 The Publish panel connects your project to Cloudflare Pages — a free static-site host — so that every commit you sync builds and publishes automatically. Open it with the **Publish** button in the toolbar.
 
-<!-- TODO(screenshot): publish-panel — the Publish modal showing the connected state with the latest deployment status -->
+![The Publish modal showing the connected state with the latest deployment status](/screenshots/publish-panel.png)
 
 Before you start, the project needs to live on GitHub — if it doesn't yet, **[GitHub](/docs/studio/publish/github)** walks you through publishing it from Studio.
 

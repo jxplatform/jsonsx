@@ -19,7 +19,7 @@ Your site's media — images, video, audio, PDFs, and fonts — lives in the pro
 
 Studio accepts images (including SVG), video, audio, PDFs, and font files. Right-click any asset to **rename**, **duplicate**, or **delete** it.
 
-<!-- TODO(screenshot): media-upload — the Manage view highlighted as a drop target while image files are dragged onto it -->
+![The Manage view highlighted as a drop target while files are dragged onto it](/screenshots/media-upload.png)
 
 :::doc-note
 Uploads are written to your project's `public/` folder under their own name, and everything in `public/` is served from your site's root: `public/hero.jpg` becomes `/hero.jpg` on the published site. The folder layout is documented in [Site architecture](/docs/framework/site).

@@ -13,7 +13,7 @@ code:
 
 A data table is like a content type for live data: a name, a set of fields, and the connection its rows are stored in. You define tables here; **Push Schema** then creates them in the actual database. Open the **Settings** gear at the bottom of the activity bar, then _Settings > Data Tables_ — tables on the left, the selected table's editor on the right.
 
-<!-- TODO(screenshot): data-table-editor — the Data Tables section with a table selected, showing the connection picker and field schema builder -->
+![The Data Tables editor pane showing the connection picker and field schema builder](/screenshots/data-table-editor.png)
 
 ## Create a table
 

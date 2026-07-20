@@ -12,7 +12,7 @@ code:
 
 The AI sidebar is the assistant's home: a chat column on the right edge of the workspace that stays put while you work. It survives tab switches — your draft message, scroll position, and conversation are all still there when you come back — and it works in every state of Studio, from the welcome screen to a page mid-edit.
 
-<!-- TODO(screenshot): ai-sidebar-chat — the sidebar with a conversation: a user message with context chips, an assistant reply with tool chips, and the composer below -->
+![A conversation in the sidebar: a user message with context chips, an assistant reply with a tool chip, and the composer below](/screenshots/ai-sidebar-chat.png)
 
 ## Open it
 
