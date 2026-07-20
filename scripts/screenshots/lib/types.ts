@@ -24,6 +24,9 @@ export type ShotAction =
   | { do: "editFunction"; eventKey: string; path: (string | number)[] }
   | { do: "openBrowse" }
   | { do: "openNewProject" }
+  | { do: "openQuickSearch" }
+  | { do: "openSettings"; section?: string }
+  | { do: "showWelcome"; projects?: { name: string; root: string; description?: string }[] }
   | { do: "select"; path: (string | number)[] | null }
   | { do: "setActivity"; value: string }
   | { do: "setCanvasMode"; value: string }
@@ -31,7 +34,16 @@ export type ShotAction =
   | { do: "setStatus"; value: string }
   | { do: "setTheme"; value: string }
   | { do: "setZoom"; value: number }
+  // Generic DOM interactions (main frame). Selectors may use puppeteer handlers
+  // Like `pierce/` to reach into Spectrum shadow DOM.
   | { do: "click"; selector: string }
+  | { do: "hover"; selector: string }
+  | { do: "type"; selector: string; text: string }
+  // Canvas-iframe interactions — real clicks/keys inside the preview document,
+  // The faithful way to start inline editing or open the slash menu.
+  | { clickCount?: number; do: "canvasClick"; selector: string }
+  | { do: "canvasType"; text: string }
+  | { do: "canvasKey"; key: string }
   | { do: "wait"; ms: number };
 
 export type ClipSpec =
@@ -78,11 +90,19 @@ export interface Shot extends ShotDefaults {
   actions?: ShotAction[];
   canvasMode?: string;
   /**
+   * Boot Studio without a project/file deep link (the welcome screen). Skips the Canvas-readiness
+   * baseline — there is no canvas without a project.
+   */
+  noProject?: boolean;
+  /** Skip the canvas-readiness baseline for files that never render a canvas (CSV grids). */
+  noCanvas?: boolean;
+  /**
    * Docs-page slugs this shot illustrates (e.g. "studio/design"). Inert to capture;
    * Scripts/docs/check-doc-refs.ts uses it to report shots no docs page references.
    */
   docs?: string[];
-  file: string;
+  /** Project-relative file to open. Required unless `noProject` is set. */
+  file?: string;
   name: string;
   regions?: ShotRegion[];
   variants?: ShotVariant[];
@@ -106,11 +126,17 @@ export interface ResolvedShot extends Shot {
 }
 
 const ACTION_KINDS = new Set([
+  "canvasClick",
+  "canvasKey",
+  "canvasType",
   "click",
   "editDef",
   "editFunction",
+  "hover",
   "openBrowse",
   "openNewProject",
+  "openQuickSearch",
+  "openSettings",
   "select",
   "setActivity",
   "setCanvasMode",
@@ -118,6 +144,8 @@ const ACTION_KINDS = new Set([
   "setStatus",
   "setTheme",
   "setZoom",
+  "showWelcome",
+  "type",
   "wait",
 ]);
 
@@ -160,8 +188,8 @@ export function validateManifest(raw: unknown): Manifest {
       fail(`duplicate shot name "${shot.name}"`);
     }
     shotNames.add(shot.name);
-    if (typeof shot.file !== "string" || !shot.file) {
-      fail(`shot "${shot.name}": file is required`);
+    if (!shot.noProject && (typeof shot.file !== "string" || !shot.file)) {
+      fail(`shot "${shot.name}": file is required (or set noProject for the welcome screen)`);
     }
     for (const action of shot.actions ?? []) {
       if (!ACTION_KINDS.has(action.do)) {

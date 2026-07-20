@@ -36,3 +36,8 @@ export function getProjectList(): ProjectListEntry[] {
 export function resetProjectList(): void {
   cache = [];
 }
+
+/** Seed seam for tests and the screenshot automation hook (staged catalogues). */
+export function seedProjectList(entries: ProjectListEntry[]): void {
+  cache = entries;
+}

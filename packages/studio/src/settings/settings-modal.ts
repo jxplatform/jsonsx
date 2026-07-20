@@ -106,11 +106,11 @@ let _activeSection = "general";
 
 let _contentEl: HTMLElement | null = null;
 
-export function openSettingsModal() {
+export function openSettingsModal(section?: string) {
   if (_handle) {
     return;
   }
-  _activeSection = "general";
+  _activeSection = section ?? "general";
   renderModal();
   // Refresh descriptor-contributed sections (cached payloads make this cheap) and rerender the
   // Nav once they land. Lazy import breaks the settings-modal ↔ extension-sections module cycle.
