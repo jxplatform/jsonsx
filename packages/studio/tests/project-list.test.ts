@@ -6,8 +6,13 @@ import { installMockPlatform } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import type { ProjectListEntry } from "../src/types";
 
-const { getProjectList, hydrateProjectList, platformListsProjects, resetProjectList } =
-  await import("../src/project-list");
+const {
+  getProjectList,
+  hydrateProjectList,
+  platformListsProjects,
+  resetProjectList,
+  seedProjectList,
+} = await import("../src/project-list");
 
 const ENTRIES: ProjectListEntry[] = [
   { name: "Site A", root: "sites/a", description: "sites/a" },
@@ -48,6 +53,15 @@ describe("hydrateProjectList / getProjectList", () => {
     installMockPlatform({ listProjects: () => Promise.reject(new Error("boom")) });
     await hydrateProjectList();
     expect(getProjectList()).toEqual([]);
+  });
+
+  test("seedProjectList stages a catalogue without a platform round-trip", async () => {
+    installMockPlatform({ listProjects: () => Promise.resolve(ENTRIES) });
+    seedProjectList([ENTRIES[1]!]);
+    expect(getProjectList()).toEqual([ENTRIES[1]!]);
+    // A later hydration overwrites the staged catalogue with platform truth.
+    await hydrateProjectList();
+    expect(getProjectList()).toEqual(ENTRIES);
   });
 
   test("re-hydration replaces stale entries and reset clears them", async () => {
