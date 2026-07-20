@@ -680,6 +680,20 @@ describe("session events (WebSocket)", () => {
       (globalThis as Record<string, unknown>)["WebSocket"] = realWs;
     }
   });
+
+  test("opens no socket without a project (hub: empty base would be a bare /events)", () => {
+    const realWs = (globalThis as Record<string, unknown>)["WebSocket"];
+    (globalThis as Record<string, unknown>)["WebSocket"] = MockWebSocket;
+    instances.length = 0;
+    try {
+      const p = createCloudPlatform(null);
+      const unsubscribe = p.subscribeFileEvents?.(() => {});
+      expect(instances).toHaveLength(0);
+      unsubscribe?.();
+    } finally {
+      (globalThis as Record<string, unknown>)["WebSocket"] = realWs;
+    }
+  });
 });
 
 describe("formats (session backend registry)", () => {

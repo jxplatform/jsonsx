@@ -334,7 +334,9 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
      * {kind:"git"} notices this handler ignores.
      */
     subscribeFileEvents(handler: (events: FsEvent[]) => void) {
-      if (typeof WebSocket === "undefined" || typeof location === "undefined") {
+      // No project means an empty base, so the bare `/events` URL hits no gateway route.
+      // That fails in a reconnect loop; mirror `collab`'s guard and degrade to no-op on the hub.
+      if (!project || typeof WebSocket === "undefined" || typeof location === "undefined") {
         return () => {};
       }
       let socket: WebSocket | null = null;
