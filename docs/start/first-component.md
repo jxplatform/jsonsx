@@ -7,7 +7,7 @@ description: "Build a live counter card in Jx Studio, click by click — declare
 
 In this tutorial you build a `counter-card` component: a button and a line of text that counts the clicks, live. Small as it is, it walks the whole loop every interactive piece of a Jx site is made from — elements on the canvas, a state value, a binding, and an event — without writing any code.
 
-<!-- TODO(screenshot): counter-finished — the finished counter-card on the canvas with Preview on, showing a count of 3 after a few clicks -->
+![The finished counter card on the canvas with Preview on, showing a count of 3](/screenshots/counter-finished.png)
 
 **About 15 minutes.** Before you start:
 
@@ -47,7 +47,7 @@ The canvas now shows your component once per breakpoint — empty for the moment
 3. Press :kbd[Esc] to clear the selection — otherwise the next element would land _inside_ the button — then click the **p** card to add a paragraph.
 4. Select the button, open the **Properties** tab, and type `Add one` into **Text Content**.
 
-<!-- TODO(screenshot): counter-elements — the design canvas with a button labeled "Add one" and an empty paragraph below it -->
+![The design canvas with a button labeled Add one and an empty paragraph below it](/screenshots/counter-elements.png)
 
 You should now see a button labeled **Add one** with an empty paragraph after it, at every breakpoint. The other ways to insert — dragging cards, the **+** affordance between elements — are covered in **[The canvas](/docs/studio/interface/canvas)** and the **[Elements panel](/docs/studio/design/elements)**.
 
@@ -73,7 +73,7 @@ Now point the paragraph at the value instead of typing fixed text:
 3. Click the button until it reads **${}** — the template mode. Each click steps to the next mode; the tooltip names the one a click will switch to.
 4. Studio pre-fills the field with your first state entry: `${state.count}`. Keep it, or mix in words: `Clicked ${state.count} times`.
 
-<!-- TODO(screenshot): counter-text-binding — the Text Content row in template mode holding ${state.count}, with the mode button accent-colored -->
+![The Text Content row in template mode holding ${state.count}, with the mode button accent-colored](/screenshots/counter-text-binding.png)
 
 The mode button takes on the accent color: this value is now dynamic, and the paragraph will always show the current count. The full ladder of dynamic values — **abc**, **$ref**, **${}**, **fx** — is explained in **[Formulas and expressions](/docs/studio/logic/formulas)**.
 
@@ -84,7 +84,7 @@ The mode button takes on the accent color: this value is now dynamic, and the pa
 3. Switch the binding's mode to **$expression**, the mode for one-step reactions.
 4. In the formula editor, set the **Operator** to `+=`, point the **Target** at `count` (a **$ref**), and type `1` as the **Value**.
 
-<!-- TODO(screenshot): counter-onclick — the Events tab with an onclick binding in $expression mode reading $count += 1 -->
+![The Events tab with an onclick binding in expression mode incrementing count](/screenshots/counter-onclick.png)
 
 The formula reads `$count += 1` in the chip strip, and green badges beside the operands show live values evaluated against the running page. The three ways an event can respond — a named function, an expression, an inline handler — are covered in **[Events panel](/docs/studio/logic/events)**.
 
@@ -92,7 +92,7 @@ The formula reads `$count += 1` in the chip strip, and green badges beside the o
 
 Switch on the **Preview** toggle in the tab bar. The paragraph now shows `0` — the real, resolved value. Click **Add one** a few times.
 
-<!-- TODO(screenshot): counter-preview — the canvas with Preview on after several clicks, the paragraph showing the climbed count -->
+![The canvas with Preview on, the paragraph showing the climbed count](/screenshots/counter-preview.png)
 
 You should see the number climb with every click. That's the whole reactive loop: the event writes to `count`, and everything bound to `count` updates by itself.
 
@@ -100,7 +100,7 @@ You should see the number climb with every click. That's the whole reactive loop
 
 Click **Data** in the activity bar. It lists the same entries as the State panel, but with what each one is worth _right now_ — your `count` row shows the current number. Keep Preview on, click **Add one**, and watch the row change; **Refresh** re-renders the canvas and reads the values again.
 
-<!-- TODO(screenshot): counter-data-explorer — the Data activity with the count entry showing its live value -->
+![The Data activity with the count entry showing its live value](/screenshots/counter-data-explorer.png)
 
 When a page ever looks wrong, this panel is where you find out what it actually sees — see **[Data explorer](/docs/studio/logic/data-explorer)**.
 
@@ -112,7 +112,7 @@ Because `count` is a plain state value on a component, it's also one of the comp
 2. The canvas re-renders with the count starting at 100, at every breakpoint.
 3. Clear the field to return to the default of `0`.
 
-<!-- TODO(screenshot): counter-test-prop — the tab bar's count field holding a test value, the canvas rendering with it -->
+![The tab bar's count field holding a test value, the canvas rendering with it](/screenshots/counter-test-prop.png)
 
 Test values are a preview lens only — they're never saved into the component. Props and test values are covered in **[Working with components](/docs/studio/design/components)**.
 
