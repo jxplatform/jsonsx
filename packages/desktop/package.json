@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/desktop",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Jx Studio — standalone desktop application built with Electrobun",
   "repository": {
     "type": "git",

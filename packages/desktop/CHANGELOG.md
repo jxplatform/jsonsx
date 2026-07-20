@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.2](https://github.com/jxsuite/jx/compare/desktop-v1.1.1...desktop-v1.1.2) (2026-07-20)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/studio bumped to 1.3.0
+
 ## [1.1.1](https://github.com/jxsuite/jx/compare/desktop-v1.1.0...desktop-v1.1.1) (2026-07-18)
 
 
