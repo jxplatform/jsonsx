@@ -10,7 +10,7 @@ code:
 
 When Jx Studio starts with no project open, the canvas area shows the welcome screen: a **Start** list of ways to get a project in front of you, followed by your projects and recent history. Everything on it is one or two clicks from a working canvas.
 
-<!-- TODO(screenshot): welcome-screen — the welcome screen with the Start actions, Projects, and Recent sections visible -->
+![The Jx Studio welcome screen with Start actions, the Projects list, and Recent files](/screenshots/welcome-screen.png)
 
 ## Start a new project
 

@@ -14,7 +14,7 @@ code:
 
 Grid turns tabular content into a spreadsheet on the canvas: rows and columns, range selection, copy and paste, and a single **Save** that writes every pending change at once. Reach for it when editing entries one file at a time is too slow — renaming a category across fifty posts, or fixing prices in a product sheet.
 
-<!-- TODO(screenshot): grid-mode — a content collection open as a grid with edited cells highlighted and the Save button showing a count -->
+![A CSV content collection open as an editable grid in Jx Studio](/screenshots/grid-mode.png)
 
 ## Open a grid
 

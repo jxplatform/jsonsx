@@ -19,7 +19,7 @@ A repeater renders one element once per item of a list — design a single card,
 4. Optionally pick a **Filter** or **Sort** function, if the document defines any.
 5. Click **Create Repeater**.
 
-<!-- TODO(screenshot): repeat-dialog — the Repeat dialog with an items source selected -->
+![The Repeat dialog with an items source selected](/screenshots/repeat-dialog.png)
 
 Your element is now the template of a repeater, marked **↻** in Layers. The repeated items render directly where the element stood — no wrapper is added around them.
 

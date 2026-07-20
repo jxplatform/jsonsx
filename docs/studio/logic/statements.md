@@ -9,7 +9,7 @@ code:
 
 Statements are function bodies built as a vertical list of visual steps instead of written as code. Each step is a card — "set this value", "call that function", "if this, then…" — and the cards run top to bottom. For most handlers, this is all the programming a page needs.
 
-<!-- TODO(screenshot): statement-editor — a function body as statement cards with an If / Else branch expanded -->
+![A function body as statement cards with an If / Else branch expanded](/screenshots/statement-editor.png)
 
 ## Where Studio offers it
 

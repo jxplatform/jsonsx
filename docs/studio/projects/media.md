@@ -35,7 +35,7 @@ Wherever Studio asks for an image or file — an image's **Properties**, a front
 
 You can also type into the path field directly, either a path from your project or a full web address.
 
-<!-- TODO(screenshot): media-picker — the media picker popover open over an image's Properties, showing the search field and thumbnail list -->
+![The media picker popover open over an image's Properties, showing the search field and thumbnail list](/screenshots/media-picker.png)
 
 ## What the build does to images
 

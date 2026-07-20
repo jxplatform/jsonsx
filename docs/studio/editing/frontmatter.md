@@ -17,7 +17,7 @@ Two surfaces show these fields: the **Document** activity in the left panel, and
 
 Click **Document** in the activity bar to open it. Its sections, top to bottom, depend on the file you have open:
 
-<!-- TODO(screenshot): document-panel — the Document activity showing Frontmatter, Page, and OpenGraph sections for a blog post -->
+![The Document activity showing Frontmatter, Page, and OpenGraph sections for a blog post](/screenshots/document-panel.png)
 
 ### Frontmatter
 

@@ -11,7 +11,7 @@ code:
 
 Every file you open in Jx Studio gets a tab in the strip above the canvas. Tabs work the way you'd expect from a browser — and they carry two things worth knowing: a dirty marker, because Studio only saves when you say so, and a memory of how you were viewing each file.
 
-<!-- TODO(screenshot): tab-strip — the tab strip with several open files, one showing the unsaved-changes dot -->
+![The tab strip with several open files, one showing the unsaved-changes dot](/screenshots/tab-strip.png)
 
 ## Opening and switching
 

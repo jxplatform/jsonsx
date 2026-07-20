@@ -15,7 +15,7 @@ code:
 
 The Settings modal holds everything that applies to your whole site rather than one page — the favicon, fonts, design tokens, and dependencies. Open it with the **Settings** gear at the bottom of the activity bar; a navigation list on the left switches between sections.
 
-<!-- TODO(screenshot): settings-modal — the Settings modal open on the General section, with the section list on the left -->
+![The Settings modal open on the General section, with the section list on the left](/screenshots/settings-modal.png)
 
 Changes save as you make them — there is no separate save button.
 

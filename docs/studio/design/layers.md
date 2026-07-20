@@ -10,7 +10,7 @@ code:
 
 Layers is the page's structure as a tree — every element in the open file, nested the way it nests on the page. Open it by clicking **Layers** in the activity bar on the left. Use it whenever the thing you want to grab is hard to click on the canvas: a wrapper with no visible edges, an element hidden behind another, or the exact parent in a deep stack.
 
-<!-- TODO(screenshot): layers-panel — the Layers panel showing a nested element tree with a selected row and its hover actions -->
+![The Layers panel showing a nested element tree with a selected row](/screenshots/layers-panel.png)
 
 ## Read the tree
 

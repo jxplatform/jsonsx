@@ -12,7 +12,7 @@ code:
 
 Imports is where you decide which building blocks a document — or the whole site — can use: components from your own project, and components from npm packages (the web's public library of ready-made building blocks). Open it by clicking **Imports** (the box icon) in the activity bar.
 
-<!-- TODO(screenshot): imports-panel — the Imports activity showing a package section with per-component checkboxes -->
+![The Imports activity showing a package section with per-component checkboxes](/screenshots/imports-panel.png)
 
 ## Two contexts
 

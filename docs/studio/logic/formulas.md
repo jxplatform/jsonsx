@@ -24,7 +24,7 @@ Bindable value rows in the **Properties** and **Style** tabs carry a small mode 
 
 Each position only offers the modes it supports (the button's tooltip names the mode a click will switch to), and Studio remembers what you had in each mode for the rest of your session — cycle away and back and your value is restored, not reset. Prefer the earliest mode that does the job — a `$ref` is easier to read (and to revisit) than a formula that only fetches one value.
 
-<!-- TODO(screenshot): field-mode-button — a Properties value row with the mode button beside its label showing the ${} glyph in accent color -->
+![A Properties value row with the mode button showing the ${} template glyph in accent color](/screenshots/field-mode-button.png)
 
 Formulas also appear as their own state entries (_+ Add… > Expression_ in the State panel) and as event handlers (the **$expression** mode in the **[Events panel](/docs/studio/logic/events)**).
 
@@ -49,7 +49,7 @@ In the compact inline editor the chips are a summary; clicking them to navigate 
 
 You don't have to assemble everything operator by operator. The brackets button beside the operator picker opens the **formula palette** — a search box over the whole catalog:
 
-<!-- TODO(screenshot): formula-palette — the formula palette open with search results grouped by Formulas, operators, and globals -->
+![The formula palette open with search results grouped into formulas, operators, and globals](/screenshots/formula-palette.png)
 
 - Type to filter by name, group, or description; :kbd[↓] and :kbd[↑] move through results and :kbd[Enter] inserts the highlighted entry.
 - **Formulas** lists the named formulas already defined in this file.
