@@ -1,0 +1,61 @@
+{
+  "title": "Blog",
+  "state": {
+    "posts": {
+      "$prototype": "ContentCollection",
+      "$src": "@jxsuite/parser/ContentCollection.class.json",
+      "contentType": "posts",
+      "sort": [
+        {
+          "field": "date",
+          "order": "desc"
+        }
+      ]
+    }
+  },
+  "children": [
+    {
+      "$prototype": "Array",
+      "items": {
+        "$ref": "#/state/posts"
+      },
+      "map": {
+        "tagName": "article",
+        "style": {
+          "maxWidth": "40rem",
+          "margin": "1rem auto",
+          "padding": "1.25rem 1.5rem",
+          "border": "1px solid #e2e5ee",
+          "borderRadius": "0.5rem",
+          "fontFamily": "system-ui, sans-serif"
+        },
+        "children": [
+          {
+            "tagName": "h3",
+            "textContent": "Post title",
+            "style": {
+              "margin": "0 0 0.35rem"
+            }
+          },
+          {
+            "tagName": "p",
+            "textContent": "A line about the post.",
+            "style": {
+              "margin": "0 0 0.5rem",
+              "color": "#454c5e"
+            }
+          },
+          {
+            "tagName": "p",
+            "textContent": "2026-01-01",
+            "style": {
+              "margin": "0",
+              "fontSize": "0.85rem",
+              "color": "#7a8195"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

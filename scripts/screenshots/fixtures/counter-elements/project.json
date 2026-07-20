@@ -1,0 +1,13 @@
+{
+  "name": "Counter Demo",
+  "url": "https://example.com",
+  "defaults": {
+    "lang": "en"
+  },
+  "$media": {
+    "--": "1280px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "My Site",
+  "url": "https://example.com",
+  "defaults": {
+    "lang": "en"
+  },
+  "$media": {
+    "--": "1280px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "content": {
+    "posts": {
+      "source": "./content/posts/",
+      "format": "Markdown",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": ["title"]
+      }
+    }
+  },
+  "extensions": ["@jxsuite/parser"]
+}

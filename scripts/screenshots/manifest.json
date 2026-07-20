@@ -1769,6 +1769,889 @@
       ]
     },
     {
+      "name": "counter-elements",
+      "docs": ["start/first-component"],
+      "project": "scripts/screenshots/fixtures/counter-elements",
+      "file": "components/counter-card.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "blocks"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setZoom",
+          "value": 0.6
+        },
+        {
+          "do": "select",
+          "path": ["children", 0]
+        },
+        {
+          "do": "setRightTab",
+          "value": "properties"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "click",
+          "selector": "sp-accordion-item[label='Element']"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": "#right-panel"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "counter-text-binding",
+      "docs": ["start/first-component"],
+      "project": "scripts/screenshots/fixtures/counter",
+      "file": "components/counter-card.json",
+      "canvasMode": "design",
+      "viewport": {
+        "width": 1920,
+        "height": 560
+      },
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "select",
+          "path": ["children", 1]
+        },
+        {
+          "do": "setRightTab",
+          "value": "properties"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "click",
+          "selector": "sp-accordion-item[label='Element']"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": "#right-panel"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "counter-text-binding",
+          "selector": "#right-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "counter-onclick",
+      "docs": ["start/first-component"],
+      "project": "scripts/screenshots/fixtures/counter",
+      "file": "components/counter-card.json",
+      "canvasMode": "design",
+      "viewport": {
+        "width": 1920,
+        "height": 640
+      },
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "select",
+          "path": ["children", 0]
+        },
+        {
+          "do": "setRightTab",
+          "value": "events"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": ".events-panel"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "counter-onclick",
+          "selector": "#right-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "counter-preview",
+      "docs": ["start/first-component"],
+      "project": "scripts/screenshots/fixtures/counter-preview",
+      "file": "components/counter-card.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "state"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setZoom",
+          "value": 0.8
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Preview resolved values']"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "counter-finished",
+      "docs": ["start/first-component"],
+      "project": "scripts/screenshots/fixtures/counter-preview",
+      "file": "components/counter-card.json",
+      "canvasMode": "design",
+      "viewport": {
+        "width": 1920,
+        "height": 1200
+      },
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setZoom",
+          "value": 0.8
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Preview resolved values']"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "counter-data-explorer",
+      "docs": ["start/first-component"],
+      "project": "scripts/screenshots/fixtures/counter-preview",
+      "file": "components/counter-card.json",
+      "canvasMode": "design",
+      "viewport": {
+        "width": 1920,
+        "height": 480
+      },
+      "actions": [
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Preview resolved values']"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "setActivity",
+          "value": "data"
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"data-row-header\")][.//span[contains(@class,\"data-name\")][normalize-space()=\"count\"]]"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": ".data-tree"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "counter-data-explorer",
+          "selector": "#left-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "counter-test-prop",
+      "docs": ["start/first-component"],
+      "project": "scripts/screenshots/fixtures/counter",
+      "file": "components/counter-card.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setZoom",
+          "value": 0.8
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Preview resolved values']"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "type",
+          "selector": ".tab-bar-prop",
+          "text": "100"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Enter"
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "blog-content-type",
+      "docs": ["start/first-collection"],
+      "project": "scripts/screenshots/fixtures/first-collection-start",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "actions": [
+        {
+          "do": "openSettings"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "click",
+          "selector": "xpath///button[contains(@class,\"settings-nav-item\")][normalize-space()=\"Content Types\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"settings-list-panel\")]//sp-action-button[normalize-space()=\"posts\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".settings-modal"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "blog-content-type",
+          "selector": ".settings-modal",
+          "padding": 0
+        }
+      ],
+      "viewport": {
+        "width": 1920,
+        "height": 720
+      }
+    },
+    {
+      "name": "blog-schema-fields",
+      "docs": ["start/first-collection"],
+      "project": "scripts/screenshots/fixtures/first-collection",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "actions": [
+        {
+          "do": "openSettings"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "click",
+          "selector": "xpath///button[contains(@class,\"settings-nav-item\")][normalize-space()=\"Content Types\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"settings-list-panel\")]//sp-action-button[normalize-space()=\"posts\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".settings-modal"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "blog-schema-fields",
+          "selector": ".settings-modal",
+          "padding": 0
+        }
+      ],
+      "viewport": {
+        "width": 1920,
+        "height": 720
+      }
+    },
+    {
+      "name": "blog-grid",
+      "docs": ["start/first-collection"],
+      "project": "scripts/screenshots/fixtures/first-collection",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setActivity",
+          "value": "files"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "click",
+          "selector": "[data-path='content/posts']",
+          "button": "right"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "click",
+          "selector": "xpath///sp-menu-item[normalize-space()=\"Edit Collection in Grid\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".tabulator"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
+      ]
+    },
+    {
+      "name": "blog-card",
+      "docs": ["start/first-collection"],
+      "project": "scripts/screenshots/fixtures/first-collection-card",
+      "file": "pages/blog.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setZoom",
+          "value": 0.6
+        },
+        {
+          "do": "select",
+          "path": ["children", 0]
+        },
+        {
+          "do": "setRightTab",
+          "value": "properties"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "blog-collection-state",
+      "docs": ["start/first-collection"],
+      "project": "scripts/screenshots/fixtures/first-collection-state",
+      "file": "pages/blog.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "state"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"signal-row\")][.//span[contains(@class,\"signal-name\")][normalize-space()=\"posts\"]]"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "blog-collection-state",
+          "selector": "#left-panel",
+          "padding": 0
+        }
+      ],
+      "viewport": {
+        "width": 1920,
+        "height": 680
+      }
+    },
+    {
+      "name": "blog-repeat-dialog",
+      "docs": ["start/first-collection"],
+      "project": "scripts/screenshots/fixtures/first-collection-state",
+      "file": "pages/blog.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "select",
+          "path": ["children", 0]
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"layer-row\")][.//span[contains(@class,\"layer-label\")][normalize-space()=\"article\"]]",
+          "button": "right"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "click",
+          "selector": "xpath///sp-menu-item[normalize-space()=\"Repeat...\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": "sp-dialog-wrapper"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "blog-insert-data",
+      "docs": ["start/first-collection"],
+      "project": "scripts/screenshots/fixtures/first-collection-bind",
+      "file": "pages/blog.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "canvasClick",
+          "selector": "xpath/(//h3)[1]",
+          "clickCount": 2
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Insert data']"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": "sp-popover[open] sp-menu-item"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "blog-preview",
+      "docs": ["start/first-collection"],
+      "project": "scripts/screenshots/fixtures/first-collection",
+      "file": "pages/blog.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "state"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setZoom",
+          "value": 0.8
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Preview resolved values']"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "blog-finished",
+      "docs": ["start/first-collection"],
+      "project": "scripts/screenshots/fixtures/first-collection",
+      "file": "pages/blog.json",
+      "canvasMode": "design",
+      "viewport": {
+        "width": 1920,
+        "height": 1200
+      },
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setZoom",
+          "value": 0.8
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Preview resolved values']"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
       "name": "content-type-builder-shot",
       "docs": ["studio/projects/content-types"],
       "project": "packages/starters/sites/blog",

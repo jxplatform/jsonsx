@@ -1,0 +1,13 @@
+{
+  "tagName": "counter-card",
+  "children": [
+    {
+      "tagName": "button",
+      "textContent": "Add one"
+    },
+    {
+      "tagName": "p",
+      "textContent": ""
+    }
+  ]
+}

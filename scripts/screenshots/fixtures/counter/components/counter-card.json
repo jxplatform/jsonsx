@@ -1,0 +1,26 @@
+{
+  "tagName": "counter-card",
+  "state": {
+    "count": {
+      "type": "integer",
+      "default": 0
+    }
+  },
+  "children": [
+    {
+      "tagName": "button",
+      "textContent": "Add one",
+      "onclick": {
+        "$expression": {
+          "operator": "+=",
+          "target": { "$ref": "#/state/count" },
+          "value": 1
+        }
+      }
+    },
+    {
+      "tagName": "p",
+      "textContent": "${state.count}"
+    }
+  ]
+}
