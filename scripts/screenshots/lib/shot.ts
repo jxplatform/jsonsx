@@ -115,7 +115,7 @@ function canvasFrame(page: Page): Frame {
 async function runAction(page: Page, action: ShotAction): Promise<void> {
   switch (action.do) {
     case "click": {
-      await page.click(action.selector);
+      await page.click(action.selector, action.button ? { button: action.button } : {});
       return;
     }
     case "hover": {
@@ -130,7 +130,11 @@ async function runAction(page: Page, action: ShotAction): Promise<void> {
     case "canvasClick": {
       const frame = canvasFrame(page);
       const el = await frame.waitForSelector(action.selector, { timeout: 15_000 });
-      await el!.click({ clickCount: action.clickCount ?? 1 });
+      // Puppeteer-core ≥20 names the option `count` (a `clickCount` key is silently ignored).
+      await el!.click({
+        count: action.clickCount ?? 1,
+        ...(action.button ? { button: action.button } : {}),
+      });
       return;
     }
     case "canvasType": {
@@ -310,7 +314,12 @@ async function captureVariant(
   }
   const clip = await resolveClip(page, shot.clip);
   const outPath = join(ctx.outDir, fileName);
-  const buffer = Buffer.from(await page.screenshot(clip ? { clip } : { fullPage: true }));
+  // With a clip puppeteer defaults captureBeyondViewport to TRUE, which resizes the render surface
+  // To the full page — a relayout that natively resets Studio's canvas scroller to 0 mid-capture.
+  // Clips here always sit inside the viewport, so capture strictly within it.
+  const buffer = Buffer.from(
+    await page.screenshot(clip ? { captureBeyondViewport: false, clip } : { fullPage: true }),
+  );
   await writeIfChanged(page, outPath, buffer, ctx, shot.name);
   return outPath;
 }
@@ -361,7 +370,8 @@ async function captureRegions(page: Page, shot: ResolvedShot, ctx: ShotContext):
     await runWait(page, { frames: 1, type: "settle" });
     const clip = await resolveRegionClip(page, region);
     const outPath = join(ctx.outDir, `${region.name}.png`);
-    const buffer = Buffer.from(await page.screenshot({ clip }));
+    // CaptureBeyondViewport: false — see captureVariant (region clips are clamped to the viewport).
+    const buffer = Buffer.from(await page.screenshot({ captureBeyondViewport: false, clip }));
     await writeIfChanged(page, outPath, buffer, ctx, shot.name);
     written.push(outPath);
   }
@@ -389,6 +399,10 @@ export async function executeShot(
   const url = `${ctx.serverUrl}${ctx.studioPath}?${params}`;
   ctx.log(`[shot:${shot.name}] ${url}`);
 
+  // Shots share one browser, and Studio persists panel widths/collapse state to localStorage —
+  // A shot that collapses a panel would otherwise leak that layout into every later shot (order-
+  // Dependent captures). Clear storage before the app boots so every shot starts from defaults.
+  await page.evaluateOnNewDocument(() => localStorage.clear());
   await page.goto(url, { timeout: 120_000, waitUntil: "networkidle2" });
   await page.waitForFunction(() => Boolean(window.__jxAutomation), { timeout: 30_000 });
 
@@ -435,7 +449,7 @@ export async function executeShot(
     for (const action of variant.actions ?? []) {
       await runAction(page, action);
     }
-    await runWaits(page, shot.waitFor);
+    await runWaits(page, variant.waitFor ?? shot.waitFor);
     const v = await captureVariant(page, shot, ctx, `${shot.name}${variant.suffix}.png`);
     if (v) {
       written.push(v);

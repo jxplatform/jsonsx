@@ -36,12 +36,12 @@ export type ShotAction =
   | { do: "setZoom"; value: number }
   // Generic DOM interactions (main frame). Selectors may use puppeteer handlers
   // Like `pierce/` to reach into Spectrum shadow DOM.
-  | { do: "click"; selector: string }
+  | { button?: "left" | "right"; do: "click"; selector: string }
   | { do: "hover"; selector: string }
   | { do: "type"; selector: string; text: string }
   // Canvas-iframe interactions — real clicks/keys inside the preview document,
   // The faithful way to start inline editing or open the slash menu.
-  | { clickCount?: number; do: "canvasClick"; selector: string }
+  | { button?: "left" | "right"; clickCount?: number; do: "canvasClick"; selector: string }
   | { do: "canvasType"; text: string }
   | { do: "canvasKey"; key: string }
   | { do: "wait"; ms: number };
@@ -75,6 +75,12 @@ export interface ShotVariant {
   actions?: ShotAction[];
   suffix: string;
   theme?: string;
+  /**
+   * Overrides the shot's waitFor for this variant. A cleanup variant (actions that revert the
+   * staged document state after the primary capture, under a region-only shot's `clip: "none"`)
+   * needs this — the shot's own waitFor typically asserts UI the cleanup just dismissed.
+   */
+  waitFor?: WaitCondition[];
 }
 
 export interface ShotDefaults {

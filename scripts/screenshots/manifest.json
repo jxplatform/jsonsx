@@ -371,7 +371,7 @@
           "do": "showWelcome",
           "projects": [
             {
-              "name": "Bistro & Caf\u00e9",
+              "name": "Bistro & Café",
               "root": "~/Sites/bistro",
               "description": "~/Sites/bistro"
             },
@@ -643,6 +643,1183 @@
         }
       ],
       "noCanvas": true
+    },
+    {
+      "name": "block-action-bar-shot",
+      "docs": ["studio/interface/canvas"],
+      "project": "packages/starters/sites/restaurant",
+      "file": "pages/index.md",
+      "canvasMode": "edit",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "click",
+          "selector": "sp-tab[value='layers']"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "canvasClick",
+          "selector": "xpath/(//h3)[3]"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".block-action-bar"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "block-action-bar",
+          "selector": ".block-action-bar",
+          "padding": 260
+        }
+      ]
+    },
+    {
+      "name": "slash-menu-shot",
+      "docs": ["studio/editing/slash-commands"],
+      "project": "packages/starters/sites/restaurant",
+      "file": "pages/index.md",
+      "canvasMode": "edit",
+      "viewport": {
+        "width": 1920,
+        "height": 1200
+      },
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "wait",
+          "ms": 2400
+        },
+        {
+          "do": "canvasClick",
+          "selector": "xpath/(//p[contains(., 'Come for the coffee')])[1]",
+          "clickCount": 2
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Enter"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "canvasType",
+          "text": "/"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": "sp-popover[open] sp-menu-item"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "slash-menu",
+          "selector": "sp-popover[open]",
+          "padding": 130
+        }
+      ],
+      "variants": [
+        {
+          "suffix": ".cleanup",
+          "actions": [
+            {
+              "do": "canvasKey",
+              "key": "Escape"
+            },
+            {
+              "do": "wait",
+              "ms": 400
+            },
+            {
+              "do": "canvasKey",
+              "key": "Escape"
+            },
+            {
+              "do": "wait",
+              "ms": 400
+            },
+            {
+              "do": "canvasKey",
+              "key": "Delete"
+            },
+            {
+              "do": "wait",
+              "ms": 600
+            }
+          ],
+          "waitFor": [
+            {
+              "type": "settle",
+              "frames": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "inline-editing-shot",
+      "docs": ["studio/editing/writing"],
+      "project": "packages/starters/sites/restaurant",
+      "file": "pages/index.md",
+      "canvasMode": "edit",
+      "viewport": {
+        "width": 1920,
+        "height": 1200
+      },
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Right Panel']"
+        },
+        {
+          "do": "wait",
+          "ms": 2400
+        },
+        {
+          "do": "canvasClick",
+          "selector": "xpath/(//p[contains(., 'Come for the coffee')])[1]",
+          "clickCount": 3
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".block-action-bar"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "inline-editing",
+          "selector": ".block-action-bar",
+          "padding": 230
+        }
+      ]
+    },
+    {
+      "name": "properties-panel-shot",
+      "docs": ["studio/design/properties", "studio/logic/formulas"],
+      "file": "components/re-listing-card.json",
+      "canvasMode": "design",
+      "viewport": {
+        "width": 1920,
+        "height": 800
+      },
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "select",
+          "path": ["children", 0]
+        },
+        {
+          "do": "setRightTab",
+          "value": "properties"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "click",
+          "selector": "sp-accordion-item[label='Element']"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": "#right-panel"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "properties-panel",
+          "selector": "#right-panel",
+          "padding": 0
+        },
+        {
+          "name": "field-mode-button",
+          "selector": "#right-panel [data-prop='href']",
+          "padding": 6
+        }
+      ]
+    },
+    {
+      "name": "events-panel-shot",
+      "docs": ["studio/logic/events"],
+      "project": "packages/starters/sites/event",
+      "file": "components/ev-agenda-tabs.json",
+      "canvasMode": "design",
+      "viewport": {
+        "width": 1920,
+        "height": 640
+      },
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "select",
+          "path": ["children", 0, "children", 0]
+        },
+        {
+          "do": "setRightTab",
+          "value": "events"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "canvasReady"
+        },
+        {
+          "type": "selector",
+          "selector": "#right-panel"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "events-panel",
+          "selector": "#right-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "formula-palette-shot",
+      "docs": ["studio/logic/formulas"],
+      "project": "packages/starters/sites/event",
+      "file": "components/ev-agenda-tabs.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "select",
+          "path": ["children", 0, "children", 0]
+        },
+        {
+          "do": "setRightTab",
+          "value": "events"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "click",
+          "selector": ".expr-browse-catalog"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "type",
+          "selector": ".formula-palette-input",
+          "text": "char"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".formula-palette"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "formula-palette",
+          "selector": ".formula-palette",
+          "padding": 10
+        }
+      ]
+    },
+    {
+      "name": "formula-workspace",
+      "docs": ["studio/logic/formula-workspace"],
+      "project": "packages/starters/sites/course",
+      "file": "components/co-curriculum-accordion.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "state"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Right Panel']"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"signal-row\")][.//span[contains(@class,\"signal-name\")][normalize-space()=\"toggle0\"]]"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Open in formula workspace']"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".formula-workspace"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "statement-editor-shot",
+      "docs": ["studio/logic/statements"],
+      "project": "scripts/screenshots/fixtures/statements",
+      "file": "components/rsvp-card.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "state"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"signal-row\")][.//span[contains(@class,\"signal-name\")][normalize-space()=\"submitRsvp\"]]"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".statement-kind-label"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "statement-editor",
+          "selector": "#left-panel div:has(> .statement-card)",
+          "padding": 30
+        }
+      ],
+      "viewport": {
+        "width": 1920,
+        "height": 1600
+      }
+    },
+    {
+      "name": "selector-menu-shot",
+      "docs": ["studio/design/states-and-selectors"],
+      "file": "components/re-listing-card.json",
+      "canvasMode": "design",
+      "viewport": {
+        "width": 1920,
+        "height": 800
+      },
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "select",
+          "path": []
+        },
+        {
+          "do": "setRightTab",
+          "value": "style"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "click",
+          "selector": "sp-picker.selector-select"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": "#right-panel"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "selector-menu",
+          "selector": "#right-panel",
+          "padding": 0
+        }
+      ]
+    },
+    {
+      "name": "convert-to-component",
+      "docs": ["studio/design/components"],
+      "file": "components/re-listing-card.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "canvasClick",
+          "selector": "xpath/(//h3)[1]"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Convert to Component']"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "canvasType",
+          "text": "r"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "e"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "-"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "c"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "a"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "r"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "d"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "-"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "t"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "i"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "t"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "l"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": "e"
+        },
+        {
+          "do": "wait",
+          "ms": 90
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "wait",
+          "ms": 200
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": "sp-dialog-wrapper"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ]
+    },
+    {
+      "name": "repeat-dialog",
+      "docs": ["studio/design/repeaters"],
+      "file": "components/rsvp-card.json",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "canvasClick",
+          "selector": "xpath/(//p)[1]"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "canvasClick",
+          "selector": "xpath/(//p)[1]",
+          "button": "right"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "click",
+          "selector": "xpath///sp-menu-item[normalize-space()=\"Repeat...\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": "sp-dialog-wrapper"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "project": "scripts/screenshots/fixtures/statements"
+    },
+    {
+      "name": "tab-strip-shot",
+      "docs": ["studio/interface/tabs"],
+      "project": "packages/starters/sites/restaurant",
+      "file": "pages/index.md",
+      "canvasMode": "edit",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "canvasClick",
+          "selector": "xpath/(//p[contains(., 'Come for the coffee')])[1]",
+          "clickCount": 2
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "canvasKey",
+          "key": "End"
+        },
+        {
+          "do": "canvasType",
+          "text": " Come hungry."
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Backspace"
+        },
+        {
+          "do": "canvasKey",
+          "key": "Escape"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "openQuickSearch"
+        },
+        {
+          "do": "type",
+          "selector": ".quick-search-input",
+          "text": "menu"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "canvasKey",
+          "key": "Enter"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "openQuickSearch"
+        },
+        {
+          "do": "type",
+          "selector": ".quick-search-input",
+          "text": "bit-hero"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "canvasKey",
+          "key": "Enter"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "openQuickSearch"
+        },
+        {
+          "do": "type",
+          "selector": ".quick-search-input",
+          "text": "about"
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "canvasKey",
+          "key": "Enter"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".tab-strip-dirty"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 3
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "tab-strip",
+          "selector": "#tab-strip",
+          "padding": 3
+        }
+      ],
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "name": "media-picker-shot",
+      "docs": ["studio/projects/media"],
+      "project": "packages/starters/sites/restaurant",
+      "file": "pages/about.md",
+      "canvasMode": "design",
+      "actions": [
+        {
+          "do": "setActivity",
+          "value": "layers"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Toggle Assistant']"
+        },
+        {
+          "do": "select",
+          "path": ["children", 1]
+        },
+        {
+          "do": "setRightTab",
+          "value": "properties"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "setStatus",
+          "value": "Ready"
+        },
+        {
+          "do": "click",
+          "selector": "sp-action-button[title='Browse media']"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": "sp-popover[open] .media-picker-filter"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "media-picker",
+          "selector": "sp-popover[open]",
+          "padding": 130
+        }
+      ]
+    },
+    {
+      "name": "content-type-builder-shot",
+      "docs": ["studio/projects/content-types"],
+      "project": "packages/starters/sites/blog",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "actions": [
+        {
+          "do": "openSettings"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "click",
+          "selector": "xpath///button[contains(@class,\"settings-nav-item\")][normalize-space()=\"Content Types\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "click",
+          "selector": "xpath///div[contains(@class,\"settings-list-panel\")]//sp-action-button[normalize-space()=\"posts\"]"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        }
+      ],
+      "waitFor": [
+        {
+          "type": "selector",
+          "selector": ".settings-modal"
+        },
+        {
+          "type": "fonts"
+        },
+        {
+          "type": "settle",
+          "frames": 4
+        }
+      ],
+      "clip": "none",
+      "regions": [
+        {
+          "name": "content-type-builder",
+          "selector": ".settings-modal",
+          "padding": 0
+        }
+      ]
     }
   ]
 }

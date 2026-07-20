@@ -293,7 +293,10 @@ const OPERATOR_META: Record<string, OperatorMeta> = {
 export function operatorEntries(): FormulaCatalogEntry[] {
   const out: FormulaCatalogEntry[] = [];
   for (const op of BLESSED_OPERATORS) {
-    const meta = OPERATOR_META[op];
+    // Own-property lookup only: a bare index would resolve inherited Object.prototype members for
+    // Ops like "toLocaleString", yielding a bogus meta whose undefined group/description breaks
+    // The palette's substring filter.
+    const meta = Object.hasOwn(OPERATOR_META, op) ? OPERATOR_META[op] : undefined;
     if (meta) {
       out.push({
         description: meta.description,

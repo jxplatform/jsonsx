@@ -1,0 +1,86 @@
+{
+  "tagName": "rsvp-card",
+  "state": {
+    "guests": 2,
+    "capacity": 4,
+    "status": "",
+    "attendees": {
+      "type": "array",
+      "default": [
+        { "name": "Ada Fields", "meal": "vegetarian" },
+        { "name": "Lin Ortega", "meal": "standard" }
+      ]
+    },
+    "submitRsvp": {
+      "$prototype": "Function",
+      "description": "Confirm the RSVP or move it to the waitlist.",
+      "body": [
+        {
+          "operator": "=",
+          "target": { "$ref": "#/state/status" },
+          "value": "checking"
+        },
+        {
+          "if": {
+            "operator": ">",
+            "target": { "$ref": "#/state/guests" },
+            "value": { "$ref": "#/state/capacity" }
+          },
+          "then": [
+            {
+              "operator": "=",
+              "target": { "$ref": "#/state/status" },
+              "value": "waitlisted"
+            }
+          ],
+          "else": [
+            {
+              "operator": "=",
+              "target": { "$ref": "#/state/status" },
+              "value": "confirmed"
+            }
+          ]
+        },
+        {
+          "dispatchEvent": "rsvp-submitted",
+          "detail": { "$ref": "#/state/status" }
+        }
+      ]
+    }
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "26rem",
+    "padding": "2rem",
+    "borderRadius": "0.75rem",
+    "border": "1px solid #e2e5ee",
+    "fontFamily": "system-ui, sans-serif",
+    "backgroundColor": "#ffffff"
+  },
+  "children": [
+    {
+      "tagName": "h3",
+      "textContent": "Reserve your seats",
+      "style": { "margin": "0 0 0.5rem" }
+    },
+    {
+      "tagName": "p",
+      "textContent": "Party of ${state.guests} — ${state.status}",
+      "style": { "margin": "0 0 1.25rem", "color": "#5b6479" }
+    },
+    {
+      "tagName": "button",
+      "textContent": "Submit RSVP",
+      "onclick": { "$ref": "#/state/submitRsvp" },
+      "style": {
+        "padding": "0.6rem 1.2rem",
+        "borderRadius": "0.5rem",
+        "border": "none",
+        "backgroundColor": "#4f46e5",
+        "color": "#ffffff",
+        "fontWeight": "600",
+        "cursor": "pointer"
+      }
+    }
+  ]
+}
