@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/jxsuite/jx/compare/studio-v1.2.0...studio-v1.3.0) (2026-07-20)
+
+
+### Features
+
+* **screenshots,studio:** staged captures for AI, data, publish, and collab docs ([50fdfce](https://github.com/jxsuite/jx/commit/50fdfce5e8c6271cef42902ab603ffa97d123612))
+* **screenshots,studio:** tranche-2 interaction captures + runner and palette fixes ([18d8ca8](https://github.com/jxsuite/jx/commit/18d8ca8efcc2c63f88f8301ec4e91e813956c8d8))
+
+
+### Bug Fixes
+
+* **studio:** add !project guard to cloud PAL adapter's subscribeFileEvents ([39010f9](https://github.com/jxsuite/jx/commit/39010f9c91997ff03d58fc5765cfd781e462052e))
+
 ## [1.2.0](https://github.com/jxsuite/jx/compare/studio-v1.1.0...studio-v1.2.0) (2026-07-18)
 
 
