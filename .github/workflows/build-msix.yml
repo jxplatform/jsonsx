@@ -56,7 +56,11 @@ jobs:
           retention-days: 30
 
       - name: Attach to release
-        if: ${{ inputs.tag_name != '' }}
+        # Run even when the build step failed (but only when a tag was supplied —
+        # a blank-tag workflow_dispatch builds without attaching), so a produced
+        # MSIX still reaches the release. action-gh-release no-ops on an empty
+        # glob (fail_on_unmatched_files defaults false).
+        if: ${{ !cancelled() && inputs.tag_name != '' }}
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag_name }}

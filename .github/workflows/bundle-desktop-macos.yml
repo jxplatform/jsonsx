@@ -117,6 +117,11 @@ jobs:
           retention-days: 7
 
       - name: Attach to release
+        # Run even when the build step failed, so any artifacts that DID land in
+        # packages/desktop/artifacts/ still reach the release. action-gh-release
+        # no-ops on an empty glob (fail_on_unmatched_files defaults false), so a
+        # total build failure leaves the job red without adding a spurious error.
+        if: ${{ !cancelled() }}
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag_name }}
