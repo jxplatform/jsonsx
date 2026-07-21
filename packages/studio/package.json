@@ -93,7 +93,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.10.6",
+    "@happy-dom/global-registrator": "^20.11.0",
     "@types/mdast": "^4.0.4",
     "@webref/css": "^8.7.0",
     "@webref/elements": "^2.7.1",

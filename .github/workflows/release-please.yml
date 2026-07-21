@@ -80,16 +80,18 @@ jobs:
     secrets: inherit
 
   # Append the platform Downloads table to the desktop release notes (preserves the
-  # previous release-it footer). Links are static and resolve once the bundlers
-  # upload their assets, so this can run in parallel with the build jobs.
+  # previous release-it footer). Runs AFTER the bundlers (with if: always()) and
+  # builds the table from the assets that actually uploaded, so a failed platform
+  # build no longer leaves dead download links. Idempotent: strips any prior
+  # Downloads section before re-appending, so re-runs don't stack duplicate tables.
   release-notes-downloads:
-    needs: release-please
-    if: needs.release-please.outputs.desktop_released == 'true'
+    needs: [release-please, desktop-linux, desktop-macos, desktop-windows, build-msix]
+    if: always() && needs.release-please.outputs.desktop_released == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Append Downloads table to release notes
+      - name: Refresh Downloads table in release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -97,16 +99,45 @@ jobs:
         run: |
           set -euo pipefail
           base="https://github.com/jxsuite/jx/releases/download/${TAG}"
+
+          # Names of assets currently attached to the release.
+          assets="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          has() { printf '%s\n' "$assets" | grep -qxF "$1"; }
+          # A markdown link cell for $2 (asset filename) labelled $1, or an em dash.
+          cell() { if has "$2"; then printf '[%s](%s/%s)' "$1" "$base" "$2"; else printf '—'; fi; }
+          # Emit a table row only when at least one of its two assets exists.
+          emit_row() { # platform arch inst-label inst-file arch-label arch-file
+            if has "$4" || has "$6"; then
+              printf '| %s | %s | %s | %s |\n' "$1" "$2" "$(cell "$3" "$4")" "$(cell "$5" "$6")"
+            fi
+          }
+          # The MSIX filename embeds the version, so match it by suffix.
+          msix_name="$(printf '%s\n' "$assets" | grep -F '.msix' | head -n1 || true)"
+
+          rows="$(
+            emit_row 'macOS'   'Apple Silicon' 'DMG'    'stable-macos-arm64-JxStudio.dmg'       'tar.zst' 'stable-macos-arm64-JxStudio.app.tar.zst'
+            emit_row 'macOS'   'Intel'         'DMG'    'stable-macos-x64-JxStudio.dmg'         'tar.zst' 'stable-macos-x64-JxStudio.app.tar.zst'
+            emit_row 'Linux'   'x64'           'tar.gz' 'stable-linux-x64-JxStudio-Setup.tar.gz' 'tar.zst' 'stable-linux-x64-JxStudio.tar.zst'
+            emit_row 'Windows' 'x64'           'MSI'    'JxStudio.msi'                          'ZIP'     'stable-win-x64-JxStudio-Setup.zip'
+            if [ -n "$msix_name" ]; then
+              printf '| %s | %s | [MSIX](%s/%s) | — |\n' 'Windows' 'Store (MSIX)' "$base" "$msix_name"
+            fi
+          )"
+
+          # Drop any existing Downloads section, then re-append a fresh one (if we
+          # have rows to show). Downloads is always last, so cutting from its
+          # header to EOF preserves the release-it body/footer above it.
           body="$(gh release view "$TAG" --json body --jq .body)"
+          body_clean="$(printf '%s' "$body" | awk 'BEGIN{keep=1} /^## Downloads[[:space:]]*$/{keep=0} keep{print}')"
+
           {
-            printf '%s\n\n' "$body"
-            printf '## Downloads\n\n'
-            printf '| Platform | Architecture | Installer | Archive |\n'
-            printf '|----------|-------------|-----------|--------|\n'
-            printf '| macOS | Apple Silicon | [DMG](%s/stable-macos-arm64-JxStudio.dmg) | [tar.zst](%s/stable-macos-arm64-JxStudio.app.tar.zst) |\n' "$base" "$base"
-            printf '| macOS | Intel | [DMG](%s/stable-macos-x64-JxStudio.dmg) | [tar.zst](%s/stable-macos-x64-JxStudio.app.tar.zst) |\n' "$base" "$base"
-            printf '| Linux | x64 | [tar.gz](%s/stable-linux-x64-JxStudio-Setup.tar.gz) | [tar.zst](%s/stable-linux-x64-JxStudio.tar.zst) |\n' "$base" "$base"
-            printf '| Windows | x64 | [MSI](%s/JxStudio.msi) | [ZIP](%s/stable-win-x64-JxStudio-Setup.zip) |\n' "$base" "$base"
+            printf '%s\n' "$body_clean"
+            if [ -n "$rows" ]; then
+              printf '\n## Downloads\n\n'
+              printf '| Platform | Architecture | Installer | Archive |\n'
+              printf '|----------|--------------|-----------|---------|\n'
+              printf '%s\n' "$rows"
+            fi
           } > notes.md
           gh release edit "$TAG" --notes-file notes.md
 
