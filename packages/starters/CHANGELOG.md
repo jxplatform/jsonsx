@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.0](https://github.com/jxsuite/jx/compare/starters-v1.1.1...starters-v1.2.0) (2026-07-22)
+
+
+### Features
+
+* enforce truthful marketing claims and add the missing LICENSE ([b7e0b09](https://github.com/jxsuite/jx/commit/b7e0b095566121d79ca50894b69a476984fb93ee))
+
+
+### Bug Fixes
+
+* **starters,examples:** repair documents the schema correctly rejected ([6913028](https://github.com/jxsuite/jx/commit/691302839526b4f1408ab98ca1b418b39784b01b))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @jxsuite/schema bumped to 1.3.0
+
 ## [1.1.1](https://github.com/jxsuite/jx/compare/starters-v1.1.0...starters-v1.1.1) (2026-07-18)
 
 

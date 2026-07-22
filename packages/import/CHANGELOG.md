@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.38.0](https://github.com/jxsuite/jx/compare/import-v0.37.1...import-v0.38.0) (2026-07-22)
+
+
+### Features
+
+* enforce truthful marketing claims and add the missing LICENSE ([b7e0b09](https://github.com/jxsuite/jx/commit/b7e0b095566121d79ca50894b69a476984fb93ee))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.0
+    * @jxsuite/schema bumped to 1.3.0
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 1.3.0
+
 ## [0.37.1](https://github.com/jxsuite/jx/compare/import-v0.37.0...import-v0.37.1) (2026-07-18)
 
 

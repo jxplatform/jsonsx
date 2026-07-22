@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/jxsuite/jx/compare/protocol-v0.5.1...protocol-v0.6.0) (2026-07-22)
+
+
+### Features
+
+* enforce truthful marketing claims and add the missing LICENSE ([b7e0b09](https://github.com/jxsuite/jx/commit/b7e0b095566121d79ca50894b69a476984fb93ee))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.3.0
+
 ## [0.5.1](https://github.com/jxsuite/jx/compare/protocol-v0.5.0...protocol-v0.5.1) (2026-07-18)
 
 

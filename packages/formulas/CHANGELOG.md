@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.0.4](https://github.com/jxsuite/jx/compare/formulas-v0.0.3...formulas-v0.0.4) (2026-07-22)
+
+
+### Features
+
+* enforce truthful marketing claims and add the missing LICENSE ([b7e0b09](https://github.com/jxsuite/jx/commit/b7e0b095566121d79ca50894b69a476984fb93ee))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.3.0
+  * devDependencies
+    * @jxsuite/runtime bumped to 1.3.0
+
 ## [0.0.3](https://github.com/jxsuite/jx/compare/formulas-v0.0.2...formulas-v0.0.3) (2026-07-18)
 
 
