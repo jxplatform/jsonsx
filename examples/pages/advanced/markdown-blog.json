@@ -12,18 +12,9 @@
       "sortBy": "frontmatter.date",
       "sortOrder": "desc"
     },
-    "currentSlug": {
-      "type": "string",
-      "default": "getting-started"
-    },
-    "currentPost": {
+    "post": {
       "$prototype": "Markdown",
-      "src": "../../content/posts/${state.currentSlug}.md"
-    },
-    "selectPost": {
-      "$prototype": "Function",
-      "parameters": ["event"],
-      "body": "event.preventDefault(); const slug = event.currentTarget.dataset?.slug; if (slug) state.currentSlug = slug;"
+      "src": "../../content/posts/getting-started.md"
     }
   },
   "children": [
@@ -70,23 +61,12 @@
                     },
                     "children": [
                       {
-                        "tagName": "a",
+                        "tagName": "span",
                         "style": {
-                          "textDecoration": "none",
                           "color": "#0066cc",
-                          "fontWeight": "600",
-                          "cursor": "pointer",
-                          ":hover": {
-                            "textDecoration": "underline"
-                          }
+                          "fontWeight": "600"
                         },
-                        "textContent": "${$map.item?.frontmatter?.title ?? ''}",
-                        "attributes": {
-                          "data-slug": "${$map.item?.slug ?? ''}"
-                        },
-                        "onclick": {
-                          "$ref": "#/state/selectPost"
-                        }
+                        "textContent": "${$map.item?.frontmatter?.title ?? ''}"
                       },
                       {
                         "tagName": "time",
@@ -112,11 +92,11 @@
               "style": {
                 "marginTop": "0"
               },
-              "textContent": "${state.currentPost?.frontmatter?.title ?? 'Loading…'}"
+              "textContent": "${state.post?.frontmatter?.title ?? ''}"
             },
             {
               "tagName": "article",
-              "children": "${state.currentPost?.$children ?? []}"
+              "children": "${state.post.$children}"
             }
           ]
         }
