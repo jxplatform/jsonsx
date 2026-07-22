@@ -1,5 +1,5 @@
 {
-  "$schema": "../../packages/schema/schema.json",
+  "$schema": "../document.schema.json",
   "$id": "TaskManager",
   "tagName": "task-manager",
   "$elements": [{ "$ref": "./task-item.json" }, { "$ref": "./task-stats.json" }],

@@ -1,5 +1,5 @@
 {
-  "$schema": "../../packages/schema/schema.json",
+  "$schema": "../document.schema.json",
   "$id": "DynamicList",
 
   "state": {

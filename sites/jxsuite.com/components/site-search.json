@@ -1,5 +1,5 @@
 {
-  "$schema": "../../../packages/schema/schema.json",
+  "$schema": "../document.schema.json",
   "$id": "SiteSearch",
   "$description": "Docs search: a toolbar trigger opening a native-popover modal over the headless @jxsuite/search client (Cmd+K / Ctrl+K / '/'). Results group section hits under their page and deep-link to heading anchors.",
 
