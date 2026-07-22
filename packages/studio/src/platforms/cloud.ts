@@ -209,6 +209,9 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
     id: "cloud",
     projectRoot: root,
     canvasUrl: "/canvas.html",
+    /* Open Project routes through Studio's repo picker (write-access repos via listRepos +
+       importProject) — sessions are URL-bound, so openProject() below never opens a dialog. */
+    openProjectPicker: "repo-list",
 
     async activate() {
       if (!project) {
@@ -377,9 +380,8 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
 
     /**
      * The project's format registry, served by the session gateway (the dev server's `GET
-     * /__studio/formats` under this session's base path). Part-4 cleanup: the cloud ProjectSession
-     * does not serve the route yet, so this degrades to an empty registry (only .json documents
-     * open) until the backend lands it.
+     * /__studio/formats` under this session's base path). Degrades to an empty registry (only .json
+     * documents open) against backends that predate the route.
      */
     async listFormats() {
       try {

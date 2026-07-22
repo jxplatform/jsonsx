@@ -11,7 +11,10 @@
   "files": [
     "*.js",
     "src",
-    "dist"
+    "dist",
+    "index.html",
+    "canvas.html",
+    "fonts"
   ],
   "type": "module",
   "exports": {

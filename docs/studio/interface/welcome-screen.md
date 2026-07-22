@@ -30,6 +30,8 @@ The full walkthrough is in **[Create a project](/docs/studio/projects/create)**.
 
 Studio opens the project and adds it to **Recent** for next time.
 
+On **studio.jxsuite.com**, projects live in GitHub repositories instead of local folders, so **Open Project…** opens a repository picker: it lists the GitHub repositories you have write access to (Jx projects first), with a filter field to narrow the list. Click one and Studio opens it at `/edit/owner/repo@branch`. Repositories without a `project.json` show an inline explanation instead of opening.
+
 ## Clone a git repository
 
 This entry appears when your Studio setup can run git.

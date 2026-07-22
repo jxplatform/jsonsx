@@ -155,7 +155,11 @@ import { hydrateProjectList } from "./project-list";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
 import { hydrateSettings } from "./services/settings-store";
 import { initWelcome } from "./panels/welcome-screen";
-import { openAddRepoModal } from "./new-project/add-repo-modal";
+import {
+  openAddRepoModal,
+  openProjectPickerModal,
+  platformUsesRepoPicker,
+} from "./new-project/add-repo-modal";
 import { openNewProjectModal } from "./new-project/new-project-modal";
 import type { DocumentStackEntry, GitDiffState } from "./types";
 import type { Tab } from "./tabs/tab";
@@ -888,6 +892,19 @@ function loadProject() {
   return _loadProject();
 }
 async function openProject() {
+  // Repo-list platforms (cloud) pick from the user's writable repositories instead of a
+  // Backend dialog; the choice opens through the same path as a recent project.
+  if (platformUsesRepoPicker()) {
+    const picked = await openProjectPickerModal();
+    if (picked) {
+      // The catalogue may have gained an entry; refresh it before navigating into the project.
+      void hydrateProjectList().then(() => {
+        render();
+      });
+      void openRecentProject(picked.root);
+    }
+    return;
+  }
   const result = await _openProject({
     renderActivityBar: () => renderActivityBar(),
     renderLeftPanel,

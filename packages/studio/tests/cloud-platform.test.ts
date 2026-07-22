@@ -85,6 +85,11 @@ describe("project binding", () => {
     expect(opened?.handle.root).toBe("octocat/my-site");
   });
 
+  test("open-project picking routes through the studio repo picker in both modes", () => {
+    expect(createCloudPlatform(PROJECT).openProjectPicker).toBe("repo-list");
+    expect(createCloudPlatform(null).openProjectPicker).toBe("repo-list");
+  });
+
   test("probeRootProject reports a non-jx repo as not a site project", async () => {
     mockFetch({
       "/project-info": {

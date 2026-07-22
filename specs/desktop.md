@@ -76,18 +76,18 @@ The PAL is a plain JavaScript object conforming to a `StudioPlatform` interface.
 
 The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — roughly 70 members today. This spec deliberately does not duplicate it; the summary below names the member families and the model that governs them. The transport-level view of the same contract is the `STUDIO_ROUTES` table in `@jxsuite/protocol` (§5.1).
 
-| Family                   | Representative members                                                                                                                                            |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Session / project**    | `id`, `projectRoot`, `activate`, `openProject`, `probeRootProject`, `createProject`, `listStarters?`, `importSite?`, `listProjects?`, recent-projects persistence |
-| **Filesystem**           | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `createDirectory`, `locateFile`, `searchFiles`, `subscribeFileEvents?`        |
-| **Documents / formats**  | `discoverComponents`, `listFormats?`, `listExtensions?`, `fetchProjectSchemas?`, `formatAction?`, `fetchPluginSchema`                                             |
-| **Packages**             | `listPackages`, `addPackage`, `removePackage`, `installDependencies?`, `outdatedPackages?`, `setPackageVersions?`                                                 |
-| **Git**                  | `gitStatus`, `gitCommit`, `gitPush`, `gitPull`, `gitDiff`, `gitCheckout`, `gitClone?`, `createPullRequest?`, …                                                    |
-| **Collab**               | `collab?` (realtime co-editing handle per document)                                                                                                               |
-| **Data / secrets**       | `dataConnections?`, `dataRows?`, row CRUD, `dataPush?`, `listSecrets?`, `setSecrets?`                                                                             |
-| **Publish / identity**   | `getUser?`, `getAccountStatus?`, `listRepos?`, `importProject?`, `cfConnection?`, `cfApi?`                                                                        |
-| **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                |
-| **Multi-window / shell** | `openProjectInNewWindow?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                        |
+| Family                   | Representative members                                                                                                                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Session / project**    | `id`, `projectRoot`, `activate`, `openProject`, `openProjectPicker?`, `probeRootProject`, `createProject`, `listStarters?`, `importSite?`, `listProjects?`, recent-projects persistence |
+| **Filesystem**           | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `createDirectory`, `locateFile`, `searchFiles`, `subscribeFileEvents?`                              |
+| **Documents / formats**  | `discoverComponents`, `listFormats?`, `listExtensions?`, `fetchProjectSchemas?`, `formatAction?`, `fetchPluginSchema`                                                                   |
+| **Packages**             | `listPackages`, `addPackage`, `removePackage`, `installDependencies?`, `outdatedPackages?`, `setPackageVersions?`                                                                       |
+| **Git**                  | `gitStatus`, `gitCommit`, `gitPush`, `gitPull`, `gitDiff`, `gitCheckout`, `gitClone?`, `createPullRequest?`, …                                                                          |
+| **Collab**               | `collab?` (realtime co-editing handle per document)                                                                                                                                     |
+| **Data / secrets**       | `dataConnections?`, `dataRows?`, row CRUD, `dataPush?`, `listSecrets?`, `setSecrets?`                                                                                                   |
+| **Publish / identity**   | `getUser?`, `getAccountStatus?`, `listRepos?`, `importProject?`, `cfConnection?`, `cfApi?`                                                                                              |
+| **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                                      |
+| **Multi-window / shell** | `openProjectInNewWindow?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                                              |
 
 **Core vs. optional, and degradation.** Required members are the minimal backend every platform implements. Optional members (marked `?` in the interface) each back an optional protocol route; Studio feature-detects them and degrades gracefully when they are absent — hiding the corresponding UI or falling back to a client-side path. Each optional route's `degradation` note in `STUDIO_ROUTES` records exactly what turns off (e.g. no `collab` → Studio edits solo with file-level saves; no `importSite` → the New Project modal hides its Import tab).
 
@@ -139,8 +139,8 @@ if (!hasPlatform()) {
    - If a project was previously open and the handle is still valid, reopen it
    - Otherwise, show the welcome state ("Open a project to get started")
 3. When the user triggers "Open Project":
-   - Studio calls `getPlatform().openProject()`
-   - The platform presents its native project opening flow
+   - With `openProjectPicker: "repo-list"` (cloud), Studio shows its own repository picker over `listRepos` + `importProject` (write-access repositories only) and opens the choice through the recent-projects path — `openProject()` is never called
+   - Otherwise Studio calls `getPlatform().openProject()` and the platform presents its native project opening flow
    - On success, Studio receives `{ config, handle }` and initializes the file tree
 
 ---
@@ -153,7 +153,7 @@ A project is identified by its `project.json` file. This is the single point of 
 
 - **Desktop:** User selects `project.json` via native file dialog. The parent directory becomes the project root.
 - **Dev server:** User selects the folder containing `project.json` via `showDirectoryPicker()`. Studio reads `project.json` from the directory to validate it.
-- **Cloud:** User selects a project from a project list. The cloud backend locates the project's `project.json` equivalent in its data store.
+- **Cloud:** User picks from a repository list (`openProjectPicker: "repo-list"` — GitHub repositories with write access, Jx-tagged repos first). Selection runs `importProject`, which probes the repository's `project.json` and resolves the catalogue root key Studio navigates to.
 
 The `project.json` file is **required** for project-level features. Studio can still open individual `.json` files for standalone component editing (see §4.3).
 
@@ -162,16 +162,18 @@ The `project.json` file is **required** for project-level features. Studio can s
 ```
 User clicks "Open Project"
         │
+        ├─── openProjectPicker: "repo-list" (Cloud): Studio's repository picker
+        │    → listRepos → write-access repos, Jx-tagged first → user picks
+        │    → importProject → { root } → opens via the recent-projects path
+        │    (openProject() is never called)
         ▼
 platform.openProject()
         │
         ├─── Desktop: Utils.openFileDialog({ allowedFileTypes: "json", canChooseFiles: true })
         │    → user picks project.json → read + parse → derive project root from parent dir
         │
-        ├─── Dev server: showDirectoryPicker()
+        └─── Dev server: showDirectoryPicker()
         │    → user picks folder → read project.json from dir → parse + validate
-        │
-        └─── Cloud: fetch project list → user picks → fetch project.json from storage
         │
         ▼
 Returns { config, handle } or null

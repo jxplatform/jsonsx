@@ -30,7 +30,7 @@ What each kind of file is for — and when to reach for which — is covered in 
 There are three ways to end up with a project open in Studio, all available from the [Welcome screen](/docs/studio/interface/welcome-screen):
 
 1. **Create a new one.** Click **New Project…** and pick a template or a complete starter site. The whole modal is walked through in **[Create a project](/docs/studio/projects/create)**.
-2. **Open an existing folder.** Click **Open Project…** and point Studio at a Jx project already on your machine. Recently opened projects also appear on the Welcome screen for one-click reopening.
+2. **Open an existing folder.** Click **Open Project…** and point Studio at a Jx project already on your machine. On studio.jxsuite.com the same button lists the GitHub repositories you can write to instead — pick one and Studio opens it. Recently opened projects also appear on the Welcome screen for one-click reopening.
 3. **Clone a repository.** Click **Clone Git Repository…** and paste a repository URL — Studio downloads the project and opens it. On platforms linked to a GitHub account, **Add Existing Repository…** lets you pick from your repositories instead of pasting a URL.
 
 :::doc-note
