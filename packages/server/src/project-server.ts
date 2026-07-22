@@ -25,14 +25,19 @@
  *   realpath re-check (symlink containment).
  */
 
-import { isAbsolute, relative, resolve, sep } from "node:path";
-import { realpathSync } from "node:fs";
+import { resolve, sep } from "node:path";
 import { handleJxMounts } from "./jx-mounts.ts";
 import { handleResolve, handleServerFunction } from "./resolve.ts";
 import { handleAiApi } from "./ai-api.ts";
 import { handleImportApi } from "./import-api.ts";
 import { resolveNpmPath } from "./server.ts";
 import type { ImportApiOptions } from "./import-api.ts";
+import {
+  decodeAndNormalizePath,
+  loopbackGate,
+  serveContained,
+  serveProjectFile,
+} from "./net-guard.ts";
 
 /** A resolved per-window session: its project root plus its RPC handler map. */
 export interface ProjectServerSession {
@@ -71,151 +76,6 @@ export interface ProjectServerHandle {
   stop: () => void;
 }
 
-const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
-
-/** True when a hostname (no port) is a loopback host. Used for best-effort Origin/Host checks. */
-function isLoopbackHost(host: string | null | undefined): boolean {
-  if (!host) {
-    return false;
-  }
-  // Strip a trailing :port (but keep bracketed IPv6 intact for the literal set).
-  let h = host;
-  if (h.startsWith("[")) {
-    const end = h.indexOf("]");
-    h = end === -1 ? h : h.slice(0, end + 1);
-  } else {
-    const colon = h.indexOf(":");
-    if (colon !== -1) {
-      h = h.slice(0, colon);
-    }
-  }
-  return LOOPBACK_HOSTS.has(h.toLowerCase());
-}
-
-/**
- * Best-effort loopback Origin/Host check (defense-in-depth, not the hard gate).
- *
- * Accept when the Origin's host is loopback OR Origin is absent (Bun-native / test clients send no
- * Origin). Do NOT hardcode-match one literal origin — localhost and 127.0.0.1 are distinct origins,
- * and a too-strict check would 403 legitimate clients.
- */
-function originIsLoopbackOrAbsent(req: Request): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) {
-    return true;
-  }
-  try {
-    return isLoopbackHost(new URL(origin).hostname);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Reject a Host header that is present and NOT loopback (defeats DNS-rebinding, where Host is the
- * attacker domain). An absent Host (Bun-native clients) is accepted.
- */
-function hostIsLoopbackOrAbsent(req: Request): boolean {
-  const host = req.headers.get("host");
-  if (!host) {
-    return true;
-  }
-  return isLoopbackHost(host);
-}
-
-/** Normalize a path for cross-platform containment comparison (separators + case on Windows). */
-function normalizeForCompare(p: string): string {
-  const slashed = p.replaceAll("\\", "/");
-  return process.platform === "win32" ? slashed.toLowerCase() : slashed;
-}
-
-/**
- * Contain `absPath` within `root`: a lexical relative() check followed by a realpath re-check so a
- * symlink inside the tree cannot point outside it. Returns the (possibly realpath'd) absolute path
- * when contained, or null otherwise. The caller must already have decoded the URL pathname.
- */
-function containedPath(absPath: string, root: string): string | null {
-  // (1) Lexical containment.
-  const rel = relative(root, absPath);
-  if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
-    return null;
-  }
-  // (2) realpath BOTH and re-check the realpath is still under realRoot (symlink containment).
-  let realRoot: string;
-  let realPath: string;
-  try {
-    realRoot = realpathSync(root);
-  } catch {
-    // Root itself is unresolvable: fall back to lexical-only containment.
-    return absPath;
-  }
-  try {
-    realPath = realpathSync(absPath);
-  } catch {
-    // Target does not exist yet — lexical containment already passed; let the caller's existence
-    // Check decide. (Reads will 404; the write-path resolves its own parent separately.)
-    return absPath;
-  }
-  const nRoot = normalizeForCompare(realRoot);
-  const nPath = normalizeForCompare(realPath);
-  if (nPath === nRoot || nPath.startsWith(nRoot.endsWith("/") ? nRoot : `${nRoot}/`)) {
-    return realPath;
-  }
-  return null;
-}
-
-/**
- * Serve a file under studioDir (or any root) if it both exists and is contained. Returns the
- * Response, or null when missing/traversed (caller decides the fallthrough status).
- */
-async function serveContained(absPath: string, root: string): Promise<Response | null> {
-  const safe = containedPath(absPath, root);
-  if (!safe) {
-    return null;
-  }
-  const file = Bun.file(safe);
-  if (await file.exists()) {
-    return new Response(file);
-  }
-  return null;
-}
-
-/**
- * Try to serve a project file at its natural URL: absolute-under-root, then root-relative, then
- * public/. Each candidate goes through containedPath (realpath). `decodedPath` is the once-decoded
- * URL pathname (leading slash, forward slashes).
- */
-async function serveProjectFile(decodedPath: string, root: string): Promise<Response | null> {
-  // Map the URL pathname back to a filesystem path. On Windows the browser requests an absolute
-  // Path as /C:/Users/… (leading slash + forward slashes); drop the slash before the drive letter.
-  // A POSIX absolute path arrives as //abs/path.
-  const fsPath = decodedPath.startsWith("//")
-    ? decodedPath.slice(1)
-    : decodedPath.replace(/^\/([A-Za-z]:)/, "$1");
-
-  // 1. Absolute path that falls under the project root.
-  if (normalizeForCompare(fsPath).startsWith(normalizeForCompare(root))) {
-    const res = await serveContained(fsPath, root);
-    if (res) {
-      return res;
-    }
-  }
-
-  // 2. Root-relative.
-  const relRes = await serveContained(resolve(root, `.${decodedPath}`), root);
-  if (relRes) {
-    return relRes;
-  }
-
-  // 3. public/ subdirectory.
-  const pubRes = await serveContained(resolve(root, "public", `.${decodedPath}`), root);
-  if (pubRes) {
-    return pubRes;
-  }
-
-  return null;
-}
-
 /**
  * Create and start a shared project server bound to loopback.
  *
@@ -243,27 +103,20 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
       const url = new URL(req.url);
       // Decode the pathname ONCE, then run ALL containment on the decoded path. Reject a path that
       // Still contains an encoded dot/slash after one decode (over-encoding bypass attempt).
-      let path: string;
-      try {
-        path = decodeURIComponent(url.pathname);
-      } catch {
-        return new Response("Bad request", { status: 400 });
+      const decoded = decodeAndNormalizePath(url);
+      if ("reject" in decoded) {
+        return decoded.reject;
       }
-      if (/%2e|%2f/i.test(path)) {
-        return new Response("Not found", { status: 404 });
-      }
-      // Collapse runs of leading slashes to a single one. The natural-URL branch re-expands a POSIX
-      // //abs prefix explicitly, so a single leading slash here is the right normal form.
-      const normPath = path.replace(/^\/{2,}/, "/");
+      const { normPath } = decoded;
 
       const winId = url.searchParams.get("win");
 
       // 1. WebSocket upgrade — token + loopback Origin/Host are the hard gate.
       const upgrade = req.headers.get("upgrade");
       if (upgrade && upgrade.toLowerCase() === "websocket") {
-        const token = url.searchParams.get("token");
-        if (token !== rpcToken || !originIsLoopbackOrAbsent(req) || !hostIsLoopbackOrAbsent(req)) {
-          return new Response("Forbidden", { status: 403 });
+        const gate = loopbackGate(req, url, rpcToken);
+        if (gate) {
+          return gate;
         }
         if (srv.upgrade(req, { data: { winId } })) {
           return;
@@ -288,9 +141,9 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         if (!importApi) {
           return new Response("Not found", { status: 404 });
         }
-        const token = url.searchParams.get("token");
-        if (token !== rpcToken || !originIsLoopbackOrAbsent(req) || !hostIsLoopbackOrAbsent(req)) {
-          return new Response("Forbidden", { status: 403 });
+        const gate = loopbackGate(req, url, rpcToken);
+        if (gate) {
+          return gate;
         }
         const importUrl = new URL(req.url);
         importUrl.pathname = "/__studio/import-site";
@@ -343,9 +196,9 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         (normPath === "/__jx_resolve__" || normPath === "/__jx_server__") &&
         req.method === "POST"
       ) {
-        const token = url.searchParams.get("token");
-        if (token !== rpcToken || !originIsLoopbackOrAbsent(req) || !hostIsLoopbackOrAbsent(req)) {
-          return new Response("Forbidden", { status: 403 });
+        const gate = loopbackGate(req, url, rpcToken);
+        if (gate) {
+          return gate;
         }
         if (normPath === "/__jx_resolve__") {
           return handleResolve(req, root, root);

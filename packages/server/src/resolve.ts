@@ -4,6 +4,7 @@ import { dirname, relative, resolve } from "node:path";
 import { errorMessage, parseClassDef } from "@jxsuite/schema/parse";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
+import { containedPath } from "./net-guard.ts";
 import { buildProjectExtensionRegistry } from "@jxsuite/compiler/format-host";
 import { loadProjectSections } from "@jxsuite/compiler/project-sections";
 import type { DynamicClass } from "@jxsuite/runtime/types";
@@ -34,6 +35,21 @@ interface ServerFunctionBody {
   $base?: string;
   arguments?: Record<string, unknown>;
   [key: string]: unknown;
+}
+
+/**
+ * True when `p` is contained within `root` or (when set) `activeProjectRoot`. Guards every
+ * `import()`/read of a caller-supplied `$src`/`$base`/`$implementation` so a `../` or absolute path
+ * cannot pull in arbitrary modules from the filesystem.
+ */
+function isImportable(p: string, root: string, activeProjectRoot: string | null): boolean {
+  if (containedPath(p, root) !== null) {
+    return true;
+  }
+  if (activeProjectRoot && containedPath(p, activeProjectRoot) !== null) {
+    return true;
+  }
+  return false;
 }
 
 /** Per-project context cache, invalidated when project.json changes on disk. */
@@ -104,6 +120,9 @@ export async function handleResolve(
       } else {
         moduleAbsPath = resolve(activeProjectRoot || root, $src);
       }
+      if (!isImportable(moduleAbsPath, root, activeProjectRoot)) {
+        return new Response(`$src "${$src}" escapes the project root`, { status: 403 });
+      }
     } else {
       // Npm/bare specifier — use createRequire from project root, fall back to server package
       const projectRoot = activeProjectRoot || root;
@@ -148,6 +167,9 @@ export async function handleResolve(
       if (classDef.$implementation) {
         // Hybrid mode: redirect to the JS implementation
         const implPath = resolve(dirname(moduleAbsPath), classDef.$implementation);
+        if (!isImportable(implPath, root, activeProjectRoot)) {
+          return new Response(`$implementation escapes the project root`, { status: 403 });
+        }
         const exportName = xport ?? classDef.title ?? $prototype;
         const mod = (await import(implPath)) as ModuleNamespace;
         const ExportedClass =
@@ -229,6 +251,10 @@ export async function handleServerFunction(req: Request, root: string) {
     });
   }
 
+  if (!isImportable(moduleAbsPath, root, null)) {
+    return new Response(`$src "${$src}" escapes the project root`, { status: 403 });
+  }
+
   let mod: ModuleNamespace;
   try {
     mod = (await import(moduleAbsPath)) as ModuleNamespace;
@@ -246,7 +272,12 @@ export async function handleServerFunction(req: Request, root: string) {
   }
 
   try {
-    const result = await (fn as (args: Record<string, unknown>) => unknown)(args);
+    // Match the production contract `fn(args, env)` (compiler emits `fn(args, c.env)`): the dev
+    // Proxy runs server-side, so `process.env` is the analogous environment binding.
+    const result = await (fn as (args: Record<string, unknown>, env: unknown) => unknown)(
+      args,
+      process.env,
+    );
     return Response.json(result ?? null);
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });

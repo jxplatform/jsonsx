@@ -50,34 +50,15 @@ Format and extension behavior is served from a per-project **extension registry*
 
 ## The security model
 
-Every filesystem route is contained by `assertAccessible`, which allows a path under either the server root or the explicitly activated project root and rejects everything else:
+The dev server and the desktop's `createProjectServer` share one set of primitives (`packages/server/src/net-guard.ts`); the dev server applies all but the token:
 
-```ts
-// packages/server/src/studio-api.ts
-export function assertAccessible(filePath: string, root: string, activeProjectRoot: string | null) {
-  const rel = relative(root, filePath);
-  if (!rel.startsWith("..") && !rel.startsWith("/")) {
-    return;
-  }
-  if (activeProjectRoot) {
-    const relActive = relative(activeProjectRoot, filePath);
-    if (!relActive.startsWith("..") && !relActive.startsWith("/")) {
-      return;
-    }
-  }
-  throw new Error("Path outside project root");
-}
-```
-
-The dev server assumes a trusted localhost during development. The desktop app cannot, so it embeds a hardened variant, `createProjectServer` (in `project-server.ts`), with a layered model worth copying in any embedding:
-
-- **Loopback bind** (`127.0.0.1`) is the primary control — other local processes and LAN pages can't read a loopback page's location, so they can't steal its token.
-- **A per-server token** is the hard gate on every privileged surface: the WebSocket RPC upgrade and the two resolve routes (RCE-capable, as above).
-- **Origin/Host checks** are best-effort defense in depth — loopback-or-absent Origin accepted, non-loopback Host rejected on privileged routes (anti-DNS-rebinding).
-- **File containment** pairs the lexical `relative()` check with a `realpath` re-check, so symlinks can't escape the project root.
+- **Loopback bind** (`127.0.0.1`) by default is the primary control — other local processes and LAN pages can't read a loopback page's location. A `hostname` option (`jx dev --host`) can widen the bind for containers, but that removes the control and should only be used behind trusted isolation.
+- **Origin/Host gate** guards every privileged surface — the RCE-capable `/__jx_resolve__` / `/__jx_server__` routes, the `/_jx/` mounts, and the whole `/__studio/*` API. A loopback (or absent) Origin passes; a cross-origin Origin or a rebinding Host is rejected. The browser Studio and the served site are same-origin, so they pass — a malicious external page does not. The dev server needs no token because it is same-origin; the desktop server, whose canvas iframe is cross-origin, adds a per-server token on top.
+- **File containment** (`containedPath`) pairs a lexical `relative()` check with a `realpath` re-check, so a `../` or absolute path can't escape and a symlink can't point outside the project root. It guards static serving, `assertAccessible` for the filesystem API, and every `$src` / `$base` / `$implementation` resolved before a dynamic `import()`. Over-encoded paths are rejected after a single decode.
+- **Two-root activation**: `assertAccessible(filePath, root, activeProjectRoot)` allows a path under the server root or the project root Studio bound via `POST /__studio/activate` — which itself only accepts a root contained under the server root or an explicit `allowedRoots` entry.
 
 :::doc-warning
-If you host the resolve proxies anywhere beyond a trusted loopback, gate them the way `project-server.ts` does — they import and execute arbitrary project code by design.
+The resolve proxies import and execute arbitrary project code by design. Keep the loopback bind, and if you must widen it, put the server behind trusted isolation — the Origin/Host gate assumes the network itself is not hostile.
 :::
 
 ## Related

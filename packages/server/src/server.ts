@@ -20,6 +20,7 @@ import { createWatcher, injectSSE } from "./watch.ts";
 import { handleJxMounts } from "./jx-mounts.ts";
 import { handleResolve, handleServerFunction } from "./resolve.ts";
 import { assertAccessible, handleStudioApi } from "./studio-api.ts";
+import { containedPath, decodeAndNormalizePath, originHostGate } from "./net-guard.ts";
 import { handleCodeApi } from "./code-api.ts";
 import { handleAiApi } from "./ai-api.ts";
 import { handleImportApi } from "./import-api.ts";
@@ -173,6 +174,18 @@ export { resolveNpmPath };
 export async function createDevServer(options: {
   root: string;
   port?: number;
+  /**
+   * Bind hostname. Defaults to loopback `127.0.0.1` — the primary security control. Binding a
+   * non-loopback host (e.g. `0.0.0.0` inside a container) exposes the RCE-capable resolve routes
+   * and the filesystem API to the network; only do so behind trusted isolation.
+   */
+  hostname?: string;
+  /**
+   * Extra filesystem roots (besides `root`) that `/__studio/activate` may switch to. Studio can
+   * activate an external project dir; a root that is neither under `root` nor listed here is
+   * refused.
+   */
+  allowedRoots?: string[];
   builds?: {
     entrypoints: string[];
     outdir: string;
@@ -186,6 +199,8 @@ export async function createDevServer(options: {
   const {
     root,
     port = 3000,
+    hostname = "127.0.0.1",
+    allowedRoots = [],
     builds = [],
     watch = true,
     studio: enableStudio = true,
@@ -247,7 +262,14 @@ export async function createDevServer(options: {
   const server = Bun.serve({
     async fetch(req, bunServer) {
       const url = new URL(req.url);
-      let path = decodeURIComponent(url.pathname);
+      // Decode the pathname ONCE and reject over-encoded traversal (%252e → %2e). Single-encoded
+      // ".." is caught later by realpath containment on the static path.
+      const decoded = decodeAndNormalizePath(url);
+      if ("reject" in decoded) {
+        return decoded.reject;
+      }
+      // Keep the un-collapsed decoded path: the static branch detects a POSIX-absolute "//abs" prefix.
+      let { path } = decoded;
       if (path.endsWith("/")) {
         path += "index.html";
       } else if (path === "") {
@@ -257,6 +279,24 @@ export async function createDevServer(options: {
       // SSE live reload
       if (handleSSE && path === "/__reload") {
         return handleSSE();
+      }
+
+      /*
+       * The RCE-capable resolve routes, the extension mounts, and the studio API are gated by a
+       * loopback Origin/Host check: the browser Studio and the served site are same-origin (they
+       * send a loopback Origin on cross-origin POSTs), while a malicious external page is rejected.
+       * The loopback bind is the primary control; this defeats CSRF + DNS-rebinding on top of it.
+       */
+      const isPrivileged =
+        path === "/__jx_resolve__" ||
+        path === "/__jx_server__" ||
+        path.startsWith("/_jx/") ||
+        (enableStudio && path.startsWith("/__studio/"));
+      if (isPrivileged) {
+        const gate = originHostGate(req);
+        if (gate) {
+          return gate;
+        }
       }
 
       // $prototype + $src proxy
@@ -285,12 +325,24 @@ export async function createDevServer(options: {
           return collabRegistry.handleRequest(req, bunServer);
         }
 
-        // Activate project — tells the server which project root to use for static file fallback
+        // Activate project — tells the server which project root to use for static file fallback.
+        // Contain the requested root: it must be under absRoot or an explicitly allowed root, so a
+        // Hostile activate cannot widen the filesystem API to arbitrary directories.
         if (path === "/__studio/activate" && req.method === "POST") {
           const body = (await req.json()) as { root?: string };
           const raw = body.root || null;
-          // Always store as absolute path
-          activeProjectRoot = raw ? resolve(absRoot, raw) : null;
+          if (!raw) {
+            activeProjectRoot = null;
+            return Response.json({ ok: true, root: null });
+          }
+          const requested = resolve(absRoot, raw);
+          const permitted =
+            containedPath(requested, absRoot) !== null ||
+            allowedRoots.some((allowed) => containedPath(requested, resolve(allowed)) !== null);
+          if (!permitted) {
+            return Response.json({ ok: false, error: "root not permitted" }, { status: 403 });
+          }
+          activeProjectRoot = requested;
           return Response.json({ ok: true, root: activeProjectRoot });
         }
 
@@ -332,7 +384,8 @@ export async function createDevServer(options: {
         }
       }
 
-      // Static files
+      // Static files. Every candidate is contained (lexical + realpath) against its root, so an
+      // Encoded "../" traversal that survived URL normalization cannot escape to arbitrary files.
 
       // If the URL path is an absolute filesystem path under the active project, serve directly.
       // A POSIX absolute path arrives as "//abs/path"; a Windows one as "/C:/dir/file" (leading
@@ -341,24 +394,40 @@ export async function createDevServer(options: {
       const fsPath = path.startsWith("//") ? path.slice(1) : path.replace(/^\/([A-Za-z]:)/, "$1");
       const normSep = (p: string) => p.replaceAll("\\", "/");
       if (activeProjectRoot && normSep(fsPath).startsWith(normSep(activeProjectRoot))) {
-        const file = Bun.file(fsPath);
-        if (await file.exists()) {
-          return fileResponse(file);
+        const safe = containedPath(fsPath, activeProjectRoot);
+        if (safe) {
+          const file = Bun.file(safe);
+          if (await file.exists()) {
+            return fileResponse(file);
+          }
         }
       }
 
-      const file = Bun.file(resolve(absRoot, `.${path}`));
-      if (!(await file.exists())) {
+      const rootSafe = containedPath(resolve(absRoot, `.${path}`), absRoot);
+      const file = rootSafe ? Bun.file(rootSafe) : null;
+      if (!file || !(await file.exists())) {
         // Try resolving relative to active studio project root
         if (activeProjectRoot) {
-          const projectFile = Bun.file(resolve(activeProjectRoot, `.${path}`));
-          if (await projectFile.exists()) {
-            return fileResponse(projectFile);
+          const projectSafe = containedPath(
+            resolve(activeProjectRoot, `.${path}`),
+            activeProjectRoot,
+          );
+          if (projectSafe) {
+            const projectFile = Bun.file(projectSafe);
+            if (await projectFile.exists()) {
+              return fileResponse(projectFile);
+            }
           }
           // Mirror production: public/ contents are served at root
-          const publicFile = Bun.file(resolve(activeProjectRoot, "public", `.${path}`));
-          if (await publicFile.exists()) {
-            return fileResponse(publicFile);
+          const publicSafe = containedPath(
+            resolve(activeProjectRoot, "public", `.${path}`),
+            activeProjectRoot,
+          );
+          if (publicSafe) {
+            const publicFile = Bun.file(publicSafe);
+            if (await publicFile.exists()) {
+              return fileResponse(publicFile);
+            }
           }
         }
 
@@ -408,6 +477,7 @@ export async function createDevServer(options: {
       return fileResponse(file);
     },
 
+    hostname,
     port,
     // Keep SSE connections alive — heartbeats are every 15 s, and AI streaming can take
     // 30+ s. The default 10 s idleTimeout kills them prematurely.
@@ -415,7 +485,7 @@ export async function createDevServer(options: {
     websocket: collabRegistry.websocket,
   });
 
-  console.log(`\n@jxsuite/server listening on http://localhost:${server.port}`);
+  console.log(`\n@jxsuite/server listening on http://${hostname}:${server.port}`);
 
   return server;
 }

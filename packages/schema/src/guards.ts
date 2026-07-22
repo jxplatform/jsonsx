@@ -174,6 +174,16 @@ export function isTemplateString(value?: unknown): value is string {
   return typeof value === "string" && value.includes("${");
 }
 
+/**
+ * Whether a function `body` returns a value — the heuristic that classifies a `$prototype:
+ * "Function"` as a computed value vs an event handler. Uses a word boundary so identifiers like
+ * `returned` do not match. Shared by the runtime interpreter and the compiler so both agree on the
+ * classification.
+ */
+export function bodyReturnsValue(body: string): boolean {
+  return /\breturn\b/.test(body);
+}
+
 // ─── Style guards & accessors ───────────────────────────────────────────────────
 
 /** A nested style object (selector/media block), as opposed to a scalar CSS value. */

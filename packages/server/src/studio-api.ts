@@ -17,6 +17,7 @@ import {
 } from "@jxsuite/compiler/format-host";
 import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import { handleDataApi } from "./data-api.ts";
+import { containedPath } from "./net-guard.ts";
 import { applyRename } from "./refactor/apply.ts";
 import {
   bunExecutable,
@@ -164,15 +165,12 @@ async function getFormatRegistry(projectRoot: string): Promise<FormatRegistry> {
  * @param {string | null} activeProjectRoot
  */
 export function assertAccessible(filePath: string, root: string, activeProjectRoot: string | null) {
-  const rel = relative(root, filePath);
-  if (!rel.startsWith("..") && !rel.startsWith("/")) {
+  // Realpath containment (symlink-safe) against the server root, or an explicitly-activated project.
+  if (containedPath(filePath, root) !== null) {
     return;
   }
-  if (activeProjectRoot) {
-    const relActive = relative(activeProjectRoot, filePath);
-    if (!relActive.startsWith("..") && !relActive.startsWith("/")) {
-      return;
-    }
+  if (activeProjectRoot && containedPath(filePath, activeProjectRoot) !== null) {
+    return;
   }
   throw new Error("Path outside project root");
 }

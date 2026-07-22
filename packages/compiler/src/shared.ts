@@ -23,6 +23,7 @@ import {
   isExpressionDef,
   isFunctionDef,
   isMappedArray,
+  bodyReturnsValue,
   isNamedFormulaDef,
   isPrototypeDef,
   isRef,
@@ -79,7 +80,7 @@ export function emitFormulaFn(def: { parameters?: unknown[] }, compiledBody: str
 export type { ExpressionNode } from "@jxsuite/runtime/expression";
 
 // CDN defaults
-export const DEFAULT_REACTIVITY_SRC = "https://esm.sh/@vue/reactivity@3.5.32";
+export const DEFAULT_REACTIVITY_SRC = "https://esm.sh/@vue/reactivity@3.5.40";
 export const DEFAULT_LIT_HTML_SRC = "https://esm.sh/lit-html@3.3.0";
 
 // ─── Schema keywords & detection ─────────────────────────────────────────────
@@ -363,7 +364,7 @@ export function buildInitialScope(
         const fn = new Function("state", ...names, body) as (
           state: Record<string, unknown>,
         ) => unknown;
-        if (body.includes("return")) {
+        if (bodyReturnsValue(body)) {
           defineLazyScopeValue(scope, key, () => fn(scope));
         } else {
           setOwnScopeValue(scope, key, fn);

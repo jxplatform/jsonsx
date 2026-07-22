@@ -26,6 +26,7 @@ import {
 import { evaluateExpression, isMutating } from "./expression.ts";
 import type { DynamicClass, JxEventHandler, JxPath, JxRenderOptions, JxScope } from "./types.ts";
 import {
+  bodyReturnsValue,
   hasStructuredBody,
   isExpressionDef,
   isFunctionDef,
@@ -35,6 +36,7 @@ import {
   isPrototypeDef,
   isRef as isRefValue,
   isServerFnDef,
+  isTemplateString,
   paramNames,
 } from "@jxsuite/schema/guards";
 import { runStatements } from "./statements.ts";
@@ -615,9 +617,9 @@ async function resolveFunction(def: JxFunctionDef, state: JxScope, key: string, 
   let isComputed = false;
   if (!hasParams) {
     if (typeof def.body === "string") {
-      isComputed = /\breturn\b/.test(def.body);
+      isComputed = bodyReturnsValue(def.body);
     } else if (fn) {
-      isComputed = fn.length <= 1 && /\breturn\b/.test(fn.toString());
+      isComputed = fn.length <= 1 && bodyReturnsValue(fn.toString());
     }
   }
   if (isComputed) {
@@ -690,6 +692,9 @@ export const RESERVED_KEYS = new Set([
  * @param {JxRenderOptions} [options]
  * @returns {HTMLElement | Text}
  */
+/** Refs already warned about, so the §13 diagnostic fires once per distinct target. */
+const warnedRefChildren = new Set<string>();
+
 export function renderNode(
   def: JxElement | string | number | boolean,
   state: JxScope,
@@ -716,6 +721,22 @@ export function renderNode(
         localState = Object.create(state) as JxScope;
       }
       localState[key] = isRefObj(val) ? resolveRef(val.$ref, state) : val;
+    }
+  }
+
+  /*
+   * §13 diagnostic: a node-level external `$ref` (the withdrawn component-instance syntax) has no
+   * tagName and silently renders an empty <div>. Warn once per target instead of failing silently —
+   * the supported mechanism is $elements + a custom-element tag (see spec §13).
+   */
+  if ("$ref" in def && !def.tagName) {
+    const refTarget = String((def as { $ref?: unknown }).$ref ?? "");
+    if (!warnedRefChildren.has(refTarget)) {
+      warnedRefChildren.add(refTarget);
+      console.warn(
+        `Jx: a $ref child ("${refTarget}") is not a supported component instance; register the ` +
+          `component in $elements and use its custom-element tag instead (spec §13).`,
+      );
     }
   }
 
@@ -780,10 +801,6 @@ export function renderNode(
  * @param {unknown} val
  * @returns {boolean}
  */
-function isTemplateString(val: unknown): val is string {
-  return typeof val === "string" && val.includes("${");
-}
-
 // ─── Property / style / attribute application ─────────────────────────────────
 
 /**

@@ -723,3 +723,64 @@ describe("POST /__studio/ai/chat — auth, config & stream edge cases", () => {
     );
   });
 });
+
+// ─── Provenance / SSRF hardening ─────────────────────────────────────────────
+
+describe("AI proxy key-provenance + SSRF hardening", () => {
+  const withEnvKey = async (fn: () => Promise<void>) => {
+    const prev = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "sk-server-secret";
+    try {
+      await fn();
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENAI_API_KEY;
+      } else {
+        process.env.OPENAI_API_KEY = prev;
+      }
+    }
+  };
+
+  it("refuses to forward the env key to a caller-supplied base URL (401, no upstream fetch)", async () => {
+    await withEnvKey(async () => {
+      let fetched = false;
+      const realFetch = globalThis.fetch;
+      globalThis.fetch = (() => {
+        fetched = true;
+        return Promise.resolve(new Response("", { status: 200 }));
+      }) as typeof fetch;
+      try {
+        const req = mockReq("/__studio/ai/chat", {
+          method: "POST",
+          body: { messages: [{ role: "user", content: "hi" }] },
+          headers: { "X-Api-Base-URL": "https://attacker.example/v1" },
+        });
+        const res = await handleAiApi(req, new URL("http://localhost/__studio/ai/chat"));
+        expect(res!.status).toBe(401);
+        expect(fetched).toBe(false);
+      } finally {
+        globalThis.fetch = realFetch;
+      }
+    });
+  });
+
+  it("blocks a base URL pointing at the cloud metadata endpoint (403)", async () => {
+    const req = mockReq("/__studio/ai/chat", {
+      method: "POST",
+      body: { messages: [{ role: "user", content: "hi" }] },
+      headers: { "X-Api-Base-URL": "http://169.254.169.254/latest", "X-Api-Key": "sk-user" },
+    });
+    const res = await handleAiApi(req, new URL("http://localhost/__studio/ai/chat"));
+    expect(res!.status).toBe(403);
+  });
+
+  it("models endpoint also refuses a caller base URL without a caller key (401)", async () => {
+    await withEnvKey(async () => {
+      const req = mockReq("/__studio/ai/models", {
+        headers: { "X-Api-Base-URL": "https://attacker.example/v1" },
+      });
+      const res = await handleAiApi(req, new URL("http://localhost/__studio/ai/models"));
+      expect(res!.status).toBe(401);
+    });
+  });
+});
