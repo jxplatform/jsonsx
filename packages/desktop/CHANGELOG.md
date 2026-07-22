@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.2.0](https://github.com/jxsuite/jx/compare/desktop-v1.1.2...desktop-v1.2.0) (2026-07-22)
+
+
+### Features
+
+* enforce truthful marketing claims and add the missing LICENSE ([b7e0b09](https://github.com/jxsuite/jx/commit/b7e0b095566121d79ca50894b69a476984fb93ee))
+
+
+### Bug Fixes
+
+* **starters,examples:** repair documents the schema correctly rejected ([6913028](https://github.com/jxsuite/jx/commit/691302839526b4f1408ab98ca1b418b39784b01b))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 1.3.0
+    * @jxsuite/create bumped to 1.2.0
+    * @jxsuite/parser bumped to 1.3.0
+    * @jxsuite/protocol bumped to 0.6.0
+    * @jxsuite/schema bumped to 1.3.0
+    * @jxsuite/server bumped to 1.2.0
+    * @jxsuite/starters bumped to 1.2.0
+    * @jxsuite/studio bumped to 1.4.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.4.0
+    * @jxsuite/server bumped to 1.2.0
+
 ## [1.1.2](https://github.com/jxsuite/jx/compare/desktop-v1.1.1...desktop-v1.1.2) (2026-07-20)
 
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.4.0](https://github.com/jxsuite/jx/compare/studio-v1.3.0...studio-v1.4.0) (2026-07-22)
+
+
+### Features
+
+* enforce truthful marketing claims and add the missing LICENSE ([b7e0b09](https://github.com/jxsuite/jx/commit/b7e0b095566121d79ca50894b69a476984fb93ee))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/ai bumped to 0.34.0
+    * @jxsuite/collab bumped to 0.5.0
+    * @jxsuite/create bumped to 1.2.0
+    * @jxsuite/formulas bumped to 0.0.4
+    * @jxsuite/markup bumped to 0.4.0
+    * @jxsuite/protocol bumped to 0.6.0
+    * @jxsuite/runtime bumped to 1.3.0
+    * @jxsuite/schema bumped to 1.3.0
+
 ## [1.3.0](https://github.com/jxsuite/jx/compare/studio-v1.2.0...studio-v1.3.0) (2026-07-20)
 
 

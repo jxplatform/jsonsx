@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.3.0](https://github.com/jxsuite/jx/compare/compiler-v1.2.0...compiler-v1.3.0) (2026-07-22)
+
+
+### Features
+
+* **compiler:** bundled entry documents and whole-project jx validate ([46a5d6b](https://github.com/jxsuite/jx/commit/46a5d6b8dedb093612edebf240ed516882917b55))
+* enforce truthful marketing claims and add the missing LICENSE ([b7e0b09](https://github.com/jxsuite/jx/commit/b7e0b095566121d79ca50894b69a476984fb93ee))
+
+
+### Bug Fixes
+
+* harden dev server and unify runtime/compiler evaluation ([47a1d4c](https://github.com/jxsuite/jx/commit/47a1d4c90f29c6389049f389c97389857f24f855))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.2.0
+    * @jxsuite/runtime bumped to 1.3.0
+    * @jxsuite/schema bumped to 1.3.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.4.0
+    * @jxsuite/parser bumped to 1.3.0
+
 ## [1.2.0](https://github.com/jxsuite/jx/compare/compiler-v1.1.0...compiler-v1.2.0) (2026-07-18)
 
 

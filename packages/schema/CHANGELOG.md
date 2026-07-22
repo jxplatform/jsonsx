@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/jxsuite/jx/compare/schema-v1.2.0...schema-v1.3.0) (2026-07-22)
+
+
+### Features
+
+* enforce truthful marketing claims and add the missing LICENSE ([b7e0b09](https://github.com/jxsuite/jx/commit/b7e0b095566121d79ca50894b69a476984fb93ee))
+
+
+### Bug Fixes
+
+* harden dev server and unify runtime/compiler evaluation ([47a1d4c](https://github.com/jxsuite/jx/commit/47a1d4c90f29c6389049f389c97389857f24f855))
+* **schema:** cover admission blocks, capability roles, and the rendering grammar ([ee6ccc1](https://github.com/jxsuite/jx/commit/ee6ccc13f6dfb579f5913273d61e02c13a8c6ba1))
+
 ## [1.2.0](https://github.com/jxsuite/jx/compare/schema-v1.1.0...schema-v1.2.0) (2026-07-18)
 
 
