@@ -12,8 +12,10 @@ export const attributesObjectSchema = {
 } as const;
 
 export const propsObjectSchema = {
+  // AnyOf, not oneOf: a RefObject value legitimately matches both the plain-object branch and
+  // The RefObject branch, and exclusive matching would reject every $ref-bound prop.
   additionalProperties: {
-    oneOf: [
+    anyOf: [
       { type: "string" },
       { type: "number" },
       { type: "boolean" },
@@ -39,7 +41,9 @@ export const elementPropertyValueSchema = {
 export const switchDefSchema = {
   additionalProperties: false,
   description: "Reactive $ref that drives which case to render.",
-  properties: { $ref: { $ref: "#/$defs/InternalRef" } },
+  // The discriminant is a reactive state path (e.g. "#/state/currentRoute") resolved by
+  // ResolveRef at render time — not a #/$defs/ type pointer.
+  properties: { $ref: { $ref: "#/$defs/StateRef" } },
   required: ["$ref"],
   type: "object",
 } as const;
@@ -70,6 +74,15 @@ export const elementDefSchema = {
     $switch: { $ref: "#/$defs/SwitchDef" },
     alt: { $ref: "#/$defs/StringOrRef" },
     attributes: { $ref: "#/$defs/AttributesObject" },
+    cases: {
+      additionalProperties: {
+        oneOf: [{ $ref: "#/$defs/ElementDef" }, { $ref: "#/$defs/ExternalComponentRef" }],
+      },
+      description:
+        "Switch cases for this element. Maps case values to element definitions or external " +
+        "component refs, rendered according to the reactive $switch discriminant.",
+      type: "object",
+    },
     checked: { $ref: "#/$defs/BoolOrRef" },
     children: { $ref: "#/$defs/ChildrenValue" },
     className: { $ref: "#/$defs/StringOrRef" },

@@ -92,7 +92,10 @@ import {
   classFieldDefSchema,
   classMethodDefSchema,
   classParameterDefSchema,
+  connectorBlockDefSchema,
   formatDefSchema,
+  projectBlockDefSchema,
+  serverBlockDefSchema,
   studioHintsSchema,
 } from "../defs/class-def.schema";
 import { extensionManifestSchema } from "../defs/extension-manifest.schema";
@@ -182,7 +185,11 @@ function buildEventHandlerProperties(eventHandlers: string[]) {
   for (const name of eventHandlers) {
     properties[name] = {
       description: `Event handler for the "${name.slice(2)}" event.`,
-      oneOf: [{ $ref: "#/$defs/RefObject" }, { $ref: "#/$defs/ExpressionEntry" }],
+      oneOf: [
+        { $ref: "#/$defs/RefObject" },
+        { $ref: "#/$defs/ExpressionEntry" },
+        { $ref: "#/$defs/FunctionDef" },
+      ],
     };
   }
   return properties;
@@ -216,6 +223,9 @@ export async function generateSchema() {
       ClassConstructorDef: classConstructorDefSchema,
       ClassMethodDef: classMethodDefSchema,
       FormatDef: formatDefSchema,
+      ProjectBlockDef: projectBlockDefSchema,
+      ServerBlockDef: serverBlockDefSchema,
+      ConnectorBlockDef: connectorBlockDefSchema,
       StudioHints: studioHintsSchema,
       ExternalClassDef: externalClassDefSchema,
       ExpressionPointer: expressionPointerSchema,
@@ -415,6 +425,7 @@ export function generateProjectSchema() {
   return {
     $defs: {
       ImageConfig: imageConfigSchema,
+      StyleObject: styleObjectSchema,
     },
     $id: "https://jxsuite.com/schema/project/v1",
     $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -446,6 +457,7 @@ export function generateProjectCoreSchema() {
       ImageConfig: imageConfigSchema,
       JxFieldSchema: jxFieldSchemaDef,
       RelationshipRef: relationshipRefSchema,
+      StyleObject: styleObjectSchema,
     },
     $id: "https://jxsuite.com/schema/project/core/v2",
     $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -514,7 +526,10 @@ export function generateClassSchema() {
       ClassFieldDef: classFieldDefSchema,
       ClassMethodDef: classMethodDefSchema,
       ClassParameterDef: classParameterDefSchema,
+      ConnectorBlockDef: connectorBlockDefSchema,
       FormatDef: formatDefSchema,
+      ProjectBlockDef: projectBlockDefSchema,
+      ServerBlockDef: serverBlockDefSchema,
       StudioHints: studioHintsSchema,
     },
     $id: "https://jxsuite.com/schema/class/v1",
@@ -565,6 +580,7 @@ export function generateClassSchema() {
       },
       $schema: { type: "string" },
       $studio: { $ref: "#/$defs/StudioHints" },
+      connector: { $ref: "#/$defs/ConnectorBlockDef" },
       description: { type: "string" },
       extends: {
         description: "Base class — string name or $ref to another .class.json.",
@@ -579,6 +595,8 @@ export function generateClassSchema() {
         ],
       },
       format: { $ref: "#/$defs/FormatDef" },
+      project: { $ref: "#/$defs/ProjectBlockDef" },
+      server: { $ref: "#/$defs/ServerBlockDef" },
       title: {
         description: "PascalCase class name, used as the export name.",
         examples: ["MarkdownFile", "DataSource", "Calculator"],
@@ -613,7 +631,19 @@ type AjvCtor = new (opts: {
 }) => AjvInstance;
 type AddFormatsFn = (ajv: AjvInstance) => void;
 
-export async function validateDocument(doc: Record<string, unknown>) {
+/**
+ * Validate a document against an arbitrary JSON Schema 2020-12 document (e.g. a bundled per-project
+ * document.schema.json from `jx schema`). The schema must be self-contained — external refs are not
+ * resolved here.
+ *
+ * @param {Record<string, unknown>} doc - The document to validate
+ * @param {Record<string, unknown>} schema - A self-contained 2020-12 schema
+ * @returns {Promise<{ errors: unknown[] | null; valid: boolean }>}
+ */
+export async function validateWithSchema(
+  doc: Record<string, unknown>,
+  schema: Record<string, unknown>,
+) {
   let Ajv: AjvCtor, addFormats: AddFormatsFn;
   try {
     // The generated schema is JSON Schema 2020-12, so use the matching Ajv build
@@ -628,11 +658,19 @@ export async function validateDocument(doc: Record<string, unknown>) {
   const ajv = new Ajv({ allErrors: true, ownProperties: true, strict: false });
   addFormats(ajv);
 
-  const schema = await generateSchema();
   const validate = ajv.compile(schema);
   const valid = validate(doc);
 
   return { errors: validate.errors ?? null, valid };
+}
+
+export async function validateDocument(doc: Record<string, unknown>) {
+  return validateWithSchema(doc, (await generateSchema()) as Record<string, unknown>);
+}
+
+/** Validate a .class.json class definition against the generated class schema. */
+export async function validateClass(doc: Record<string, unknown>) {
+  return validateWithSchema(doc, generateClassSchema() as Record<string, unknown>);
 }
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────

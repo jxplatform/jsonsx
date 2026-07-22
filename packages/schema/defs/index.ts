@@ -69,12 +69,16 @@ export {
 
 // Class definitions
 export {
+  CLASS_METHOD_ROLES,
   classParameterDefSchema,
   classFieldDefSchema,
   classConstructorDefSchema,
   classMethodDefSchema,
   classDefSchema,
+  connectorBlockDefSchema,
   formatDefSchema,
+  projectBlockDefSchema,
+  serverBlockDefSchema,
   studioHintsSchema,
 } from "./class-def.schema";
 

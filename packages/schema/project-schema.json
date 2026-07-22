@@ -58,6 +58,24 @@
         }
       },
       "type": "object"
+    },
+    "StyleObject": {
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "$ref": "#/$defs/StyleObject"
+          }
+        ]
+      },
+      "description": "CSS style definition. camelCase property names follow CSSOM convention. Keys starting with :, ., &, or [ are treated as nested CSS selectors. Keys matching $media breakpoint names (or other @-prefixed at-rules) group nested rules. Nesting is recursive: selector and at-rule groups may nest to arbitrary depth (e.g. breakpoint → selector → pseudo-class), mirroring the compiler's recursive emission.",
+      "properties": {},
+      "type": "object"
     }
   },
   "$id": "https://jxsuite.com/schema/project/v1",
@@ -360,11 +378,11 @@
             "type": "number"
           },
           {
-            "type": "object"
+            "$ref": "#/$defs/StyleObject"
           }
         ]
       },
-      "description": "Global CSS styles applied to the <body> element. Uses the same camelCase CSSOM convention as component styles.",
+      "description": "Global CSS styles applied to the <body> element. Uses the same camelCase CSSOM convention and recursive selector/at-rule nesting as component styles.",
       "type": "object"
     },
     "url": {

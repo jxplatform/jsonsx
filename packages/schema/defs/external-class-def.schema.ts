@@ -92,7 +92,20 @@ export const externalClassDefSchema = {
     },
     sameSite: { enum: ["strict", "lax", "none"], type: "string" },
     secure: { type: "boolean" },
-    sort: { $ref: "#/$defs/RefObject" },
+    sort: {
+      anyOf: [
+        { $ref: "#/$defs/RefObject" },
+        { description: "A single sort rule, e.g. { field, order }.", type: "object" },
+        {
+          description: 'Ordered sort rules, e.g. [{ field: "date", order: "desc" }].',
+          items: { type: "object" },
+          type: "array",
+        },
+      ],
+      description:
+        "Sort configuration: a reactive $ref binding, a single { field, order } rule, or an " +
+        "ordered array of rules.",
+    },
     src: {
       description: "Configuration property passed to external class constructor.",
       type: "string",

@@ -15,6 +15,14 @@ export const functionDefSchema = {
       examples: ["./counter.js", "npm:@myorg/validators"],
       type: "string",
     },
+    arguments: {
+      description:
+        "Legacy alias for parameters: bare string parameter names (state may be listed " +
+        "explicitly as the first name). Superseded by parameters.",
+      examples: [["state", "event"]],
+      items: { type: "string" },
+      type: "array",
+    },
     body: {
       description:
         "Inline function body: an opaque JS source string (first implicit parameter is state), or a structured statement array (spec §20) — explicit structured function declaration, analyzable by tooling and editable visually. The escalation ladder within the shape is structured statements → JS string.",

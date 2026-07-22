@@ -130,6 +130,8 @@ describe("generateClassSchema", () => {
 
   test("$defs contains ClassMethodDef with role enum", () => {
     const methodDef = schema.$defs.ClassMethodDef;
+    // Method/accessor plus every capability role (format + admission blocks) — kept in
+    // Lockstep with format-registry by tests/class-schema-drift.test.ts.
     expect(methodDef.properties.role.enum).toEqual([
       "method",
       "accessor",
@@ -137,6 +139,15 @@ describe("generateClassSchema", () => {
       "serialize",
       "discover",
       "load",
+      "projectData",
+      "resolvePaths",
+      "lower",
+      "emit",
+      "mount",
+      "dialect",
+      "deploySchema",
+      "bindings",
+      "testConnection",
     ]);
     expect(methodDef.properties.timing.items.enum).toEqual(["compiler", "server", "client"]);
   });
