@@ -11,11 +11,11 @@ import type {
   DataRowUpdate,
   SecretsSetRequest,
 } from "@jxsuite/protocol";
-import type { ImportProgressEvent, ImportSiteOptions } from "@jxsuite/studio/types";
+import type { ImportProgressEvent, ImportSiteOptions, StudioPlatform } from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload } from "@jxsuite/server/refactor";
 
-export function createDesktopPlatform() {
+export function createDesktopPlatform(): StudioPlatform {
   // The studio sidebar's live-sync subscriber, if any. Set via subscribeFileEvents below.
   let fileEventHandler: ((events: FsEventPayload[]) => void) | null = null;
   const rpc = Electroview.defineRPC<StudioRPC>({

@@ -24,6 +24,7 @@ jobs:
           - { dir: extensions/connector, flag: connector }
           - { dir: packages/create, flag: create }
           - { dir: packages/desktop, flag: desktop }
+          - { dir: packages/formulas, flag: formulas }
           - { dir: packages/import, flag: import }
           - { dir: packages/markup, flag: markup }
           - { dir: extensions/parser, flag: parser }
@@ -187,6 +188,9 @@ jobs:
       # Docs: generated reference pages must match their sources (diff gate), and
       # /docs frontmatter ↔ specs/code/screenshots/nav must agree.
       - run: bun run docs:verify
+      # Marketing copy + README: no unbacked claims, dead download links, or wrong
+      # starter counts; LICENSE files present. See scripts/docs/check-site-claims.ts.
+      - run: bun run docs:claims
       # Jx schema compliance: every project root (examples, sites, starters, screenshot
       # fixtures) validates end-to-end — project.json, documents, classes, fragments, and
       # self-contained committed entry docs. See scripts/validate-schemas.ts.
