@@ -5,15 +5,20 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { runEntry, setValidateProjectFile } from "./_cli-harness.ts";
+import { runEntry, setValidateProjectTree } from "./_cli-harness.ts";
 
 describe("jx cli — validate invalid project", () => {
-  it("pretty-prints errors and exits 1", async () => {
-    setValidateProjectFile(() =>
+  it("pretty-prints issues and exits 1", async () => {
+    setValidateProjectTree(() =>
       Promise.resolve({
-        errors: [
-          { instancePath: "/content/posts", message: "must have required property 'source'" },
-          { keyword: "unevaluatedProperties" },
+        checked: 3,
+        issues: [
+          {
+            errors: [
+              { instancePath: "/content/posts", message: "must have required property 'source'" },
+            ],
+            file: "project.json",
+          },
         ],
         valid: false,
       }),
@@ -22,8 +27,7 @@ describe("jx cli — validate invalid project", () => {
     expect(result.exited).toBe(true);
     expect(result.exitCode).toBe(1);
     const output = result.errors.join("\n");
-    expect(output).toContain("project.json is INVALID");
-    expect(output).toContain("/content/posts: must have required property 'source'");
-    expect(output).toContain('/: {"keyword":"unevaluatedProperties"}');
+    expect(output).toContain("Project is INVALID");
+    expect(output).toContain("project.json:");
   });
 });

@@ -442,13 +442,15 @@ describe("schemas.fields plumbing", () => {
 
       const { projectSchemaPath } = await writeProjectSchemas(dir);
       const schema = JSON.parse(readFileSync(projectSchemaPath, "utf8")) as {
-        $defs: { Fields: { anyOf: { $ref: string }[] } };
+        $defs: Record<string, unknown> & { Fields: { anyOf: { $ref: string }[] } };
         allOf: { $ref: string }[];
       };
       const refs = schema.$defs.Fields.anyOf.map((r) => r.$ref);
       expect(refs).toContain("https://acme.test/schema/fields/v1#/$defs/ColumnExtra");
-      // The fragment itself joins the allOf so its resource loads during validation.
-      expect(schema.allOf.some((r) => r.$ref.includes("fields.fragment.schema.json"))).toBe(true);
+      // The fragment joins the allOf (by canonical $id — committed docs are bundled) and its
+      // Resource embeds under $defs so the union refs resolve without file access.
+      expect(schema.allOf.some((r) => r.$ref === "https://acme.test/schema/fields/v1")).toBe(true);
+      expect(schema.$defs["https://acme.test/schema/fields/v1"]).toBeDefined();
     } finally {
       rmSync(dir, { force: true, recursive: true });
     }

@@ -3,10 +3,12 @@
  *
  * Composes the per-project entry documents (project.schema.json and document.schema.json) from the
  * core schemas and each enabled extension's shipped fragments, then writes them into the project
- * root as committed artifacts. All fragment refs are PROJECT-RELATIVE, POSIX-style `./` paths:
- * paths that resolve inside the project are emitted as-is; bare-specifier packages resolving
- * through workspace symlinks (outside the root) fall back to the conventional
- * `./node_modules/<package>/<subpath>` form, which resolves once dependencies are installed.
+ * root as committed, SELF-CONTAINED bundles: every fragment ref is resolved through
+ * {@link bundleSchema}, embedding the core + fragment resources under `$defs` keyed by their
+ * canonical `$id`s. Relative `./node_modules/...` refs only resolve through Node module resolution,
+ * which editors do not perform (hoisted workspaces leave projects without their own node_modules) —
+ * the bundled form resolves offline for ajv `jx validate`, VS Code's JSON language service, and the
+ * studio's Monaco alike, with one resolution behavior for all consumers.
  */
 
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -57,11 +59,22 @@ export async function writeProjectSchemas(projectRoot: string) {
     }
   }
 
-  const projectSchema = emitProjectSchema({ corePath, fieldSchemaRefs, fragments });
-  const documentSchema = emitDocumentSchema({
-    corePath: coreSchemaRef(projectRoot, CORE_DOCUMENT_SPECIFIER),
-    pathsValueRefs,
-  });
+  // Bundle before committing: the emitted relative refs are an intermediate form only.
+  const root = resolve(projectRoot);
+  const loadJson = restrictedSchemaLoader(root);
+  const projectSchema = await bundleSchema(
+    emitProjectSchema({ corePath, fieldSchemaRefs, fragments }),
+    loadJson,
+    root,
+  );
+  const documentSchema = await bundleSchema(
+    emitDocumentSchema({
+      corePath: coreSchemaRef(projectRoot, CORE_DOCUMENT_SPECIFIER),
+      pathsValueRefs,
+    }),
+    loadJson,
+    root,
+  );
 
   const projectSchemaPath = resolve(projectRoot, "project.schema.json");
   const documentSchemaPath = resolve(projectRoot, "document.schema.json");

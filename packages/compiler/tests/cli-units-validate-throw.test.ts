@@ -5,11 +5,11 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { runEntry, setValidateProjectFile } from "./_cli-harness.ts";
+import { runEntry, setValidateProjectTree } from "./_cli-harness.ts";
 
 describe("jx cli — validate infrastructure failure", () => {
   it("reports the thrown error and exits 1", async () => {
-    setValidateProjectFile(() =>
+    setValidateProjectTree(() =>
       Promise.reject(new Error("project.schema.json not found in /tmp/x")),
     );
     const result = await runEntry("cli", ["validate", "/tmp/jx-cli-validate-throw"]);

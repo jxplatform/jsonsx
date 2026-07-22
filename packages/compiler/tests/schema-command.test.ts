@@ -83,24 +83,27 @@ afterAll(() => {
 });
 
 describe("writeProjectSchemas", () => {
-  it("emits both entry documents with project-relative refs", async () => {
+  it("emits both entry documents as self-contained bundles", async () => {
     const { projectSchemaPath, documentSchemaPath } = await writeProjectSchemas(TMP);
     expect(projectSchemaPath).toBe(resolve(TMP, "project.schema.json"));
     expect(documentSchemaPath).toBe(resolve(TMP, "document.schema.json"));
 
     const project = readJson("project.schema.json");
     expect(project.$comment).toBe(GENERATED_SCHEMA_COMMENT);
-    // Workspace resolution escapes the fixture root → conventional node_modules fallback; the
-    // Local extension stays a plain in-project path.
+    // The committed form is bundled: every fragment ref lands on the canonical $id of the
+    // Resource embedded under $defs — no ./node_modules or in-project relative refs remain.
     expect(project.allOf!.map((entry) => entry.$ref)).toEqual([
-      "./node_modules/@jxsuite/schema/schemas/project.core.schema.json",
-      "./node_modules/@jxsuite/parser/schemas/project.fragment.schema.json",
-      "./local-ext/project.fragment.schema.json",
+      "https://jxsuite.com/schema/project/core/v2",
+      "https://jxsuite.com/schema/ext/parser/project/v1",
+      "https://test.invalid/local-ext/project/v1",
     ]);
+    expect(project.$defs!["https://jxsuite.com/schema/project/core/v2"]).toBeDefined();
+    expect(project.$defs!["https://test.invalid/local-ext/project/v1"]).toBeDefined();
     expect(project.unevaluatedProperties).toBe(false);
 
     const document = readJson("document.schema.json");
-    expect(document.$ref).toBe("./node_modules/@jxsuite/schema/schema.json");
+    expect(document.$ref).toBe("https://jxsuite.com/schema/v1");
+    expect(document.$defs!["https://jxsuite.com/schema/v1"]).toBeDefined();
     // Parser's fragment contributes its canonical paths shape; the $id-less local fragment none.
     expect(document.$defs!.PathsValue!.anyOf).toEqual([
       { $ref: "https://jxsuite.com/schema/ext/parser/document/v1#/$defs/ContentPathsSource" },
@@ -139,8 +142,9 @@ describe("writeProjectSchemas", () => {
 
   it("falls back to host resolution for core refs outside the workspace", async () => {
     // A project root outside the monorepo: project-first resolution fails (the empty node_modules
-    // Disables Bun's install-cache fallback), so the core specifiers resolve through the host and
-    // Escape the root — landing on the conventional ./node_modules refs.
+    // Disables Bun's install-cache fallback), so the intermediate refs land on the conventional
+    // ./node_modules form — and the bundler's host fallback then embeds the real resources, so
+    // The committed files still carry only canonical $id refs.
     const root = mkdtempSync(resolve(tmpdir(), "jx-schema-command-"));
     try {
       mkdirSync(resolve(root, "node_modules"));
@@ -156,12 +160,14 @@ describe("writeProjectSchemas", () => {
         readFileSync(resolve(root, "project.schema.json"), "utf8"),
       ) as SchemaDoc;
       expect(project.allOf!.map((entry) => entry.$ref)).toEqual([
-        "./node_modules/@jxsuite/schema/schemas/project.core.schema.json",
+        "https://jxsuite.com/schema/project/core/v2",
       ]);
+      expect(project.$defs!["https://jxsuite.com/schema/project/core/v2"]).toBeDefined();
       const document = JSON.parse(
         readFileSync(resolve(root, "document.schema.json"), "utf8"),
       ) as SchemaDoc;
-      expect(document.$ref).toBe("./node_modules/@jxsuite/schema/schema.json");
+      expect(document.$ref).toBe("https://jxsuite.com/schema/v1");
+      expect(document.$defs!["https://jxsuite.com/schema/v1"]).toBeDefined();
     } finally {
       rmSync(root, { force: true, recursive: true });
     }
