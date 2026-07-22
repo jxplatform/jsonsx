@@ -49,7 +49,8 @@
     "test:coverage": "bun test --isolate --coverage",
     "test:coverage:workspaces": "bun run --workspaces test:coverage",
     "typecheck": "tsc",
-    "upgrade": "bunx npm-check-updates -u && bun install && bun run --workspaces --if-present upgrade"
+    "upgrade": "bunx npm-check-updates -u && bun install && bun run --workspaces --if-present upgrade",
+    "schema:validate-all": "bun scripts/validate-schemas.ts"
   },
   "dependencies": {
     "@jxsuite/server": "workspace:^"

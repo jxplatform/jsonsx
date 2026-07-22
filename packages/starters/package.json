@@ -26,6 +26,8 @@
     "test:coverage": "bun test --isolate --coverage"
   },
   "devDependencies": {
-    "@jxsuite/schema": "workspace:^"
+    "@jxsuite/schema": "workspace:^",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
   }
 }

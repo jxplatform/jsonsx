@@ -187,3 +187,7 @@ jobs:
       # Docs: generated reference pages must match their sources (diff gate), and
       # /docs frontmatter ↔ specs/code/screenshots/nav must agree.
       - run: bun run docs:verify
+      # Jx schema compliance: every project root (examples, sites, starters, screenshot
+      # fixtures) validates end-to-end — project.json, documents, classes, fragments, and
+      # self-contained committed entry docs. See scripts/validate-schemas.ts.
+      - run: bun run schema:validate-all
