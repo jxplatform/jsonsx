@@ -22,13 +22,15 @@ The component schema is derived at generation time from web standards data (`@we
 
 ## 2. Exports
 
-| Export                    | Description                                                 |
-| ------------------------- | ----------------------------------------------------------- |
-| `generateSchema()`        | Returns the Jx component meta-schema as a JavaScript object |
-| `generateProjectSchema()` | Returns the project.json schema as a JavaScript object      |
-| `generateClassSchema()`   | Returns the .class.json schema as a JavaScript object       |
-| `generateSchemaString()`  | Returns the component schema as a formatted JSON string     |
-| `validateDocument(doc)`   | Validates a Jx document against the component schema        |
+| Export                       | Description                                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `generateSchema()`           | Returns the Jx component meta-schema as a JavaScript object                                               |
+| `generateProjectSchema()`    | Returns the project.json schema as a JavaScript object                                                    |
+| `generateClassSchema()`      | Returns the .class.json schema as a JavaScript object                                                     |
+| `generateSchemaString()`     | Returns the component schema as a formatted JSON string                                                   |
+| `validateDocument(doc)`      | Validates a Jx document against the component schema                                                      |
+| `validateClass(doc)`         | Validates a .class.json definition against the class schema                                               |
+| `validateWithSchema(doc, s)` | Validates against an arbitrary self-contained 2020-12 schema (e.g. a bundled per-project document schema) |
 
 ---
 
@@ -78,6 +80,17 @@ All 13 built-in prototypes with their specific configuration properties:
 - All standard HTML DOM properties derived from `@webref/idl`
 - CSSOM camelCase style properties derived from `@webref/css`
 - All `EventHandler` names (onclick, oninput, etc.) derived from IDL
+- Every `on*` handler accepts a `$ref` binding, an inline `$expression`, or an
+  inline `FunctionDef` (`$prototype: "Function"` with `body` and
+  `parameters`/legacy `arguments`)
+- `StyleObject` is recursive: selector and at-rule groups nest to arbitrary
+  depth (spec.md §9.2); the project-level `style` shares the same contract
+- `ChildrenValue` accepts a `${…}` template string resolving at build time to
+  an array of child definitions (spec.md §8.4), alongside the array and
+  Array-namespace forms
+- Element-level `$switch`/`cases`: the discriminant is a `StateRef`
+  (`#/state/…`), and `cases` maps case values to element definitions or
+  external component refs (spec.md §14.1)
 
 #### CEM Annotations
 
@@ -121,8 +134,8 @@ Validates `.class.json` files with:
 - `$defs.returnTypes` — output type schemas
 - `$defs.fields` — class fields with role, access, scope
 - `$defs.constructor` — constructor definition
-- `$defs.methods` — methods and accessors; capability roles `parse`, `serialize`, `discover`, `load` (with a `timing` array) mark static format capabilities (see specs/extensions.md)
-- `format` — format-extension participation block (`extensions`, `mediaType`, `documentKinds`, `exportTarget`, `remote`)
+- `$defs.methods` — methods and accessors; the `role` enum covers `method`/`accessor` plus every static capability role hosts dispatch on (with a `timing` array): the format roles `parse`, `serialize`, `discover`, `load` and the admission-block roles `projectData`, `resolvePaths`, `lower`, `emit`, `mount`, `dialect`, `deploySchema`, `bindings`, `testConnection`. The enum is kept in lockstep with format-registry's `EXTENSION_CAPABILITIES` by the drift-guard test (`packages/schema/tests/class-schema-drift.test.ts`); see specs/extensions.md §8
+- Admission blocks (specs/extensions.md §6): `format` (`extensions`, `mediaType`, `documentKinds`, `exportTarget`, `remote`), `project` (`key` required; `title`, `description`, `referenceable`), `server` (`basePath` required; `order`, `module`), and `connector` (`provider` + `kind` required; `local`, `serve`, `module`, open for provider extras)
 - `$studio` — studio control-surface hints (modes, documentMode, newFileTemplate, element/nesting constraints)
 
 ---

@@ -701,6 +701,25 @@ Template strings in text node children are reactive:
 
 When all children are bare strings with no element siblings, prefer the simpler `textContent` representation instead.
 
+#### Computed Children (Build Time)
+
+The entire `children` value may be a `${…}` template string that resolves **at
+site-build time** to an array of child definitions. This is the mechanism for
+injecting parsed content (e.g. a content entry's `$children` from
+`@jxsuite/parser`) into a wrapper element:
+
+```json
+{ "tagName": "bl-prose", "children": "${state.entry.$children}" }
+```
+
+The compiler's template pass replaces `children` with the resolved array and
+recurses into it. Scope of the feature: the template must resolve to an array
+during the site build (e.g. from `$paths`-bound state or a compiler-timing
+prototype). A computed-children string is **not** re-evaluated at runtime —
+runtime-reactive content swapping is not supported through this form — and a
+plain non-template string is not a valid `children` value at all (text
+children must be array items, per above).
+
 ### 8.5 Slot Support
 
 Custom elements support the standard HTML `slot` mechanism for content composition:
@@ -784,6 +803,28 @@ CSS nesting is supported via special keys. Keys beginning with `:`, `.`, `&`, or
 ```
 
 Inline properties are applied directly to the element. Nested rules are emitted as a scoped `<style>` block using a generated `data-jx` attribute selector.
+
+Nesting is **recursive**: selector groups and at-rule groups (`@`-prefixed
+keys — named breakpoints per §9.4, or standard at-rules like
+`@starting-style`) may nest to arbitrary depth, e.g. breakpoint → selector →
+pseudo-class:
+
+```json
+{
+  "style": {
+    "& .nav-link": { "color": "gray", ":hover": { "color": "white" } },
+    "@--sm": {
+      "& li:nth-of-type(2n)": { ":hover": { "opacity": "0.8" } }
+    }
+  }
+}
+```
+
+Both the compiler and the runtime resolve nesting recursively; the component
+and project style schemas model the same recursive contract. (Known compiler
+limitation: inside an at-rule group, only one selector level is currently
+emitted — at-rule → selector → pseudo is accepted by the schema and runtime
+but not yet fully emitted by the static compiler.)
 
 ### 9.3 Static Style Extraction
 

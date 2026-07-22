@@ -87,7 +87,7 @@ Directory URLs map to their `index.html` (with or without a trailing slash) and 
 
 ## `jx schema`
 
-Generate the project's JSON Schema entry documents — `project.schema.json` and `document.schema.json` — by composing the core schemas with the fragments shipped by each extension in `project.json`'s `extensions`. The outputs are written into the project root as committed artifacts with project-relative refs. No flags.
+Generate the project's JSON Schema entry documents — `project.schema.json` and `document.schema.json` — by composing the core schemas with the fragments shipped by each extension in `project.json`'s `extensions`. The outputs are written into the project root as committed, **self-contained** artifacts: the core and fragment resources are embedded under `$defs` keyed by their canonical `$id`s, so editors resolve them offline with no `node_modules`, network, or editor configuration. No flags.
 
 ```
 jx schema [root]
@@ -97,13 +97,15 @@ Re-run it whenever you change the `extensions` list so editors and `jx validate`
 
 ## `jx validate`
 
-Validate `project.json` against the generated `project.schema.json` (run `jx schema` first). No flags.
+Validate the whole project tree (run `jx schema` first). No flags.
 
 ```
 jx validate [root]
 ```
 
-Prints `project.json is valid` on success; otherwise lists each violation with its instance path and exits `1`.
+Checks, in order: `project.json` against the generated `project.schema.json`; that both committed entry documents are self-contained (no relative `$ref`s — otherwise it asks you to regenerate with `jx schema`); every document under `components/`, `pages/`, and `layouts/` against the bundled document schema; every project-local `*.class.json` against the class schema; and each enabled extension's schema fragments compile standalone.
+
+Prints `Project is valid (N files checked)` on success; otherwise lists each file's violations with their instance paths and exits `1`.
 
 ## `jx db push`
 
