@@ -161,4 +161,62 @@ describe("applyRename", () => {
     expect(read("content/banner.toy")).toBe("../img/new.png");
     expect(report.references.files.some((f) => f.path === "content/banner.toy")).toBe(true);
   });
+
+  test("a missing rename target is reported as a plain file rename", async () => {
+    const registry = await buildProjectFormatRegistry(root);
+    const report = await applyRename({
+      absFrom: join(root, "ghost-old.json"),
+      absTo: join(root, "ghost-new.json"),
+      registry,
+      root,
+    });
+    expect(report.isDir).toBe(false);
+    expect(report.ok).toBe(true);
+    expect(report.errors).toHaveLength(0);
+  });
+
+  test("skips the tag rename when the new name is not a valid custom-element name", async () => {
+    write("my-counter.json", JSON.stringify({ children: [], tagName: "my-counter" }));
+    write("pages/index.json", JSON.stringify({ children: [{ tagName: "my-counter" }] }));
+
+    renameSync(join(root, "my-counter.json"), join(root, "button.json"));
+    const registry = await buildProjectFormatRegistry(root);
+    const report = await applyRename({
+      absFrom: join(root, "my-counter.json"),
+      absTo: join(root, "button.json"),
+      registry,
+      root,
+    });
+
+    expect(report.tagSkipped).toContain("not a valid custom-element name");
+    expect(report.tag).toBeUndefined();
+    // The instance keeps its original tag — no rename happened.
+    expect(JSON.parse(read("pages/index.json")).children[0].tagName).toBe("my-counter");
+  });
+
+  test("reports files whose format can parse but not serialize", async () => {
+    const parseOnlyRegistry = {
+      byExtension: (_ext: string, capability: string) =>
+        capability === "parse"
+          ? { call: (_op: string, raw: unknown) => Promise.resolve(JSON.parse(String(raw))) }
+          : null,
+      documentExtensions: () => [".toy"],
+    } as unknown as Parameters<typeof applyRename>[0]["registry"];
+
+    write("old.json", "{}");
+    write("content/card.toy", JSON.stringify({ $ref: "../old.json" }));
+    renameSync(join(root, "old.json"), join(root, "new.json"));
+
+    const report = await applyRename({
+      absFrom: join(root, "old.json"),
+      absTo: join(root, "new.json"),
+      registry: parseOnlyRegistry,
+      root,
+    });
+
+    const failure = report.errors.find((e) => e.path === "content/card.toy");
+    expect(failure?.error).toContain("No serializer");
+    // The unserializable file is left untouched on disk.
+    expect(read("content/card.toy")).toBe(JSON.stringify({ $ref: "../old.json" }));
+  });
 });

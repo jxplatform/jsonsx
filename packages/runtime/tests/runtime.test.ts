@@ -2258,3 +2258,41 @@ describe("buildScope — structured function bodies", () => {
     expect(state.cart).toEqual(["apple"]);
   });
 });
+
+describe("renderNode — §13 $ref-child diagnostic", () => {
+  const BASE = "http://localhost/";
+
+  test("warns once for a node-level $ref child and renders an empty div", async () => {
+    const state = await buildScope({}, {}, BASE);
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const el = _renderNode({ $ref: "./components/card.json" } as unknown as JxElement, state);
+      expect((el as HTMLElement).tagName).toBe("DIV");
+      expect((el as HTMLElement).childNodes.length).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain("$elements");
+      // Second render of the same $ref does not warn again (dedup).
+      _renderNode({ $ref: "./components/card.json" } as unknown as JxElement, state);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
+describe("Jx — $schema version guard", () => {
+  test("warns once for a document declaring a newer hosted $schema", async () => {
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const target = document.createElement("div");
+      await Jx(
+        { $schema: "https://jxsuite.com/schema/v2", tagName: "div" } as unknown as JxDocument,
+        target,
+      );
+      const called = warn.mock.calls.some((c) => String(c[0]).includes("v2"));
+      expect(called).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});

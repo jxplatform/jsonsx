@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CapturedStyle } from "../src/style-capture.ts";
 
 type FakeSite = Record<string, { title: string; bodyHtml: string; links: string[] }>;
 
@@ -36,17 +37,20 @@ void mock.module("../src/capture.ts", () => ({ capturePage, launchBrowser, close
 
 const captureStyles = mock(() =>
   Promise.resolve({
-    elements: [],
-    uaDefaults: {},
+    elements: [] as CapturedStyle[],
+    uaDefaults: {} as Record<string, Record<string, string>>,
     mediaQueries: ["(max-width: 768px)"],
-    customProperties: {},
-    documentStyles: { "background-color": "rgb(9, 9, 9)" },
+    customProperties: {} as Record<string, string>,
+    documentStyles: { "background-color": "rgb(9, 9, 9)" } as Record<string, string>,
   }),
 );
 void mock.module("../src/style-capture.ts", () => ({ captureStyles }));
 
 const extractMedia = mock(() =>
-  Promise.resolve({ breakpoints: { "--md": "(max-width: 768px)" }, deltas: {} }),
+  Promise.resolve({
+    breakpoints: { "--md": "(max-width: 768px)" } as Record<string, string>,
+    deltas: {},
+  }),
 );
 void mock.module("../src/media-extract.ts", () => ({ extractMedia }));
 
@@ -145,6 +149,14 @@ Disallow:
     const disallowed = await fetchRobotsTxt("https://crawl.example");
     expect(disallowed.size).toBe(0);
   });
+
+  test("allows everything on a non-ok robots.txt response", async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(new Response("gone", { status: 404 })),
+    ) as unknown as typeof fetch;
+    const disallowed = await fetchRobotsTxt("https://crawl.example");
+    expect(disallowed.size).toBe(0);
+  });
 });
 
 describe("crawlSite", () => {
@@ -236,6 +248,68 @@ describe("crawlSite", () => {
       onProgress: () => {},
     });
     expect(result.pages).toHaveLength(2);
+  });
+
+  test("merges style tokens when custom properties match computed values", async () => {
+    seedSite();
+    captureStyles.mockResolvedValueOnce({
+      elements: [{ path: [0], tagName: "h1", styles: { color: "rgb(1, 2, 3)" } }],
+      uaDefaults: {},
+      mediaQueries: [],
+      customProperties: { "--brand": "rgb(1, 2, 3)" },
+      documentStyles: {},
+    });
+    const result = await crawlSite({
+      url: HOME,
+      outDir: outDir(),
+      maxDepth: 0,
+      maxPages: 1,
+      maxNodesPerPage: 5000,
+      skipStyles: false,
+      skipAssets: true,
+      respectRobots: false,
+      onProgress: () => {},
+    });
+    expect(result.styleTokens).toEqual({ "--brand": "rgb(1, 2, 3)" });
+    // No @media queries on this page → no breakpoints merged.
+    expect(result.breakpoints).toBeUndefined();
+  });
+
+  test("media queries without breakpoint deltas leave the merged set empty", async () => {
+    seedSite();
+    extractMedia.mockResolvedValueOnce({ breakpoints: {}, deltas: {} });
+    const result = await crawlSite({
+      url: HOME,
+      outDir: outDir(),
+      maxDepth: 0,
+      maxPages: 1,
+      maxNodesPerPage: 5000,
+      skipStyles: false,
+      skipAssets: true,
+      respectRobots: false,
+      onProgress: () => {},
+    });
+    expect(extractMedia).toHaveBeenCalled();
+    expect(result.breakpoints).toBeUndefined();
+  });
+
+  test("survives asset-collection failures with a warning", async () => {
+    seedSite();
+    collectAssets.mockRejectedValueOnce(new Error("collect boom"));
+    const messages: string[] = [];
+    const result = await crawlSite({
+      url: HOME,
+      outDir: outDir(),
+      maxDepth: 0,
+      maxPages: 1,
+      maxNodesPerPage: 5000,
+      skipStyles: true,
+      skipAssets: false,
+      respectRobots: false,
+      onProgress: (m) => messages.push(m),
+    });
+    expect(result.pages).toHaveLength(1);
+    expect(messages.some((m) => m.includes("Asset collection failed"))).toBe(true);
   });
 
   test("throws when the signal aborts mid-crawl", async () => {

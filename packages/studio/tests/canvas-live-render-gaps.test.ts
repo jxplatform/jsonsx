@@ -1,0 +1,176 @@
+/**
+ * Canvas live render gaps — layout trees with non-element children (markLayoutNodes' primitive
+ * guard, nested slot containers), the legacy whole-children repeater and $switch-cases walks of
+ * findArrayPaths, and collectTags' primitive guard during content-mode component discovery.
+ */
+import { installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { initCanvasLiveRender, resolveCanvasDocument } from "../src/canvas/canvas-live-render";
+import { invalidateLayoutCache } from "../src/site-context";
+import { loadComponentRegistry } from "../src/files/components";
+import { closeAllTabs } from "../src/workspace/workspace";
+
+import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { Tab } from "../src/tabs/tab";
+
+const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
+happyDOM.setURL("http://localhost:3000/");
+
+let canvasMode = "design";
+
+beforeEach(() => {
+  document.body.innerHTML = "";
+  document.head.innerHTML = "";
+  resetStudioState();
+  installMockPlatform();
+  invalidateLayoutCache();
+  canvasMode = "design";
+  initCanvasLiveRender({ getCanvasMode: () => canvasMode });
+});
+
+afterEach(async () => {
+  closeAllTabs();
+  installMockPlatform();
+  await loadComponentRegistry();
+});
+
+describe("layout wrapping with irregular trees", () => {
+  test("a nested slot container behind non-content siblings still maps the page prefix", async () => {
+    // The slot hides inside a wrapper; a sibling subtree (header > nav) holds only layout nodes, so
+    // The prefix search must descend, fail, continue, and find the content in the next branch.
+    const layout = {
+      children: [
+        {
+          children: [
+            { children: [{ tagName: "span", textContent: "nav" }], tagName: "header" },
+            { children: [{ tagName: "noscript" }, { tagName: "slot" }], tagName: "main" },
+          ],
+          tagName: "div",
+        },
+      ],
+      tagName: "body",
+    };
+    resetStudioState({ isSiteProject: true, projectConfig: {} });
+    installMockPlatform({}, { "layouts/nested.json": JSON.stringify(layout) });
+    const tab = resetWorkspaceWithTab(
+      {
+        $layout: "./layouts/nested.json",
+        children: [{ tagName: "p", textContent: "Page content" }],
+        tagName: "div",
+      } as unknown as JxMutableNode,
+      { documentPath: "pages/home.json" },
+    ) as Tab;
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+
+    expect(result.mapperCtx.layoutWrapped).toBe(true);
+    // The prefix descends into the wrapper's main container…
+    expect(result.mapperCtx.pageContentPrefix).toEqual(["children", 0, "children", 1, "children"]);
+    // …and the offset accounts for the layout's leading <noscript> sibling.
+    expect(result.mapperCtx.pageContentOffset).toBe(1);
+  });
+
+  test("primitive children in the layout tree survive layout marking", async () => {
+    const layout = {
+      children: [42, { children: [{ tagName: "slot" }], tagName: "main" }],
+      tagName: "div",
+    };
+    resetStudioState({ isSiteProject: true, projectConfig: {} });
+    installMockPlatform({}, { "layouts/odd.json": JSON.stringify(layout) });
+    const tab = resetWorkspaceWithTab(
+      {
+        $layout: "./layouts/odd.json",
+        children: [{ tagName: "p", textContent: "Page content" }],
+        tagName: "div",
+      } as unknown as JxMutableNode,
+      { documentPath: "pages/odd.json" },
+    ) as Tab;
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    expect(result.mapperCtx.layoutWrapped).toBe(true);
+  });
+});
+
+describe("findArrayPaths edge shapes", () => {
+  test("walks the legacy whole-children repeater form", async () => {
+    resetWorkspaceWithTab();
+    const legacy = {
+      children: [
+        {
+          children: {
+            $prototype: "Array",
+            items: ["a"],
+            map: { tagName: "li" },
+          },
+          tagName: "ul",
+        },
+      ],
+      tagName: "div",
+    } as unknown as JxMutableNode;
+    const result = await resolveCanvasDocument(legacy);
+    expect(result.mapperCtx.arrayPaths).toContain("children/0/children");
+  });
+
+  test("walks $switch cases (including nested repeaters and primitive case values)", async () => {
+    resetWorkspaceWithTab();
+    const doc = {
+      $switch: { $ref: "#/state/view" },
+      cases: {
+        list: {
+          children: [{ $prototype: "Array", items: [], map: { tagName: "li" } }],
+          tagName: "ul",
+        },
+        off: null,
+      },
+      children: [],
+      tagName: "div",
+    } as unknown as JxMutableNode;
+    const result = await resolveCanvasDocument(doc);
+    expect(result.mapperCtx.arrayPaths).toContain("cases/list/children/0");
+  });
+
+  test("nested map templates and primitive children are walked safely", async () => {
+    resetWorkspaceWithTab();
+    const doc = {
+      children: [
+        7 as unknown as JxMutableNode,
+        {
+          $prototype: "Array",
+          items: [],
+          map: { $prototype: "Array", items: [], map: { tagName: "li" } },
+        },
+      ],
+      tagName: "div",
+    } as unknown as JxMutableNode;
+    const result = await resolveCanvasDocument(doc);
+    expect(result.mapperCtx.arrayPaths).toContain("children/1");
+    expect(result.mapperCtx.arrayPaths).toContain("children/1/map");
+  });
+});
+
+describe("content-mode component discovery with irregular children", () => {
+  test("collectTags skips primitive children while still registering component refs", async () => {
+    installMockPlatform({
+      discoverComponents: async () => [
+        { path: "components/x-card-live.json", source: "jx", tagName: "x-card-live" },
+      ],
+    });
+    await loadComponentRegistry();
+    const tab = resetWorkspaceWithTab(
+      {
+        // Pre-existing refs (object and string forms) exercise the existing-ref key extraction.
+        $elements: [{ $ref: "./components/manual.json" }, "components/by-name.json"],
+        children: [
+          9 as unknown as JxMutableNode,
+          { children: [null as unknown as JxMutableNode], tagName: "x-card-live" },
+        ],
+        tagName: "div",
+      } as unknown as JxMutableNode,
+      { documentPath: "content/odd.md" },
+    ) as Tab;
+    tab.doc.mode = "content";
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    const refs = ((result.renderDoc as { $elements?: { $ref?: string }[] }).$elements ?? []).map(
+      (e) => e.$ref,
+    );
+    expect(refs.some((r) => r?.includes("components/x-card-live.json"))).toBe(true);
+  });
+});

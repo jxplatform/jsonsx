@@ -16,4 +16,4 @@ coveragePathIgnorePatterns = [
   "../schema/**",
   "../server/**",
 ]
-coverageThreshold = { lines = 0.90, functions = 0.89 }
+coverageThreshold = { lines = 0.95, functions = 0.94 }

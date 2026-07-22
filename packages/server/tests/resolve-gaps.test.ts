@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { handleResolve } from "../src/resolve";
+import { handleResolve, handleServerFunction } from "../src/resolve";
 import { join, resolve } from "node:path";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const FIXTURES = resolve(import.meta.dir, "_resolve_gaps_fixtures");
@@ -189,5 +189,91 @@ describe("handleResolve — gaps", () => {
     );
     expect(res.status).toBe(400);
     expect(await res.text()).toContain("Cannot resolve");
+  });
+
+  test("imports a $src under the active project root but outside the server root", async () => {
+    // The active project lives OUTSIDE the server root: isImportable must accept it via the
+    // ActiveProjectRoot containment branch.
+    const external = mkdtempSync(join(tmpdir(), "jx-resolve-active-"));
+    try {
+      writeFileSync(join(external, "Ctx.class.json"), JSON.stringify(ctxClass));
+      const res = await handleResolve(
+        resolveReq({ $prototype: "Ctx", $src: "./Ctx.class.json" }),
+        join(FIXTURES, "proj-valid"),
+        external,
+      );
+      expect(res.status).toBe(200);
+      const value = (await res.json()) as { a: number };
+      expect(value.a).toBe(5);
+    } finally {
+      rmSync(external, { force: true, recursive: true });
+    }
+  });
+
+  test("server-function proxy rejects a $src that escapes the project root", async () => {
+    const req = new Request("http://localhost/__jx_server__", {
+      body: JSON.stringify({ $export: "run", $src: "../outside.js", arguments: {} }),
+      method: "POST",
+    });
+    const res = await handleServerFunction(req, join(FIXTURES, "proj-valid"));
+    expect(res.status).toBe(403);
+    expect(await res.text()).toContain("escapes the project root");
+  });
+
+  test("rejects a .class.json whose $implementation escapes the project root", async () => {
+    const root = join(FIXTURES, "impl-escape");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(
+      join(root, "Esc.class.json"),
+      JSON.stringify({
+        $implementation: "../outside-impl.js",
+        $prototype: "Class",
+        title: "Esc",
+      }),
+    );
+    writeFileSync(join(FIXTURES, "outside-impl.js"), "export class Esc {}");
+    const res = await handleResolve(
+      resolveReq({ $prototype: "Esc", $src: "./Esc.class.json" }),
+      root,
+    );
+    expect(res.status).toBe(403);
+    expect(await res.text()).toContain("$implementation escapes the project root");
+  });
+
+  test("trusts a bare-specifier class whose $implementation sits outside the project root", async () => {
+    // An installed package (bare specifier) is resolved through Node's module resolution, so its
+    // Class file — and the sibling $implementation it names, even one above the class dir — is as
+    // Trusted as the package's own code. The root-escape guard must not fire here.
+    const pkgRoot = mkdtempSync(join(tmpdir(), "jx-resolve-trusted-"));
+    const projRoot = mkdtempSync(join(tmpdir(), "jx-resolve-proj-"));
+    try {
+      const pkgDir = join(pkgRoot, "node_modules", "trusted-ext");
+      mkdirSync(join(pkgDir, "src"), { recursive: true });
+      mkdirSync(join(pkgDir, "dist"), { recursive: true });
+      writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: "trusted-ext" }));
+      writeFileSync(
+        join(pkgDir, "src", "Ext.class.json"),
+        JSON.stringify({ $implementation: "../dist/ext.js", $prototype: "Ext", title: "Ext" }),
+      );
+      writeFileSync(
+        join(pkgDir, "dist", "ext.js"),
+        "export class Ext { resolve() { return { ok: true }; } }",
+      );
+      // The project require walks up from projRoot; symlink the package into its node_modules so a
+      // Bare specifier resolves without a real install.
+      mkdirSync(join(projRoot, "node_modules"), { recursive: true });
+      writeFileSync(join(projRoot, "package.json"), JSON.stringify({ name: "proj" }));
+      symlinkSync(pkgDir, join(projRoot, "node_modules", "trusted-ext"));
+
+      const res = await handleResolve(
+        resolveReq({ $prototype: "Ext", $src: "trusted-ext/src/Ext.class.json" }),
+        projRoot,
+      );
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+    } finally {
+      rmSync(pkgRoot, { force: true, recursive: true });
+      rmSync(projRoot, { force: true, recursive: true });
+    }
   });
 });

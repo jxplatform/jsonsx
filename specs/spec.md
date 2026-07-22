@@ -2,8 +2,8 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 2.0.1-draft
-**Status:** In Progress
+**Version:** 2.1.0-draft
+**Status:** Partial
 **License:** MIT
 
 ---
@@ -28,6 +28,9 @@
 16. [Custom Element Definitions](#16-custom-element-definitions)
 17. [Reserved Keywords](#17-reserved-keywords)
 18. [Standards Alignment](#18-standards-alignment)
+19. [Declarative Expressions](#19-declarative-expressions-expression)
+20. [Structured Function Bodies](#20-structured-function-bodies-statements)
+21. [Evaluation Surface](#21-evaluation-surface)
 
 ---
 
@@ -83,14 +86,16 @@ Within a single component, state declared in `state` is available to all descend
 
 Where a web platform standard exists, Jx follows it:
 
-| Jx Feature                         | Platform Precedent                       |
-| ---------------------------------- | ---------------------------------------- |
-| `$ref` for references              | JSON Reference / JSON Pointer (RFC 6901) |
-| `$defs` for type definitions       | JSON Schema 2020-12                      |
-| Signal scope at component boundary | CSS Custom Properties scope              |
-| Explicit props at element boundary | HTML attributes on Custom Elements       |
-| `.json` / `.js` file pairs         | HTML / JS, CSS Modules / JS              |
-| `$prototype` namespaces            | Web API constructor names                |
+| Jx Feature                         | Platform Precedent                                           |
+| ---------------------------------- | ------------------------------------------------------------ |
+| `$ref` path syntax                 | JSON Pointer (RFC 6901) shape; Jx binding semantics (see §7) |
+| `$defs` for type definitions       | JSON Schema 2020-12                                          |
+| Signal scope at component boundary | CSS Custom Properties scope                                  |
+| Explicit props at element boundary | HTML attributes on Custom Elements                           |
+| `.json` / `.js` file pairs         | HTML / JS, CSS Modules / JS                                  |
+| `$prototype` namespaces            | Named after Web API constructors (semantics are Jx-specific) |
+
+Jx borrows the **shape** of these standards. Where the semantics diverge — `$ref` binds live state rather than substituting schemas, `$prototype: "Request"` auto-fetches rather than describing an inert request — the spec says so explicitly rather than implying full conformance.
 
 ---
 
@@ -120,13 +125,15 @@ Every Jx document is a JSON object with the following top-level fields:
 | `tagName`  | Required    | HTML tag name for the root element                                                                                                                                                                              |
 | `children` | Optional    | Array of child element definitions, text nodes (strings/numbers), and/or Array namespaces (repeaters) mixed freely. A bare Array namespace (the whole children slot is one repeater) is also accepted. See §10. |
 
-### 3.2 JSON Schema Dialect
+### 3.2 Schema-Backed Documents
 
-Jx is a JSON Schema dialect. Documents may be validated against the Jx meta-schema using any JSON Schema 2020-12 compatible validator. The `$schema` URI identifies the dialect version and enables schema-aware tooling.
+Jx ships a real JSON Schema 2020-12 meta-schema (generated from W3C webref data). A Jx document is validated **as an instance** against that meta-schema by any 2020-12-compatible validator — this is what powers editor autocomplete, hover docs, and CI validation. The `$schema` URI in a document points editors at the meta-schema for that document (the VS Code "schema for this instance" convention); it is a tooling pointer, not a dialect declaration.
 
-Jx extends the base JSON Schema vocabulary with the following reserved keywords: `$prototype`, `$props`, `$switch`, `$map`, `$src`, `$export`, `timing`, `default`, `body`, `arguments`, `name`.
+> **Status: Implemented.** `packages/schema` generates the meta-schema and exposes `validateDocument` (ajv 2020). Two honesty notes: Jx is **not** a JSON Schema _dialect_ in the normative sense — it declares no `$vocabulary`, so a validator cannot process a Jx document as a _schema_. And the reserved Jx keywords below are not JSON Schema vocabulary; a standards-only processor ignores them.
 
-Standard JSON Schema 2020-12 keywords (`type`, `format`, `properties`, `items`, `enum`, `minimum`, `maximum`, `minLength`, `maxLength`, `pattern`, `required`, `description`, `examples`, etc.) are inherited from the JSON Schema vocabulary and are valid on `$defs` type definitions and `state` typed value entries.
+Jx layers the following reserved keywords on top of the JSON object model: `$prototype`, `$props`, `$switch`, `$map`, `$src`, `$export`, `timing`, `default`, `body`, `arguments`, `name`. (`default` is a standard JSON Schema annotation keyword that Jx repurposes as the Shape-2 discriminator — see §5.)
+
+Standard JSON Schema 2020-12 keywords (`type`, `format`, `properties`, `items`, `enum`, `minimum`, `maximum`, `minLength`, `maxLength`, `pattern`, `required`, `description`, `examples`, etc.) are genuine 2020-12 and are valid on `$defs` type definitions. Note that a Shape-2 `state` entry may reference a def with `"type": { "$ref": "#/$defs/…" }`, which is a Jx convenience, not valid JSON Schema (there `type` must be a string).
 
 ---
 
@@ -486,7 +493,7 @@ State entries prefixed with `#` are private. They are never exposed to the studi
 }
 ```
 
-> **Status: Partially implemented.** The studio enforces the convention: `#` entries are excluded from the editable prop list (`componentPropEntries`) and skipped during CEM extraction (`cem-export`), so they never surface in the property panel or the exported manifest. The runtime does not yet enforce it — `#` entries build into scope like any other state entry, and a `$props` write against a `#` name is not blocked.
+> **Status: Partial.** The studio enforces the convention: `#` entries are excluded from the editable prop list (`componentPropEntries`) and skipped during CEM extraction (`cem-export`), so they never surface in the property panel or the exported manifest. The runtime does not yet enforce it — `#` entries build into scope like any other state entry, and a `$props` write against a `#` name is not blocked.
 
 ### 5.7 Shape Detection Algorithm
 
@@ -576,9 +583,11 @@ Prefer `${}` for single-use reactive bindings. Prefer `$ref` for reused or named
 
 ### 6.6 Scope
 
-Template strings anywhere in a component's document tree have access only to that component's `state` via `state.propertyName`. The `state` scope is always the current component's reactive proxy.
+Template strings resolve `state.propertyName` against the current component's reactive proxy, plus the iteration bindings (`$map`, `item`, `index`) where an Array map provides them.
 
-> **Status: Implemented.** Runtime wraps template strings in `effect()` for all string-valued properties.
+> **Status: Implemented.** The interpreting runtime compiles each `${…}` with `new Function` and wraps it in an `effect()`. **Honesty note:** this is full JavaScript, not a sandbox — `state` is in scope, but so is the entire global environment, and a template _can_ assign or call side effects (`"${state.count = 1}"` runs). The "access only to `state`" wording is therefore an authoring convention, not an enforced boundary. The compiler emits no `new Function` (templates are spliced verbatim into generated modules — §21); the eval requirement applies only to the interpreting runtime (dev server, Studio canvas, `@jxsuite/runtime` as a library), which consequently needs CSP `'unsafe-eval'`.
+
+> **Status: Future.** A restricted template evaluator (reusing the `$expression` operator allowlist, §19) would make the `state`-only scope a real boundary and remove the interpreter's `unsafe-eval` requirement. Not yet built.
 
 ---
 
@@ -586,23 +595,25 @@ Template strings anywhere in a component's document tree have access only to tha
 
 ### 7.1 `$ref` Syntax
 
-Jx uses `$ref` to express bindings between properties and declared state, following the JSON Reference convention:
+Jx uses `$ref` to bind a property to declared state. The path **borrows JSON Pointer syntax** (RFC 6901 shape — a `#`-fragment of `/`-separated tokens):
 
 ```json
 { "$ref": "#/state/count" }
 ```
 
+The **semantics are Jx-specific**, not JSON Reference: a Jx `$ref` reads a live value off the reactive scope, it does not substitute a schema. Two consequences follow. RFC 6901 escape sequences (`~0`, `~1`) are **not implemented** — a key containing `/` or `~` is unreachable. And within a **nested** path (the segments after the first) `.` works as a separator alongside `/`, so `#/state/user/name` walks into `state.user.name`; the leading token is read literally, so `#/state/user.name` reads the key `"user.name"`, not `state.user.name`. The schemes below (`window#/`, `parent#/`, `$map/`, `event#/`, …) are Jx extensions, not JSON Reference URIs.
+
 ### 7.2 Reference Schemes
 
-| Scheme           | Example                 | Resolves to                                      |
-| ---------------- | ----------------------- | ------------------------------------------------ |
-| Internal `state` | `"#/state/count"`       | Signal or handler in current component's `state` |
-| Window global    | `"window#/currentUser"` | `window.currentUser`                             |
-| Document global  | `"document#/appConfig"` | `document.appConfig`                             |
-| Parent scope     | `"parent#/sharedState"` | Named signal passed via `$props`                 |
-| Map context      | `"$map/item"`           | Current item in an Array map iteration           |
-| Map index        | `"$map/index"`          | Current index in an Array map iteration          |
-| External file    | `"./other.json"`        | Another Jx component (fully dereferenced)        |
+| Scheme           | Example                 | Resolves to                                                                                                                                       |
+| ---------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Internal `state` | `"#/state/count"`       | Signal or handler in current component's `state`                                                                                                  |
+| Window global    | `"window#/currentUser"` | `window.currentUser`                                                                                                                              |
+| Document global  | `"document#/appConfig"` | `document.appConfig`                                                                                                                              |
+| Parent scope     | `"parent#/sharedState"` | Named signal passed via `$props`                                                                                                                  |
+| Map context      | `"$map/item"`           | Current item in an Array map iteration                                                                                                            |
+| Map index        | `"$map/index"`          | Current index in an Array map iteration                                                                                                           |
+| External file    | `"./other.json"`        | A component document — resolved for `$switch` cases and `$elements` registration (§14, §16), **not** as a node-level component instance (see §13) |
 
 ### 7.3 Reactive Bindings
 
@@ -615,18 +626,18 @@ When a `$ref` resolves to a reactive state property or computed, the binding is 
 }
 ```
 
-### 7.4 `$ref` Resolution Order
+### 7.4 `$ref` Resolution
 
-1. `$map/` — iteration context (highest priority)
-2. `$reduce/acc` — fold accumulator (reduce per-item expression only)
-3. `$args/` — named-formula parameters (callable body only, §19.4c)
-4. `event#/` — handler event context (handler position only)
-5. `#/state/` — current component scope
-6. `parent#/` — explicitly passed props
-7. `window#/` — global window properties
-8. `document#/` — global document properties
+Resolution is **scheme dispatch**, not a cascading fallback: the leading token selects exactly one source. A `#/state/…` ref that misses yields no value and does **not** fall through to `window`/`document` (an explicit-scheme miss reads as `undefined`; only a bare, schemeless ref falls back to `null`). Those globals are reachable only via an explicit `window#/` or `document#/` ref. Context schemes are only valid in the position that provides them:
 
-> **Status: Implemented.** Runtime `resolveRef` handles all schemes.
+- `$map/`, `$reduce/acc` — iteration / fold context (mapped-array and reduce expressions)
+- `$args/` — named-formula parameters (callable body only, §19.4c)
+- `event#/` — handler event context (handler position only)
+- `#/state/` — the current component's scope (which already includes `$props`, merged in place — see §15.4)
+- `parent#/` — resolves against the same merged scope as a bare state read
+- `window#/` / `document#/` — the corresponding global object
+
+> **Status: Implemented** for `$map/`, `$reduce/`, `$args/`, `event#/`, `#/state/`, `window#/`, `document#/` in `resolveRef`. **Partial** for node-level external-file refs: `$switch` cases and `$elements` entries are fetched and resolved (§14, §16), but a bare `{ "$ref": "./x.json" }` child is **not** — see §13.
 
 ---
 
@@ -700,6 +711,25 @@ Template strings in text node children are reactive:
 ```
 
 When all children are bare strings with no element siblings, prefer the simpler `textContent` representation instead.
+
+#### Computed Children (Build Time)
+
+The entire `children` value may be a `${…}` template string that resolves **at
+site-build time** to an array of child definitions. This is the mechanism for
+injecting parsed content (e.g. a content entry's `$children` from
+`@jxsuite/parser`) into a wrapper element:
+
+```json
+{ "tagName": "bl-prose", "children": "${state.entry.$children}" }
+```
+
+The compiler's template pass replaces `children` with the resolved array and
+recurses into it. Scope of the feature: the template must resolve to an array
+during the site build (e.g. from `$paths`-bound state or a compiler-timing
+prototype). A computed-children string is **not** re-evaluated at runtime —
+runtime-reactive content swapping is not supported through this form — and a
+plain non-template string is not a valid `children` value at all (text
+children must be array items, per above).
 
 ### 8.5 Slot Support
 
@@ -784,6 +814,28 @@ CSS nesting is supported via special keys. Keys beginning with `:`, `.`, `&`, or
 ```
 
 Inline properties are applied directly to the element. Nested rules are emitted as a scoped `<style>` block using a generated `data-jx` attribute selector.
+
+Nesting is **recursive**: selector groups and at-rule groups (`@`-prefixed
+keys — named breakpoints per §9.4, or standard at-rules like
+`@starting-style`) may nest to arbitrary depth, e.g. breakpoint → selector →
+pseudo-class:
+
+```json
+{
+  "style": {
+    "& .nav-link": { "color": "gray", ":hover": { "color": "white" } },
+    "@--sm": {
+      "& li:nth-of-type(2n)": { ":hover": { "opacity": "0.8" } }
+    }
+  }
+}
+```
+
+Both the compiler and the runtime resolve nesting recursively; the component
+and project style schemas model the same recursive contract. (Known compiler
+limitation: inside an at-rule group, only one selector level is currently
+emitted — at-rule → selector → pseudo is accepted by the schema and runtime
+but not yet fully emitted by the static compiler.)
 
 ### 9.3 Static Style Extraction
 
@@ -1028,7 +1080,9 @@ When any `arguments` value is a signal `$ref`, the call becomes reactive.
 
 #### Security Boundary
 
-Private environment variables and server-only credentials remain in the server process. The browser receives only the function's serialized return value. The `env` parameter gives server functions access to platform bindings (KV namespaces, D1 databases, email workers, secrets) without exposing them to the client.
+**In a compiled deployment**, private environment variables and server-only credentials remain in the server process: the compiler emits the function into a `_worker.js` route the browser can only call over HTTP, and the browser receives only the serialized return value. The `env` parameter gives server functions access to platform bindings (KV namespaces, D1 databases, email workers, secrets) without exposing them to the client.
+
+> **Status: Partial (dev boundary).** During `jx dev`, the interpreting runtime currently attempts a browser-side `import()` of the `$src` module before falling back to the `/__jx_server__` proxy. A `*.server.js` that is browser-loadable therefore has its **source delivered to the client** in dev — so do not embed secrets in the module body; read them from `env` inside the function, which only the proxy (and the compiled worker) provides. The compiled deployment does not have this gap. Making the dev path proxy-first is a tracked follow-up.
 
 #### Site-Wide Bundling
 
@@ -1220,14 +1274,18 @@ At runtime, `buildScope` injects the mapped `$src` into each bare `$prototype` e
 
 ## 13. Component Encapsulation
 
-### 13.1 External Component References
+### 13.1 Component Instances
+
+A component instance is created by **registering** the component document in the top-level `$elements` map (§16) and then placing an element node with its **custom-element `tagName`**, passing data through `$props`:
 
 ```json
 {
+  "$elements": {
+    "my-card": { "$ref": "./components/card.json" }
+  },
   "children": [
-    { "$ref": "./components/my-counter.json" },
     {
-      "$ref": "./components/card.json",
+      "tagName": "my-card",
       "$props": {
         "title": "Hello",
         "count": { "$ref": "#/state/count" }
@@ -1237,13 +1295,15 @@ At runtime, `buildScope` injects the mapped `$src` into each bare `$prototype` e
 }
 ```
 
+> **Status: Removed.** A node-level external `$ref` child — `{ "$ref": "./card.json", "$props": {…} }` placed directly in `children` — is **not** a component instance. The runtime does not fetch or render it (it produces an empty `<div>`, and `renderNode` emits a one-time console warning). Register the document in `$elements` and instantiate it by its custom-element tag, as above. `$switch` cases (§14) and `$elements` entries (§16) are the resolved external-`$ref` positions.
+
 ### 13.2 Explicit Props
 
-Props are passed via `$props`. This is the only mechanism for passing state across component boundaries:
+Props are passed via `$props` on the instance node. This is the only mechanism for passing state across component boundaries:
 
 ```json
 {
-  "$ref": "./card.json",
+  "tagName": "my-card",
   "$props": {
     "title": "Static string",
     "count": { "$ref": "#/state/count" },
@@ -1319,11 +1379,12 @@ Signals do not cross component boundaries implicitly. `$props` is required.
 
 ### 15.4 Scope Resolution Order
 
-1. `$map/` context
-2. Local component `state`
-3. Explicitly passed `$props`
-4. `window` globals
-5. `document` globals
+A bare identifier or `#/state/` ref resolves in this order:
+
+1. `$map/` iteration context, where present
+2. The component scope — `state` entries and `$props`, which are **merged into the same scope** (a `$prop` overwrites a same-named `state` entry in place; there is no separate props namespace)
+
+`window` and `document` globals are **not** part of this fallback chain: an explicit-scheme miss yields no value (a bare, schemeless ref is the only form that falls back to `null`). Reach globals with an explicit `window#/` / `document#/` ref (§7.4).
 
 > **Status: Implemented.**
 
@@ -1413,7 +1474,7 @@ Custom elements may carry annotations compatible with the Custom Elements Manife
 - `emits` on functions — CEM `Event` objects
 - `attribute` and `reflects` on typed `state` entries
 
-> **Status: Partially implemented.** Schema includes CEM fields. Studio has CEM editing UI. Full CEM document export is pending.
+> **Status: Partial.** Schema includes CEM fields. Studio has CEM editing UI. Full CEM document export is pending.
 
 ---
 
@@ -1456,18 +1517,30 @@ Custom elements may carry annotations compatible with the Custom Elements Manife
 
 ## 18. Standards Alignment
 
-| Feature                 | Standard                        |
-| ----------------------- | ------------------------------- |
-| `$ref`, `$defs`, `$id`  | JSON Schema 2020-12             |
-| JSON Pointer paths      | RFC 6901                        |
-| Reactivity              | `@vue/reactivity` (Vue 3)       |
-| Custom elements         | Web Components v1               |
-| Style properties        | CSSOM camelCase                 |
-| Media breakpoints       | CSS `@custom-media` convention  |
-| Module loading          | ECMAScript Modules / `import()` |
-| `$expression` operators | ECMAScript operator punctuators |
-| Array / aggregate ops   | ECMAScript `Array.prototype`    |
-| `event#` scheme         | DOM `Event` interface           |
+Genuine alignment — Jx uses these as specified:
+
+| Feature                   | Standard                                                    |
+| ------------------------- | ----------------------------------------------------------- |
+| `$defs` type definitions  | JSON Schema 2020-12 (validated as document instances, §3.2) |
+| Reactivity                | `@vue/reactivity` (Vue 3) — a library, not a web standard   |
+| Custom elements           | Web Components v1                                           |
+| Style properties          | CSSOM camelCase                                             |
+| Media breakpoints         | CSS `@custom-media` convention                              |
+| Module loading            | ECMAScript Modules / `import()`                             |
+| `$expression` operators   | ECMAScript operator punctuators (no new tokens, §19)        |
+| Array / aggregate ops     | ECMAScript `Array.prototype`                                |
+| `dispatchEvent` statement | WHATWG DOM `CustomEvent` (§20)                              |
+| Custom-elements manifest  | CEM 2.1.0 export (§16.8)                                    |
+
+Borrowed shape, Jx-specific semantics — named after a standard but **not** conformant to it:
+
+| Feature                      | Borrows from                      | Where it diverges                                                                                             |
+| ---------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `$ref` paths                 | JSON Pointer (RFC 6901)           | Live-state binding, not schema substitution; `~0`/`~1` escapes unimplemented; `.` treated as a separator (§7) |
+| `$id`                        | JSON Schema `$id`                 | Used as a display name; does **not** establish a base URI for relative `$ref`                                 |
+| `$schema`                    | JSON Schema `$schema`             | Editor "schema-for-instance" pointer, not a dialect/meta-schema declaration (§3.2)                            |
+| `$prototype` names           | Web API constructor names         | `Request` auto-fetches, `LocalStorage`/`Cookie` aren't real constructor names, etc. (§12)                     |
+| Statement `if`/`then`/`else` | ECMAScript `if` (not JSON Schema) | Imperative control flow over a statement list, not schema applicators (§20)                                   |
 
 ---
 
@@ -1961,6 +2034,34 @@ Every statement kind reuses a web-platform name — §19.4's law extended to sta
 ### 20.3 Lowering
 
 `body: Statement[]` follows the named-formula pattern (§19.4c): without `parameters` the entry lowers to an event handler `(state, event)`; with `parameters` it lowers to a positional callable whose arguments bind to `$args/` names. The engine is `runStatements` (interpreter) + `compileStatements` (JS emitter) — one module, both halves, mirroring §19.8: `if`/`else` and `switch` emit their genuine ECMAScript statement forms, and dispatch emits `dispatchEvent(new CustomEvent(type, init))`. Inline event bindings accept structured bodies through the existing Function binding form — `JxEventBinding` is unchanged.
+
+---
+
+## 21. Evaluation Surface
+
+Jx documents contain executable code — `${}` templates and `body`/`$src` functions. Where and how that code runs differs by mode, and the security posture differs with it. This section states the surface honestly so hosts can make an informed decision.
+
+### 21.1 Compiled Output — No Runtime Eval
+
+The compiler produces plain HTML/CSS plus per-island ES modules. It does **not** emit `new Function` or `eval`: a `${}` template is **spliced verbatim** into an emitted module as a real template literal (`compile-client.ts`), and statements/`$expression` lower to genuine JS. A compiled static or island page therefore runs under a strict CSP with **no `'unsafe-eval'`**.
+
+> **Status: Implemented.** Enforced by a test (`packages/compiler/tests/no-eval.test.ts`) that compiles templates, `$switch` external cases, and a `.class.json`, and asserts the emitted JS contains no `new Function(`/`eval(`.
+
+The corollary is a **build-time** concern, not a runtime one: because template text becomes code in the bundle, any document string that reaches a template position becomes executable at build time. A pipeline that compiles **untrusted** documents (e.g. user-submitted content merged into the tree) must sanitize or escape `${` sequences first — treat compiling a document as running it.
+
+### 21.2 Build Host — Trusted-Input Evaluation
+
+During a build the compiler evaluates project code (resolving `timing: "compiler"` prototypes, importing `$src` modules). This is the same trust class as running the project's own `npm`/`bun` scripts: build inputs are trusted by definition.
+
+### 21.3 Interpreting Runtime — Requires `'unsafe-eval'`
+
+The interpreting runtime — the dev server, the Studio canvas, and `@jxsuite/runtime` used directly as a library — compiles `${}` templates and inline `body` functions with `new Function` on the fly (§6.6). Any page hosting the interpreter must allow `'unsafe-eval'` in its CSP. This is why the compiled path exists: ship compiled output to production and the eval requirement disappears. A future restricted evaluator (§6.6) would remove this requirement from the interpreter as well.
+
+### 21.4 Trust Model for Documents
+
+A Jx document is **executable input**. Loading and rendering an untrusted document in the interpreting runtime runs its code; compiling an untrusted document runs its code at build time. Jx does not sandbox document code — treat a `.json` document with the same trust you would treat a `.js` file from the same source.
+
+> **Status: Implemented** (as a stated property, not a sandbox). See also `@jxsuite/server` §4.2 for the dev-server network controls and `docs/framework/concepts/security.md` for the user-facing summary.
 
 ---
 

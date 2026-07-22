@@ -6,7 +6,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createDevServer } from "../src/server.ts";
 import { createCollabRegistry } from "../src/collab.ts";
 import { createWsCollabConnection } from "@jxsuite/collab/client";
@@ -137,6 +137,10 @@ describe("/__studio/collab", () => {
   test("a binary path is refused by the capability", async () => {
     expect(await connect().openDoc("assets/logo.png")).toBeNull();
   });
+
+  test("a path escaping the server root is refused by the capability", async () => {
+    expect(await connect().openDoc("../escape.md")).toBeNull();
+  });
 });
 
 describe("watcher-driven resets", () => {
@@ -222,6 +226,52 @@ describe("graceful shutdown", () => {
   });
 });
 
+describe("persist failures", () => {
+  test("a failed shutdown write-back is swallowed and stop() still completes", async () => {
+    const dir = resolve(import.meta.dir, "_collab_persist_fail_fixtures");
+    rmSync(dir, { force: true, recursive: true });
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, "doc.md");
+    writeFileSync(file, "start\n");
+    const registry = createCollabRegistry({ absRoot: dir, activeProjectRoot: () => null });
+    const srv = Bun.serve({
+      fetch: (req, bunServer) => registry.handleRequest(req, bunServer) ?? new Response("ok"),
+      port: 0,
+      websocket: registry.websocket,
+    });
+    const connection = createWsCollabConnection({
+      openTimeoutMs: 5000,
+      url: `ws://localhost:${srv.port}`,
+    });
+    try {
+      const handle = await connection.openDoc("doc.md");
+      await handle!.whenSynced;
+      updateSourceText(handle!.doc, "start\n\nnever lands\n", "test");
+      await new Promise<void>((res) => {
+        const off = handle!.onDirty((d) => {
+          if (d) {
+            off();
+            res();
+          }
+        });
+      });
+      // Turn the target path into a directory: the shutdown write-back must fail (EISDIR),
+      // Be swallowed, and clear its optimistic signature without breaking stop().
+      rmSync(file);
+      mkdirSync(file);
+      await registry.stop();
+      // The failed write left the directory in place; nothing was force-written.
+      expect(statSync(file).isDirectory()).toBe(true);
+      // A second stop() after the failure is still a no-op.
+      await registry.stop();
+    } finally {
+      connection.destroy();
+      void srv.stop(true);
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+});
+
 describe("registry external changes", () => {
   test("a genuinely external write resets the room; write-back echoes do not", async () => {
     const dir = resolve(import.meta.dir, "_collab_registry_fixtures");
@@ -271,6 +321,161 @@ describe("registry external changes", () => {
     await until(() => received.includes("control:doc-reset"));
 
     hostConnection.close();
+    await registry.stop();
+    rmSync(dir, { force: true, recursive: true });
+  });
+
+  test("a deleted file resets the room; unknown paths and text frames are ignored", async () => {
+    const dir = resolve(import.meta.dir, "_collab_delete_fixtures");
+    rmSync(dir, { force: true, recursive: true });
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, "doc.md");
+    writeFileSync(file, "will vanish");
+    const registry = createCollabRegistry({ absRoot: dir, activeProjectRoot: () => null });
+    const { decodeFrame, encodeFrame } = await import("@jxsuite/collab/envelope");
+
+    const received: string[] = [];
+    const fakeWs = {
+      close: () => {},
+      data: { connection: null as unknown },
+      send: (data: Uint8Array) => {
+        try {
+          const frame = decodeFrame(new Uint8Array(data));
+          received.push(frame.type === "control" ? `control:${frame.message.type}` : frame.type);
+        } catch {
+          received.push("malformed");
+        }
+      },
+    };
+    // A text frame is ignored outright — even before any connection state exists.
+    void registry.websocket.message?.(fakeWs as never, "not a binary frame");
+    void registry.websocket.open?.(fakeWs as never);
+    const hostConnection = fakeWs.data.connection as {
+      handleMessage: (d: Uint8Array) => void;
+      close: () => void;
+    };
+    hostConnection.handleMessage(
+      encodeFrame({ message: { path: "doc.md", type: "open" }, type: "control" }),
+    );
+    await until(() => received.includes("control:opened"));
+
+    // A change notification for a path no room has ever loaded is dropped.
+    registry.handleExternalChange(join(dir, "ghost.md"));
+    await new Promise((resolveSleep) => {
+      setTimeout(resolveSleep, 100);
+    });
+    expect(received).not.toContain("control:doc-reset");
+
+    // Deleting the file behind an open room is a genuine external change: the read fails and the
+    // Room resets its subscribers.
+    rmSync(file);
+    registry.handleExternalChange(file);
+    await until(() => received.includes("control:doc-reset"));
+
+    // Leaving the room schedules the empty-room grace timer; stop() clears it.
+    hostConnection.close();
+    await new Promise((resolveSleep) => {
+      setTimeout(resolveSleep, 50);
+    });
+    await registry.stop();
+    rmSync(dir, { force: true, recursive: true });
+  });
+
+  test("an empty room is torn down after the grace period elapses", async () => {
+    const dir = resolve(import.meta.dir, "_collab_grace_fixtures");
+    rmSync(dir, { force: true, recursive: true });
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, "doc.md");
+    writeFileSync(file, "grace");
+    const registry = createCollabRegistry({ absRoot: dir, activeProjectRoot: () => null });
+    const { decodeFrame, encodeFrame } = await import("@jxsuite/collab/envelope");
+
+    const received: string[] = [];
+    const fakeWs = {
+      close: () => {},
+      data: { connection: null as unknown },
+      send: (data: Uint8Array) => {
+        try {
+          const frame = decodeFrame(new Uint8Array(data));
+          received.push(frame.type === "control" ? `control:${frame.message.type}` : frame.type);
+        } catch {
+          received.push("malformed");
+        }
+      },
+    };
+    void registry.websocket.open?.(fakeWs as never);
+    const hostConnection = fakeWs.data.connection as {
+      handleMessage: (d: Uint8Array) => void;
+      close: () => void;
+    };
+    hostConnection.handleMessage(
+      encodeFrame({ message: { path: "doc.md", type: "open" }, type: "control" }),
+    );
+    await until(() => received.includes("control:opened"));
+
+    // Capture the 30 s empty-room grace timer instead of waiting it out.
+    const realSetTimeout = globalThis.setTimeout;
+    let graceCb: (() => void) | null = null;
+    globalThis.setTimeout = ((cb: () => void, ms?: number, ...rest: unknown[]) => {
+      if (ms === 30_000) {
+        graceCb = cb;
+        return realSetTimeout(() => {}, 0);
+      }
+      return realSetTimeout(cb, ms as number, ...rest);
+    }) as unknown as typeof setTimeout;
+    try {
+      void registry.websocket.close?.(fakeWs as never, 1000, "bye");
+      await until(() => graceCb !== null);
+    } finally {
+      globalThis.setTimeout = realSetTimeout;
+    }
+
+    // The grace period elapses: the room is destroyed and later change events are dropped.
+    graceCb!();
+    const frames = received.length;
+    registry.handleExternalChange(file);
+    await new Promise((resolveSleep) => {
+      setTimeout(resolveSleep, 100);
+    });
+    expect(received.length).toBe(frames);
+
+    // Re-open and leave again, but this time let the (real) grace timer stay pending so that
+    // Stop() has a live destroy timer to clear.
+    let scheduled = false;
+    globalThis.setTimeout = ((cb: () => void, ms?: number, ...rest: unknown[]) => {
+      if (ms === 30_000) {
+        scheduled = true;
+      }
+      return realSetTimeout(cb, ms as number, ...rest);
+    }) as unknown as typeof setTimeout;
+    try {
+      const fakeWs2 = {
+        close: () => {},
+        data: { connection: null as unknown },
+        send: (data: Uint8Array) => {
+          try {
+            const frame = decodeFrame(new Uint8Array(data));
+            const label = frame.type === "control" ? frame.message.type : frame.type;
+            received.push(`re:${label}`);
+          } catch {
+            received.push("re:malformed");
+          }
+        },
+      };
+      void registry.websocket.open?.(fakeWs2 as never);
+      const secondConnection = fakeWs2.data.connection as {
+        handleMessage: (d: Uint8Array) => void;
+        close: () => void;
+      };
+      secondConnection.handleMessage(
+        encodeFrame({ message: { path: "doc.md", type: "open" }, type: "control" }),
+      );
+      await until(() => received.includes("re:opened"));
+      void registry.websocket.close?.(fakeWs2 as never, 1000, "bye");
+      await until(() => scheduled);
+    } finally {
+      globalThis.setTimeout = realSetTimeout;
+    }
     await registry.stop();
     rmSync(dir, { force: true, recursive: true });
   });

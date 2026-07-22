@@ -366,7 +366,7 @@
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "Signals-based reactivity (TC39 aligned)"
+                        "props.text": "Fine-grained reactivity, powered by @vue/reactivity"
                       }
                     },
                     {
@@ -432,7 +432,7 @@
                 "color": "var(--color-text-secondary)",
                 "whiteSpace": "pre-wrap"
               },
-              "textContent": "$ jx build\n\n✓ Compiled 47 pages\n✓ Optimized 23 images (webp, avif)\n✓ Generated sitemap.xml\n✓ Output: ./dist (312kb total)\n\nDone in 0.8s\n\n$ deploy ./dist  # Any static host works"
+              "textContent": "$ jx build\n\n✓ Compiled pages\n✓ Optimized images (webp, avif)\n✓ Generated sitemap.xml\n✓ Output: ./dist\n\n$ deploy ./dist  # Any static host works"
             },
             {
               "tagName": "div",
@@ -475,7 +475,7 @@
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "Sub-second builds for typical sites"
+                        "props.text": "Incremental, cache-friendly builds"
                       }
                     },
                     {
@@ -487,7 +487,7 @@
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "100/100 Lighthouse scores by default"
+                        "props.text": "Static HTML with zero JS by default"
                       }
                     },
                     {

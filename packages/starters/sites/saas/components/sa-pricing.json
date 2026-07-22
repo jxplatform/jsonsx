@@ -198,9 +198,9 @@
               "tagName": "div",
               "style": { "display": "flex", "flexDirection": "column", "gap": "0.6rem" },
               "children": [
-                { "tagName": "sa-check-item", "state": { "text": "Up to 3 projects" } },
-                { "tagName": "sa-check-item", "state": { "text": "Community support" } },
-                { "tagName": "sa-check-item", "state": { "text": "1 GB storage" } }
+                { "tagName": "sa-check-item", "$props": { "text": "Up to 3 projects" } },
+                { "tagName": "sa-check-item", "$props": { "text": "Community support" } },
+                { "tagName": "sa-check-item", "$props": { "text": "1 GB storage" } }
               ]
             }
           ]
@@ -316,10 +316,10 @@
               "tagName": "div",
               "style": { "display": "flex", "flexDirection": "column", "gap": "0.6rem" },
               "children": [
-                { "tagName": "sa-check-item", "state": { "text": "Unlimited projects" } },
-                { "tagName": "sa-check-item", "state": { "text": "Automations & workflows" } },
-                { "tagName": "sa-check-item", "state": { "text": "Analytics dashboard" } },
-                { "tagName": "sa-check-item", "state": { "text": "Priority email support" } }
+                { "tagName": "sa-check-item", "$props": { "text": "Unlimited projects" } },
+                { "tagName": "sa-check-item", "$props": { "text": "Automations & workflows" } },
+                { "tagName": "sa-check-item", "$props": { "text": "Analytics dashboard" } },
+                { "tagName": "sa-check-item", "$props": { "text": "Priority email support" } }
               ]
             }
           ]
@@ -414,10 +414,10 @@
               "tagName": "div",
               "style": { "display": "flex", "flexDirection": "column", "gap": "0.6rem" },
               "children": [
-                { "tagName": "sa-check-item", "state": { "text": "Everything in Pro" } },
-                { "tagName": "sa-check-item", "state": { "text": "SSO & SCIM provisioning" } },
-                { "tagName": "sa-check-item", "state": { "text": "Advanced permissions" } },
-                { "tagName": "sa-check-item", "state": { "text": "99.9% uptime SLA" } }
+                { "tagName": "sa-check-item", "$props": { "text": "Everything in Pro" } },
+                { "tagName": "sa-check-item", "$props": { "text": "SSO & SCIM provisioning" } },
+                { "tagName": "sa-check-item", "$props": { "text": "Advanced permissions" } },
+                { "tagName": "sa-check-item", "$props": { "text": "99.9% uptime SLA" } }
               ]
             }
           ]

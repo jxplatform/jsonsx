@@ -8,6 +8,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { JxElement } from "@jxsuite/schema/types";
+import type { CapturedStyle } from "../src/style-capture.ts";
 
 const pageClose = mock(() => Promise.resolve());
 const fakeBrowser = { fake: true };
@@ -27,8 +28,8 @@ void mock.module("../src/capture.ts", () => ({ launchBrowser, closeBrowser, capt
 
 const captureStyles = mock(() =>
   Promise.resolve({
-    elements: [],
-    uaDefaults: {},
+    elements: [] as CapturedStyle[],
+    uaDefaults: {} as Record<string, Record<string, string>>,
     mediaQueries: [] as string[],
     customProperties: {} as Record<string, string>,
     documentStyles: { "background-color": "rgb(1, 2, 3)" } as Record<string, string>,
@@ -37,7 +38,10 @@ const captureStyles = mock(() =>
 void mock.module("../src/style-capture.ts", () => ({ captureStyles }));
 
 const extractMedia = mock(() =>
-  Promise.resolve({ breakpoints: { "--md": "(max-width: 768px)" }, deltas: {} }),
+  Promise.resolve({
+    breakpoints: { "--md": "(max-width: 768px)" } as Record<string, string>,
+    deltas: {},
+  }),
 );
 void mock.module("../src/media-extract.ts", () => ({ extractMedia }));
 
@@ -279,6 +283,75 @@ describe("importSite — single-page mode", () => {
     expect(emitOpts.breakpoints).toEqual({ "--md": "(max-width: 768px)" });
   });
 
+  test("reports sub-kilobyte download sizes and skipped tracking URLs", async () => {
+    downloadAssets.mockResolvedValueOnce({
+      rewriteMap: new Map([["https://site.example/hero.jpg", "public/assets/images/hero.jpg"]]),
+      failed: [],
+      skipped: ["https://site.example/analytics.js"],
+      totalBytes: 512,
+    });
+    const events: ProgressEvent[] = [];
+    await importSite({ url: "https://site.example/", outDir: freshOutDir(), maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+    const messages = events.map((e) => e.message);
+    expect(messages.some((m) => m.includes("512 B"))).toBe(true);
+    expect(messages.some((m) => m.includes("Skipped 1 tracking/analytics URLs"))).toBe(true);
+  });
+
+  test("reports megabyte-range download sizes", async () => {
+    downloadAssets.mockResolvedValueOnce({
+      rewriteMap: new Map([["https://site.example/hero.jpg", "public/assets/images/hero.jpg"]]),
+      failed: [],
+      skipped: [],
+      totalBytes: 3 * 1024 * 1024,
+    });
+    const events: ProgressEvent[] = [];
+    await importSite({ url: "https://site.example/", outDir: freshOutDir(), maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+    expect(events.some((e) => e.message.includes("3.0 MB"))).toBe(true);
+  });
+
+  test("extracts design tokens when custom properties match computed values", async () => {
+    captureStyles.mockResolvedValueOnce({
+      elements: [{ path: [0], tagName: "h1", styles: { color: "rgb(4, 5, 6)" } }],
+      uaDefaults: {},
+      mediaQueries: [],
+      customProperties: { "--ink": "rgb(4, 5, 6)" },
+      documentStyles: {},
+    });
+    const events: ProgressEvent[] = [];
+    await importSite({ url: "https://site.example/", outDir: freshOutDir(), maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+    expect(events.some((e) => e.message.includes("design tokens"))).toBe(true);
+    const emitOpts = emitMultiPageProject.mock.calls[0]?.[0] as {
+      styleTokens?: Record<string, string>;
+    };
+    expect(emitOpts.styleTokens).toEqual({ "--ink": "rgb(4, 5, 6)" });
+  });
+
+  test("reports when media queries yield no breakpoint deltas", async () => {
+    captureStyles.mockResolvedValueOnce({
+      elements: [],
+      uaDefaults: {},
+      mediaQueries: ["(max-width: 500px)"],
+      customProperties: {},
+      documentStyles: {},
+    });
+    extractMedia.mockResolvedValueOnce({ breakpoints: {}, deltas: {} });
+    const events: ProgressEvent[] = [];
+    await importSite({ url: "https://site.example/", outDir: freshOutDir(), maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+    expect(events.some((e) => e.message.includes("No responsive breakpoints"))).toBe(true);
+    const emitOpts = emitMultiPageProject.mock.calls[0]?.[0] as {
+      breakpoints?: Record<string, string>;
+    };
+    expect(emitOpts.breakpoints).toBeUndefined();
+  });
+
   test("warns on pages above the node cap", async () => {
     const result = await importSite({
       url: "https://site.example/",
@@ -314,6 +387,28 @@ describe("importSite — single-page mode", () => {
     };
     expect(emitOpts.componentizeOptions).toBe(false);
     expect(emitOpts.precomputedComponents?.components.has("hero-banner")).toBe(true);
+  });
+
+  test("skips the AI pass when the heuristic finds no components", async () => {
+    componentize.mockReturnValueOnce({
+      components: new Map<string, { tagName: string }>(),
+      rewrittenPages: new Map<string, JxElement>(),
+    });
+    await importSite({
+      url: "https://site.example/",
+      outDir: freshOutDir(),
+      maxDepth: 0,
+      ai: { apiKey: "sk-test" },
+    });
+    expect(componentize).toHaveBeenCalled();
+    expect(aiComponentize).not.toHaveBeenCalled();
+    // Emit falls back to its own heuristic pass: no precomputed components handed over.
+    const emitOpts = emitMultiPageProject.mock.calls[0]?.[0] as {
+      componentizeOptions: unknown;
+      precomputedComponents?: unknown;
+    };
+    expect(emitOpts.precomputedComponents).toBeUndefined();
+    expect(emitOpts.componentizeOptions).toEqual({});
   });
 
   test("skips the AI pass when componentization is disabled", async () => {

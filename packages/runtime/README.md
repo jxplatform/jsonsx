@@ -49,13 +49,13 @@ Each document goes through four steps:
 
 ## `$ref` bindings
 
-| Pattern  | Example                        | Meaning                           |
-| -------- | ------------------------------ | --------------------------------- |
-| State    | `{ "$ref": "#/state/count" }`  | Reactive state binding            |
-| Map item | `{ "$ref": "$map/item" }`      | Current item in `Array` iteration |
-| Parent   | `{ "$ref": "parent#/color" }`  | Prop passed via `$props`          |
-| Window   | `{ "$ref": "window#/config" }` | Window global                     |
-| External | `{ "$ref": "./card.json" }`    | Another Jx component              |
+| Pattern  | Example                        | Meaning                                                     |
+| -------- | ------------------------------ | ----------------------------------------------------------- |
+| State    | `{ "$ref": "#/state/count" }`  | Reactive state binding                                      |
+| Map item | `{ "$ref": "$map/item" }`      | Current item in `Array` iteration                           |
+| Parent   | `{ "$ref": "parent#/color" }`  | Prop passed via `$props`                                    |
+| Window   | `{ "$ref": "window#/config" }` | Window global                                               |
+| External | `{ "$ref": "./card.json" }`    | Component doc — via `$switch`/`$elements`, not a bare child |
 
 ## Custom element support
 

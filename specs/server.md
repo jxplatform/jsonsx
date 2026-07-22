@@ -107,7 +107,7 @@ Executes `timing: "server"` functions during development. The runtime sends:
 }
 ```
 
-The server imports the module, calls the exported function with the arguments object (a single object argument, not a positional array), and returns the result as JSON. Reactive re-execution (`signal: true`) is driven runtime-side via `effect()`.
+The server imports the module and calls the exported function as `fn(args, env)` — the arguments object plus an environment binding (`process.env` in the dev proxy, matching the compiled production route's `fn(args, c.env)`) — then returns the result as JSON. Reactive re-execution (`signal: true`) is driven runtime-side via `effect()`.
 
 > **Status: Implemented.** `src/resolve.ts` `handleServerFunction()`.
 
@@ -137,16 +137,16 @@ Handlers are dispatched inside the `/__studio/*` branch in this order: collab �
 
 ### 4.2 Security
 
-Two layers, depending on how the server is exposed:
+Both server entry points share one set of primitives (`src/net-guard.ts`), applied at different strengths:
 
-**Dev server (two-root activation model).** Every file operation passes `assertAccessible(filePath, root, activeProjectRoot)`: the path must sit under the server root **or** under the active project root that Studio explicitly bound via `POST /__studio/activate`. This permits editing an external project that the user deliberately opened while still rejecting path traversal.
+**Dev server (`createDevServer`).** Defends against a malicious web page and local traversal:
 
-**Loopback project server (`src/project-server.ts`, used by the desktop launchers).** Layered controls:
+- **Loopback bind** (`127.0.0.1`) by default is the primary control; a `hostname` option (`--host` on the `jx dev` CLI) can widen it for containers, which removes that control and must only be used behind trusted isolation
+- **Origin/Host gate** on every privileged surface — the RCE-capable `/__jx_resolve__` / `/__jx_server__` routes (both do dynamic `import()`), the `/_jx/` extension mounts, and the whole `/__studio/*` API: a loopback (or absent) Origin is accepted, a non-loopback Origin or Host is rejected (anti-CSRF, anti-DNS-rebinding). The browser Studio and the served site are same-origin, so they pass; an external page does not. No token is used — same-origin does not need one
+- **File containment**: every static path and every caller-supplied relative or absolute `$src` / `$base` / `$implementation` resolved before a dynamic `import()` passes a lexical `relative()` check **plus a realpath re-check** (`containedPath`), so a `../` or absolute path cannot escape and a symlink cannot point outside the tree; over-encoded paths are rejected after a single decode. A **bare-specifier** `$src` is exempt: it resolves only through Node's `node_modules` lookup (an installed package), so the class file — and the sibling `$implementation` it names, even one above the class directory — is trusted as that package's own code; the containment check still binds a project-local relative `$src`
+- **Two-root activation**: filesystem operations go through `assertAccessible(filePath, root, activeProjectRoot)` — the path must sit under the server root **or** the active project root Studio bound via `POST /__studio/activate`, which itself only accepts a root contained under the server root or an explicit `allowedRoots` entry
 
-- **Loopback bind** (`127.0.0.1`) is the primary control — other local processes and LAN pages cannot read a loopback page's location, so they cannot steal the URL token
-- A **per-server token** is the hard gate on every privileged surface: the WebSocket RPC upgrade, the RCE-capable `/__jx_resolve__` / `/__jx_server__` routes (both do dynamic `import()`), and the site-import route
-- **Origin/Host checks** are best-effort defense-in-depth: a loopback (or absent) Origin is accepted; privileged routes additionally reject a non-loopback Host header (anti-DNS-rebinding)
-- File serving is contained with a lexical `relative()` check **plus a realpath re-check**, so a symlink inside the tree cannot point outside it; over-encoded paths are rejected after a single decode
+**Loopback project server (`src/project-server.ts`, used by the desktop launchers).** Adds, on top of the above, a **per-server token** as the hard gate on the WebSocket RPC upgrade and the resolve/import routes — the desktop canvas iframe is cross-origin, so it carries the token in its URL where the same-origin dev server does not need one.
 
 ---
 

@@ -26,6 +26,7 @@ import {
 import { evaluateExpression, isMutating } from "./expression.ts";
 import type { DynamicClass, JxEventHandler, JxPath, JxRenderOptions, JxScope } from "./types.ts";
 import {
+  bodyReturnsValue,
   hasStructuredBody,
   isExpressionDef,
   isFunctionDef,
@@ -35,6 +36,7 @@ import {
   isPrototypeDef,
   isRef as isRefValue,
   isServerFnDef,
+  isTemplateString,
   paramNames,
 } from "@jxsuite/schema/guards";
 import { runStatements } from "./statements.ts";
@@ -68,6 +70,29 @@ import type { Ref } from "@vue/reactivity";
  * @returns {Promise<JxScope>} Resolves with the live component scope (state reactive
  * proxy)
  */
+/** The document-schema version this runtime understands (the `/schema/vN` in a hosted `$schema`). */
+export const SUPPORTED_SCHEMA_VERSION = 1;
+let _schemaVersionWarned = false;
+
+/**
+ * Warn once when a document declares a hosted `$schema` whose version differs from the one this
+ * runtime supports. A relative or non-hosted `$schema` (local dev schema paths) is ignored. This is
+ * a diagnostic only — there is no document-format migration story yet (see spec §3.2 / §21.4).
+ */
+function checkSchemaVersion($schema: unknown): void {
+  if (_schemaVersionWarned || typeof $schema !== "string") {
+    return;
+  }
+  const match = $schema.match(/\/schema\/v(\d+)\b/);
+  if (match && Number(match[1]) !== SUPPORTED_SCHEMA_VERSION) {
+    _schemaVersionWarned = true;
+    console.warn(
+      `Jx: document $schema is version v${match[1]} but this runtime supports ` +
+        `v${SUPPORTED_SCHEMA_VERSION}. Behavior may be undefined; there is no format migrator yet.`,
+    );
+  }
+}
+
 export async function Jx(
   source: string | JxDocument,
   target: HTMLElement = document.body,
@@ -75,6 +100,7 @@ export async function Jx(
 ) {
   const base = typeof source === "string" ? new URL(source, location.href).href : location.href;
   const doc = await resolve(source);
+  checkSchemaVersion(doc.$schema);
 
   // Register custom elements declared in $elements (depth-first)
   if (doc.$elements) {
@@ -615,9 +641,9 @@ async function resolveFunction(def: JxFunctionDef, state: JxScope, key: string, 
   let isComputed = false;
   if (!hasParams) {
     if (typeof def.body === "string") {
-      isComputed = /\breturn\b/.test(def.body);
+      isComputed = bodyReturnsValue(def.body);
     } else if (fn) {
-      isComputed = fn.length <= 1 && /\breturn\b/.test(fn.toString());
+      isComputed = fn.length <= 1 && bodyReturnsValue(fn.toString());
     }
   }
   if (isComputed) {
@@ -690,6 +716,9 @@ export const RESERVED_KEYS = new Set([
  * @param {JxRenderOptions} [options]
  * @returns {HTMLElement | Text}
  */
+/** Refs already warned about, so the §13 diagnostic fires once per distinct target. */
+const warnedRefChildren = new Set<string>();
+
 export function renderNode(
   def: JxElement | string | number | boolean,
   state: JxScope,
@@ -716,6 +745,22 @@ export function renderNode(
         localState = Object.create(state) as JxScope;
       }
       localState[key] = isRefObj(val) ? resolveRef(val.$ref, state) : val;
+    }
+  }
+
+  /*
+   * §13 diagnostic: a node-level external `$ref` (the withdrawn component-instance syntax) has no
+   * tagName and silently renders an empty <div>. Warn once per target instead of failing silently —
+   * the supported mechanism is $elements + a custom-element tag (see spec §13).
+   */
+  if ("$ref" in def && !def.tagName) {
+    const refTarget = String((def as { $ref?: unknown }).$ref ?? "");
+    if (!warnedRefChildren.has(refTarget)) {
+      warnedRefChildren.add(refTarget);
+      console.warn(
+        `Jx: a $ref child ("${refTarget}") is not a supported component instance; register the ` +
+          `component in $elements and use its custom-element tag instead (spec §13).`,
+      );
     }
   }
 
@@ -780,10 +825,6 @@ export function renderNode(
  * @param {unknown} val
  * @returns {boolean}
  */
-function isTemplateString(val: unknown): val is string {
-  return typeof val === "string" && val.includes("${");
-}
-
 // ─── Property / style / attribute application ─────────────────────────────────
 
 /**

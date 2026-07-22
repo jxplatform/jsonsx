@@ -17,10 +17,10 @@
       "children": [
         {
           "$prototype": "Array",
-          "$map": "$docs",
-          "$template": {
+          "items": { "$ref": "#/state/$docs" },
+          "map": {
             "tagName": "li",
-            "children": ["${item.data.title}"]
+            "children": ["${$map.item.data.title}"]
           }
         }
       ]

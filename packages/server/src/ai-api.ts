@@ -7,13 +7,15 @@
  *
  * API key flow:
  *   1. Request header X-Api-Key or Authorization: Bearer <key>
- *   2. Fallback: OPENAI_API_KEY env var
+ *   2. Fallback: OPENAI_API_KEY env var — attached ONLY to the env/default base URL, never to a
+ *      caller-supplied X-Api-Base-URL (prevents exfiltrating the server key to a chosen endpoint)
  *   3. If neither → 401 with error message
  *
  * Base URL flow:
- *   1. Request header X-Api-Base-URL
+ *   1. Request header X-Api-Base-URL — allowed only alongside a header API key
  *   2. Fallback: OPENAI_BASE_URL env var
  *   3. Default: https://api.openai.com/v1
+ *   A base URL resolving to a cloud metadata / link-local host is refused (SSRF defense).
  *
  * @license MIT
  */
@@ -46,30 +48,87 @@ interface ModelEntry {
   owned_by?: string;
 }
 
-function getConfig(req: Request): { apiKey: string | null; baseUrl: string; missingKey: boolean } {
+/**
+ * SSRF defense: refuse to proxy to a cloud metadata endpoint or a link-local host. Loopback and
+ * private-LAN hosts are intentionally allowed — self-hosted / local LLMs run there. An unparseable
+ * base URL is blocked. `169.254.169.254` (the AWS/GCP/Azure metadata IP) lives in the link-local
+ * `169.254.0.0/16` range, which is the primary thing this stops.
+ */
+function isBlockedHost(rawUrl: string): boolean {
+  let host: string;
+  try {
+    host = new URL(rawUrl).hostname.toLowerCase();
+  } catch {
+    return true;
+  }
+  const h = host.startsWith("[") ? host.slice(1, -1) : host;
+  if (h === "metadata.google.internal") {
+    return true;
+  }
+  if (h.startsWith("169.254.")) {
+    return true; // IPv4 link-local, incl. the cloud metadata IP
+  }
+  if (h.startsWith("fe80:")) {
+    return true; // IPv6 link-local
+  }
+  return false;
+}
+
+interface AiConfig {
+  apiKey: string | null;
+  baseUrl: string;
+  missingKey: boolean;
+  reject?: { status: number; message: string };
+}
+
+function getConfig(req: Request): AiConfig {
   const authHeader = req.headers.get("Authorization") || "";
   const apiKeyHeader = req.headers.get("X-Api-Key") || "";
   const baseUrlHeader = req.headers.get("X-Api-Base-URL") || "";
 
-  let apiKey = null;
-
-  // Check Authorization: Bearer <key>
+  // Track the PROVENANCE of the key: a header-supplied key may ride a caller's custom base URL; the
+  // Server's env key never leaves for a caller-chosen endpoint (key-exfiltration defense).
+  let apiKey: string | null = null;
+  let keyFromHeader = false;
   if (authHeader.startsWith("Bearer ")) {
     apiKey = authHeader.slice(7).trim();
+    keyFromHeader = true;
   }
-
-  // Check X-Api-Key header (overrides Bearer)
   if (apiKeyHeader) {
-    apiKey = apiKeyHeader.trim();
+    apiKey = apiKeyHeader.trim(); // X-Api-Key overrides Bearer
+    keyFromHeader = true;
   }
 
-  // Check env var (fallback)
+  const baseFromHeader = Boolean(baseUrlHeader);
+  const baseUrl = baseUrlHeader || process.env.OPENAI_BASE_URL || DEFAULT_BASE_URL;
+
+  if (isBlockedHost(baseUrl)) {
+    return {
+      apiKey: null,
+      baseUrl,
+      missingKey: true,
+      reject: { status: 403, message: "Base URL host is not permitted." },
+    };
+  }
+
+  // A caller-supplied base URL requires a caller-supplied key. Refuse to forward the env
+  // OPENAI_API_KEY to an endpoint the request chose.
+  if (baseFromHeader && !keyFromHeader) {
+    return {
+      apiKey: null,
+      baseUrl,
+      missingKey: true,
+      reject: {
+        status: 401,
+        message: "A custom base URL requires an explicit API key (X-Api-Key).",
+      },
+    };
+  }
+
+  // Env key is only ever attached to the env/default base URL.
   if (!apiKey && process.env.OPENAI_API_KEY) {
     apiKey = process.env.OPENAI_API_KEY;
   }
-
-  // Check base URL
-  const baseUrl = baseUrlHeader || process.env.OPENAI_BASE_URL || DEFAULT_BASE_URL;
 
   return { apiKey, baseUrl, missingKey: !apiKey };
 }
@@ -97,7 +156,10 @@ function jsonError(status: number, message: string): Response {
 
 /** Handle POST /__studio/ai/chat — proxy chat completions to OpenAI via SSE. */
 export async function handleChat(req: Request): Promise<Response> {
-  const { apiKey, baseUrl, missingKey } = getConfig(req);
+  const { apiKey, baseUrl, missingKey, reject } = getConfig(req);
+  if (reject) {
+    return jsonError(reject.status, reject.message);
+  }
   if (missingKey) {
     return jsonError(
       401,
@@ -374,7 +436,10 @@ export async function handleChat(req: Request): Promise<Response> {
  * key is available.
  */
 export async function handleModels(req: Request): Promise<Response> {
-  const { apiKey, baseUrl, missingKey } = getConfig(req);
+  const { apiKey, baseUrl, missingKey, reject } = getConfig(req);
+  if (reject) {
+    return jsonError(reject.status, reject.message);
+  }
 
   // No key available → return hardcoded defaults so the UI can at least render.
   if (missingKey) {

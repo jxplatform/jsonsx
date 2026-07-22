@@ -13,7 +13,7 @@ Jx is a schema and runtime for building reactive web applications using plain JS
 
 **Structure and state are data.** The shape of each `state` entry determines its type and behavior — no additional flags required in the common case.
 
-A Jx component is a single `.json` file that is fully self-describing:
+A Jx component is a single `.json` file that can be fully self-describing:
 
 ```json
 {
@@ -75,4 +75,4 @@ Every Jx document has these top-level fields:
 | `$elements`  | Custom element dependency declarations                 |
 | `timing`     | Execution timing: `"compiler"`, `"server"`, `"client"` |
 
-For the complete specification, see the [full spec document](https://github.com/jxsuite/jx/blob/main/spec/spec.md).
+For the complete specification, see the [full spec document](https://github.com/jxsuite/jx/blob/main/specs/spec.md).

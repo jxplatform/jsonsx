@@ -1,0 +1,300 @@
+/**
+ * Coverage-gap tests for the New Project wizard and the Add Existing Repository picker:
+ *
+ * - New-project-modal: the credentials-gate re-render callbacks, the Template context label, starter
+ *   selection + missing-selection validation, the busy guards on Back/tab-change, and the agent
+ *   submit's directory derivation + failure surface.
+ * - Add-repo-modal: double-open, double-import, import-less platforms, and Escape dismissal.
+ */
+import { flush, installMockPlatform } from "./harness";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import type { RepoInfo, StarterInfo } from "../src/types";
+
+const { closeNewProjectModal, openNewProjectModal } =
+  await import("../src/new-project/new-project-modal");
+const { closeAddRepoModal, openAddRepoModal } = await import("../src/new-project/add-repo-modal");
+const { initLayers } = await import("../src/ui/layers");
+
+document.body.innerHTML = `
+  <div id="layer-popover"></div>
+  <div id="layer-modal"></div>
+  <div id="layer-dialog"></div>
+`;
+initLayers();
+
+type AnyEl = HTMLElement & { value?: string; selected?: string };
+
+function field(index: number): AnyEl {
+  return document.querySelectorAll("#layer-modal sp-textfield")[index] as AnyEl;
+}
+
+function typeInto(el: AnyEl, value: string) {
+  el.value = value;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function footerButtons(): AnyEl[] {
+  return [
+    ...document.querySelectorAll("#layer-modal .new-project-modal-footer sp-button"),
+  ] as AnyEl[];
+}
+
+function clickFooter(label: string) {
+  const btn = footerButtons().find((b) => b.textContent?.includes(label));
+  btn!.dispatchEvent(new Event("click", { bubbles: true }));
+}
+
+function switchTab(value: string) {
+  const tabs = document.querySelector("#layer-modal sp-tabs") as AnyEl;
+  tabs.selected = value;
+  tabs.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function errorText(): string | null {
+  return document.querySelector("#layer-modal .new-project-error")?.textContent?.trim() ?? null;
+}
+
+function contextText(): string | null {
+  return (
+    document.querySelector("#layer-modal .new-project-step-context")?.textContent?.trim() ?? null
+  );
+}
+
+const STARTERS: StarterInfo[] = [
+  {
+    accent: "#3b82f6",
+    description: "d1",
+    features: [],
+    id: "portfolio",
+    industry: "General",
+    name: "Portfolio",
+    tagline: "Show your work",
+    thumbnail: "",
+  },
+  {
+    accent: "#10b981",
+    description: "d2",
+    features: [],
+    id: "bakery",
+    industry: "Food",
+    name: "Bakery",
+    tagline: "Fresh daily",
+    thumbnail: "",
+  },
+];
+
+beforeEach(() => {
+  localStorage.clear();
+});
+
+afterEach(() => {
+  closeNewProjectModal();
+  closeAddRepoModal();
+});
+
+describe("new-project modal gaps", () => {
+  test("saving a key through the agent gate re-renders past it", async () => {
+    installMockPlatform();
+    void openNewProjectModal();
+    switchTab("agent");
+    const creds = document.querySelector("#layer-modal .ai-creds-form") as HTMLElement;
+    expect(creds).toBeTruthy();
+
+    const keyInput = creds.querySelector('input[type="password"]') as HTMLInputElement;
+    keyInput.value = "sk-fresh-key";
+    keyInput.dispatchEvent(new Event("input", { bubbles: true }));
+    const save = [...creds.querySelectorAll("sp-button")].find((b) =>
+      b.textContent?.includes("Save"),
+    ) as HTMLElement;
+    save.dispatchEvent(new Event("click", { bubbles: true }));
+    await flush();
+
+    // The gate lifted: the prompt field replaced the credentials form.
+    expect(document.querySelector("#layer-modal .ai-creds-form")).toBeNull();
+    expect(document.querySelector("#layer-modal .new-project-agent-prompt")).toBeTruthy();
+  });
+
+  test("the Parameters step labels the chosen template source", () => {
+    installMockPlatform();
+    void openNewProjectModal();
+    clickFooter("Next");
+    expect(contextText()).toContain("Template · Blank");
+  });
+
+  test("the starter tab requires a selection before Next", () => {
+    installMockPlatform(); // No listStarters → nothing auto-selected.
+    void openNewProjectModal();
+    switchTab("starter");
+    expect(document.querySelector("#layer-modal .new-project-tab-intro")?.textContent).toContain(
+      "No starter sites",
+    );
+    clickFooter("Next");
+    expect(errorText()).toContain("Choose a starter site");
+  });
+
+  test("starter cards select on click and seed the Parameters step", async () => {
+    installMockPlatform({ listStarters: async () => STARTERS });
+    void openNewProjectModal();
+    await flush();
+    switchTab("starter");
+    const cards = [...document.querySelectorAll("#layer-modal .new-project-template")];
+    expect(cards).toHaveLength(2);
+    (cards[1] as HTMLElement).dispatchEvent(new Event("click", { bubbles: true }));
+    await flush();
+    const reCards = [...document.querySelectorAll("#layer-modal .new-project-template")];
+    expect(reCards[1]!.classList.contains("selected")).toBe(true);
+
+    clickFooter("Next");
+    expect(contextText()).toContain("Starter Site · Bakery");
+    // The starter's tagline seeds the description field.
+    const description = field(2);
+    expect(description.value).toBe("Fresh daily");
+  });
+
+  test("Back and tab switches are ignored while a create is in flight", async () => {
+    let releaseCreate: () => void = () => {};
+    installMockPlatform({
+      createProject: (async () => {
+        await new Promise<void>((resolve) => {
+          releaseCreate = resolve;
+        });
+        return { config: { name: "Slow Site" }, root: "/projects/slow-site" };
+      }) as never,
+    });
+    const promise = openNewProjectModal();
+    const staleTabs = document.querySelector("#layer-modal sp-tabs") as AnyEl;
+    clickFooter("Next");
+    typeInto(field(0), "Slow Site");
+    clickFooter("Create Project");
+    expect(footerButtons().some((b) => b.textContent?.includes("Creating…"))).toBe(true);
+
+    clickFooter("Back"); // Guarded: the wizard must stay on the Parameters step.
+    expect(document.querySelector("#layer-modal .new-project-step-heading")).toBeTruthy();
+
+    staleTabs.selected = "starter"; // A stale tab strip cannot hijack the flow mid-create.
+    staleTabs.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(document.querySelector("#layer-modal .new-project-step-heading")).toBeTruthy();
+
+    releaseCreate();
+    expect(await promise).toEqual({
+      config: { name: "Slow Site" },
+      root: "/projects/slow-site",
+    } as never);
+  });
+
+  test("agent submit derives a blank directory and surfaces create failures", async () => {
+    localStorage.setItem("jx.ai.openaiKey", "sk-agent-test");
+    const attempts: Record<string, unknown>[] = [];
+    installMockPlatform({
+      createProject: (async (opts: Record<string, unknown>) => {
+        attempts.push(opts);
+        throw new Error("quota exceeded for this account");
+      }) as never,
+    });
+    void openNewProjectModal();
+    switchTab("agent");
+    typeInto(field(0), "A tiny site");
+    clickFooter("Next");
+    typeInto(field(0), "Failing Agent Site");
+    typeInto(field(1), ""); // Clear the derived directory — submit must re-derive it.
+    clickFooter("Create & Start Agent");
+    await flush();
+
+    expect(attempts[0]).toMatchObject({
+      directory: "failing-agent-site",
+      name: "Failing Agent Site",
+      template: "blank",
+    });
+    expect(errorText()).toContain("quota exceeded");
+  });
+});
+
+describe("add-repo modal gaps", () => {
+  const REPOS: RepoInfo[] = [
+    {
+      defaultBranch: "main",
+      fullName: "octocat/site",
+      isJxProject: true,
+      name: "site",
+      owner: "octocat",
+      permission: "admin",
+      private: true,
+    },
+    {
+      defaultBranch: "trunk",
+      fullName: "acme/marketing",
+      isJxProject: false,
+      name: "marketing",
+      owner: "acme",
+      permission: "write",
+      private: false,
+    },
+  ];
+
+  function rows(): HTMLButtonElement[] {
+    return [...document.querySelectorAll("#layer-modal .add-repo-row")] as HTMLButtonElement[];
+  }
+
+  test("a second open while the picker is up resolves null immediately", async () => {
+    installMockPlatform({
+      importProject: () => Promise.resolve({ root: "octocat/site@main" }),
+      listRepos: () => Promise.resolve(REPOS),
+    });
+    const first = openAddRepoModal();
+    await flush();
+    expect(await openAddRepoModal()).toBeNull();
+    closeAddRepoModal();
+    expect(await first).toBeNull();
+  });
+
+  test("clicking another repo while an import runs is ignored", async () => {
+    let releaseImport: () => void = () => {};
+    let imports = 0;
+    installMockPlatform({
+      importProject: (() => {
+        imports += 1;
+        return new Promise((resolve) => {
+          releaseImport = () => resolve({ root: "octocat/site@main" });
+        });
+      }) as never,
+      listRepos: () => Promise.resolve(REPOS),
+    });
+    const promise = openAddRepoModal();
+    await flush();
+    rows()[0]!.dispatchEvent(new Event("click", { bubbles: true }));
+    await flush();
+    rows()[1]!.dispatchEvent(new Event("click", { bubbles: true }));
+    await flush();
+    expect(imports).toBe(1);
+    releaseImport();
+    expect(await promise).toEqual({ root: "octocat/site@main" });
+  });
+
+  test("platforms that cannot import surface the inline notice", async () => {
+    installMockPlatform({ listRepos: () => Promise.resolve(REPOS) });
+    const promise = openAddRepoModal();
+    await flush();
+    rows()[0]!.dispatchEvent(new Event("click", { bubbles: true }));
+    await flush();
+    expect(document.querySelector("#layer-modal .new-project-error")?.textContent).toContain(
+      "cannot import repositories",
+    );
+    closeAddRepoModal();
+    expect(await promise).toBeNull();
+  });
+
+  test("Escape dismisses the picker", async () => {
+    installMockPlatform({
+      importProject: () => Promise.resolve({ root: "r" }),
+      listRepos: () => Promise.resolve(REPOS),
+    });
+    const promise = openAddRepoModal();
+    await flush();
+    const modal = document.querySelector("#layer-modal .add-repo-modal") as HTMLElement;
+    modal.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape" }),
+    );
+    expect(document.querySelector("#layer-modal .add-repo-modal")).toBeNull();
+    expect(await promise).toBeNull();
+  });
+});

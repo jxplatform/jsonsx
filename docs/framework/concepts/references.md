@@ -10,7 +10,7 @@ spec:
 
 > **Studio writes this format for you.** Switching any bindable field to **$ref** mode with its field-mode button ([Formulas and expressions](/docs/studio/logic/formulas)) writes the `$ref` objects on this page.
 
-A reference is an object with a single `$ref` key whose string value points at something declared elsewhere — a state entry, a global, an iteration item, or another file. References follow the JSON Reference convention (JSON Pointer, RFC 6901), so a Jx binding looks like any other `$ref` in the JSON Schema world.
+A reference is an object with a single `$ref` key whose string value points at something declared elsewhere — a state entry, a global, an iteration item, or another file. The path **borrows JSON Pointer syntax** (RFC 6901 shape — a `#`-fragment of `/`-separated tokens), but the semantics are Jx-specific: a `$ref` reads a live value off the reactive scope, it does not substitute a schema. (So RFC 6901 `~0`/`~1` escapes are not implemented; within a nested path the segments after the first may be separated by `.` as well as `/`.)
 
 ```json
 {
@@ -23,16 +23,16 @@ A reference is an object with a single `$ref` key whose string value points at s
 
 The prefix of the `$ref` string selects where the lookup happens:
 
-| Scheme           | Example                 | Resolves to                                        |
-| ---------------- | ----------------------- | -------------------------------------------------- |
-| Internal `state` | `"#/state/count"`       | Value or handler in the current document's `state` |
-| Window global    | `"window#/currentUser"` | `window.currentUser`                               |
-| Document global  | `"document#/appConfig"` | `document.appConfig`                               |
-| Parent scope     | `"parent#/sharedState"` | Named value passed via `$props`                    |
-| Map context      | `"$map/item"`           | Current item in a repeater iteration               |
-| Map index        | `"$map/index"`          | Current index in a repeater iteration              |
-| Event context    | `"event#/target/value"` | Property path on the handler event (expressions)   |
-| External file    | `"./other.json"`        | Another Jx document, fully dereferenced            |
+| Scheme           | Example                 | Resolves to                                                                                                   |
+| ---------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Internal `state` | `"#/state/count"`       | Value or handler in the current document's `state`                                                            |
+| Window global    | `"window#/currentUser"` | `window.currentUser`                                                                                          |
+| Document global  | `"document#/appConfig"` | `document.appConfig`                                                                                          |
+| Parent scope     | `"parent#/sharedState"` | Named value passed via `$props`                                                                               |
+| Map context      | `"$map/item"`           | Current item in a repeater iteration                                                                          |
+| Map index        | `"$map/index"`          | Current index in a repeater iteration                                                                         |
+| Event context    | `"event#/target/value"` | Property path on the handler event (expressions)                                                              |
+| External file    | `"./other.json"`        | A component document — for `$switch` cases and `$elements` registration, not a bare `children` node (see §13) |
 
 Paths navigate nested data with further `/` segments: `"#/state/user/name"`, `"$map/item/title"`.
 
@@ -79,22 +79,23 @@ Inside a declarative [expression](/docs/framework/concepts/expressions) used as 
 
 `event#` is resolvable only in handler position. Referencing it from an expression that is not invoked as a handler is a compile-time error.
 
-## Resolution order
+## Resolution
 
-When a reference could match more than one scheme, resolution proceeds top-down:
+The leading token selects exactly one source — it is scheme dispatch, not a cascading fallback:
 
-1. `$map/` — iteration context (highest priority)
+1. `$map/` — iteration context
 2. `$reduce/acc` — fold accumulator ([expression](/docs/framework/concepts/expressions) `reduce` only)
 3. `$args/` — named-formula parameters (callable bodies only)
 4. `event#/` — handler event context (handler position only)
-5. `#/state/` — current document scope
-6. `parent#/` — explicitly passed props
-7. `window#/` — global window properties
-8. `document#/` — global document properties
+5. `#/state/` — the current document's scope (which already includes `$props`, merged in place)
+6. `parent#/` — resolves against that same merged scope
+7. `window#/` / `document#/` — the corresponding global object
+
+A `#/state/…` miss does **not** fall through to `window`/`document` — those are reachable only through an explicit `window#/` or `document#/` ref. (An explicit-scheme miss reads as `undefined`; only a bare, schemeless ref falls back to `null`.)
 
 ## How it works
 
-The runtime resolves each `$ref` at render time against the current scope: `$map/` and `parent#/` look up the enclosing iteration or prop scope, `#/state/` reads the document's reactive proxy, and deeper path segments walk nested objects step by step. Because reads happen inside reactive effects, any binding whose target changes re-runs automatically. A `$ref` to an external `.json` file loads and renders that document in place — the basis of [component instances](/docs/framework/concepts/props-and-scope) and [dynamic switching](/docs/framework/concepts/switching).
+The runtime resolves each `$ref` at render time against the current scope: `$map/` and `parent#/` look up the enclosing iteration or prop scope, `#/state/` reads the document's reactive proxy, and deeper path segments walk nested objects step by step. Because reads happen inside reactive effects, any binding whose target changes re-runs automatically. An external `.json` `$ref` is loaded and rendered where the runtime supports it — as a [`$switch`](/docs/framework/concepts/switching) case or an `$elements` registration that backs a [component instance](/docs/framework/concepts/props-and-scope) — but a bare `{ "$ref": "./x.json" }` node is not (see spec §13).
 
 ## Rules
 
@@ -103,7 +104,7 @@ The runtime resolves each `$ref` at render time against the current scope: `$map
 - `$map/` references are valid only inside a repeater's `map` template.
 - `event#/` is valid only in an expression used as an event handler.
 - `parent#/` resolves only names explicitly passed via `$props` — there is no implicit parent access.
-- External file references resolve the whole document; you cannot point into another file's internals.
+- External file references resolve the whole document (via `$switch`/`$elements`); you cannot point into another file's internals, and a bare external `$ref` child is not a component instance (spec §13).
 
 ## Related
 

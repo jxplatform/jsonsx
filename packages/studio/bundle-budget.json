@@ -1,0 +1,7 @@
+{
+  "$comment": "Size ceilings (bytes) for built Studio bundles, checked by scripts/check-bundle-budget.ts. Studio is a dev tool so end users don't download it, but it is unmonitored otherwise (the codecov bundle path is broken — see codecov-bundle-analysis-diagnosis.md). Raise a ceiling deliberately, with justification, when a real feature grows it.",
+  "tolerance": 0.05,
+  "budgets": {
+    "studio.js": 14000000
+  }
+}

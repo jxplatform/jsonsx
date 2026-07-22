@@ -1,3 +1,5 @@
 bunx nano-staged
 # Advisory (never blocks): staged source files whose docs/specs aren't in the commit
 bun scripts/docs/check-doc-sync.ts --staged || true
+# Blocking (deterministic, sub-second, no network): marketing/README claims must be true
+bun scripts/docs/check-site-claims.ts

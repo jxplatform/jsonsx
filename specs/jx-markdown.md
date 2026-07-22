@@ -1,5 +1,11 @@
 # Jx Markdown Specification
 
+**Version:** 1.0.0-draft
+**Status:** Partial
+**License:** MIT
+
+---
+
 Jx Markdown is a first-class authoring format for Jx components and content pages. It uses standard Markdown syntax enhanced with YAML frontmatter and [remark-directive](https://github.com/remarkjs/remark-directive) syntax to represent the full Jx component model.
 
 Jx Markdown is primarily intended for content-heavy components. JSON remains the preferred format for technically complex components. The studio visual editor works transparently on both formats.

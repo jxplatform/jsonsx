@@ -1,3 +1,27 @@
+/**
+ * Method capability roles: "method"/"accessor" plus every static capability role hosts dispatch on
+ * (format-registry EXTENSION_CAPABILITIES — specs/extensions.md §8). Kept as a literal tuple so
+ * FromSchema inference stays precise; the drift-guard test in tests/class-schema-drift.test.ts
+ * asserts parity with EXTENSION_CAPABILITIES.
+ */
+export const CLASS_METHOD_ROLES = [
+  "method",
+  "accessor",
+  "parse",
+  "serialize",
+  "discover",
+  "load",
+  "projectData",
+  "resolvePaths",
+  "lower",
+  "emit",
+  "mount",
+  "dialect",
+  "deploySchema",
+  "bindings",
+  "testConnection",
+] as const;
+
 export const classParameterDefSchema = {
   description: "A typed parameter definition for a class.",
   properties: {
@@ -100,7 +124,7 @@ export const classMethodDefSchema = {
     },
     returnType: {},
     role: {
-      enum: ["method", "accessor", "parse", "serialize", "discover", "load"],
+      enum: CLASS_METHOD_ROLES,
       type: "string",
     },
     scope: { enum: ["instance", "static"], type: "string" },
@@ -154,6 +178,85 @@ export const formatDefSchema = {
     },
   },
   required: ["extensions"],
+  type: "object",
+} as const;
+
+export const projectBlockDefSchema = {
+  additionalProperties: false,
+  description:
+    "Project-section admission block (specs/extensions.md §9). A class carrying this block owns " +
+    "the project.json section named by `key`; hosts dispatch that section's data through the " +
+    "class's projectData/resolvePaths capabilities.",
+  properties: {
+    description: { type: "string" },
+    key: {
+      description: "The project.json top-level section this class owns (exclusive per project).",
+      type: "string",
+    },
+    referenceable: {
+      description: "Whether section entries can be referenced from documents (e.g. content types).",
+      type: "boolean",
+    },
+    title: { type: "string" },
+  },
+  required: ["key"],
+  type: "object",
+} as const;
+
+export const serverBlockDefSchema = {
+  additionalProperties: false,
+  description:
+    "Server-mount admission block (specs/extensions.md §11). A class carrying this block mounts " +
+    "routes under its /_jx/ basePath in the site worker and dev server.",
+  properties: {
+    basePath: {
+      description: "Route subtree this class mounts — must be under /_jx/ (exclusive per project).",
+      examples: ["/_jx/data", "/_jx/auth"],
+      type: "string",
+    },
+    module: {
+      description: "Module specifier exporting the mount handler.",
+      type: "string",
+    },
+    order: {
+      description: "Mount order (ascending; default 100).",
+      type: "number",
+    },
+  },
+  required: ["basePath"],
+  type: "object",
+} as const;
+
+export const connectorBlockDefSchema = {
+  // Open by design: the block mirrors format-registry's ConnectorBlock ([key: string]: unknown) —
+  // Providers carry extra keys (e.g. D1's `module`), so additionalProperties stays true.
+  description:
+    "Connection-provider admission block (specs/extensions.md §12). A class carrying this block " +
+    "provides database connections of the given provider/kind.",
+  properties: {
+    kind: {
+      description: "SQL dialect family the provider speaks.",
+      enum: ["sqlite", "postgres"],
+      type: "string",
+    },
+    local: {
+      description: "Local-development substitute provider (e.g. sqlite for D1).",
+      type: "string",
+    },
+    module: {
+      description: "Module specifier exporting the provider implementation.",
+      type: "string",
+    },
+    provider: {
+      description: "Provider identifier (e.g. d1, supabase, sqlite).",
+      type: "string",
+    },
+    serve: {
+      description: "Module specifier exporting the serve-time worker binding.",
+      type: "string",
+    },
+  },
+  required: ["provider", "kind"],
   type: "object",
 } as const;
 
@@ -258,6 +361,7 @@ export const classDefSchema = {
     $prototype: { const: "Class", type: "string" },
     $schema: { type: "string" },
     $studio: { $ref: "#/$defs/StudioHints" },
+    connector: { $ref: "#/$defs/ConnectorBlockDef" },
     description: { type: "string" },
     extends: {
       description: "Base class — string name or $ref to another .class.json.",
@@ -267,6 +371,8 @@ export const classDefSchema = {
       ],
     },
     format: { $ref: "#/$defs/FormatDef" },
+    project: { $ref: "#/$defs/ProjectBlockDef" },
+    server: { $ref: "#/$defs/ServerBlockDef" },
     title: {
       description: "PascalCase class name, used as the export name.",
       type: "string",

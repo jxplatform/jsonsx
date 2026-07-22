@@ -100,6 +100,33 @@ void mock.module("@jxsuite/schema/validate-project", () => ({
   },
 }));
 
+export interface ProjectTreeResultLike {
+  valid: boolean;
+  checked: number;
+  issues: { file: string; errors: unknown[] }[];
+}
+
+let validateProjectTreeImpl: (root: string) => Promise<ProjectTreeResultLike> = () =>
+  Promise.resolve({ checked: 1, issues: [], valid: true });
+
+export const validateProjectTreeCalls: string[] = [];
+
+export function setValidateProjectTree(impl: typeof validateProjectTreeImpl) {
+  validateProjectTreeImpl = impl;
+}
+
+void mock.module("../src/site/validate-command.ts", () => ({
+  formatProjectTreeIssues: (result: ProjectTreeResultLike) =>
+    result.issues.flatMap((issue) => [
+      `${issue.file}:`,
+      ...issue.errors.map((error) => `  - ${JSON.stringify(error)}`),
+    ]),
+  validateProjectTree: (root: string) => {
+    validateProjectTreeCalls.push(root);
+    return validateProjectTreeImpl(root);
+  },
+}));
+
 export interface DbPushResultLike {
   results: {
     connection: string;

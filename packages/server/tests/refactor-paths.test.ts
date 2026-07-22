@@ -76,6 +76,10 @@ describe("classifyRef", () => {
   test("bare specifier is still a path (gated later by resolution)", () => {
     expect(classifyRef("@scope/pkg/x.js").kind).toBe("path");
   });
+
+  test("a value that is only a query/fragment suffix is none", () => {
+    expect(classifyRef("?v=2").kind).toBe("none");
+  });
 });
 
 describe("normalizeSegments / joinPosix", () => {
@@ -84,6 +88,8 @@ describe("normalizeSegments / joinPosix", () => {
     ["/p/./a/./b", "/p/a/b"],
     ["/../a", "/a"],
     ["a/../b", "b"],
+    ["../a", "../a"],
+    ["../../a", "../../a"],
   ])("%s", (input, out) => {
     expect(normalizeSegments(input)).toBe(out);
   });

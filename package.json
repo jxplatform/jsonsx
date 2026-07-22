@@ -2,6 +2,8 @@
   "name": "jxsuite",
   "version": "0.34.0",
   "private": true,
+  "license": "MIT",
+  "author": "Kevin Shenk <kevin@avu.nu>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jxsuite/jx.git"
@@ -29,6 +31,8 @@
     "desktop:stable": "bun run --cwd packages/desktop build:stable",
     "dev": "bun run server.js",
     "docs:check": "bun scripts/docs/check-doc-refs.ts",
+    "docs:claims": "bun scripts/docs/check-site-claims.ts",
+    "docs:status": "bun scripts/docs/check-spec-status.ts",
     "docs:generate": "bun scripts/docs/generate-reference.ts",
     "docs:sync": "bun scripts/docs/check-doc-sync.ts",
     "docs:verify": "bun run docs:generate && git diff --exit-code -- docs && bun run docs:check",
@@ -49,7 +53,8 @@
     "test:coverage": "bun test --isolate --coverage",
     "test:coverage:workspaces": "bun run --workspaces test:coverage",
     "typecheck": "tsc",
-    "upgrade": "bunx npm-check-updates -u && bun install && bun run --workspaces --if-present upgrade"
+    "upgrade": "bunx npm-check-updates -u && bun install && bun run --workspaces --if-present upgrade",
+    "schema:validate-all": "bun scripts/validate-schemas.ts"
   },
   "dependencies": {
     "@jxsuite/server": "workspace:^"

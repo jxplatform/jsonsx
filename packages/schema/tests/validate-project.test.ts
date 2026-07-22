@@ -101,9 +101,43 @@ describe("validateProjectFile", () => {
     expect(result.valid).toBe(true);
   });
 
+  test("a version-skewed local @jxsuite/schema falls back to the validator's own files", async () => {
+    // A stale local install whose exports map lacks the subpath makes both createRequire legs
+    // Throw ERR_PACKAGE_PATH_NOT_EXPORTED (Node stops walking up once the package is found).
+    // The loader then reads the running validator's own copy off disk. class-schema.json exists
+    // In this package but is not in its exports map, so the fallback is the only working leg.
+    const root = makeProject({
+      fragments: ["./node_modules/@jxsuite/schema/class-schema.json"],
+      nodeModules: false,
+    });
+    const staleDir = join(root, "node_modules/@jxsuite/schema");
+    mkdirSync(staleDir, { recursive: true });
+    writeFileSync(
+      join(staleDir, "package.json"),
+      JSON.stringify({ exports: { ".": "./index.js" }, name: "@jxsuite/schema" }),
+    );
+    // Infrastructure succeeds (no "is not resolvable" throw): the ref loaded through the
+    // Fallback, and the class schema then rejects the project INSTANCE as ordinary data errors
+    // (proof the loaded file is the real class schema, not a stub).
+    const result = await validateProjectFile(root);
+    expect(result.valid).toBe(false);
+    expect(JSON.stringify(result.errors)).toContain("$prototype");
+  });
+
   test("an unresolvable node_modules ref throws (project and host both miss)", async () => {
     const root = makeProject({
       fragments: ["./node_modules/@jx-nope/missing/project.fragment.schema.json"],
+    });
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types `.rejects.toThrow` as void, but it resolves a Promise at runtime; the await is required.
+    await expect(validateProjectFile(root)).rejects.toThrow("is not resolvable");
+  });
+
+  test("an @jxsuite/schema subpath absent from the validator's own files still throws", async () => {
+    // The specifier hits the own-files fallback (its prefix matches), but no such file ships in
+    // This package, so existsSync misses and the loader falls through to the not-resolvable throw
+    // Rather than returning a stub. Covers the fallback's negative leg.
+    const root = makeProject({
+      fragments: ["./node_modules/@jxsuite/schema/does-not-exist.schema.json"],
     });
     // oxlint-disable-next-line typescript/await-thenable -- Bun types `.rejects.toThrow` as void, but it resolves a Promise at runtime; the await is required.
     await expect(validateProjectFile(root)).rejects.toThrow("is not resolvable");

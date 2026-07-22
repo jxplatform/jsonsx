@@ -129,6 +129,47 @@ describe("startDev", () => {
     expect(html).toContain("EventSource('/__reload')");
   });
 
+  test("a source change rebuilds the site before broadcasting the reload", async () => {
+    const server = await startDev({ port: 0, root: SITE });
+    servers.push(server);
+
+    const sse = await fetch(`http://localhost:${server.port}/__reload`);
+    const reader = sse.body!.getReader();
+    // Give chokidar a beat to finish its initial scan before the edit.
+    await new Promise((resolveSleep) => {
+      setTimeout(resolveSleep, 300);
+    });
+    writeFileSync(
+      join(SITE, "pages/index.json"),
+      JSON.stringify({
+        children: [{ children: ["Rebuilt by watch"], tagName: "h1" }],
+        title: "Home",
+      }),
+      "utf8",
+    );
+
+    const decoder = new TextDecoder();
+    let reloaded = false;
+    const deadline = Date.now() + 15_000;
+    while (!reloaded && Date.now() < deadline) {
+      const { value } = (await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("timeout waiting for reload")), 15_000);
+        }),
+      ])) as ReadableStreamReadResult<Uint8Array>;
+      if (value && decoder.decode(value).includes("data: reload")) {
+        reloaded = true;
+      }
+    }
+    expect(reloaded).toBe(true);
+    void reader.cancel();
+
+    // The preReload rebuild ran before the broadcast: dist now serves the new content.
+    const res = await fetch(`http://localhost:${server.port}/`);
+    expect(await res.text()).toContain("Rebuilt by watch");
+  }, 20_000);
+
   test("prints build errors but still boots", async () => {
     const BROKEN = resolve(import.meta.dir, "__test-dev-broken__");
     rmSync(BROKEN, { force: true, recursive: true });

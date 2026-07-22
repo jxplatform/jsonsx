@@ -3,7 +3,7 @@
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
 **Version:** 1.0.1-draft
-**Status:** Proposed
+**Status:** Pending
 **License:** MIT
 
 ---
@@ -767,8 +767,8 @@ The Browse view serves as the current collection browser. Future enhancements:
 | View              | Status          | Description                                                                              |
 | ----------------- | --------------- | ---------------------------------------------------------------------------------------- |
 | **Table view**    | **Implemented** | File listing with Name, Category, Type, Path columns. Filterable by category and search. |
-| **Card view**     | Planned         | Visual card layout with hero image, title, and summary. Good for blog posts.             |
-| **Calendar view** | Planned         | Date-sorted timeline. Useful for date-based collections (blog, events).                  |
+| **Card view**     | **Pending**     | Visual card layout with hero image, title, and summary. Good for blog posts.             |
+| **Calendar view** | **Pending**     | Date-sorted timeline. Useful for date-based collections (blog, events).                  |
 
 The view mode will be selectable per collection. Studio will remember the preference.
 
@@ -783,9 +783,10 @@ Markdown files (`.md`) open in **content mode** — a centered column WYSIWYG ca
 
 ### 7.4 Content Entry Editor
 
-#### Frontmatter Form (Not Yet Implemented)
+#### Frontmatter Form
 
-When a markdown content entry belongs to a collection with a defined schema, the **right panel** should render a schema-driven form for editing frontmatter fields. This reuses the existing `widgetForType()` / `inferInputType()` pattern already used for HTML attribute editing:
+> **Status: Pending.**
+> When a markdown content entry belongs to a collection with a defined schema, the **right panel** should render a schema-driven form for editing frontmatter fields. This reuses the existing `widgetForType()` / `inferInputType()` pattern already used for HTML attribute editing:
 
 | JSON Schema Type                     | Widget                                        |
 | ------------------------------------ | --------------------------------------------- |
@@ -800,23 +801,25 @@ When a markdown content entry belongs to a collection with a defined schema, the
 | `object`                             | Nested form group                             |
 | `$ref` to collection                 | Entry picker (dropdown of collection entries) |
 
-#### JSON Data Entry Editing (Not Yet Implemented)
+#### JSON Data Entry Editing
 
-JSON content entries (e.g., `authors/authors.json`) should open a form-based editor generated from the collection's JSON Schema, reusing the same widget mapping.
+> **Status: Pending.**
+> JSON content entries (e.g., `authors/authors.json`) should open a form-based editor generated from the collection's JSON Schema, reusing the same widget mapping.
 
-#### CSV Editing (Not Yet Implemented)
+#### CSV Editing
 
-CSV content entries should render as an inline table editor using `<sp-table>` with column types derived from the schema.
+> **Status: Pending.**
+> CSV content entries should render as an inline table editor using `<sp-table>` with column types derived from the schema.
 
 ### 7.5 Content CRUD Operations
 
 | Operation       | Status          | Action                                                                                                                                                                              |
 | --------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Create**      | Planned         | "New Entry" button on collection. Creates a file with schema defaults. For Markdown, creates a file with frontmatter stub. Studio assigns a slug from the title or prompts for one. |
+| **Create**      | **Pending**     | "New Entry" button on collection. Creates a file with schema defaults. For Markdown, creates a file with frontmatter stub. Studio assigns a slug from the title or prompts for one. |
 | **Read**        | **Implemented** | Browse view lists all content files; clicking opens in WYSIWYG (Markdown) or component editor (JSON).                                                                               |
 | **Update**      | **Partial**     | Markdown body editable via WYSIWYG canvas. Frontmatter and JSON data forms not yet available.                                                                                       |
-| **Delete**      | Planned         | Context menu → Delete. Confirms with dialog. Removes the file from disk.                                                                                                            |
-| **Rename/Move** | Planned         | Context menu → Rename. Updates filename (and therefore entry ID/slug). Warns if other entries reference this ID.                                                                    |
+| **Delete**      | **Pending**     | Context menu → Delete. Confirms with dialog. Removes the file from disk.                                                                                                            |
+| **Rename/Move** | **Pending**     | Context menu → Rename. Updates filename (and therefore entry ID/slug). Warns if other entries reference this ID.                                                                    |
 
 ### 7.6 Draft Workflow
 
@@ -966,7 +969,7 @@ The compiler serializes the `textContent` object to a JSON string within the `<s
 
 ### 8.6 Studio SEO Panel
 
-> **Current status:** Not yet implemented. The compiler handles `$head` merge (§8.3) at build time, but Studio has no visual SEO editing UI.
+> **Status: Pending.** The compiler handles `$head` merge (§8.3) at build time, but Studio has no visual SEO editing UI.
 
 The Studio inspector will include an "SEO" tab for any page or content entry:
 
@@ -1124,7 +1127,7 @@ The compiler resolves image `src` paths against the **project root**, not the re
 
 ### 9.4 Studio Media Browser
 
-> **Current status:** The Browse view's "Media" category filter lists all media files by extension (regardless of directory). The features below are planned enhancements.
+> **Status: Pending.** The Browse view's "Media" category filter lists all media files by extension (regardless of directory). The features below are planned enhancements.
 
 Studio will provide a media management panel accessible from:
 
@@ -1291,7 +1294,7 @@ Status 200 redirects function as rewrites (proxy-style).
 
 ### 11.4 Studio Redirect Editor
 
-> **Current status:** Not yet implemented. The compiler generates `_redirects` and HTML meta-refresh files from `project.json` redirect rules at build time, but Studio has no visual editor for managing them.
+> **Status: Pending.** The compiler generates `_redirects` and HTML meta-refresh files from `project.json` redirect rules at build time, but Studio has no visual editor for managing them.
 
 Studio will provide a dedicated redirect management UI under site settings:
 

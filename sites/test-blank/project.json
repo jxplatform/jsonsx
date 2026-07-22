@@ -1,7 +1,7 @@
 {
   "name": "AI Test Blank Canvas",
   "url": "http://localhost:3000",
-  "$schema": "../../packages/schema/project-schema.json",
+  "$schema": "./project.schema.json",
   "defaults": {
     "layout": "./layouts/base.json",
     "lang": "en"

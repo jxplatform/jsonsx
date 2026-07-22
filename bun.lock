@@ -173,7 +173,7 @@
         "@jxsuite/starters": "workspace:^",
         "@jxsuite/studio": "workspace:^",
         "dbus-ts": "^0.0.7",
-        "electrobun": "latest",
+        "electrobun": "1.18.1",
         "env-paths": "^4.0.0",
         "lit-html": "^3.3.3",
         "zod": "^4.4.3",
@@ -247,7 +247,7 @@
       "version": "1.2.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
-        "@vue/reactivity": "^3.5.40",
+        "@vue/reactivity": "3.5.40",
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.11.0",
@@ -294,6 +294,8 @@
       "version": "1.1.1",
       "devDependencies": {
         "@jxsuite/schema": "workspace:^",
+        "ajv": "^8.20.0",
+        "ajv-formats": "^3.0.1",
       },
     },
     "packages/studio": {

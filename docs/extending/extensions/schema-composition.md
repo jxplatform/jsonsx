@@ -59,7 +59,7 @@ Note the one non-local reference: field-schema positions point at the canonical 
 
 ## Generated entry documents
 
-`jx schema` writes two committed files into the project root, composing core with every fragment listed by the project's `extensions`. The generated `project.schema.json` of a project using only the parser:
+`jx schema` writes two committed files into the project root, composing core with every fragment listed by the project's `extensions`. Both files are **self-contained bundles**: every referenced resource is embedded under `$defs` keyed by its canonical `$id`, and the composition refs are those canonical URIs — no relative `./node_modules/…` paths, so any editor or validator resolves them offline. The generated `project.schema.json` of a project using only the parser (embedded resource bodies elided):
 
 ```json
 {
@@ -71,12 +71,14 @@ Note the one non-local reference: field-schema positions point at the canonical 
         { "$ref": "https://jxsuite.com/schema/project/core/v2#/$defs/JxFieldSchema" },
         { "$ref": "https://jxsuite.com/schema/project/core/v2#/$defs/RelationshipRef" }
       ]
-    }
+    },
+    "https://jxsuite.com/schema/project/core/v2": { "…": "embedded core fragment" },
+    "https://jxsuite.com/schema/ext/parser/project/v1": { "…": "embedded parser fragment" }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "allOf": [
-    { "$ref": "./node_modules/@jxsuite/schema/schemas/project.core.schema.json" },
-    { "$ref": "./node_modules/@jxsuite/parser/schemas/project.fragment.schema.json" }
+    { "$ref": "https://jxsuite.com/schema/project/core/v2" },
+    { "$ref": "https://jxsuite.com/schema/ext/parser/project/v1" }
   ],
   "type": "object",
   "unevaluatedProperties": false
@@ -85,7 +87,7 @@ Note the one non-local reference: field-schema positions point at the canonical 
 
 Top-level section keys combine via `allOf` + `unevaluatedProperties: false` — 2020-12 `unevaluatedProperties` sees annotations from adjacent `allOf` branches, so the entry document closes the object without any fragment needing to know its siblings. A misspelled or un-contributed top-level key fails validation.
 
-`document.schema.json` is the same move for documents: a thin wrapper around the core document schema that re-embeds the paths union resource as the union of extension-contributed `$paths` shapes (the parser contributes `ContentPathsSource` from its document fragment).
+`document.schema.json` is the same move for documents: the core document schema embedded under its canonical `$id` (`https://jxsuite.com/schema/v1`), with the paths union resource re-embedded as the union of extension-contributed `$paths` shapes (the parser contributes `ContentPathsSource` from its document fragment).
 
 `project.json` binds via `"$schema": "./project.schema.json"`.
 
@@ -106,9 +108,9 @@ The mechanism is **`$id` shadowing**: core ships a default resource under each w
 
 ## Validation
 
-- Any compliant validator resolves the entry documents offline: the `allOf` refs are relative file paths into the project's `node_modules`, and canonical-URI refs resolve from the `$id`s of the already-loaded fragments and embeds.
-- `jx validate` validates `project.json` against `./project.schema.json` using ajv-2020 with a file loader restricted to the project root and `node_modules`. CI validates every starter.
-- VS Code's JSON language service follows relative `$schema`/`$ref` natively and indexes embedded `$id`s. Where an editor fetches the canonical URLs instead (they are served from jxsuite.com), it gets the shipped defaults — the degradation is _under-suggestion_ of extension field extras, never false errors.
+- Any compliant validator resolves the committed entry documents offline **with no file access at all**: every `$ref` is a local pointer or a canonical URI resolving to an embedded resource's `$id`. Editors (VS Code, Monaco) index embedded `$id`s and need no `node_modules`, network, or configuration.
+- `jx validate` validates the whole project tree: `project.json` against `./project.schema.json`, every component/page/layout against the bundled document schema, every project-local `*.class.json` against the class schema, each fragment standalone, and flags any residual relative `$ref` in a committed entry document. CI runs this over every project root in the repo.
+- Where a client fetches the canonical URLs instead (they are served from jxsuite.com), it gets the shipped defaults — the degradation is _under-suggestion_ of extension field extras, never false errors.
 
 ## Regenerating
 

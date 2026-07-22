@@ -1,5 +1,11 @@
 # Imports
 
+**Version:** 1.0.0-draft
+**Status:** Partial
+**License:** MIT
+
+---
+
 The JX import system provides a unified way to manage three types of external dependencies: JX class files, npm packages, and web component libraries.
 
 ## Import Types

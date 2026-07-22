@@ -233,11 +233,12 @@ export const projectConfigSchema = {
     },
     style: {
       additionalProperties: {
-        oneOf: [{ type: "string" }, { type: "number" }, { type: "object" }],
+        oneOf: [{ type: "string" }, { type: "number" }, { $ref: "#/$defs/StyleObject" }],
       },
       description:
         "Global CSS styles applied to the <body> element. " +
-        "Uses the same camelCase CSSOM convention as component styles.",
+        "Uses the same camelCase CSSOM convention and recursive selector/at-rule " +
+        "nesting as component styles.",
       type: "object",
     },
     url: {

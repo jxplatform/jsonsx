@@ -3,7 +3,7 @@
 ## References Between Named Entries Across Extension Sections
 
 **Version:** 1.0.0-draft
-**Status:** In Progress
+**Status:** Partial
 **License:** MIT
 
 Companion to [extensions.md](./extensions.md) §5/§9. Defines the standard

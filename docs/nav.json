@@ -102,6 +102,7 @@
         { "path": "framework/concepts/data-prototypes", "label": "Data prototypes" },
         { "path": "framework/concepts/timing", "label": "Timing" },
         { "path": "framework/concepts/switching", "label": "Dynamic switching" },
+        { "path": "framework/concepts/security", "label": "Security" },
         { "path": "framework/site", "label": "Site architecture" },
         { "path": "framework/site/project-json", "label": "project.json" },
         { "path": "framework/site/routing", "label": "Routing" },
@@ -144,6 +145,7 @@
         { "path": "extending/embedding/backend-protocol", "label": "The backend protocol" },
         { "path": "extending/embedding/dev-server", "label": "Dev server internals" },
         { "path": "extending/reference/studio-routes", "label": "Protocol routes" },
+        { "path": "extending/reference/implementation-status", "label": "Implementation status" },
         { "path": "extending/contributing/monorepo", "label": "Working in the monorepo" },
         { "path": "extending/contributing/docs", "label": "Contributing to these docs" }
       ]

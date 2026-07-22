@@ -40,6 +40,11 @@ jobs:
       - name: Build with metafile
         run: bun run build:metafile
         working-directory: packages/${{ matrix.package }}
+      # Studio's bundle is otherwise unmonitored (the Codecov path below is a documented no-op on
+      # main). This enforces a committed size ceiling; it skips gracefully if dist isn't present.
+      - name: Check bundle budget
+        if: matrix.package == 'studio'
+        run: bun packages/studio/scripts/check-bundle-budget.ts
       - name: Upload bundle stats to Codecov
         run: >-
           bunx metafile-codecov

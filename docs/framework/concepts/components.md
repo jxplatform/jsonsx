@@ -133,15 +133,20 @@ Custom elements render to the light DOM (no Shadow DOM). Style scoping uses `dat
 
 ## Props and Encapsulation
 
-Props are passed via `$props` — the only mechanism for crossing component boundaries:
+Props are passed via `$props` on an instance node — the only mechanism for crossing component boundaries. Register the component in `$elements` and instantiate it by its custom-element tag:
 
 ```
 {
-  "$ref": "./card.json",
-  "$props": {
-    "title": "Static string",
-    "count": { "$ref": "#/state/count" }
-  }
+  "$elements": { "my-card": { "$ref": "./card.json" } },
+  "children": [
+    {
+      "tagName": "my-card",
+      "$props": {
+        "title": "Static string",
+        "count": { "$ref": "#/state/count" }
+      }
+    }
+  ]
 }
 ```
 

@@ -18,7 +18,8 @@ export const childrenValueSchema = {
   description:
     "Array of child definitions — elements, text, or Array namespaces (dynamic lists) mixed " +
     "freely. A bare Array namespace (the whole children slot is one dynamic list) is also " +
-    "accepted for backward compatibility.",
+    "accepted for backward compatibility, as is a ${…} template string that resolves at build " +
+    "time to an array of child definitions.",
   oneOf: [
     {
       items: {
@@ -32,5 +33,13 @@ export const childrenValueSchema = {
       type: "array",
     },
     { $ref: "#/$defs/ArrayNamespace" },
+    {
+      description:
+        "Computed children — a ${…} template that resolves at build time to an array of child " +
+        'definitions (e.g. "${state.entry.$children}" for parsed content). A bare plain-text ' +
+        "string is NOT a valid children value; text children must be array items.",
+      pattern: "\\$\\{",
+      type: "string",
+    },
   ],
 } as const;

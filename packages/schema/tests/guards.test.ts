@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   SCHEMA_KEYWORDS,
+  bodyReturnsValue,
   childrenContainArray,
   ensureNestedStyle,
   getEventBinding,
@@ -274,6 +275,18 @@ describe("isTemplateString", () => {
     expect(isTemplateString("$count")).toBe(false);
     expect(isTemplateString()).toBe(false);
     expect(isTemplateString(42)).toBe(false);
+  });
+});
+
+describe("bodyReturnsValue", () => {
+  test("detects a return statement (computed vs handler)", () => {
+    expect(bodyReturnsValue("return state.count + 1")).toBe(true);
+    expect(bodyReturnsValue("const x = 1;\n  return x")).toBe(true);
+  });
+
+  test("does not match identifiers that merely contain 'return'", () => {
+    expect(bodyReturnsValue("const returned = fetchData()")).toBe(false);
+    expect(bodyReturnsValue("state.count++")).toBe(false);
   });
 });
 

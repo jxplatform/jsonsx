@@ -3,7 +3,7 @@
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
 **Version:** 2.0.0-draft
-**Status:** In Progress
+**Status:** Partial
 **License:** MIT
 
 ---
@@ -557,18 +557,18 @@ For dynamic documents that are not custom elements, the compiler emits:
 
 | Feature                              | Description                                                       | Status                                                                           |
 | ------------------------------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `timing: "compiler"`                 | Bake fetch responses into HTML at build time                      | **Not implemented**                                                              |
-| Island serialization                 | `<script type="application/Jx+json">` hydration islands           | **Not implemented**                                                              |
-| Bundle manifest                      | Exact dependency manifest from JSON analysis                      | **Partially implemented** (imports collected but no standalone manifest file)    |
-| Multi-page build                     | Orchestrate compilation across all pages in a site project        | **Not implemented**                                                              |
+| `timing: "compiler"`                 | Bake fetch responses into HTML at build time                      | **Pending**                                                                      |
+| Island serialization                 | `<script type="application/Jx+json">` hydration islands           | **Pending**                                                                      |
+| Bundle manifest                      | Exact dependency manifest from JSON analysis                      | **Partial** (imports collected but no standalone manifest file)                  |
+| Multi-page build                     | Orchestrate compilation across all pages in a site project        | **Pending**                                                                      |
 | Layout resolution                    | Resolve `$layout` and `<slot>` insertion during compilation       | **Implemented** via `site-build`                                                 |
 | `$head` merge                        | Merge site + layout + page `<head>` entries with deduplication    | **Implemented** via `head-merger.js`                                             |
 | `$paths` expansion                   | Generate one page per content entry for dynamic routes            | **Implemented** via `pages-discovery.js`                                         |
 | `ContentCollection` / `ContentEntry` | New `$prototype` values for querying content at build time        | **Implemented** via `content-loader.js`                                          |
-| Sitemap generation                   | Auto-generate `sitemap.xml` from route table                      | **Not implemented**                                                              |
+| Sitemap generation                   | Auto-generate `sitemap.xml` from route table                      | **Pending**                                                                      |
 | Image optimization                   | Format conversion, responsive sizes, lazy loading, caching        | **Implemented** via `image-optimizer.js`, `image-transform.js`, `image-cache.js` |
 | Site-wide server bundling            | `build.adapter` collects all server entries into `dist/worker.js` | **Implemented** — Cloudflare adapter with asset fallback                         |
-| Platform-specific files              | Emit `_redirects` (Netlify), `vercel.json`, etc.                  | **Not implemented** (redirects partially via `generateRedirects`)                |
+| Platform-specific files              | Emit `_redirects` (Netlify), `vercel.json`, etc.                  | **Pending** (redirects partially via `generateRedirects`)                        |
 
 See the [Site Architecture Specification](site-architecture.md) for the full multi-page compilation and routing design.
 

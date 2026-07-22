@@ -26,7 +26,7 @@ Commands:
   dev [root]       Start the dev server (requires @jxsuite/server and Bun)
   preview [root]   Serve an already-built dist/ directory
   schema [root]    Generate project.schema.json + document.schema.json from project.json#/extensions
-  validate [root]  Validate project.json against its generated project.schema.json
+  validate [root]  Validate the whole project: project.json, documents, classes, and fragments
   db push [root]   Sync the data section's tables to their connections (additive-only)
 
 Options:
@@ -161,18 +161,15 @@ Options:
     }
   } else if (command === "validate") {
     try {
-      const { validateProjectFile } = await import("@jxsuite/schema/validate-project");
-      const { valid, errors } = await validateProjectFile(projectRoot);
-      if (valid) {
-        console.log(`project.json is valid (${projectRoot})`);
+      const { formatProjectTreeIssues, validateProjectTree } =
+        await import("./site/validate-command.ts");
+      const result = await validateProjectTree(projectRoot);
+      if (result.valid) {
+        console.log(`Project is valid (${result.checked} files checked in ${projectRoot})`);
       } else {
-        console.error(`project.json is INVALID (${projectRoot}):`);
-        for (const error of errors ?? []) {
-          const { instancePath, message } = (error ?? {}) as {
-            instancePath?: string;
-            message?: string;
-          };
-          console.error(`  - ${instancePath || "/"}: ${message ?? JSON.stringify(error)}`);
+        console.error(`Project is INVALID (${projectRoot}):`);
+        for (const line of formatProjectTreeIssues(result)) {
+          console.error(line);
         }
         process.exit(1);
       }

@@ -133,6 +133,19 @@ async function loadProjectSchemaRef(uri: string, root: string): Promise<Record<s
       const selfRequire = createRequire(import.meta.url);
       resolved = selfRequire.resolve(specifier);
     } catch (error) {
+      // Exports-map subpath resolution is brittle against version-skewed shadowing installs (a
+      // Stale local copy terminates Node's walk-up with ERR_PACKAGE_PATH_NOT_EXPORTED). Our own
+      // Schema files are pure data and the running validator's copy is guaranteed to match, so
+      // Read them straight off this package's disk as the last resort.
+      const ownPrefix = "@jxsuite/schema/";
+      if (specifier.startsWith(ownPrefix)) {
+        const ownFile = fileURLToPath(
+          new URL(`../${specifier.slice(ownPrefix.length)}`, import.meta.url),
+        );
+        if (existsSync(ownFile)) {
+          return JSON.parse(readFileSync(ownFile, "utf8")) as Record<string, unknown>;
+        }
+      }
       throw new Error(
         `Schema ref "${uri}" does not exist and "${specifier}" is not resolvable from the ` +
           `project or the host`,

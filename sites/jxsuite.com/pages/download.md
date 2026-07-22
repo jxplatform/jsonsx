@@ -12,7 +12,7 @@ $head:
   - tagName: meta
     attributes:
       property: "og:description"
-      content: "Free, open-source, code-signed desktop app for macOS, Windows, and Linux. Or install via the CLI."
+      content: "Free, open-source desktop app for macOS, Windows, and Linux. Or install via the CLI."
 $elements:
   - "$ref": "../components/cta-button.json"
   - "$ref": "../components/check-item.json"
@@ -64,10 +64,10 @@ Windows
 :::
 
 :::p{style.fontSize="0.875rem" style.color="var(--color-text-secondary)" style.margin="0" style.lineHeight="1.6"}
-Signed installer. Windows 10 or later, x64.
+Unsigned installer — Windows SmartScreen will warn on first run. Windows 10 or later, x64.
 :::
 
-::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/Jx.Studio.msi" props.label="Download .msi" props.variant="primary" props.newTab="true"}
+::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/JxStudio.msi" props.label="Download .msi" props.variant="primary" props.newTab="true"}
 ::::
 
 ::::div{style.display="flex" style.flexDirection="column" style.gap="1rem" style.padding="2rem" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)" style.backgroundColor="var(--color-bg-surface)" style.textAlign="center"}
@@ -102,7 +102,7 @@ Rather work from the terminal?
 :::
 
 :::p{style.color="var(--color-text-secondary)" style.fontSize="1.0625rem" style.lineHeight="1.7" style.margin="0 auto 2rem" style.maxWidth="560px"}
-Scaffold a project and open it in Studio from your own machine — no app install. Studio runs against your local files through the dev server.
+Scaffold a project and run it locally with live reload from your own machine. For the visual editor, use the Studio desktop app above.
 :::
 
 ::::div{style.backgroundColor="var(--color-bg-surface)" style.border="1px solid var(--color-border)" style.borderRadius="var(--radius)" style.padding="1.25rem 1.5rem" style.fontFamily="var(--font-mono)" style.fontSize="0.875rem" style.color="var(--color-text-secondary)" style.textAlign="left" style.lineHeight="2" style.maxWidth="480px" style.margin="0 auto 2rem"}

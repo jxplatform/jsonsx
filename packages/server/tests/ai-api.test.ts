@@ -723,3 +723,131 @@ describe("POST /__studio/ai/chat — auth, config & stream edge cases", () => {
     );
   });
 });
+
+// ─── Provenance / SSRF hardening ─────────────────────────────────────────────
+
+describe("AI proxy key-provenance + SSRF hardening", () => {
+  const withEnvKey = async (fn: () => Promise<void>) => {
+    const prev = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "sk-server-secret";
+    try {
+      await fn();
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENAI_API_KEY;
+      } else {
+        process.env.OPENAI_API_KEY = prev;
+      }
+    }
+  };
+
+  it("refuses to forward the env key to a caller-supplied base URL (401, no upstream fetch)", async () => {
+    await withEnvKey(async () => {
+      let fetched = false;
+      const realFetch = globalThis.fetch;
+      globalThis.fetch = (() => {
+        fetched = true;
+        return Promise.resolve(new Response("", { status: 200 }));
+      }) as unknown as typeof fetch;
+      try {
+        const req = mockReq("/__studio/ai/chat", {
+          method: "POST",
+          body: { messages: [{ role: "user", content: "hi" }] },
+          headers: { "X-Api-Base-URL": "https://attacker.example/v1" },
+        });
+        const res = await handleAiApi(req, new URL("http://localhost/__studio/ai/chat"));
+        expect(res!.status).toBe(401);
+        expect(fetched).toBe(false);
+      } finally {
+        globalThis.fetch = realFetch;
+      }
+    });
+  });
+
+  it("blocks a base URL pointing at the cloud metadata endpoint (403)", async () => {
+    const req = mockReq("/__studio/ai/chat", {
+      method: "POST",
+      body: { messages: [{ role: "user", content: "hi" }] },
+      headers: { "X-Api-Base-URL": "http://169.254.169.254/latest", "X-Api-Key": "sk-user" },
+    });
+    const res = await handleAiApi(req, new URL("http://localhost/__studio/ai/chat"));
+    expect(res!.status).toBe(403);
+  });
+
+  it("models endpoint also refuses a caller base URL without a caller key (401)", async () => {
+    await withEnvKey(async () => {
+      const req = mockReq("/__studio/ai/models", {
+        headers: { "X-Api-Base-URL": "https://attacker.example/v1" },
+      });
+      const res = await handleAiApi(req, new URL("http://localhost/__studio/ai/models"));
+      expect(res!.status).toBe(401);
+    });
+  });
+
+  it.each([
+    ["an unparseable base URL", "not a url at all"],
+    ["the GCP metadata hostname", "http://metadata.google.internal/v1"],
+    ["an IPv6 link-local host", "http://[fe80::1]/v1"],
+  ])("blocks %s (403)", async (_label, baseUrl) => {
+    const req = mockReq("/__studio/ai/chat", {
+      method: "POST",
+      body: { messages: [{ role: "user", content: "hi" }] },
+      headers: { "X-Api-Base-URL": baseUrl, "X-Api-Key": "sk-user" },
+    });
+    const res = await handleAiApi(req, new URL("http://localhost/__studio/ai/chat"));
+    expect(res!.status).toBe(403);
+  });
+});
+
+// ─── Mid-stream pump failures ─────────────────────────────────────────────────
+
+describe("POST /__studio/ai/chat — mid-stream pump failures", () => {
+  /**
+   * An upstream whose body delivers one chunk, then rejects the next read. A Response-shaped plain
+   * object keeps the JS ReadableStream as-is (a real Response would eagerly pump it natively and
+   * surface the rejection at construction instead of at the proxy's reader).
+   */
+  const failingUpstream = (error: Error) => {
+    let reads = 0;
+    const reader = {
+      cancel: () => Promise.resolve(),
+      read: () => {
+        reads += 1;
+        if (reads === 1) {
+          return Promise.resolve({
+            done: false,
+            value: new TextEncoder().encode('data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n'),
+          });
+        }
+        return Promise.reject(error);
+      },
+    };
+    return { body: { getReader: () => reader }, ok: true, status: 200 } as unknown as Response;
+  };
+
+  it("reports a mid-stream read failure as an error event", async () => {
+    await withUpstream(
+      (() =>
+        Promise.resolve(failingUpstream(new Error("connection reset")))) as unknown as typeof fetch,
+      async () => {
+        const res = await handleAiApi(chatReq(), new URL("http://localhost/__studio/ai/chat"));
+        const events = await readSSEEvents(res!);
+        expect(events.some((e) => e.type === "delta" && e.content === "Hi")).toBe(true);
+        const error = events.find((e) => e.type === "error");
+        expect(error!.message).toContain("Stream error: connection reset");
+      },
+    );
+  });
+
+  it("emits a cancelled done when the read aborts mid-stream", async () => {
+    const abort = Object.assign(new Error("The operation was aborted."), { name: "AbortError" });
+    await withUpstream(
+      (() => Promise.resolve(failingUpstream(abort))) as unknown as typeof fetch,
+      async () => {
+        const res = await handleAiApi(chatReq(), new URL("http://localhost/__studio/ai/chat"));
+        const events = await readSSEEvents(res!);
+        expect(events.find((e) => e.type === "done")!.stopReason).toBe("cancelled");
+      },
+    );
+  });
+});

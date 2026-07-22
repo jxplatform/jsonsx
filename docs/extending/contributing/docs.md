@@ -70,7 +70,7 @@ Use at most a couple per screenful, and never open a page with one.
 - **Studio surface page**: definition sentence (what it is, where it lives) → hero screenshot → "Open …" click path first → verb-first task sections with numbered steps and a screenshot after each state-changing step → a `:::doc-note` naming what Studio writes, linking the Framework counterpart → related links.
 - **Framework concept page**: a "Studio writes this format for you" note linking the Studio surface → smallest complete JSON example first → one H2 per variant with a short example each → how it compiles → hard rules → related links.
 - **Tutorial**: outcome + finished screenshot + rough duration + prerequisites → numbered steps with expected-result sentences ("You should now see…") → "What you built" recap → next steps.
-- **Generated reference**: do not edit these — they carry a `GENERATED` banner and are produced by `bun run docs:generate` from package data; CI fails on drift.
+- **Generated reference**: do not edit these — they carry a `GENERATED` banner and are produced by `bun run docs:generate` from package data and the specs' status markers; CI fails on drift.
 
 ## Screenshots
 
