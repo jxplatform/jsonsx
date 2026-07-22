@@ -110,6 +110,10 @@ export async function handleResolve(
   }
 
   let moduleAbsPath;
+  // A bare specifier resolves through Node's module resolution (an installed package), so the
+  // Class file — and the `$implementation` sibling it names — are as trusted as the package's own
+  // Code. The root-escape guard only binds a caller-supplied relative `$src`/`$base`.
+  let trustedResolution = false;
   try {
     if ($src.startsWith("./") || $src.startsWith("../")) {
       // Relative path
@@ -133,6 +137,7 @@ export async function handleResolve(
         const serverRequire = createRequire(import.meta.url);
         moduleAbsPath = serverRequire.resolve($src);
       }
+      trustedResolution = true;
     }
   } catch (error) {
     return new Response(`Cannot resolve $src "${$src}": ${errorMessage(error)}`, { status: 400 });
@@ -167,7 +172,9 @@ export async function handleResolve(
       if (classDef.$implementation) {
         // Hybrid mode: redirect to the JS implementation
         const implPath = resolve(dirname(moduleAbsPath), classDef.$implementation);
-        if (!isImportable(implPath, root, activeProjectRoot)) {
+        // A trusted (bare-specifier) class file names its own sibling implementation; only a
+        // Project-local relative $src is held to the root-escape guard.
+        if (!trustedResolution && !isImportable(implPath, root, activeProjectRoot)) {
           return new Response(`$implementation escapes the project root`, { status: 403 });
         }
         const exportName = xport ?? classDef.title ?? $prototype;

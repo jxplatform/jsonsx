@@ -108,7 +108,7 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
 
 interface TabBarCtx {
   closeFormulaWorkspace: () => void;
-  closeFunctionEditor: () => void;
+  closeFunctionEditor: () => Promise<void> | void;
   navigateBack: () => Promise<void> | void;
   navigateToLevel: (i: number) => Promise<void> | void;
 }

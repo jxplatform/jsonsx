@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { handleResolve, handleServerFunction } from "../src/resolve";
 import { join, resolve } from "node:path";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const FIXTURES = resolve(import.meta.dir, "_resolve_gaps_fixtures");
@@ -238,5 +238,42 @@ describe("handleResolve — gaps", () => {
     );
     expect(res.status).toBe(403);
     expect(await res.text()).toContain("$implementation escapes the project root");
+  });
+
+  test("trusts a bare-specifier class whose $implementation sits outside the project root", async () => {
+    // An installed package (bare specifier) is resolved through Node's module resolution, so its
+    // Class file — and the sibling $implementation it names, even one above the class dir — is as
+    // Trusted as the package's own code. The root-escape guard must not fire here.
+    const pkgRoot = mkdtempSync(join(tmpdir(), "jx-resolve-trusted-"));
+    const projRoot = mkdtempSync(join(tmpdir(), "jx-resolve-proj-"));
+    try {
+      const pkgDir = join(pkgRoot, "node_modules", "trusted-ext");
+      mkdirSync(join(pkgDir, "src"), { recursive: true });
+      mkdirSync(join(pkgDir, "dist"), { recursive: true });
+      writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: "trusted-ext" }));
+      writeFileSync(
+        join(pkgDir, "src", "Ext.class.json"),
+        JSON.stringify({ $implementation: "../dist/ext.js", $prototype: "Ext", title: "Ext" }),
+      );
+      writeFileSync(
+        join(pkgDir, "dist", "ext.js"),
+        "export class Ext { resolve() { return { ok: true }; } }",
+      );
+      // The project require walks up from projRoot; symlink the package into its node_modules so a
+      // Bare specifier resolves without a real install.
+      mkdirSync(join(projRoot, "node_modules"), { recursive: true });
+      writeFileSync(join(projRoot, "package.json"), JSON.stringify({ name: "proj" }));
+      symlinkSync(pkgDir, join(projRoot, "node_modules", "trusted-ext"));
+
+      const res = await handleResolve(
+        resolveReq({ $prototype: "Ext", $src: "trusted-ext/src/Ext.class.json" }),
+        projRoot,
+      );
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+    } finally {
+      rmSync(pkgRoot, { force: true, recursive: true });
+      rmSync(projRoot, { force: true, recursive: true });
+    }
   });
 });

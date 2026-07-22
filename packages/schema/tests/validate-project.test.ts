@@ -132,6 +132,17 @@ describe("validateProjectFile", () => {
     await expect(validateProjectFile(root)).rejects.toThrow("is not resolvable");
   });
 
+  test("an @jxsuite/schema subpath absent from the validator's own files still throws", async () => {
+    // The specifier hits the own-files fallback (its prefix matches), but no such file ships in
+    // This package, so existsSync misses and the loader falls through to the not-resolvable throw
+    // Rather than returning a stub. Covers the fallback's negative leg.
+    const root = makeProject({
+      fragments: ["./node_modules/@jxsuite/schema/does-not-exist.schema.json"],
+    });
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types `.rejects.toThrow` as void, but it resolves a Promise at runtime; the await is required.
+    await expect(validateProjectFile(root)).rejects.toThrow("is not resolvable");
+  });
+
   test("a ref outside node_modules that does not exist throws", async () => {
     const root = makeProject({ fragments: ["./missing-local.fragment.schema.json"] });
     // oxlint-disable-next-line typescript/await-thenable -- Bun types `.rejects.toThrow` as void, but it resolves a Promise at runtime; the await is required.
