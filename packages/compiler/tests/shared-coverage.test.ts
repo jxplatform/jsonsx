@@ -207,4 +207,14 @@ describe("buildComponentCSS — media blocks", () => {
     expect(css).toContain("@media (max-width: 600px) { my-el {");
     expect(css).toContain("@media (min-width: 1px) { my-el {");
   });
+
+  test("a non-object @-block value is ignored", () => {
+    const css = buildComponentCSS("my-el", {
+      "@--mobile": "not-an-object",
+      color: "red",
+    } as any);
+    expect(css).toContain("color: red;");
+    expect(css).not.toContain("@media");
+    expect(css).not.toContain("not-an-object");
+  });
 });

@@ -104,6 +104,64 @@ describe("applyDocOpsToY mirrors the plain applier", () => {
       applyDocOpsToY(ydoc, [{ key: "x", op: "set-key", path: ["children", 2] }], LOCAL_ORIGIN),
     ).toThrow(CollabPathError);
   });
+
+  test("child ops against a missing or non-array children key throw CollabPathError", () => {
+    const { ydoc } = fresh();
+    // The h1 leaf has no children array and remove-child must not create one.
+    expect(() =>
+      applyDocOpsToY(
+        ydoc,
+        [{ index: 0, op: "remove-child", parentPath: ["children", 0] }],
+        LOCAL_ORIGIN,
+      ),
+    ).toThrow(CollabPathError);
+    // A children key holding a non-array value is unusable even for inserts.
+    applyDocOpsToY(
+      ydoc,
+      [{ key: "children", op: "set-key", path: ["children", 0], value: "not-an-array" }],
+      LOCAL_ORIGIN,
+    );
+    expect(() =>
+      applyDocOpsToY(
+        ydoc,
+        [{ index: 0, node: { tagName: "b" }, op: "insert-child", parentPath: ["children", 0] }],
+        LOCAL_ORIGIN,
+      ),
+    ).toThrow(CollabPathError);
+  });
+
+  test("set-child and move-child index bounds throw CollabPathError", () => {
+    const { ydoc } = fresh();
+    expect(() =>
+      applyDocOpsToY(
+        ydoc,
+        [{ index: 9, node: { tagName: "x" }, op: "set-child", parentPath: [] }],
+        LOCAL_ORIGIN,
+      ),
+    ).toThrow(CollabPathError);
+    expect(() =>
+      applyDocOpsToY(
+        ydoc,
+        [{ fromIndex: 9, fromParentPath: [], op: "move-child", toIndex: 0, toParentPath: [] }],
+        LOCAL_ORIGIN,
+      ),
+    ).toThrow(CollabPathError);
+    // The source index resolves, so the removal commits before the target bound check fires.
+    expect(() =>
+      applyDocOpsToY(
+        ydoc,
+        [{ fromIndex: 0, fromParentPath: [], op: "move-child", toIndex: 9, toParentPath: [] }],
+        LOCAL_ORIGIN,
+      ),
+    ).toThrow(CollabPathError);
+  });
+
+  test("an unknown op kind throws a plain error (not CollabPathError)", () => {
+    const { ydoc } = fresh();
+    expect(() =>
+      applyDocOpsToY(ydoc, [{ op: "explode" } as unknown as JxDocOp], LOCAL_ORIGIN),
+    ).toThrow("unknown-doc-op:explode");
+  });
 });
 
 describe("two docs wired memory-to-memory converge", () => {
@@ -278,5 +336,57 @@ describe("yEventsToDocOps (fast inbound path)", () => {
 
   test("empty event list produces no ops", () => {
     expect(yEventsToDocOps([])).toEqual([]);
+  });
+
+  test("a path with a non-string/number segment bails to null", () => {
+    const fake = { path: [Symbol("weird")] } as unknown as Y.YEvent<never>;
+    expect(yEventsToDocOps([fake])).toBeNull();
+  });
+
+  test("two array events in one transaction bail to null", () => {
+    const a = new Y.Doc();
+    const b = new Y.Doc();
+    seedStructure(a, {
+      children: [
+        { children: [{ tagName: "p" }], tagName: "section" },
+        { children: [{ tagName: "p" }], tagName: "aside" },
+      ],
+      tagName: "div",
+    });
+    Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
+    let ops: JxDocOp[] | null | "unset" = "unset";
+    b.getMap("structure").observeDeep((events) => {
+      ops = yEventsToDocOps(events as unknown as Y.YEvent<never>[]);
+    });
+    // One transaction splicing two disjoint children arrays: neither path contains the other, so
+    // The overlap guard passes and the multi-array guard must bail.
+    applyDocOpsToY(
+      a,
+      [
+        { index: 0, node: "x", op: "insert-child", parentPath: ["children", 0] },
+        { index: 0, node: "y", op: "insert-child", parentPath: ["children", 1] },
+      ],
+      "x",
+    );
+    Y.applyUpdate(b, Y.encodeStateAsUpdate(a, Y.encodeStateVector(b)));
+    expect(ops).toBeNull();
+  });
+
+  test("an array event off the children key bails to null", () => {
+    const a = new Y.Doc();
+    const b = new Y.Doc();
+    seedStructure(a, BASE);
+    // A Y.Array living under a key other than "children" is not part of the structure contract.
+    a.getMap("structure").set("items", new Y.Array<unknown>());
+    Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
+    let ops: JxDocOp[] | null | "unset" = "unset";
+    b.getMap("structure").observeDeep((events) => {
+      ops = yEventsToDocOps(events as unknown as Y.YEvent<never>[]);
+    });
+    a.transact(() => {
+      (a.getMap("structure").get("items") as Y.Array<unknown>).insert(0, ["x"]);
+    });
+    Y.applyUpdate(b, Y.encodeStateAsUpdate(a, Y.encodeStateVector(b)));
+    expect(ops).toBeNull();
   });
 });

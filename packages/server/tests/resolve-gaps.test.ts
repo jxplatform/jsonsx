@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { handleResolve } from "../src/resolve";
+import { handleResolve, handleServerFunction } from "../src/resolve";
 import { join, resolve } from "node:path";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -189,5 +189,54 @@ describe("handleResolve — gaps", () => {
     );
     expect(res.status).toBe(400);
     expect(await res.text()).toContain("Cannot resolve");
+  });
+
+  test("imports a $src under the active project root but outside the server root", async () => {
+    // The active project lives OUTSIDE the server root: isImportable must accept it via the
+    // ActiveProjectRoot containment branch.
+    const external = mkdtempSync(join(tmpdir(), "jx-resolve-active-"));
+    try {
+      writeFileSync(join(external, "Ctx.class.json"), JSON.stringify(ctxClass));
+      const res = await handleResolve(
+        resolveReq({ $prototype: "Ctx", $src: "./Ctx.class.json" }),
+        join(FIXTURES, "proj-valid"),
+        external,
+      );
+      expect(res.status).toBe(200);
+      const value = (await res.json()) as { a: number };
+      expect(value.a).toBe(5);
+    } finally {
+      rmSync(external, { force: true, recursive: true });
+    }
+  });
+
+  test("server-function proxy rejects a $src that escapes the project root", async () => {
+    const req = new Request("http://localhost/__jx_server__", {
+      body: JSON.stringify({ $export: "run", $src: "../outside.js", arguments: {} }),
+      method: "POST",
+    });
+    const res = await handleServerFunction(req, join(FIXTURES, "proj-valid"));
+    expect(res.status).toBe(403);
+    expect(await res.text()).toContain("escapes the project root");
+  });
+
+  test("rejects a .class.json whose $implementation escapes the project root", async () => {
+    const root = join(FIXTURES, "impl-escape");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(
+      join(root, "Esc.class.json"),
+      JSON.stringify({
+        $implementation: "../outside-impl.js",
+        $prototype: "Class",
+        title: "Esc",
+      }),
+    );
+    writeFileSync(join(FIXTURES, "outside-impl.js"), "export class Esc {}");
+    const res = await handleResolve(
+      resolveReq({ $prototype: "Esc", $src: "./Esc.class.json" }),
+      root,
+    );
+    expect(res.status).toBe(403);
+    expect(await res.text()).toContain("$implementation escapes the project root");
   });
 });

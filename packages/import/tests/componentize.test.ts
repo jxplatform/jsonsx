@@ -224,3 +224,75 @@ describe("componentize", () => {
     expect(allValues1).toContain("/beta");
   });
 });
+
+describe("componentize — string children and edge shapes", () => {
+  function banner(text: string): JxElement {
+    return {
+      tagName: "aside",
+      children: [{ tagName: "strong", children: ["Note:", text] }, "static tail"],
+    };
+  }
+
+  test("raw string children participate: varying text interpolates, static stays literal", () => {
+    const pages = new Map<string, JxElement>([
+      ["pages/index.json", { tagName: "div", children: [banner("first"), banner("second")] }],
+    ]);
+    const result = componentize(pages);
+    expect(result.components.size).toBe(1);
+
+    const comp = [...result.components.values()][0]!;
+    const strong = (comp.template.children as JxElement[])[0]!;
+    expect(strong.children).toEqual(["Note:", "${state.text}"]);
+    expect((comp.template.children as unknown[])[1]).toBe("static tail");
+
+    const page = result.rewrittenPages.get("pages/index.json")!;
+    const children = page.children as JxElement[];
+    expect(children[0]!.$props).toEqual({ text: "first" });
+    expect(children[1]!.$props).toEqual({ text: "second" });
+  });
+
+  test("an attribute named like an index falls back to the 'value' state name", () => {
+    const widget = (v: string): JxElement => ({
+      tagName: "section",
+      children: [{ tagName: "div", attributes: { "0": v }, children: [{ tagName: "i" }] }],
+    });
+    const pages = new Map<string, JxElement>([
+      ["pages/index.json", { tagName: "div", children: [widget("alpha"), widget("beta")] }],
+    ]);
+    const result = componentize(pages);
+    // The deeper section pattern claims first; its inner div repeat is subsumed by the claim.
+    expect(result.components.size).toBe(1);
+
+    const comp = [...result.components.values()][0]!;
+    expect(comp.template.tagName).toBe("section");
+    const div = (comp.template.children as JxElement[])[0]!;
+    expect(div.attributes?.["0"]).toBe("${state.value}");
+
+    const page = result.rewrittenPages.get("pages/index.json")!;
+    expect((page.children as JxElement[])[0]!.$props).toEqual({ value: "alpha" });
+    expect((page.children as JxElement[])[1]!.$props).toEqual({ value: "beta" });
+  });
+
+  test("call-sites nested below the top level are rewritten in place", () => {
+    const pages = new Map<string, JxElement>([
+      [
+        "pages/index.json",
+        {
+          tagName: "div",
+          children: [
+            { tagName: "main", children: [card("Nested A", "da", "/a")] },
+            { tagName: "aside", children: [card("Nested B", "db", "/b")] },
+          ],
+        },
+      ],
+    ]);
+    const result = componentize(pages);
+    expect(result.components.size).toBe(1);
+
+    const page = result.rewrittenPages.get("pages/index.json")!;
+    const main = (page.children as JxElement[])[0]!;
+    const aside = (page.children as JxElement[])[1]!;
+    expect((main.children as JxElement[])[0]!.tagName).toMatch(/^component-/);
+    expect((aside.children as JxElement[])[0]!.tagName).toMatch(/^component-/);
+  });
+});

@@ -170,6 +170,86 @@ describe("createWatcher — rebuild integration", () => {
     }
   });
 
+  test("logs a preReload failure and still broadcasts the reload", async () => {
+    const dir = setup("prereload-fail");
+    try {
+      const preReloadCalls: string[] = [];
+      const logged: string[] = [];
+      const origError = console.error;
+      console.error = (...args: unknown[]) => void logged.push(args.map(String).join(" "));
+      try {
+        const { handleSSE, watcher } = createWatcher(dir, [], {
+          debounce: 10,
+          preReload: (filename) => {
+            preReloadCalls.push(filename);
+            throw new Error("site build exploded");
+          },
+          reloadOnAnyChange: true,
+        });
+        const reader = (handleSSE().body as ReadableStream).getReader();
+        await waitReady(watcher);
+
+        writeFileSync(join(dir, "entry.js"), "export const changed = 1;");
+
+        const decoder = new TextDecoder();
+        let reloaded = false;
+        while (!reloaded) {
+          const { value } = (await Promise.race([
+            reader.read(),
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error("timeout waiting for reload")), 3000);
+            }),
+          ])) as ReadableStreamReadResult<Uint8Array>;
+          if (value && decoder.decode(value).includes("data: reload")) {
+            reloaded = true;
+          }
+        }
+        expect(preReloadCalls).toEqual(["entry.js"]);
+        expect(logged.some((l) => l.includes("preReload failed: site build exploded"))).toBe(true);
+        void reader.cancel();
+        await watcher.close();
+        await sleep(100);
+      } finally {
+        console.error = origError;
+      }
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
+  test("SSE heartbeats keep the stream alive and stop after the client disconnects", async () => {
+    const dir = setup("sse-heartbeat");
+    const realSetInterval = globalThis.setInterval;
+    let heartbeat: (() => void) | undefined;
+    globalThis.setInterval = ((cb: () => void, ms?: number) => {
+      const timer = realSetInterval(() => {}, ms);
+      if (ms === 15_000) {
+        heartbeat = cb;
+      }
+      return timer;
+    }) as unknown as typeof setInterval;
+    try {
+      const { handleSSE, watcher } = createWatcher(dir, [], { debounce: 10 });
+      const reader = (handleSSE().body as ReadableStream).getReader();
+      expect(heartbeat).toBeDefined();
+
+      // While connected, the heartbeat comment frame reaches the client.
+      heartbeat!();
+      const { value } = await reader.read();
+      expect(new TextDecoder().decode(value)).toContain(": heartbeat");
+
+      // After the client goes away the enqueue fails and the interval clears itself.
+      await reader.cancel();
+      heartbeat!();
+
+      await watcher.close();
+      await sleep(50);
+    } finally {
+      globalThis.setInterval = realSetInterval;
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
   test("swallows transient EINVAL watch errors but logs the rest", async () => {
     const dir = setup("watch-errors");
     try {

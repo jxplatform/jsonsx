@@ -114,6 +114,45 @@ beforeAll(() => {
   );
   writeFileSync(join(ROOT, "node_modules", "bad-cem", "cem.json"), "{nope");
 
+  // Project whose extension registers a component-kind document format
+  mkdirSync(join(ROOT, "comp-ext-proj", "widget-ext"), { recursive: true });
+  writeFileSync(
+    join(ROOT, "comp-ext-proj", "project.json"),
+    JSON.stringify({ extensions: ["./widget-ext"], name: "Comp Ext" }),
+  );
+  writeFileSync(
+    join(ROOT, "comp-ext-proj", "widget-ext", "jx-extension.json"),
+    JSON.stringify({ classes: { Widget: "./Widget.class.json" }, name: "widget-ext" }),
+  );
+  writeFileSync(
+    join(ROOT, "comp-ext-proj", "widget-ext", "Widget.class.json"),
+    JSON.stringify({
+      $defs: {
+        methods: {
+          parse: {
+            identifier: "parse",
+            role: "parse",
+            scope: "static",
+            timing: ["compiler", "server"],
+          },
+        },
+      },
+      $implementation: "./widget-impl.js",
+      $prototype: "Class",
+      extends: "Object",
+      format: { documentKinds: ["component"], extensions: [".wgt"] },
+      title: "Widget",
+    }),
+  );
+  writeFileSync(
+    join(ROOT, "comp-ext-proj", "widget-ext", "widget-impl.js"),
+    "export class Widget { static parse() { return { tagName: 'x-wgt' }; } }",
+  );
+  writeFileSync(
+    join(ROOT, "comp-ext-proj", "card.json"),
+    JSON.stringify({ $elements: [], state: {}, tagName: "x-card" }),
+  );
+
   // Subproject without its own node_modules (forces root fallback)
   mkdirSync(join(ROOT, "sub"), { recursive: true });
   writeFileSync(
@@ -155,6 +194,35 @@ beforeAll(() => {
       },
       $prototype: "Class",
       title: "Schema",
+    }),
+  );
+  writeFileSync(
+    join(ROOT, "Init.class.json"),
+    JSON.stringify({
+      $defs: {
+        fields: {
+          count: {
+            access: "public",
+            examples: [1, 2, 3],
+            identifier: "count",
+            initializer: 7,
+            role: "field",
+            scope: "instance",
+            type: { type: "number" },
+          },
+          fixed: {
+            access: "public",
+            default: "abc",
+            identifier: "fixed",
+            initializer: "ignored",
+            role: "field",
+            scope: "instance",
+            type: { type: "string" },
+          },
+        },
+      },
+      $prototype: "Class",
+      title: "Init",
     }),
   );
   writeFileSync(
@@ -377,6 +445,16 @@ describe("files — gaps", () => {
     const res = await callApi(req, url);
     expect(res.status).toBe(500);
   });
+
+  test("reports files outside the active project relative to the server root", async () => {
+    // Listing the SERVER root while an external project is active: entries are not under the
+    // Project root, so they are reported relative to the server root instead.
+    const { req, url } = getReq(`/__studio/files?dir=${encodeURIComponent(ROOT)}&glob=*.txt`);
+    const res = await callApi(req, url, ROOT, EXTERNAL);
+    expect(res.status).toBe(200);
+    const files = (await res.json()) as { path: string }[];
+    expect(files.map((f) => f.path)).toContain("blocker.txt");
+  });
 });
 
 // ─── components ──────────────────────────────────────────────────────────────
@@ -398,6 +476,14 @@ describe("components — gaps", () => {
     const label = widget.props.find((p: { name: string }) => p.name === "label");
     expect(label.default).toBe("hi");
     expect(label.type).toBe("string");
+  });
+
+  test("includes extension-declared component formats in the scan", async () => {
+    const { req, url } = getReq("/__studio/components?dir=comp-ext-proj");
+    const res = await callApi(req, url);
+    expect(res.status).toBe(200);
+    const components = (await res.json()) as { tagName: string }[];
+    expect(components.some((c) => c.tagName === "x-card")).toBe(true);
   });
 
   test("discovers CEM components via root node_modules fallback", async () => {
@@ -543,6 +629,24 @@ describe("packages add/remove — gaps", () => {
     const res = await callApi(req, url);
     expect(res.status).toBe(500);
   });
+
+  test("remove reports a non-zero bun exit with its stderr", async () => {
+    // An empty dir outside any package tree: the spawn succeeds, but `bun remove` finds no
+    // Package.json and exits non-zero.
+    const emptyDir = mkdtempSync(join(tmpdir(), "jx-remove-fail-"));
+    try {
+      const { req, url } = jsonReq("/__studio/packages/remove", "POST", {
+        dir: emptyDir,
+        name: "anything",
+      });
+      const res = await callApi(req, url);
+      expect(res.status).toBe(500);
+      const payload = (await res.json()) as { error: string };
+      expect(payload.error.length).toBeGreaterThan(0);
+    } finally {
+      rmSync(emptyDir, { force: true, recursive: true });
+    }
+  });
 });
 
 // ─── file CRUD error paths ───────────────────────────────────────────────────
@@ -686,6 +790,53 @@ describe("plugin-schema — gaps", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.schema.properties.live.type).toBe("boolean");
+  });
+
+  test("uses a field initializer as the default when no explicit default exists", async () => {
+    const { req, url } = getReq("/__studio/plugin-schema?src=./Init.class.json");
+    const res = await callApi(req, url);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      schema: { properties: Record<string, { default?: unknown }> };
+    };
+    expect(body.schema.properties.count!.default).toBe(7);
+    expect((body.schema.properties.count as { examples?: number[] }).examples).toEqual([1, 2, 3]);
+    // An explicit default always wins over the initializer.
+    expect(body.schema.properties.fixed!.default).toBe("abc");
+  });
+});
+
+// ─── error paths reached through a vanished server root ──────────────────────
+
+describe("vanished server root — scan error paths", () => {
+  const GHOST = join(FIXTURES, "ghost-root");
+
+  test("sites returns 500 when the scan root cannot be read", async () => {
+    const { req, url } = getReq("/__studio/sites");
+    const res = await callApi(req, url, GHOST);
+    expect(res.status).toBe(500);
+  });
+
+  test("locate returns 500 when the scan root cannot be read", async () => {
+    const { req, url } = jsonReq("/__studio/locate", "POST", { name: "page.json" });
+    const res = await callApi(req, url, GHOST);
+    expect(res.status).toBe(500);
+  });
+
+  test("components returns 500 when the scan root cannot be read", async () => {
+    const { req, url } = getReq("/__studio/components");
+    const res = await callApi(req, url, GHOST);
+    expect(res.status).toBe(500);
+  });
+});
+
+// ─── data-api delegation ─────────────────────────────────────────────────────
+
+describe("data-api delegation", () => {
+  test("data routes are answered by the data-api delegate", async () => {
+    const { req, url } = getReq("/__studio/data/connections");
+    const res = await callApi(req, url);
+    expect(res.headers.get("Content-Type")).toContain("application/json");
   });
 });
 

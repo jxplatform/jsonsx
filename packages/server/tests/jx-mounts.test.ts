@@ -106,6 +106,24 @@ describe("handleJxMounts", () => {
     expect(await call("GET", "/_jx/unclaimed/route")).toBeNull();
   });
 
+  test("a broken project.json is warned about and dispatches nothing", async () => {
+    const broken = `${TMP}-broken`;
+    rmSync(broken, { force: true, recursive: true });
+    const warned: string[] = [];
+    const origWarn = console.warn;
+    console.warn = (...args: unknown[]) => void warned.push(args.map(String).join(" "));
+    try {
+      mkdirSync(broken, { recursive: true });
+      writeFileSync(resolve(broken, "project.json"), "{not json", "utf8");
+      const url = new URL("http://x/_jx/data/comments");
+      expect(await handleJxMounts(new Request(url), url, broken)).toBeNull();
+      expect(warned.some((w) => w.includes("failed to build extension mounts"))).toBe(true);
+    } finally {
+      console.warn = origWarn;
+      rmSync(broken, { force: true, recursive: true });
+    }
+  });
+
   test("projects without extensions dispatch nothing", async () => {
     const bare = `${TMP}-bare`;
     rmSync(bare, { force: true, recursive: true });
@@ -192,6 +210,18 @@ describe("dev-vars", () => {
   test("loadDevVars returns {} when the file is absent", () => {
     expect(loadDevVars(`${TMP}/nope`)).toEqual({});
     expect(loadDevVars(TMP)).toEqual({ MOUNT_TEST_SECRET: "shh" });
+  });
+
+  test("loadDevVars returns {} when the file is unreadable", () => {
+    // A DIRECTORY named .dev.vars exists but readFileSync throws (EISDIR).
+    const dir = `${TMP}-unreadable-vars`;
+    rmSync(dir, { force: true, recursive: true });
+    try {
+      mkdirSync(resolve(dir, ".dev.vars"), { recursive: true });
+      expect(loadDevVars(dir)).toEqual({});
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
   });
 });
 

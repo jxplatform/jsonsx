@@ -40,6 +40,11 @@ beforeAll(async () => {
     children: [{ tagName: "h1", textContent: "Home" }],
     tagName: "main",
   });
+  // Nested page directory: the document walk must recurse into subdirectories.
+  writeFile("pages/blog/post.json", {
+    children: [{ tagName: "h2", textContent: "Post" }],
+    tagName: "article",
+  });
   writeFile("classes/Good.class.json", {
     $prototype: "Class",
     title: "Good",
@@ -75,6 +80,53 @@ describe("validateProjectTree", () => {
     } finally {
       rmSync(resolve(TMP, "components/broken.json"), { force: true });
       rmSync(resolve(TMP, "classes/Bad.class.json"), { force: true });
+    }
+  });
+
+  it("reports an invalid project.json as a file-scoped issue", async () => {
+    writeFile("project.json", {
+      extensions: ["@jxsuite/parser"],
+      name: 42,
+    });
+    try {
+      const result = await validateProjectTree(TMP);
+      expect(result.valid).toBe(false);
+      const issue = result.issues.find((entry) => entry.file === "project.json");
+      expect(issue).toBeDefined();
+      expect(JSON.stringify(issue!.errors)).toContain("string");
+    } finally {
+      writeFile("project.json", {
+        extensions: ["@jxsuite/parser"],
+        name: "Validate Command Fixture",
+      });
+    }
+  });
+
+  it("reports extension schema fragments that fail to compile", async () => {
+    writeFile("bad-ext/jx-extension.json", {
+      name: "bad-ext",
+      schemas: { project: "./bad.fragment.schema.json" },
+    });
+    // An unresolvable $ref makes Ajv's standalone compile throw for this fragment.
+    writeFile("bad-ext/bad.fragment.schema.json", {
+      $ref: "https://jx.invalid/missing.schema.json",
+    });
+    writeFile("project.json", {
+      extensions: ["@jxsuite/parser", "./bad-ext"],
+      name: "Validate Command Fixture",
+    });
+    try {
+      const result = await validateProjectTree(TMP);
+      expect(result.valid).toBe(false);
+      const issue = result.issues.find((entry) => entry.file === "./bad-ext (project fragment)");
+      expect(issue).toBeDefined();
+      expect(JSON.stringify(issue!.errors)).toContain("missing.schema.json");
+    } finally {
+      rmSync(resolve(TMP, "bad-ext"), { force: true, recursive: true });
+      writeFile("project.json", {
+        extensions: ["@jxsuite/parser"],
+        name: "Validate Command Fixture",
+      });
     }
   });
 

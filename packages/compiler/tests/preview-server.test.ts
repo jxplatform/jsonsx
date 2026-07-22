@@ -41,6 +41,14 @@ describe("resolvePreviewFile", () => {
     expect(resolvePreviewFile(TMP, "/../secret")).toBeNull();
     expect(resolvePreviewFile(TMP, "/missing")).toBeNull();
   });
+
+  test("rejects candidates that escape the dist directory", () => {
+    // A relative pathname normalizes to a parent-directory candidate outside dist.
+    expect(resolvePreviewFile(TMP, "..")).toBeNull();
+    expect(resolvePreviewFile(TMP, "../secret")).toBeNull();
+    // Windows-style separators only turn into traversal AFTER the normalize step.
+    expect(resolvePreviewFile(TMP, String.raw`/..\secret`)).toBeNull();
+  });
 });
 
 describe("startPreviewServer", () => {
@@ -66,5 +74,23 @@ describe("startPreviewServer", () => {
     const res = await fetch(`${base}/nope/`);
     expect(res.status).toBe(404);
     expect(await res.text()).toBe("<h1>Missing</h1>");
+  });
+
+  test("answers a plain-text 404 when the build has no 404.html", async () => {
+    const bare = resolve(import.meta.dir, "__test-preview-bare__");
+    rmSync(bare, { force: true, recursive: true });
+    mkdirSync(bare, { recursive: true });
+    writeFileSync(join(bare, "index.html"), "<h1>Bare</h1>", "utf8");
+    const bareServer = startPreviewServer(bare, 0);
+    try {
+      const { port } = bareServer.address() as AddressInfo;
+      const res = await fetch(`http://localhost:${port}/nope/`);
+      expect(res.status).toBe(404);
+      expect(res.headers.get("content-type")).toContain("text/plain");
+      expect(await res.text()).toBe("Not found");
+    } finally {
+      bareServer.close();
+      rmSync(bare, { force: true, recursive: true });
+    }
   });
 });

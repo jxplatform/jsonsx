@@ -88,6 +88,13 @@ describe("rewriteDocRefs — recognized reference forms", () => {
     expect(changes).toHaveLength(0);
   });
 
+  test("a non-array $elements value is walked like any nested object", () => {
+    const doc = { $elements: { $ref: "../components/counter.json" } };
+    const { changes } = rewriteDocRefs(doc, ctx({}));
+    expect(doc.$elements).toEqual({ $ref: "../components/button.json" });
+    expect(changes).toHaveLength(1);
+  });
+
   test("non-path $elements entries (external URLs) are left alone", () => {
     const doc = { $elements: ["https://cdn.example.com/x.js"] };
     const { changes } = rewriteDocRefs(doc, ctx({}));

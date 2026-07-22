@@ -13,6 +13,7 @@ coveragePathIgnorePatterns = [
   "../parser/**",
   "../runtime/**",
   "../schema/**",
+  "../starters/**",
   "../studio/**",
 ]
-coverageThreshold = { lines = 0.94, functions = 0.84 }
+coverageThreshold = { lines = 0.96, functions = 0.95 }

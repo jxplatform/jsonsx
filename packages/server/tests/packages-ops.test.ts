@@ -188,11 +188,13 @@ describe("install / set-versions with stubbed spawn", () => {
     });
     const res = await setPackageVersions(dir, [
       { name: "@jxsuite/compiler", version: "^0.30.1" },
+      { name: "hono", version: "^4.5.0" },
       { dev: false, name: "new-dep", version: "^1.0.0" },
     ]);
     expect(res.ok).toBe(true);
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
     expect(pkg.devDependencies["@jxsuite/compiler"]).toBe("^0.30.1"); // Stayed in devDeps
+    expect(pkg.dependencies.hono).toBe("^4.5.0"); // Stayed in deps
     expect(pkg.dependencies["new-dep"]).toBe("^1.0.0"); // New -> deps
     expect(spawned.at(-1)).toEqual([BUN, "install"]);
   });

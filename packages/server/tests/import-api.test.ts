@@ -49,6 +49,18 @@ const apiOptions = {
   toRoot: (dest: string) => `root:${dest}`,
 };
 
+async function waitUntil(cond: () => boolean): Promise<void> {
+  const deadline = Date.now() + 2000;
+  while (Date.now() < deadline) {
+    if (cond()) {
+      return;
+    }
+    await new Promise((r) => {
+      setTimeout(r, 10);
+    });
+  }
+}
+
 async function readLines(res: Response): Promise<Record<string, unknown>[]> {
   const text = await res.text();
   return text
@@ -184,6 +196,17 @@ describe("streaming", () => {
     });
   });
 
+  test("accepts an Authorization: Bearer token as the API key", async () => {
+    const { req, url } = makeRequest(
+      { directory: "bearer-ai", url: "https://x.example", aiComponents: true },
+      { Authorization: "Bearer sk-bearer" },
+    );
+    const res = await handleImportApi(req, url, apiOptions);
+    await res?.text();
+    const ai = importCalls[0]!.options.ai as { apiKey: string };
+    expect(ai.apiKey).toBe("sk-bearer");
+  });
+
   test("falls back to the OPENAI_API_KEY env var", async () => {
     process.env.OPENAI_API_KEY = "sk-env";
     const { req, url } = makeRequest({
@@ -217,6 +240,74 @@ describe("streaming", () => {
     expect(res?.status).toBe(200);
     const lines = await readLines(res!);
     expect(lines.at(-1)).toEqual({ type: "error", error: "Chrome not found" });
+  });
+
+  test("stops writing once the client cancels the stream", async () => {
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let finished = false;
+    importBehavior = async (call) => {
+      const outDir = call.options.outDir as string;
+      mkdirSync(outDir, { recursive: true });
+      writeFileSync(join(outDir, "project.json"), "{}");
+      call.onProgress?.({ phase: "capture", message: "first" });
+      await gate;
+      // The first post-cancel write trips the enqueue failure and marks the stream closed;
+      // The second returns early on the closed flag. Neither may throw into the pipeline.
+      call.onProgress?.({ phase: "late", message: "after-cancel" });
+      call.onProgress?.({ phase: "late", message: "after-close" });
+      finished = true;
+      return { fileCount: 0, outDir, pages: [], verify: null, warnings: [] };
+    };
+
+    const { req, url } = makeRequest({ directory: "cancelled", url: "https://x.example" });
+    const res = await handleImportApi(req, url, apiOptions);
+    const reader = res!.body!.getReader();
+    const first = await reader.read();
+    expect(new TextDecoder().decode(first.value)).toContain("first");
+    await reader.cancel();
+    release!();
+
+    await waitUntil(() => finished);
+    expect(finished).toBe(true);
+  });
+
+  test("emits heartbeat lines while a phase is silent", async () => {
+    const realSetInterval = globalThis.setInterval;
+    let heartbeat: (() => void) | undefined;
+    globalThis.setInterval = ((cb: () => void, ms?: number) => {
+      const timer = realSetInterval(() => {}, ms);
+      if (ms === 15_000) {
+        heartbeat = cb;
+      }
+      return timer;
+    }) as unknown as typeof setInterval;
+    try {
+      let release: (() => void) | undefined;
+      const gate = new Promise<void>((r) => {
+        release = r;
+      });
+      importBehavior = async (call) => {
+        const outDir = call.options.outDir as string;
+        mkdirSync(outDir, { recursive: true });
+        writeFileSync(join(outDir, "project.json"), "{}");
+        await gate;
+        return { fileCount: 0, outDir, pages: [], verify: null, warnings: [] };
+      };
+
+      const { req, url } = makeRequest({ directory: "silent", url: "https://x.example" });
+      const res = await handleImportApi(req, url, apiOptions);
+      await waitUntil(() => heartbeat !== undefined);
+      heartbeat!();
+      release!();
+      const lines = await readLines(res!);
+      expect(lines[0]).toEqual({ type: "heartbeat" });
+      expect(lines.at(-1)!.type).toBe("done");
+    } finally {
+      globalThis.setInterval = realSetInterval;
+    }
   });
 
   test("forwards the request abort signal into the pipeline", async () => {

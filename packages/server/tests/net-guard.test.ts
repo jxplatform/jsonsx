@@ -165,6 +165,11 @@ describe("serveProjectFile", () => {
   test("returns null for a missing file", async () => {
     expect(await serveProjectFile("/nope.html", PROJECT)).toBeNull();
   });
+  test("an absolute-under-root path to a missing file falls through to null", async () => {
+    // A POSIX absolute path arrives as //abs/path; the abs branch misses, then the
+    // Root-relative and public/ fallbacks miss too.
+    expect(await serveProjectFile(`/${PROJECT}/nope.html`, PROJECT)).toBeNull();
+  });
 });
 
 // ─── URL decode hardening ───────────────────────────────────────────────────
@@ -179,6 +184,13 @@ describe("decodeAndNormalizePath", () => {
     expect("reject" in out).toBe(true);
     if ("reject" in out) {
       expect(out.reject.status).toBe(404);
+    }
+  });
+  test("rejects a malformed percent-encoding with a 400", () => {
+    const out = decodeAndNormalizePath(new URL("http://127.0.0.1/%"));
+    expect("reject" in out).toBe(true);
+    if ("reject" in out) {
+      expect(out.reject.status).toBe(400);
     }
   });
 });
