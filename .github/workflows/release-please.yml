@@ -147,8 +147,49 @@ jobs:
   # non-deterministic. The bundlers force `make_latest: true`, but on a batch that bumps
   # only ai/runtime (outside desktop's closure) no desktop build runs — this guard
   # re-pins the newest existing desktop release so "latest = desktop" holds every time.
-  pin-desktop-latest:
+  # Desktop bundlers are non-blocking (a flaky platform build must not sink the release), so a
+  # release can ship with a missing installer. This verifies the expected downloadable assets
+  # (from packages/desktop/release-assets.json) are actually present; on a gap it marks the release
+  # pre-release (so pin-desktop-latest doesn't advertise a hole) and opens a tracking issue.
+  verify-desktop-assets:
     needs: [release-please, desktop-linux, desktop-macos, desktop-windows, build-msix]
+    if: always() && needs.release-please.outputs.desktop_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify expected desktop assets are present
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.desktop_tag }}
+        run: |
+          set -euo pipefail
+          expected="$(jq -r '.assets[] | select(.downloadable) | .file' packages/desktop/release-assets.json)"
+          actual="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          missing=""
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            if ! printf '%s\n' "$actual" | grep -qxF "$f"; then
+              missing="$missing $f"
+            fi
+          done <<< "$expected"
+          if [ -n "$missing" ]; then
+            echo "::warning::Release $TAG is missing expected desktop assets:$missing"
+            gh release edit "$TAG" --prerelease
+            gh issue create \
+              --title "Release $TAG is missing desktop assets" \
+              --label release-incomplete \
+              --body "Expected downloadable assets (packages/desktop/release-assets.json) missing from $TAG:$missing. Marked pre-release so the latest pin does not advertise a hole." || true
+          else
+            echo "All expected desktop assets present on $TAG."
+          fi
+
+  pin-desktop-latest:
+    needs:
+      [release-please, desktop-linux, desktop-macos, desktop-windows, build-msix, verify-desktop-assets]
     if: always() && needs.release-please.outputs.releases_created == 'true'
     runs-on: ubuntu-latest
     permissions:

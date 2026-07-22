@@ -2279,3 +2279,20 @@ describe("renderNode — §13 $ref-child diagnostic", () => {
     }
   });
 });
+
+describe("Jx — $schema version guard", () => {
+  test("warns once for a document declaring a newer hosted $schema", async () => {
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const target = document.createElement("div");
+      await Jx(
+        { $schema: "https://jxsuite.com/schema/v2", tagName: "div" } as unknown as JxDocument,
+        target,
+      );
+      const called = warn.mock.calls.some((c) => String(c[0]).includes("v2"));
+      expect(called).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});

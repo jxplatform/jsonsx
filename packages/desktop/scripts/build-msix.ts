@@ -214,17 +214,26 @@ await $`${makeappx} pack /d ${msixStageDir} /p ${outputMsix} /o`;
 console.log(`[build-msix] Created: ${outputMsix}`);
 
 // --- Step 8: Sign if certificate exists ---
+let signed = false;
 if (existsSync(certPath)) {
   const signtool = findSdkTool("signtool");
   try {
     await $`${signtool} sign /f ${certPath} /p ${certPassword} /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 ${outputMsix}`;
     console.log("[build-msix] Signed MSIX");
+    signed = true;
   } catch {
-    console.error("[build-msix] Signing failed. Continuing without signature.");
+    console.error(
+      "[build-msix] ⚠ Signing FAILED — shipping an UNSIGNED MSIX. SmartScreen will warn.",
+    );
   }
 } else {
-  console.log("[build-msix] No certificate found, skipping signing.");
+  console.warn(
+    "[build-msix] ⚠ No signing certificate — shipping an UNSIGNED MSIX. SmartScreen will warn on first run.",
+  );
 }
+// Record the honest signing status next to the artifact so a release job (and the marketing-claims
+// Gate via packages/desktop/release-assets.json) can verify it rather than assume.
+await Bun.write(join(artifactsDir, "msix-signing.json"), JSON.stringify({ signed }, null, 2));
 
 // --- Step 9: Copy artifacts ---
 const msixName = `JxStudio_${quadVersion}_x64.msix`;

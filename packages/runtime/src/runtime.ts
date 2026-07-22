@@ -70,6 +70,29 @@ import type { Ref } from "@vue/reactivity";
  * @returns {Promise<JxScope>} Resolves with the live component scope (state reactive
  * proxy)
  */
+/** The document-schema version this runtime understands (the `/schema/vN` in a hosted `$schema`). */
+export const SUPPORTED_SCHEMA_VERSION = 1;
+let _schemaVersionWarned = false;
+
+/**
+ * Warn once when a document declares a hosted `$schema` whose version differs from the one this
+ * runtime supports. A relative or non-hosted `$schema` (local dev schema paths) is ignored. This is
+ * a diagnostic only — there is no document-format migration story yet (see spec §3.2 / §21.4).
+ */
+function checkSchemaVersion($schema: unknown): void {
+  if (_schemaVersionWarned || typeof $schema !== "string") {
+    return;
+  }
+  const match = $schema.match(/\/schema\/v(\d+)\b/);
+  if (match && Number(match[1]) !== SUPPORTED_SCHEMA_VERSION) {
+    _schemaVersionWarned = true;
+    console.warn(
+      `Jx: document $schema is version v${match[1]} but this runtime supports ` +
+        `v${SUPPORTED_SCHEMA_VERSION}. Behavior may be undefined; there is no format migrator yet.`,
+    );
+  }
+}
+
 export async function Jx(
   source: string | JxDocument,
   target: HTMLElement = document.body,
@@ -77,6 +100,7 @@ export async function Jx(
 ) {
   const base = typeof source === "string" ? new URL(source, location.href).href : location.href;
   const doc = await resolve(source);
+  checkSchemaVersion(doc.$schema);
 
   // Register custom elements declared in $elements (depth-first)
   if (doc.$elements) {
