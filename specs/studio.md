@@ -3,7 +3,7 @@
 ## Visual Builder for Jx Documents
 
 **Version:** 2.2.0-draft
-**Status:** In Progress
+**Status:** Partial
 **License:** MIT
 
 ---

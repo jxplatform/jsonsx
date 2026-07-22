@@ -2,8 +2,8 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 2.0.1-draft
-**Status:** In Progress
+**Version:** 2.1.0-draft
+**Status:** Partial
 **License:** MIT
 
 ---
@@ -493,7 +493,7 @@ State entries prefixed with `#` are private. They are never exposed to the studi
 }
 ```
 
-> **Status: Partially implemented.** The studio enforces the convention: `#` entries are excluded from the editable prop list (`componentPropEntries`) and skipped during CEM extraction (`cem-export`), so they never surface in the property panel or the exported manifest. The runtime does not yet enforce it — `#` entries build into scope like any other state entry, and a `$props` write against a `#` name is not blocked.
+> **Status: Partial.** The studio enforces the convention: `#` entries are excluded from the editable prop list (`componentPropEntries`) and skipped during CEM extraction (`cem-export`), so they never surface in the property panel or the exported manifest. The runtime does not yet enforce it — `#` entries build into scope like any other state entry, and a `$props` write against a `#` name is not blocked.
 
 ### 5.7 Shape Detection Algorithm
 
@@ -1474,7 +1474,7 @@ Custom elements may carry annotations compatible with the Custom Elements Manife
 - `emits` on functions — CEM `Event` objects
 - `attribute` and `reflects` on typed `state` entries
 
-> **Status: Partially implemented.** Schema includes CEM fields. Studio has CEM editing UI. Full CEM document export is pending.
+> **Status: Partial.** Schema includes CEM fields. Studio has CEM editing UI. Full CEM document export is pending.
 
 ---
 

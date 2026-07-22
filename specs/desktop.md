@@ -3,7 +3,7 @@
 ## Platform Abstraction, Project Loading, and Component Scoping
 
 **Version:** 1.0.0-draft
-**Status:** Proposed
+**Status:** Pending
 **License:** MIT
 
 ---
@@ -189,7 +189,7 @@ Studio initializes project state:
 
 ### 4.3 Single File Mode
 
-> **Status: Specified, not yet exposed.** Current builds have no user-facing entry point into standalone single-file editing — Studio always opens a project (`project.json`), and documents open inside that project context. The `build.format: "single"` project option is reserved for this workflow but currently unused. The behavior below is the design target.
+> **Status: Pending.** Current builds have no user-facing entry point into standalone single-file editing — Studio always opens a project (`project.json`), and documents open inside that project context. The `build.format: "single"` project option is reserved for this workflow but currently unused. The behavior below is the design target.
 
 When a user opens an individual `.json` file (via "Open File" or by double-clicking in an already-open project tree), Studio enters **single file mode**:
 

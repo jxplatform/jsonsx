@@ -191,6 +191,9 @@ jobs:
       # Marketing copy + README: no unbacked claims, dead download links, or wrong
       # starter counts; LICENSE files present. See scripts/docs/check-site-claims.ts.
       - run: bun run docs:claims
+      # Specs: every file has a header, every status uses the canonical vocabulary,
+      # and footer versions match. See scripts/docs/check-spec-status.ts.
+      - run: bun run docs:status
       # Jx schema compliance: every project root (examples, sites, starters, screenshot
       # fixtures) validates end-to-end — project.json, documents, classes, fragments, and
       # self-contained committed entry docs. See scripts/validate-schemas.ts.

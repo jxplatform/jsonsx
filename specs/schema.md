@@ -3,7 +3,7 @@
 ## JSON Schema 2020-12 Meta-Schema Generator
 
 **Version:** 2.0.0-draft
-**Status:** In Progress
+**Status:** Partial
 **License:** MIT
 
 ---

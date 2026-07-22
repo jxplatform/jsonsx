@@ -3,7 +3,7 @@
 ## Extension Packages, Schema Composition, and the Capability Contract
 
 **Version:** 2.0.0-draft
-**Status:** In Progress
+**Status:** Partial
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The

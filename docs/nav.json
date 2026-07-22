@@ -145,6 +145,7 @@
         { "path": "extending/embedding/backend-protocol", "label": "The backend protocol" },
         { "path": "extending/embedding/dev-server", "label": "Dev server internals" },
         { "path": "extending/reference/studio-routes", "label": "Protocol routes" },
+        { "path": "extending/reference/implementation-status", "label": "Implementation status" },
         { "path": "extending/contributing/monorepo", "label": "Working in the monorepo" },
         { "path": "extending/contributing/docs", "label": "Contributing to these docs" }
       ]

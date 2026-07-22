@@ -1,7 +1,7 @@
 # Jx Studio UI/UX Interface Guidelines
 
 **Version:** 1.0.0
-**Status:** Active
+**Status:** Implemented
 **Applies to:** `packages/studio/`
 
 ---

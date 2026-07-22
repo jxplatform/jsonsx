@@ -3,7 +3,7 @@
 ## Content Formats and the Reference Format-Extension Classes
 
 **Version:** 3.0.0-draft
-**Status:** In Progress
+**Status:** Partial
 **License:** MIT
 
 ---
