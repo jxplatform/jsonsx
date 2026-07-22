@@ -102,6 +102,7 @@
         { "path": "framework/concepts/data-prototypes", "label": "Data prototypes" },
         { "path": "framework/concepts/timing", "label": "Timing" },
         { "path": "framework/concepts/switching", "label": "Dynamic switching" },
+        { "path": "framework/concepts/security", "label": "Security" },
         { "path": "framework/site", "label": "Site architecture" },
         { "path": "framework/site/project-json", "label": "project.json" },
         { "path": "framework/site/routing", "label": "Routing" },

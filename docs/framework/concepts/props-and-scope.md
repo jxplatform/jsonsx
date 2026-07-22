@@ -14,7 +14,7 @@ Scope is where a name can be seen. Within one document, every `state` entry is v
 
 ```json
 {
-  "$ref": "./card.json",
+  "tagName": "my-card",
   "$props": {
     "title": "Static string",
     "count": { "$ref": "#/state/count" }
@@ -24,14 +24,18 @@ Scope is where a name can be seen. Within one document, every `state` entry is v
 
 ## Component instances
 
-A component instance is a `$ref` to another document's file, placed anywhere an element could go. `$props` is optional — an instance without it renders the component with its own defaults:
+A component instance is created in two steps: **register** the component document under a custom-element tag in the top-level `$elements` map, then place an element node with that tag. `$props` is optional — an instance without it renders the component with its own defaults:
 
 ```json
 {
+  "$elements": {
+    "my-counter": { "$ref": "./components/my-counter.json" },
+    "my-card": { "$ref": "./components/card.json" }
+  },
   "children": [
-    { "$ref": "./components/my-counter.json" },
+    { "tagName": "my-counter" },
     {
-      "$ref": "./components/card.json",
+      "tagName": "my-card",
       "$props": {
         "title": "Hello",
         "count": { "$ref": "#/state/count" }
@@ -41,13 +45,17 @@ A component instance is a `$ref` to another document's file, placed anywhere an 
 }
 ```
 
+:::doc-note
+A bare `{ "$ref": "./card.json" }` placed directly in `children` is **not** a component instance — it renders an empty `<div>`. Register the document in `$elements` and instantiate it by its tag, as above. See spec §13.
+:::
+
 ## Static and bound props
 
 A prop value is either a plain JSON value (fixed for this instance) or a `$ref` (bound to the parent's state). Functions pass the same way, so a child can trigger behavior the parent owns:
 
 ```json
 {
-  "$ref": "./card.json",
+  "tagName": "my-card",
   "$props": {
     "title": "Static string",
     "count": { "$ref": "#/state/count" },
