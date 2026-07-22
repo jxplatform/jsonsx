@@ -2,6 +2,8 @@
   "name": "jxsuite",
   "version": "0.34.0",
   "private": true,
+  "license": "MIT",
+  "author": "Kevin Shenk <kevin@avu.nu>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jxsuite/jx.git"
@@ -29,6 +31,7 @@
     "desktop:stable": "bun run --cwd packages/desktop build:stable",
     "dev": "bun run server.js",
     "docs:check": "bun scripts/docs/check-doc-refs.ts",
+    "docs:claims": "bun scripts/docs/check-site-claims.ts",
     "docs:generate": "bun scripts/docs/generate-reference.ts",
     "docs:sync": "bun scripts/docs/check-doc-sync.ts",
     "docs:verify": "bun run docs:generate && git diff --exit-code -- docs && bun run docs:check",

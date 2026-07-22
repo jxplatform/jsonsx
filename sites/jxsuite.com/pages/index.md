@@ -137,7 +137,7 @@ Most visual builders trap your work in a proprietary format you can't read, can'
 ::section-label{props.text="The Landscape"}
 
 :::h2{style.fontSize="clamp(1.75rem, 4vw, 2.5rem)" style.fontWeight="700" style.letterSpacing="-0.03em" style.margin="0 0 1rem"}
-The only visual builder that hands you the files.
+The visual builder that hands you the files.
 :::
 
 :::p{style.color="var(--color-text-secondary)" style.maxWidth="560px" style.margin="0 auto" style.fontSize="1.0625rem"}
@@ -150,13 +150,13 @@ Webflow and Wix give you a canvas but keep your work. Astro and Hugo give you th
 :::::stats{style.padding="clamp(3rem, 6vw, 4rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
 ::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
 :::div{style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))" style.gap="1rem"}
-::stat-card{props.value="100" props.label="Lighthouse score out of the box"}
+::stat-card{props.value="0kb" props.label="JavaScript on static pages by default"}
 
-::stat-card{props.value="$0/yr" props.label="Maintenance cost — no plugins, no patches"}
+::stat-card{props.value="$0" props.label="License cost — MIT, no subscription"}
 
-::stat-card{props.value="MIT" props.label="Licensed forever — no vendor, no fees"}
+::stat-card{props.value="MIT" props.label="Yours to fork, self-host, and keep"}
 
-::stat-card{props.value="<1s" props.label="Build time for a typical 50-page site"}
+::stat-card{props.value="JSON" props.label="Every page is a plain file you own"}
 :::
 ::::
 :::::
@@ -180,9 +180,9 @@ Everything you design compiles from — and saves back to — plain JSON-DOM. Re
 :::div{style.marginTop="3rem" style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(260px, 1fr))" style.gap="1rem"}
 ::pillar-card{props.icon="📄" props.title="File-Based CMS" props.description="JSON documents and Markdown content. No database, no admin panel. Git is your CMS — branch, merge, review, deploy." props.features="Content collections · Markdown + directives · Frontmatter schemas · Dynamic routes"}
 
-::pillar-card{props.icon="⚡" props.title="Reactive Framework" props.description="Signals-based reactivity, web components, and template bindings. Interactive islands hydrate only where needed." props.features="TC39 Signals · Web Components · Template literals · Zero JS by default"}
+::pillar-card{props.icon="⚡" props.title="Reactive Framework" props.description="Fine-grained reactivity, web components, and template bindings. Interactive islands hydrate only where needed." props.features="Vue-powered reactivity · Web Components · Template literals · Zero JS by default"}
 
-::pillar-card{props.icon="🚀" props.title="Static Generator" props.description="Compiles to pure HTML, CSS, and minimal JS. Deploy to any static host — Cloudflare Pages, GitHub Pages, Vercel, or a $5 VPS." props.features="Zero runtime · Image optimization · Code splitting · <100ms builds"}
+::pillar-card{props.icon="🚀" props.title="Static Generator" props.description="Compiles to pure HTML, CSS, and minimal JS. Deploy to any static host — Cloudflare Pages, GitHub Pages, Vercel, or a $5 VPS." props.features="Zero runtime · Image optimization · Static HTML output"}
 :::
 
 ::::div{style.textAlign="center" style.marginTop="2.5rem" style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap" style.alignItems="center" style.flexDirection="column"}

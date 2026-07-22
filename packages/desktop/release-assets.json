@@ -1,0 +1,29 @@
+{
+  "$comment": "Single source of truth for GitHub release asset filenames and their signing status. Consumed by scripts/docs/check-site-claims.ts (download-link + 'signed' claim verification) and, going forward, the desktop build scripts. Update filenames HERE first. `signed` reflects whether the shipped artifact is actually code-signed/notarized today.",
+  "assets": [
+    {
+      "file": "stable-macos-arm64-JxStudio.dmg",
+      "platform": "macos",
+      "signed": true,
+      "downloadable": true
+    },
+    {
+      "file": "stable-macos-x64-JxStudio.dmg",
+      "platform": "macos",
+      "signed": true,
+      "downloadable": true
+    },
+    {
+      "file": "JxStudio.msi",
+      "platform": "windows",
+      "signed": false,
+      "downloadable": true
+    },
+    {
+      "file": "stable-linux-x64-JxStudio-Setup.tar.gz",
+      "platform": "linux",
+      "signed": false,
+      "downloadable": true
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "$comment": "Forbidden-claim lint for marketing surfaces (sites/jxsuite.com/pages/** + README.md), enforced by scripts/docs/check-site-claims.ts. A pattern hit FAILS unless an `allow` entry (matching id + file, whose `text` is a substring of the matched line/value) covers it. Reword the copy and the allow entry goes stale → CI fails until re-justified. Each allow entry needs one of `evidence` (a repo path or specs/<file>#<anchor>) or `reason` (why the match is not a product claim).",
+  "patterns": [
+    {
+      "id": "tc39-signals",
+      "regex": "TC39|signals-based",
+      "flags": "i",
+      "hint": "Reactivity is @vue/reactivity (spec §18). Do not claim TC39 Signals / signals-based reactivity."
+    },
+    {
+      "id": "lighthouse",
+      "regex": "lighthouse|100/100",
+      "flags": "i",
+      "hint": "No committed Lighthouse measurement exists; do not claim a Lighthouse score."
+    },
+    {
+      "id": "code-splitting",
+      "regex": "code[- ]splitting",
+      "flags": "i",
+      "hint": "Code splitting is not implemented."
+    },
+    {
+      "id": "build-timing",
+      "regex": "<\\s*\\d+\\s*(ms|s)\\b|\\bsub-second\\b|\\d+\\s*(ms|s)\\b[^.\\n]{0,30}build|build[^.\\n]{0,30}\\d+\\s*(ms|s)\\b",
+      "flags": "i",
+      "hint": "Build-time figures need a committed benchmark. Measured: ~8s warm for 131 routes."
+    },
+    {
+      "id": "only-superlative",
+      "regex": "\\bonly\\b[^.\\n]{0,40}\\b(builder|framework|tool|IDE|platform)\\b",
+      "flags": "i",
+      "hint": "Uniqueness claims are unverifiable (Webstudio, Silex, Puck, WeWeb exist)."
+    },
+    {
+      "id": "signed",
+      "regex": "\\b(signed|notarized)\\b|code-signed",
+      "flags": "i",
+      "hint": "Only assets marked signed:true in packages/desktop/release-assets.json may be described as signed/notarized."
+    },
+    {
+      "id": "price-figure",
+      "regex": "\\$\\s?\\d[\\d,]*",
+      "flags": "",
+      "hint": "Dollar figures need a source (evidence) or must be labelled illustrative (reason)."
+    }
+  ],
+  "allow": [
+    {
+      "id": "signed",
+      "file": "sites/jxsuite.com/pages/download.md",
+      "text": "Signed &amp; notarized. macOS 12 or later.",
+      "evidence": ".github/workflows/bundle-desktop-macos.yml"
+    },
+    {
+      "id": "price-figure",
+      "file": "sites/jxsuite.com/pages/index.md",
+      "text": "$0",
+      "evidence": "LICENSE"
+    },
+    {
+      "id": "price-figure",
+      "file": "sites/jxsuite.com/pages/index.md",
+      "text": "$5 VPS",
+      "reason": "Illustrative third-party hosting price, not a Jx product claim."
+    },
+    {
+      "id": "price-figure",
+      "file": "sites/jxsuite.com/pages/compare.json",
+      "text": "$80/mo",
+      "reason": "Illustrative cost-of-ownership estimate, labelled as such in the section header."
+    },
+    {
+      "id": "price-figure",
+      "file": "sites/jxsuite.com/pages/compare.json",
+      "text": "$200/yr",
+      "reason": "Illustrative cost-of-ownership estimate, labelled as such in the section header."
+    },
+    {
+      "id": "price-figure",
+      "file": "sites/jxsuite.com/pages/compare.json",
+      "text": "$4,000/yr",
+      "reason": "Illustrative cost-of-ownership estimate, labelled as such in the section header."
+    },
+    {
+      "id": "price-figure",
+      "file": "sites/jxsuite.com/pages/compare.json",
+      "text": "$300/yr",
+      "reason": "Illustrative cost-of-ownership estimate, labelled as such in the section header."
+    },
+    {
+      "id": "price-figure",
+      "file": "sites/jxsuite.com/pages/compare.json",
+      "text": "~$5,460",
+      "reason": "Illustrative cost-of-ownership estimate, labelled as such in the section header."
+    },
+    {
+      "id": "price-figure",
+      "file": "sites/jxsuite.com/pages/compare.json",
+      "text": "$0",
+      "reason": "Static hosting free tier + MIT license; the illustrative Jx column."
+    }
+  ]
+}

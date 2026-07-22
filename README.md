@@ -38,9 +38,9 @@ Jx is a schema and runtime for building reactive web applications using **plain 
 
 ### Key ideas
 
-- **DOM-first** — Property names mirror the DOM API (`tagName`, `className`, `textContent`, `onclick`). Nothing new to learn.
+- **DOM-first** — Property names mirror the DOM API (`tagName`, `className`, `textContent`, `onclick`). The schema reads like the DOM you already know.
 - **Reactive everywhere** — Template strings `"${state.count} items"` work anywhere a string value appears. Dependencies are tracked automatically.
-- **JSON Schema dialect** — Documents are valid JSON Schema 2020-12. `$ref`, `$defs`, and `$id` work as expected. Schema tooling (validation, autocomplete, LSP) applies directly.
+- **Schema-backed** — A real JSON Schema 2020-12 meta-schema validates every document, powering editor autocomplete and CI validation. `$defs` holds standard type definitions; `$ref` uses JSON-Pointer-shaped paths with Jx binding semantics.
 - **Rule of Least Power** — Declarative JSON over imperative JS. `$ref` bindings over template expressions. Template expressions over handler functions. Functions only when logic demands it.
 - **Component encapsulation** — Signal scope is bounded at the custom element level. Cross-component data flows through explicit `$props`.
 
@@ -68,13 +68,13 @@ bun install
 bun run dev
 
 # Run tests
-bun test
+bun test --isolate
 
 # Build all packages
 bun run build
 ```
 
-The dev server starts at `http://localhost:3000` with interactive examples (counter, todo list, forms, fetch, routing, and more).
+The dev server starts at `http://localhost:3000` with interactive examples (counter, todo list, forms, fetch, and more).
 
 ## How it works
 
@@ -184,7 +184,7 @@ Mark a state entry with `timing: "server"` to run it server-side. The browser re
 
 ## Studio
 
-Jx Studio is a visual builder for Jx documents, available as a browser-based dev tool and a standalone desktop app.
+Jx Studio is a visual builder for Jx documents. It ships as a standalone desktop app; contributors working in this repository can also run it in the browser via the dev server.
 
 <p align="center">
   <img src="sites/jxsuite.com/public/screenshots/hero.png" alt="Jx Studio editing the jxsuite.com homepage — layers panel, live canvas, and element inspector" width="800">
@@ -199,7 +199,7 @@ Jx Studio is a visual builder for Jx documents, available as a browser-based dev
 
 ```bash
 bun run dev          # Dev server with examples
-bun test             # Run test suite
+bun test --isolate   # Run test suite
 bun run build        # Build all packages
 bun run lint         # Lint with oxlint
 bun run format       # Format with oxfmt
@@ -209,4 +209,4 @@ bun run desktop      # Launch desktop app (Electrobun)
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

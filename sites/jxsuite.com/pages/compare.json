@@ -68,7 +68,7 @@
                 "margin": "0 auto",
                 "maxWidth": "640px"
               },
-              "textContent": "WordPress, Webflow, and Wix each solved one thing and traded away another — your files, your speed, or your budget. Jx Studio is the only open-source visual builder that hands you the files. Here's how it compares."
+              "textContent": "WordPress, Webflow, and Wix each solved one thing and traded away another — your files, your speed, or your budget. Jx Studio is an open-source visual builder that hands you the files. Here's how it compares."
             }
           ]
         }
@@ -544,7 +544,7 @@
                                 "color": "var(--color-accent)",
                                 "fontWeight": "600"
                               },
-                              "textContent": "100/100"
+                              "textContent": "Strong"
                             },
                             {
                               "tagName": "td",
@@ -621,7 +621,7 @@
                     "margin": "0 auto",
                     "fontSize": "1.0625rem"
                   },
-                  "textContent": "A typical 40-page brochure site for a small business. Real numbers."
+                  "textContent": "A typical 40-page brochure site for a small business. Illustrative estimates — your costs will vary."
                 }
               ]
             },

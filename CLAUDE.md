@@ -14,10 +14,11 @@ Every package must keep full unit-test coverage. Enforcement has three layers:
    (Bun only counts files imported during the run, so a brand-new untested
    file is otherwise invisible to thresholds). Type-only files are allowlisted
    inside the script.
-3. **CI** — `.github/workflows/test.yml` runs a 10-package matrix:
-   `bun test --isolate --coverage` (cwd = the package, so its bunfig applies)
-   plus the manifest check, and a separate lint + typecheck job. The Bun
-   version is pinned there; bump it together with re-baselining thresholds.
+3. **CI** — `.github/workflows/test.yml` runs the per-package matrix (see the
+   matrix list in that file): `bun test --isolate --coverage` (cwd = the
+   package, so its bunfig applies) plus the manifest check, and a separate
+   lint-and-typecheck job. The Bun version is pinned there; bump it together
+   with re-baselining thresholds.
 
 Conventions:
 
@@ -68,3 +69,27 @@ must land code, spec edits, and docs-page updates together.
   trigger the sync check. `@since` is available for versioned additions.
 - **Gates**: `bun run docs:check` (associations), `bun run docs:verify`
   (generated-page drift, clean tree only) — both must stay green.
+
+## Marketing & Claims Policy
+
+Marketing copy (`sites/jxsuite.com/pages/**`) and `README.md` are gated by
+`bun run docs:claims` (blocking in CI and `deploy-site.yml`). The rule: a claim
+may only exist if it is (a) removed, (b) qualitative and clean of the forbidden
+patterns, or (c) pattern-matched **and** carries an allow entry in
+`scripts/docs/claims.json` whose `evidence` points at a test, a generated
+source, or a spec anchor whose status is `Implemented`. Reword the copy and the
+allow entry goes stale, so CI fails until it is re-justified.
+
+- **New numbers need committed evidence.** Never introduce a performance,
+  price, or scale figure (`<1s`, `100/100`, `$0/mo`) without a committed
+  measurement or an allow entry explaining why it is illustrative. Measured
+  numbers come from a benchmark, not from memory.
+- **Download links / installer claims** derive from
+  `packages/desktop/release-assets.json` — the single source of truth for asset
+  filenames and their `signed` status. Only assets marked `signed: true` may be
+  described as signed or notarized.
+- **Non-mechanizable review items** (checked by hand): Studio-availability
+  phrasing must match `docs/start/install.md` (the desktop app is the only
+  end-user path to the visual editor; browser Studio is a repo-contributor
+  workflow); avoid superlatives ("the only…", "fastest") the checker can't
+  verify.
