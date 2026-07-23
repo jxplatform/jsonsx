@@ -127,6 +127,14 @@ export interface StudioPlatform {
     config: ProjectConfig;
     handle: { root: string; name: string; projectConfig: ProjectConfig };
   } | null>;
+  /**
+   * How "Open Project" picks a project. Absent: `openProject()` owns picking (native dialog /
+   * showDirectoryPicker). `"repo-list"`: Studio shows its repository picker over `listRepos` +
+   * `importProject` (write-access repositories) and opens the choice through the recent-projects
+   * path — `openProject()` is never called. Cloud sets this: its sessions are URL-bound, so there
+   * is no backend dialog to delegate to.
+   */
+  openProjectPicker?: "repo-list";
   probeRootProject: () => Promise<{
     meta: { root: string; name: string };
     info: {

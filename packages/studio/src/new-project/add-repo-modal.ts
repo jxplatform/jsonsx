@@ -1,20 +1,29 @@
 /// <reference lib="dom" />
 /**
- * Add Existing Repository modal — a filterable picker over `platform.listRepos` (every repo the
- * platform's account link can reach, personal and organization). Choosing a repo runs
- * `platform.importProject`, which adopts it as a Jx project (probes project.json, tags + catalogues
- * it) and resolves with the catalogue root key; the caller opens it through the same path as a
- * recent project. Repos without a project.json fail with the backend's structured message, shown
- * inline.
+ * Repository picker modal — a filterable picker over `platform.listRepos` (every repo the
+ * platform's account link can reach, personal and organization). Two modes share the dialog:
+ *
+ * - "add" (Add Existing Repository): the unfiltered adoption path.
+ * - "open" (Open Project on `openProjectPicker: "repo-list"` platforms): only write-access
+ *   repositories, Jx-tagged ones first.
+ *
+ * Choosing a repo runs `platform.importProject`, which adopts it as a Jx project (probes
+ * project.json, tags + catalogues it) and resolves with the catalogue root key; the caller opens it
+ * through the same path as a recent project. Repos without a project.json fail with the backend's
+ * structured message, shown inline.
  */
 
 import { html, nothing } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
+import { getAccountStatus, needsAppInstall } from "../account-status";
 import { getPlatform } from "../platform";
 import { openModal } from "../ui/layers";
 import type { RepoInfo } from "../types";
 
+type PickerMode = "add" | "open";
+
 let _handle: ReturnType<typeof openModal> | null = null;
+let _mode: PickerMode = "add";
 let _repos: RepoInfo[] | null = null;
 let _filter = "";
 let _error = "";
@@ -28,11 +37,29 @@ export function platformSupportsAddRepo(): boolean {
   return typeof platform.listRepos === "function" && typeof platform.importProject === "function";
 }
 
-/** Open the picker. Resolves with the imported project's catalogue root key, or null when cancelled. */
+/** True when the active platform routes Open Project through this repo picker. */
+export function platformUsesRepoPicker(): boolean {
+  return getPlatform().openProjectPicker === "repo-list" && platformSupportsAddRepo();
+}
+
+/**
+ * Open the adoption picker. Resolves with the imported project's catalogue root key, or null when
+ * cancelled.
+ */
 export function openAddRepoModal(): Promise<{ root: string } | null> {
+  return openPicker("add");
+}
+
+/** Open Project as a repo picker (write-access repositories only). Null when cancelled. */
+export function openProjectPickerModal(): Promise<{ root: string } | null> {
+  return openPicker("open");
+}
+
+function openPicker(mode: PickerMode): Promise<{ root: string } | null> {
   if (_handle) {
     return Promise.resolve(null);
   }
+  _mode = mode;
   _repos = null;
   _filter = "";
   _error = "";
@@ -104,7 +131,13 @@ async function chooseRepo(repo: RepoInfo) {
 
 function visibleRepos(): RepoInfo[] {
   const query = _filter.trim().toLowerCase();
-  const repos = _repos ?? [];
+  let repos = _repos ?? [];
+  if (_mode === "open") {
+    // Open Project offers only repos the user can write to; Jx-tagged repos surface first.
+    // The topic is an accelerator, not ground truth — untagged repos still open via importProject.
+    const writable = repos.filter((r) => r.permission === "admin" || r.permission === "write");
+    repos = [...writable.filter((r) => r.isJxProject), ...writable.filter((r) => !r.isJxProject)];
+  }
   return query ? repos.filter((r) => r.fullName.toLowerCase().includes(query)) : repos;
 }
 
@@ -129,17 +162,43 @@ function repoRowTpl(repo: RepoInfo) {
   `;
 }
 
+function emptyTpl() {
+  if (_filter) {
+    return html`<div class="add-repo-empty">No repositories match the filter.</div>`;
+  }
+  if (_mode === "open" && (_repos ?? []).length > 0) {
+    return html`<div class="add-repo-empty">
+      No repositories with write access. Widen the Jx Suite GitHub App's repository access, or ask a
+      repository admin for write access.
+    </div>`;
+  }
+  if (needsAppInstall()) {
+    return html`<div class="add-repo-empty">
+      No repositories are reachable yet.
+      <a
+        class="add-repo-install"
+        href=${getAccountStatus()?.appInstallUrl ?? "#"}
+        target="_blank"
+        rel="noreferrer"
+      >
+        Install the Jx Suite GitHub App
+      </a>
+      to grant repository access, then reopen this dialog.
+    </div>`;
+  }
+  return html`<div class="add-repo-empty">
+    No repositories are reachable. Install the GitHub App (or widen its repository access) and try
+    again.
+  </div>`;
+}
+
 function bodyTpl() {
   if (_repos === null) {
     return html`<div class="add-repo-empty">Loading repositories…</div>`;
   }
   const repos = visibleRepos();
   if (repos.length === 0) {
-    return html`<div class="add-repo-empty">
-      ${_filter
-        ? "No repositories match the filter."
-        : "No repositories are reachable. Install the GitHub App (or widen its repository access) and try again."}
-    </div>`;
+    return emptyTpl();
   }
   return html`<div class="add-repo-list">${repos.map((repo) => repoRowTpl(repo))}</div>`;
 }
@@ -156,7 +215,9 @@ function renderModal() {
       }}
     >
       <div class="new-project-modal-header">
-        <h2 class="new-project-modal-title">Add existing repository</h2>
+        <h2 class="new-project-modal-title">
+          ${_mode === "open" ? "Open Project" : "Add existing repository"}
+        </h2>
         <sp-action-button quiet size="s" @click=${closeAddRepoModal} title="Close">
           <sp-icon-close slot="icon"></sp-icon-close>
         </sp-action-button>

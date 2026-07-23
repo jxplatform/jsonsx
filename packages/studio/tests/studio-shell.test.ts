@@ -75,6 +75,8 @@ let consumePatchedReturn = false;
 const consumePatchedMock = mock((_doc: object) => consumePatchedReturn);
 let newProjectResult: { root: string } | null = null;
 let addRepoResult: { root: string } | null = null;
+let pickerEnabled = false;
+let pickerResult: { root: string } | null = null;
 
 void mock.module("../src/services/monaco-setup.js", () => ({}));
 
@@ -171,7 +173,9 @@ void mock.module("../src/new-project/new-project-modal.ts", () => ({
 void mock.module("../src/new-project/add-repo-modal.ts", () => ({
   closeAddRepoModal: mock(() => {}),
   openAddRepoModal: mock(async () => addRepoResult),
+  openProjectPickerModal: mock(async () => pickerResult),
   platformSupportsAddRepo: mock(() => true),
+  platformUsesRepoPicker: mock(() => pickerEnabled),
 }));
 
 // Capture the left-panel mount ctx (setGitDiffState / renderCanvas / cloneRepository arrows).
@@ -786,6 +790,35 @@ describe("project open delegates", () => {
     await toolbarCtx.openProject();
     const after = state.calls.filter((c) => c[0] === "openProject").length;
     expect(after).toBe(before + 1);
+  });
+
+  test("repo-list platforms route openProject through the picker, bypassing the backend dialog", async () => {
+    pickerEnabled = true;
+    pickerResult = { root: "/picked/repo" };
+    const before = state.calls.filter((c) => c[0] === "openProject").length;
+    try {
+      await toolbarCtx.openProject();
+      await waitFor(() => statusMessages.includes("Opened project: Recent Project"));
+    } finally {
+      pickerEnabled = false;
+      pickerResult = null;
+    }
+    expect(state.calls.filter((c) => c[0] === "openProject")).toHaveLength(before);
+    expect(platform.projectRoot).toBe("/picked/repo");
+    expect(statusMessages).toContain("Opened project: Recent Project");
+  });
+
+  test("a cancelled repo picker is a no-op", async () => {
+    pickerEnabled = true;
+    pickerResult = null;
+    const before = state.calls.filter((c) => c[0] === "openProject").length;
+    try {
+      await toolbarCtx.openProject();
+    } finally {
+      pickerEnabled = false;
+    }
+    expect(state.calls.filter((c) => c[0] === "openProject")).toHaveLength(before);
+    expect(statusMessages).toHaveLength(0);
   });
 
   test("welcome openNewProject does nothing when the modal is cancelled", async () => {

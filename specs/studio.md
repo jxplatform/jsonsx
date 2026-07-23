@@ -80,16 +80,16 @@ Immutable state with undo/redo history (100 entries). All mutations produce a ne
 
 Studio uses a platform abstraction (`platform.js`) to decouple UI from backend:
 
-| Method                 | Description                      |
-| ---------------------- | -------------------------------- |
-| `listFiles(dir)`       | List directory contents          |
-| `readFile(path)`       | Read file content                |
-| `writeFile(path, c)`   | Write file content               |
-| `deleteFile(path)`     | Delete file                      |
-| `renameFile(old,new)`  | Rename/move file                 |
-| `discoverComponents()` | Scan project for custom elements |
-| `openProject()`        | Open project picker              |
-| `probeRootProject()`   | Auto-detect project at startup   |
+| Method                 | Description                                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `listFiles(dir)`       | List directory contents                                                                                    |
+| `readFile(path)`       | Read file content                                                                                          |
+| `writeFile(path, c)`   | Write file content                                                                                         |
+| `deleteFile(path)`     | Delete file                                                                                                |
+| `renameFile(old,new)`  | Rename/move file                                                                                           |
+| `discoverComponents()` | Scan project for custom elements                                                                           |
+| `openProject()`        | Open project picker (unless `openProjectPicker: "repo-list"` routes it through Studio's repository picker) |
+| `probeRootProject()`   | Auto-detect project at startup                                                                             |
 
 Three platform targets:
 
