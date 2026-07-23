@@ -6,7 +6,10 @@ spec:
   - extensions.md#8.1
   - extensions.md#8.2
   - extensions.md#8.3
+  - extensions.md#8.5
 code:
+  - packages/schema/src/asset-paths.ts
+  - packages/compiler/src/site/asset-mounts.ts
   - extensions/parser/src/Content.class.json
   - extensions/parser/src/Markdown.class.json
   - extensions/connector/src/TableQuery.class.json
@@ -59,6 +62,8 @@ To find and invoke a capability, a host scans `$defs.methods` for the `role`, ta
 | `projectData`    | `project`   | `(sectionValue, { projectConfig, root, registry, io }) → unknown`           | site build, dev server — result stored as `_project[<key>]` |
 | `resolvePaths`   | `project`   | `(pathsDef, { data, projectConfig, root }) → Record<string, unknown>[]`     | pages discovery (`$paths` expansion), Studio preview        |
 | `lower`          | any         | `(def, context) → JxStateDefinition`                                        | compiler — rewrites a state def into a core shape           |
+| `emit`           | `project`   | `(sectionValue, { projectConfig, root, sections, routes }) → EmitFile[]`    | site build — writes derived assets into the build output    |
+| `assets`         | `project`   | `(sectionValue, { projectConfig, root }) → AssetMount[]`                    | site build, dev server — publishes directories at site URLs |
 | `mount`          | `server`    | `(options, ctx) → (request, env) => Promise<Response>`                      | generated site worker, dev server                           |
 | `dialect`        | `connector` | `(connection, env) → Kysely Dialect`                                        | data mounts, auth, deploy                                   |
 | `deploySchema`   | `connector` | `(tables, connection, { env, dryRun }) → { statements, applied, warnings }` | `jx db push`, Studio push                                   |
@@ -120,6 +125,34 @@ Because the types, enums, and defaults are right there in the descriptor, Studio
 ```
 
 A page authored with `{ "$prototype": "TableQuery", "table": "posts", "timing": "client" }` compiles into a plain reactive fetch of `/_jx/data/posts?…` — dynamic-data queries work in compiled sites with **no extension code shipped to the browser**. `lower` may appear on a class with any admission block (or none).
+
+## `assets`
+
+`assets` publishes a directory your section already reads from at a site URL, so the files beside its sources are reachable:
+
+```json
+"assets": {
+  "role": "assets",
+  "scope": "static",
+  "identifier": "assets",
+  "timing": ["compiler", "server"],
+  "parameters": [
+    { "identifier": "sectionValue", "type": { "type": "object" } },
+    { "identifier": "ctx", "type": { "type": "object" } }
+  ],
+  "returnType": { "type": "array" }
+}
+```
+
+Each returned pair is an **asset mount**: `{ "urlPrefix": "/content/blog", "dir": "/abs/path/to/content/blog" }`. The parser returns one per content type with a directory source, which is what lets a Markdown entry reference `./images/hero.png` and still resolve everywhere.
+
+Hosts do three things with a mount, and your extension writes none of them:
+
+- the site build resolves mounted URLs for [image optimization](/docs/framework/site/images), then copies **only the files the compiled output references** to their URL path in `dist/`;
+- the dev and desktop servers serve the mount ahead of the project root, so previews match the built site;
+- `jx preview` needs nothing — it serves `dist/`, where the files already are.
+
+`dir` may sit outside the project root — that is the point. Return the mount from the section's config alone: the call is expected to be cheap and side-effect-free, and hosts may make it per request. A `urlPrefix` claimed for two different directories is a configuration error; sharing one `dir` across prefixes is fine.
 
 ## Related
 

@@ -12,7 +12,7 @@ code:
 
 Edit is for writing. Open a content page and the canvas becomes the page itself — double-click any text and type, right where it renders. It feels like working in a doc editor; it saves as clean Markdown.
 
-![Jx Studio editing markdown content inline with a WYSIWYG editor](/screenshots/mode-edit.png)
+![Jx Studio editing markdown content inline with a WYSIWYG editor](../images/mode-edit.png)
 
 Markdown pages open in Edit automatically. For anything else, pick **Edit** in the mode switcher at the right end of the toolbar — see **[Modes and the preview toggle](/docs/studio/interface/modes)**.
 

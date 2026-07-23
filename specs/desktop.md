@@ -2,8 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 1.0.0-draft
+**Version:** 0.2.5-draft
 **Status:** Pending
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -712,6 +713,22 @@ Ensure desktop app matches dev-mode capabilities:
 - [ ] Project authentication and authorization
 - [ ] Real-time collaboration via WebSocket change feed
 
+## Changelog
+
+- **0.2.5-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.2.4-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.2.3-draft** (2026-07-17) — Align spec.md, site-architecture, desktop, server, extensions with reality (`c61ba567`).
+- **0.2.2-draft** (2026-07-13) — Run formatter (`9e776783`).
+- **0.2.1-draft** (2026-05-20) — Run formatter (`8ba47930`).
+- **0.2.0-draft** (2026-05-17) — Remove auto-detection script and update documentation for NixOS desktop runtime (`6b746644`).
+- **0.1.6-draft** (2026-05-16) — Update desktop spec (`9453ea1f`).
+- **0.1.5-draft** (2026-04-23) — Oxfmt (`af32c08c`).
+- **0.1.4-draft** (2026-04-23) — Rebrand to jxsuite (`2897a4e8`).
+- **0.1.3-draft** (2026-04-22) — Consolidate project config schema and rename as such (`e3523dbf`).
+- **0.1.2-draft** (2026-04-16) — Landing site + working exports + release-it + linting (`a8409b5f`).
+- **0.1.1-draft** (2026-04-15) — Rebrand to Jx / Jx Platform (`abc63f2d`).
+- **0.1.0-draft** (2026-04-15) — Implement platform abstraction (`962ba588`).
+
 ---
 
-_Jx Studio Desktop Architecture Specification v1.0.0-draft_
+_Jx Studio Desktop Architecture Specification v0.2.5-draft_

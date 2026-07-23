@@ -9,7 +9,7 @@ code:
 
 Quick Access is the fastest way to open a file: a search palette that drops over the workspace, finds files by name as you type, and opens your pick on :kbd[Enter]. If you know roughly what a file is called, it beats clicking through the file tree every time.
 
-![The Quick Access palette open over the workspace with results for a typed query](/screenshots/quick-access.png)
+![The Quick Access palette open over the workspace with results for a typed query](../../images/quick-access.png)
 
 ## Open it
 

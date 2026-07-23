@@ -18,7 +18,7 @@ const CLAIMS_PATH = join(ROOT, "scripts/docs/claims.json");
 const RELEASE_ASSETS_PATH = join(ROOT, "packages/desktop/release-assets.json");
 const REGISTRY_PATH = join(ROOT, "packages/starters/registry.json");
 const MANIFEST_PATH = join(ROOT, "scripts/screenshots/manifest.json");
-const SCREENSHOTS_DIR = join(ROOT, "sites/jxsuite.com/public/screenshots");
+const SCREENSHOTS_DIR = join(ROOT, "docs/images");
 
 const violations: string[] = [];
 const fail = (file: string, message: string) => {
@@ -229,7 +229,9 @@ function checkStarterCount(): void {
 
 // ─── Screenshot refs on site pages ─────────────────────────────────────────────
 
-const SCREENSHOT_RE = /\/screenshots\/([A-Za-z0-9_-]+)\.(?:png|webp|jpg|jpeg)/g;
+// Site pages reference the screenshots through the docs content type's asset mount
+// (/content/docs/images/…), which is where the build republishes docs/images/.
+const SCREENSHOT_RE = /\/content\/docs\/images\/([A-Za-z0-9_-]+)\.(?:png|webp|jpg|jpeg)/g;
 
 function checkScreenshots(): void {
   let manifestNames: Set<string>;

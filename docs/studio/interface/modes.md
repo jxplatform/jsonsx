@@ -15,13 +15,13 @@ The mode switcher on the right side of the toolbar changes how the canvas presen
 
 Edit is for writing. The canvas becomes the page itself — click any text and type, press `/` for blocks, fill in the page's metadata alongside. It reads like the finished page because it is the finished page. Full guide: **[Edit mode](/docs/studio/editing)**.
 
-![Jx Studio editing markdown content inline with a WYSIWYG editor](/screenshots/mode-edit.png)
+![Jx Studio editing markdown content inline with a WYSIWYG editor](../../images/mode-edit.png)
 
 ## Design
 
 Design is for structure and style. The canvas shows a live panel per breakpoint — phone, tablet, desktop side by side — and the **Style** tab in the right panel becomes a full visual inspector for the selected element. Full guide: **[Design mode](/docs/studio/design)**.
 
-![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](/screenshots/mode-design.png)
+![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](../../images/mode-design.png)
 
 ## Grid
 
@@ -35,7 +35,7 @@ Code shows the file as raw source in a full code editor with syntax highlighting
 
 Stylebook is the catalog of your project's element defaults — every heading, button, and link rendered with its base style, so you set the look of each element type once for the whole site. Selecting Stylebook switches the right panel to the **Style** tab automatically. See **[Design mode](/docs/studio/design)** for how it fits into styling.
 
-![Jx Studio Stylebook mode showing element defaults across breakpoints](/screenshots/stylebook.png)
+![Jx Studio Stylebook mode showing element defaults across breakpoints](../../images/stylebook.png)
 
 ## Which files offer which modes
 

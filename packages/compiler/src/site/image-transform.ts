@@ -16,7 +16,9 @@ import {
   processImage,
 } from "./image-optimizer.ts";
 import { getCached, getImageCacheDir, setCached } from "./image-cache.ts";
+import { resolveAssetUrl } from "@jxsuite/schema/asset-paths";
 
+import type { AssetMount } from "@jxsuite/schema/asset-paths";
 import type { ImageConfig, ImageManifest } from "./image-optimizer.ts";
 import type { JxDocument, JxMutableNode } from "@jxsuite/schema/types";
 import type { CacheManifest } from "./image-cache.ts";
@@ -193,13 +195,20 @@ function isAllowedRemote(src: string, config: ImageConfig) {
 /**
  * Resolve a src path to an absolute filesystem path.
  *
- * Handles paths starting with "/" (relative to public dir or project root).
+ * Extension asset mounts win first — they publish directories that may sit outside the project root
+ * (extensions.md §8.5), so a mounted src has no other resolution. Otherwise paths starting with "/"
+ * resolve into `public/`, and relative ones from the project root.
  *
  * @param {string} src
  * @param {string} projectRoot
+ * @param {readonly AssetMount[]} [mounts]
  * @returns {string}
  */
-function resolveImagePath(src: string, projectRoot: string) {
+function resolveImagePath(src: string, projectRoot: string, mounts?: readonly AssetMount[]) {
+  const mounted = mounts?.length ? resolveAssetUrl(mounts, src) : null;
+  if (mounted) {
+    return mounted;
+  }
   if (src.startsWith("/")) {
     return resolve(projectRoot, "public", src.slice(1));
   }
@@ -218,6 +227,7 @@ function resolveImagePath(src: string, projectRoot: string) {
  * @param {string} projectRoot
  * @param {CacheManifest | null} cache - Variant cache (build mode); unused in cloudflare mode
  * @param {ImageMetaCache} [metaCache] - Dimension/hash memo (cloudflare mode)
+ * @param {readonly AssetMount[]} [mounts] - Extension asset mounts (extensions.md §8.5)
  * @returns {Promise<{ imageRefs: Map<string, ImageManifest> }>}
  */
 export async function transformImageNodes(
@@ -226,6 +236,7 @@ export async function transformImageNodes(
   projectRoot: string,
   cache: CacheManifest | null,
   metaCache?: ImageMetaCache,
+  mounts: readonly AssetMount[] = [],
 ) {
   const imageRefs = new Map<string, ImageManifest>();
 
@@ -234,7 +245,7 @@ export async function transformImageNodes(
   }
 
   const meta = metaCache ?? new Map();
-  await walkAndTransform(doc, config, projectRoot, cache, meta, imageRefs);
+  await walkAndTransform(doc, config, projectRoot, cache, meta, imageRefs, mounts);
 
   return { imageRefs };
 }
@@ -246,6 +257,7 @@ export async function transformImageNodes(
  * @param {CacheManifest | null} cache
  * @param {ImageMetaCache} metaCache
  * @param {Map<string, ImageManifest>} imageRefs
+ * @param {readonly AssetMount[]} mounts
  */
 async function walkAndTransform(
   node: JxMutableNode | JxDocument,
@@ -254,13 +266,14 @@ async function walkAndTransform(
   cache: CacheManifest | null,
   metaCache: ImageMetaCache,
   imageRefs: Map<string, ImageManifest>,
+  mounts: readonly AssetMount[],
 ) {
   if (!node || typeof node !== "object") {
     return;
   }
 
   if (node.tagName === "img") {
-    await transformImgNode(node, config, projectRoot, cache, metaCache, imageRefs);
+    await transformImgNode(node, config, projectRoot, cache, metaCache, imageRefs, mounts);
   }
 
   if (typeof node.innerHTML === "string" && node.innerHTML.includes("<img")) {
@@ -271,6 +284,7 @@ async function walkAndTransform(
       cache,
       metaCache,
       imageRefs,
+      mounts,
     );
   }
 
@@ -279,7 +293,7 @@ async function walkAndTransform(
       if (typeof child === "string") {
         continue;
       }
-      await walkAndTransform(child, config, projectRoot, cache, metaCache, imageRefs);
+      await walkAndTransform(child, config, projectRoot, cache, metaCache, imageRefs, mounts);
     }
   }
 }
@@ -291,6 +305,7 @@ async function walkAndTransform(
  * @param {CacheManifest | null} cache
  * @param {ImageMetaCache} metaCache
  * @param {Map<string, ImageManifest>} imageRefs
+ * @param {readonly AssetMount[]} mounts
  */
 async function transformImgNode(
   node: JxMutableNode | JxDocument,
@@ -299,6 +314,7 @@ async function transformImgNode(
   cache: CacheManifest | null,
   metaCache: ImageMetaCache,
   imageRefs: Map<string, ImageManifest>,
+  mounts: readonly AssetMount[],
 ) {
   if (!node.attributes) {
     node.attributes = {};
@@ -325,7 +341,7 @@ async function transformImgNode(
     // Fit=scale-down avoid upscaling past the source size.
     srcset = buildCloudflareSrcset(src, config, Infinity, null);
   } else {
-    const absoluteSrc = resolveImagePath(src, projectRoot);
+    const absoluteSrc = resolveImagePath(src, projectRoot, mounts);
     if (!existsSync(absoluteSrc)) {
       return;
     }
@@ -382,6 +398,7 @@ const DATA_NO_OPT_RE = /\bdata-no-optimize\b/;
  * @param {CacheManifest | null} cache
  * @param {ImageMetaCache} metaCache
  * @param {Map<string, ImageManifest>} imageRefs
+ * @param {readonly AssetMount[]} mounts
  * @returns {Promise<string>}
  */
 async function transformInnerHtmlImages(
@@ -391,6 +408,7 @@ async function transformInnerHtmlImages(
   cache: CacheManifest | null,
   metaCache: ImageMetaCache,
   imageRefs: Map<string, ImageManifest>,
+  mounts: readonly AssetMount[],
 ) {
   /** @type {{ match: string; replacement: string }[]} */
   const replacements = [];
@@ -418,7 +436,7 @@ async function transformInnerHtmlImages(
       continue;
     }
 
-    const absoluteSrc = remote ? null : resolveImagePath(src, projectRoot);
+    const absoluteSrc = remote ? null : resolveImagePath(src, projectRoot, mounts);
     if (absoluteSrc && !existsSync(absoluteSrc)) {
       continue;
     }

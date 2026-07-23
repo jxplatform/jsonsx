@@ -2,8 +2,9 @@
 
 ## Content Formats and the Reference Format-Extension Classes
 
-**Version:** 3.0.0-draft
+**Version:** 0.2.4-draft
 **Status:** Partial
+**Updated:** 2026-07-23
 **License:** MIT
 
 ---
@@ -171,6 +172,42 @@ Directives map to custom element tags in the Jx tree (text/leaf/container, nesti
 
 All classes satisfy the Jx external class contract: constructor receives the config object, `resolve()` returns the value (async), and `.class.json` schemas allow the dev server, compiler, and studio to introspect structure — including the format block, capability roles with `timing`, and `$studio` hints — without importing the implementation.
 
+## 9. `Content` — the project-section class
+
+> **Status: Implemented.**
+
+`Content.class.json` owns the `project.json` `content` section (extensions.md §9). Its capabilities are format-agnostic: `projectData` loads every content type through the format registry, `resolvePaths` expands `contentType` `$paths`, and `assets` publishes the collections' directories.
+
+### 9.1 `assets` — collection asset mounts
+
+`Content.assets(sectionValue, { root })` returns one mount per content type whose `source` is a local **directory**: `{ urlPrefix: "/content/<type>", dir: <resolved source> }`. Single-file, remote, and missing sources get no mount — a lone file's siblings are not its collection — and a content type whose name is not URL-safe is skipped with a warning.
+
+### 9.2 Content-relative asset references
+
+Entries address media relative to themselves, so a collection reads correctly in a markdown editor and on the built site alike. After a format class loads a file, the loader remaps its references onto that collection's mount:
+
+- element `src` and `poster` values anywhere in `$children`, and frontmatter fields the content-type schema declares `"format": "uri-reference"` (string or array of strings);
+- only when the value is relative (no leading `/`, no `scheme:`, no `#`, no `${…}` template) **and** resolves against the entry's own directory to an existing file inside the mount directory;
+- a relative reference that resolves to nothing is left as authored and reported as a warning naming the entry;
+- the raw `body` is never rewritten — it is the round-trip source Studio saves back — and `href` is out of scope, since links between entries are routes rather than assets.
+
+Because the rewrite happens in the loader, every consumer of `projectData` — site build, dev server, studio preview, search indexing — sees the same mounted URLs with no extra work.
+
+## Changelog
+
+- **0.2.4-draft** (2026-07-23) — Document the Content project-section class: asset mounts and content-relative reference rewriting (§9).
+- **0.2.3-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.2.2-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.2.1-draft** (2026-07-17) — Sidecar bundling, extension emit capability, heading anchors (`07e28bc3`).
+- **0.2.0-draft** (2026-06-10) — Consolidate markdown and csv handling to the parser package (`8b1ba6da`).
+- **0.1.6-draft** (2026-05-20) — Run formatter (`8ba47930`).
+- **0.1.5-draft** (2026-05-08) — Pass markdown attributes as properties (`407b70fc`).
+- **0.1.4-draft** (2026-04-23) — Rebrand to jxsuite (`2897a4e8`).
+- **0.1.3-draft** (2026-04-22) — Consolidate project config schema and rename as such (`e3523dbf`).
+- **0.1.2-draft** (2026-04-16) — Landing site + working exports + release-it + linting (`a8409b5f`).
+- **0.1.1-draft** (2026-04-15) — Rebrand to Jx / Jx Platform (`abc63f2d`).
+- **0.1.0-draft** (2026-04-10) — Consolidate specs (`80ca313f`).
+
 ---
 
-_`@jxsuite/parser` Specification v3.0.0-draft_
+_`@jxsuite/parser` Specification v0.2.4-draft_

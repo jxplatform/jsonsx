@@ -4,6 +4,7 @@ We're crafting a comprehensive web-based application suite that aims to encompas
 - Code in strongly typed Typescript. Ensure all linting, typechecking, and tests pass following all changes.
 - Implement tests in parallel with features—use native Bun + Happy DOM and other mock API providers, as appropriate.
 - Reference the general and package-specific specs (./specs) prior to planning and implementing features, update specs to reflect user requests prior to adding new features. Edit spec sections in place — never renumber headings (user docs anchor them).
+- Every substantive spec edit is a release: run `bun run spec:bump <spec.md> <major|minor|patch> -m "<what changed>"` to advance the version, restamp `**Updated:**`, and add a `## Changelog` entry, then `bun run docs:generate`. CI blocks a changed spec body that wasn't released (`bun run docs:spec-release`). See ./specs/README.md.
 - User documentation (./docs, published at jxsuite.com/docs) must track shipped behavior: behavior-changing work updates the affected docs pages in the same change set. Run `bun run docs:sync` to map your diff to affected pages/specs, and `bun run docs:check` before finishing. Plans must include a "Specs & docs" step.
 - Use Chrome MCP to test new UI/UX changes prior to finishing the task.
 

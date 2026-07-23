@@ -14,7 +14,7 @@ Your content collections are files in your project — right for pages, posts, a
 
 You don't need to have run a database before. The default setup is a single file inside your project — nothing to install, no account to create — and the same table definitions carry over unchanged when you later point them at a hosted service.
 
-![The Settings modal open on the Data Tables section with a table selected and its field schema visible](/screenshots/data-tables-section.png)
+![The Settings modal open on the Data Tables section with a table selected and its field schema visible](../images/data-tables-section.png)
 
 ## Where it lives
 

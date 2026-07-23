@@ -740,4 +740,55 @@ describe("image-transform", () => {
       expect(getImageMetadata).not.toHaveBeenCalled();
     });
   });
+  describe("asset mounts", () => {
+    test("resolves a mounted src outside the project root", async () => {
+      const external = join(TMP, "external/images");
+      mkdirSync(external, { recursive: true });
+      writeFileSync(join(external, "diagram.png"), "fake-png-data");
+      const mounts = [{ dir: join(TMP, "external"), urlPrefix: "/content/docs" }];
+      const doc: any = {
+        attributes: { src: "/content/docs/images/diagram.png" },
+        tagName: "img",
+      };
+
+      await transformImageNodes(
+        doc,
+        defaultConfig,
+        TMP,
+        { entries: {}, version: 1 },
+        undefined,
+        mounts,
+      );
+
+      expect(doc.attributes.srcset).toContain("/_optimized/hero-640-abc.avif 640w");
+      expect(doc.attributes.src).toBe("/content/docs/images/diagram.png");
+    });
+
+    test("a mounted URL with no file behind it is left alone", async () => {
+      const mounts = [{ dir: join(TMP, "external"), urlPrefix: "/content/docs" }];
+      const doc: any = { attributes: { src: "/content/docs/gone.png" }, tagName: "img" };
+
+      await transformImageNodes(
+        doc,
+        defaultConfig,
+        TMP,
+        { entries: {}, version: 1 },
+        undefined,
+        mounts,
+      );
+
+      expect(doc.attributes.srcset).toBeUndefined();
+    });
+
+    test("without mounts the same src falls back to public/ and is skipped", async () => {
+      const doc: any = {
+        attributes: { src: "/content/docs/images/diagram.png" },
+        tagName: "img",
+      };
+
+      await transformImageNodes(doc, defaultConfig, TMP, { entries: {}, version: 1 });
+
+      expect(doc.attributes.srcset).toBeUndefined();
+    });
+  });
 });

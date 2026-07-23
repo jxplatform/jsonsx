@@ -37,7 +37,7 @@ Gutenberg's blocks split into two ideas. **Elements** are the building parts —
 
 Writing feels like the part of Gutenberg you liked. Open a content page in [Edit mode](/docs/studio/editing) and the canvas becomes the page itself: click any text and type, use slash commands for headings, lists, images, and tables. It saves as Markdown files, not rows in a `posts` table.
 
-![Jx Studio's Edit mode with a content page open for inline writing on the canvas](/screenshots/mode-edit.png)
+![Jx Studio's Edit mode with a content page open for inline writing on the canvas](../images/mode-edit.png)
 
 ## Custom post types and fields
 

@@ -9,7 +9,7 @@ code:
 
 Events is the right-panel tab where an element gets its behavior: what happens when it's clicked, typed into, submitted, or hovered. Select an element on the canvas, then click **Events** in the right panel — with nothing selected, the tab just asks you to select an element first.
 
-![The Events tab with an onclick binding in expression mode](/screenshots/events-panel.png)
+![The Events tab with an onclick binding in expression mode](../../images/events-panel.png)
 
 ## Add a binding
 

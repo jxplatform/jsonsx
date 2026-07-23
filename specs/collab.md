@@ -2,8 +2,9 @@
 
 ## Real-Time Co-Editing for Jx Projects
 
-**Version:** 0.1.0-draft
+**Version:** 0.1.1-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -52,6 +53,11 @@ There is currently **no cross-version migration story** for the document format 
 breaking change to the Jx document schema across a room's lifetime is out of scope for this draft and
 tracked separately (see spec §3.2 on `$schema`).
 
+## Changelog
+
+- **0.1.1-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.1.0-draft** (2026-07-22) — Reconcile spec with shipped behavior; document the eval surface (`c8d1d580`).
+
 ---
 
-_Jx `@jxsuite/collab` Specification v0.1.0-draft — a stub, subject to expansion._
+_Jx `@jxsuite/collab` Specification v0.1.1-draft — a stub, subject to expansion._

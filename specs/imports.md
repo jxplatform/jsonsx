@@ -1,7 +1,8 @@
 # Imports
 
-**Version:** 1.0.0-draft
+**Version:** 0.1.6-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -176,3 +177,13 @@ Content collections support `$elements` in their `project.json `collections``, c
 Collection `$elements` merge with site-level `$elements` to determine the full set of available components for markdown rendering. The `$elements` entries are passed as `allowedNames` to the `MarkdownDirective` plugin, restricting which directive tag names are valid in that collection's markdown files.
 
 The compiler's `injectContext()` also merges site-level `$elements` into page-level `$elements` during the build, using the same union-dedup strategy as the runtime.
+
+## Changelog
+
+- **0.1.6-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.1.5-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.1.4-draft** (2026-06-10) — Consolidate markdown and csv handling to the parser package (`8b1ba6da`).
+- **0.1.3-draft** (2026-06-01) — Remove old glob-based content type references (`6bcbfdaf`).
+- **0.1.2-draft** (2026-05-19) — Reflect new content type transition (`6eb3d2b6`).
+- **0.1.1-draft** (2026-04-22) — Consolidate project config schema and rename as such (`e3523dbf`).
+- **0.1.0-draft** (2026-04-22) — External web component support (`a9d0fbe4`).

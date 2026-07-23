@@ -32,6 +32,8 @@ import { loadProjectConfig } from "./site-loader.ts";
 import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
 import { buildProjectExtensionRegistry } from "./format-host.ts";
 import { loadProjectSections } from "./project-sections.ts";
+import { collectAssetRefs, copyMountedAssets, loadAssetMounts } from "./asset-mounts.ts";
+import type { AssetMount } from "@jxsuite/schema/asset-paths";
 import type { FormatEntry, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import { resolveLayout } from "./layout-resolver.ts";
@@ -208,6 +210,26 @@ export async function buildSite(
     log(`  Loaded ${sectionKeys.length} section(s): ${sectionKeys.join(", ")}`);
   }
 
+  // ── 3c. Extension asset mounts (extensions.md §8.5) ─────────────────────
+  // Directories published at a site URL — typically an external content source's co-located
+  // Images. They resolve for image optimization below, and the files pages actually reference
+  // Are copied into dist in step 7c.
+  const { errors: mountErrors, mounts: assetMounts } = await loadAssetMounts(
+    registry,
+    projectConfig,
+    projectRoot,
+  );
+  errors.push(...mountErrors);
+  for (const message of mountErrors) {
+    console.error(message);
+  }
+  if (assetMounts.length > 0) {
+    log(
+      `  Mounted ${assetMounts.length} asset dir(s): ${assetMounts.map((m) => m.urlPrefix).join(", ")}`,
+    );
+  }
+  const assetRefs = new Set<string>();
+
   // ── 4. Expand dynamic routes ────────────────────────────────────────────
   const routes = await expandDynamicRoutes(
     staticRoutes,
@@ -262,6 +284,7 @@ export async function buildSite(
           const css = buildComponentCSS(doc.tagName, doc.style, doc, projectConfig.$media ?? {});
           if (css) {
             componentCSS.set(doc.tagName, css);
+            collectAssetRefs(css, assetMounts, assetRefs);
             writeFileSync(resolve(componentOutDir, `${doc.tagName}.css`), css, "utf8");
             fileCount += 1;
           }
@@ -325,6 +348,7 @@ export async function buildSite(
         formatRegistry,
         registry,
         rewriteSidecarSrc,
+        assetMounts,
       );
 
       // Determine which component tags are fully static (for script omission)
@@ -344,6 +368,10 @@ export async function buildSite(
           staticTags,
         );
       }
+
+      // Mounted assets this page actually references — scanned from the finished HTML so a
+      // Reference is caught wherever it came from (markdown image, hand-authored page, $head).
+      collectAssetRefs(result.html, assetMounts, assetRefs);
 
       // Determine output path
       const outPath = routeToOutputPath(route.urlPattern, outDir, trailingSlash);
@@ -568,7 +596,19 @@ export async function buildSite(
     console.warn("sitemap.xml skipped — set `url` in project.json to enable sitemap generation.");
   }
 
-  // ── 7c. Copy public/ assets ─────────────────────────────────────────────
+  // ── 7c. Copy referenced mounted assets (extensions.md §8.5) ─────────────
+  // Only files the compiled output references are copied, so a content source's entry files
+  // Never land in dist. Runs before the public/ copy, which keeps shadowing everything.
+  if (assetRefs.size > 0) {
+    const { copied, missing } = copyMountedAssets(assetRefs, assetMounts, outDir);
+    fileCount += copied;
+    log(`Copying ${copied} mounted asset(s)...`);
+    for (const url of missing) {
+      console.warn(`Referenced asset not found: ${url}`);
+    }
+  }
+
+  // ── 7c(ii). Copy public/ assets ─────────────────────────────────────────
   if (existsSync(publicDir)) {
     log("Copying public/ assets...");
     cpSync(publicDir, outDir, { recursive: true });
@@ -630,6 +670,7 @@ async function compilePage(
   formatRegistry?: FormatRegistry,
   registry?: ExtensionRegistry,
   rewriteSidecarSrc?: (specifier: string, docDir: string | null) => string,
+  assetMounts: readonly AssetMount[] = [],
 ) {
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
@@ -744,6 +785,7 @@ async function compilePage(
       projectRoot,
       imageCache,
       imageMetaCache ?? undefined,
+      assetMounts,
     );
   }
 

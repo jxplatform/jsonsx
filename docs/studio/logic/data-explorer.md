@@ -10,7 +10,7 @@ code:
 
 Data is the read side of the **[State panel](/docs/studio/logic/state)**: the same entries, but showing what each one is worth **right now**, as the canvas runs the page — the actual list your fetch returned, the current count, the parsed form. Open it by clicking **Data** in the activity bar. When something on the page looks wrong, this is where you find out what the page actually sees.
 
-![The Data activity with state entries expanded into live data trees](/screenshots/data-explorer.png)
+![The Data activity with state entries expanded into live data trees](../../images/data-explorer.png)
 
 ## Read the values
 

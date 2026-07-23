@@ -187,7 +187,7 @@ Mark a state entry with `timing: "server"` to run it server-side. The browser re
 Jx Studio is a visual builder for Jx documents. It ships as a standalone desktop app; contributors working in this repository can also run it in the browser via the dev server.
 
 <p align="center">
-  <img src="sites/jxsuite.com/public/screenshots/hero.png" alt="Jx Studio editing the jxsuite.com homepage — layers panel, live canvas, and element inspector" width="800">
+  <img src="docs/images/hero.png" alt="Jx Studio editing the jxsuite.com homepage — layers panel, live canvas, and element inspector" width="800">
 </p>
 
 - Canvas with live preview and inline editing

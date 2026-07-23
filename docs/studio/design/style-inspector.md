@@ -12,7 +12,7 @@ code:
 
 The Style inspector is the **Style** tab of the right panel — a full set of visual CSS controls for the selected element. Select an element in Design mode and click **Style** at the top of the right panel; edits apply to the live canvas as you make them.
 
-![Jx Studio style inspector with spacing, typography, and color controls for a selected element](/screenshots/design-inspector.png)
+![Jx Studio style inspector with spacing, typography, and color controls for a selected element](../../images/design-inspector.png)
 
 ## The toolbar
 

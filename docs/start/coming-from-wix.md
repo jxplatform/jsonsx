@@ -11,7 +11,7 @@ On Wix or Squarespace, your site lives inside your account: the editor, the file
 
 Jx Studio is a full visual builder: click any text and type right on the page, drag in headings, images, and sections, and style everything with panels — colors, spacing, fonts — while a live canvas shows the page at every screen size. Nothing in the [Studio documentation](/docs/studio) assumes you can code.
 
-![Jx Studio with a real-estate site open on the canvas, showing the layers tree and properties panel](/screenshots/hero.png)
+![Jx Studio with a real-estate site open on the canvas, showing the layers tree and properties panel](../images/hero.png)
 
 One difference you'll notice immediately: Studio is an app you [download](/docs/start/install), not a website you sign into. There's no account, because there's nothing to have an account _on_ — it opens your files directly.
 

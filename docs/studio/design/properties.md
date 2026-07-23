@@ -10,7 +10,7 @@ code:
 
 Properties is the first tab of the right panel — alongside **Events** and **Style** — and it edits everything about the selected element that isn't styling: what kind of element it is, its attributes, and, for component instances, their props. Select an element on the canvas or in [Layers](/docs/studio/design/layers), then click **Properties** at the top of the right panel.
 
-![The Properties panel for a selected link showing the Element and Link sections](/screenshots/properties-panel.png)
+![The Properties panel for a selected link showing the Element and Link sections](../../images/properties-panel.png)
 
 ## The Element section
 

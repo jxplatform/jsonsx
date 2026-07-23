@@ -2,8 +2,9 @@
 
 ## AI Assistant for Jx Studio
 
-**Version:** 0.1.0-draft
+**Version:** 0.1.1-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -48,6 +49,11 @@ The assistant executes only through the same file/RPC surfaces a human uses, beh
 Origin/Host gate and path containment (`@jxsuite/server` §4.2). It has no independent network or
 filesystem access beyond the connected provider endpoint.
 
+## Changelog
+
+- **0.1.1-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.1.0-draft** (2026-07-22) — Reconcile spec with shipped behavior; document the eval surface (`c8d1d580`).
+
 ---
 
-_Jx `@jxsuite/ai` Specification v0.1.0-draft — a stub, subject to expansion._
+_Jx `@jxsuite/ai` Specification v0.1.1-draft — a stub, subject to expansion._

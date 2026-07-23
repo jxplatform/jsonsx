@@ -7,7 +7,7 @@ description: "Give a Jx site a blog in Studio: define a posts content type, crea
 
 In this tutorial you give your site a blog the structured way: a `posts` content type with a field schema, three entries created from it, a round of bulk editing in Grid mode, and a Blog page that lists every post from live data. Add a fourth post next month and the page updates itself.
 
-![The Blog page in Preview, listing three post cards with titles, dates, and descriptions](/screenshots/blog-finished.png)
+![The Blog page in Preview, listing three post cards with titles, dates, and descriptions](../images/blog-finished.png)
 
 **About 20 minutes.** Before you start:
 
@@ -22,7 +22,7 @@ A content type is your CMS schema: where a collection's entries live, and what f
 2. Click **New Entry** at the bottom of the type list.
 3. Type `Posts` and click **Create**.
 
-![The Content Types section with the new posts type selected and its empty field schema](/screenshots/blog-content-type.png)
+![The Content Types section with the new posts type selected and its empty field schema](../images/blog-content-type.png)
 
 You should see the new type selected, named `posts`, with a matching source folder (`content/posts/`) and an empty field schema ready to fill.
 
@@ -34,7 +34,7 @@ Add three fields — for each one, click **Add Field**, type the name, pick its 
 2. `date` — type **string**, format **date**, so entries get a real date field.
 3. `description` — type **string**.
 
-![The posts type with title, date, and description rows in its field schema](/screenshots/blog-schema-fields.png)
+![The posts type with title, date, and description rows in its field schema](../images/blog-schema-fields.png)
 
 You should now see three field rows in the schema. These become the form every post fills in. Leave **Source** and **Format** as they are, and close Settings. Everything the builder can do — nested fields, references between types — is in **[Content types](/docs/studio/projects/content-types)**.
 
@@ -44,7 +44,7 @@ You should now see three field rows in the schema. These become the form every p
 2. Click **New** — the menu now lists an item for the type you just defined. Pick **Posts**.
 3. Name the entry `hello-world`.
 
-![Jx Studio Manage Files modal with live previews of every project file](/screenshots/mode-manage.png)
+![Jx Studio Manage Files modal with live previews of every project file](../images/mode-manage.png)
 
 Studio creates the file in `content/posts/` with every schema field pre-filled with a sensible blank, and opens it. Back in Manage, the entry appears under the **Content** filter, labeled with its type.
 
@@ -58,7 +58,7 @@ The post opens in **Edit** mode with a **Properties** bar directly above the pag
 
 Then click into the page below and write a paragraph or two of body text.
 
-![Jx Studio editing markdown content inline with a WYSIWYG editor](/screenshots/mode-edit.png)
+![Jx Studio editing markdown content inline with a WYSIWYG editor](../images/mode-edit.png)
 
 You should see the frontmatter form filled in and your words on the page. The same fields also live in the **Document** activity — see **[Frontmatter and page metadata](/docs/studio/editing/frontmatter)**.
 
@@ -75,7 +75,7 @@ Editing entries one file at a time doesn't scale, so Studio can open the whole c
 1. Click **Files** in the activity bar.
 2. Right-click the `content/posts` folder and choose **Edit Collection in Grid**.
 
-![The posts collection open in Grid mode, one row per entry with title, date, and description columns](/screenshots/blog-grid.png)
+![The posts collection open in Grid mode, one row per entry with title, date, and description columns](../images/blog-grid.png)
 
 You should see one row per post and one column per schema field, with the **Path** column pinned at the left — and your two blank rows plain to see.
 
@@ -106,7 +106,7 @@ Design a single card — the repeater will copy it per post:
 2. With the article selected, click the **h3** card, then the **p** card twice — each new element lands inside the selection.
 3. Select each of the three in turn and give it placeholder text via **Text Content** in the **Properties** tab: `Post title`, `A line about the post.`, and `2026-01-01`.
 
-![The design canvas with one article card holding a heading and two placeholder paragraphs](/screenshots/blog-card.png)
+![The design canvas with one article card holding a heading and two placeholder paragraphs](../images/blog-card.png)
 
 You should see one plausible-looking post card on the canvas. Style it as much or as little as you like — see **[Design mode](/docs/studio/design)**.
 
@@ -119,7 +119,7 @@ The page needs the posts as data it can render:
 3. Rename the new entry to `posts` (type the name and press :kbd[Enter]).
 4. Set **contentType** to `posts`, and add a **sort** rule on the `date` field with order `desc`, so the newest post lists first.
 
-![The State panel editing a ContentCollection entry with contentType posts and a date sort rule](/screenshots/blog-collection-state.png)
+![The State panel editing a ContentCollection entry with contentType posts and a date sort rule](../images/blog-collection-state.png)
 
 Open the **Data** activity and you should see `posts` worth `Array(3)` — your three entries, live. Filters, limits, and the other sources are covered in **[Data sources](/docs/studio/logic/data-sources)**.
 
@@ -129,7 +129,7 @@ Open the **Data** activity and you should see `posts` worth `Array(3)` — your 
 2. In the dialog, set **Items source** to `posts`.
 3. Click **Create Repeater**.
 
-![The Repeat dialog with posts selected as the items source](/screenshots/blog-repeat-dialog.png)
+![The Repeat dialog with posts selected as the items source](../images/blog-repeat-dialog.png)
 
 Your card is now the repeater's _template_, marked **↻** in Layers. On the design canvas it still renders once — that's the template view. Everything about repeaters lives in **[Repeaters](/docs/studio/design/repeaters)**.
 
@@ -141,7 +141,7 @@ Inside the template, each post's data is in scope:
 2. Click **Insert data** on the floating toolbar and pick `item.data.title`. A live placeholder lands in the text.
 3. Do the same for the two paragraphs: `item.data.description` and `item.data.date`.
 
-![The Insert data list open over the card's heading, offering item.data fields](/screenshots/blog-insert-data.png)
+![The Insert data list open over the card's heading, offering item.data fields](../images/blog-insert-data.png)
 
 Each text now holds a placeholder that fills itself from the current post. (A collection entry's schema fields live under `item.data`; `item` and `index` are there too.)
 
@@ -149,11 +149,11 @@ Each text now holds a placeholder that fills itself from the current post. (A co
 
 Switch on the **Preview** toggle in the tab bar.
 
-![Preview on, the single card expanded into three post cards with real titles, dates, and descriptions](/screenshots/blog-preview.png)
+![Preview on, the single card expanded into three post cards with real titles, dates, and descriptions](../images/blog-preview.png)
 
 You should see the single card expand into three, newest first, each filled in from its own post. Switch Preview off, then save your tabs with :kbd[⌘S] / :kbd[Ctrl+S]. When you're ready, commit the lot from **Source Control** — see **[Source control](/docs/studio/publish/source-control)**.
 
-![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](/screenshots/git-commit.png)
+![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](../images/git-commit.png)
 
 ## Give each post its own page
 

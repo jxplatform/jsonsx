@@ -2,8 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 2.0.0-draft
+**Version:** 0.2.8-draft
 **Status:** Partial
+**Updated:** 2026-07-23
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -387,21 +388,22 @@ All capability methods are `scope: "static"` — hosts call them on the
 implementation class without constructing an instance. The instance
 `resolve()` method remains the runtime's on-demand access path.
 
-| Role             | Block       | Signature                                                                   | Consumers                                                                    |
-| ---------------- | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `parse`          | `format`    | `(source, options?) → JxDocument`                                           | compiler, server, studio (open file)                                         |
-| `serialize`      | `format`    | `(doc, options?) → string`                                                  | studio (save), site build (export sidecars)                                  |
-| `discover`       | `format`    | `(source, { baseDir }) → string[]`                                          | content loading (list entry files)                                           |
-| `load`           | `format`    | `(path, { schema, directiveOptions }) → ContentLoaderEntry[]`               | content loading (parse one source)                                           |
-| `projectData`    | `project`   | `(sectionValue, { projectConfig, root, registry, io }) → unknown`           | compiler site build, dev server resolve — result stored as `_project[<key>]` |
-| `resolvePaths`   | `project`   | `(pathsDef, { data, projectConfig, root }) → Record<string, unknown>[]`     | pages discovery (`$paths` expansion), studio preview                         |
-| `lower`          | any         | `(def, context) → JxStateDefinition`                                        | compiler — rewrites a state def into a core shape for client output          |
-| `emit`           | `project`   | `(sectionValue, { projectConfig, root, sections, routes }) → EmitFile[]`    | compiler site build — writes derived assets into the build output (§8.4)     |
-| `mount`          | `server`    | `(options, ctx) → (request: Request, env) => Promise<Response>`             | generated site worker, dev server                                            |
-| `dialect`        | `connector` | `(connection, env) → Kysely Dialect`                                        | data mounts, auth, deploy                                                    |
-| `deploySchema`   | `connector` | `(tables, connection, { env, dryRun }) → { statements, applied, warnings }` | `jx db push`, studio push                                                    |
-| `bindings`       | `connector` | `(connection) → wrangler config fragment`                                   | scaffolding, `jx db push`                                                    |
-| `testConnection` | `connector` | `(connection, env) → { ok, error? }`                                        | studio connections UI, CLI                                                   |
+| Role             | Block       | Signature                                                                   | Consumers                                                                          |
+| ---------------- | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `parse`          | `format`    | `(source, options?) → JxDocument`                                           | compiler, server, studio (open file)                                               |
+| `serialize`      | `format`    | `(doc, options?) → string`                                                  | studio (save), site build (export sidecars)                                        |
+| `discover`       | `format`    | `(source, { baseDir }) → string[]`                                          | content loading (list entry files)                                                 |
+| `load`           | `format`    | `(path, { schema, directiveOptions }) → ContentLoaderEntry[]`               | content loading (parse one source)                                                 |
+| `projectData`    | `project`   | `(sectionValue, { projectConfig, root, registry, io }) → unknown`           | compiler site build, dev server resolve — result stored as `_project[<key>]`       |
+| `resolvePaths`   | `project`   | `(pathsDef, { data, projectConfig, root }) → Record<string, unknown>[]`     | pages discovery (`$paths` expansion), studio preview                               |
+| `lower`          | any         | `(def, context) → JxStateDefinition`                                        | compiler — rewrites a state def into a core shape for client output                |
+| `emit`           | `project`   | `(sectionValue, { projectConfig, root, sections, routes }) → EmitFile[]`    | compiler site build — writes derived assets into the build output (§8.4)           |
+| `assets`         | `project`   | `(sectionValue, { projectConfig, root }) → AssetMount[]`                    | compiler site build, dev server — publishes source directories at site URLs (§8.5) |
+| `mount`          | `server`    | `(options, ctx) → (request: Request, env) => Promise<Response>`             | generated site worker, dev server                                                  |
+| `dialect`        | `connector` | `(connection, env) → Kysely Dialect`                                        | data mounts, auth, deploy                                                          |
+| `deploySchema`   | `connector` | `(tables, connection, { env, dryRun }) → { statements, applied, warnings }` | `jx db push`, studio push                                                          |
+| `bindings`       | `connector` | `(connection) → wrangler config fragment`                                   | scaffolding, `jx db push`                                                          |
+| `testConnection` | `connector` | `(connection, env) → { ok, error? }`                                        | studio connections UI, CLI                                                         |
 
 `resolvePaths` methods declare a `"discriminator"` — the `$paths` key that
 routes to them (parser: `contentType`). Hosts dispatch on which discriminator
@@ -477,6 +479,58 @@ emit(sectionValue, { projectConfig, root, sections, routes })
   parser's content collections keyed by collection name), `routes` the
   expanded route table. Emitters derive their output from this loaded data
   rather than re-reading source files.
+
+### 8.5 `assets`
+
+> **Status: Implemented.**
+
+`assets` publishes a directory the section already reads from at a site URL,
+so files that live beside a section's sources — an external content
+collection's co-located images, most of all — resolve for every host:
+
+```
+assets(sectionValue, { projectConfig, root }) → { urlPrefix: string, dir: string }[]
+```
+
+A returned pair is an **asset mount**: `urlPrefix` is a site-absolute URL
+prefix (a leading slash is added if missing, a trailing one dropped), `dir`
+the absolute directory it maps onto. `dir` may sit outside the project root —
+that is the point: a `content` source of `../../docs` is unreachable by every
+other path the host knows.
+
+- **Timing** is `["compiler", "server"]`, and the call is a pure function of
+  the section's configuration — no loaded entries, no filesystem walk beyond
+  checking that a source directory exists. Hosts may call it per build, per
+  project-context load, or per request.
+- **Gating** matches `emit`: a class owning a project section contributes only
+  when the project declares a non-empty value for that key.
+- **Prefix exclusivity**: two mounts may share a `dir`, but a `urlPrefix`
+  claimed for two different directories is a configuration error, reported
+  like a route error. The first declaration wins.
+- **URL mapping** is deterministic and hash-free, shared by every host through
+  `@jxsuite/schema/asset-paths` (`assetUrlFor`, `resolveAssetUrl`,
+  `collectAssetUrls`). Reverse mapping decodes a URL exactly once, refuses a
+  still-encoded dot or slash, and refuses `.`/`..` and empty segments, so a
+  mounted URL can never escape its directory.
+
+Hosts consume mounts in three places:
+
+- **The site build** resolves mounted URLs while optimizing images (so a
+  mounted image gets the same `srcset` treatment as one in `public/`), scans
+  its compiled HTML and CSS for mounted URLs, and copies **only the
+  referenced files** into the build output at their URL path. Entry files
+  beside them never reach `dist/`. A referenced URL with no file behind it is
+  reported as a warning, not a build error. The copy runs after `emit` and
+  before the `public/` copy, so `public/` still shadows.
+- **The dev and desktop servers** serve mounts ahead of the project root and
+  `public/`, each contained against its own `dir` — so a preview renders the
+  same URLs the built site will.
+- **`jx preview`** needs nothing: it serves `dist/`, where the files already
+  are.
+
+Statically referenced assets are the contract. A `src` a page computes at
+runtime cannot be discovered by the build scan, so those files belong in
+`public/`.
 
 ---
 
@@ -835,6 +889,19 @@ db push`, and has a moderated, auth-gated guestbook — with project.json
 validation, a studio settings section, and dev-server parity, none of it
 requiring changes to any core package.
 
+## Changelog
+
+- **0.2.8-draft** (2026-07-23) — Add the assets capability (§8.5): section owners publish source directories at site URLs.
+- **0.2.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.2.6-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.2.5-draft** (2026-07-22) — Align specs and docs with the bundled-schema validation contract (`ae861ff6`).
+- **0.2.4-draft** (2026-07-17) — Sidecar bundling, extension emit capability, heading anchors (`07e28bc3`).
+- **0.2.3-draft** (2026-07-17) — Align spec.md, site-architecture, desktop, server, extensions with reality (`c61ba567`).
+- **0.2.2-draft** (2026-07-11) — Better Auth extension — sessions, permissions, auth-gated data (`bf472285`).
+- **0.2.1-draft** (2026-07-08) — Shipped schema fragments + per-project schema emitters (`9e4a8936`).
+- **0.2.0-draft** (2026-07-08) — Extensions v2 framework + docs (`3fb8795f`).
+- **0.1.0-draft** (2026-06-10) — Consolidate markdown and csv handling to the parser package (`8b1ba6da`).
+
 ---
 
-_Jx Extensions Specification v2.0.0-draft_
+_Jx Extensions Specification v0.2.8-draft_

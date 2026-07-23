@@ -88,7 +88,7 @@
             {
               "tagName": "img",
               "attributes": {
-                "src": "/screenshots/hero.png",
+                "src": "/content/docs/images/hero.png",
                 "alt": "Jx Studio editing a website — layers panel, live canvas, and element inspector",
                 "width": "3840",
                 "height": "2400",
@@ -163,7 +163,7 @@
                   "tagName": "mode-card",
                   "attributes": {
                     "props.name": "Manage",
-                    "props.image": "/screenshots/mode-manage.png",
+                    "props.image": "/content/docs/images/mode-manage.png",
                     "props.imageAlt": "Jx Studio Manage Files modal with live previews of every project file",
                     "props.description": "Project explorer, content collections, and file operations with live previews. Create pages, upload media, and build content models — the CMS layer, without the CMS."
                   }
@@ -172,7 +172,7 @@
                   "tagName": "mode-card",
                   "attributes": {
                     "props.name": "Edit",
-                    "props.image": "/screenshots/mode-edit.png",
+                    "props.image": "/content/docs/images/mode-edit.png",
                     "props.imageAlt": "Jx Studio editing markdown content inline with a WYSIWYG editor",
                     "props.description": "Click any text and type. Slash commands for blocks, frontmatter forms on the side. WYSIWYG content authoring that feels like Notion — saves as clean Markdown."
                   }
@@ -181,7 +181,7 @@
                   "tagName": "mode-card",
                   "attributes": {
                     "props.name": "Design",
-                    "props.image": "/screenshots/mode-design.png",
+                    "props.image": "/content/docs/images/mode-design.png",
                     "props.imageAlt": "Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector",
                     "props.description": "A live canvas for every breakpoint and a full CSS inspector — spacing, type, color, layout, hover states, and design tokens. Everything you'd do in DevTools, but persistent."
                   }
@@ -190,7 +190,7 @@
                   "tagName": "mode-card",
                   "attributes": {
                     "props.name": "Script",
-                    "props.image": "/screenshots/mode-script.png",
+                    "props.image": "/content/docs/images/mode-script.png",
                     "props.imageAlt": "Jx Studio editing a component state function in the Monaco code editor",
                     "props.description": "State, data, and events in structured panels, plus a Monaco editor for functions and integrations. When a client asks for 'one little interactive thing,' you stop saying no."
                   }
@@ -281,7 +281,7 @@
             {
               "tagName": "img",
               "attributes": {
-                "src": "/screenshots/new-project.png",
+                "src": "/content/docs/images/new-project.png",
                 "alt": "Jx Studio New Project dialog — name, directory, production URL, and deployment adapter picker",
                 "width": "3840",
                 "height": "2000",
@@ -322,7 +322,7 @@
             {
               "tagName": "img",
               "attributes": {
-                "src": "/screenshots/git-panel.png",
+                "src": "/content/docs/images/git-panel.png",
                 "alt": "Jx Studio Source Control panel — branch, commit-and-sync, and a tree of changed files",
                 "width": "480",
                 "height": "1880",

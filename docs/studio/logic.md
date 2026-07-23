@@ -17,7 +17,7 @@ There is no single "logic mode" in Studio. Interactivity comes from a few focuse
 - **[Formulas](/docs/studio/logic/formulas)** — not a place but an affordance: almost any value field carries an **fx** menu that turns a fixed value into a computed one, with live previews as you build it. A **[full-screen workspace](/docs/studio/logic/formula-workspace)** opens when a formula deserves the whole canvas.
 - **[Code](/docs/studio/logic/code)** — the escape hatch. A real code editor for function bodies, and a **Code** canvas mode that shows any file as raw source.
 
-![Jx Studio State panel listing a component's state and functions](/screenshots/state-panel.png)
+![Jx Studio State panel listing a component's state and functions](../images/state-panel.png)
 
 Together they cover the whole range: most interactions never need code, and the ones that do get a proper editor rather than a cramped text box.
 
