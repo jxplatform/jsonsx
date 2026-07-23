@@ -2,6 +2,7 @@
 
 **Version:** 1.0.0-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -434,3 +435,7 @@ Converts a Jx JSON document back to markdown source (`@jxsuite/parser/serialize`
 - `mode: "export"` — lossy clean GFM: Jx decoration stripped, wrapper tags unwrapped, custom elements inlined via injected `componentDefs`, template strings evaluated via injected hooks. Used by site builds for `.md` export sidecars.
 
 This is the single Jx→markdown serializer — the studio and the compiler both dispatch to it through the `Markdown` format class.
+
+## Changelog
+
+- **1.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.

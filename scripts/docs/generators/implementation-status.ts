@@ -29,12 +29,14 @@ export function generateImplementationStatus(): string {
     "",
     "## Specs at a glance",
     "",
-    "| Spec | Version | Status |",
-    "| --- | --- | --- |",
+    "| Spec | Version | Status | Updated |",
+    "| --- | --- | --- | --- |",
   ];
 
   for (const spec of specs) {
-    lines.push(`| \`${spec.file}\` | ${spec.headerVersion ?? "—"} | ${spec.headerStatus ?? "—"} |`);
+    lines.push(
+      `| \`${spec.file}\` | ${spec.headerVersion ?? "—"} | ${spec.headerStatus ?? "—"} | ${spec.headerUpdated ?? "—"} |`,
+    );
   }
 
   lines.push("", "## Sections not yet implemented", "");

@@ -1,6 +1,7 @@
-// Shared parser for the spec status-marker vocabulary. Used by check-spec-status.ts (enforcement)
-// And generators/implementation-status.ts (the generated status page). One canonical vocabulary so
-// A machine can read "what is built" straight from the specs.
+// Shared parser for the spec status-marker vocabulary and per-spec release metadata. Used by
+// Check-spec-status.ts (enforcement), check-spec-release.ts (the bump gate), spec-bump.ts (the
+// Release CLI), and the implementation-status / spec-changelog generators. One canonical parser so
+// A machine can read "what is built" and "what changed when" straight from the specs.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -21,12 +22,22 @@ export interface SectionStatus {
   line: number;
 }
 
+/** One release recorded in a spec's `## Changelog` section. */
+export interface ChangelogEntry {
+  version: string;
+  date: string; // ISO YYYY-MM-DD
+  summary: string;
+  line: number;
+}
+
 export interface SpecStatus {
   file: string; // Basename, e.g. "spec.md"
   headerVersion?: string;
   headerStatus?: string; // Raw (may be off-vocab — the checker validates)
+  headerUpdated?: string; // ISO YYYY-MM-DD from the **Updated:** line
   footerVersion?: string;
   sections: SectionStatus[];
+  changelog: ChangelogEntry[]; // Newest first, as written
   /** Legacy / off-vocabulary forms found, for the checker to reject. */
   badForms: { line: number; text: string; reason: string }[];
 }
@@ -35,7 +46,11 @@ const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*[a-z]?)\s+(.*)$/;
 const BLOCKQUOTE_STATUS = /^>\s*\*\*Status:\s*([A-Za-z]+)/;
 const HEADER_VERSION = /^\*\*Version:\*\*\s*(.+)$/;
 const HEADER_STATUS = /^\*\*Status:\*\*\s*(.+)$/;
+const HEADER_UPDATED = /^\*\*Updated:\*\*\s*(.+)$/;
 const FOOTER_VERSION = /Specification v([0-9][A-Za-z0-9.-]*)/;
+const CHANGELOG_HEADING = /^##\s+Changelog\s*$/;
+// `- **<version>** (<YYYY-MM-DD>) — <summary>` (em-dash or hyphen separator).
+const CHANGELOG_ENTRY = /^-\s+\*\*([^*]+)\*\*\s*\((\d{4}-\d{2}-\d{2})\)\s*[—-]\s*(.+)$/;
 
 /** Legacy forms the normalization removed; the checker rejects their reintroduction. */
 const LEGACY = [
@@ -55,19 +70,80 @@ const LEGACY = [
   { re: /\|\s*Planned\s*\|/, reason: 'use a bold cell "**Pending**", not plain "Planned"' },
 ];
 
-/** Parse one spec file's status markers. */
+/** A `MAJOR.MINOR.PATCH` version, optionally a `-draft` prerelease. */
+export interface ParsedVersion {
+  major: number;
+  minor: number;
+  patch: number;
+  draft: boolean;
+  raw: string;
+}
+
+/** Parse a spec version string; returns null if it is not `X.Y.Z` (optionally `-draft`). */
+export function splitVersion(v: string): ParsedVersion | null {
+  const m = v.trim().match(/^(\d+)\.(\d+)\.(\d+)(-draft)?$/);
+  if (!m) {
+    return null;
+  }
+  return {
+    major: Number(m[1]!),
+    minor: Number(m[2]!),
+    patch: Number(m[3]!),
+    draft: Boolean(m[4]),
+    raw: v.trim(),
+  };
+}
+
+/**
+ * Compare two spec versions. Negative if a < b, 0 if equal, positive if a > b. A `-draft`
+ * Prerelease sorts below the same released tuple (2.1.0-draft < 2.1.0). Returns null if either
+ * String is not a valid spec version.
+ */
+export function compareSpecVersion(a: string, b: string): number | null {
+  const pa = splitVersion(a);
+  const pb = splitVersion(b);
+  if (!pa || !pb) {
+    return null;
+  }
+  if (pa.major !== pb.major) {
+    return pa.major - pb.major;
+  }
+  if (pa.minor !== pb.minor) {
+    return pa.minor - pb.minor;
+  }
+  if (pa.patch !== pb.patch) {
+    return pa.patch - pb.patch;
+  }
+  if (pa.draft === pb.draft) {
+    return 0;
+  }
+  return pa.draft ? -1 : 1;
+}
+
+/** Parse one spec file's status markers and release metadata. */
 export function parseSpecFile(path: string, file: string): SpecStatus {
-  const lines = readFileSync(path, "utf8").split("\n");
-  const out: SpecStatus = { file, sections: [], badForms: [] };
+  return parseSpecSource(readFileSync(path, "utf8"), file);
+}
+
+/** Parse spec source text (shared by parseSpecFile and callers that already hold the text). */
+export function parseSpecSource(source: string, file: string): SpecStatus {
+  const lines = source.split("\n");
+  const out: SpecStatus = { file, sections: [], changelog: [], badForms: [] };
   let currentSection: SectionStatus | null = null;
+  let inChangelog = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     const lineNo = i + 1;
 
+    // Header/footer metadata (guards keep the first match; harmless to retry in the changelog).
     const v = line.match(HEADER_VERSION);
     if (v && out.headerVersion === undefined) {
       out.headerVersion = v[1]!.trim();
+    }
+    const u = line.match(HEADER_UPDATED);
+    if (u && out.headerUpdated === undefined) {
+      out.headerUpdated = u[1]!.trim();
     }
     const hs = line.match(HEADER_STATUS);
     if (hs && out.headerStatus === undefined && !line.startsWith(">")) {
@@ -76,6 +152,25 @@ export function parseSpecFile(path: string, file: string): SpecStatus {
     const fv = line.match(FOOTER_VERSION);
     if (fv) {
       out.footerVersion = fv[1]!;
+    }
+
+    // The `## Changelog` section ends spec-body scanning; the rest is release metadata.
+    if (CHANGELOG_HEADING.test(line)) {
+      inChangelog = true;
+      currentSection = null;
+      continue;
+    }
+    if (inChangelog) {
+      const ce = line.match(CHANGELOG_ENTRY);
+      if (ce) {
+        out.changelog.push({
+          version: ce[1]!.trim(),
+          date: ce[2]!,
+          summary: ce[3]!.trim(),
+          line: lineNo,
+        });
+      }
+      continue;
     }
 
     const h = line.match(NUMBERED_HEADING);
@@ -108,10 +203,13 @@ export function parseSpecFile(path: string, file: string): SpecStatus {
   return out;
 }
 
-/** Parse every spec file in `specsDir` (top-level only; design-notes and subdirs are exempt). */
+/**
+ * Parse every spec file in `specsDir` (top-level only; `README.md`, design-notes, and subdirs are
+ * Exempt).
+ */
 export function parseSpecStatuses(specsDir: string): SpecStatus[] {
   return readdirSync(specsDir)
-    .filter((f) => f.endsWith(".md"))
+    .filter((f) => f.endsWith(".md") && f !== "README.md")
     .toSorted()
     .map((f) => parseSpecFile(join(specsDir, f), f));
 }

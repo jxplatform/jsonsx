@@ -4,6 +4,7 @@
 
 **Version:** 1.0.0-draft
 **Status:** Pending
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -709,6 +710,10 @@ Ensure desktop app matches dev-mode capabilities:
 - [ ] Implement `CloudPlatform` adapter
 - [ ] Project authentication and authorization
 - [ ] Real-time collaboration via WebSocket change feed
+
+## Changelog
+
+- **1.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
 
 ---
 

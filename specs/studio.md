@@ -4,6 +4,7 @@
 
 **Version:** 2.2.0-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -571,6 +572,10 @@ All file operations go through the Platform Abstraction Layer, which maps to `@j
 | Redirect editor              | CRUD table for site redirect rules                             | **Pending** |
 
 See the [Site Architecture Specification](site-architecture.md) for full design details on content management UI.
+
+## Changelog
+
+- **2.2.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
 
 ---
 

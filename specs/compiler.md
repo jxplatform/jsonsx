@@ -4,6 +4,7 @@
 
 **Version:** 2.0.0-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -656,6 +657,10 @@ The site build bundles Function-def `$src` modules for the browser
 | `@vue/reactivity` | ~7 kB       | `reactive()`, `computed()`, `effect()` |
 | `lit-html`        | ~3 kB       | `html`, `render()`                     |
 | **Total**         | **~10 kB**  |                                        |
+
+## Changelog
+
+- **2.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
 
 ---
 

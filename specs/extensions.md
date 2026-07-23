@@ -4,6 +4,7 @@
 
 **Version:** 2.0.0-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -834,6 +835,10 @@ A project adds `"@acme/jx-guestbook"` to `extensions`, runs `jx schema && jx
 db push`, and has a moderated, auth-gated guestbook — with project.json
 validation, a studio settings section, and dev-server parity, none of it
 requiring changes to any core package.
+
+## Changelog
+
+- **2.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
 
 ---
 

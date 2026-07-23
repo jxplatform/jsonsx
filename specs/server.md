@@ -4,6 +4,7 @@
 
 **Version:** 2.1.0
 **Status:** Implemented
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -196,6 +197,10 @@ Incremental rebuild triggered by the file watcher: only entries whose `match` (R
 | `@jxsuite/runtime`                      | Shared runtime types                                          |
 
 `oxfmt` and `oxlint` are resolved from the workspace for the code services. Bun built-ins: `Bun.serve`, `Bun.build`, `Bun.Transpiler`, `Bun.file`, `Bun.Glob`.
+
+## Changelog
+
+- **2.1.0** (2026-07-22) — Baseline: spec versioning + changelog introduced.
 
 ---
 

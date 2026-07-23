@@ -4,6 +4,7 @@
 
 **Version:** 1.0.0-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 Companion to [extensions.md](./extensions.md) §5/§9. Defines the standard
@@ -105,6 +106,10 @@ type:
   `array`/`items` form.
 - Value editors for reference fields present entry pickers populated from
   the resolved section data (`#/$context/<sectionKey>` enumeration).
+
+## Changelog
+
+- **1.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
 
 ---
 

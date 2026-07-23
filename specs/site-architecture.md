@@ -4,6 +4,7 @@
 
 **Version:** 1.0.1-draft
 **Status:** Pending
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -1672,3 +1673,7 @@ This spec builds on existing Jx primitives wherever possible:
 - [ ] Pagination helpers
 - [ ] RSS/Atom feed generation (unblocked by the `emit` capability, extensions.md §8.4)
 - [x] Search index generation — via the extension `emit` capability (extensions.md §8.4)
+
+## Changelog
+
+- **1.0.1-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.

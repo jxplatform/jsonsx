@@ -2,6 +2,7 @@
 
 **Version:** 1.0.0
 **Status:** Implemented
+**Updated:** 2026-07-22
 **Applies to:** `packages/studio/`
 
 ---
@@ -424,3 +425,7 @@ When building new UI in Studio, verify:
 - [ ] State mutations are immutable (produce new objects)
 - [ ] Custom components use light DOM (`createRenderRoot() { return this; }`)
 - [ ] Event handlers call `e.stopPropagation()` when wrapping Spectrum events in light DOM components
+
+## Changelog
+
+- **1.0.0** (2026-07-22) — Baseline: spec versioning + changelog introduced.

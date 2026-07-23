@@ -4,6 +4,7 @@
 
 **Version:** 0.1.0-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -47,6 +48,10 @@ enumerated here once it stabilizes.
 The assistant executes only through the same file/RPC surfaces a human uses, behind the server's
 Origin/Host gate and path containment (`@jxsuite/server` §4.2). It has no independent network or
 filesystem access beyond the connected provider endpoint.
+
+## Changelog
+
+- **0.1.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
 
 ---
 

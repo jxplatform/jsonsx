@@ -9,6 +9,7 @@ import { dirname, join, resolve } from "node:path";
 import { generateFormulas } from "./generators/formulas.ts";
 import { generateImplementationStatus } from "./generators/implementation-status.ts";
 import { generateOperators } from "./generators/operators.ts";
+import { generateSpecChangelog } from "./generators/spec-changelog.ts";
 import { generateStarters } from "./generators/starters.ts";
 import { generateStudioRoutes } from "./generators/studio-routes.ts";
 
@@ -17,6 +18,7 @@ const ROOT = resolve(import.meta.dir, "../..");
 const PAGES: Record<string, () => string> = {
   "docs/extending/reference/studio-routes.md": generateStudioRoutes,
   "docs/extending/reference/implementation-status.md": generateImplementationStatus,
+  "docs/extending/reference/spec-changelog.md": generateSpecChangelog,
   "docs/framework/reference/formulas.md": generateFormulas,
   "docs/framework/reference/operators.md": generateOperators,
   "docs/studio/projects/starters.md": generateStarters,

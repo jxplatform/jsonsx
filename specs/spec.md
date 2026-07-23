@@ -4,6 +4,7 @@
 
 **Version:** 2.1.0-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -2281,6 +2282,10 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
   ]
 }
 ```
+
+## Changelog
+
+- **2.1.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
 
 ---
 

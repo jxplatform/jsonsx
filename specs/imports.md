@@ -2,6 +2,7 @@
 
 **Version:** 1.0.0-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -176,3 +177,7 @@ Content collections support `$elements` in their `project.json `collections``, c
 Collection `$elements` merge with site-level `$elements` to determine the full set of available components for markdown rendering. The `$elements` entries are passed as `allowedNames` to the `MarkdownDirective` plugin, restricting which directive tag names are valid in that collection's markdown files.
 
 The compiler's `injectContext()` also merges site-level `$elements` into page-level `$elements` during the build, using the same union-dedup strategy as the runtime.
+
+## Changelog
+
+- **1.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.

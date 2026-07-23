@@ -4,6 +4,7 @@
 
 **Version:** 3.0.0-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -170,6 +171,10 @@ Directives map to custom element tags in the Jx tree (text/leaf/container, nesti
 ## 8. External class contract compliance
 
 All classes satisfy the Jx external class contract: constructor receives the config object, `resolve()` returns the value (async), and `.class.json` schemas allow the dev server, compiler, and studio to introspect structure — including the format block, capability roles with `timing`, and `$studio` hints — without importing the implementation.
+
+## Changelog
+
+- **3.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
 
 ---
 

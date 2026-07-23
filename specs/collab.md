@@ -4,6 +4,7 @@
 
 **Version:** 0.1.0-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -51,6 +52,10 @@ are part of the session lifecycle; a full state machine will be documented here 
 There is currently **no cross-version migration story** for the document format a room carries; a
 breaking change to the Jx document schema across a room's lifetime is out of scope for this draft and
 tracked separately (see spec §3.2 on `$schema`).
+
+## Changelog
+
+- **0.1.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
 
 ---
 

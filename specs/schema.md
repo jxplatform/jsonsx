@@ -4,6 +4,7 @@
 
 **Version:** 2.0.0-draft
 **Status:** Partial
+**Updated:** 2026-07-22
 **License:** MIT
 
 ---
@@ -178,6 +179,10 @@ Three JSON Schema 2020-12 documents:
 | `@webref/css`      | CSS property definitions      |
 | `@webref/elements` | HTML element definitions      |
 | `@webref/idl`      | Web IDL interface definitions |
+
+## Changelog
+
+- **2.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
 
 ---
 

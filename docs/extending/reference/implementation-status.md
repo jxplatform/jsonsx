@@ -12,23 +12,23 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 ## Specs at a glance
 
-| Spec                      | Version     | Status      |
-| ------------------------- | ----------- | ----------- |
-| `ai.md`                   | 0.1.0-draft | Partial     |
-| `collab.md`               | 0.1.0-draft | Partial     |
-| `compiler.md`             | 2.0.0-draft | Partial     |
-| `desktop.md`              | 1.0.0-draft | Pending     |
-| `extensions.md`           | 2.0.0-draft | Partial     |
-| `imports.md`              | 1.0.0-draft | Partial     |
-| `jx-markdown.md`          | 1.0.0-draft | Partial     |
-| `parser.md`               | 3.0.0-draft | Partial     |
-| `relationships.md`        | 1.0.0-draft | Partial     |
-| `schema.md`               | 2.0.0-draft | Partial     |
-| `server.md`               | 2.1.0       | Implemented |
-| `site-architecture.md`    | 1.0.1-draft | Pending     |
-| `spec.md`                 | 2.1.0-draft | Partial     |
-| `studio-ui-guidelines.md` | 1.0.0       | Implemented |
-| `studio.md`               | 2.2.0-draft | Partial     |
+| Spec                      | Version     | Status      | Updated    |
+| ------------------------- | ----------- | ----------- | ---------- |
+| `ai.md`                   | 0.1.0-draft | Partial     | 2026-07-22 |
+| `collab.md`               | 0.1.0-draft | Partial     | 2026-07-22 |
+| `compiler.md`             | 2.0.0-draft | Partial     | 2026-07-22 |
+| `desktop.md`              | 1.0.0-draft | Pending     | 2026-07-22 |
+| `extensions.md`           | 2.0.0-draft | Partial     | 2026-07-22 |
+| `imports.md`              | 1.0.0-draft | Partial     | 2026-07-22 |
+| `jx-markdown.md`          | 1.0.0-draft | Partial     | 2026-07-22 |
+| `parser.md`               | 3.0.0-draft | Partial     | 2026-07-22 |
+| `relationships.md`        | 1.0.0-draft | Partial     | 2026-07-22 |
+| `schema.md`               | 2.0.0-draft | Partial     | 2026-07-22 |
+| `server.md`               | 2.1.0       | Implemented | 2026-07-22 |
+| `site-architecture.md`    | 1.0.1-draft | Pending     | 2026-07-22 |
+| `spec.md`                 | 2.1.0-draft | Partial     | 2026-07-22 |
+| `studio-ui-guidelines.md` | 1.0.0       | Implemented | 2026-07-22 |
+| `studio.md`               | 2.2.0-draft | Partial     | 2026-07-22 |
 
 ## Sections not yet implemented
 

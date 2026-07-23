@@ -173,6 +173,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The spec release gate diffs against the merge base with main; a shallow
+          # clone has no merge base and the gate would silently pass.
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.13
@@ -192,8 +196,13 @@ jobs:
       # starter counts; LICENSE files present. See scripts/docs/check-site-claims.ts.
       - run: bun run docs:claims
       # Specs: every file has a header, every status uses the canonical vocabulary,
-      # and footer versions match. See scripts/docs/check-spec-status.ts.
+      # footer versions match, and each spec's changelog agrees with its header.
+      # See scripts/docs/check-spec-status.ts.
       - run: bun run docs:status
+      # Specs: a spec whose body changed must also be released — version advanced,
+      # **Updated:** restamped, and a new changelog entry (`bun run spec:bump`).
+      # See scripts/docs/check-spec-release.ts.
+      - run: bun run docs:spec-release --base origin/${{ github.event.repository.default_branch }}
       # Jx schema compliance: every project root (examples, sites, starters, screenshot
       # fixtures) validates end-to-end — project.json, documents, classes, fragments, and
       # self-contained committed entry docs. See scripts/validate-schemas.ts.

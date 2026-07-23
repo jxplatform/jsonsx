@@ -26,20 +26,28 @@ if (input.stop_hook_active) {
   process.exit(0); // Already continued once for this report — let the stop through.
 }
 
-let report = "";
-try {
-  // --strict exits 1 when findings exist, with the report on stderr.
-  execFileSync("bun", ["scripts/docs/check-doc-sync.ts", "--strict"], {
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-} catch (error) {
-  report = `${error.stdout?.toString() ?? ""}${error.stderr?.toString() ?? ""}`.trim();
+/** Run a checker that exits non-zero with its report on stdout/stderr; return the report. */
+function reportOf(script, args = []) {
+  try {
+    execFileSync("bun", [script, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    return "";
+  } catch (error) {
+    return `${error.stdout?.toString() ?? ""}${error.stderr?.toString() ?? ""}`.trim();
+  }
 }
 
-if (report) {
+// --strict exits 1 when findings exist, with the report on stderr.
+const reports = [
+  reportOf("scripts/docs/check-doc-sync.ts", ["--strict"]),
+  // Specs edited this session must also be released (version + **Updated:** + changelog).
+  reportOf("scripts/docs/check-spec-release.ts"),
+].filter(Boolean);
+
+if (reports.length > 0) {
   console.error(
-    `${report}\n\nBefore finishing: update the listed docs page(s) and spec section(s) if this ` +
-      `session's changes altered behavior, or state explicitly that no documentation update is needed.`,
+    `${reports.join("\n\n")}\n\nBefore finishing: update the listed docs page(s) and spec ` +
+      `section(s) if this session's changes altered behavior, release any spec whose body ` +
+      `changed (\`bun run spec:bump\`), or state explicitly that no update is needed.`,
   );
   process.exit(2);
 }
