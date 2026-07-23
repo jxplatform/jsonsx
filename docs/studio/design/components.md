@@ -20,7 +20,7 @@ The natural way to make a component is to design it in place first, then promote
 2. Right-click it (on the canvas or in [Layers](/docs/studio/design/layers)) and choose **Convert to Component**.
 3. Give it a tag name — lowercase, with a hyphen, like `pricing-card` — and click **Convert**. Studio validates the name as you type and won't let you collide with an existing component.
 
-![The Convert to Component dialog with a tag name filled in](/screenshots/convert-to-component.png)
+![The Convert to Component dialog with a tag name filled in](../../images/convert-to-component.png)
 
 Studio saves the component as its own file in the project's `components/` folder, swaps your selection for an instance of it, and adds it to the [Elements panel](/docs/studio/design/elements) — drop more instances anywhere from there. If the component's slots need attention, Studio says so in the status bar.
 

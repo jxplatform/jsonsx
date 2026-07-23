@@ -10,7 +10,7 @@ code:
 
 Shipping a Jx site is part of the Studio flow — no terminal, no separate deploy tool. The one boundary worth knowing up front: **Studio publishes your code — it doesn't build or deploy the site.** Studio's job ends when your files reach your repository; your host takes it from there.
 
-![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](/screenshots/git-commit.png)
+![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](../images/git-commit.png)
 
 ## How it goes live
 

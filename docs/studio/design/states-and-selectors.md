@@ -10,7 +10,7 @@ code:
 
 Buttons darken on hover, inputs glow on focus, disabled controls fade — those are the same element in a different _state_, and each state can carry its own styles. In Studio you style states with the selector menu in the [Style inspector](/docs/studio/design/style-inspector)'s toolbar, next to the breakpoint tabs.
 
-![The Style inspector's selector menu open, listing built-in states and existing selectors](/screenshots/selector-menu.png)
+![The Style inspector's selector menu open, listing built-in states and existing selectors](../../images/selector-menu.png)
 
 ## Style a state
 

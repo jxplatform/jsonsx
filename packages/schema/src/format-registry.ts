@@ -22,8 +22,8 @@ export const FORMAT_CAPABILITIES: readonly FormatCapability[] = [
 /**
  * All well-known static capability roles across admission blocks (specs/extensions.md §8): format
  * roles plus project-section (`projectData`, `resolvePaths`), compile-away (`lower`), build-time
- * asset emission (`emit`), server-mount (`mount`), and connector (`dialect`, `deploySchema`,
- * `bindings`, `testConnection`) roles.
+ * asset emission (`emit`), static asset mounts (`assets`), server-mount (`mount`), and connector
+ * (`dialect`, `deploySchema`, `bindings`, `testConnection`) roles.
  */
 export type ExtensionCapability =
   | FormatCapability
@@ -31,6 +31,7 @@ export type ExtensionCapability =
   | "resolvePaths"
   | "lower"
   | "emit"
+  | "assets"
   | "mount"
   | "dialect"
   | "deploySchema"
@@ -43,6 +44,7 @@ export const EXTENSION_CAPABILITIES: readonly ExtensionCapability[] = [
   "resolvePaths",
   "lower",
   "emit",
+  "assets",
   "mount",
   "dialect",
   "deploySchema",

@@ -6,6 +6,7 @@ spec:
   - compiler.md#7
 code:
   - packages/compiler/src/site/image-transform.ts
+  - packages/compiler/src/site/asset-mounts.ts
   - packages/compiler/src/site/image-optimizer.ts
   - packages/compiler/src/site/image-cache.ts
 ---
@@ -51,7 +52,7 @@ For each eligible image, the pipeline (powered by [Sharp](https://sharp.pixelplu
 2. **Generates one variant per width × format** and writes it to `dist/images/_optimized/{stem}-{width}-{hash}.{format}` (e.g. `hero-640-a1b2c3d4.webp`).
 3. **Mutates the `<img>`** in the compiled HTML: a `srcset` listing the variants in the best configured format (AVIF when configured, otherwise the first format), plus `sizes` from config (unless the node already sets one), and `loading="lazy"` / `decoding="async"` when `lazyLoad` is on. The original `src` stays as the fallback.
 
-Images embedded in pre-rendered Markdown content go through the same transformation, so a `![hero](/images/hero.jpg)` in a blog post is optimized like any hand-placed `<img>`.
+Images embedded in pre-rendered Markdown content go through the same transformation, so a `![hero](./images/hero.jpg)` in a blog post is optimized like any hand-placed `<img>`.
 
 ## Which images are eligible
 
@@ -66,7 +67,15 @@ Skipped automatically:
 
 ## Where srcs resolve
 
-Image paths resolve against the **site root**, not the referring file: a `/`-prefixed src like `/images/hero.jpg` resolves into `public/` (so it's `public/images/hero.jpg` on disk, and works verbatim at runtime too), while a relative src like `content/blog/images/hero.jpg` resolves from the project root.
+In pages, layouts, and components, image paths resolve against the **site root**, not the referring file: a `/`-prefixed src like `/images/hero.jpg` resolves into `public/` (so it's `public/images/hero.jpg` on disk, and works verbatim at runtime too), while a relative src like `content/blog/images/hero.jpg` resolves from the project root.
+
+**Content entries are the exception** — they resolve against themselves, so a collection stays readable in a markdown editor:
+
+```markdown
+![A diagram](./images/diagram.png)
+```
+
+A relative reference in an entry is remapped to the collection's own URL — `content/blog/images/diagram.png` becomes `/content/blog/images/diagram.png` — and the build copies the file there. See [Content collections](/docs/framework/site/content-collections).
 
 ## Per-image overrides
 

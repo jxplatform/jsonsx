@@ -27,7 +27,7 @@
 
 import { resolve, sep } from "node:path";
 import { handleJxMounts } from "./jx-mounts.ts";
-import { handleResolve, handleServerFunction } from "./resolve.ts";
+import { handleResolve, handleServerFunction, projectAssetMounts } from "./resolve.ts";
 import { handleAiApi } from "./ai-api.ts";
 import { handleImportApi } from "./import-api.ts";
 import { resolveNpmPath } from "./server.ts";
@@ -206,8 +206,9 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         return handleServerFunction(req, root);
       }
 
-      // 6. Project files at natural URLs.
-      const fileRes = await serveProjectFile(normPath, root);
+      // 6. Project files at natural URLs, including extension asset mounts (§8.5) — that is what
+      // Lets a canvas preview show an image a content entry references relative to itself.
+      const fileRes = await serveProjectFile(normPath, root, await projectAssetMounts(root));
       if (fileRes) {
         return fileRes;
       }

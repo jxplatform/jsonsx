@@ -705,3 +705,171 @@ describe("Content.resolvePaths", () => {
     expect(warnings.some((w) => w.includes('content type "none"'))).toBe(true);
   });
 });
+
+// ─── Asset mounts and content-relative references ────────────────────────────
+
+describe("content asset mounts", () => {
+  const MEDIA = resolve(TMP, "content/media");
+
+  beforeAll(() => {
+    mkdirSync(resolve(MEDIA, "images"), { recursive: true });
+    mkdirSync(resolve(MEDIA, "nested"), { recursive: true });
+    writeFileSync(resolve(MEDIA, "images/hero.png"), "png-bytes");
+    writeFileSync(resolve(MEDIA, "images/my shot.png"), "png-bytes");
+    writeFileSync(resolve(TMP, "outside.png"), "png-bytes");
+    writeFileSync(
+      resolve(MEDIA, "post.md"),
+      [
+        "---",
+        "title: Post",
+        "cover: ./images/hero.png",
+        "gallery:",
+        "  - ./images/hero.png",
+        "code: packages/compiler/src/site/site-build.ts",
+        "---",
+        "",
+        "![hero](./images/hero.png)",
+        "",
+        "![spaced](<./images/my shot.png>)",
+        "",
+        "![gone](./images/nope.png)",
+        "",
+        "![rooted](/images/hero.png)",
+        "",
+        "![remote](https://example.com/hero.png)",
+        "",
+        "![escaping](../../outside.png)",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      resolve(MEDIA, "nested/deep.md"),
+      "---\ntitle: Deep\n---\n\n![hero](../images/hero.png)\n",
+    );
+  });
+
+  const mediaSection: ContentSection = {
+    media: {
+      format: "Markdown",
+      schema: {
+        properties: {
+          code: { type: "string" },
+          cover: { format: "uri-reference", type: "string" },
+          gallery: { items: { format: "uri-reference", type: "string" }, type: "array" },
+          title: { type: "string" },
+        },
+        type: "object",
+      },
+      source: "./content/media/",
+    },
+  };
+
+  /** Load the media content type through the real Markdown class. */
+  async function loadMedia(): Promise<Map<string, ContentLoaderEntry[]>> {
+    const registry = await buildFixtureRegistry();
+    return await Content.projectData(mediaSection, { projectConfig: {}, registry, root: TMP });
+  }
+
+  /** The `src` of every img in an entry's rendered children. */
+  function imageSrcs(entry: ContentLoaderEntry): string[] {
+    const srcs: string[] = [];
+    const walk = (node: unknown) => {
+      if (!node || typeof node !== "object") {
+        return;
+      }
+      const record = node as Record<string, unknown>;
+      const attributes = record.attributes as Record<string, unknown> | undefined;
+      if (record.tagName === "img" && typeof attributes?.src === "string") {
+        srcs.push(attributes.src);
+      }
+      for (const child of (record.children as unknown[]) ?? []) {
+        walk(child);
+      }
+    };
+    for (const child of entry.$children ?? []) {
+      walk(child);
+    }
+    return srcs;
+  }
+
+  describe("Content.assets", () => {
+    it("publishes each directory source at /content/<type>", () => {
+      const mounts = Content.assets(
+        { media: { source: "./content/media/" }, posts: { source: "./content/posts/" } },
+        { root: TMP },
+      );
+      expect(mounts).toEqual([
+        { dir: resolve(TMP, "content/media").split("\\").join("/"), urlPrefix: "/content/media" },
+        { dir: resolve(TMP, "content/posts").split("\\").join("/"), urlPrefix: "/content/posts" },
+      ]);
+    });
+
+    it("skips single-file, remote, missing, and source-less types", () => {
+      const mounts = Content.assets(
+        {
+          bare: {},
+          gone: { source: "./content/not-here/" },
+          nav: { format: "json", source: "./content/plain.json" },
+          remote: { format: "Csv", source: "https://example.com/data.csv" },
+        },
+        { root: TMP },
+      );
+      expect(mounts).toEqual([]);
+    });
+
+    it("warns and skips a content type name that is not URL-safe", () => {
+      const warnings = captureWarnings();
+      const mounts = Content.assets(
+        { "odd name/x": { source: "./content/media/" } },
+        { root: TMP },
+      );
+      expect(mounts).toEqual([]);
+      expect(warnings.some((w) => w.includes("not URL-safe"))).toBe(true);
+    });
+
+    it("returns [] for an absent section", () => {
+      expect(Content.assets(undefined, { root: TMP })).toEqual([]);
+    });
+  });
+
+  describe("reference rewriting", () => {
+    it("remaps entry-relative image srcs onto the mount", async () => {
+      const warnings = captureWarnings();
+      const data = await loadMedia();
+      const post = (data.get("media") as ContentLoaderEntry[]).find((e) => e.id === "post")!;
+
+      expect(imageSrcs(post)).toEqual([
+        "/content/media/images/hero.png",
+        "/content/media/images/my%20shot.png",
+        "./images/nope.png",
+        "/images/hero.png",
+        "https://example.com/hero.png",
+        "../../outside.png",
+      ]);
+      expect(warnings.some((w) => w.includes('references missing asset "./images/nope.png"'))).toBe(
+        true,
+      );
+    });
+
+    it("resolves against the entry's own directory, not the source root", async () => {
+      const data = await loadMedia();
+      const deep = (data.get("media") as ContentLoaderEntry[]).find((e) => e.id === "nested/deep")!;
+      expect(imageSrcs(deep)).toEqual(["/content/media/images/hero.png"]);
+    });
+
+    it("remaps only frontmatter fields declared uri-reference", async () => {
+      const data = await loadMedia();
+      const post = (data.get("media") as ContentLoaderEntry[]).find((e) => e.id === "post")!;
+      expect(post.data.cover).toBe("/content/media/images/hero.png");
+      expect(post.data.gallery).toEqual(["/content/media/images/hero.png"]);
+      expect(post.data.code).toBe("packages/compiler/src/site/site-build.ts");
+    });
+
+    it("leaves the raw body untouched so round-tripping still writes the authored path", async () => {
+      const data = await loadMedia();
+      const post = (data.get("media") as ContentLoaderEntry[]).find((e) => e.id === "post")!;
+      expect(post.body).toContain("![hero](./images/hero.png)");
+      expect(post.body).not.toContain("/content/media/");
+    });
+  });
+});

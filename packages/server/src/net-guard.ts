@@ -18,6 +18,8 @@
 
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { realpathSync } from "node:fs";
+import { resolveAssetUrl } from "@jxsuite/schema/asset-paths";
+import type { AssetMount } from "@jxsuite/schema/asset-paths";
 
 export const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
@@ -151,14 +153,28 @@ export async function serveContained(absPath: string, root: string): Promise<Res
 }
 
 /**
- * Try to serve a project file at its natural URL: absolute-under-root, then root-relative, then
- * public/. Each candidate goes through containedPath (realpath). `decodedPath` is the once-decoded
- * URL pathname (leading slash, forward slashes).
+ * Try to serve a project file at its natural URL: an extension asset mount, then
+ * absolute-under-root, then root-relative, then public/. Each candidate goes through containedPath
+ * (realpath). `decodedPath` is the once-decoded URL pathname (leading slash, forward slashes).
+ *
+ * Mounts come first and are contained against their own directory rather than the project root:
+ * they exist precisely to publish directories that may sit outside it (extensions.md §8.5).
  */
 export async function serveProjectFile(
   decodedPath: string,
   root: string,
+  mounts: readonly AssetMount[] = [],
 ): Promise<Response | null> {
+  for (const mount of [...mounts].toSorted((a, b) => b.urlPrefix.length - a.urlPrefix.length)) {
+    const mounted = resolveAssetUrl([mount], decodedPath);
+    if (!mounted) {
+      continue;
+    }
+    const res = await serveContained(mounted, mount.dir);
+    if (res) {
+      return res;
+    }
+  }
   // Map the URL pathname back to a filesystem path. On Windows the browser requests an absolute
   // Path as /C:/Users/… (leading slash + forward slashes); drop the slash before the drive letter.
   // A POSIX absolute path arrives as //abs/path.

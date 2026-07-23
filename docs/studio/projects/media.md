@@ -10,7 +10,7 @@ code:
 
 Your site's media — images, video, audio, PDFs, and fonts — lives in the project's `public/` folder, and the Manage view is where you put it there. Open Manage with the **Manage** button in the toolbar and click the **Media** filter to see every asset with a thumbnail.
 
-![The Manage view with live previews and thumbnails of every project file](/screenshots/mode-manage.png)
+![The Manage view with live previews and thumbnails of every project file](../../images/mode-manage.png)
 
 ## Upload files
 
@@ -19,7 +19,7 @@ Your site's media — images, video, audio, PDFs, and fonts — lives in the pro
 
 Studio accepts images (including SVG), video, audio, PDFs, and font files. Right-click any asset to **rename**, **duplicate**, or **delete** it.
 
-![The Manage view highlighted as a drop target while files are dragged onto it](/screenshots/media-upload.png)
+![The Manage view highlighted as a drop target while files are dragged onto it](../../images/media-upload.png)
 
 :::doc-note
 Uploads are written to your project's `public/` folder under their own name, and everything in `public/` is served from your site's root: `public/hero.jpg` becomes `/hero.jpg` on the published site. The folder layout is documented in [Site architecture](/docs/framework/site).
@@ -35,7 +35,7 @@ Wherever Studio asks for an image or file — an image's **Properties**, a front
 
 You can also type into the path field directly, either a path from your project or a full web address.
 
-![The media picker popover open over an image's Properties, showing the search field and thumbnail list](/screenshots/media-picker.png)
+![The media picker popover open over an image's Properties, showing the search field and thumbnail list](../../images/media-picker.png)
 
 ## What the build does to images
 

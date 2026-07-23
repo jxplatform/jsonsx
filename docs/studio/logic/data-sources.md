@@ -15,7 +15,7 @@ Each source's editor shows just the fields that source needs.
 
 **Fetch (Request)** loads data over HTTP — a JSON API, most typically.
 
-![The State panel editing a Request source's URL, method, and timing](/screenshots/data-source-request.png)
+![The State panel editing a Request source's URL, method, and timing](../../images/data-source-request.png)
 
 - **URL** — where to fetch from.
 - **Method** — `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`.

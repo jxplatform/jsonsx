@@ -18,9 +18,14 @@ import { buildAll } from "./build.ts";
 import { createCollabRegistry } from "./collab.ts";
 import { createWatcher, injectSSE } from "./watch.ts";
 import { handleJxMounts } from "./jx-mounts.ts";
-import { handleResolve, handleServerFunction } from "./resolve.ts";
+import { handleResolve, handleServerFunction, projectAssetMounts } from "./resolve.ts";
 import { assertAccessible, handleStudioApi } from "./studio-api.ts";
-import { containedPath, decodeAndNormalizePath, originHostGate } from "./net-guard.ts";
+import {
+  containedPath,
+  decodeAndNormalizePath,
+  originHostGate,
+  serveProjectFile,
+} from "./net-guard.ts";
 import { handleCodeApi } from "./code-api.ts";
 import { handleAiApi } from "./ai-api.ts";
 import { handleImportApi } from "./import-api.ts";
@@ -400,6 +405,20 @@ export async function createDevServer(options: {
           if (await file.exists()) {
             return fileResponse(file);
           }
+        }
+      }
+
+      // Extension asset mounts (§8.5) publish directories that may sit outside the project root,
+      // Such as an external content source's co-located images. They resolve here exactly as they
+      // Will once the site is built, so dev and production render the same URLs.
+      if (activeProjectRoot) {
+        const mountRes = await serveProjectFile(
+          path,
+          activeProjectRoot,
+          await projectAssetMounts(activeProjectRoot),
+        );
+        if (mountRes) {
+          return new Response(mountRes.body, { headers: NO_CACHE });
         }
       }
 

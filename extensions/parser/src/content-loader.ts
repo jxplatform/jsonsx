@@ -17,11 +17,18 @@
  * @module @jxsuite/parser/content-loader
  */
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { basename, extname, resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { basename, dirname, extname, resolve } from "node:path";
+import { assetUrlFor } from "@jxsuite/schema/asset-paths";
+import type { AssetMount } from "@jxsuite/schema/asset-paths";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FormatEntry, FormatHostIO, FormatRegistry } from "@jxsuite/schema/format-registry";
-import type { ContentTypeSchema, JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
+import type {
+  ContentTypeSchema,
+  JxElement,
+  JxMutableNode,
+  ProjectConfig,
+} from "@jxsuite/schema/types";
 import type { ContentLoaderEntry, ContentTypeDef } from "./types.ts";
 
 export type { ContentEntry, ContentLoaderEntry, TocEntry } from "./types.ts";
@@ -101,6 +108,176 @@ function discoverJSONFiles(resolvedSource: string): string[] {
   }
 }
 
+// ─── Asset mounts and content-relative references ────────────────────────────
+
+/** The project.json section key this class owns; also the URL namespace for its asset mounts. */
+const SECTION_KEY = "content";
+
+/** Content type names safe to place in a URL path segment unescaped. */
+const SAFE_TYPE_NAME = /^[\w.~-]+$/;
+
+/** Node keys whose value is a media reference the rewrite may remap. */
+const ASSET_KEYS = ["src", "poster"] as const;
+
+/** A value that is already a URL, a template, or a fragment — never a content-relative file. */
+function isNonRelativeRef(value: string): boolean {
+  return (
+    value === "" ||
+    value.startsWith("/") ||
+    value.startsWith("#") ||
+    value.includes("${") ||
+    /^[a-z][\w+.-]*:/i.test(value)
+  );
+}
+
+/**
+ * Asset mounts for a `content` section: every content type whose source is a local **directory**
+ * publishes that directory at `/content/<type>`, so files sitting beside the entries (images,
+ * downloads) have a stable site URL even when the source lives outside the project root.
+ * Single-file and remote sources get no mount — a lone file's siblings are not its collection.
+ *
+ * @param {ContentSection} section - The project.json `content` section value
+ * @param {string} root - Absolute project root directory
+ * @returns {AssetMount[]} One mount per eligible content type, in declaration order
+ */
+export function contentAssetMounts(section: ContentSection, root: string): AssetMount[] {
+  const mounts: AssetMount[] = [];
+  for (const [name, contentTypeDef] of Object.entries(section ?? {})) {
+    const source = contentTypeDef?.source;
+    if (!source || source.startsWith("http://") || source.startsWith("https://")) {
+      continue;
+    }
+    if (!SAFE_TYPE_NAME.test(name)) {
+      console.warn(
+        `Content type "${name}": name is not URL-safe — its source directory is not published ` +
+          `at /${SECTION_KEY}/${name}, so content-relative asset references stay unresolved.`,
+      );
+      continue;
+    }
+    const resolvedSource = resolve(root, source).split("\\").join("/");
+    if (extname(source) || !existsSync(resolvedSource) || !statSync(resolvedSource).isDirectory()) {
+      continue;
+    }
+    mounts.push({ dir: resolvedSource, urlPrefix: `/${SECTION_KEY}/${name}` });
+  }
+  return mounts;
+}
+
+/**
+ * Rewrite one content-relative reference to its mounted URL, or null to leave the value untouched.
+ * A value is rewritten only when it is relative, resolves against the entry's own directory to a
+ * file that exists, and lands inside the mount — so nothing an existing project authored (a
+ * project-root-relative path, an absolute URL, a bound template) changes meaning.
+ */
+function rewriteRef(
+  value: string,
+  entryDir: string,
+  mount: AssetMount,
+  onMissing: (value: string) => void,
+): string | null {
+  if (isNonRelativeRef(value)) {
+    return null;
+  }
+  const bare = value.split("#")[0]!.split("?")[0]!;
+  let target: string;
+  try {
+    target = resolve(entryDir, decodeURIComponent(bare));
+  } catch {
+    return null;
+  }
+  const url = assetUrlFor([mount], target);
+  if (!url) {
+    return null; // Resolves outside the collection — not ours to publish
+  }
+  if (!existsSync(target)) {
+    onMissing(value);
+    return null;
+  }
+  const suffix = value.slice(bare.length);
+  return `${url}${suffix}`;
+}
+
+/** Rewrite media references on one node and its children, in place. */
+function rewriteNodeAssets(
+  node: JxElement | string | undefined,
+  entryDir: string,
+  mount: AssetMount,
+  onMissing: (value: string) => void,
+) {
+  if (!node || typeof node !== "object") {
+    return;
+  }
+  const record = node as unknown as Record<string, unknown>;
+  const attributes = record.attributes as Record<string, unknown> | undefined;
+  for (const key of ASSET_KEYS) {
+    for (const holder of [record, attributes]) {
+      const value = holder?.[key];
+      if (typeof value === "string") {
+        const rewritten = rewriteRef(value, entryDir, mount, onMissing);
+        if (rewritten) {
+          holder![key] = rewritten;
+        }
+      }
+    }
+  }
+  const { children } = record;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      rewriteNodeAssets(child as JxElement | string, entryDir, mount, onMissing);
+    }
+  }
+}
+
+/**
+ * Remap an entry's content-relative asset references onto the content type's mount.
+ *
+ * Markdown that says `![…](../images/hero.png)` reads correctly in any editor and, after this pass,
+ * renders as `/content/<type>/images/hero.png` everywhere the entry is used. Frontmatter is
+ * remapped only for fields the content-type schema declares `"format": "uri-reference"` — the
+ * schema is what distinguishes a media path from an ordinary string. The raw `body` is never
+ * touched: it is the round-trip source Studio writes back to disk.
+ *
+ * @param {ContentLoaderEntry[]} entries - Entries loaded from one source file (mutated in place)
+ * @param {string} filePath - Absolute path of that source file
+ * @param {AssetMount} mount - The content type's asset mount
+ * @param {string} typeName - Content type name, for warnings
+ * @param {ContentTypeSchema} [schema] - Content type schema, for `uri-reference` fields
+ */
+export function rewriteEntryAssets(
+  entries: ContentLoaderEntry[],
+  filePath: string,
+  mount: AssetMount,
+  typeName: string,
+  schema?: ContentTypeSchema,
+) {
+  const entryDir = dirname(filePath);
+  const uriFields = Object.entries(schema?.properties ?? {})
+    .filter(([, def]) => def?.format === "uri-reference" || def?.items?.format === "uri-reference")
+    .map(([field]) => field);
+
+  for (const entry of entries) {
+    const onMissing = (value: string) =>
+      console.warn(
+        `Content type "${typeName}": entry "${entry.id}" references missing asset "${value}"`,
+      );
+
+    for (const child of entry.$children ?? []) {
+      rewriteNodeAssets(child, entryDir, mount, onMissing);
+    }
+
+    for (const field of uriFields) {
+      const value = entry.data[field];
+      if (typeof value === "string") {
+        entry.data[field] = rewriteRef(value, entryDir, mount, onMissing) ?? value;
+      } else if (Array.isArray(value)) {
+        entry.data[field] = value.map((item) =>
+          typeof item === "string" ? (rewriteRef(item, entryDir, mount, onMissing) ?? item) : item,
+        );
+      }
+    }
+  }
+}
+
 // ─── Content Config ───────────────────────────────────────────────────────────
 
 /**
@@ -135,8 +312,11 @@ export async function loadContentSection(
   formats: FormatRegistry,
 ): Promise<Map<string, ContentLoaderEntry[]>> {
   const contentTypes = new Map<string, ContentLoaderEntry[]>();
+  const mounts = new Map(
+    contentAssetMounts(section, root).map((mount) => [mount.urlPrefix.split("/").pop()!, mount]),
+  );
   for (const [name, contentTypeDef] of Object.entries(section)) {
-    const entries = await loadContentType(name, contentTypeDef, root, formats);
+    const entries = await loadContentType(name, contentTypeDef, root, formats, mounts.get(name));
     contentTypes.set(name, entries);
   }
   return contentTypes;
@@ -168,6 +348,7 @@ export function getContentTypeElements(
  * @param {ContentTypeDef} contentTypeDef - Content type definition from the `content` section
  * @param {string} projectRoot - Absolute path to project root directory
  * @param {FormatRegistry} registry - Format-dispatch view of the extension registry
+ * @param {AssetMount} [mount] - The type's asset mount; content-relative references remap onto it
  * @returns {Promise<ContentLoaderEntry[]>} Array of ContentEntry
  */
 async function loadContentType(
@@ -175,6 +356,7 @@ async function loadContentType(
   contentTypeDef: ContentTypeDef,
   projectRoot: string,
   registry: FormatRegistry,
+  mount?: AssetMount,
 ) {
   const { source } = contentTypeDef;
   if (!source) {
@@ -243,7 +425,11 @@ async function loadContentType(
     const files = discoverJSONFiles(resolvedSource);
     const entries: ContentLoaderEntry[] = [];
     for (const filePath of files) {
-      entries.push(...loadJSONEntries(filePath));
+      const fileEntries = loadJSONEntries(filePath);
+      if (mount) {
+        rewriteEntryAssets(fileEntries, filePath, mount, name, schema);
+      }
+      entries.push(...fileEntries);
     }
     if (schema) {
       validateEntries(entries, schema, name);
@@ -273,13 +459,15 @@ async function loadContentType(
   const sourceRoot = extname(source) ? undefined : resolvedSource;
   const entries: ContentLoaderEntry[] = [];
   for (const filePath of files) {
-    entries.push(
-      ...((await entry.call("load", filePath, {
-        directiveOptions,
-        schema,
-        ...(sourceRoot !== undefined && { sourceRoot }),
-      })) as ContentLoaderEntry[]),
-    );
+    const fileEntries = (await entry.call("load", filePath, {
+      directiveOptions,
+      schema,
+      ...(sourceRoot !== undefined && { sourceRoot }),
+    })) as ContentLoaderEntry[];
+    if (mount) {
+      rewriteEntryAssets(fileEntries, filePath, mount, name, schema);
+    }
+    entries.push(...fileEntries);
   }
 
   // Validate entries against schema if present
@@ -467,6 +655,19 @@ export class Content {
     const data = await loadContentSection(section, ctx.root, ctx.registry.formats);
     resolveContentTypeRefs(data, section);
     return data;
+  }
+
+  /**
+   * Publish each content type's source directory at `/content/<type>` (specs/extensions.md §8.5).
+   * Hosts serve, resolve, and copy files through the returned mounts, which is what lets an entry
+   * reference `../images/hero.png` and still resolve in a built site, the dev server, and Studio.
+   *
+   * @param {unknown} sectionValue - The project.json `content` section value
+   * @param {{ projectConfig?: ProjectConfig; root: string }} ctx - Host context
+   * @returns {AssetMount[]} One mount per content type with a local directory source
+   */
+  static assets(sectionValue: unknown, ctx: { root: string }): AssetMount[] {
+    return contentAssetMounts((sectionValue ?? {}) as ContentSection, ctx.root);
   }
 
   /**

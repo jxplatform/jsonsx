@@ -13,7 +13,7 @@ code:
 
 The Jx Studio window is one workspace with a fixed set of regions: a toolbar on top, an activity bar and panel on the left, the canvas in the center with its tabs above, an inspector panel on the right, and a status bar along the bottom. This page walks through each one. For a quicker orientation, start with **[A tour of Jx Studio](/docs/start/studio-tour)**.
 
-![The Jx Studio workspace with the canvas in the center, panels on both sides, and the toolbar across the top](/screenshots/hero.png)
+![The Jx Studio workspace with the canvas in the center, panels on both sides, and the toolbar across the top](../images/hero.png)
 
 ## Toolbar
 

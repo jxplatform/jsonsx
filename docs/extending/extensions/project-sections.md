@@ -4,6 +4,7 @@ description: "Owning a project.json section: the project block, projectData and 
 spec:
   - extensions.md#9
   - extensions.md#9.1
+  - extensions.md#8.5
 code:
   - extensions/parser/src/Content.class.json
   - extensions/auth/src/Auth.class.json
@@ -54,6 +55,16 @@ A dynamic route's `$paths` value is dispatched to the section class whose `resol
 ```
 
 dispatches to `Content.resolvePaths(pathsDef, { data, projectConfig, root })`, which returns one route-param object per entry (`[{ "slug": "hello-world" }, …]`). Hosts dispatch purely on which discriminator key is present — no central switch statement, no extension aware of any other. The contributed `$paths` shape is also what your document fragment unions into the paths schema resource, so editors validate it. See [Routing](/docs/framework/site/routing) for the authoring side.
+
+## Publishing files: `assets`
+
+If your section reads from directories, the `assets` capability publishes them at a site URL so the files beside its sources are reachable:
+
+```
+assets(sectionValue, { projectConfig, root }) → [{ urlPrefix: "/content/blog", dir: "/abs/content/blog" }]
+```
+
+The parser returns one mount per content type with a directory source. The site build resolves those URLs for image optimization and copies the referenced files into `dist/`; the dev server serves them from the source. That is what makes a collection's co-located images work — including when the source lives outside the project. Details in [Capability methods](/docs/extending/extensions/capabilities).
 
 ## Studio settings: `$studio.settings`
 

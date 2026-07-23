@@ -24,6 +24,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `compiler.md`
 
+- **0.1.22-draft** (2026-07-23) — Image src resolution consults extension asset mounts before public/ (§7.3).
 - **0.1.21-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.20-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.19-draft** (2026-07-17) — Forced color-scheme contract — dual emission, color-scheme triplet, pre-paint script (`e629684d`).
@@ -65,6 +66,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.2.8-draft** (2026-07-23) — Add the assets capability (§8.5): section owners publish source directories at site URLs.
 - **0.2.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.6-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.2.5-draft** (2026-07-22) — Align specs and docs with the bundled-schema validation contract (`ae861ff6`).
@@ -98,6 +100,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `parser.md`
 
+- **0.2.4-draft** (2026-07-23) — Document the Content project-section class: asset mounts and content-relative reference rewriting (§9).
 - **0.2.3-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.2-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.2.1-draft** (2026-07-17) — Sidecar bundling, extension emit capability, heading anchors (`07e28bc3`).
@@ -135,6 +138,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.1.9** (2026-07-23) — Serve extension asset mounts ahead of the project root in the static-file chain (§3).
 - **0.1.8** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.7** (2026-07-22) — Fix failing tests (`56e073f8`).
 - **0.1.6** (2026-07-22) — Harden dev server and unify runtime/compiler evaluation (`47a1d4c9`).
@@ -147,6 +151,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.1.36-draft** (2026-07-23) — Note the mounted-asset copy step in the build pipeline (§12.1).
+- **0.1.35-draft** (2026-07-23) — Content entries address media relative to themselves; collections publish their directory at /content/<type> (§9.3).
 - **0.1.34-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.33-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.32-draft** (2026-07-17) — Forced color-scheme contract — dual emission, color-scheme triplet, pre-paint script (`e629684d`).

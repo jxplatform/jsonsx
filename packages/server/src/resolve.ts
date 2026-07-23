@@ -7,6 +7,8 @@ import { createRequire } from "node:module";
 import { containedPath } from "./net-guard.ts";
 import { buildProjectExtensionRegistry } from "@jxsuite/compiler/format-host";
 import { loadProjectSections } from "@jxsuite/compiler/project-sections";
+import { loadAssetMounts } from "@jxsuite/compiler/asset-mounts";
+import type { AssetMount } from "@jxsuite/schema/asset-paths";
 import type { DynamicClass } from "@jxsuite/runtime/types";
 import type { JxClassDef, ProjectConfig } from "@jxsuite/schema/types";
 
@@ -53,7 +55,10 @@ function isImportable(p: string, root: string, activeProjectRoot: string | null)
 }
 
 /** Per-project context cache, invalidated when project.json changes on disk. */
-const projectContextCache = new Map<string, { mtime: number; context: Record<string, unknown> }>();
+const projectContextCache = new Map<
+  string,
+  { mtime: number; context: Record<string, unknown>; mounts: AssetMount[] }
+>();
 
 /**
  * Lazy-load project context (project.json + extension-loaded sections) for class instantiation.
@@ -64,6 +69,12 @@ const projectContextCache = new Map<string, { mtime: number; context: Record<str
  * @returns {Promise<Record<string, unknown> | null>} `{ config, root, ...sections }` or null
  */
 async function loadProjectContext(projectRoot: string) {
+  const entry = await loadProjectEntry(projectRoot);
+  return entry?.context ?? null;
+}
+
+/** Load (or reuse) the cached project context plus its extension asset mounts. */
+async function loadProjectEntry(projectRoot: string) {
   const projectJsonPath = resolve(projectRoot, "project.json");
   if (!existsSync(projectJsonPath)) {
     return null;
@@ -72,17 +83,31 @@ async function loadProjectContext(projectRoot: string) {
     const { mtimeMs } = statSync(projectJsonPath);
     const cached = projectContextCache.get(projectRoot);
     if (cached && cached.mtime === mtimeMs) {
-      return cached.context;
+      return cached;
     }
     const config = JSON.parse(readFileSync(projectJsonPath, "utf8")) as ProjectConfig;
     const registry = await buildProjectExtensionRegistry(projectRoot, config);
     const sections = await loadProjectSections(projectRoot, config, registry);
+    const { mounts } = await loadAssetMounts(registry, config, projectRoot);
     const context = { config, root: projectRoot, ...sections };
-    projectContextCache.set(projectRoot, { context, mtime: mtimeMs });
-    return context;
+    const entry = { context, mounts, mtime: mtimeMs };
+    projectContextCache.set(projectRoot, entry);
+    return entry;
   } catch {
     return null;
   }
+}
+
+/**
+ * Extension asset mounts for a project (specs/extensions.md §8.5) — the directories the dev server
+ * serves at their site URLs, so content-relative images resolve exactly as they will once built.
+ *
+ * @param {string} projectRoot
+ * @returns {Promise<AssetMount[]>} Mounts, or an empty list when there is no project here
+ */
+export async function projectAssetMounts(projectRoot: string): Promise<AssetMount[]> {
+  const entry = await loadProjectEntry(projectRoot);
+  return entry?.mounts ?? [];
 }
 
 /**

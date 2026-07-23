@@ -10,7 +10,7 @@ code:
 
 Design is the visual canvas — the mode for shaping structure and style. Switch to it with the **Design** button in the mode switcher on the right side of the toolbar, and Studio renders the open page or component with the real runtime, exactly as it will render in production, while you edit it directly.
 
-![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](/screenshots/mode-design.png)
+![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](../images/mode-design.png)
 
 ## A canvas per breakpoint
 

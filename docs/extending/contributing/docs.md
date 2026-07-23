@@ -77,7 +77,9 @@ Use at most a couple per screenful, and never open a page with one.
 All screenshots come from the automated pipeline — none are hand-taken, so every image can be regenerated when the UI changes:
 
 1. Declare the shot in `scripts/screenshots/manifest.json` (project, file, actions, regions). Give it a `docs` field listing the page slugs it illustrates.
-2. Run `bun run screenshots` — output lands in `sites/jxsuite.com/public/screenshots/` and is committed.
-3. Reference it as `![descriptive alt text](/screenshots/<name>.png)`.
+2. Run `bun run screenshots` — output lands in `docs/images/` and is committed.
+3. Reference it **relative to your page**, e.g. `![descriptive alt text](../images/<name>.png)` from `docs/start/`, `../../images/<name>.png` one level deeper.
 
-Alt text is mandatory and describes the state shown ("Style inspector with the Typography section expanded"), not the filename. Shots drive the starter sites (real-estate by default, dark theme) so docs show real projects, not Jx internals. CI verifies every referenced image is produced by the manifest and exists on disk.
+Relative paths are what make `/docs` readable in any markdown editor — the images travel with the pages. The site build republishes them under `/content/docs/images/` (the `docs` collection's [asset mount](/docs/framework/site/content-collections)), which is also how a site page outside `/docs` references one.
+
+Alt text is mandatory and describes the state shown ("Style inspector with the Typography section expanded"), not the filename. Shots drive the starter sites (real-estate by default, dark theme) so docs show real projects, not Jx internals. CI verifies every referenced image resolves into `docs/images/`, is produced by the manifest, and exists on disk.

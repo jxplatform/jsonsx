@@ -15,7 +15,7 @@ code:
 
 The desktop app is Jx Studio as a native application: the same Studio documented everywhere else in this section, wrapped in its own window with everything it needs bundled inside. You install it, open it, and build — no terminal, no dev server, no browser tab. It edits the plain files in your project folders directly.
 
-![The Studio workspace — the same interface in the desktop app and the browser](/screenshots/hero.png)
+![The Studio workspace — the same interface in the desktop app and the browser](../images/hero.png)
 
 ## Install and update
 

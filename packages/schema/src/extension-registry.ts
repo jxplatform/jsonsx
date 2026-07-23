@@ -156,6 +156,11 @@ export class ExtensionRegistry {
     return this.#classes.filter((e) => e.capabilities.emit !== undefined);
   }
 
+  /** Classes declaring an `assets` capability (static asset mounts, §8.5), in declaration order. */
+  assetProviders(): FormatEntry[] {
+    return this.#classes.filter((e) => e.capabilities.assets !== undefined);
+  }
+
   /** Server-mount classes, sorted by `server.order` (ascending; default 100), then name. */
   serverMounts(): FormatEntry[] {
     return this.#classes

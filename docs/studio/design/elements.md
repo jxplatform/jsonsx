@@ -11,7 +11,7 @@ code:
 
 Elements is the palette of things you can add to the page — the standard HTML building blocks plus your own components, laid out as cards. Open it by clicking **Elements** in the activity bar on the left.
 
-![The Elements panel with the Components section and element category accordions open](/screenshots/elements-panel.png)
+![The Elements panel with the Components section and element category accordions open](../../images/elements-panel.png)
 
 ## What's in the palette
 

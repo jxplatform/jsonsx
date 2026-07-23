@@ -11,7 +11,7 @@ code:
 
 Stylebook is a canvas mode that catalogs your elements — every heading, paragraph, button, list, table, and form control, plus your components, rendered as specimen cards with their current default styles. Instead of styling one `h2` on one page, you style what _every_ `h2` looks like, in one place. Switch to it with **Stylebook** in the mode switcher on the right side of the toolbar.
 
-![Jx Studio Stylebook mode showing element defaults across breakpoints](/screenshots/stylebook.png)
+![Jx Studio Stylebook mode showing element defaults across breakpoints](../../images/stylebook.png)
 
 Your project file opens in Stylebook automatically — that's the natural home for site-wide defaults. Opening Stylebook on a page or component styles that file's element defaults instead.
 

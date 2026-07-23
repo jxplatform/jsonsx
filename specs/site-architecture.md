@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.34-draft
+**Version:** 0.1.36-draft
 **Status:** Pending
-**Updated:** 2026-07-22
+**Updated:** 2026-07-23
 **License:** MIT
 
 ---
@@ -587,6 +587,8 @@ Collections are defined in the `content` key of `project.json`. Each key names a
 }
 ```
 
+A collection whose `source` is a **directory** also publishes that directory at `/content/<type>` — the collection's asset mount ([extensions.md §8.5](./extensions.md)). Files sitting beside the entries (images, downloads) therefore have a stable site URL even when the source lives outside the project, and entries address them relative to themselves. See §9.3.
+
 ### 6.2 Collection Shapes
 
 `format` values are **format class names** provided by enabled extensions (§6.5) — `"json"` is the only native built-in. There is no YAML format class.
@@ -988,10 +990,10 @@ The Studio inspector will include an "SEO" tab for any page or content entry:
 
 Media files live in two locations:
 
-| Location                            | Purpose                                     | Processing                 |
-| ----------------------------------- | ------------------------------------------- | -------------------------- |
-| `public/`                           | Global static assets (favicon, fonts, PDFs) | Copied verbatim to `dist/` |
-| `content/*/images/` (or co-located) | Collection-specific media                   | Optimized at build time    |
+| Location                            | Purpose                                     | Processing                                                      |
+| ----------------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
+| `public/`                           | Global static assets (favicon, fonts, PDFs) | Copied verbatim to `dist/`                                      |
+| `content/*/images/` (or co-located) | Collection-specific media                   | Optimized at build time; published at `/content/<type>/` (§9.3) |
 
 ### 9.2 Image Optimization
 
@@ -1112,19 +1114,31 @@ In Jx documents:
 }
 ```
 
-In Markdown frontmatter:
+The compiler resolves image `src` paths against the **project root**, not the referring file: root-relative paths (`/…`) resolve into the `public/` directory, and relative paths resolve from the project root (e.g. `./content/blog/images/hero.jpg`).
 
-```yaml
-heroImage: ./content/blog/images/hero.jpg
-```
+#### Content-relative media
 
-In Markdown body:
+Content entries are the exception, and they resolve against **themselves**. A markdown entry references media the way any markdown editor expects — relative to the file:
 
 ```markdown
-![Alt text](./content/blog/images/diagram.png)
+![Alt text](./images/diagram.png)
 ```
 
-The compiler resolves image `src` paths against the **project root**, not the referring file: root-relative paths (`/…`) resolve into the `public/` directory, and relative paths resolve from the project root (e.g. `./content/blog/images/hero.jpg`).
+```yaml
+heroImage: ./images/hero.jpg
+```
+
+When the collection is loaded, such a reference is rewritten to the collection's asset mount (§6.1): `content/blog/images/diagram.png` becomes `/content/blog/images/diagram.png`, which the site build copies into `dist/` and the dev server serves from the original file. The result is content that renders both in a markdown editor and on the built site — including collections whose `source` points outside the project, where no project-root path could reach the file at all.
+
+The rewrite is deliberately conservative. A value is remapped only when it:
+
+- appears as an element `src`/`poster`, or in a frontmatter field the collection schema declares `"format": "uri-reference"`;
+- is relative — not `/…`, not `scheme:…`, not `#…`, and carries no `${…}` template;
+- resolves against the entry's own directory to a **file that exists**, inside the collection directory.
+
+Anything else is left exactly as authored, so existing project-root-relative paths keep their meaning. A relative `src` that resolves to nothing is reported as a warning naming the entry. The raw markdown `body` is never rewritten — it is the round-trip source Studio writes back to disk — and `href` links are out of scope: links between entries are routes, not assets.
+
+Only statically referenced files are copied into the build. A `src` computed at runtime belongs in `public/`.
 
 ### 9.4 Studio Media Browser
 
@@ -1351,6 +1365,10 @@ Extension emit          → section-owner classes with an `emit` capability writ
                           derived assets (search indexes, feeds) via the host
                           (extensions.md §8.4); shadowed by same-named public/ files
     ↓
+Copy mounted assets     → files the compiled HTML/CSS reference under an extension
+                          asset mount (extensions.md §8.5), copied to their URL path;
+                          unreferenced siblings and entry files stay out of dist/
+    ↓
 Emit dist/
     ├── index.html
     ├── about/index.html
@@ -1360,6 +1378,8 @@ Emit dist/
     ├── components/
     │   ├── site-header.js
     │   └── site-header.css
+    ├── content/
+    │   └── blog/images/hero.jpg        (referenced collection media)
     ├── images/
     │   └── _optimized/         (responsive image variants)
     ├── sitemap.xml
@@ -1676,6 +1696,8 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.1.36-draft** (2026-07-23) — Note the mounted-asset copy step in the build pipeline (§12.1).
+- **0.1.35-draft** (2026-07-23) — Content entries address media relative to themselves; collections publish their directory at /content/<type> (§9.3).
 - **0.1.34-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.33-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.32-draft** (2026-07-17) — Forced color-scheme contract — dual emission, color-scheme triplet, pre-paint script (`e629684d`).

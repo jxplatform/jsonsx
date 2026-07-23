@@ -9,7 +9,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildProjectExtensionRegistry } from "../src/site/format-host";
 import { loadProjectSections } from "../src/site/project-sections";
@@ -98,6 +98,9 @@ beforeAll(async () => {
     },
     defaults: { lang: "en", layout: "./layouts/base.json" },
     extensions: ["@jxsuite/parser"],
+    // Optimization is exercised in image-transform.test.ts against a mocked Sharp; here the
+    // Point is which files the build copies, so keep the real encoder out of it.
+    images: { optimize: false },
     name: "Content Test Site",
     url: "https://test.com",
   });
@@ -124,8 +127,14 @@ draft: false
 # Hello World
 
 This is my first blog post. Welcome!
+
+![A diagram](./images/diagram.png)
 `,
   );
+
+  // Assets living beside the entries: one referenced by a post, one never referenced
+  writeFile("content/blog/images/diagram.png", "png-bytes");
+  writeFile("content/blog/images/unused.png", "png-bytes");
 
   writeFile(
     "content/blog/second-post.md",
@@ -204,7 +213,7 @@ WIDGET-3,Green Widget,14.99,widgets`,
       field: "id",
       param: "slug",
     },
-    children: [{ children: ["Post content here"], tagName: "article" }],
+    children: [{ children: "${state.post.$children ?? []}", tagName: "article" }],
     state: {
       post: {
         $prototype: "ContentEntry",
@@ -481,6 +490,20 @@ describe("buildSite with content sections", () => {
     expect(existsSync(join(dist, "en/index.html"))).toBe(true);
     expect(existsSync(join(dist, "fr/index.html"))).toBe(true);
     expect(existsSync(join(dist, "de/index.html"))).toBe(true);
+  });
+
+  it("publishes referenced content assets at their mounted URL, and nothing else", async () => {
+    await buildSite(TMP, { verbose: false });
+    const dist = resolve(TMP, "dist");
+
+    // The post's entry-relative image is rewritten to the mount URL and copied there
+    const html = readFileSync(join(dist, "blog/hello-world/index.html"), "utf8");
+    expect(html).toContain('src="/content/blog/images/diagram.png"');
+    expect(existsSync(join(dist, "content/blog/images/diagram.png"))).toBe(true);
+
+    // Unreferenced siblings and the entry files themselves stay out of the build
+    expect(existsSync(join(dist, "content/blog/images/unused.png"))).toBe(false);
+    expect(existsSync(join(dist, "content/blog/hello-world.md"))).toBe(false);
   });
 
   it("fails loudly on the deleted contentTypes key with a migration hint", async () => {

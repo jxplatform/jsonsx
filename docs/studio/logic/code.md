@@ -11,7 +11,7 @@ code:
 
 Everything in the Logic pages so far works without writing code. But Studio doesn't pretend code doesn't exist — when a function outgrows **[statements](/docs/studio/logic/statements)**, or you want to see exactly what a file contains, you get a real editor: Monaco, the same component that powers VS Code, with syntax highlighting, completions, and inline error checking.
 
-![Jx Studio editing a component state function in the Monaco code editor](/screenshots/mode-script.png)
+![Jx Studio editing a component state function in the Monaco code editor](../../images/mode-script.png)
 
 There are two distinct code surfaces, for two different jobs.
 
