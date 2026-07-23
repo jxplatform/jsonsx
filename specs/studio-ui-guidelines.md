@@ -1,6 +1,6 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 1.0.0
+**Version:** 0.1.6
 **Status:** Implemented
 **Updated:** 2026-07-22
 **Applies to:** `packages/studio/`
@@ -428,4 +428,10 @@ When building new UI in Studio, verify:
 
 ## Changelog
 
-- **1.0.0** (2026-07-22) — Baseline: spec versioning + changelog introduced.
+- **0.1.6** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.1.5** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.1.4** (2026-07-17) — Color-scheme canvas preview — Auto/Light/Dark tab-bar control (`ccdc1d3e`).
+- **0.1.3** (2026-06-01) — Convert to typescript (`e352e265`).
+- **0.1.2** (2026-04-22) — External web component support (`a9d0fbe4`).
+- **0.1.1** (2026-04-22) — Init new site (`f33d319b`).
+- **0.1.0** (2026-04-18) — Ui guidelines (`91f2b29e`).

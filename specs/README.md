@@ -9,7 +9,7 @@ These specs are the source of truth for Jx behavior. User documentation (`/docs`
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 2.1.0
+**Version:** 0.1.8
 **Status:** Implemented
 **Updated:** 2026-07-22
 **License:** MIT
@@ -24,11 +24,12 @@ These specs are the source of truth for Jx behavior. User documentation (`/docs`
 
 ## Changelog
 
-- **2.1.0** (2026-07-22) — Baseline: spec versioning + changelog introduced.
+- **0.1.8** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.1.7** (2026-07-22) — Fix failing tests (`56e073f8`).
 
 ---
 
-_`@jxsuite/server` Specification v2.1.0_
+_`@jxsuite/server` Specification v0.1.8_
 ```
 
 | Field        | Rule                                                                                           |
@@ -45,17 +46,22 @@ Numbered headings (`## 5`, `### 5.1`, `#### 19.4a`) are anchors: docs pages refe
 Every substantive edit is a release. Do not hand-edit the version, the date, or the changelog — run:
 
 ```sh
-bun run spec:bump <spec.md> <major|minor|patch> -m "<what changed>"
+bun run spec:bump <spec.md> <major|minor|patch|stable> -m "<what changed>"
 bun run docs:generate   # refresh the derived reference pages
 ```
 
 That advances the header **and** footer version, restamps `**Updated:**` to today, and prepends a `## Changelog` entry.
 
-| Level | Use when                                                                                                    |
-| ----- | ----------------------------------------------------------------------------------------------------------- |
-| major | A breaking change to a documented contract — renamed, removed, or redefined behavior that authors depend on |
-| minor | Additive — a new section, newly documented behavior, a contract that gains capability                       |
-| patch | Editorial — wording, examples, non-normative clarification                                                  |
+| Level  | Use when                                                                                                    |
+| ------ | ----------------------------------------------------------------------------------------------------------- |
+| major  | A breaking change to a documented contract — renamed, removed, or redefined behavior that authors depend on |
+| minor  | Additive — a new section, newly documented behavior, a contract that gains capability                       |
+| patch  | Editorial — wording, examples, non-normative clarification                                                  |
+| stable | Graduate a 0.x spec to 1.0.0 — a deliberate declaration that its contract is settled                        |
+
+**Every spec is pre-1.0 today**, and while a spec is at `0.x` the release-please `bump-minor-pre-major` policy applies: `major` moves the **minor** digit, and `minor` and `patch` both move the **patch** digit. So a structural break reads `0.2.7 → 0.3.0`, and everything else reads `0.2.7 → 0.2.8`. Past `1.0.0` the levels mean exactly what they say.
+
+These version numbers were not chosen by hand — they were **reconstructed from git history**. Every commit that touched a spec was classified by what it did to that spec's numbered-section anchor space (removed an anchor → structural break; added one → additive; neither → editorial) and the versions walked forward from `0.1.0` at the commit that introduced each spec. That is why each changelog entry carries the short SHA of the commit it describes.
 
 The `-draft` suffix is derived from `**Status:**`, not chosen: specs that are not `Implemented` carry it, `Implemented` specs do not. To graduate a spec, set `**Status:** Implemented` first, then bump — the suffix drops automatically.
 

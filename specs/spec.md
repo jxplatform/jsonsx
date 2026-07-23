@@ -2,7 +2,7 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 2.1.0-draft
+**Version:** 0.4.23-draft
 **Status:** Partial
 **Updated:** 2026-07-22
 **License:** MIT
@@ -2285,8 +2285,47 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
-- **2.1.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
+- **0.4.23-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.4.22-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.4.21-draft** (2026-07-22) — Reconcile spec with shipped behavior; document the eval surface (`c8d1d580`).
+- **0.4.20-draft** (2026-07-22) — Align specs and docs with the bundled-schema validation contract (`ae861ff6`).
+- **0.4.19-draft** (2026-07-17) — Forced color-scheme contract — dual emission, color-scheme triplet, pre-paint script (`e629684d`).
+- **0.4.18-draft** (2026-07-17) — Sidecar bundling, extension emit capability, heading anchors (`07e28bc3`).
+- **0.4.17-draft** (2026-07-17) — Align spec.md, site-architecture, desktop, server, extensions with reality (`c61ba567`).
+- **0.4.16-draft** (2026-07-17) — Clean up spec (`897e8c1e`).
+- **0.4.15-draft** (2026-07-15) — Pure method operators and the composite formula catalog (spec §19.4d) (`58be3b1a`).
+- **0.4.14-draft** (2026-07-15) — Conditional operators and editor evaluation trace (spec §19.4b, §19.9) (`79926245`).
+- **0.4.13-draft** (2026-06-15) — Arrays as pseudo-element (`0b8b3070`).
+- **0.4.12-draft** (2026-06-10) — Consolidate markdown and csv handling to the parser package (`8b1ba6da`).
+- **0.4.11-draft** (2026-06-02) — Returns type in the class definition (`32e4737a`).
+- **0.4.10-draft** (2026-06-01) — Declarative expressions (`472aeb15`).
+- **0.4.9-draft** (2026-05-25) — Element annotations (title/description) (`c9137e50`).
+- **0.4.8-draft** (2026-05-20) — "format" on fields for image fields (`02f87d29`).
+- **0.4.7-draft** (2026-05-20) — Release 0.11.0 (`4a0e17ed`).
+- **0.4.6-draft** (2026-05-20) — Run formatter (`8ba47930`).
+- **0.4.5-draft** (2026-05-18) — Always emit worker.js for cloudflare (`3dd37c2d`).
+- **0.4.4-draft** (2026-05-15) — Add markdown prototypes at top-level (`24020906`).
+- **0.4.3-draft** (2026-05-15) — Provider-sepcific Site-Wide Bundling (`51cb5cf6`).
+- **0.4.2-draft** (2026-04-23) — Oxfmt (`af32c08c`).
+- **0.4.1-draft** (2026-04-23) — Rebrand to jxsuite (`2897a4e8`).
+- **0.4.0-draft** (2026-04-22) — Consolidate project config schema and rename as such (`e3523dbf`).
+- **0.3.7-draft** (2026-04-22) — External web component support (`a9d0fbe4`).
+- **0.3.6-draft** (2026-04-22) — Init new site (`f33d319b`).
+- **0.3.5-draft** (2026-04-20) — Text nodes support (`4d45eeb7`).
+- **0.3.4-draft** (2026-04-16) — Landing site + working exports + release-it + linting (`a8409b5f`).
+- **0.3.3-draft** (2026-04-15) — Rebrand to Jx / Jx Platform (`abc63f2d`).
+- **0.3.2-draft** (2026-04-15) — Importmap support (`c1b329d4`).
+- **0.3.1-draft** (2026-04-15) — Require json based entrypoints for external class integration (`86dc4383`).
+- **0.3.0-draft** (2026-04-10) — Consolidate specs (`80ca313f`).
+- **0.2.3-draft** (2026-04-07) — Custom element spec (`4f377be3`).
+- **0.2.2-draft** (2026-04-06) — Server-side timing (scaffolding) (`23932590`).
+- **0.2.1-draft** (2026-04-06) — Transition to vue reactivity (`70cb8445`).
+- **0.2.0-draft** (2026-04-06) — Pure js in defs and strings (`6494999d`).
+- **0.1.3-draft** (2026-04-06) — External/md parser (`5161ec0e`).
+- **0.1.2-draft** (2026-04-04) — Declarative media breakpoints (`3142b64e`).
+- **0.1.1-draft** (2026-04-04) — Rebrand as JSONsx (`0daa94f7`).
+- **0.1.0-draft** (2026-04-04) — Init (`a93852ac`).
 
 ---
 
-_Jx Specification v2.1.0-draft — subject to revision_
+_Jx Specification v0.4.23-draft — subject to revision_

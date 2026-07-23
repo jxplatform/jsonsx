@@ -2,7 +2,7 @@
 
 ## JSON Schema 2020-12 Meta-Schema Generator
 
-**Version:** 2.0.0-draft
+**Version:** 0.2.8-draft
 **Status:** Partial
 **Updated:** 2026-07-22
 **License:** MIT
@@ -182,8 +182,20 @@ Three JSON Schema 2020-12 documents:
 
 ## Changelog
 
-- **2.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
+- **0.2.8-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.2.7-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.2.6-draft** (2026-07-22) — Align specs and docs with the bundled-schema validation contract (`ae861ff6`).
+- **0.2.5-draft** (2026-06-10) — Consolidate markdown and csv handling to the parser package (`8b1ba6da`).
+- **0.2.4-draft** (2026-05-18) — Always emit worker.js for cloudflare (`3dd37c2d`).
+- **0.2.3-draft** (2026-05-15) — Provider-sepcific Site-Wide Bundling (`51cb5cf6`).
+- **0.2.2-draft** (2026-04-23) — Site build (`ffe60ddc`).
+- **0.2.1-draft** (2026-04-23) — Compiler cli + published site (`4607ebbc`).
+- **0.2.0-draft** (2026-04-22) — Consolidate project config schema and rename as such (`e3523dbf`).
+- **0.1.3-draft** (2026-04-20) — Text nodes support (`4d45eeb7`).
+- **0.1.2-draft** (2026-04-16) — Landing site + working exports + release-it + linting (`a8409b5f`).
+- **0.1.1-draft** (2026-04-15) — Rebrand to Jx / Jx Platform (`abc63f2d`).
+- **0.1.0-draft** (2026-04-10) — Consolidate specs (`80ca313f`).
 
 ---
 
-_`@jxsuite/schema` Specification v2.0.0-draft_
+_`@jxsuite/schema` Specification v0.2.8-draft_

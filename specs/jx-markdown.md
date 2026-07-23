@@ -1,6 +1,6 @@
 # Jx Markdown Specification
 
-**Version:** 1.0.0-draft
+**Version:** 0.1.7-draft
 **Status:** Partial
 **Updated:** 2026-07-22
 **License:** MIT
@@ -438,4 +438,11 @@ This is the single Jx→markdown serializer — the studio and the compiler both
 
 ## Changelog
 
-- **1.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
+- **0.1.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.1.6-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.1.5-draft** (2026-07-17) — Build-time syntax highlighting for markdown code fences (`b2e7a561`).
+- **0.1.4-draft** (2026-06-15) — Arrays as pseudo-element (`0b8b3070`).
+- **0.1.3-draft** (2026-06-10) — Consolidate markdown and csv handling to the parser package (`8b1ba6da`).
+- **0.1.2-draft** (2026-05-25) — Element annotations (title/description) (`c9137e50`).
+- **0.1.1-draft** (2026-05-20) — Run formatter (`8ba47930`).
+- **0.1.0-draft** (2026-05-11) — Jx markdown (`7b102340`).

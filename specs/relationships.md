@@ -2,7 +2,7 @@
 
 ## References Between Named Entries Across Extension Sections
 
-**Version:** 1.0.0-draft
+**Version:** 0.1.3-draft
 **Status:** Partial
 **Updated:** 2026-07-22
 **License:** MIT
@@ -109,8 +109,11 @@ type:
 
 ## Changelog
 
-- **1.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
+- **0.1.3-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.1.2-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.1.1-draft** (2026-07-08) — Shipped schema fragments + per-project schema emitters (`9e4a8936`).
+- **0.1.0-draft** (2026-07-08) — Extensions v2 framework + docs (`3fb8795f`).
 
 ---
 
-_Jx Relationships Specification v1.0.0-draft_
+_Jx Relationships Specification v0.1.3-draft_

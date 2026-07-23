@@ -2,7 +2,7 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 2.0.0-draft
+**Version:** 0.2.7-draft
 **Status:** Partial
 **Updated:** 2026-07-22
 **License:** MIT
@@ -838,8 +838,16 @@ requiring changes to any core package.
 
 ## Changelog
 
-- **2.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
+- **0.2.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.2.6-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.2.5-draft** (2026-07-22) — Align specs and docs with the bundled-schema validation contract (`ae861ff6`).
+- **0.2.4-draft** (2026-07-17) — Sidecar bundling, extension emit capability, heading anchors (`07e28bc3`).
+- **0.2.3-draft** (2026-07-17) — Align spec.md, site-architecture, desktop, server, extensions with reality (`c61ba567`).
+- **0.2.2-draft** (2026-07-11) — Better Auth extension — sessions, permissions, auth-gated data (`bf472285`).
+- **0.2.1-draft** (2026-07-08) — Shipped schema fragments + per-project schema emitters (`9e4a8936`).
+- **0.2.0-draft** (2026-07-08) — Extensions v2 framework + docs (`3fb8795f`).
+- **0.1.0-draft** (2026-06-10) — Consolidate markdown and csv handling to the parser package (`8b1ba6da`).
 
 ---
 
-_Jx Extensions Specification v2.0.0-draft_
+_Jx Extensions Specification v0.2.7-draft_

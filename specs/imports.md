@@ -1,6 +1,6 @@
 # Imports
 
-**Version:** 1.0.0-draft
+**Version:** 0.1.6-draft
 **Status:** Partial
 **Updated:** 2026-07-22
 **License:** MIT
@@ -180,4 +180,10 @@ The compiler's `injectContext()` also merges site-level `$elements` into page-le
 
 ## Changelog
 
-- **1.0.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
+- **0.1.6-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.1.5-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.1.4-draft** (2026-06-10) — Consolidate markdown and csv handling to the parser package (`8b1ba6da`).
+- **0.1.3-draft** (2026-06-01) — Remove old glob-based content type references (`6bcbfdaf`).
+- **0.1.2-draft** (2026-05-19) — Reflect new content type transition (`6eb3d2b6`).
+- **0.1.1-draft** (2026-04-22) — Consolidate project config schema and rename as such (`e3523dbf`).
+- **0.1.0-draft** (2026-04-22) — External web component support (`a9d0fbe4`).

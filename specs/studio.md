@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 2.2.0-draft
+**Version:** 0.1.25-draft
 **Status:** Partial
 **Updated:** 2026-07-22
 **License:** MIT
@@ -575,8 +575,33 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
-- **2.2.0-draft** (2026-07-22) — Baseline: spec versioning + changelog introduced.
+- **0.1.25-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
+- **0.1.24-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
+- **0.1.23-draft** (2026-07-17) — Scheme-variant editing — token overrides, scheme-layer routing, live feedback (`49f0c525`).
+- **0.1.22-draft** (2026-07-17) — Color-scheme canvas preview — Auto/Light/Dark tab-bar control (`ccdc1d3e`).
+- **0.1.21-draft** (2026-07-17) — Consolidated field mode switcher (`0a135ed1`).
+- **0.1.20-draft** (2026-06-10) — Consolidate markdown and csv handling to the parser package (`8b1ba6da`).
+- **0.1.19-draft** (2026-05-25) — Allow nested global styles (`1159d585`).
+- **0.1.18-draft** (2026-05-20) — "format" on fields for image fields (`02f87d29`).
+- **0.1.17-draft** (2026-05-20) — Run formatter (`8ba47930`).
+- **0.1.16-draft** (2026-05-15) — Git sidebar (`79663844`).
+- **0.1.15-draft** (2026-04-23) — Include global styling (`d8d25640`).
+- **0.1.14-draft** (2026-04-23) — Site build (`ffe60ddc`).
+- **0.1.13-draft** (2026-04-23) — Compiler cli + published site (`4607ebbc`).
+- **0.1.12-draft** (2026-04-22) — Consolidate project config schema and rename as such (`e3523dbf`).
+- **0.1.11-draft** (2026-04-22) — External web component support (`a9d0fbe4`).
+- **0.1.10-draft** (2026-04-22) — Init new site (`f33d319b`).
+- **0.1.9-draft** (2026-04-20) — Text nodes support (`4d45eeb7`).
+- **0.1.8-draft** (2026-04-20) — Better project-level scoping (`0cba233c`).
+- **0.1.7-draft** (2026-04-18) — Dedicated combo/picker component for style preview (`d8d07921`).
+- **0.1.6-draft** (2026-04-18) — Fix the test path handling on windows (`26ea0d70`).
+- **0.1.5-draft** (2026-04-17) — Update studio specs (`d0e5475a`).
+- **0.1.4-draft** (2026-04-17) — Reorganize code tree (`d5ee04c4`).
+- **0.1.3-draft** (2026-04-16) — Landing site + working exports + release-it + linting (`a8409b5f`).
+- **0.1.2-draft** (2026-04-15) — Rebrand to Jx / Jx Platform (`abc63f2d`).
+- **0.1.1-draft** (2026-04-10) — Finalize vision for site architecture (`da594993`).
+- **0.1.0-draft** (2026-04-10) — Consolidate specs (`80ca313f`).
 
 ---
 
-_`@jxsuite/studio` Specification v2.2.0-draft_
+_`@jxsuite/studio` Specification v0.1.25-draft_
