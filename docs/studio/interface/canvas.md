@@ -13,7 +13,7 @@ code:
 
 The canvas is the center of the workspace, where your page renders live — the real thing, not a mock-up. You work on it directly: click to select, drag to rearrange, double-click to type. How it behaves depends on the current [mode](/docs/studio/interface/modes); this page covers the interactions shared by the visual modes.
 
-![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](/screenshots/mode-design.png)
+![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](../../images/mode-design.png)
 
 ## Pan and zoom
 
@@ -42,7 +42,7 @@ A small floating toolbar appears above the selected element:
 - For a component instance, **Edit Component** opens the component itself; for anything else, **Convert to Component** turns the selection into a reusable component.
 - While you're editing text, formatting buttons (bold, italic, and friends) and an **Insert data** button join the bar. See [Edit mode](/docs/studio/editing).
 
-![A selected element on the canvas with the floating block action bar above it](/screenshots/block-action-bar.png)
+![A selected element on the canvas with the floating block action bar above it](../../images/block-action-bar.png)
 
 ## Inserting elements
 

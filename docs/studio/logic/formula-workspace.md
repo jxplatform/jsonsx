@@ -10,7 +10,7 @@ code:
 
 The formula workspace gives one formula the entire canvas. The compact editors in the panels are fine for a two-step formula; when one grows branches, the workspace lays the whole tree out with live values at every step and your page's data alongside.
 
-![The full-screen formula workspace with the chip strip, selected-step editor, and data rail](/screenshots/formula-workspace.png)
+![The full-screen formula workspace with the chip strip, selected-step editor, and data rail](../../images/formula-workspace.png)
 
 ## Open it
 

@@ -3,7 +3,9 @@ title: "Content collections"
 description: "The content section of project.json: sources, formats, entry ids, ContentCollection queries, ContentEntry lookups, and schema validation."
 spec:
   - site-architecture.md#6
+  - site-architecture.md#9.3
   - parser.md#3.2
+  - parser.md#9.2
 code:
   - extensions/parser/src/content-loader.ts
   - extensions/parser/src/content.ts
@@ -50,6 +52,22 @@ Every entry has an `id`, derived from the filesystem:
 - **Flat directories** — the filename without extension: `content/blog/hello-world.md` → `hello-world`.
 - **Nested directories** — a path-based id with `/` separators: `docs/framework/site/routing.md` → `framework/site/routing`, with a trailing `/index` stripped. Path-based ids pair naturally with `[...param]` catch-all routes — see [Routing](/docs/framework/site/routing).
 - **JSON files** — an array file yields one entry per item (each item's `id` field, or an indexed fallback); an object file is a single entry named after the file.
+
+## Media beside your content
+
+Entries reference images the way any markdown editor expects — relative to the file itself:
+
+```markdown
+![A diagram of the pipeline](./images/diagram.png)
+```
+
+Keep the images in the collection directory (`content/blog/images/diagram.png`), and the entry reads correctly in VS Code, Obsidian, GitHub, and on the built site alike. When the collection loads, that reference is remapped to the collection's own URL — `/content/blog/images/diagram.png` — which the build copies into `dist/` and the dev server serves straight from the source file. It works even when the source lives outside the project, which is how these docs ship their screenshots from `docs/images/`.
+
+Only files an entry actually references are published; unreferenced siblings and the entry files themselves never reach `dist/`.
+
+:::doc-note
+Remapping applies to element `src`/`poster` values and to frontmatter fields your schema declares as `"format": "uri-reference"` (that's also what gives Studio a [media picker](/docs/studio/projects/media) for the field). A path that doesn't resolve to a real file beside the entry is left exactly as written, with a build warning naming the entry — so root-relative paths into `public/` keep working unchanged.
+:::
 
 ## Querying with ContentCollection
 

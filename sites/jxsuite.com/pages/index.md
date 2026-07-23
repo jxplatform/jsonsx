@@ -63,7 +63,7 @@ Free forever · macOS, Windows & Linux · or `bun create @jxsuite my-site`
 :::
 
 :::div{style.maxWidth="960px" style.margin="0 auto"}
-::img{style.display="block" style.width="100%" style.height="auto" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)" style.boxShadow="0 24px 64px rgba(0, 0, 0, 0.45)" src="/screenshots/hero.png" width="3840" height="2400" alt="Jx Studio editing a website — layers panel, live canvas, and element inspector" loading="eager" decoding="async"}
+::img{style.display="block" style.width="100%" style.height="auto" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)" style.boxShadow="0 24px 64px rgba(0, 0, 0, 0.45)" src="/content/docs/images/hero.png" width="3840" height="2400" alt="Jx Studio editing a website — layers panel, live canvas, and element inspector" loading="eager" decoding="async"}
 :::
 ::::
 :::::

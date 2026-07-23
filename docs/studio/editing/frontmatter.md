@@ -17,7 +17,7 @@ Two surfaces show these fields: the **Document** activity in the left panel, and
 
 Click **Document** in the activity bar to open it. Its sections, top to bottom, depend on the file you have open:
 
-![The Document activity showing Frontmatter, Page, and OpenGraph sections for a blog post](/screenshots/document-panel.png)
+![The Document activity showing Frontmatter, Page, and OpenGraph sections for a blog post](../../images/document-panel.png)
 
 ### Frontmatter
 
@@ -56,7 +56,7 @@ The escape hatch for everything else that can live in a page's head: pick a tag 
 
 When a collection page is open in Edit mode, a **Properties** bar sits directly above the page — the same fields as the Document panel's Frontmatter section (title included), right where you're writing. Click its header to collapse it to a slim strip; every tab remembers whether you left it open or closed.
 
-![The collapsible Properties bar above a post open in Edit mode](/screenshots/properties-bar.png)
+![The collapsible Properties bar above a post open in Edit mode](../../images/properties-bar.png)
 
 :::doc-note
 On disk, all of this lives at the top of the page's own file, in a small labeled block above the content — the frontmatter. That's why metadata travels with the page: copy the file and everything comes along, and any text editor can read it.

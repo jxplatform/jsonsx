@@ -13,7 +13,7 @@ code:
 
 In Edit mode you write on the real page: double-click any text — a heading, a paragraph, a list item, a table cell — and the cursor lands in it, ready to type. There is no separate preview to keep in sync; the page you're editing is the page.
 
-![A paragraph mid-edit on the canvas with the formatting toolbar above it](/screenshots/inline-editing.png)
+![A paragraph mid-edit on the canvas with the formatting toolbar above it](../../images/inline-editing.png)
 
 ## Start and stop
 

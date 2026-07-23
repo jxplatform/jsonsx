@@ -17,7 +17,7 @@ In Studio, choose **New Project**. Give it a name and a folder, set your product
 
 Then pick a **template**. Start from **Blank** for an empty project, or clone one of the [starter sites](/templates) — a restaurant, shop, portfolio, SaaS landing, blog, and more. Each one is a complete, themed site (pages, components, content, and images) you can reshape into your own. Studio copies it in as plain files and opens it on the canvas.
 
-![Jx Studio New Project dialog — template gallery, name, directory, production URL, and deployment adapter picker](/screenshots/new-project-modal.png)
+![Jx Studio New Project dialog — template gallery, name, directory, production URL, and deployment adapter picker](../images/new-project-modal.png)
 
 Already have a Jx project? Use **Open Project** to point Studio at a folder on disk, or **Clone** to pull one from git. (Developers who'd rather scaffold from a terminal can use `bun create @jxsuite` instead — see [CLI commands](/docs/framework/build/cli) — then open the result in Studio.)
 
@@ -25,11 +25,11 @@ Already have a Jx project? Use **Open Project** to point Studio at a folder on d
 
 Studio gives you a surface for each part of the job. Start in **[Manage](/docs/studio/projects/browse)** to see your project — pages, components, content, and media — with live previews.
 
-![Jx Studio Manage Files modal with live previews of every project file](/screenshots/mode-manage.png)
+![Jx Studio Manage Files modal with live previews of every project file](../images/mode-manage.png)
 
 Open a content page and switch to **[Edit](/docs/studio/editing)** to write inline — click any text and type, use slash commands for blocks, fill in frontmatter on the side. Open a component and switch to **[Design](/docs/studio/design)** for the visual canvas: a live preview at every breakpoint, and a full CSS inspector for spacing, type, color, and hover states.
 
-![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](/screenshots/mode-design.png)
+![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](../images/mode-design.png)
 
 ## 4. Add an interaction
 
@@ -39,7 +39,7 @@ Websites do things. In Studio, interactivity comes from three panels working tog
 - **Events** — bind a handler to a click, input, or submit with the structured expression editor.
 - **Code** — drop into the Monaco editor when a handler needs real JavaScript.
 
-![Jx Studio editing a component state function in the Monaco code editor](/screenshots/mode-script.png)
+![Jx Studio editing a component state function in the Monaco code editor](../images/mode-script.png)
 
 Add a `count` to state, a button, and an `onclick` that increments it — you've built a reactive component. See **[Script & logic](/docs/studio/logic)** for the full toolkit.
 
@@ -47,7 +47,7 @@ Add a `count` to state, a button, and an `onclick` that increments it — you've
 
 When you're happy, open **Source Control**. Review your changes, write a message, and **commit and sync** — or, for a brand-new project, **Publish to GitHub** and Studio creates the repository for you.
 
-![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](/screenshots/git-commit.png)
+![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](../images/git-commit.png)
 
 Here's the one boundary worth knowing: **Studio publishes code; it doesn't build or deploy the site.** It commits and pushes, and it sets the deploy adapter you chose in step 2. Your host takes it from there — building the static site (`bunx jx build`) on every push and serving the `dist/` output from a CDN. See **[Git & publish](/docs/studio/publish)** for the full flow.
 

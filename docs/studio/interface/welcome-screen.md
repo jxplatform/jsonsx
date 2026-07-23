@@ -10,7 +10,7 @@ code:
 
 When Jx Studio starts with no project open, the canvas area shows the welcome screen: a **Start** list of ways to get a project in front of you, followed by your projects and recent history. Everything on it is one or two clicks from a working canvas.
 
-![The Jx Studio welcome screen with Start actions, the Projects list, and Recent files](/screenshots/welcome-screen.png)
+![The Jx Studio welcome screen with Start actions, the Projects list, and Recent files](../../images/welcome-screen.png)
 
 ## Start a new project
 
@@ -19,7 +19,7 @@ When Jx Studio starts with no project open, the canvas area shows the welcome sc
 3. Click **Next**, name the project, and adjust the design quickstart (colors, fonts, logo).
 4. Click **Create Project** — Studio writes the files and opens the project.
 
-![The New Project dialog with the template gallery and project parameters](/screenshots/new-project-modal.png)
+![The New Project dialog with the template gallery and project parameters](../../images/new-project-modal.png)
 
 The full walkthrough is in **[Create a project](/docs/studio/projects/create)**.
 

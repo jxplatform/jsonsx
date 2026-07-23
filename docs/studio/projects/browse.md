@@ -7,7 +7,7 @@ description: "The Manage surface in Jx Studio: browse your project, create pages
 
 Manage is your project's home base — the file layer and the CMS layer in one place. Open it from the toolbar to see everything your site is made of, with live previews.
 
-![Jx Studio Manage Files modal with live previews of every project file](/screenshots/mode-manage.png)
+![Jx Studio Manage Files modal with live previews of every project file](../../images/mode-manage.png)
 
 ## Browse your project
 

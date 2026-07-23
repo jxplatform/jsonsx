@@ -14,9 +14,20 @@ const PNG_1x1 = Buffer.from(
 function ensureFixtures() {
   mkdirSync(join(FIXTURES, "sites/demo/public"), { recursive: true });
   mkdirSync(join(FIXTURES, "root-public"), { recursive: true });
-  writeFileSync(join(FIXTURES, "sites/demo/project.json"), JSON.stringify({ name: "demo" }));
+  // A content source OUTSIDE the project — the case asset mounts exist for.
+  mkdirSync(join(FIXTURES, "external-docs/images"), { recursive: true });
+  writeFileSync(
+    join(FIXTURES, "sites/demo/project.json"),
+    JSON.stringify({
+      content: { docs: { format: "Markdown", source: "../../external-docs" } },
+      extensions: ["@jxsuite/parser"],
+      name: "demo",
+    }),
+  );
   writeFileSync(join(FIXTURES, "sites/demo/public/image.png"), PNG_1x1);
   writeFileSync(join(FIXTURES, "root-public/root-file.txt"), "hello from root");
+  writeFileSync(join(FIXTURES, "external-docs/images/hero.png"), PNG_1x1);
+  writeFileSync(join(FIXTURES, "external-docs/guide.md"), "---\ntitle: Guide\n---\n\nHi.\n");
 }
 
 /**
@@ -84,7 +95,20 @@ else {
   if (body.relPath !== fwd(expectedPath)) errors.push("resolve-site relPath: " + body.relPath + " (expected " + fwd(expectedPath) + ")");
 }
 
-// Test 7: deactivation resets resolution
+// Test 7: the content collection's asset mount serves a file living outside the project
+res = await fetch(base + "/content/docs/images/hero.png");
+if (res.status !== 200) errors.push("mounted asset: expected 200, got " + res.status);
+else {
+  const buf = new Uint8Array(await res.arrayBuffer());
+  if (buf[0] !== 0x89 || buf[1] !== 0x50) errors.push("mounted asset magic bytes wrong");
+}
+
+// Test 8: a miss inside the mount stays a miss (mount containment itself is unit-tested
+// in net-guard.test.ts, where the served branch is observable)
+res = await fetch(base + "/content/docs/images/gone.png");
+if (res.status !== 404) errors.push("missing mounted asset: expected 404, got " + res.status);
+
+// Test 9: deactivation resets resolution
 await fetch(base + "/__studio/activate", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -92,6 +116,8 @@ await fetch(base + "/__studio/activate", {
 });
 res = await fetch(base + "/public/image.png");
 if (res.status !== 404) errors.push("post-deactivate: expected 404, got " + res.status);
+res = await fetch(base + "/content/docs/images/hero.png");
+if (res.status !== 404) errors.push("post-deactivate mount: expected 404, got " + res.status);
 
 server.stop();
 

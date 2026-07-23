@@ -19,6 +19,7 @@
   "type": "module",
   "exports": {
     ".": "./src/compiler.ts",
+    "./asset-mounts": "./src/site/asset-mounts.ts",
     "./format-host": "./src/site/format-host.ts",
     "./project-sections": "./src/site/project-sections.ts",
     "./schema-command": "./src/site/schema-command.ts",

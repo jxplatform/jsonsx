@@ -12,7 +12,7 @@ code:
 
 The data grid is **[Grid mode](/docs/studio/editing/grid)** pointed at a database table: the same spreadsheet surface — typed cells, range selection, fill down, find & replace, one batched **Save** — but the rows come from a live database instead of files in your project. Use it to check what visitors have submitted, fix a bad value, seed test rows, or clean out old data.
 
-![A database table open as a grid tab with the toolbar and pager visible](/screenshots/data-grid.png)
+![A database table open as a grid tab with the toolbar and pager visible](../../images/data-grid.png)
 
 ## Open a table
 

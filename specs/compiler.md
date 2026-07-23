@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.1.21-draft
+**Version:** 0.1.22-draft
 **Status:** Partial
-**Updated:** 2026-07-22
+**Updated:** 2026-07-23
 **License:** MIT
 
 ---
@@ -465,7 +465,7 @@ Up to 4 variants are processed concurrently per image.
 **Processed:**
 
 - Static `src` paths (strings, not `${...}` template expressions)
-- Local paths (relative or `/`-prefixed) that exist on disk (resolved from `public/` or project root)
+- Local paths (relative or `/`-prefixed) that exist on disk — resolved from an extension asset mount first ([extensions.md §8.5](./extensions.md)), then `public/` or the project root
 - Raster formats: `.jpg`, `.jpeg`, `.png`, `.webp`, `.avif`, `.tiff`
 
 **Skipped:**
@@ -660,6 +660,7 @@ The site build bundles Function-def `$src` modules for the browser
 
 ## Changelog
 
+- **0.1.22-draft** (2026-07-23) — Image src resolution consults extension asset mounts before public/ (§7.3).
 - **0.1.21-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.20-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.19-draft** (2026-07-17) — Forced color-scheme contract — dual emission, color-scheme triplet, pre-paint script (`e629684d`).
@@ -685,4 +686,4 @@ The site build bundles Function-def `$src` modules for the browser
 
 ---
 
-_`@jxsuite/compiler` Specification v0.1.21-draft_
+_`@jxsuite/compiler` Specification v0.1.22-draft_

@@ -36,7 +36,7 @@ The Style inspector itself gives you the CSS control you're used to — spacing,
 
 Instead of one canvas you flip between breakpoints, Design mode renders a live panel for **every** breakpoint side by side, each running your real responsive rules. A tablet-only change shows up in the tablet panel while the others hold still — no more toggling back and forth to check you didn't break desktop. See **[Design mode](/docs/studio/design)** and **[Breakpoints](/docs/studio/design/breakpoints)**.
 
-![Jx Studio's Design mode rendering one component across four responsive breakpoints with the style inspector open](/screenshots/mode-design.png)
+![Jx Studio's Design mode rendering one component across four responsive breakpoints with the style inspector open](../images/mode-design.png)
 
 ## Symbols and components
 

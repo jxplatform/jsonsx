@@ -40,6 +40,18 @@
         "type": "array",
         "description": "Route-param objects, one per content entry: { [param]: value }",
         "items": { "type": "object" }
+      },
+      "AssetMounts": {
+        "type": "array",
+        "description": "Static asset mounts, one per content type: { urlPrefix, dir }",
+        "items": {
+          "type": "object",
+          "properties": {
+            "urlPrefix": { "type": "string" },
+            "dir": { "type": "string" }
+          },
+          "required": ["urlPrefix", "dir"]
+        }
       }
     },
 
@@ -111,6 +123,34 @@
         ],
         "returnType": { "$ref": "#/$defs/returnTypes/PathEntries" },
         "description": "Expand a content-type $paths source into one route-param object per entry (param defaults to \"slug\", field to \"id\")"
+      },
+      "assets": {
+        "role": "assets",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "assets",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "sectionValue",
+            "type": { "type": "object" },
+            "description": "The project.json `content` section value (content type name → definition)"
+          },
+          {
+            "identifier": "ctx",
+            "type": {
+              "type": "object",
+              "properties": {
+                "projectConfig": { "type": "object" },
+                "root": { "type": "string" }
+              }
+            },
+            "description": "Host context: { projectConfig, root }"
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/AssetMounts" },
+        "description": "Publish each content type's source directory at /content/<type>, so files sitting beside entries (images, downloads) resolve for hosts"
       }
     }
   }

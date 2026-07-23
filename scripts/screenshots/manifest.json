@@ -1,5 +1,5 @@
 {
-  "outDir": "sites/jxsuite.com/public/screenshots",
+  "outDir": "docs/images",
   "server": {
     "url": "http://localhost:3000",
     "studioPath": "/packages/studio/index.html"

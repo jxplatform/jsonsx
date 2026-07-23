@@ -10,8 +10,9 @@
 //   - `spec:` entries (`spec.md#19.4` or `site-architecture.md`) must name a real
 //     Spec file and a real numbered heading in it
 //   - `code:` entries must be repo paths that exist
-//   - Body `/screenshots/<name>.png` refs must be produced by the screenshots
-//     Manifest AND exist on disk
+//   - Body image refs must be page-relative paths into docs/images/ (so the page
+//     Renders in any markdown editor), be produced by the screenshots manifest,
+//     AND exist on disk
 //   - `generated: true` pages must carry the generator banner
 //   - Nav bijection: every docs page appears exactly once in docs/nav.json and
 //     Every nav path has a page
@@ -20,12 +21,12 @@
 //     A real docs page
 
 import { existsSync, readFileSync } from "node:fs";
-import { extname, join, relative, resolve } from "node:path";
+import { basename, dirname, extname, join, relative, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const DOCS_DIR = join(ROOT, "docs");
 const SPECS_DIR = join(ROOT, "specs");
-const SCREENSHOTS_DIR = join(ROOT, "sites/jxsuite.com/public/screenshots");
+const SCREENSHOTS_DIR = join(ROOT, "docs/images");
 const MANIFEST_PATH = join(ROOT, "scripts/screenshots/manifest.json");
 const NAV_PATH = join(DOCS_DIR, "nav.json");
 
@@ -143,7 +144,14 @@ function docPageExists(slug: string): boolean {
 
 const screenshotNames = manifestImageNames();
 const referencedScreenshots = new Set<string>();
-const SCREENSHOT_RE = /\/screenshots\/([A-Za-z0-9._-]+)\.(?:png|webp|jpg|jpeg)/g;
+// Markdown image targets: any page-relative path, so a ref pointing somewhere other than
+// Docs/images/ is caught below rather than skipped silently.
+const IMAGE_RE = /!\[[^\]]*]\(<?([^)>\s]+\.(?:png|webp|jpg|jpeg))>?\s*(?:"[^"]*")?\)/g;
+
+/** Drop fenced blocks and inline code spans — image syntax quoted as an example is prose. */
+function withoutCode(source: string): string {
+  return source.replaceAll(/```[\s\S]*?```/g, "").replaceAll(/`[^`\n]*`/g, "");
+}
 
 const docFiles = [...new Bun.Glob("**/*.md").scanSync({ cwd: DOCS_DIR })]
   .map((f) => join(DOCS_DIR, f))
@@ -198,14 +206,26 @@ for (const file of docFiles) {
     }
   }
 
-  for (const m of source.matchAll(SCREENSHOT_RE)) {
-    const name = m[1]!;
+  for (const m of withoutCode(source).matchAll(IMAGE_RE)) {
+    const target = m[1]!;
+    // Images are addressed relative to the page so /docs reads correctly in a markdown editor;
+    // The compiler republishes them under /content/docs/ when the site builds.
+    if (target.startsWith("/") || /^[a-z][\w+.-]*:/i.test(target)) {
+      fail(file, `image ref must be page-relative into docs/images/: ${target}`);
+      continue;
+    }
+    const resolved = resolve(dirname(file), target);
+    if (dirname(resolved) !== SCREENSHOTS_DIR) {
+      fail(file, `image ref must resolve into docs/images/: ${target}`);
+      continue;
+    }
+    const name = basename(resolved, extname(resolved));
     referencedScreenshots.add(name);
     if (!screenshotNames.has(name)) {
       fail(file, `screenshot "${name}" is not produced by scripts/screenshots/manifest.json`);
     }
-    if (!existsSync(join(SCREENSHOTS_DIR, `${name}.png`))) {
-      fail(file, `screenshot file missing on disk: public/screenshots/${name}.png`);
+    if (!existsSync(resolved)) {
+      fail(file, `screenshot file missing on disk: docs/images/${basename(resolved)}`);
     }
   }
 

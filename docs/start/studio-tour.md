@@ -11,7 +11,7 @@ code:
 
 Everything in Jx Studio happens in one window. This page is your map: what each region is called, what it does, and where to read more. If you've used another visual builder, the layout will feel familiar — a live canvas in the middle, panels on either side, and a toolbar on top.
 
-![The Jx Studio workspace with the canvas in the center, panels on both sides, and the toolbar across the top](/screenshots/hero.png)
+![The Jx Studio workspace with the canvas in the center, panels on both sides, and the toolbar across the top](../images/hero.png)
 
 ## The toolbar
 

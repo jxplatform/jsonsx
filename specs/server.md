@@ -2,9 +2,9 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.1.8
+**Version:** 0.1.9
 **Status:** Implemented
-**Updated:** 2026-07-22
+**Updated:** 2026-07-23
 **License:** MIT
 
 ---
@@ -68,7 +68,9 @@ The request path is matched in this order (`src/server.ts`):
 4. `/_jx/*` — extension server mounts
 5. `/__studio/*` — Studio API (collab WebSocket/probe, activate, AI proxy, site import, code services, then the main studio handler)
 6. Custom `middleware`
-7. Static files — server root, then the active project root, then its `public/` (mirroring production), then npm bare specifiers resolved through `node_modules` and bundled on demand with `Bun.build`. Served HTML gets the live-reload client injected (except the Studio shell, which manages its own state); all responses carry `Cache-Control: no-cache`.
+7. Static files — the active project's extension asset mounts ([extensions.md §8.5](./extensions.md)), then the server root, then the active project root, then its `public/` (mirroring production), then npm bare specifiers resolved through `node_modules` and bundled on demand with `Bun.build`. Served HTML gets the live-reload client injected (except the Studio shell, which manages its own state); all responses carry `Cache-Control: no-cache`.
+
+**Asset mounts.** A mount publishes a directory that may sit outside the project root — a content collection's co-located images — at the same site URL the built site will use, so a dev preview and a production page render identically. Each candidate is contained against the mount's own directory (lexical + realpath), and the URL→path mapping refuses `.`/`..`, empty segments, and still-encoded dots or slashes. Mounts come from the section owner's `assets` capability via the per-project context cache, so they refresh when `project.json` changes on disk. The desktop loopback server (`project-server.ts`) resolves them through the same `serveProjectFile` path.
 
 **Extension mounts (`/_jx/*`, `src/jx-mounts.ts`).** Extension classes with a `server` block mount the same fetch-style handlers here that the generated site worker mounts in production — one shared context per project, handlers built via the static `mount(options, ctx)` capability and dispatched by `basePath` prefix. Dev conveniences: `env` is `process.env` merged under the project's `.dev.vars` plus `JX_PROJECT_ROOT`; connector classes with `local: "<provider>"` are stood in by the registry's local provider (e.g. D1 → sqlite at `.jx/data/<connection>.sqlite`); `autoSync: true` syncs table schemas additively on first touch. The per-project runtime is cached and invalidated when `project.json` changes on disk.
 
@@ -200,6 +202,7 @@ Incremental rebuild triggered by the file watcher: only entries whose `match` (R
 
 ## Changelog
 
+- **0.1.9** (2026-07-23) — Serve extension asset mounts ahead of the project root in the static-file chain (§3).
 - **0.1.8** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.7** (2026-07-22) — Fix failing tests (`56e073f8`).
 - **0.1.6** (2026-07-22) — Harden dev server and unify runtime/compiler evaluation (`47a1d4c9`).
@@ -212,4 +215,4 @@ Incremental rebuild triggered by the file watcher: only entries whose `match` (R
 
 ---
 
-_`@jxsuite/server` Specification v0.1.8_
+_`@jxsuite/server` Specification v0.1.9_

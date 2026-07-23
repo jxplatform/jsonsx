@@ -11,7 +11,7 @@ code:
 
 A design token is a named value — **Primary Blue** instead of `#3b82f6`, **Body Serif** instead of a font list. Define it once for the site and reference it everywhere; change it once and everywhere updates. Tokens are what keep a growing site on one palette instead of thirty slightly different blues.
 
-![The CSS Variables settings section with grouped color, font, and size variables](/screenshots/css-variables.png)
+![The CSS Variables settings section with grouped color, font, and size variables](../../images/css-variables.png)
 
 ## Define tokens
 

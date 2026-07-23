@@ -10,7 +10,7 @@ code:
 
 Source Control is Studio's built-in git client — a sidebar panel that records your work as commits and keeps your copy of the project in sync with its repository. Open it by clicking **Source Control** (the branch icon) in the activity bar; a badge on the icon shows how many files have changed.
 
-![The Source Control panel with sync status, branch selector, commit box, and changed files](/screenshots/git-panel.png)
+![The Source Control panel with sync status, branch selector, commit box, and changed files](../../images/git-panel.png)
 
 If the project isn't under version control yet, the panel offers **Initialize Repository** to start tracking it locally, and **Publish to GitHub** to go straight to a hosted repository — see **[GitHub](/docs/studio/publish/github)**.
 
@@ -33,7 +33,7 @@ The **Local Changes** tab lists every changed file, grouped by the part of the p
 
 To record a commit without pushing, open the dropdown beside the button and choose **Commit (don't sync)**, or press :kbd[Ctrl+Enter] in the message box. If nothing is staged, the commit takes all changed files.
 
-![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](/screenshots/git-commit.png)
+![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](../../images/git-commit.png)
 
 ## Stay in sync
 

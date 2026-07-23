@@ -164,7 +164,7 @@
             {
               "tagName": "img",
               "attributes": {
-                "src": "/screenshots/mode-design.png",
+                "src": "/content/docs/images/mode-design.png",
                 "alt": "Jx Studio design mode — one component rendered across four responsive breakpoint canvases",
                 "width": "3840",
                 "height": "2000",

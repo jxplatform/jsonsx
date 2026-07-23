@@ -170,6 +170,52 @@ describe("serveProjectFile", () => {
     // Root-relative and public/ fallbacks miss too.
     expect(await serveProjectFile(`/${PROJECT}/nope.html`, PROJECT)).toBeNull();
   });
+
+  describe("asset mounts", () => {
+    // OUTSIDE sits next to the project, not under it — exactly the case mounts exist for.
+    const mounts = [{ dir: OUTSIDE, urlPrefix: "/content/docs" }];
+
+    test("serves a mounted file living outside the project root", async () => {
+      const res = await serveProjectFile("/content/docs/secret.txt", PROJECT, mounts);
+      expect(res).not.toBeNull();
+      expect(await res!.text()).toBe("top-secret");
+    });
+
+    test("serves a mounted file whose name has a space (the caller decodes once)", async () => {
+      writeFileSync(join(OUTSIDE, "my shot.png"), "png-bytes");
+      const res = await serveProjectFile("/content/docs/my shot.png", PROJECT, mounts);
+      expect(res).not.toBeNull();
+      expect(await res!.text()).toBe("png-bytes");
+    });
+
+    test("the most specific mount wins when prefixes nest", async () => {
+      mkdirSync(join(OUTSIDE, "images"), { recursive: true });
+      writeFileSync(join(OUTSIDE, "images", "hero.png"), "nested-mount");
+      const nested = [
+        { dir: OUTSIDE, urlPrefix: "/content" },
+        { dir: join(OUTSIDE, "images"), urlPrefix: "/content/docs" },
+      ];
+
+      const res = await serveProjectFile("/content/docs/hero.png", PROJECT, nested);
+
+      expect(await res!.text()).toBe("nested-mount");
+    });
+
+    test("refuses to serve outside the mount directory", async () => {
+      expect(
+        await serveProjectFile("/content/docs/../project/index.html", PROJECT, mounts),
+      ).toBeNull();
+    });
+
+    test("falls through when the URL matches no mount", async () => {
+      expect(await serveProjectFile("/content/other/secret.txt", PROJECT, mounts)).toBeNull();
+      expect(await serveProjectFile("/content/docs/gone.txt", PROJECT, mounts)).toBeNull();
+    });
+
+    test("without mounts the same URL is not served", async () => {
+      expect(await serveProjectFile("/content/docs/secret.txt", PROJECT)).toBeNull();
+    });
+  });
 });
 
 // ─── URL decode hardening ───────────────────────────────────────────────────

@@ -9,7 +9,7 @@ code:
 
 State is where you declare everything the open page or component knows: the values it holds, the values it derives, the data it fetches, and the functions it can run. Open it by clicking **State** (the brackets icon) in the activity bar.
 
-![Jx Studio State panel listing a component's state and functions](/screenshots/state-panel.png)
+![Jx Studio State panel listing a component's state and functions](../../images/state-panel.png)
 
 Every entry belongs to the open file — each page or component carries its own state, saved inside its own JSON file.
 

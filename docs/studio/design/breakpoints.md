@@ -11,7 +11,7 @@ code:
 
 A breakpoint is a named screen-size condition — Tablet, Desktop — at which your design is allowed to change. In Design mode every breakpoint gets its own live canvas panel, labeled with its name and width, all showing the same page at once. The responsive rules evaluate for real in each panel, so you never wonder what the phone view looks like — it's right there next to the desktop one.
 
-![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](/screenshots/mode-design.png)
+![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](../../images/mode-design.png)
 
 ## The active breakpoint
 

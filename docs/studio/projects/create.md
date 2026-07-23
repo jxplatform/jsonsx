@@ -12,7 +12,7 @@ code:
 
 The New Project modal is a two-step wizard: first you choose what to start from, then you fill in the project's details and an optional design quickstart. Open it from the [Welcome screen](/docs/studio/interface/welcome-screen) with **New Project…**, or from the dropdown beside **Open Project** in the toolbar.
 
-![The New Project dialog with the template gallery, name, directory, production URL, and deployment adapter fields](/screenshots/new-project-modal.png)
+![The New Project dialog with the template gallery, name, directory, production URL, and deployment adapter fields](../../images/new-project-modal.png)
 
 ## Step 1: choose a source
 

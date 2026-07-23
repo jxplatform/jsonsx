@@ -12,7 +12,7 @@ code:
 
 Content types are your site's CMS schema. Each one describes a collection — blog posts, team members, projects — by naming the folder its entries live in, the file format they use, and the fields every entry carries. Once a type exists, creating an on-model entry is one click. Open the builder from the **Settings** gear at the bottom of the activity bar, then _Settings > Content Types_: your types are listed on the left, and selecting one opens its editor on the right.
 
-![The Content Types section with a type selected and its field schema open in the builder](/screenshots/content-type-builder.png)
+![The Content Types section with a type selected and its field schema open in the builder](../../images/content-type-builder.png)
 
 ## Create a content type
 
