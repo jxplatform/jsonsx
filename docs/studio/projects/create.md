@@ -54,6 +54,8 @@ Below the parameters sits a creation-time subset of the design settings. Every f
 
 Click **Create Project** (or **Create & Start Agent** on the Agent tab). Studio writes the project folder and opens it. **Back** returns to the source step without losing what you've typed.
 
+If the **Project Name** is missing, the error appears directly under that field. If creation itself fails, the message appears just above the footer buttons, so it stays visible however far the form is scrolled.
+
 :::doc-note
 Studio creates the folder you named, with `pages/`, `components/`, and a `project.json` carrying your name, URL, adapter, and design choices. The full folder anatomy is documented in [Site architecture](/docs/framework/site).
 :::

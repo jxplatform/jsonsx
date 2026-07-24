@@ -50,6 +50,15 @@ function errorText(): string | null {
   return document.querySelector("#layer-modal .new-project-error")?.textContent?.trim() ?? null;
 }
 
+/** The inline validation message slotted into the Project Name textfield. */
+function nameError(): string | null {
+  return (
+    document
+      .querySelector('#layer-modal sp-textfield sp-help-text[slot="negative-help-text"]')
+      ?.textContent?.trim() ?? null
+  );
+}
+
 function switchTab(value: string) {
   const tabs: any = document.querySelector("#layer-modal sp-tabs");
   tabs.selected = value;
@@ -284,6 +293,16 @@ describe("openNewProjectModal — Starter Site tab", () => {
     expect(opts.design).toBeUndefined();
   });
 
+  test("openNewProjectModal({ tab: 'starter' }) opens directly on the Starter Site tab", async () => {
+    installMockPlatform({ listStarters: (async () => sampleStarters) as never });
+    void openNewProjectModal({ tab: "starter" });
+    await flush();
+    expect(document.querySelector("#layer-modal sp-tabs")?.getAttribute("selected")).toBe(
+      "starter",
+    );
+    expect(templateCards()[0]?.textContent).toContain("Bistro & Café");
+  });
+
   test("a failing listStarters leaves the modal usable", async () => {
     installMockPlatform({
       listStarters: (async () => {
@@ -299,14 +318,30 @@ describe("openNewProjectModal — Starter Site tab", () => {
 });
 
 describe("openNewProjectModal — submit", () => {
-  test("rejects an empty project name with an inline error", () => {
+  test("rejects an empty project name with an inline error at the field", async () => {
     const { state } = installMockPlatform();
     void openNewProjectModal();
     goNext();
     clickCreate();
-    expect(errorText()).toBe("Project name is required");
+    // The message renders inside the name field, not in the global strip.
+    expect(nameError()).toBe("Project name is required");
+    expect(field(0).hasAttribute("invalid")).toBe(true);
+    expect(errorText()).toBeNull();
     expect(modal()).toBeTruthy();
     expect(state.calls.filter((c) => c[0] === "createProject")).toHaveLength(0);
+    // The scroll-to-top + focus helper runs without throwing.
+    await flush();
+  });
+
+  test("typing into the name field clears the inline error", () => {
+    installMockPlatform();
+    void openNewProjectModal();
+    goNext();
+    clickCreate();
+    expect(nameError()).toBe("Project name is required");
+    typeInto(field(0), "My Site");
+    expect(nameError()).toBeNull();
+    expect(field(0).hasAttribute("invalid")).toBe(false);
   });
 
   test("creates the project, shows progress, and resolves with the result", async () => {
@@ -390,6 +425,10 @@ describe("openNewProjectModal — submit", () => {
 
     expect(modal()).toBeTruthy();
     expect(errorText()).toContain("disk full");
+    // The backend error lives OUTSIDE the scroll body so it is visible at any scroll position.
+    expect(document.querySelector("#layer-modal .new-project-modal-body .new-project-error")) //
+      .toBeNull();
+    expect(document.querySelector("#layer-modal .new-project-error--global")).toBeTruthy();
     // Button returns to its idle state for a retry
     expect(footerButtons()[1].hasAttribute("disabled")).toBe(false);
     expect(footerButtons()[1].textContent).toContain("Create Project");

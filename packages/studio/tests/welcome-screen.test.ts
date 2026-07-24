@@ -54,19 +54,25 @@ describe("renderWelcome — start actions", () => {
     expect(host.querySelector(".welcome-subtitle")?.textContent).toBe("Visual component builder");
 
     const btns = actions(host);
-    expect(btns).toHaveLength(2);
+    expect(btns).toHaveLength(3);
     expect(btns[0]!.textContent).toContain("New Project...");
-    expect(btns[1]!.textContent).toContain("Open Project...");
+    expect(btns[1]!.textContent).toContain("Start from an Example...");
+    expect(btns[2]!.textContent).toContain("Open Project...");
     // Mock platform has no gitClone, so the clone action is hidden
     expect(host.textContent).not.toContain("Clone Git Repository");
   });
 
-  test("New Project and Open Project buttons invoke the ctx callbacks", () => {
+  test("New Project, Example, and Open Project buttons invoke the ctx callbacks", () => {
     const ctx = makeCtx();
     const host = renderScreen(ctx);
-    const [newBtn, openBtn] = actions(host);
+    const [newBtn, exampleBtn, openBtn] = actions(host);
     pointer(newBtn!, "click");
     expect(ctx.openNewProject).toHaveBeenCalledTimes(1);
+    expect(ctx.openNewProject).toHaveBeenLastCalledWith();
+    // The example action opens the same modal preselected to the Starter Site tab.
+    pointer(exampleBtn!, "click");
+    expect(ctx.openNewProject).toHaveBeenCalledTimes(2);
+    expect(ctx.openNewProject).toHaveBeenLastCalledWith({ tab: "starter" });
     pointer(openBtn!, "click");
     expect(ctx.openProject).toHaveBeenCalledTimes(1);
     expect(ctx.cloneRepository).not.toHaveBeenCalled();
@@ -80,9 +86,9 @@ describe("renderWelcome — start actions", () => {
     const ctx = makeCtx();
     const host = renderScreen(ctx);
     const btns = actions(host);
-    expect(btns).toHaveLength(3);
-    expect(btns[2]!.textContent).toContain("Add Existing Repository...");
-    pointer(btns[2]!, "click");
+    expect(btns).toHaveLength(4);
+    expect(btns[3]!.textContent).toContain("Add Existing Repository...");
+    pointer(btns[3]!, "click");
     expect(ctx.addExistingRepo).toHaveBeenCalledTimes(1);
   });
 
@@ -93,9 +99,9 @@ describe("renderWelcome — start actions", () => {
     const ctx = makeCtx();
     const host = renderScreen(ctx);
     const btns = actions(host);
-    expect(btns).toHaveLength(3);
-    expect(btns[2]!.textContent).toContain("Clone Git Repository...");
-    pointer(btns[2]!, "click");
+    expect(btns).toHaveLength(4);
+    expect(btns[3]!.textContent).toContain("Clone Git Repository...");
+    pointer(btns[3]!, "click");
     expect(ctx.cloneRepository).toHaveBeenCalledTimes(1);
   });
 });

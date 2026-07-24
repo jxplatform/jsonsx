@@ -23,6 +23,10 @@ When Jx Studio starts with no project open, the canvas area shows the welcome sc
 
 The full walkthrough is in **[Create a project](/docs/studio/projects/create)**.
 
+## Start from an example
+
+**Start from an Example…** opens the same New Project dialog directly on the **Starter Site** tab — a gallery of complete, themed sites (restaurant, shop, portfolio, blog, and more) that Studio copies in as plain files you own. It's the quickest way to a working site on a first run. Browse the gallery in **[Starter templates](/docs/studio/projects/starters)**.
+
 ## Open an existing project
 
 1. Click **Open Project…**.

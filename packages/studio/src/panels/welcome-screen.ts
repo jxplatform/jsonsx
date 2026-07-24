@@ -15,7 +15,7 @@ import { platformSupportsClone } from "./git-panel";
 interface WelcomeCtx {
   openProject: () => void;
   openRecentProject: (root: string) => void;
-  openNewProject: () => void;
+  openNewProject: (options?: { tab?: "starter" }) => void;
   cloneRepository: () => void;
   addExistingRepo: () => void;
 }
@@ -58,6 +58,20 @@ export function renderWelcome(host: HTMLElement) {
                 />
               </svg>
               New Project...
+            </button>
+            <button class="welcome-action" @click=${() => ctx.openNewProject({ tab: "starter" })}>
+              <svg
+                class="welcome-action-icon"
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+              >
+                <path
+                  d="M1 1h6v6H1V1zm1 1v4h4V2H2zm7-1h6v6H9V1zm1 1v4h4V2h-4zM1 9h6v6H1V9zm1 1v4h4v-4H2zm7-1h6v6H9V9zm1 1v4h4v-4h-4z"
+                />
+              </svg>
+              Start from an Example...
             </button>
             <button class="welcome-action" @click=${() => ctx.openProject()}>
               <svg

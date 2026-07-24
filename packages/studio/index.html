@@ -3026,6 +3026,13 @@
         color: var(--danger);
         padding: 4px 0;
       }
+      /* Backend/global creation errors sit between the scroll body and the footer so they are
+         visible regardless of scroll position. */
+      .new-project-error--global {
+        flex: none;
+        padding: 8px 16px;
+        border-top: 1px solid var(--border);
+      }
       .add-repo-modal .new-project-modal-body {
         display: flex;
         flex-direction: column;

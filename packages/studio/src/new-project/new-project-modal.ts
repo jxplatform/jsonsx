@@ -58,12 +58,27 @@ let _paramsSeededFor = "";
 
 let _error = "";
 
+/**
+ * Inline validation error shown at the Project Name field (the global strip is for backend
+ * failures).
+ */
+let _nameError = "";
+
 /** GitHub-App install link carried by a structured needs_installation_access failure. */
 let _errorInstallUrl = "";
 
 function captureError(error: unknown) {
   _error = errorMessage(error);
   _errorInstallUrl = installUrlOf(error) ?? "";
+}
+
+/** After a failed submit, bring the params step back to the top and focus the name field. */
+function focusNameField() {
+  requestAnimationFrame(() => {
+    const body = document.querySelector(".new-project-modal-body");
+    body?.scrollTo?.(0, 0);
+    body?.querySelector<HTMLElement>("sp-textfield")?.focus?.();
+  });
 }
 
 let _creating = false;
@@ -99,7 +114,7 @@ function credsForm() {
  *
  * @returns {Promise<{ root: string; config: object } | null>}
  */
-export function openNewProjectModal(): Promise<{
+export function openNewProjectModal(options?: { tab?: "template" | "starter" }): Promise<{
   root: string;
   config: ProjectConfig;
 } | null> {
@@ -113,13 +128,14 @@ export function openNewProjectModal(): Promise<{
     name: "",
     url: "",
   };
-  _tab = "template";
+  _tab = options?.tab ?? "template";
   _step = "source";
   _template = "blank";
   _starter = "";
   _agentPrompt = "";
   _paramsSeededFor = "";
   _error = "";
+  _nameError = "";
   _errorInstallUrl = "";
   _creating = false;
   _starters = [];
@@ -215,6 +231,9 @@ function renderModal() {
   const onInput =
     (field: "name" | "description" | "url" | "adapter" | "directory") => (e: Event) => {
       _form[field] = (e.target as HTMLInputElement).value;
+      if (field === "name") {
+        _nameError = "";
+      }
       if (field === "name" && !_form.directory) {
         // Auto-derive directory slug from name while user hasn't manually typed one
         _dirDerived = true;
@@ -301,6 +320,7 @@ function renderModal() {
     }
     _step = "source";
     _error = "";
+    _nameError = "";
     renderModal();
   };
 
@@ -308,8 +328,9 @@ function renderModal() {
 
   const onSubmit = async () => {
     if (!_form.name.trim()) {
-      _error = "Project name is required";
+      _nameError = "Project name is required";
       renderModal();
+      focusNameField();
       return;
     }
     if (!_form.directory.trim()) {
@@ -318,6 +339,7 @@ function renderModal() {
 
     _creating = true;
     _error = "";
+    _nameError = "";
     renderModal();
 
     try {
@@ -337,8 +359,9 @@ function renderModal() {
 
   const onAgentSubmit = async () => {
     if (!_form.name.trim()) {
-      _error = "Project name is required";
+      _nameError = "Project name is required";
       renderModal();
+      focusNameField();
       return;
     }
     if (!_form.directory.trim()) {
@@ -347,6 +370,7 @@ function renderModal() {
 
     _creating = true;
     _error = "";
+    _nameError = "";
     renderModal();
 
     try {
@@ -468,9 +492,14 @@ function renderModal() {
       <sp-textfield
         placeholder="My Site"
         .value=${_form.name}
+        ?invalid=${Boolean(_nameError)}
         @input=${onInput("name")}
         style="width: 100%"
-      ></sp-textfield>
+      >
+        ${_nameError
+          ? html`<sp-help-text slot="negative-help-text">${_nameError}</sp-help-text>`
+          : ""}
+      </sp-textfield>
     </label>
 
     <label class="new-project-field">
@@ -601,19 +630,17 @@ function renderModal() {
             </div>
           `
         : ""}
-      <div class="new-project-modal-body">
-        ${bodyTpl()}
-        ${_tab !== "import" && _error
-          ? html`<div class="new-project-error">
-              ${_error}
-              ${_errorInstallUrl
-                ? html`<a href=${_errorInstallUrl} target="_blank" rel="noreferrer">
-                    Install the Jx Suite GitHub App →
-                  </a>`
-                : ""}
-            </div>`
-          : ""}
-      </div>
+      <div class="new-project-modal-body">${bodyTpl()}</div>
+      ${_tab !== "import" && _error
+        ? html`<div class="new-project-error new-project-error--global">
+            ${_error}
+            ${_errorInstallUrl
+              ? html`<a href=${_errorInstallUrl} target="_blank" rel="noreferrer">
+                  Install the Jx Suite GitHub App →
+                </a>`
+              : ""}
+          </div>`
+        : ""}
       <div class="new-project-modal-footer">${footerTpl()}</div>
     </div>
   `;

@@ -550,8 +550,8 @@ initWelcome({
     }
   },
   cloneRepository: () => cloneRepository({ openRecentProject }),
-  openNewProject: async () => {
-    const result = await openNewProjectModal();
+  openNewProject: async (options) => {
+    const result = await openNewProjectModal(options);
     if (result) {
       void openRecentProject(result.root);
     }

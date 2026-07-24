@@ -84,9 +84,12 @@ describe("Agent flow", () => {
     clickFooter("Next");
     clickFooter("Create & Start Agent");
     await flush();
-    expect(document.querySelector("#layer-modal .new-project-error")?.textContent).toContain(
-      "name is required",
-    );
+    // The message renders inline at the name field, not in the global strip.
+    expect(
+      document
+        .querySelector('#layer-modal sp-textfield sp-help-text[slot="negative-help-text"]')
+        ?.textContent?.trim(),
+    ).toBe("Project name is required");
     expect(state.calls.filter((c) => c[0] === "createProject")).toHaveLength(0);
   });
 
