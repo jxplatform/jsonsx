@@ -1,6 +1,11 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["packages/schema/*.json", "**/_fixtures/*", "**/_studio_fixtures/*"],
+  "ignorePatterns": [
+    "**/_fixtures/*",
+    "**/_studio_fixtures/*",
+    "CHANGELOG.md",
+    "packages/schema/*.json"
+  ],
   "indentStyle": "tab",
   "jsdoc": true
 }
