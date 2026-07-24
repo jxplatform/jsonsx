@@ -80,6 +80,13 @@ export default {
     // Loopback server reads them off disk and serves them over http (they are never fetched via the
     // Views:// scheme). Without these two entries the packaged canvas iframe 404s at boot.
     copy: {
+      // Static data for @jxsuite/create and @jxsuite/starters. Their JS is inlined into
+      // App/bun/index.js, where import.meta.dirname resolves to app/bun/ at runtime — so the data
+      // Dirs they read relative to it must be staged to exactly these paths.
+      "../create/template": "bun/template",
+      "../create/templates": "bun/templates",
+      "../starters/registry.json": "bun/registry.json",
+      "../starters/sites": "bun/sites",
       "assets/studio/canvas.html": "views/studio/canvas.html",
       "assets/studio/dist/iframe-entry.js": "views/studio/dist/iframe-entry.js",
       "assets/studio/dist/iframe-entry.js.map": "views/studio/dist/iframe-entry.js.map",
@@ -100,7 +107,8 @@ export default {
 
   scripts: {
     preBuild: "./scripts/pre-build.ts",
-    // Workaround for electrobun's broken Windows icon embedding; see the script header.
-    postBuild: "./scripts/embed-windows-icon.ts",
+    // Verifies the staged bundle contents (fails the build on omissions), then chains the
+    // Windows-icon workaround; see the script headers.
+    postBuild: "./scripts/post-build.ts",
   },
 } satisfies ElectrobunConfig;

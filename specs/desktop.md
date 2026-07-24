@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.2.5-draft
+**Version:** 0.2.6-draft
 **Status:** Pending
-**Updated:** 2026-07-22
+**Updated:** 2026-07-24
 **License:** MIT
 
 ---
@@ -476,6 +476,8 @@ jx-studio-app/
     └── electrobun/               # Framework
 ```
 
+**Packaged static data.** In a packaged build, ElectroBun inlines the whole bun-side JS graph into `app/bun/index.js`, so `import.meta.dirname` in every inlined module resolves to `app/bun/` at runtime. Static data directories read relative to it — `@jxsuite/create`'s `template/` and `templates/`, and `@jxsuite/starters`' `registry.json` and `sites/` — must therefore be staged to those exact paths by `build.copy` in `electrobun.config.ts`. The `postBuild` hook verifies the staged bundle (including the studio view assets) and fails the build on any omission.
+
 ---
 
 ## 8. Chrome Development Mode
@@ -715,6 +717,7 @@ Ensure desktop app matches dev-mode capabilities:
 
 ## Changelog
 
+- **0.2.6-draft** (2026-07-24) — Document packaged static-data staging into app/bun (create templates, starters) and postBuild bundle verification.
 - **0.2.5-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.4-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.2.3-draft** (2026-07-17) — Align spec.md, site-architecture, desktop, server, extensions with reality (`c61ba567`).
@@ -731,4 +734,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.2.5-draft_
+_Jx Studio Desktop Architecture Specification v0.2.6-draft_
