@@ -228,11 +228,10 @@
             "margin": "0",
             "padding": "4.5rem 0 2rem",
             "boxShadow": "-8px 0 24px var(--color-shadow)",
-            "display": "flex",
             "flexDirection": "column",
             "transform": "translateX(100%)",
             "transition": "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), display 0.3s allow-discrete, overlay 0.3s allow-discrete",
-            ":popover-open": { "transform": "translateX(0)" },
+            ":popover-open": { "display": "flex", "transform": "translateX(0)" },
             "::backdrop": {
               "backgroundColor": "rgba(0, 0, 0, 0.5)",
               "opacity": "0",
