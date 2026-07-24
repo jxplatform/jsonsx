@@ -204,7 +204,7 @@ function promptComponentName(defaultName: string) {
           <sp-textfield
             placeholder="my-component"
             value=${value}
-            ?negative=${Boolean(error)}
+            ?invalid=${Boolean(error)}
             @input=${onInput}
             @keydown=${onKeydown}
             ${ref((el) => {

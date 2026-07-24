@@ -228,6 +228,10 @@ describe("create new definition", () => {
     confirmDialog();
     await flush();
     expect(helpText()).toContain("Invalid identifier");
+    // The `invalid` property is what makes Spectrum project the negative-help-text slot.
+    expect(document.querySelector("#layer-dialog sp-textfield")?.hasAttribute("invalid")).toBe(
+      true,
+    );
     dialog()!.dispatchEvent(new Event("cancel"));
     await done;
   });

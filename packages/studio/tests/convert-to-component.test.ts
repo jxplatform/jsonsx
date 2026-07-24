@@ -229,6 +229,8 @@ describe("name validation", () => {
     await flush();
     expect(dialog()).not.toBeNull();
     expect(helpText()).toContain("Lowercase");
+    // The `invalid` property is what makes Spectrum project the negative-help-text slot.
+    expect(textfield()!.hasAttribute("invalid")).toBe(true);
     dialog()!.dispatchEvent(new Event("cancel"));
     await done;
   });

@@ -200,7 +200,7 @@ async function promptRepeaterConfig(defs: Record<string, unknown>) {
                       size="s"
                       placeholder="myItems"
                       .value=${newDefName}
-                      ?negative=${Boolean(error)}
+                      ?invalid=${Boolean(error)}
                       @input=${(e: Event) => {
                         newDefName = (e.target as HTMLInputElement).value || "";
                         error = "";
