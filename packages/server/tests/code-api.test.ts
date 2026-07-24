@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { handleCodeApi } from "../src/code-api";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { handleCodeApi, resolveOxlintBin } from "../src/code-api";
 
 /**
  * @param {string} action
@@ -128,8 +130,10 @@ describe("code-api", () => {
       const { req, url } = codeRequest("lint", { code: "debugger;" });
       const res = await handleCodeApi(req, url);
       const data = await (res as Response).json();
-      // Oxlint should flag `debugger` statement
-      expect(Array.isArray(data.diagnostics)).toBe(true);
+      // Oxlint must actually flag the `debugger` statement — an empty array here means the
+      // Binary was not found and the endpoint failed silently (the original regression).
+      expect(data.error).toBeUndefined();
+      expect(data.diagnostics.length).toBeGreaterThan(0);
     });
 
     test("returns empty diagnostics for clean code", async () => {
@@ -149,6 +153,34 @@ describe("code-api", () => {
       const res = await handleCodeApi(req, url);
       const data = await (res as Response).json();
       expect(Array.isArray(data.diagnostics)).toBe(true);
+    });
+  });
+
+  describe("resolveOxlintBin", () => {
+    test("an explicit JX_OXLINT_BIN override wins", () => {
+      process.env.JX_OXLINT_BIN = "/custom/bin/oxlint";
+      try {
+        expect(resolveOxlintBin()).toBe("/custom/bin/oxlint");
+      } finally {
+        delete process.env.JX_OXLINT_BIN;
+      }
+    });
+
+    test("walks up to the workspace-root node_modules/.bin", () => {
+      const bin = resolveOxlintBin();
+      expect(bin).toEndWith(join("node_modules", ".bin", "oxlint"));
+      expect(existsSync(bin!)).toBe(true);
+    });
+
+    test("returns null when no bin dir and no PATH candidate exist", () => {
+      const path = process.env.PATH;
+      process.env.PATH = "";
+      try {
+        // Starting at the filesystem root skips every node_modules probe.
+        expect(resolveOxlintBin("/")).toBeNull();
+      } finally {
+        process.env.PATH = path;
+      }
     });
   });
 });

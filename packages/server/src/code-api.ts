@@ -7,7 +7,8 @@
 
 import { tmpdir } from "node:os";
 import { errorMessage } from "@jxsuite/schema/parse";
-import { join, resolve } from "node:path";
+import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import { format } from "oxfmt";
 
@@ -26,11 +27,32 @@ interface CodeApiBody {
   args?: string[];
 }
 
-const OXLINT_BIN = resolve(
-  import.meta.dir,
-  "../../node_modules/.bin",
-  process.platform === "win32" ? "oxlint.exe" : "oxlint",
-);
+const OXLINT_NAME = process.platform === "win32" ? "oxlint.exe" : "oxlint";
+
+/**
+ * Locate the oxlint CLI: explicit JX_OXLINT_BIN override (empty value = disable lint outright),
+ * then a walk up from this module probing node_modules/.bin (finds the workspace root in the
+ * monorepo and the hoisted bin for npm consumers), then PATH. Null when oxlint is unavailable —
+ * e.g. the packaged desktop app, where the lint endpoint quietly returns no diagnostics.
+ */
+export function resolveOxlintBin(startDir: string = import.meta.dir): string | null {
+  const override = process.env.JX_OXLINT_BIN;
+  if (override !== undefined) {
+    return override || null;
+  }
+  let dir = startDir;
+  for (;;) {
+    const candidate = join(dir, "node_modules", ".bin", OXLINT_NAME);
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) {
+      return Bun.which("oxlint", { PATH: process.env.PATH ?? "" });
+    }
+    dir = parent;
+  }
+}
 
 // ─── Wrapper utilities ───────────────────────────────────────────────────────
 
@@ -151,6 +173,12 @@ export async function handleCodeApi(req: Request, url: URL) {
       return Response.json({ diagnostics: [] });
     }
 
+    const oxlintBin = resolveOxlintBin();
+    if (!oxlintBin) {
+      // No oxlint anywhere (packaged desktop app) — lint quietly disables.
+      return Response.json({ diagnostics: [] });
+    }
+
     const wrapped = wrapBody(code, args);
     const headerLen = wrapped.indexOf("\n") + 1;
     const tmpFile = join(
@@ -160,7 +188,7 @@ export async function handleCodeApi(req: Request, url: URL) {
 
     try {
       await Bun.write(tmpFile, wrapped);
-      const proc = Bun.spawn([OXLINT_BIN, "--format=json", "-A", "no-unused-vars", tmpFile], {
+      const proc = Bun.spawn([oxlintBin, "--format=json", "-A", "no-unused-vars", tmpFile], {
         stderr: "pipe",
         stdout: "pipe",
       });

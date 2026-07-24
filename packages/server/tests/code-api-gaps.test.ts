@@ -1,34 +1,9 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { handleCodeApi } from "../src/code-api";
-import { resolve } from "node:path";
-import { existsSync, rmSync, symlinkSync } from "node:fs";
 
-// Code-api resolves the oxlint binary relative to its own source directory:
-// Packages/server/src/../../node_modules/.bin/oxlint → packages/node_modules/.bin. That directory
-// Does not exist in a workspace layout (oxlint is hoisted to the repo-root node_modules), so mirror
-// The repo-root node_modules there for the duration of this file. A directory junction (vs a file
-// Symlink) needs no elevated privileges on Windows and keeps the real oxlint shim resolving its own
-// Package from the junctioned tree; on POSIX the type arg is ignored and it is a normal symlink.
-const EXPECTED_MODULES = resolve(import.meta.dir, "../../node_modules");
-const REAL_MODULES = resolve(import.meta.dir, "../../../node_modules");
-
-let createdLink = false;
-
-beforeAll(() => {
-  if (!existsSync(EXPECTED_MODULES) && existsSync(REAL_MODULES)) {
-    symlinkSync(REAL_MODULES, EXPECTED_MODULES, "junction");
-    createdLink = true;
-  }
-});
-
-afterAll(() => {
-  try {
-    if (createdLink) {
-      // Removing the path unlinks the junction/symlink itself; the real node_modules tree survives.
-      rmSync(EXPECTED_MODULES, { force: true, recursive: true });
-    }
-  } catch {}
-});
+// Code-api locates the oxlint binary by walking up from its own directory probing
+// Node_modules/.bin, so in the workspace layout it finds the repo-root hoisted bin directly —
+// No staging or symlinking is needed for these tests to exercise the real linter.
 
 function codeRequest(action: string, body: unknown) {
   const url = new URL(`http://localhost/__studio/code/${action}`);
