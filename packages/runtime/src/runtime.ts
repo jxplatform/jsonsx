@@ -773,6 +773,17 @@ export function renderNode(
   }
 
   if (def.$props) {
+    // A hyphenated tag carrying $props is a component instance whose definition has not finished
+    // Registering yet (async defineElement — e.g. the Studio desktop canvas, where the component
+    // Fetch can land after this node renders). Render via the property-first path anyway: it sets
+    // The instance props as JS properties on the bare element, which the eventual upgrade's
+    // ConnectedCallback reads back off `this` (see the def.state merge below), so the instance's
+    // Props win. The old branch stripped the props here, so a late upgrade painted the component's
+    // State DEFAULTS instead ("0"/"DESCRIPTION" for every instance). A non-custom tag can never
+    // Upgrade, so it keeps the historical mergeProps-into-scope behavior.
+    if (tagName.includes("-")) {
+      return renderCustomElementWithProps(def, localState, options, path);
+    }
     const { $props: _$props, ...rest } = def;
     return renderNode(rest, mergeProps(def, localState), options);
   }

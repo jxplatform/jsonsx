@@ -71,6 +71,28 @@ describe("Custom Elements", () => {
     el.remove();
   });
 
+  test("instance $props are carried onto a not-yet-registered custom element", () => {
+    // Regression for the Studio desktop-canvas bug: a component instance can render BEFORE its async
+    // DefineElement finishes. renderNode must carry the instance's $props onto the bare tag as JS
+    // Properties so the eventual upgrade's connectedCallback consumes them (the def.state merge in
+    // ConnectedCallback reads instance props off `this`). The old code stripped $props here, so a
+    // Late upgrade painted the component's state DEFAULTS instead — every instance showed the same
+    // "0"/"DESCRIPTION". Asserting the JS property is browser-agnostic; the upgrade half (a JS
+    // Property winning over a state default) is covered by "$props override state defaults" above.
+    // (happy-dom does not upgrade an already-created element on a later define, so the full late
+    // Upgrade cannot be exercised here — but a real Chromium browser does.)
+    const tag = uniqueTag();
+    const el = renderNode(
+      { $props: { label: "instance-value", value: 42 }, tagName: tag },
+      reactive({}),
+    );
+    // Still unregistered — yet the fix has already set the instance props as JS properties, ready
+    // For whenever the upgrade lands, instead of discarding them.
+    expect(customElements.get(tag)).toBeUndefined();
+    expect((el as unknown as { label: string }).label).toBe("instance-value");
+    expect((el as unknown as { value: number }).value).toBe(42);
+  });
+
   test("props.* attributes override state defaults and are stripped", async () => {
     const tag = uniqueTag();
     await defineElement({
