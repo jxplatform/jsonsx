@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.2.6-draft
+**Version:** 0.2.7-draft
 **Status:** Pending
 **Updated:** 2026-07-24
 **License:** MIT
@@ -120,16 +120,19 @@ export function hasPlatform() {
 }
 ```
 
-Each deployment target calls `registerPlatform()` before Studio initializes. The desktop init bundle registers the RPC-backed adapter; the studio entry itself registers the dev-server adapter only when nothing else has:
+Each deployment target either pre-registers its adapter before Studio initializes, or hands Studio a signal to build one itself. The desktop init bundle pre-registers the RPC-backed adapter on `__jxPlatform`. The cloud shell (the platform repo's `edit-init`) instead publishes a `window.__jxCloud` signal — the bound project, or `null` for the project-less hub — and lets the studio entry construct the adapter, so the cloud adapter (and the collab WebSocket client's `yjs` instance) lives **inside** the studio bundle rather than the shell; a second bundled `yjs` in the shell would break collab's cross-module `instanceof` checks. When nothing pre-registered, the studio entry resolves the default adapter — cloud when `__jxCloud` was signalled, else the dev server:
 
 ```javascript
-// Desktop (init bundle, loaded before studio.js)
+// Desktop (init bundle, loaded before studio.js) — pre-registers its adapter
 import { registerPlatform } from "@jxsuite/studio/platform";
 registerPlatform(createDesktopPlatform());
 
-// Studio entry (studio.ts) — dev-server fallback
+// Cloud shell (edit-init, loaded before studio.js) — publishes a signal, not an adapter
+globalThis.__jxCloud = { project }; // project: CloudProject | null
+
+// Studio entry (studio.ts) — build the default adapter when none was pre-registered
 if (!hasPlatform()) {
-  registerPlatform(createDevServerPlatform());
+  registerPlatform(resolveDefaultPlatform()); // cloud when __jxCloud is set, else dev server
 }
 ```
 
@@ -717,6 +720,7 @@ Ensure desktop app matches dev-mode capabilities:
 
 ## Changelog
 
+- **0.2.7-draft** (2026-07-24) — Cloud platform registers inside studio.js via a window.__jxCloud signal (single yjs for collab).
 - **0.2.6-draft** (2026-07-24) — Document packaged static-data staging into app/bun (create templates, starters) and postBuild bundle verification.
 - **0.2.5-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.4-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -734,4 +738,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.2.6-draft_
+_Jx Studio Desktop Architecture Specification v0.2.7-draft_
