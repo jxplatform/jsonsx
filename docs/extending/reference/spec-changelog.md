@@ -50,6 +50,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.2.7-draft** (2026-07-24) — Cloud platform registers inside studio.js via a window.__jxCloud signal (single yjs for collab).
 - **0.2.6-draft** (2026-07-24) — Document packaged static-data staging into app/bun (create templates, starters) and postBuild bundle verification.
 - **0.2.5-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.4-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).

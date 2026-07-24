@@ -68,7 +68,6 @@ import {
 } from "./panels/statusbar";
 import { exportFile, parseSourceForPath, saveFile, serializeDocument } from "./files/file-ops";
 import {
-  documentExtensions,
   formatForPath,
   loadFormats,
   refreshExtensionUi,
@@ -78,6 +77,7 @@ import {
   loadProject as _loadProject,
   openProject as _openProject,
   renderFilesTemplate as _renderFilesTemplate,
+  findHomePage,
   loadDirectory,
   openFileInTab,
   openHomePage,
@@ -102,7 +102,7 @@ import { openConnectorGrid } from "./grid/grid-open";
 
 import { getPlatform, hasPlatform, registerPlatform } from "./platform";
 import { parseMediaEntries } from "./utils/canvas-media";
-import { createDevServerPlatform } from "./platforms/devserver";
+import { resolveDefaultPlatform } from "./platforms/default-platform";
 import { mountResizeEdges } from "./resize-edges";
 import { codeService } from "./services/code-services";
 import { defBadgeLabel, defCategory, renderSignalsTemplate } from "./panels/signals-panel";
@@ -389,9 +389,11 @@ initCssData(webdata);
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 
-// Register the dev server platform adapter (PAL) as default if none pre-registered
+// Register the default platform adapter (PAL) if none was pre-registered (desktop registers its own
+// On window.__jxPlatform). resolveDefaultPlatform picks cloud when the shell signalled it, creating
+// The cloud adapter inside THIS bundle so collab shares studio's single yjs, else the dev server.
 if (!hasPlatform()) {
-  registerPlatform(createDevServerPlatform());
+  registerPlatform(resolveDefaultPlatform());
 }
 
 // Screenshot/automation runners (scripts/screenshots/) await window.__jxAutomation right after
@@ -785,25 +787,9 @@ if (_projectParam) {
         const _fileParam = _urlParams.get("file");
         let fileRelPath = _fileParam || siteCtx.fileRelPath || _projectParam;
 
-        // When opening project.json, default to home page instead
+        // When opening project.json, default to home page instead (listing-based, no 404 probes).
         if (fileRelPath === "project.json" || fileRelPath.endsWith("/project.json")) {
-          let opened = false;
-          await loadFormats();
-          const homeCandidates = [
-            ...documentExtensions("page").map((ext) => `pages/index${ext}`),
-            "pages/index.json",
-          ];
-          for (const candidate of homeCandidates) {
-            try {
-              await platform.readFile(candidate);
-              fileRelPath = candidate;
-              opened = true;
-              break;
-            } catch {}
-          }
-          if (!opened) {
-            fileRelPath = "project.json";
-          }
+          fileRelPath = (await findHomePage()) ?? "project.json";
         }
 
         const content = await platform.readFile(fileRelPath);

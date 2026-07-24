@@ -52,7 +52,7 @@ import type { TemplateResult } from "lit-html";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { StudioState } from "../state.js";
 import type { Tab } from "../tabs/tab.js";
-import type { RenameResult } from "../types";
+import type { DirEntry, RenameResult } from "../types";
 import { rectOf } from "../utils/geometry";
 
 // ─── File icon map ────────────────────────────────────────────────────────────
@@ -215,19 +215,33 @@ export async function openProject({
   }
 }
 
-export async function openHomePage() {
-  const platform = getPlatform();
+/**
+ * The project's home page path (`pages/index.<page-ext>` or `pages/index.json`), or null if none.
+ * Lists `pages/` once and matches by name — a directory read returns 200 with `[]` for a missing
+ * dir, so this never provokes the console 404s a blind per-candidate read would.
+ */
+export async function findHomePage(): Promise<string | null> {
   await loadFormats();
-  const candidates = [
-    ...documentExtensions("page").map((ext) => `pages/index${ext}`),
-    "pages/index.json",
-  ];
-  for (const path of candidates) {
-    try {
-      await platform.readFile(path);
-      await openFileInTab(path);
-      return;
-    } catch {}
+  const exts = [...documentExtensions("page"), ".json"];
+  let entries: DirEntry[];
+  try {
+    entries = await getPlatform().listDirectory("pages");
+  } catch {
+    return null;
+  }
+  const files = new Set(entries.filter((e) => e.type === "file").map((e) => e.name));
+  for (const ext of exts) {
+    if (files.has(`index${ext}`)) {
+      return `pages/index${ext}`;
+    }
+  }
+  return null;
+}
+
+export async function openHomePage() {
+  const home = await findHomePage();
+  if (home) {
+    await openFileInTab(home);
   }
 }
 

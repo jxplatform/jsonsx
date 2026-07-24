@@ -273,8 +273,20 @@ async function recoverAfterFailedPull(original: unknown): Promise<void> {
   await discardPullAndSync(plan);
 }
 
+/**
+ * Snapshot the package files (aligned to PKG_PATHS). Lists the root once and reads only the files
+ * that exist, so absent lockfiles (cloud projects don't commit one) never trigger a console 404
+ * from a blind read. Listing failure falls back to probing all paths.
+ */
 async function snapshotPackageFiles(): Promise<(string | null)[]> {
-  return Promise.all(PKG_PATHS.map((path) => tryRead(path)));
+  let present: Set<string>;
+  try {
+    const entries = await getPlatform().listDirectory("");
+    present = new Set(entries.filter((e) => e.type === "file").map((e) => e.name));
+  } catch {
+    present = new Set(PKG_PATHS);
+  }
+  return Promise.all(PKG_PATHS.map((path) => (present.has(path) ? tryRead(path) : null)));
 }
 
 /**

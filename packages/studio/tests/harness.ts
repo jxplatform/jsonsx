@@ -81,7 +81,9 @@ export interface MockPlatformState {
 }
 
 function dirEntriesFor(files: Map<string, string>, dir: string): DirEntry[] {
-  const prefix = dir.endsWith("/") ? dir : `${dir}/`;
+  // Root ("" or ".") maps to an empty prefix, matching the real backends (a root listing returns
+  // Top-level entries, not a synthetic "/" prefix). Non-root dirs get a trailing-slash prefix.
+  const prefix = dir === "" || dir === "." ? "" : dir.endsWith("/") ? dir : `${dir}/`;
   const seen = new Map<string, DirEntry>();
   for (const path of files.keys()) {
     if (!path.startsWith(prefix)) {

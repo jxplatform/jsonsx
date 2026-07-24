@@ -329,6 +329,31 @@ describe("pullWithPackageSync — post-pull sync", () => {
 
     expect(progressCard()?.textContent).toContain("lockfile corrupt");
   });
+
+  test("falls back to reading all package files when the root listing fails", async () => {
+    let installed = false;
+    const { state } = installMockPlatform(
+      {
+        gitPull: async () => {
+          state.files.set("package.json", PKG_AUTOMATED);
+        },
+        gitStatus: async () => gitStatusOf(),
+        installDependencies: async () => {
+          installed = true;
+          return { ok: true };
+        },
+        listDirectory: async () => {
+          throw new Error("listing unavailable");
+        },
+      },
+      { "package.json": PKG_HEAD },
+    );
+
+    await pullWithPackageSync();
+    await flush();
+
+    expect(installed).toBe(true);
+  });
 });
 
 // ─── Reactive fallback ───────────────────────────────────────────────────────

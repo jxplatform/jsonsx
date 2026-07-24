@@ -10,6 +10,7 @@ import { createState, requireProjectState, setProjectState, projectState } from 
 import { activeTab, closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import {
+  findHomePage,
   loadDirectory,
   loadProject,
   openFileFromTree,
@@ -264,6 +265,45 @@ describe("openHomePage", () => {
     await openHomePage();
 
     expect(activeTab.value).toBeNull();
+  });
+});
+
+// ─── findHomePage (listing-based; never provokes per-candidate 404s) ────────────
+
+describe("findHomePage", () => {
+  test("prefers a format page candidate over index.json", async () => {
+    installFsPlatform({ "pages/index.json": "{}", "pages/index.md": "# Home" });
+    siteState();
+
+    expect(await findHomePage()).toBe("pages/index.md");
+  });
+
+  test("falls back to pages/index.json when no format candidate exists", async () => {
+    installFsPlatform({ "pages/index.json": "{}" });
+    siteState();
+
+    expect(await findHomePage()).toBe("pages/index.json");
+  });
+
+  test("returns null when no index page exists", async () => {
+    installFsPlatform({ "readme.md": "# hi" });
+    siteState();
+
+    expect(await findHomePage()).toBeNull();
+  });
+
+  test("returns null when the pages listing fails", async () => {
+    installFsPlatform(
+      { "pages/index.json": "{}" },
+      {
+        listDirectory: async () => {
+          throw new Error("offline");
+        },
+      },
+    );
+    siteState();
+
+    expect(await findHomePage()).toBeNull();
   });
 });
 
