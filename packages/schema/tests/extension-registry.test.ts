@@ -303,6 +303,25 @@ describe("ExtensionRegistry accessors", () => {
     expect(reg.byName("Tables")?.capabilities.emit?.timing).toEqual(["compiler"]);
   });
 
+  test("assetProviders filters to classes with an assets capability (§8.5)", async () => {
+    const files = standardFiles();
+    // Give the auth mount an `assets` capability method (static asset mount).
+    files["/nm/@acme/auth/src/Auth.class.json"] = {
+      ...AUTH_MOUNT_CLASS,
+      $defs: {
+        methods: {
+          ...AUTH_MOUNT_CLASS.$defs.methods,
+          assets: { identifier: "assets", role: "assets", scope: "static", timing: ["server"] },
+        },
+      },
+    };
+    const reg = await buildExtensionRegistry(["@acme/data", "@acme/auth"], makeIO(files), BASE);
+    // Only the auth mount declares `assets`; the emit-only Tables class is not an asset provider.
+    expect(reg.assetProviders().map((e) => e.name)).toEqual(["AuthMount"]);
+    expect(reg.byName("AuthMount")?.capabilities.assets?.timing).toEqual(["server"]);
+    expect(reg.emitters().map((e) => e.name)).toEqual(["Tables"]);
+  });
+
   test("mounts without an order default to 100 and tie-break by name", async () => {
     const files = standardFiles();
     files["/nm/@acme/auth/src/Auth.class.json"] = {

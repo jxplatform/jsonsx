@@ -5,7 +5,7 @@
  * (`options.connectors`, carrying the dev server's `local: "sqlite"` stand-ins) when available,
  * else `resolveDialect` over the first-party providers — either way yielding Better Auth's
  * `database: { dialect, type }` Kysely config. `getAuthMigrations` compiles Better Auth's additive
- * system-table sync (verified against better-auth 1.6.23: `getMigrations` from
+ * system-table sync (verified against better-auth 1.6.25: `getMigrations` from
  * `better-auth/db/migration` returns { toBeCreated, toBeAdded, runMigrations, compileMigrations })
  * into push steps of kind "auth", composed by the host after the connector plan — the connector
  * never special-cases auth.

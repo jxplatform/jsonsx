@@ -271,6 +271,21 @@ describe("bundleSchema mechanics", () => {
     expect(bundled).toEqual(entry);
   });
 
+  test("a ref collapsing to a bare filename resolves against '.' (no directory component)", async () => {
+    // A "sub" baseDir plus a parent-escaping "../child.json" ref cancel out to a bare "child.json"
+    // With no directory part, so schemaDirOf finds no "/" and returns "." as the embed's scope.
+    const seen: string[] = [];
+    const loader = async (path: string): Promise<Record<string, unknown>> => {
+      seen.push(path);
+      return { type: "string" };
+    };
+    const entry = { properties: { c: { $ref: "../child.json" } }, type: "object" };
+    const bundled = await bundleSchema(entry, loader, "sub");
+    expect(seen).toEqual(["child.json"]);
+    const props = bundled.properties as Record<string, { $ref: string }>;
+    expect(props.c!.$ref).toBe("urn:jx:bundled:1");
+  });
+
   test("leading '..' segments survive normalization for relative base dirs", async () => {
     // A relative baseDir with a parent-escaping ref keeps its ".." prefix (only absolute paths
     // Clamp at the root) — the loader receives the preserved relative path.
