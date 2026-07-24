@@ -50,8 +50,9 @@ describe("jx-extension.json manifest", () => {
     expect(pkg.exports["./schemas/project.fragment.schema.json"]).toBeDefined();
     expect(pkg.files).toContain("jx-extension.json");
     expect(pkg.files).toContain("schemas/");
-    // Better Auth is pinned to the exact verified version (plan Part 4b).
-    expect(pkg.dependencies["better-auth"]).toBe("1.6.25");
+    // Better Auth is intentionally unpinned so it tracks latest releases — guard against a
+    // Regression to an exact-version lock (a bare "1.2.3" with no range operator).
+    expect(pkg.dependencies["better-auth"]).not.toMatch(/^\d/);
     expect(pkg.dependencies["@jxsuite/connector"]).toBe("workspace:^");
     // Every class descriptor is addressable through the exports map.
     for (const ref of Object.values(manifest.classes)) {

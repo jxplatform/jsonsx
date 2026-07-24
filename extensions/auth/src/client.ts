@@ -1,11 +1,11 @@
 /**
  * Client — the browser-safe Better Auth client wrapper.
  *
- * Wraps `createAuthClient` from better-auth/client (verified against 1.6.25: `signIn.email`,
- * `signUp.email`, `signIn.social`, `signOut`, `getSession`, each returning `{ data, error }`)
- * behind a module-level singleton pointed at the site's own /_jx/auth mount. Everything here is
- * typed structurally against the narrow slice the session store and auth actions consume, so
- * bundles never depend on Better Auth's inferred mega-types.
+ * Wraps `createAuthClient` from better-auth/client (`signIn.email`, `signUp.email`,
+ * `signIn.social`, `signOut`, `getSession`, each returning `{ data, error }`) behind a module-level
+ * singleton pointed at the site's own /_jx/auth mount. Everything here is typed structurally
+ * against the narrow slice the session store and auth actions consume, so bundles never depend on
+ * Better Auth's inferred mega-types.
  */
 
 import { createAuthClient } from "better-auth/client";

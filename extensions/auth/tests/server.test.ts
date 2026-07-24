@@ -1,8 +1,8 @@
 /**
- * Server.test.ts — real Better Auth 1.6.25 over the connector's bun:sqlite dialect (plan Part 4b
- * testing bullet: sign-up → cookie → session; migrations compiled into kind "auth" push steps and
- * applied). The database is a tempdir sqlite file resolved through the real Sqlite provider, so the
- * whole `resolveDialect` seam runs, not a mock.
+ * Server.test.ts — real Better Auth over the connector's bun:sqlite dialect (plan Part 4b testing
+ * bullet: sign-up → cookie → session; migrations compiled into kind "auth" push steps and applied).
+ * The database is a tempdir sqlite file resolved through the real Sqlite provider, so the whole
+ * `resolveDialect` seam runs, not a mock.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";

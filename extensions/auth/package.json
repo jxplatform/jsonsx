@@ -40,7 +40,7 @@
   "dependencies": {
     "@jxsuite/connector": "workspace:^",
     "@jxsuite/schema": "workspace:^",
-    "better-auth": "1.6.25",
+    "better-auth": "^1.6.25",
     "kysely": "^0.29.4"
   },
   "devDependencies": {

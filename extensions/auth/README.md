@@ -5,7 +5,7 @@
 ## Overview
 
 `@jxsuite/auth` is the Jx extension putting users behind the connector's data tables. It owns the
-project.json `auth` section and mounts [Better Auth](https://better-auth.com) (pinned 1.6.25) at
+project.json `auth` section and mounts [Better Auth](https://better-auth.com) at
 `/_jx/auth` — **order 10**, ahead of the connector's `/_jx/data` mount (order 20) — publishing the
 `ctx.auth = { getSession, authorize }` hooks on the shared server context
 (specs/extensions.md §11). With this mount active, table permission rules beyond
