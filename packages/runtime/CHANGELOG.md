@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.1](https://github.com/jxsuite/jx/compare/runtime-v1.3.0...runtime-v1.3.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* **runtime:** trigger-independent proper component mapping ([28ab97b](https://github.com/jxsuite/jx/commit/28ab97b7795db7aa26dfd3abcf33198d0144b3f1))
+* **runtime:** trigger-independent proper component mapping ([88157e3](https://github.com/jxsuite/jx/commit/88157e3cd100c0e497da934ef1cd7161e0946039))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.4.0
+
 ## [1.3.0](https://github.com/jxsuite/jx/compare/runtime-v1.2.0...runtime-v1.3.0) (2026-07-22)
 
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.4.0](https://github.com/jxsuite/jx/compare/compiler-v1.3.0...compiler-v1.4.0) (2026-07-24)
+
+
+### Features
+
+* support external/relative asset files ([368c909](https://github.com/jxsuite/jx/commit/368c9092214a2d589d20f7d2ddad03e698b76940))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.2.1
+    * @jxsuite/runtime bumped to 1.3.1
+    * @jxsuite/schema bumped to 1.4.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.4.1
+    * @jxsuite/parser bumped to 1.4.0
+
 ## [1.3.0](https://github.com/jxsuite/jx/compare/compiler-v1.2.0...compiler-v1.3.0) (2026-07-22)
 
 

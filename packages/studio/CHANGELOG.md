@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.5.0](https://github.com/jxsuite/jx/compare/studio-v1.4.0...studio-v1.5.0) (2026-07-24)
+
+
+### Features
+
+* **studio:** Open Project repo picker + ship the editor shell in the npm package ([05154c7](https://github.com/jxsuite/jx/commit/05154c7f5a1cf1f8b42d1643fff8cc0fa96cfb2c))
+
+
+### Bug Fixes
+
+* **studio:** make New Project errors visible; add example entry point ([39f5a35](https://github.com/jxsuite/jx/commit/39f5a356240fd4b987a9a0919459dda1a48e6e79))
+* **studio:** show validation errors in convert dialogs ([aebae6e](https://github.com/jxsuite/jx/commit/aebae6eab863bf6e0e5464dca36422e8eaa80be6))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.5.1
+    * @jxsuite/create bumped to 1.2.1
+    * @jxsuite/formulas bumped to 0.0.5
+    * @jxsuite/markup bumped to 0.4.1
+    * @jxsuite/protocol bumped to 0.6.1
+    * @jxsuite/runtime bumped to 1.3.1
+    * @jxsuite/schema bumped to 1.4.0
+
 ## [1.4.0](https://github.com/jxsuite/jx/compare/studio-v1.3.0...studio-v1.4.0) (2026-07-22)
 
 
