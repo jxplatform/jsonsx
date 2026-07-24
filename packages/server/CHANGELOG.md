@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.3.0](https://github.com/jxsuite/jx/compare/server-v1.2.0...server-v1.3.0) (2026-07-24)
+
+
+### Features
+
+* support external/relative asset files ([368c909](https://github.com/jxsuite/jx/commit/368c9092214a2d589d20f7d2ddad03e698b76940))
+
+
+### Bug Fixes
+
+* **server:** resolve the oxlint binary robustly for the lint endpoint ([5e7e5e8](https://github.com/jxsuite/jx/commit/5e7e5e87a13857c794ef1b065f0e61496c8697b5))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.5.1
+    * @jxsuite/compiler bumped to 1.4.0
+    * @jxsuite/create bumped to 1.2.1
+    * @jxsuite/import bumped to 0.38.1
+    * @jxsuite/protocol bumped to 0.6.1
+    * @jxsuite/runtime bumped to 1.3.1
+    * @jxsuite/schema bumped to 1.4.0
+    * @jxsuite/starters bumped to 1.2.1
+  * devDependencies
+    * @jxsuite/auth bumped to 0.4.1
+    * @jxsuite/connector bumped to 0.4.1
+    * @jxsuite/parser bumped to 1.4.0
+
 ## [1.2.0](https://github.com/jxsuite/jx/compare/server-v1.1.1...server-v1.2.0) (2026-07-22)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/jxsuite/jx/compare/schema-v1.3.0...schema-v1.4.0) (2026-07-24)
+
+
+### Features
+
+* support external/relative asset files ([368c909](https://github.com/jxsuite/jx/commit/368c9092214a2d589d20f7d2ddad03e698b76940))
+
 ## [1.3.0](https://github.com/jxsuite/jx/compare/schema-v1.2.0...schema-v1.3.0) (2026-07-22)
 
 

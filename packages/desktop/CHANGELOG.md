@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.2.1](https://github.com/jxsuite/jx/compare/desktop-v1.2.0...desktop-v1.2.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* **desktop:** stage create/starters static data into the Electrobun bundle ([8b8d56a](https://github.com/jxsuite/jx/commit/8b8d56ae1de4c52200861d5b6cc474d634bc5d84))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 1.4.0
+    * @jxsuite/create bumped to 1.2.1
+    * @jxsuite/parser bumped to 1.4.0
+    * @jxsuite/protocol bumped to 0.6.1
+    * @jxsuite/schema bumped to 1.4.0
+    * @jxsuite/server bumped to 1.3.0
+    * @jxsuite/starters bumped to 1.2.1
+    * @jxsuite/studio bumped to 1.5.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.4.1
+    * @jxsuite/server bumped to 1.3.0
+
 ## [1.2.0](https://github.com/jxsuite/jx/compare/desktop-v1.1.2...desktop-v1.2.0) (2026-07-22)
 
 
