@@ -46,6 +46,24 @@ Deeper paths reach into item fields — `"$map/item/title"` — and template str
 }
 ```
 
+The `map` template is an ordinary element def, so `attributes`, `id`, `className`, `style`, and event handlers all work there and can read the iteration context — which is how a list row gets a per-item link or a selected state:
+
+```json
+{
+  "$prototype": "Array",
+  "items": { "$ref": "#/state/posts" },
+  "map": {
+    "tagName": "a",
+    "id": "post-${index}",
+    "attributes": {
+      "href": "${item.url}",
+      "class": "row ${index === state.active ? 'is-active' : ''}"
+    },
+    "textContent": "${item.title}"
+  }
+}
+```
+
 ## Mixing with sibling elements
 
 The Array object is a _member_ of `children`, so it can sit among ordinary siblings — a static header row followed by a dynamic list, for example. It renders **wrapper-less**: mapped items become direct children of the parent element, with no container in between.

@@ -713,6 +713,27 @@ function emitMappedArray(arrayDef: JxMappedArray, indent: string) {
   const tag = mapDef.tagName ?? "div";
   const parts: string[] = [];
 
+  // The map root gets the same attribute treatment as any other element (emitLitNode above);
+  // `${item…}`/`${index…}` templates resolve against the map callback's own parameters.
+  if (mapDef.attributes) {
+    for (const [key, val] of Object.entries(mapDef.attributes)) {
+      if (val && typeof val === "object" && isRef(val)) {
+        parts.push(`${key}="\${${mapRefToExpr(val.$ref)}}"`);
+      } else if (typeof val === "string" && val.includes("${")) {
+        parts.push(`${key}="${toLitExpr(val)}"`);
+      } else {
+        parts.push(`${key}="${val}"`);
+      }
+    }
+  }
+
+  if (mapDef.id) {
+    parts.push(`id="${toLitExpr(String(mapDef.id))}"`);
+  }
+  if (mapDef.className) {
+    parts.push(`class="${toLitExpr(String(mapDef.className))}"`);
+  }
+
   if (mapDef.$props) {
     for (const [key, val] of Object.entries(mapDef.$props)) {
       if (isRef(val)) {

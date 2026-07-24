@@ -707,6 +707,38 @@ describe("compileElement — emitMappedArray edge cases", () => {
     expect(content).toContain("s.handleClick(s, e)");
   });
 
+  test("attributes, id and className on the map root reach the template", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: {
+          attributes: {
+            "aria-selected": "${index === s.active ? 'true' : 'false'}",
+            href: "${item.url}",
+            role: "option",
+            target: { $ref: "$map/item/target" },
+          },
+          className: "row ${index === state.active ? 'is-active' : ''}",
+          id: "row-${index}",
+          tagName: "a",
+          textContent: "${$map.item.title}",
+        },
+      },
+      state: { active: 0, items: [] },
+      tagName: "test-map-attrs",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('href="${item.url}"');
+    expect(content).toContain('role="option"');
+    expect(content).toContain("aria-selected=\"${index === s.active ? 'true' : 'false'}\"");
+    expect(content).toContain('target="${item.target}"');
+    expect(content).toContain('id="row-${index}"');
+    // `state.` is rewritten to the component's `s` alias, as everywhere else in the template.
+    expect(content).toContain("class=\"row ${index === s.active ? 'is-active' : ''}\"");
+  });
+
   test("children in mapped array", async () => {
     const result = await compileElement({
       children: {

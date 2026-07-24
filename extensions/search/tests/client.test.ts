@@ -8,9 +8,24 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { configure, isReady, preload, query, runSearch, searchInit } from "../src/client";
-import type { SearchResultGroup } from "../src/client";
+import {
+  buildExcerpt,
+  buildTokens,
+  configure,
+  crumbsFromSlug,
+  isReady,
+  preload,
+  query,
+  runSearch,
+  searchInit,
+} from "../src/client";
+import type { SearchResult, SearchResultGroup, SearchToken } from "../src/client";
 import type { SearchIndexEnvelope } from "../src/search-index";
+
+/** Render tokens back to a string, wrapping matched runs, for readable assertions. */
+function marked(tokens: SearchToken[]): string {
+  return tokens.map((token) => (token.m ? `[${token.t}]` : token.t)).join("");
+}
 
 const ENVELOPE: SearchIndexEnvelope = {
   boost: { heading: 2, title: 4 },
@@ -61,6 +76,91 @@ function settle(): Promise<void> {
     setTimeout(resolve, 0);
   });
 }
+
+/** A body long enough that the excerpt window has to elide on both sides. */
+const LONG_TEXT = `${"alpha ".repeat(40)}needle ${"omega ".repeat(40)}`.trim();
+
+describe("highlight tokens", () => {
+  test("marks whole words that start with a term, leaving the rest plain", () => {
+    expect(marked(buildTokens("Search the index", ["index"]))).toBe("Search the [index]");
+  });
+
+  test("a prefix term highlights the whole word it landed on, case-insensitively", () => {
+    expect(marked(buildTokens("An Introduction", ["intro"]))).toBe("An [Introduction]");
+  });
+
+  test("marks every occurrence, including at the very start and very end", () => {
+    expect(marked(buildTokens("index of the index", ["index"]))).toBe("[index] of the [index]");
+  });
+
+  test("adjacent matches keep their separator as a plain run", () => {
+    expect(marked(buildTokens("site search index", ["search", "index"]))).toBe(
+      "site [search] [index]",
+    );
+  });
+
+  test("no match yields a single plain run; empty text yields no tokens", () => {
+    expect(buildTokens("Site architecture", ["nothing"])).toEqual([
+      { m: false, t: "Site architecture" },
+    ]);
+    expect(buildTokens("", ["anything"])).toEqual([]);
+  });
+
+  test("empty and blank terms are ignored rather than matching everything", () => {
+    expect(buildTokens("Site", [])).toEqual([{ m: false, t: "Site" }]);
+    expect(marked(buildTokens("Site index", ["", "index"]))).toBe("Site [index]");
+  });
+});
+
+describe("excerpts", () => {
+  test("text shorter than the window comes back whole, unelided", () => {
+    expect(buildExcerpt("The emit capability writes the index.", ["index"])).toBe(
+      "The emit capability writes the index.",
+    );
+  });
+
+  test("a match in the middle elides on both sides and stays near the window width", () => {
+    const excerpt = buildExcerpt(LONG_TEXT, ["needle"]);
+    expect(excerpt.startsWith("…")).toBe(true);
+    expect(excerpt.endsWith("…")).toBe(true);
+    expect(excerpt).toContain("needle");
+    expect(excerpt.length).toBeLessThan(180);
+  });
+
+  test("a match near the start keeps the opening intact", () => {
+    const excerpt = buildExcerpt(`needle ${"omega ".repeat(40)}`, ["needle"]);
+    expect(excerpt.startsWith("needle")).toBe(true);
+    expect(excerpt.endsWith("…")).toBe(true);
+  });
+
+  test("with no match in the body, the opening of the text is used", () => {
+    const excerpt = buildExcerpt(LONG_TEXT, ["absent"]);
+    expect(excerpt.startsWith("alpha")).toBe(true);
+    expect(excerpt.endsWith("…")).toBe(true);
+  });
+
+  test("blank text yields no excerpt", () => {
+    expect(buildExcerpt("   ", ["needle"])).toBe("");
+  });
+});
+
+describe("breadcrumbs", () => {
+  test("ancestor segments are title-cased, the leaf dropped", () => {
+    expect(crumbsFromSlug("framework/site/search")).toEqual(["Framework", "Site"]);
+  });
+
+  test("hyphens and underscores become spaces", () => {
+    expect(crumbsFromSlug("extending/custom-elements/api_reference")).toEqual([
+      "Extending",
+      "Custom Elements",
+    ]);
+  });
+
+  test("a top-level slug has no ancestors, and empty segments are dropped", () => {
+    expect(crumbsFromSlug("install")).toEqual([]);
+    expect(crumbsFromSlug("/start//install/")).toEqual(["Start"]);
+  });
+});
 
 describe("preload failure handling (runs before the success path)", () => {
   test("query before ready returns [] and kicks off a (failing) preload", async () => {
@@ -119,12 +219,35 @@ describe("preload success + queries", () => {
     expect(groups[0]!.slug).toBe("start/install");
   });
 
-  test("limit caps result groups; group:false returns flat documents", () => {
-    const limited = query("site install search", { limit: 1 });
-    expect(limited).toHaveLength(1);
-    const flat = query("search index", { group: false }) as { id: string }[];
-    expect(flat.length).toBeGreaterThan(1);
-    expect(flat[0]!.id).toBeDefined();
+  test("limit caps result groups", () => {
+    expect(query("site install search", { limit: 1 })).toHaveLength(1);
+  });
+
+  test("group:false returns flat rows with breadcrumbs and highlight tokens", () => {
+    const rows = query("search index", { group: false }) as SearchResult[];
+    expect(rows.length).toBeGreaterThan(1);
+    const section = rows.find((row) => row.heading === "Search index")!;
+    expect(section.url).toBe("/docs/framework/site/#search-index");
+    // A section row trails the page title after the slug's ancestors.
+    expect(section.crumbs).toEqual(["Framework", "Site architecture"]);
+    expect(marked(section.titleTokens)).toBe("[Search] [index]");
+    expect(marked(section.excerptTokens)).toBe(
+      "The emit capability writes the [search] [index] into dist.",
+    );
+    const page = rows.find((row) => row.heading === "")!;
+    expect(page.crumbs).toEqual(["Framework"]);
+    expect(page.titleTokens).toEqual([{ m: false, t: "Site architecture" }]);
+  });
+
+  test("group:false caps how many rows one page contributes", () => {
+    const uncapped = query("search index", { group: false }) as SearchResult[];
+    expect(uncapped.filter((row) => row.slug === "framework/site").length).toBeGreaterThan(1);
+    const capped = query("search index", { group: false, pageCap: 1 }) as SearchResult[];
+    expect(capped.filter((row) => row.slug === "framework/site")).toHaveLength(1);
+  });
+
+  test("group:false honours limit", () => {
+    expect(query("search index install", { group: false, limit: 1 })).toHaveLength(1);
   });
 
   test("blank queries return no results", () => {
@@ -139,21 +262,22 @@ describe("$src state conventions", () => {
     expect(searchInit(state)).toBe(true);
     await settle();
     expect(state.searchReady).toBe(true);
-    expect((state.searchResults as SearchResultGroup[])[0]!.slug).toBe("start/install");
+    expect((state.searchResults as SearchResult[])[0]!.slug).toBe("start/install");
   });
 
-  test("runSearch reads the input event, stores grouped results, and resets the active row", () => {
+  test("runSearch reads the input event, stores flat rows, and resets the active row", () => {
     const state: Record<string, unknown> = { searchActive: 3 };
     const results = runSearch(state, { target: { value: "search index" } });
     expect(state.searchQuery).toBe("search index");
     expect(state.searchResults).toBe(results);
+    expect(state.searchCount).toBe(results.length);
     expect(state.searchActive).toBe(0);
-    expect((results as SearchResultGroup[])[0]!.slug).toBe("framework/site");
+    expect(results[0]!.slug).toBe("framework/site");
+    expect(results[0]!.titleTokens.some((token) => token.m)).toBe(true);
   });
 
   test("runSearch without an event falls back to state.searchQuery", () => {
     const state: Record<string, unknown> = { searchQuery: "install" };
-    const results = runSearch(state) as SearchResultGroup[];
-    expect(results[0]!.slug).toBe("start/install");
+    expect(runSearch(state)[0]!.slug).toBe("start/install");
   });
 });

@@ -67,7 +67,7 @@ Bind an input to `state.q` and map over `state.results`. Each result group is a 
 }
 ```
 
-In compiled sites the def lowers to plain client code that lazily loads the bundled client and fetches the index on first use — nothing is downloaded until the visitor actually searches. Options: `limit` (max result groups, default 8), `group` (set `false` for a flat document list), `index` (override the index URL).
+In compiled sites the def lowers to plain client code that lazily loads the bundled client and fetches the index on first use — nothing is downloaded until the visitor actually searches. Options: `limit` (max rows, default 8), `group` (set `false` for the flat row list described below), `index` (override the index URL).
 
 ## Building a search UI component
 
@@ -86,11 +86,51 @@ Interactive components aren't lowered, so inside a compiled component you use th
 ```
 
 - `searchInit(state)` preloads the index and flips `state.searchReady` (re-running any pending query).
-- `runSearch(state, e)` reads the input event, stores grouped results on `state.searchResults`, and resets `state.searchActive` — wire it to your input's `oninput`.
+- `runSearch(state, e)` reads the input event, stores flat rows on `state.searchResults`, publishes the row count as `state.searchCount`, and resets `state.searchActive` — wire it to your input's `oninput`.
 
 The build bundles `npm:@jxsuite/search/client` (MiniSearch included) into `/assets/` automatically — declare the dependency in your project's `package.json` and import it like any module.
 
-For full control, import the core API from the same module: `preload(indexUrl?)`, `isReady()`, and the synchronous `query(text, { limit, group })`.
+For full control, import the core API from the same module: `preload(indexUrl?)`, `isReady()`, and the synchronous `query(text, { limit, group, pageCap })`.
+
+## Rendering a result row
+
+Flat rows (`group: false`, what `runSearch` uses) arrive presentation-ready. Each row is one page **or** one of its heading sections, and carries a breadcrumb plus pre-highlighted text — so a component can render matches without doing any string work of its own:
+
+```json
+{
+  "url": "/docs/framework/site/#assets",
+  "title": "Site architecture",
+  "heading": "Assets",
+  "crumbs": ["Framework", "Site architecture"],
+  "titleTokens": [{ "t": "Assets", "m": true }],
+  "excerptTokens": [
+    { "t": "…referenced from a page are copied into ", "m": false },
+    { "t": "assets", "m": true },
+    { "t": "/ at build time…", "m": false }
+  ],
+  "score": 9.1
+}
+```
+
+A token's `m` flag marks a run that matched a query term — whole words, so a prefix search for `intro` highlights `introduction`. Map over the tokens and style the matched runs; nothing is injected as HTML:
+
+```json
+{
+  "$prototype": "Array",
+  "items": { "$ref": "$map/item/titleTokens" },
+  "map": {
+    "tagName": "span",
+    "attributes": { "class": "${item.m ? 'hl' : ''}" },
+    "textContent": "${item.t}"
+  }
+}
+```
+
+`crumbs` is the slug's ancestor trail, with the page title appended on a section row. `excerptTokens` cover a ~160-character window around the first body match, elided with `…` when it doesn't reach an edge. At most `pageCap` rows (default 3) come from any one page, so a long page can't flood the list.
+
+:::doc-tip
+Grouped results (`group: true`, the default and what the `Search` prototype returns) keep the older nested shape — a page with a `hits` array of its matching sections. Use flat rows for a search palette, grouped for a results page organized by document.
+:::
 
 :::doc-note
 One index per site is the assumption: the first `preload` wins the in-page singleton. Multiple collections are fine — they share the one index and results carry their `collection` name.

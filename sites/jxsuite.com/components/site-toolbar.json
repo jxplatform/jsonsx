@@ -50,166 +50,177 @@
           ]
         },
         {
+          "$title": "Toolbar End",
           "tagName": "div",
           "style": {
             "display": "flex",
             "alignItems": "center",
-            "gap": "clamp(1rem, 3vw, 1.75rem)",
-            "@--md": { "display": "none" }
+            "gap": "clamp(0.75rem, 2vw, 1.25rem)"
           },
           "children": [
-            {
-              "tagName": "a",
-              "attributes": { "href": "/studio" },
-              "style": {
-                "color": "var(--color-text-secondary)",
-                "textDecoration": "none",
-                "fontSize": "0.875rem",
-                "fontWeight": "500",
-                "transition": "color 0.15s",
-                ":hover": { "color": "var(--color-text-primary)" }
-              },
-              "children": ["Studio"]
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/features" },
-              "style": {
-                "color": "var(--color-text-secondary)",
-                "textDecoration": "none",
-                "fontSize": "0.875rem",
-                "fontWeight": "500",
-                "transition": "color 0.15s",
-                ":hover": { "color": "var(--color-text-primary)" }
-              },
-              "children": ["Features"]
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/templates" },
-              "style": {
-                "color": "var(--color-text-secondary)",
-                "textDecoration": "none",
-                "fontSize": "0.875rem",
-                "fontWeight": "500",
-                "transition": "color 0.15s",
-                ":hover": { "color": "var(--color-text-primary)" }
-              },
-              "children": ["Templates"]
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/compare" },
-              "style": {
-                "color": "var(--color-text-secondary)",
-                "textDecoration": "none",
-                "fontSize": "0.875rem",
-                "fontWeight": "500",
-                "transition": "color 0.15s",
-                ":hover": { "color": "var(--color-text-primary)" }
-              },
-              "children": ["Compare"]
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/docs/start/first-project" },
-              "style": {
-                "color": "var(--color-text-secondary)",
-                "textDecoration": "none",
-                "fontSize": "0.875rem",
-                "fontWeight": "500",
-                "transition": "color 0.15s",
-                ":hover": { "color": "var(--color-text-primary)" }
-              },
-              "children": ["Docs"]
-            },
             { "tagName": "site-search" },
-            { "tagName": "theme-toggle" },
             {
-              "tagName": "a",
-              "attributes": {
-                "href": "https://github.com/jxsuite/jx",
-                "target": "_blank",
-                "rel": "noopener noreferrer"
-              },
+              "tagName": "div",
               "style": {
-                "color": "var(--color-text-secondary)",
-                "textDecoration": "none",
-                "fontSize": "0.875rem",
-                "fontWeight": "500",
-                "transition": "color 0.15s",
-                ":hover": { "color": "var(--color-text-primary)" }
-              },
-              "children": ["GitHub"]
-            },
-            {
-              "tagName": "a",
-              "attributes": { "href": "/download" },
-              "style": {
-                "display": "inline-flex",
+                "display": "flex",
                 "alignItems": "center",
-                "backgroundColor": "var(--color-accent-solid)",
-                "color": "white",
-                "textDecoration": "none",
-                "fontSize": "0.875rem",
-                "fontWeight": "600",
-                "padding": "0.4rem 1rem",
-                "borderRadius": "var(--radius)",
-                "transition": "background-color 0.15s"
+                "gap": "clamp(1rem, 3vw, 1.75rem)",
+                "@--md": { "display": "none" }
               },
-              "children": ["Download"]
-            }
-          ]
-        },
-        {
-          "$title": "Hamburger Button",
-          "tagName": "button",
-          "attributes": {
-            "popovertarget": "site-mobile-menu",
-            "aria-label": "Open menu"
-          },
-          "style": {
-            "display": "none",
-            "flexDirection": "column",
-            "justifyContent": "space-between",
-            "width": "28px",
-            "height": "20px",
-            "background": "none",
-            "border": "none",
-            "cursor": "pointer",
-            "padding": "0",
-            "@--md": { "display": "flex" }
-          },
-          "children": [
-            {
-              "tagName": "span",
-              "style": {
-                "display": "block",
-                "height": "2px",
-                "width": "100%",
-                "backgroundColor": "var(--color-text-primary)",
-                "borderRadius": "2px"
-              }
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/studio" },
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "textDecoration": "none",
+                    "fontSize": "0.875rem",
+                    "fontWeight": "500",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-text-primary)" }
+                  },
+                  "children": ["Studio"]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/features" },
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "textDecoration": "none",
+                    "fontSize": "0.875rem",
+                    "fontWeight": "500",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-text-primary)" }
+                  },
+                  "children": ["Features"]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/templates" },
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "textDecoration": "none",
+                    "fontSize": "0.875rem",
+                    "fontWeight": "500",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-text-primary)" }
+                  },
+                  "children": ["Templates"]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/compare" },
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "textDecoration": "none",
+                    "fontSize": "0.875rem",
+                    "fontWeight": "500",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-text-primary)" }
+                  },
+                  "children": ["Compare"]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/docs/start/first-project" },
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "textDecoration": "none",
+                    "fontSize": "0.875rem",
+                    "fontWeight": "500",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-text-primary)" }
+                  },
+                  "children": ["Docs"]
+                },
+                { "tagName": "theme-toggle" },
+                {
+                  "tagName": "a",
+                  "attributes": {
+                    "href": "https://github.com/jxsuite/jx",
+                    "target": "_blank",
+                    "rel": "noopener noreferrer"
+                  },
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "textDecoration": "none",
+                    "fontSize": "0.875rem",
+                    "fontWeight": "500",
+                    "transition": "color 0.15s",
+                    ":hover": { "color": "var(--color-text-primary)" }
+                  },
+                  "children": ["GitHub"]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "/download" },
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "backgroundColor": "var(--color-accent-solid)",
+                    "color": "white",
+                    "textDecoration": "none",
+                    "fontSize": "0.875rem",
+                    "fontWeight": "600",
+                    "padding": "0.4rem 1rem",
+                    "borderRadius": "var(--radius)",
+                    "transition": "background-color 0.15s"
+                  },
+                  "children": ["Download"]
+                }
+              ]
             },
             {
-              "tagName": "span",
+              "$title": "Hamburger Button",
+              "tagName": "button",
+              "attributes": {
+                "popovertarget": "site-mobile-menu",
+                "aria-label": "Open menu"
+              },
               "style": {
-                "display": "block",
-                "height": "2px",
-                "width": "100%",
-                "backgroundColor": "var(--color-text-primary)",
-                "borderRadius": "2px"
-              }
-            },
-            {
-              "tagName": "span",
-              "style": {
-                "display": "block",
-                "height": "2px",
-                "width": "100%",
-                "backgroundColor": "var(--color-text-primary)",
-                "borderRadius": "2px"
-              }
+                "display": "none",
+                "flexDirection": "column",
+                "justifyContent": "space-between",
+                "width": "28px",
+                "height": "20px",
+                "background": "none",
+                "border": "none",
+                "cursor": "pointer",
+                "padding": "0",
+                "@--md": { "display": "flex" }
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "height": "2px",
+                    "width": "100%",
+                    "backgroundColor": "var(--color-text-primary)",
+                    "borderRadius": "2px"
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "height": "2px",
+                    "width": "100%",
+                    "backgroundColor": "var(--color-text-primary)",
+                    "borderRadius": "2px"
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "height": "2px",
+                    "width": "100%",
+                    "backgroundColor": "var(--color-text-primary)",
+                    "borderRadius": "2px"
+                  }
+                }
+              ]
             }
           ]
         },
