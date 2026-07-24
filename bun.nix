@@ -2365,9 +2365,9 @@
     url = "https://registry.npmjs.org/domhandler/-/domhandler-5.0.3.tgz";
     hash = "sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==";
   };
-  "dompurify@3.4.8" = fetchurl {
-    url = "https://registry.npmjs.org/dompurify/-/dompurify-3.4.8.tgz";
-    hash = "sha512-yb1cEmaOum7wFvOCSQxyfgVlv5D47Rc30iZWoMpbDIWTnJ6grDDQyu2KFJzB2k7u0pMuJcQ1zphH//fFnw2tjQ==";
+  "dompurify@3.2.7" = fetchurl {
+    url = "https://registry.npmjs.org/dompurify/-/dompurify-3.2.7.tgz";
+    hash = "sha512-WhL/YuveyGXJaerVlMYGWhvQswa7myDG17P7Vu65EWC05o8vfeNbvNf4d/BOvH99+ZW+LlQsc1GDKMa1vNK6dw==";
   };
   "domutils@3.2.2" = fetchurl {
     url = "https://registry.npmjs.org/domutils/-/domutils-3.2.2.tgz";
@@ -3593,9 +3593,9 @@
     url = "https://registry.npmjs.org/modify-values/-/modify-values-1.0.1.tgz";
     hash = "sha512-xV2bxeN6F7oYjZWTe/YPAy6MN2M+sL4u/Rlm2AHCIVGfo2p1yGmBHQ6vHehl4bRTZBdHu3TSkWdYgkwpYzAGSw==";
   };
-  "monaco-editor@0.56.0" = fetchurl {
-    url = "https://registry.npmjs.org/monaco-editor/-/monaco-editor-0.56.0.tgz";
-    hash = "sha512-sXboRm3BeBeLm938eaiyLMe0OxzfXIlZvbv4ir/jVgQy1zDhWjgmny0WoN45fuDKhCCQsYMbBJrv/A6jd8aCUg==";
+  "monaco-editor@0.55.1" = fetchurl {
+    url = "https://registry.npmjs.org/monaco-editor/-/monaco-editor-0.55.1.tgz";
+    hash = "sha512-jz4x+TJNFHwHtwuV9vA9rMujcZRb0CEilTEwG2rRSpe/A7Jdkuj8xPKttCgOh+v/lkHy7HsZ64oj+q3xoAFl9A==";
   };
   "mri@1.2.0" = fetchurl {
     url = "https://registry.npmjs.org/mri/-/mri-1.2.0.tgz";

@@ -8,24 +8,24 @@
         "@jxsuite/server": "workspace:^",
       },
       "devDependencies": {
-        "@commitlint/cli": "^21.2.1",
-        "@commitlint/config-conventional": "^21.2.0",
-        "@ttsc/graph": "^0.21.0",
-        "bun-types": "^1.3.14",
-        "bun2nix": "^2.1.2",
-        "chrome-devtools-mcp": "^1.6.0",
-        "husky": "^9.1.7",
-        "metafile-codecov-bundle": "^0.1.1",
-        "nano-staged": "^1.0.2",
-        "oxfmt": "^0.60.0",
-        "oxlint": "^1.75.0",
-        "oxlint-tsgolint": "^7.0.2001",
-        "puppeteer-core": "^25.3.0",
-        "release-please": "^17.10.4",
-        "ts-migrate": "^0.1.35",
-        "ts-migrate-plugins": "^0.1.35",
-        "ttsc": "^0.21.0",
-        "typescript": "^7.0.2",
+        "@commitlint/cli": "latest",
+        "@commitlint/config-conventional": "latest",
+        "@ttsc/graph": "latest",
+        "bun-types": "latest",
+        "bun2nix": "latest",
+        "chrome-devtools-mcp": "latest",
+        "husky": "latest",
+        "metafile-codecov-bundle": "latest",
+        "nano-staged": "latest",
+        "oxfmt": "latest",
+        "oxlint": "latest",
+        "oxlint-tsgolint": "latest",
+        "puppeteer-core": "latest",
+        "release-please": "latest",
+        "ts-migrate": "latest",
+        "ts-migrate-plugins": "latest",
+        "ttsc": "latest",
+        "typescript": "latest",
       },
     },
     "examples": {
@@ -353,7 +353,7 @@
         "ajv-formats": "^3.0.1",
         "lit": "^3.3.3",
         "lit-html": "^3.3.3",
-        "monaco-editor": "^0.56.0",
+        "monaco-editor": "^0.55.1",
         "tabulator-tables": "^6.5",
         "y-monaco": "^0.1.6",
         "yaml": "^2.9.0",
@@ -1516,7 +1516,7 @@
 
     "domhandler": ["domhandler@5.0.3", "", { "dependencies": { "domelementtype": "^2.3.0" } }, "sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w=="],
 
-    "dompurify": ["dompurify@3.4.8", "", { "optionalDependencies": { "@types/trusted-types": "^2.0.7" } }, "sha512-yb1cEmaOum7wFvOCSQxyfgVlv5D47Rc30iZWoMpbDIWTnJ6grDDQyu2KFJzB2k7u0pMuJcQ1zphH//fFnw2tjQ=="],
+    "dompurify": ["dompurify@3.2.7", "", { "optionalDependencies": { "@types/trusted-types": "^2.0.7" } }, "sha512-WhL/YuveyGXJaerVlMYGWhvQswa7myDG17P7Vu65EWC05o8vfeNbvNf4d/BOvH99+ZW+LlQsc1GDKMa1vNK6dw=="],
 
     "domutils": ["domutils@3.2.2", "", { "dependencies": { "dom-serializer": "^2.0.0", "domelementtype": "^2.3.0", "domhandler": "^5.0.3" } }, "sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw=="],
 
@@ -2048,7 +2048,7 @@
 
     "modify-values": ["modify-values@1.0.1", "", {}, "sha512-xV2bxeN6F7oYjZWTe/YPAy6MN2M+sL4u/Rlm2AHCIVGfo2p1yGmBHQ6vHehl4bRTZBdHu3TSkWdYgkwpYzAGSw=="],
 
-    "monaco-editor": ["monaco-editor@0.56.0", "", { "dependencies": { "dompurify": "3.4.8", "marked": "14.0.0" } }, "sha512-sXboRm3BeBeLm938eaiyLMe0OxzfXIlZvbv4ir/jVgQy1zDhWjgmny0WoN45fuDKhCCQsYMbBJrv/A6jd8aCUg=="],
+    "monaco-editor": ["monaco-editor@0.55.1", "", { "dependencies": { "dompurify": "3.2.7", "marked": "14.0.0" } }, "sha512-jz4x+TJNFHwHtwuV9vA9rMujcZRb0CEilTEwG2rRSpe/A7Jdkuj8xPKttCgOh+v/lkHy7HsZ64oj+q3xoAFl9A=="],
 
     "mri": ["mri@1.2.0", "", {}, "sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA=="],
 
