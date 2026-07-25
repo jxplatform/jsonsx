@@ -596,6 +596,55 @@ describe("source mode", () => {
     });
   });
 
+  /* A model carries the file identity Monaco validates against: its URI is what the JSON language
+     service resolves a relative `$schema` against, and its language id picks the tokenizer. The
+     buffer-swap fast path used to reuse one model across a source→source tab switch, so opening
+     project.json after pages/index.json checked it as though it lived in pages/ — its
+     "./project.schema.json" resolved to file:///pages/project.schema.json, which is registered
+     nowhere, and the "No schema request service available" diagnostic came straight back. */
+  test("a source→source tab switch rebuilds the model at the new file's uri", async () => {
+    openSyncedTab(undefined, { documentPath: "pages/index.json" });
+    setMode("source");
+    renderCanvas();
+    await flush();
+    expect(createdModels).toHaveLength(1);
+    expect(String(createdModels[0]!.uri)).toBe("file:///pages/index.json");
+    const firstEditor = createdEditors[0]!;
+
+    openSyncedTab(undefined, { documentPath: "project.json", id: "tab-project" });
+    setMode("source");
+    renderCanvas();
+    await flush();
+
+    expect(createdModels).toHaveLength(2);
+    expect(String(createdModels[1]!.uri)).toBe("file:///project.json");
+    expect(createdModels[0]!.dispose).toHaveBeenCalled();
+    expect(firstEditor.dispose).toHaveBeenCalled();
+    expect(view.monacoEditor).toBe(createdEditors[1] as never);
+  });
+
+  /* The generated entry documents get a reserved URI so they cannot collide with the ids the
+     schemas are registered under — Monaco's JSON adapter calls resetSchema(model.uri) on disposal,
+     which would wipe the inline registration and break every project.json for the session. */
+  test("generated entry documents mount under the reserved uri", async () => {
+    openSyncedTab(undefined, { documentPath: "project.schema.json" });
+    setMode("source");
+    renderCanvas();
+    await flush();
+    expect(String(createdModels[0]!.uri)).toBe("file:///.jx/generated/project.schema.json");
+  });
+
+  test("re-rendering the SAME source tab keeps its model", async () => {
+    openSyncedTab(undefined, { documentPath: "pages/index.json" });
+    setMode("source");
+    renderCanvas();
+    await flush();
+    renderCanvas();
+    await flush();
+    expect(createdModels).toHaveLength(1);
+    expect(createdModels[0]!.dispose).not.toHaveBeenCalled();
+  });
+
   test("format documents serialize to source and parse edits back", async () => {
     setFormats([MARKDOWN_FORMAT]);
     closeAllTabs();

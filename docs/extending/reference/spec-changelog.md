@@ -14,6 +14,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `ai.md`
 
+- **0.1.2-draft** (2026-07-25) — Schema gate (§3.1): tool-level validation against the active project's entry documents, before-write for disk writes and after-apply on canvas, project.json included.
 - **0.1.1-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.0-draft** (2026-07-22) — Reconcile spec with shipped behavior; document the eval surface (`c8d1d580`).
 
@@ -71,6 +72,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.3.2-draft** (2026-07-25) — $schema bindings must be satisfied by by-id registration, never fetching — an in-document $schema overrides fileMatch and an unresolvable one voids validation entirely (§5.4).
 - **0.3.1-draft** (2026-07-25) — $paths validates against the source union instead of accepting any object (§5.3).
 - **0.3.0-draft** (2026-07-25) — Committed entry documents are single-resource: every $ref a root pointer (§5.2, §5.4).
 - **0.2.9-draft** (2026-07-24) — §2 package layout: correct the auth package description, note that /_jx/auth serves the Better Auth routes while table permission rules are enforced at /_jx/data, and add the missing search extension to the tree.
@@ -255,6 +257,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.1.27-draft** (2026-07-25) — Source-mode schema validation contract: per-project entry documents, offline $schema-id registration, worker self-location (§4.2.1); fetchProjectSchemas in the PAL table (§3.4).
 - **0.1.26-draft** (2026-07-25) — PAL table records the destination members: createDestination, createProject's user-chosen destination, and pickDirectory.
 - **0.1.25-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.24-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).

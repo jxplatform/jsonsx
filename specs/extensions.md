@@ -2,7 +2,7 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.1-draft
+**Version:** 0.3.2-draft
 **Status:** Partial
 **Updated:** 2026-07-25
 **License:** MIT
@@ -336,6 +336,27 @@ names) are emitted by the generator, which is the single aggregation party.
   effective unions, which is the §5.3 override quietly not applying. Only the
   first resolve error surfaces as a diagnostic, so one visible complaint can
   hide many. Root pointers avoid both paths, and cost nothing under ajv.
+
+  **The `$schema` binding must be satisfied by registration, not by fetching.**
+  A file's own `$schema` (§5.2) OVERRIDES any file-pattern association the host
+  configured — the language service resolves it first and returns — so a host
+  that registers the entry documents only by pattern leaves every bound file
+  resolving a URI it has no way to load. That is not a partial failure: the file
+  then validates against an empty schema, so one "cannot load schema"
+  diagnostic hides every real error in it. A host holding the entry documents
+  in memory (the studio, via `fetchProjectSchemas`) must therefore ALSO
+  register them under the id the pointer resolves to — for a project mounted at
+  the root, `file:///project.schema.json` and `file:///document.schema.json` —
+  which keeps resolution offline and makes the binding equivalent to the
+  pattern association. Enabling a schema-request service is not an alternative:
+  the resolved id carries a `file:` scheme, and fetching would reopen the
+  external-`$ref` hazard the flattening exists to close.
+
+  A relative pointer resolves against the file's OWN directory, so it needs one
+  `../` per level (`../document.schema.json` from `pages/`, `../../` from
+  `pages/blog/`). A pointer with too few names a file that does not exist, and
+  fails identically in every consumer — it is an authoring error, not something
+  a host compensates for.
 
 - `jx validate` (compiler CLI) validates the WHOLE project tree: `project.json`
   against `./project.schema.json` (ajv-2020; a restricted file loader with a
@@ -935,6 +956,7 @@ requiring changes to any core package.
 
 ## Changelog
 
+- **0.3.2-draft** (2026-07-25) — $schema bindings must be satisfied by by-id registration, never fetching — an in-document $schema overrides fileMatch and an unresolvable one voids validation entirely (§5.4).
 - **0.3.1-draft** (2026-07-25) — $paths validates against the source union instead of accepting any object (§5.3).
 - **0.3.0-draft** (2026-07-25) — Committed entry documents are single-resource: every $ref a root pointer (§5.2, §5.4).
 - **0.2.9-draft** (2026-07-24) — §2 package layout: correct the auth package description, note that /_jx/auth serves the Better Auth routes while table permission rules are enforced at /_jx/data, and add the missing search extension to the tree.
@@ -951,4 +973,4 @@ requiring changes to any core package.
 
 ---
 
-_Jx Extensions Specification v0.3.1-draft_
+_Jx Extensions Specification v0.3.2-draft_

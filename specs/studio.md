@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.1.26-draft
+**Version:** 0.1.27-draft
 **Status:** Partial
 **Updated:** 2026-07-25
 **License:** MIT
@@ -81,19 +81,20 @@ Immutable state with undo/redo history (100 entries). All mutations produce a ne
 
 Studio uses a platform abstraction (`platform.js`) to decouple UI from backend:
 
-| Method                 | Description                                                                                                |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `listFiles(dir)`       | List directory contents                                                                                    |
-| `readFile(path)`       | Read file content                                                                                          |
-| `writeFile(path, c)`   | Write file content                                                                                         |
-| `deleteFile(path)`     | Delete file                                                                                                |
-| `renameFile(old,new)`  | Rename/move file                                                                                           |
-| `discoverComponents()` | Scan project for custom elements                                                                           |
-| `openProject()`        | Open project picker (unless `openProjectPicker: "repo-list"` routes it through Studio's repository picker) |
-| `probeRootProject()`   | Auto-detect project at startup                                                                             |
-| `createDestination`    | Whether New Project collects a folder (`"path"`) or a repository (`"repo"`) — see specs/desktop.md §4.5    |
-| `createProject(opts)`  | Scaffold a project at the user-chosen `opts.destination`; never defaults a location                        |
-| `pickDirectory?()`     | Native folder picker behind the modal's **Browse…** button (desktop only)                                  |
+| Method                   | Description                                                                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `listFiles(dir)`         | List directory contents                                                                                    |
+| `readFile(path)`         | Read file content                                                                                          |
+| `writeFile(path, c)`     | Write file content                                                                                         |
+| `deleteFile(path)`       | Delete file                                                                                                |
+| `renameFile(old,new)`    | Rename/move file                                                                                           |
+| `discoverComponents()`   | Scan project for custom elements                                                                           |
+| `openProject()`          | Open project picker (unless `openProjectPicker: "repo-list"` routes it through Studio's repository picker) |
+| `probeRootProject()`     | Auto-detect project at startup                                                                             |
+| `createDestination`      | Whether New Project collects a folder (`"path"`) or a repository (`"repo"`) — see specs/desktop.md §4.5    |
+| `createProject(opts)`    | Scaffold a project at the user-chosen `opts.destination`; never defaults a location                        |
+| `pickDirectory?()`       | Native folder picker behind the modal's **Browse…** button (desktop only)                                  |
+| `fetchProjectSchemas?()` | The active project's generated entry documents, PRE-BUNDLED (extensions.md §5.2) — drives §4.2.1           |
 
 Three platform targets:
 
@@ -148,6 +149,28 @@ Site style is injected into the canvas as a real stylesheet (custom properties i
 | Preview   | Clean preview without editing chrome          |
 | Source    | Raw JSON/code view                            |
 | Content   | Markdown editing mode (inline text editing)   |
+
+#### 4.2.1 Source-mode schema validation
+
+Source mode validates JSON against the ACTIVE project's generated entry documents
+(extensions.md §5.2), fetched pre-bundled through `fetchProjectSchemas` (§3.4) on project
+activation, after a `project.json` write, and on `extensions` changes. The bundled core schemas are
+the offline fallback, and the same payload feeds the AI assistant's schema gate (ai.md §3.1) — one
+fetch, so the two surfaces can never judge a file by different rules.
+
+Resolution is entirely offline: Monaco's schema-request service stays disabled, and the schemas are
+registered as inline objects. Each registers under BOTH its canonical `https://jxsuite.com/…` URI
+(with the `pages|layouts|components|elements` fileMatch globs) and the `file:///project.schema.json`
+/ `file:///document.schema.json` id that a file's own relative `$schema` resolves to — an
+in-document `$schema` overrides fileMatch entirely, so without the second registration a bound file
+resolves to an empty schema and is not validated at all. Models mount at
+`file:///<project-relative-path>` so those pointers resolve against the file's own directory; the
+two generated entry documents mount under a reserved prefix instead, because a model URI equal to a
+registered id un-registers that schema when the model is disposed.
+
+Monaco's web workers are resolved relative to the studio bundle's own URL. No worker means no
+language service and therefore no diagnostics at all — silently — so each host must ship
+`workers/*.worker.js` beside the bundle it serves.
 
 ### 4.3 Pan, Zoom, and Centering
 
@@ -578,6 +601,7 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.1.27-draft** (2026-07-25) — Source-mode schema validation contract: per-project entry documents, offline $schema-id registration, worker self-location (§4.2.1); fetchProjectSchemas in the PAL table (§3.4).
 - **0.1.26-draft** (2026-07-25) — PAL table records the destination members: createDestination, createProject's user-chosen destination, and pickDirectory.
 - **0.1.25-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.24-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -608,4 +632,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.1.26-draft_
+_`@jxsuite/studio` Specification v0.1.27-draft_

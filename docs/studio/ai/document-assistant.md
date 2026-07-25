@@ -29,6 +29,8 @@ Every change lands on the canvas the moment it's made, so the page updates in fr
 
 After each change, Studio validates the document and test-renders it out of sight. If an edit introduced a problem — an invalid property, something that breaks rendering — the assistant is told exactly what went wrong and fixes it with follow-up edits in the same request. The page may pass through an imperfect intermediate state while it iterates; that's the self-correction loop working, not the final result.
 
+The rules it's checked against are your project's own — the same generated schemas the **[code editor](/docs/studio/logic/code)** underlines against, so sections contributed by the extensions you've enabled are enforced too. Writes to `project.json` go through the same gate before they reach disk, and a change to your enabled extensions updates the rules for both surfaces immediately.
+
 If the assistant runs out of working rounds before everything is fixed, it stops and lists what was applied and which problems remain, so nothing fails silently.
 
 ## Undo and save

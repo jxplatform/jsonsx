@@ -37,7 +37,12 @@ A function body normally lives inside the component's JSON. When one grows large
 The **Code** entry in the toolbar's mode switcher shows the open file itself as raw source — JSON for pages and components, Markdown for content — as introduced in **[Modes and the preview toggle](/docs/studio/interface/modes)**. It's the same document the visual surfaces edit, from the other side:
 
 - Edits parse back into the document as you type, so switching back to **Edit** or **Design** shows your changes. While the source is momentarily unparseable mid-edit, Studio simply waits — it never replaces your document with a broken parse.
+- JSON files are checked against your project's own schema as you type — mistyped keys, wrong value types and missing required properties are underlined, and :kbd[Ctrl+Space] completes property names. Studio uses the `project.schema.json` and `document.schema.json` that [`jx schema`](/docs/framework/build/cli) generates from your enabled extensions, so the editor enforces exactly what `jx validate` does, including extension-contributed sections. It reads them directly, with no network access — an offline project still gets full validation.
 - **Export** in the tab bar saves a copy of the file elsewhere.
+
+:::doc-note
+Studio regenerates those two schema files whenever they are missing or older than `project.json`, so a project you have never run `jx schema` on still validates, and turning an extension on or off updates the rules without a restart.
+:::
 
 ## When to drop down
 

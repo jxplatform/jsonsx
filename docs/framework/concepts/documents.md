@@ -41,7 +41,9 @@ Every document is a JSON object with up to six top-level fields:
 Only `tagName` is required. A document can also carry `$media` (named breakpoints, see [Styling](/docs/framework/concepts/styling)) and `$elements` (custom-element dependencies, see [Components](/docs/framework/concepts/components)).
 
 :::doc-note
-`https://jxsuite.com/schema/v1` names the dialect, which is what you want for a document that travels on its own. Inside a project, point `$schema` at the `document.schema.json` that [`jx schema`](/docs/framework/build/cli) writes into the project root instead, relative to the file — `"../document.schema.json"` from `pages/` or `components/`. That bundle is the core schema _plus_ every enabled extension's contributions, so your editor's autocomplete and `jx validate` are reading the same rules. See [Schema composition](/docs/extending/extensions/schema-composition).
+`https://jxsuite.com/schema/v1` names the dialect, which is what you want for a document that travels on its own. Inside a project, point `$schema` at the `document.schema.json` that [`jx schema`](/docs/framework/build/cli) writes into the project root instead. That bundle is the core schema _plus_ every enabled extension's contributions, so your editor's autocomplete and `jx validate` are reading the same rules. See [Schema composition](/docs/extending/extensions/schema-composition).
+
+The pointer is resolved relative to the file that carries it, so it needs one `../` per folder level: `"../document.schema.json"` from `pages/index.json`, `"../../document.schema.json"` from `pages/blog/post.json`. Too few and it points at a file that does not exist, which every validator reports as an unresolvable schema rather than as a document error.
 :::
 
 ## `$defs` — type definitions

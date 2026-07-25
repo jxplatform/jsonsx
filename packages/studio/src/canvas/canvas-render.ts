@@ -17,6 +17,7 @@ import { view } from "../view";
 import { parseSourceForPath, serializeDocument } from "../files/file-ops";
 import { detachGridPanel, gridPanelMounted, renderGridMode } from "../grid/grid-panel";
 import { formatByName, formatForPath } from "../format/format-host";
+import { modelUriFor } from "../services/monaco-setup";
 import { renderWelcome } from "../panels/welcome-screen";
 import { projectState } from "../state";
 import {
@@ -274,6 +275,23 @@ export function renderCanvas() {
     return;
   }
 
+  /* Source mode across a TAB switch: the buffer swap below reuses the existing model, and a model
+     carries the file identity Monaco validates against — its URI is what the JSON language service
+     resolves a document's relative `$schema` against, and its language id picks the tokenizer. Reuse
+     it for another file and `project.json` gets checked as though it sat in the previous tab's
+     folder (`./project.schema.json` → `file:///pages/project.schema.json`, unregistered, back to
+     "No schema request service available"). Tear down instead and let the creation path below build
+     a model with the right URI. */
+  if (canvasMode === "source" && view.monacoEditor) {
+    const expectedUri = monaco.Uri.parse(modelUriFor(tab.documentPath || "document.json"));
+    if (view.monacoEditor.getModel()?.uri.toString() !== expectedUri.toString()) {
+      disposeSourceCollab();
+      view.monacoEditor.getModel()?.dispose();
+      view.monacoEditor.dispose();
+      view.monacoEditor = null;
+    }
+  }
+
   // Source mode: update existing Monaco editor without recreating. Don't replace the buffer while
   // The user is actively typing in it — that would reformat under the cursor (the source view is
   // The editing surface here, mirroring the panel draft-state behaviour).
@@ -429,7 +447,7 @@ export function renderCanvas() {
 
     const filePath = tab.documentPath || "document.json";
     const lang = sourceLang(tab);
-    const modelUri = monaco.Uri.parse(`file:///${filePath}`);
+    const modelUri = monaco.Uri.parse(modelUriFor(filePath));
     const model = monaco.editor.createModel("", lang, modelUri);
     // Co-edited tabs bind the buffer to the shared Y.Text instead of a local serialization: the
     // Canonical lock flips to "source", peers co-type character-level, and the source reconciler

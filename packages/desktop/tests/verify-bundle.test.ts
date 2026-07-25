@@ -52,6 +52,17 @@ describe("verifyBundle", () => {
     expect(verifyBundle(appDir)).toEqual(["bun/sites/beta/project.json"]);
   });
 
+  /* The workers are the one staged asset whose absence is invisible at runtime: Monaco just never
+     starts a language service, so the packaged code view loses schema validation with no error.
+     Keep them in REQUIRED so the postBuild gate is what catches an omission. */
+  test("requires Monaco's worker bundles", () => {
+    for (const worker of ["editor.worker.js", "json.worker.js", "ts.worker.js"]) {
+      expect(REQUIRED).toContain(`views/studio/dist/workers/${worker}`);
+    }
+    rmSync(join(appDir, "views", "studio", "dist", "workers", "json.worker.js"));
+    expect(verifyBundle(appDir)).toEqual(["views/studio/dist/workers/json.worker.js"]);
+  });
+
   test("a missing registry is reported without throwing", () => {
     rmSync(join(appDir, "bun", "registry.json"));
     expect(verifyBundle(appDir)).toEqual(["bun/registry.json"]);
