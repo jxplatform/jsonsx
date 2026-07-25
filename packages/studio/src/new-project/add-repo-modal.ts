@@ -11,11 +11,21 @@
  * project.json, tags + catalogues it) and resolves with the catalogue root key; the caller opens it
  * through the same path as a recent project. Repos without a project.json fail with the backend's
  * structured message, shown inline.
+ *
+ * The list only ever shows what the Jx Suite GitHub App can reach, so the dialog also carries an
+ * access footer: per-installation links to widen the App's repository selection, a link to install
+ * it on another account, and Refresh — the user grants access in a GitHub tab, comes back, and
+ * reloads the list without losing the dialog.
  */
 
 import { html, nothing } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
-import { getAccountStatus, needsAppInstall } from "../account-status";
+import {
+  getAccountStatus,
+  getRepoAccessLinks,
+  hydrateAccountStatus,
+  needsAppInstall,
+} from "../account-status";
 import { getPlatform } from "../platform";
 import { openModal } from "../ui/layers";
 import type { RepoInfo } from "../types";
@@ -60,10 +70,28 @@ function openPicker(mode: PickerMode): Promise<{ root: string } | null> {
     return Promise.resolve(null);
   }
   _mode = mode;
-  _repos = null;
   _filter = "";
-  _error = "";
   _importing = "";
+
+  loadRepos();
+
+  return new Promise((resolve) => {
+    _resolve = resolve;
+    renderModal();
+  });
+}
+
+/**
+ * (Re)load the repository list and the App's installation coverage. Both feed the same question —
+ * "which repositories can Jx see?" — so a refresh after a permission change re-reads both.
+ */
+function loadRepos(): void {
+  _repos = null;
+  _error = "";
+  // Paints the loading state on a refresh; a no-op on open, where the caller renders next.
+  renderIfOpen();
+
+  void hydrateAccountStatus().then(renderIfOpen);
 
   void getPlatform()
     .listRepos?.()
@@ -75,13 +103,15 @@ function openPicker(mode: PickerMode): Promise<{ root: string } | null> {
       _error = errorMessage(error);
     })
     .finally(() => {
-      renderModal();
+      renderIfOpen();
     });
+}
 
-  return new Promise((resolve) => {
-    _resolve = resolve;
+/** Render only while the dialog is still up — a load settling after close must not reopen it. */
+function renderIfOpen(): void {
+  if (_resolve) {
     renderModal();
-  });
+  }
 }
 
 export function closeAddRepoModal() {
@@ -168,8 +198,8 @@ function emptyTpl() {
   }
   if (_mode === "open" && (_repos ?? []).length > 0) {
     return html`<div class="add-repo-empty">
-      No repositories with write access. Widen the Jx Suite GitHub App's repository access, or ask a
-      repository admin for write access.
+      No repositories with write access. Widen the Jx Suite GitHub App's repository access below, or
+      ask a repository admin for write access.
     </div>`;
   }
   if (needsAppInstall()) {
@@ -183,7 +213,7 @@ function emptyTpl() {
       >
         Install the Jx Suite GitHub App
       </a>
-      to grant repository access, then reopen this dialog.
+      to grant repository access, then use Refresh below.
     </div>`;
   }
   return html`<div class="add-repo-empty">
@@ -201,6 +231,58 @@ function bodyTpl() {
     return emptyTpl();
   }
   return html`<div class="add-repo-list">${repos.map((repo) => repoRowTpl(repo))}</div>`;
+}
+
+/**
+ * Repository-access footer: the list is bounded by what the Jx Suite App was granted, so every mode
+ * offers a way out of that boundary — widen an existing installation, install on another account,
+ * then Refresh to pick up the newly reachable repositories.
+ */
+function accessTpl() {
+  const links = getRepoAccessLinks();
+  if (!links) {
+    return nothing;
+  }
+  return html`
+    <div class="add-repo-access">
+      <span class="add-repo-access-note">
+        Missing a repository? Grant the Jx Suite GitHub App access to more of them:
+      </span>
+      <span class="add-repo-access-links">
+        ${links.manage.map(
+          (entry) => html`
+            <a
+              class="add-repo-access-link"
+              href=${entry.url}
+              target="_blank"
+              rel="noreferrer"
+              title="Manage repository access for ${entry.account}"
+            >
+              ${entry.account}
+            </a>
+          `,
+        )}
+        ${links.installUrl
+          ? html`<a
+              class="add-repo-access-link"
+              href=${links.installUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="Install the Jx Suite GitHub App on another account"
+            >
+              Another account…
+            </a>`
+          : nothing}
+      </span>
+      <button
+        class="add-repo-refresh"
+        ?disabled=${_repos === null || Boolean(_importing)}
+        @click=${() => loadRepos()}
+      >
+        Refresh
+      </button>
+    </div>
+  `;
 }
 
 function renderModal() {
@@ -233,6 +315,7 @@ function renderModal() {
           }}
         ></sp-textfield>
         ${bodyTpl()} ${_error ? html`<div class="new-project-error">${_error}</div>` : nothing}
+        ${accessTpl()}
       </div>
     </div>
   `;

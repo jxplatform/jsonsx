@@ -3116,6 +3116,46 @@
         color: var(--accent, #1473e6);
         text-decoration: underline;
       }
+      /* Repository-access footer: widen the GitHub App, or reload after doing so. */
+      .add-repo-access {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 6px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+        font-size: var(--spectrum-font-size-50, 11px);
+        color: var(--fg-dim);
+      }
+      .add-repo-access-note {
+        flex: 1 1 auto;
+      }
+      .add-repo-access-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .add-repo-access-link {
+        color: var(--accent, #1473e6);
+        text-decoration: underline;
+      }
+      .add-repo-refresh {
+        padding: 2px 8px;
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        font: inherit;
+        font-size: var(--spectrum-font-size-50, 11px);
+        color: var(--fg);
+        cursor: pointer;
+      }
+      .add-repo-refresh:hover:not([disabled]) {
+        background: var(--hover-bg);
+      }
+      .add-repo-refresh[disabled] {
+        opacity: 0.5;
+        cursor: default;
+      }
       .new-project-tabs {
         padding: 0 16px;
         border-bottom: 1px solid var(--border);

@@ -37,7 +37,7 @@ Publishing uploads your project's files to GitHub. With **Private repository** o
 :::
 
 :::doc-tip
-Some Studio platforms connect to GitHub through the **Jx Suite GitHub App** instead — when that applies, the [Welcome screen](/docs/studio/interface/welcome-screen) offers **Install the Jx Suite GitHub App** and an **Add Existing Repository…** picker for repositories your account can already reach.
+Some Studio platforms connect to GitHub through the **Jx Suite GitHub App** instead — when that applies, the [Welcome screen](/docs/studio/interface/welcome-screen) offers **Install the Jx Suite GitHub App** and an **Add Existing Repository…** picker for repositories your account can already reach. The picker's footer links to the App's repository-access settings for each account, so you can widen what Studio sees at any time — see [Repository access](/docs/studio/interface/welcome-screen#repository-access).
 :::
 
 ## Next

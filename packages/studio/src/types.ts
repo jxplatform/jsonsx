@@ -94,8 +94,12 @@ export type {
 
 /** Repository-access onboarding state returned by `StudioPlatform.getAccountStatus`. */
 export interface AccountStatus {
-  /** GitHub App installations (personal + organization) visible to the signed-in user. */
-  installations: { id: number; account: string | null }[];
+  /**
+   * GitHub App installations (personal + organization) visible to the signed-in user. `manageUrl`
+   * is that installation's own settings page, where the user widens which repositories the App can
+   * reach; absent when the platform cannot report one.
+   */
+  installations: { id: number; account: string | null; manageUrl?: string }[];
   /** Where to install the App (github.com/apps/<slug>/installations/new), when known. */
   appInstallUrl?: string;
 }

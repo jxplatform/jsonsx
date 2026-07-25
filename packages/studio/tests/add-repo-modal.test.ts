@@ -58,6 +58,16 @@ function errorText(): string | null {
   return document.querySelector("#layer-modal .new-project-error")?.textContent?.trim() ?? null;
 }
 
+function accessLinks(): HTMLAnchorElement[] {
+  return [
+    ...document.querySelectorAll("#layer-modal .add-repo-access-link"),
+  ] as HTMLAnchorElement[];
+}
+
+function refreshButton(): HTMLButtonElement | null {
+  return document.querySelector("#layer-modal .add-repo-refresh");
+}
+
 afterEach(() => {
   closeAddRepoModal();
   resetAccountStatus();
@@ -182,6 +192,112 @@ describe("openAddRepoModal", () => {
     expect(rows()).toHaveLength(1);
     expect(rows()[0]!.textContent).toContain("acme/docs");
     closeAddRepoModal();
+    expect(await promise).toBeNull();
+  });
+});
+
+describe("repository-access footer", () => {
+  const MANAGE_URL = "https://github.com/settings/installations/7";
+  const INSTALL_URL = "https://github.com/apps/jx-suite/installations/new";
+
+  test("offers a manage link per installation plus another-account install", async () => {
+    installMockPlatform({
+      getAccountStatus: () =>
+        Promise.resolve({
+          appInstallUrl: INSTALL_URL,
+          installations: [{ account: "octocat", id: 7, manageUrl: MANAGE_URL }],
+        }),
+      importProject: () => Promise.resolve({ root: "r" }),
+      listRepos: () => Promise.resolve(REPOS),
+      openProjectPicker: "repo-list",
+    });
+    const promise = openProjectPickerModal();
+    await flush();
+    // Rendered alongside a populated list — widening access is not just an empty-state fallback.
+    expect(rows()).toHaveLength(2);
+    expect(accessLinks().map((a) => [a.textContent?.trim(), a.href])).toEqual([
+      ["octocat", MANAGE_URL],
+      ["Another account…", INSTALL_URL],
+    ]);
+    closeAddRepoModal();
+    expect(await promise).toBeNull();
+  });
+
+  test("the picker hydrates account status itself, so Add mode gets the links too", async () => {
+    installMockPlatform({
+      getAccountStatus: () =>
+        Promise.resolve({
+          appInstallUrl: INSTALL_URL,
+          installations: [{ account: "octocat", id: 7, manageUrl: MANAGE_URL }],
+        }),
+      importProject: () => Promise.resolve({ root: "r" }),
+      listRepos: () => Promise.resolve(REPOS),
+    });
+    // No hydrateAccountStatus() call here — opening the dialog must be enough.
+    const promise = openAddRepoModal();
+    await flush();
+    expect(accessLinks()).toHaveLength(2);
+    closeAddRepoModal();
+    expect(await promise).toBeNull();
+  });
+
+  test("Refresh re-reads repositories granted while the dialog stayed open", async () => {
+    let granted = false;
+    installMockPlatform({
+      getAccountStatus: () =>
+        Promise.resolve({
+          appInstallUrl: INSTALL_URL,
+          installations: [{ account: "octocat", id: 7, manageUrl: MANAGE_URL }],
+        }),
+      importProject: () => Promise.resolve({ root: "r" }),
+      listRepos: () => Promise.resolve(granted ? REPOS : [REPOS[0]!]),
+      openProjectPicker: "repo-list",
+    });
+    const promise = openProjectPickerModal();
+    await flush();
+    expect(rows()).toHaveLength(1);
+
+    granted = true;
+    refreshButton()!.dispatchEvent(new Event("click", { bubbles: true }));
+    // Mid-refresh the list is unknown again, so Refresh cannot be double-fired.
+    expect(refreshButton()!.disabled).toBe(true);
+    await flush();
+    expect(rows()).toHaveLength(2);
+    expect(refreshButton()!.disabled).toBe(false);
+
+    closeAddRepoModal();
+    expect(await promise).toBeNull();
+  });
+
+  test("platforms with no account status show no access footer", async () => {
+    installMockPlatform({
+      importProject: () => Promise.resolve({ root: "r" }),
+      listRepos: () => Promise.resolve(REPOS),
+    });
+    const promise = openAddRepoModal();
+    await flush();
+    expect(accessLinks()).toHaveLength(0);
+    expect(refreshButton()).toBeNull();
+    closeAddRepoModal();
+    expect(await promise).toBeNull();
+  });
+
+  test("a listing that settles after dismissal does not resurrect the dialog", async () => {
+    let release: (repos: RepoInfo[]) => void = () => {};
+    installMockPlatform({
+      importProject: () => Promise.resolve({ root: "r" }),
+      listRepos: () =>
+        new Promise<RepoInfo[]>((resolve) => {
+          release = resolve;
+        }),
+    });
+    const promise = openAddRepoModal();
+    await flush();
+    closeAddRepoModal();
+    expect(modal()).toBeNull();
+    release(REPOS);
+    await flush();
+    expect(modal()).toBeNull();
     expect(await promise).toBeNull();
   });
 });

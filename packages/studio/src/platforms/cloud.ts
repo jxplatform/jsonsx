@@ -14,6 +14,7 @@
 import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
+  AccountStatus,
   CreateProjectDestination,
   DirEntry,
   ExtensionsInfo,
@@ -774,18 +775,30 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
       };
     },
 
-    /** GitHub-App installation coverage from /me — powers the welcome install prompt. */
+    /**
+     * GitHub-App installation coverage from /me — powers the welcome install prompt and the repo
+     * picker's "grant access to more repositories" links (`manageUrl` per installation).
+     */
     async getAccountStatus() {
       const res = await fetch("/api/v1/me", { credentials: "include" });
       if (!res.ok) {
         return null;
       }
       const me = (await res.json()) as {
-        installations?: { id: number; account: string | null }[];
+        installations?: { id: number; account: string | null; manageUrl?: string }[];
         appInstallUrl?: string;
       };
       return {
-        installations: me.installations ?? [],
+        installations: (me.installations ?? []).map((entry) => {
+          const installation: AccountStatus["installations"][number] = {
+            id: entry.id,
+            account: entry.account,
+          };
+          if (entry.manageUrl) {
+            installation.manageUrl = entry.manageUrl;
+          }
+          return installation;
+        }),
         ...(me.appInstallUrl ? { appInstallUrl: me.appInstallUrl } : {}),
       };
     },

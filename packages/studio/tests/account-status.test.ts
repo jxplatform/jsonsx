@@ -7,6 +7,7 @@ import { installMockPlatform } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
   getAccountStatus,
+  getRepoAccessLinks,
   hydrateAccountStatus,
   needsAppInstall,
   resetAccountStatus,
@@ -58,6 +59,59 @@ describe("account-status cache", () => {
     await hydrateAccountStatus();
     expect(getAccountStatus()).toBeNull();
     expect(needsAppInstall()).toBe(false);
+  });
+});
+
+describe("getRepoAccessLinks", () => {
+  test("one manage link per installation that reports one, plus the install URL", async () => {
+    installMockPlatform({
+      getAccountStatus: () =>
+        Promise.resolve({
+          appInstallUrl: INSTALL_URL,
+          installations: [
+            { account: "octocat", id: 7, manageUrl: "https://github.com/settings/installations/7" },
+            // No manageUrl: not linkable, so it contributes nothing.
+            { account: "acme", id: 8 },
+            {
+              account: null,
+              id: 9,
+              manageUrl: "https://github.com/organizations/globex/settings/installations/9",
+            },
+          ],
+        }),
+    });
+    await hydrateAccountStatus();
+    expect(getRepoAccessLinks()).toEqual({
+      manage: [
+        { account: "octocat", url: "https://github.com/settings/installations/7" },
+        {
+          account: "Installation 9",
+          url: "https://github.com/organizations/globex/settings/installations/9",
+        },
+      ],
+      installUrl: INSTALL_URL,
+    });
+  });
+
+  test("the install URL alone still offers a way to widen access", async () => {
+    installMockPlatform({
+      getAccountStatus: () =>
+        Promise.resolve({ appInstallUrl: INSTALL_URL, installations: [{ account: "a", id: 1 }] }),
+    });
+    await hydrateAccountStatus();
+    expect(getRepoAccessLinks()).toEqual({ manage: [], installUrl: INSTALL_URL });
+  });
+
+  test("unknown status, or nothing linkable, means no affordance at all", async () => {
+    installMockPlatform();
+    await hydrateAccountStatus();
+    expect(getRepoAccessLinks()).toBeNull();
+
+    installMockPlatform({
+      getAccountStatus: () => Promise.resolve({ installations: [{ account: "a", id: 1 }] }),
+    });
+    await hydrateAccountStatus();
+    expect(getRepoAccessLinks()).toBeNull();
   });
 });
 

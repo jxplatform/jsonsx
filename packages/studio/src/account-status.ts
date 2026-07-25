@@ -33,6 +33,35 @@ export function needsAppInstall(): boolean {
   return cache !== null && cache.installations.length === 0 && Boolean(cache.appInstallUrl);
 }
 
+/** Where the user can widen the App's repository access, for the repo picker's access footer. */
+export interface RepoAccessLinks {
+  /** One entry per installation that reports its settings page, in the platform's order. */
+  manage: { account: string; url: string }[];
+  /** Install the App on an account that has none yet (also covers "another organization"). */
+  installUrl?: string;
+}
+
+/**
+ * Links that let the user grant the App access to more repositories: each installation's own
+ * settings page plus the install URL for accounts it has not reached yet. Null when the status is
+ * unknown (platform without `getAccountStatus`, or a failed hydrate) or when nothing is linkable —
+ * callers render no access affordance rather than a dead link.
+ */
+export function getRepoAccessLinks(): RepoAccessLinks | null {
+  if (cache === null) {
+    return null;
+  }
+  const manage = cache.installations.flatMap((entry) =>
+    entry.manageUrl
+      ? [{ account: entry.account ?? `Installation ${entry.id}`, url: entry.manageUrl }]
+      : [],
+  );
+  if (manage.length === 0 && !cache.appInstallUrl) {
+    return null;
+  }
+  return { manage, ...(cache.appInstallUrl ? { installUrl: cache.appInstallUrl } : {}) };
+}
+
 /** Reset seam for tests. */
 export function resetAccountStatus(): void {
   cache = null;
