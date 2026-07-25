@@ -24,6 +24,7 @@ import type {
   GitStatusResult,
   PackageInfo,
   ProjectListEntry,
+  ProjectSchemasResponse,
   RenameResult,
   RepoInfo,
   StarterInfo,
@@ -413,6 +414,27 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
         return body.extensions ?? [];
       } catch {
         return [];
+      }
+    },
+
+    /**
+     * The session's generated entry documents, composed server-side from the core schemas and each
+     * enabled extension's fragments (extensions.md §5.2) and returned PRE-BUNDLED — Monaco and the
+     * AI assistant register them as inline objects and never fetch (studio.md §4.2.1).
+     *
+     * Degrades to `{}` rather than throwing: a backend too old to serve the route, or a project
+     * whose extensions the session cannot compose, keeps the bundled core schemas. That fallback
+     * under-suggests extension extras but never reports false errors (§5.3).
+     */
+    async fetchProjectSchemas(): Promise<ProjectSchemasResponse> {
+      try {
+        const res = await api("/project-schemas");
+        if (!res.ok) {
+          return {};
+        }
+        return (await res.json()) as ProjectSchemasResponse;
+      } catch {
+        return {};
       }
     },
 

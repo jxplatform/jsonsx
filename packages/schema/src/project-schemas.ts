@@ -490,3 +490,119 @@ export function emitDocumentSchema(inputs: DocumentSchemaInputs): Record<string,
     allOf: [{ $ref: corePath }],
   };
 }
+
+// ─── Composition (specs/extensions.md §5.2) ──────────────────────────────────
+
+/** Loader-resolvable refs to one extension's shipped schema fragments, as its manifest names them. */
+export interface ExtensionFragmentRefs {
+  /** Project fragment — plain `properties` for the extension's section keys. */
+  project?: string | undefined;
+  /** Document fragment — its `$defs` become `$paths` source-union members. */
+  document?: string | undefined;
+  /** Fields fragment — its `$defs` become Field-schema union members. */
+  fields?: string | undefined;
+}
+
+export interface ComposeProjectSchemasInputs {
+  /** Ref to the core project fragment (`@jxsuite/schema/schemas/project.core.schema.json`). */
+  coreProjectRef: string;
+  /** Ref to the core document schema (`@jxsuite/schema/schema.json`). */
+  coreDocumentRef: string;
+  /** Enabled extensions in registry order; each contributes the fragments it ships. */
+  extensions: ExtensionFragmentRefs[];
+  /** Loads a ref's JSON. Every ref above and every `$ref` inside resolves through this ALONE. */
+  loadJson: SchemaJsonLoader;
+  /** Directory the refs resolve against ("" for hosts addressing by bare specifier). */
+  baseDir: string;
+}
+
+/**
+ * Compose a project's two committed entry documents from the core schemas and its enabled
+ * extensions' fragments — bundled, then flattened to root JSON pointers (§5.2/§5.4).
+ *
+ * Host-agnostic by construction: every file it needs arrives through `loadJson`, so the same
+ * composition runs over a filesystem (`jx schema`) and over a virtual tree of bundled artifacts
+ * (the cloud session, which has no `node_modules` and no filesystem). That shared path is the point
+ * — a project's schemas must not depend on which host generated them.
+ *
+ * @param {ComposeProjectSchemasInputs} inputs - Core refs, extension fragments, loader, base
+ * @returns {Promise<{ project: Record<string, unknown>; document: Record<string, unknown> }>} The
+ *   self-contained entry documents, ready to write or to hand an editor
+ */
+export async function composeProjectSchemas(inputs: ComposeProjectSchemasInputs): Promise<{
+  project: Record<string, unknown>;
+  document: Record<string, unknown>;
+}> {
+  const { baseDir, coreDocumentRef, coreProjectRef, extensions, loadJson } = inputs;
+
+  const fragments: string[] = [];
+  const pathsValueRefs: string[] = [];
+  const documentFragments: string[] = [];
+  const fieldSchemaRefs: string[] = [];
+  for (const ext of extensions) {
+    if (ext.project) {
+      fragments.push(ext.project);
+    }
+    if (ext.document) {
+      const documentRefs = await fragmentDefsRefs(ext.document, loadJson, baseDir);
+      pathsValueRefs.push(...documentRefs);
+      /* The paths union names this fragment's shapes by canonical $id only, so the bundler needs
+         the path handed to it explicitly or those refs stay dangling. A fragment that contributed
+         nothing (no $id, or no $defs) is left out rather than embedded unreferenced. */
+      if (documentRefs.length > 0) {
+        documentFragments.push(ext.document);
+      }
+    }
+    // The `schemas.fields` manifest convention: a fragment whose $defs members are extension
+    // Field extras, unioned into the per-project field resource (specs/extensions.md §5.3).
+    if (ext.fields) {
+      fieldSchemaRefs.push(...(await fragmentDefsRefs(ext.fields, loadJson, baseDir)));
+      fragments.push(ext.fields);
+    }
+  }
+
+  // Bundle then flatten: the emitted relative refs are an intermediate form only.
+  const projectEntry = emitProjectSchema({ corePath: coreProjectRef, fieldSchemaRefs, fragments });
+  const documentEntry = emitDocumentSchema({ corePath: coreDocumentRef, pathsValueRefs });
+  return {
+    document: flattenSchema(
+      await bundleSchema(documentEntry, loadJson, baseDir, documentFragments),
+    ),
+    project: flattenSchema(await bundleSchema(projectEntry, loadJson, baseDir)),
+  };
+}
+
+/**
+ * Canonical "uri#/pointer" refs into a fragment's `$defs` shapes: one per `$defs` entry, addressed
+ * by the fragment's own `$id` (refs inside the entry document's embeds resolve against canonical
+ * URIs, never file paths). An `$id`-less or `$defs`-less fragment contributes no union members —
+ * that is simply the shape of a fragment declaring only `properties`.
+ *
+ * An UNREADABLE fragment contributes nothing here but still fails the composition, because the
+ * bundler goes on to embed the same ref and throws. That is deliberate: silently dropping it would
+ * emit an entry document that under-validates the project with nothing to show for it. A host that
+ * cannot supply an extension's fragments must leave that extension out of `extensions` entirely —
+ * which is exactly what the cloud session does for packages it does not bundle.
+ *
+ * @param {string} ref - Loader-resolvable ref to the fragment, relative to `baseDir`
+ * @param {SchemaJsonLoader} loadJson - The host's loader
+ * @param {string} baseDir - Directory the ref resolves against
+ * @returns {Promise<string[]>} One ref per `$defs` member, in declaration order
+ */
+async function fragmentDefsRefs(
+  ref: string,
+  loadJson: SchemaJsonLoader,
+  baseDir: string,
+): Promise<string[]> {
+  let fragment: { $id?: unknown; $defs?: Record<string, unknown> };
+  try {
+    fragment = await loadJson(normalizeSchemaPath(`${normalizeSchemaPath(baseDir)}/${ref}`));
+  } catch {
+    return [];
+  }
+  const { $id } = fragment;
+  if (typeof $id !== "string" || !fragment.$defs) {
+    return [];
+  }
+  return Object.keys(fragment.$defs).map((name) => `${$id}#/$defs/${name}`);
+}
