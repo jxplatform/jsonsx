@@ -122,19 +122,49 @@ export function setExtensions(extensions: ExtensionsInfo[]) {
 }
 
 /**
- * Fire-and-forget refresh of the extension-facing editor surface after project (re)activation or an
- * `extensions` change: Monaco's per-project schemas and the descriptor-contributed settings
- * sections. Both modules load lazily — monaco is heavy and the settings registry pulls DOM
- * templates — and both degrade silently (bundled core schemas, built-in sections only).
+ * Fetch the active project's entry documents ONCE and hand the same payload to every consumer.
+ *
+ * The backends regenerate entry documents that are missing or older than `project.json` and write
+ * them to disk (extensions.md §5.2), so a second concurrent fetch is not a harmless duplicate — it
+ * races the first on the same two files. One fetch also guarantees Monaco's diagnostics and the AI
+ * assistant's gate judge a document by the SAME schema; when they disagree the model ships work its
+ * own tool call called clean and the editor immediately paints red.
+ *
+ * @param {object} platform - The studio platform (only `fetchProjectSchemas` is consulted)
+ * @returns {Promise<void>} Resolves once both consumers have been updated
+ */
+async function shareProjectSchemas(platform: {
+  fetchProjectSchemas?: () => Promise<{ project?: unknown; document?: unknown }>;
+}): Promise<void> {
+  let schemas: { project?: unknown; document?: unknown } | null = null;
+  try {
+    schemas = (await platform.fetchProjectSchemas?.()) ?? null;
+  } catch {
+    // Editor degradation: both consumers keep the bundled core schemas.
+  }
+  await Promise.all([
+    import("../services/monaco-setup")
+      .then(({ applyProjectSchemas }) => applyProjectSchemas(schemas))
+      .catch(() => false),
+    import("../services/jx-validate")
+      .then(({ applyProjectSchemas }) => applyProjectSchemas(schemas))
+      .catch(() => false),
+  ]);
+}
+
+/**
+ * Fire-and-forget refresh of the extension-facing editor surface after project (re)activation, a
+ * `project.json` write, or an `extensions` change: the per-project schemas behind Monaco's
+ * diagnostics and the AI assistant's validation gate, plus the descriptor-contributed settings
+ * sections. Every module loads lazily — monaco is heavy and the settings registry pulls DOM
+ * templates — and all of them degrade silently (core schemas, built-in sections only).
  *
  * @param {object} platform - The studio platform (only `fetchProjectSchemas` is consulted here)
  */
 export function refreshExtensionUi(platform: {
   fetchProjectSchemas?: () => Promise<{ project?: unknown; document?: unknown }>;
 }): void {
-  void import("../services/monaco-setup")
-    .then(({ refreshProjectSchemas }) => refreshProjectSchemas(platform))
-    .catch(() => false);
+  void shareProjectSchemas(platform);
   void import("../settings/extension-sections")
     .then(({ syncExtensionSettingsSections }) => syncExtensionSettingsSections())
     .catch(() => {

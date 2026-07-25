@@ -281,6 +281,61 @@ describe("ai-project-tools — write_file", () => {
     expect(bad.success).toBe(false);
     expect(onProjectConfigWritten).toHaveBeenCalledTimes(1);
   });
+
+  /* Project.json used to be exempt from the schema gate by construction — syntactically valid JSON
+     was written straight to disk, and Monaco flagged it against the per-project entry document the
+     moment a human opened the file. The gate has to block BEFORE the write: disk writes have no
+     undo to lean on. */
+  test("a schema-invalid project.json is refused before anything is written", async () => {
+    const onProjectConfigWritten = mock((_c: object) => {});
+    const validateProject = mock(async (_c: unknown) => ["/extensions: must be object"]);
+    const { registry, state } = makeHarness({}, { onProjectConfigWritten, validateProject });
+
+    const res = await registry.execute("write_file", {
+      content: JSON.stringify({ extensions: "nope", name: "Demo" }),
+      path: "project.json",
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("project.json has schema errors");
+    expect(res.error).toContain("must be object");
+    expect(validateProject).toHaveBeenCalledWith({ extensions: "nope", name: "Demo" });
+    expect(writes(state)).toHaveLength(0);
+    expect(onProjectConfigWritten).not.toHaveBeenCalled();
+  });
+
+  test("the document validator is never used for project.json", async () => {
+    const validate = mock(async (_d: unknown) => ["/tagName: must be string"]);
+    const validateProject = mock(async (_c: unknown) => []);
+    const { registry, state } = makeHarness({}, { validate, validateProject });
+
+    const res = await registry.execute("write_file", {
+      content: JSON.stringify({ name: "Demo" }),
+      path: "project.json",
+    });
+
+    expect(res.success).toBe(true);
+    expect(validate).not.toHaveBeenCalled();
+    expect(validateProject).toHaveBeenCalledTimes(1);
+    expect(writes(state)).toHaveLength(1);
+  });
+
+  /* Kept in step with monaco-setup's DOCUMENT_FILE_MATCH — `elements/` was missing here, so an
+     element document reached disk validated only by the structural sniff. */
+  test("elements/*.json is gated like every other document folder", async () => {
+    const validate = mock(async (_d: unknown) => ["/tagName: must be string"]);
+    const { registry, state } = makeHarness({}, { validate });
+
+    const res = await registry.execute("write_file", {
+      content: JSON.stringify({ nothing: "doc-shaped" }),
+      path: "elements/badge.json",
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("schema errors");
+    expect(validate).toHaveBeenCalledTimes(1);
+    expect(writes(state)).toHaveLength(0);
+  });
 });
 
 describe("ai-project-tools — search_files", () => {

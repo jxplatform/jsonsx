@@ -17,13 +17,13 @@
 import { createToolDefinition } from "@jxsuite/ai/tools";
 import type { CreateProjectDestination } from "../types";
 import type { ToolRegistry, ToolResult } from "@jxsuite/ai/tools";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
 import { getPlatform } from "../platform";
 import { workspace } from "../workspace/workspace";
 import type { Tab } from "../tabs/tab";
 import { beginBatch, endBatch, isBatching } from "../tabs/transact";
 import { translateValidationError } from "./ai-tools";
-import { validateDoc } from "./jx-validate";
+import { validateDoc, validateProjectConfig } from "./jx-validate";
 import { flagHardcodedTokens, formatTokenHints } from "./token-lint";
 
 /** Directories the file tools never descend into or report. */
@@ -65,9 +65,14 @@ function pathError(path: unknown): ToolResult {
   };
 }
 
-/** Whether a project-relative path conventionally holds a Jx document. */
+/**
+ * Whether a project-relative path conventionally holds a Jx document. Kept in step with
+ * monaco-setup.ts's DOCUMENT_FILE_MATCH so the assistant's gate and the editor's diagnostics cover
+ * the same files — `elements/` used to be missing here and validated only by the
+ * {@link looksLikeJxDoc} sniff.
+ */
 function isJxDocPath(path: string): boolean {
-  return /^(pages|layouts|components)\//.test(path) && path.endsWith(".json");
+  return /^(pages|layouts|components|elements)\//.test(path) && path.endsWith(".json");
 }
 
 /** Structural sniff for Jx-document-shaped JSON values. */
@@ -83,6 +88,8 @@ function looksLikeJxDoc(value: unknown): boolean {
 export interface ProjectToolsCtx {
   getTab: () => Tab | null;
   validate?: (doc: unknown) => Promise<string[]>;
+  /** Gate for `project.json` writes — the per-project entry document, not the document schema. */
+  validateProject?: (config: unknown) => Promise<string[]>;
   renderCheck?: (doc: unknown) => Promise<{ ok: true } | { ok: false; error: string }>;
   /** Live getter — the project style appears only after a project is open/bootstrapped. */
   getProjectStyle?: () => Record<string, string> | undefined;
@@ -94,8 +101,11 @@ export interface ProjectToolsCtx {
   adoptProject: (root: string) => Promise<void>;
   /** Fired after adoption is verified — the session store re-keys the live chat here. */
   onProjectAdopted?: (root: string) => void;
-  /** Fired after a successful `project.json` write so workspace/project state stay in sync. */
-  onProjectConfigWritten?: (config: object) => void;
+  /**
+   * Fired after a successful `project.json` write so workspace/project state stay in sync. The
+   * config has passed the project-schema gate by then, which is what makes the type honest.
+   */
+  onProjectConfigWritten?: (config: ProjectConfig) => void;
 }
 
 /**
@@ -109,6 +119,7 @@ export function registerProjectTools(
   {
     getTab,
     validate = validateDoc,
+    validateProject = validateProjectConfig,
     renderCheck,
     getProjectStyle,
     findOpenTab,
@@ -318,15 +329,35 @@ export function registerProjectTools(
           }
         }
 
+        /* Parsed as `unknown` because that is what it is until the schema says otherwise — this is
+           model-authored text, and the gate below is the whole reason we do not trust its shape. */
+        let projectConfig: ProjectConfig | undefined;
         if (relPath === "project.json") {
+          let parsedConfig: unknown;
           try {
-            JSON.parse(content);
+            parsedConfig = JSON.parse(content);
           } catch (error) {
             return {
               success: false,
               error: `project.json must be valid JSON: ${error instanceof Error ? error.message : String(error)}`,
             };
           }
+          /* The per-project entry document closes the composition over every enabled extension
+             (extensions.md §5.2), so this is what catches a typo'd section key or a misshapen
+             extension section. Without it the model shipped config its own tool call called clean
+             and Monaco flagged the moment a human opened the file. */
+          const configErrors = await validateProject(parsedConfig);
+          if (configErrors.length > 0) {
+            const formatted = configErrors
+              .map((e) => `- ${translateValidationError(e)}`)
+              .join("\n");
+            return {
+              success: false,
+              error: `project.json has schema errors — nothing was written. Fix these and retry:\n${formatted}`,
+            };
+          }
+          // Narrowed only now: the assertion is earned by the schema gate, not by JSON.parse.
+          projectConfig = parsedConfig as ProjectConfig;
         }
 
         try {
@@ -338,8 +369,8 @@ export function registerProjectTools(
           };
         }
 
-        if (relPath === "project.json") {
-          onProjectConfigWritten?.(JSON.parse(content) as object);
+        if (projectConfig) {
+          onProjectConfigWritten?.(projectConfig);
         }
 
         let summary = `Wrote "${relPath}" ${NOT_UNDOABLE}.`;

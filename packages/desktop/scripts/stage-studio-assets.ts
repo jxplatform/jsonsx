@@ -9,6 +9,21 @@ import { join, resolve } from "node:path";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 
 /**
+ * Monaco's pre-bundled web workers (packages/studio/scripts/build-workers.ts). Without them the
+ * packaged shell has no JSON language service at all — schema validation, completion and hover in
+ * the code view silently stop working, because `new Worker()` 404s and Monaco surfaces nothing.
+ */
+const WORKER_BUNDLES = ["editor.worker.js", "json.worker.js", "ts.worker.js"];
+
+/** The vendored JetBrains Mono faces index.html declares via @font-face. */
+const FONT_FILES = [
+  "jetbrains-mono-400.woff2",
+  "jetbrains-mono-500.woff2",
+  "jetbrains-mono-700.woff2",
+  "OFL.txt",
+];
+
+/**
  * Copy the built studio assets into `<desktopDir>/assets/studio` and patch index.html to load the
  * launcher init bundle (dist/init.js, built by the caller) before studio.js.
  */
@@ -19,6 +34,21 @@ export async function stageStudioAssets(desktopDir: string): Promise<void> {
 
   await copyFile(join(studioDir, "dist", "studio.css"), join(outDir, "dist", "studio.css"));
   await copyFile(join(studioDir, "dist", "studio.js"), join(outDir, "dist", "studio.js"));
+
+  // Monaco workers + webfonts. Both are addressed relatively — the workers against the BUNDLE's own
+  // Url (monaco-setup.ts), the fonts against the document (index.html @font-face) — so the staged
+  // Tree has to mirror packages/studio's layout exactly for either to resolve.
+  await mkdir(join(outDir, "dist", "workers"), { recursive: true });
+  for (const worker of WORKER_BUNDLES) {
+    await copyFile(
+      join(studioDir, "dist", "workers", worker),
+      join(outDir, "dist", "workers", worker),
+    );
+  }
+  await mkdir(join(outDir, "fonts"), { recursive: true });
+  for (const font of FONT_FILES) {
+    await copyFile(join(studioDir, "fonts", font), join(outDir, "fonts", font));
+  }
 
   // Iframe canvas: the project server serves the canvas doc + its bundle from assets/studio.
   // Without these, the packaged iframe 404s at boot (/__studio__/canvas.html and its entry).

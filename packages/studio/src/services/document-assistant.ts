@@ -28,6 +28,7 @@ import { getBaseUrl, getModel, getOpenAiKey } from "./ai-settings";
 import { trimContext } from "./context-manager";
 import { renderCheck } from "./render-critic";
 import { openFileInTab, reloadFileInTab } from "../files/files";
+import { refreshExtensionUi } from "../format/format-host";
 import * as sessionStore from "./ai-session-store";
 
 /**
@@ -103,11 +104,15 @@ export function createDocumentAssistant() {
         sessionStore.moveSession("", root, sessionId);
       }
     },
-    onProjectConfigWritten: (config: object) => {
+    onProjectConfigWritten: (config: ProjectConfig) => {
       setWorkspaceProject(workspace.projectRoot, config);
       if (projectState) {
-        setProjectState({ ...projectState, projectConfig: config as ProjectConfig });
+        setProjectState({ ...projectState, projectConfig: config });
       }
+      /* An `extensions` edit changes what the generated entry documents compose, and the backends
+         regenerate them from project.json on demand — so without this the editor and the assistant
+         both keep judging by the PREVIOUS project's schemas until the window reopens. */
+      refreshExtensionUi(getPlatform());
     },
   });
 

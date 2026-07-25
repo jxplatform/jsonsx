@@ -93,6 +93,12 @@ export default {
       "assets/studio/dist/init.js": "views/studio/dist/init.js",
       "assets/studio/dist/studio.css": "views/studio/dist/studio.css",
       "assets/studio/dist/studio.js": "views/studio/dist/studio.js",
+      // Monaco's web workers and the vendored webfonts. monaco-setup.ts resolves the workers
+      // Relative to the studio document (views://studio/index.html), so a missing entry here does
+      // Not 404 loudly — it just leaves the code view with no JSON language service, and therefore
+      // No schema validation, completion or hover.
+      "assets/studio/dist/workers": "views/studio/dist/workers",
+      "assets/studio/fonts": "views/studio/fonts",
       "assets/studio/index.html": "views/studio/index.html",
     },
   },

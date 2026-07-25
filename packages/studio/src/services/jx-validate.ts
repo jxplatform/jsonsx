@@ -1,65 +1,150 @@
 /**
- * Jx-validate.js — cached Jx document schema validation for the AI assistant.
+ * Jx-validate.js — cached Jx schema validation for the AI assistant.
  *
- * Uses `@jxsuite/schema`'s pre-generated `schema.json` (the committed output of `generateSchema()`)
- * as the eval signal for the agent loop (ADR docs/ai-assistant-decision.md §6b). We import the
- * generated JSON rather than the generator itself: `generateSchema()` pulls in `@webref/*` + Node
- * builtins (node:path/process) and would crash a browser bundle. The ajv validator is compiled once
- * per session — `@jxsuite/schema`'s `validateDocument` recompiles on every call, which is too slow
- * to run after every mutation in the loop.
+ * Validates against the ACTIVE project's generated entry documents (`document.schema.json` /
+ * `project.schema.json`, extensions.md §5.2) once {@link applyProjectSchemas} has been handed them,
+ * and against `@jxsuite/schema`'s pre-generated core schemas until then. Matching what Monaco shows
+ * in the code view is the point: the entry documents close the composition with
+ * `unevaluatedProperties: false` and union in each enabled extension's shapes, so validating the
+ * agent loop against core alone lets the model write a `$paths` source or a `search:` section that
+ * its own tool call reports clean and the editor paints red the moment a human opens the file.
+ *
+ * We import the generated JSON rather than the generator itself: `generateSchema()` pulls in
+ * `@webref/*` + Node builtins (node:path/process) and would crash a browser bundle. Validators are
+ * compiled once per schema swap — `@jxsuite/schema`'s `validateDocument` recompiles on every call,
+ * which is too slow to run after every mutation in the loop.
  *
  * @license MIT
  */
 
-import schema from "@jxsuite/schema/schema.json";
+import coreDocumentSchema from "@jxsuite/schema/schema.json";
+import coreProjectSchema from "@jxsuite/schema/project-schema.json";
 
 type ValidateFn = ((doc: unknown) => boolean) & {
   errors?: { instancePath?: string; message?: string }[] | null;
 };
 
-let _validate: ValidateFn | null = null;
-let _loading: Promise<ValidateFn | null> | null = null;
+/** Which of the two entry documents a validator covers. */
+type SchemaKind = "document" | "project";
 
-/** Compile (once) and return the ajv validate function, or null if ajv is unavailable. */
-function getValidator() {
-  if (_validate) {
-    return Promise.resolve(_validate);
-  }
-  if (!_loading) {
-    _loading = (async () => {
-      try {
-        // The generated schema is JSON Schema draft 2020-12, so it needs Ajv's 2020 build —
-        // The default export only knows draft-07 and throws on the 2020 meta-schema ref.
-        // Optional peer dependency: validation degrades to a no-op if ajv is absent or the
-        // Schema fails to compile.
-        const { default: Ajv2020 } = await import("ajv/dist/2020.js");
-        const { default: addFormats } = await import("ajv-formats");
-        const ajv = new Ajv2020({ allErrors: true, strict: false, allowUnionTypes: true });
-        addFormats(ajv);
-        _validate = ajv.compile(schema as object);
-        return _validate;
-      } catch {
-        return null;
+const CORE: Record<SchemaKind, object> = {
+  document: coreDocumentSchema as object,
+  project: coreProjectSchema as object,
+};
+
+const active: Record<SchemaKind, object> = { ...CORE };
+const compiling: Record<SchemaKind, Promise<ValidateFn | null> | null> = {
+  document: null,
+  project: null,
+};
+
+/**
+ * One console report per session — a validator that cannot compile is otherwise indistinguishable
+ * from a clean document, in the agent loop AND in the eval scoreboard.
+ */
+let reportedFailure = false;
+
+/**
+ * Compile (once per active schema) and return the ajv validate function, or null when ajv is
+ * unavailable or the schema will not compile.
+ *
+ * @param {SchemaKind} kind - Which entry document to compile
+ * @returns {Promise<ValidateFn | null>} The compiled validator, or null when unavailable
+ */
+function getValidator(kind: SchemaKind): Promise<ValidateFn | null> {
+  compiling[kind] ??= (async () => {
+    try {
+      // The generated schemas are JSON Schema draft 2020-12, so they need Ajv's 2020 build —
+      // The default export only knows draft-07 and throws on the 2020 meta-schema ref.
+      // Optional peer dependency: validation degrades to a no-op if ajv is absent or the
+      // Schema fails to compile.
+      const { default: Ajv2020 } = await import("ajv/dist/2020.js");
+      const { default: addFormats } = await import("ajv-formats");
+      const ajv = new Ajv2020({ allErrors: true, strict: false, allowUnionTypes: true });
+      addFormats(ajv);
+      return ajv.compile(active[kind]) as ValidateFn;
+    } catch (error) {
+      if (!reportedFailure) {
+        reportedFailure = true;
+        console.error(
+          `[jx] ${kind} schema validation is unavailable — the AI assistant's schema gate is a ` +
+            `no-op for this session:`,
+          error,
+        );
       }
-    })();
-  }
-  return _loading;
+      return null;
+    }
+  })();
+  return compiling[kind];
 }
 
 /**
- * Validate a Jx document against the schema.
+ * Swap in the active project's pre-bundled entry documents (the payload behind the platform's
+ * `fetchProjectSchemas` member). Each half falls back to its core schema when absent, so a partial
+ * payload still upgrades the half it carries. Discards the compiled validators so the next call
+ * recompiles.
  *
- * @param {unknown} doc
+ * @param {object | null} schemas - Pre-bundled `{ document, project }`, or null to restore core
+ * @returns {boolean} True when at least one per-project schema was applied
+ */
+export function applyProjectSchemas(
+  schemas: { project?: unknown; document?: unknown } | null,
+): boolean {
+  const document = (schemas?.document as object | undefined) ?? CORE.document;
+  const project = (schemas?.project as object | undefined) ?? CORE.project;
+  if (document === active.document && project === active.project) {
+    return Boolean(schemas?.document || schemas?.project);
+  }
+  active.document = document;
+  active.project = project;
+  compiling.document = null;
+  compiling.project = null;
+  return Boolean(schemas?.document || schemas?.project);
+}
+
+/** Restore the core schemas (project closed / tests). */
+export function resetProjectSchemas(): void {
+  applyProjectSchemas(null);
+}
+
+/**
+ * Format ajv errors the way the agent loop consumes them (see ai-tools.ts
+ * `translateValidationError`).
+ *
+ * @param {ValidateFn} validate - The validator that just ran
+ * @returns {string[]} One formatted string per error
+ */
+function formatErrors(validate: ValidateFn): string[] {
+  return (validate.errors || []).map((e) => `${e.instancePath || "(root)"}: ${e.message}`);
+}
+
+/**
+ * Validate a Jx document against the active document schema.
+ *
+ * @param {unknown} doc - Parsed document
  * @returns {Promise<string[]>} Formatted error strings; empty when valid or validation unavailable
  */
-export async function validateDoc(doc: unknown) {
-  const validate = await getValidator();
-  if (!validate) {
+export async function validateDoc(doc: unknown): Promise<string[]> {
+  const validate = await getValidator("document");
+  if (!validate || validate(doc)) {
     return [];
   }
-  const valid = validate(doc);
-  if (valid) {
+  return formatErrors(validate);
+}
+
+/**
+ * Validate a `project.json` config against the active project schema. The per-project entry
+ * document is what closes the composition (`unevaluatedProperties: false` over core + every enabled
+ * extension's fragment), so this is the only gate that catches a typo'd section key or a misshapen
+ * extension section before the write lands.
+ *
+ * @param {unknown} config - Parsed project.json
+ * @returns {Promise<string[]>} Formatted error strings; empty when valid or validation unavailable
+ */
+export async function validateProjectConfig(config: unknown): Promise<string[]> {
+  const validate = await getValidator("project");
+  if (!validate || validate(config)) {
     return [];
   }
-  return (validate.errors || []).map((e) => `${e.instancePath || "(root)"}: ${e.message}`);
+  return formatErrors(validate);
 }

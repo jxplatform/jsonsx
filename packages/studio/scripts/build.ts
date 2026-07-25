@@ -48,4 +48,5 @@ for (const entry of ["./src/studio.ts", "./src/canvas/iframe-entry.ts"]) {
 }
 
 // Bundle Monaco's web workers into dist/workers.
-await import("./build-workers.ts");
+const { buildMonacoWorkers } = await import("./build-workers.ts");
+await buildMonacoWorkers();

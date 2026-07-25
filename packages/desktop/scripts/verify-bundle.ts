@@ -27,6 +27,13 @@ export const REQUIRED = [
   "views/studio/dist/init.js",
   "views/studio/dist/studio.js",
   "views/studio/dist/studio.css",
+  /* Monaco's workers and the vendored webfonts. studio.js resolves the workers relative to its own
+     url, so an omission here does not 404 loudly — it leaves the packaged code view with no JSON
+     language service at all: no schema validation, no completion, no hover. */
+  "views/studio/dist/workers/editor.worker.js",
+  "views/studio/dist/workers/json.worker.js",
+  "views/studio/dist/workers/ts.worker.js",
+  "views/studio/fonts/jetbrains-mono-400.woff2",
 ];
 
 /** @returns Missing required paths (relative to appDir); empty array means the bundle is complete. */
