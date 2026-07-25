@@ -29,7 +29,7 @@ Every Jx file validates against one of three JSON Schema 2020-12 documents, publ
 | `project.json`                        | `https://jxsuite.com/schema/project/v1` |
 | Class definitions (`*.class.json`)    | `https://jxsuite.com/schema/class/v1`   |
 
-Inside a project, prefer the generated local copies over the network: `jx schema` writes `project.schema.json` and `document.schema.json` into the project root, composed from the core schemas plus the fragments each enabled extension ships, and fully self-contained (see [Machine-readable docs](/docs/framework/agents/machine-readable) and [Schema composition](/docs/extending/extensions/schema-composition)). `project.json` binds itself with `"$schema": "./project.schema.json"`. Documents carry no `$schema` key in the shipped starters — `jx validate` checks them against `document.schema.json` either way — so add one only if you want editor autocomplete, pointing it at that file relatively (`"../document.schema.json"` from `pages/`).
+Inside a project, prefer the generated local copies over the network: `jx schema` writes `project.schema.json` and `document.schema.json` into the project root, composed from the core schemas plus the fragments each enabled extension ships. Each is a self-contained single-resource schema — every `$ref` a root-relative JSON Pointer into the same file — so an editor resolves it offline with no `node_modules`, no network, and no configuration (see [Machine-readable docs](/docs/framework/agents/machine-readable) and [Schema composition](/docs/extending/extensions/schema-composition)). `project.json` binds itself with `"$schema": "./project.schema.json"`. Documents carry no `$schema` key in the shipped starters — `jx validate` checks them against `document.schema.json` either way — so add one only if you want editor autocomplete, pointing it at that file relatively (`"../document.schema.json"` from `pages/`).
 
 ## Project structure
 
@@ -235,7 +235,7 @@ Pages are documents with a few extra top-level fields:
 
 - `$layout` — a path resolved from the **project root**, or `false` for no layout. Omit it to use `defaults.layout` from `project.json`.
 - `$head` — merges with the layout's and the project's entries; the page wins on conflicts.
-- `$paths` — the concrete routes a `[param]` page generates.
+- `$paths` — the concrete routes a `[param]` page generates. One source shape, checked strictly by the generated document schema: `{ contentType, param, field }` (needs `@jxsuite/parser`), `{ values, param }`, `{ "$ref": "./data.json", param, field }`, or a bare array of parameter objects. A key that is not part of one of these is an error, not a silently empty build.
 - `tagName` is optional on a page that uses a layout.
 
 Dynamic route (`pages/blog/[slug].json`):

@@ -69,6 +69,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.3.1-draft** (2026-07-25) — $paths validates against the source union instead of accepting any object (§5.3).
+- **0.3.0-draft** (2026-07-25) — Committed entry documents are single-resource: every $ref a root pointer (§5.2, §5.4).
 - **0.2.9-draft** (2026-07-24) — §2 package layout: correct the auth package description, note that /_jx/auth serves the Better Auth routes while table permission rules are enforced at /_jx/data, and add the missing search extension to the tree.
 - **0.2.8-draft** (2026-07-23) — Add the assets capability (§8.5): section owners publish source directories at site URLs.
 - **0.2.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).

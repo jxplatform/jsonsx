@@ -102,6 +102,8 @@ import { extensionManifestSchema } from "../defs/extension-manifest.schema";
 import {
   DOCUMENT_PATHS_SCHEMA_ID,
   PROJECT_FIELDS_SCHEMA_ID,
+  documentPathsCoreMembers,
+  documentPathsUnknownSourceMember,
   jxFieldSchemaDef,
   relationshipRefSchema,
 } from "../defs/field-schema.schema";
@@ -288,6 +290,19 @@ export async function generateSchema() {
       JsonSchemaType: jsonSchemaTypeSchema,
       HeadEntry: headEntrySchema,
       ImageConfig: imageConfigSchema,
+      /* The shipped DEFAULT paths union, embedded under its canonical $id so `$paths`'s ref
+         resolves with this file alone (it is registered standalone as the studio's offline
+         fallback). A per-project entry document embeds the same $id carrying core members PLUS
+         extension shapes; that embed is declared first, so it wins resolution and this one is
+         inert there (extensions.md §5.3). */
+      PathsValue: {
+        $id: DOCUMENT_PATHS_SCHEMA_ID,
+        anyOf: [...documentPathsCoreMembers, documentPathsUnknownSourceMember],
+        description:
+          "Default $paths source union: the core shapes, plus a catch-all for source shapes " +
+          "contributed by extensions this schema cannot see. The project's generated " +
+          "document.schema.json replaces this with the exact set its extensions provide.",
+      },
     },
     $id: "https://jxsuite.com/schema/v1",
     $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -362,10 +377,17 @@ export async function generateSchema() {
         type: "object",
       },
       $paths: {
+        /* Was `type: "object"`, which accepted any object at all — a misspelled key or a
+           content-type source in a project without the parser enabled passed validation and then
+           silently expanded to zero pages. Referencing the union resource by its canonical $id is
+           what makes the per-project entry document's effective union apply (extensions.md §5.3);
+           `$defs.PathsValue` below carries the shipped default so this file still resolves alone. */
+        $ref: DOCUMENT_PATHS_SCHEMA_ID,
         description:
-          "Dynamic route parameters. Maps parameter names to data sources " +
-          "for generating one page per entry at build time.",
-        type: "object",
+          "Dynamic route source for a page: expands one page per entry at build time. One of the " +
+          "core shapes (explicit `values`, a `$ref` data file, or a bare array of parameter " +
+          "objects) or a source shape contributed by an enabled extension, such as the parser's " +
+          "`contentType`.",
       },
       $schema: {
         description: "URI identifying the Jx dialect version. Enables schema-aware IDE tooling.",
@@ -499,9 +521,11 @@ export function generateDocumentPathsSchema() {
   return {
     $id: DOCUMENT_PATHS_SCHEMA_ID,
     $schema: "https://json-schema.org/draft/2020-12/schema",
+    anyOf: [...documentPathsCoreMembers, documentPathsUnknownSourceMember],
     description:
-      "Default $paths-value union for documents. Per-project entry documents override this " +
-      "resource with the union of extension-contributed paths shapes.",
+      "Default $paths-value union for documents: the core source shapes. Per-project entry " +
+      "documents override this resource with those members PLUS every extension-contributed " +
+      "paths shape.",
     title: "Jx Document Paths Union",
   };
 }

@@ -12,6 +12,10 @@
 import { describe, expect, test } from "bun:test";
 import Ajv2020 from "ajv/dist/2020";
 import {
+  documentPathsCoreMembers,
+  documentPathsUnknownSourceMember,
+} from "../defs/field-schema.schema";
+import {
   GENERATED_SCHEMA_COMMENT,
   PROJECT_CORE_SCHEMA_ID,
   PROJECT_FIELDS_SCHEMA_ID,
@@ -199,16 +203,44 @@ describe("emitDocumentSchema", () => {
       corePath: "./node_modules/@jxsuite/schema/schema.json",
       pathsValueRefs: [`${FRAG_ID}#/$defs/ContentPathsSource`],
     });
-    expect(doc.$ref).toBe("./node_modules/@jxsuite/schema/schema.json");
+    expect(doc.allOf).toEqual([{ $ref: "./node_modules/@jxsuite/schema/schema.json" }]);
     const defs = doc.$defs as Record<string, Record<string, unknown>>;
     expect(defs.PathsValue!.$id).toBe("https://jxsuite.com/schema/document/paths/v2");
-    expect(defs.PathsValue!.anyOf).toEqual([{ $ref: `${FRAG_ID}#/$defs/ContentPathsSource` }]);
+    /* The union is ADDITIVE: it shadows the shipped default by $id, so it has to carry the core
+       source shapes itself or they would stop validating the moment an extension contributes one. */
+    const members = defs.PathsValue!.anyOf as Record<string, unknown>[];
+    expect(members.at(-1)).toEqual({ $ref: `${FRAG_ID}#/$defs/ContentPathsSource` });
+    expect(members).toEqual([...documentPathsCoreMembers, members.at(-1)!]);
   });
 
-  test("stays permissive with no contributed paths shapes", () => {
+  test("references the core via allOf, never a root $ref beside $defs", () => {
+    /* A root-level $ref makes VS Code shallow-merge the core resource's $defs over the entry's
+       own, breaking every `#/$defs/<embed>/...` pointer downstream. */
+    const doc = emitDocumentSchema({ corePath: "./core.json", pathsValueRefs: [] });
+    expect(doc.$ref).toBeUndefined();
+    expect(doc.allOf).toEqual([{ $ref: "./core.json" }]);
+  });
+
+  test("carries the core source shapes with no contributed paths shapes", () => {
     const doc = emitDocumentSchema({ corePath: "./core.json", pathsValueRefs: [] });
     const defs = doc.$defs as Record<string, Record<string, unknown>>;
-    expect(defs.PathsValue).toEqual({ $id: "https://jxsuite.com/schema/document/paths/v2" });
+    expect(defs.PathsValue).toEqual({
+      $id: "https://jxsuite.com/schema/document/paths/v2",
+      anyOf: [...documentPathsCoreMembers],
+    });
+  });
+
+  test("entry unions never carry the default's unknown-source escape hatch", () => {
+    /* That member exists so the shipped default under-suggests instead of reporting false errors
+       on extension shapes it cannot see. An entry document knows the enabled extensions, so
+       inheriting it would silently re-open `$paths` to anything. */
+    const doc = emitDocumentSchema({
+      corePath: "./core.json",
+      pathsValueRefs: [`${FRAG_ID}#/$defs/ContentPathsSource`],
+    });
+    const defs = doc.$defs as Record<string, Record<string, unknown>>;
+    expect(defs.PathsValue!.anyOf).not.toContainEqual(documentPathsUnknownSourceMember);
+    expect(generateDocumentPathsSchema().anyOf).toContainEqual(documentPathsUnknownSourceMember);
   });
 });
 

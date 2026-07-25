@@ -3,9 +3,11 @@
  *
  * Extends the original project.json check into the full compliance walk:
  *
- * 1. `project.json` against the generated entry schema (validateProjectFile);
- * 2. The committed entry documents are SELF-CONTAINED (no residual relative `$ref`s — the
- *    editor-resolution guarantee of the bundled form, specs/extensions.md §5.4);
+ * 1. The committed entry documents are SELF-CONTAINED and SINGLE-RESOURCE: every `$ref` is a
+ *    root-relative JSON Pointer that resolves inside the file — the editor-resolution guarantee of
+ *    the committed form (specs/extensions.md §5.4). Checked first and fatal, since walks 2–4
+ *    compile those documents;
+ * 2. `project.json` against the generated entry schema (validateProjectFile);
  * 3. Every document under `components/`, `pages/`, and `layouts/` against the bundled document schema
  *    (core + extension `$paths` union — the same schema the studio consumes);
  * 4. Every project-local `*.class.json` against the generated class schema;
@@ -94,32 +96,38 @@ export async function validateProjectTree(
   const issues: ProjectTreeIssue[] = [];
   let checked = 0;
 
-  // 1. project.json against the generated entry schema.
-  const projectResult = await validateProjectFile(root);
-  checked += 1;
-  if (!projectResult.valid) {
-    issues.push({ errors: projectResult.errors ?? [], file: "project.json" });
-  }
-
-  // 2. Committed entry documents must be self-contained (the editor-resolution guarantee).
+  /* 1. Committed entry documents must be self-contained (the editor-resolution guarantee). This
+     runs FIRST because every later walk compiles one of them: an unresolvable ref surfaces from ajv
+     as a thrown MissingRefError, so diagnosing it here turns a stack trace into "regenerate with
+     `jx schema`". Nothing downstream is meaningful until it holds, hence the early return. */
   for (const name of ["project.schema.json", "document.schema.json"]) {
     const path = resolve(root, name);
     if (!existsSync(path)) {
       continue;
     }
     checked += 1;
-    const residual: string[] = [];
-    collectRelativeRefs(JSON.parse(readFileSync(path, "utf8")), residual);
-    if (residual.length > 0) {
+    const entry = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+    const unresolvable = collectUnresolvableRefs(entry);
+    if (unresolvable.length > 0) {
       issues.push({
-        errors: residual.map((ref) => ({
+        errors: unresolvable.map(({ reason, ref }) => ({
           message:
-            `relative $ref "${ref}" — committed entry documents must be self-contained; ` +
-            `regenerate with \`jx schema\``,
+            `$ref "${ref}" ${reason} — committed entry documents must be self-contained ` +
+            `single-resource schemas; regenerate with \`jx schema\``,
         })),
         file: name,
       });
     }
+  }
+  if (issues.length > 0) {
+    return { checked, issues, valid: false };
+  }
+
+  // 2. project.json against the generated entry schema.
+  const projectResult = await validateProjectFile(root);
+  checked += 1;
+  if (!projectResult.valid) {
+    issues.push({ errors: projectResult.errors ?? [], file: "project.json" });
   }
 
   const { addFormats, Ajv } = await loadAjv();
@@ -186,29 +194,117 @@ export async function validateProjectTree(
   return { checked, issues, valid: issues.length === 0 };
 }
 
-/** Collect relative-path `$ref`s (anything without a URI scheme that isn't a `#` pointer). */
-function collectRelativeRefs(node: unknown, out: string[]): void {
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      collectRelativeRefs(item, out);
+/**
+ * Every `$ref` a committed entry document may carry must be a root-relative JSON Pointer that
+ * resolves inside the same file. Three ways that fails, all of which break editor resolution: a
+ * relative path (needs Node module resolution), a URI (VS Code fetches it over the network instead
+ * of matching an embedded `$id`), and a pointer with no node at the other end.
+ *
+ * Walks only subschema keyword positions, since `examples`/`default`/`const`/`enum` hold instance
+ * data and Jx document examples legitimately contain `$ref` strings of their own.
+ *
+ * @param {Record<string, unknown>} entry - Parsed committed entry document
+ * @returns {{ ref: string; reason: string }[]} One entry per offending `$ref`
+ */
+function collectUnresolvableRefs(
+  entry: Record<string, unknown>,
+): { ref: string; reason: string }[] {
+  const out: { ref: string; reason: string }[] = [];
+  const seen = new Set<Record<string, unknown>>();
+
+  const resolvePointer = (pointer: string): boolean => {
+    let current: unknown = entry;
+    for (const raw of pointer.slice(1).split("/")) {
+      if (raw === "") {
+        continue;
+      }
+      const segment = raw.replaceAll("~1", "/").replaceAll("~0", "~");
+      if (typeof current !== "object" || current === null) {
+        return false;
+      }
+      current = (current as Record<string, unknown>)[segment];
+      if (current === undefined) {
+        return false;
+      }
     }
-    return;
-  }
-  if (node === null || typeof node !== "object") {
-    return;
-  }
-  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
-    if (
-      key === "$ref" &&
-      typeof value === "string" &&
-      !value.startsWith("#") &&
-      !/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(value)
-    ) {
-      out.push(value);
+    return true;
+  };
+
+  const walk = (node: unknown): void => {
+    if (!isRecord(node) || seen.has(node)) {
+      return;
     }
-    collectRelativeRefs(value, out);
-  }
+    seen.add(node);
+    const ref = node.$ref;
+    if (typeof ref === "string") {
+      if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(ref)) {
+        out.push({ reason: "is an absolute URI editors resolve over the network", ref });
+      } else if (!ref.startsWith("#")) {
+        out.push({ reason: "is a relative path only Node module resolution can follow", ref });
+      } else if (ref.length > 1 && !ref.startsWith("#/")) {
+        out.push({ reason: "is an $anchor reference, which has no root-pointer form", ref });
+      } else if (ref.length > 1 && !resolvePointer(ref.slice(1))) {
+        out.push({ reason: "points at no node in this document", ref });
+      }
+    }
+    for (const [keyword, value] of Object.entries(node)) {
+      if (!SUBSCHEMA_KEYWORDS.has(keyword)) {
+        continue;
+      }
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          walk(item);
+        }
+      } else if (isRecord(value)) {
+        // Map-valued keywords hold subschemas one level down; single-valued ones are the schema.
+        walk(value);
+        if (MAP_SUBSCHEMA_KEYWORDS.has(keyword)) {
+          for (const item of Object.values(value)) {
+            walk(item);
+          }
+        }
+      }
+    }
+  };
+  walk(entry);
+  return out;
 }
+
+/** True for a plain object (a candidate subschema node). */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Keywords whose values map names to subschemas. */
+const MAP_SUBSCHEMA_KEYWORDS = new Set([
+  "$defs",
+  "definitions",
+  "dependencies",
+  "dependentSchemas",
+  "patternProperties",
+  "properties",
+]);
+
+/** Every keyword position a subschema can occupy (see {@link MAP_SUBSCHEMA_KEYWORDS} for maps). */
+const SUBSCHEMA_KEYWORDS = new Set([
+  ...MAP_SUBSCHEMA_KEYWORDS,
+  "additionalItems",
+  "additionalProperties",
+  "allOf",
+  "anyOf",
+  "contains",
+  "contentSchema",
+  "else",
+  "if",
+  "items",
+  "not",
+  "oneOf",
+  "prefixItems",
+  "propertyNames",
+  "then",
+  "unevaluatedItems",
+  "unevaluatedProperties",
+]);
 
 /** Recursively list `.json` files under a directory (absent directories yield nothing). */
 function walkJsonFiles(dir: string): string[] {

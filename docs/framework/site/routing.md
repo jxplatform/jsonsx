@@ -82,6 +82,10 @@ A JSON array file, one page per item, with `field` selecting the property to use
 
 For catch-all routes the parameter value may itself contain slashes: nested content entries get path-based ids (like `framework/site/routing`), so a single `[...slug]` page fans out into the whole tree of URLs.
 
+:::doc-tip
+Your project's generated `document.schema.json` validates `$paths` against exactly these shapes plus any your extensions contribute, so a misspelled key or a source belonging to an extension you have not enabled is flagged in the editor and by `jx validate` — rather than building zero pages and warning at the end of the log. Run [`jx schema`](/docs/framework/build/cli) after changing `extensions` to keep that set current.
+:::
+
 ## Route priority
 
 When several routes could match the same URL, the more specific one wins:

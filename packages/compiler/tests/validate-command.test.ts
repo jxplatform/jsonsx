@@ -2,12 +2,15 @@
  * Validate-command.test.ts — `jx validate` whole-project walk
  *
  * Builds a fixture project (parser extension enabled), generates its bundled entry documents, and
- * drives validateProjectTree end-to-end: valid tree, invalid document, invalid class file,
- * residual-relative-ref detection on a stale unbundled entry document, and issue formatting.
+ * drives validateProjectTree end-to-end: valid tree, invalid document, invalid class file, issue
+ * formatting, and the self-containment gate on the committed entry documents — every ref form that
+ * resolves for some consumer but not all of them (relative path, absolute URI, `$anchor`, pointer
+ * to nothing) is rejected, while `$ref`-shaped strings in instance-data keywords are left alone.
+ * Also pins the strict `$paths` source union the generated document schema now carries.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { emitProjectSchema } from "@jxsuite/schema/project-schemas";
 import { writeProjectSchemas } from "../src/site/schema-command";
@@ -145,6 +148,80 @@ describe("validateProjectTree", () => {
       expect(JSON.stringify(issue!.errors)).toContain("regenerate with `jx schema`");
     } finally {
       await writeProjectSchemas(TMP);
+    }
+  });
+
+  /* Each of these ref forms resolves for someone but not for everyone, which is exactly the class of
+     bug that let a dangling paths-union ref and unresolvable editor pointers sit in committed files
+     unnoticed. The check runs before the ajv walks so it reports them instead of a MissingRefError. */
+  const OFFENDING_REFS: [string, string][] = [
+    ["#/$defs/NoSuchEmbed", "points at no node in this document"],
+    ["#/$defs/project-core-v2/properties/name/type/deeper", "points at no node in this document"],
+    ["#anchored", "is an $anchor reference"],
+    ["https://jxsuite.com/schema/project/core/v2", "is an absolute URI"],
+    ["./node_modules/@jxsuite/schema/schema.json", "is a relative path"],
+  ];
+  for (const [ref, reason] of OFFENDING_REFS) {
+    it(`flags a committed $ref that ${reason} — "${ref}"`, async () => {
+      const pristine = readFileSync(resolve(TMP, "project.schema.json"), "utf8");
+      const schema = JSON.parse(pristine) as { allOf: unknown[] };
+      schema.allOf.push({ $ref: ref });
+      writeFile("project.schema.json", schema);
+      try {
+        const result = await validateProjectTree(TMP);
+        expect(result.valid).toBe(false);
+        const issue = result.issues.find((entry) => entry.file === "project.schema.json");
+        expect(issue).toBeDefined();
+        expect(JSON.stringify(issue!.errors)).toContain(reason);
+      } finally {
+        writeFileSync(resolve(TMP, "project.schema.json"), pristine, "utf8");
+      }
+    });
+  }
+
+  /* `$paths` used to be declared `type: "object"`, which accepted literally any object — a typo or
+     a source shape whose extension is not enabled passed validation and then expanded to zero pages
+     at build time with only a console warning. The generated entry document now unions the core
+     source shapes with each enabled extension's. */
+  const PATHS_CASES: [string, unknown, boolean][] = [
+    ["parser contentType source", { contentType: "posts", field: "id", param: "slug" }, true],
+    ["core explicit values", { param: "lang", values: ["en", "fr"] }, true],
+    ["core data-file $ref", { $ref: "./data/products.json", field: "sku", param: "id" }, true],
+    ["legacy parameter array", [{ slug: "hello" }], true],
+    ["misspelled discriminator", { contentTyp: "posts", param: "slug" }, false],
+    ["empty object", {}, false],
+    ["stray key beside values", { bogus: 1, values: ["a"] }, false],
+    ["source for a disabled extension", { param: "id", table: "products" }, false],
+    ["not an object at all", "posts", false],
+  ];
+  for (const [label, $paths, expected] of PATHS_CASES) {
+    it(`${expected ? "accepts" : "rejects"} a $paths ${label}`, async () => {
+      writeFile("pages/[slug].json", { $paths, children: [], tagName: "article" });
+      try {
+        const result = await validateProjectTree(TMP);
+        const issue = result.issues.find((entry) => entry.file === "pages/[slug].json");
+        expect(issue === undefined).toBe(expected);
+      } finally {
+        rmSync(resolve(TMP, "pages/[slug].json"), { force: true });
+      }
+    });
+  }
+
+  it("ignores $ref-shaped strings inside instance-data keywords", async () => {
+    // Jx document examples legitimately contain refs like "#/state/cart" — not schema refs.
+    const pristine = readFileSync(resolve(TMP, "project.schema.json"), "utf8");
+    const schema = JSON.parse(pristine) as { $defs: Record<string, unknown> };
+    schema.$defs.Probe = {
+      default: { $ref: "#/state/fallback" },
+      enum: [{ $ref: "#/state/one" }],
+      examples: [{ $ref: "#/state/cart" }],
+    };
+    writeFile("project.schema.json", schema);
+    try {
+      const result = await validateProjectTree(TMP);
+      expect(result.issues.find((entry) => entry.file === "project.schema.json")).toBeUndefined();
+    } finally {
+      writeFileSync(resolve(TMP, "project.schema.json"), pristine, "utf8");
     }
   });
 });

@@ -241,7 +241,8 @@
   "copy": {
     "../../packages/schema/schema.json": "schema/v1/index.json",
     "../../packages/schema/project-schema.json": "schema/project/v1/index.json",
-    "../../packages/schema/class-schema.json": "schema/class/v1/index.json"
+    "../../packages/schema/class-schema.json": "schema/class/v1/index.json",
+    "../../packages/schema/schemas/document.paths.schema.json": "schema/document/paths/v2/index.json"
   },
   "build": {
     "outDir": "./dist",
