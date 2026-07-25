@@ -14,6 +14,7 @@ import {
   escapeHtml,
   isMutating,
   isSchemaOnly,
+  PREFORMATTED_TAGS,
   tagNameToClassName,
 } from "../shared.ts";
 import {
@@ -532,12 +533,14 @@ export function emitElementModule(
  * @param {JxMutableNode["children"]} children
  * @param {JxStyle | null | undefined} parentStyle
  * @param {string} indent
+ * @param {boolean} [preformatted]
  * @returns {string}
  */
 function emitLitChildren(
   children: JxMutableNode["children"],
   _parentStyle: JxStyle | null | undefined,
   indent: string,
+  preformatted = false,
 ) {
   if (!children) {
     return "";
@@ -555,17 +558,20 @@ function emitLitChildren(
   // Mixed children: elements/text plus array pseudo-elements expanded inline among siblings.
   return children
     .map((child: JxMutableNode | string) =>
-      isMappedArray(child) ? emitMappedArray(child, indent) : emitLitNode(child, indent),
+      isMappedArray(child)
+        ? emitMappedArray(child, indent)
+        : emitLitNode(child, preformatted ? "" : indent, preformatted),
     )
-    .join("\n");
+    .join(preformatted ? "" : "\n");
 }
 
 /**
  * @param {JxMutableNode | string} def
  * @param {string} indent
+ * @param {boolean} [preformatted]
  * @returns {string}
  */
-function emitLitNode(def: JxMutableNode | string, indent: string) {
+function emitLitNode(def: JxMutableNode | string, indent: string, preformatted = false) {
   // String children are text nodes
   if (typeof def === "string") {
     if (def.includes("${")) {
@@ -581,6 +587,8 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
   }
 
   const tag = def.tagName ?? "div";
+  // `white-space` inherits, so once inside a <pre> the whole subtree stays whitespace-significant.
+  const inPre = preformatted || PREFORMATTED_TAGS.has(tag);
 
   const parts: string[] = [];
 
@@ -691,10 +699,15 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
   } else if (def.innerHTML !== undefined) {
     inner = def.innerHTML;
   } else if (def.children) {
-    inner = `\n${emitLitChildren(def.children, def.style, `${indent}  `)}\n${indent}`;
+    inner = inPre
+      ? emitLitChildren(def.children, def.style, "", true)
+      : `\n${emitLitChildren(def.children, def.style, `${indent}  `)}\n${indent}`;
   }
 
-  return `${indent}<${tag}${attrsStr}\n${indent}>${inner}</${tag}>`;
+  // Inside a <pre>, the newline before `>` would land in the element's own text.
+  return inPre
+    ? `<${tag}${attrsStr}>${inner}</${tag}>`
+    : `${indent}<${tag}${attrsStr}\n${indent}>${inner}</${tag}>`;
 }
 
 /**

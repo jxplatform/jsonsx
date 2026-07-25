@@ -768,6 +768,14 @@ describe("buildInner", () => {
     expect(result).toContain("<span>");
   });
 
+  test("indents children by default, but not in a preformatted context", () => {
+    const def = { children: [{ tagName: "p" }, { tagName: "span" }] };
+    const compiler = (d: any) => `<${d.tagName}>`;
+    const base = { media: {}, scope: null, scopeDefs: {} };
+    expect(buildInner(def, null, base, compiler)).toBe("<p>\n  <span>");
+    expect(buildInner(def, null, { ...base, preformatted: true }, compiler)).toBe("<p><span>");
+  });
+
   test("returns empty for no content", () => {
     const def = {} as any;
     const context = { media: {}, scope: null, scopeDefs: {} };

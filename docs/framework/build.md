@@ -92,6 +92,8 @@ When the page document itself is dynamic — it declares live `state`, binds `$r
 
 Two more outputs sit alongside these tiers: `.class.json` documents compile to ES class modules, and `timing: "server"` entries generate server handlers — a per-route `_server.js`, or a single site-wide worker when `build.adapter` is set.
 
+Across all three tiers the emitter indents nested children so the generated HTML stays readable — except inside `pre`, `textarea`, and the rest of the tags browsers render with `white-space: pre`. There, and everywhere below them (`white-space` inherits), children are concatenated with no separator, because indentation between elements would be content rather than formatting. This is what keeps a syntax-highlighted code block — one `<span>` per token — rendering as the code you wrote.
+
 ## CSS extraction
 
 Style never ships as JavaScript. During compilation, every static `style` definition — the project-level `style` from `project.json`, the layout's, the page's, and each node's — is extracted into a single `<style>` block in the page `<head>`, with `$media` breakpoint names expanded to real media queries. Components additionally emit a `dist/components/<tag>.css` sidecar, and styles found in component slot content are collected into the page's style block. See [Styling](/docs/framework/concepts/styling) for the authoring model.

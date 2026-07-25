@@ -16,6 +16,7 @@ import {
   DEFAULT_LIT_HTML_SRC,
   DEFAULT_REACTIVITY_SRC,
   buildAttrs,
+  childSeparator,
   colorSchemePrePaintScript,
   compileExpression,
   compileStatements,
@@ -27,6 +28,7 @@ import {
   isRefObject,
   isSchemaOnly,
   isTemplateString,
+  PREFORMATTED_TAGS,
   pureSchemeOf,
   resolveStaticValue,
 } from "../shared.ts";
@@ -335,6 +337,8 @@ function buildClientNode(
   );
 
   const tag = def.tagName ?? "div";
+  // `white-space` inherits, so once inside a <pre> the whole subtree stays whitespace-significant.
+  nextContext.preformatted = context.preformatted === true || PREFORMATTED_TAGS.has(tag);
   const bindAttrs = [];
   let needsBind = false;
 
@@ -530,9 +534,14 @@ function buildClientNode(
     const listKey = `_children${counter.l}`;
     counter.l += 1;
     const childrenTpl = source.children
-      .map((c) => emitChildLit(c as JxMutableNode))
-      .join("\n      ");
-    bindings.set(listKey, `() => html\`\n      ${childrenTpl}\n    \``);
+      .map((c) => emitChildLit(c as JxMutableNode, nextContext.preformatted))
+      .join(childSeparator(nextContext.preformatted, "      "));
+    bindings.set(
+      listKey,
+      nextContext.preformatted
+        ? `() => html\`${childrenTpl}\``
+        : `() => html\`\n      ${childrenTpl}\n    \``,
+    );
     bindAttrs.push(`:render="${listKey}"`);
     needsBind = true;
     const bindAttrStr2 = ` ${bindAttrs.join(" ")}`;
@@ -551,7 +560,7 @@ function buildClientNode(
           counter,
         );
       })
-      .join("\n  ");
+      .join(childSeparator(nextContext.preformatted));
   }
 
   // Self-closing tags
@@ -570,13 +579,16 @@ function buildClientNode(
  * index.
  *
  * @param {JxMutableNode} def
+ * @param {boolean} [preformatted]
  * @returns {string}
  */
-function emitLitMapTemplate(def: JxMutableNode | undefined) {
+function emitLitMapTemplate(def: JxMutableNode | undefined, preformatted = false) {
   if (!def) {
     return "";
   }
   const tag = def.tagName ?? "div";
+  // `white-space` inherits, so once inside a <pre> the whole subtree stays whitespace-significant.
+  const inPre = preformatted || PREFORMATTED_TAGS.has(tag);
   let attrs = "";
 
   if (def.id) {
@@ -674,7 +686,8 @@ function emitLitMapTemplate(def: JxMutableNode | undefined) {
     // Legacy whole-children repeater nested inside a map template.
     inner = `\n      ${emitArrayHole(def.children)}\n    `;
   } else if (Array.isArray(def.children)) {
-    inner = `\n      ${def.children.map((c) => emitChildLit(c)).join("\n      ")}\n    `;
+    const rendered = def.children.map((c) => emitChildLit(c, inPre));
+    inner = inPre ? rendered.join("") : `\n      ${rendered.join("\n      ")}\n    `;
   }
 
   const voidTags = new Set(["input", "br", "hr", "img", "meta", "link"]);
@@ -689,9 +702,10 @@ function emitLitMapTemplate(def: JxMutableNode | undefined) {
  * via a `.map()` hole), or a nested element.
  *
  * @param {JxMutableNode | string} c
+ * @param {boolean} [preformatted]
  * @returns {string}
  */
-function emitChildLit(c: JxMutableNode | string): string {
+function emitChildLit(c: JxMutableNode | string, preformatted = false): string {
   if (typeof c === "string") {
     return isTemplateString(c) ? mapRefsToLit(c) : escapeHtml(c);
   }
@@ -701,7 +715,7 @@ function emitChildLit(c: JxMutableNode | string): string {
   if (isMappedArray(c)) {
     return emitArrayHole(c);
   }
-  return emitLitMapTemplate(c);
+  return emitLitMapTemplate(c, preformatted);
 }
 
 /**

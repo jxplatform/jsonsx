@@ -24,6 +24,42 @@ describe("compileStaticPage", () => {
     expect(html).toContain("</html>");
   });
 
+  test("children inside <pre> are concatenated without the readability indent", () => {
+    // Syntax-highlighted code arrives as one span per token with bare "\n" line separators from
+    // `extensions/parser` highlight.ts. Whitespace the emitter adds between them is rendered text
+    // Inside a <pre> that is rendered text, which used to shred code blocks into one token a line.
+    const doc = {
+      children: [
+        {
+          tagName: "pre",
+          children: [
+            {
+              tagName: "code",
+              children: [
+                { tagName: "span", textContent: "const" },
+                { tagName: "span", textContent: " x = 1;" },
+                "\n",
+                { tagName: "span", textContent: "return x;" },
+              ],
+            },
+          ],
+        },
+      ],
+    } as unknown as JxDocument;
+    const { html } = compileStaticPage(doc, baseOpts);
+    expect(html).toContain(
+      "<pre><code><span>const</span><span> x = 1;</span>\n<span>return x;</span></code></pre>",
+    );
+  });
+
+  test("children outside <pre> keep the readability indent", () => {
+    const doc = {
+      children: [{ tagName: "p", children: [{ tagName: "b", textContent: "a" }, "b"] }],
+    } as unknown as JxDocument;
+    const { html } = compileStaticPage(doc, baseOpts);
+    expect(html).toContain("<p><b>a</b>\n  b</p>");
+  });
+
   test("includes meta charset and viewport", () => {
     const doc = { children: [] };
     const { html } = compileStaticPage(doc, baseOpts);

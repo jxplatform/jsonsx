@@ -707,6 +707,33 @@ describe("compileElement — emitMappedArray edge cases", () => {
     expect(content).toContain("s.handleClick(s, e)");
   });
 
+  test("a <pre> subtree emits without the lit template's indentation", async () => {
+    const result = await compileElement({
+      children: [
+        {
+          tagName: "pre",
+          children: [
+            {
+              tagName: "code",
+              children: [
+                { tagName: "span", textContent: "const" },
+                { tagName: "span", textContent: " x = 1;" },
+                "\n",
+                { tagName: "span", textContent: "return x;" },
+              ],
+            },
+          ],
+        },
+      ],
+      tagName: "test-pre",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain(
+      "<pre><code><span>const</span><span> x = 1;</span>\n<span>return x;</span></code></pre>",
+    );
+  });
+
   test("attributes, id and className on the map root reach the template", async () => {
     const result = await compileElement({
       children: {

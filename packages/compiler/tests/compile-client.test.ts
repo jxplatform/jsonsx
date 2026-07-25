@@ -6,6 +6,35 @@ import type { JxDocument } from "@jxsuite/schema/types";
 const asDoc = (d: unknown) => d as JxDocument;
 
 describe("compileClient", () => {
+  test("children inside <pre> are concatenated without the readability indent", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "pre",
+          children: [
+            {
+              tagName: "code",
+              children: [
+                { tagName: "span", textContent: "const" },
+                { tagName: "span", textContent: " x = 1;" },
+                "\n",
+                { tagName: "span", textContent: "return x;" },
+              ],
+            },
+          ],
+        },
+        { tagName: "p", children: [{ tagName: "b", textContent: "a" }, "b"] },
+      ],
+      state: { unused: 0 },
+    } as unknown as JxDocument;
+    const { html } = compileClient(doc, { title: "T" });
+    expect(html).toContain(
+      "<pre><code><span>const</span><span> x = 1;</span>\n<span>return x;</span></code></pre>",
+    );
+    // Ordinary elements still get the indent.
+    expect(html).toContain("<p><b>a</b>\n  b</p>");
+  });
+
   test("compiles counter example to pre-rendered HTML with bindings", () => {
     const counter = {
       children: [

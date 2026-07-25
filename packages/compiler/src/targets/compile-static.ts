@@ -7,11 +7,13 @@
 
 import {
   buildAttrs,
+  childSeparator,
   colorSchemePrePaintScript,
   compileStyles,
   createCompileContext,
   escapeHtml,
   isNodeDynamic,
+  PREFORMATTED_TAGS,
   pureSchemeOf,
   resolveStaticValue,
   SELF_CLOSING,
@@ -127,6 +129,7 @@ function compileNode(
     scope: Record<string, unknown> | null;
     scopeDefs: Record<string, unknown>;
     media: Record<string, string>;
+    preformatted?: boolean;
   },
   islands: { def: JxMutableNode; tagName: string; className: string }[],
 ): string {
@@ -166,7 +169,9 @@ function compileNode(
     return `<${tag}${attrs}>`;
   }
 
-  const inner = buildInnerWithIslands(def, raw, nextContext, islands);
+  // `white-space` inherits, so once inside a <pre> the whole subtree stays whitespace-significant.
+  const preformatted = context.preformatted === true || PREFORMATTED_TAGS.has(tag);
+  const inner = buildInnerWithIslands(def, raw, { ...nextContext, preformatted }, islands);
 
   return `<${tag}${attrs}>${inner}</${tag}>`;
 }
@@ -188,6 +193,7 @@ function buildInnerWithIslands(
     scope: Record<string, unknown> | null;
     scopeDefs: Record<string, unknown>;
     media: Record<string, string>;
+    preformatted?: boolean;
   },
   islands: { def: JxMutableNode; tagName: string; className: string }[],
 ): string {
@@ -209,7 +215,7 @@ function buildInnerWithIslands(
         const childRaw = (rawChildren?.[i] ?? c) as JxMutableNode;
         return compileNode(child, childDynamic, childRaw, context, islands);
       })
-      .join("\n  ");
+      .join(childSeparator(context.preformatted));
   }
   return "";
 }

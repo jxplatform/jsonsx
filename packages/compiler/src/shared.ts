@@ -275,6 +275,8 @@ export interface CompileContext {
   scope: Record<string, unknown>;
   scopeDefs: Record<string, unknown>;
   media: Record<string, string>;
+  /** True inside a `<pre>`-like subtree, where emitters must not indent nested children. */
+  preformatted?: boolean;
 }
 
 export function createCompileContext(
@@ -614,6 +616,26 @@ export function buildAttrs(def: JxElement | JxMutableNode, scope: Record<string,
 }
 
 /**
+ * Tags rendered with `white-space: pre` by every UA, where inter-element whitespace is content
+ * rather than formatting. Emitters indent nested children for readability; inside these tags — and
+ * anywhere below them, since `white-space` inherits — that indentation would render as literal
+ * blank lines and leading spaces, so children must be concatenated with no separator.
+ */
+export const PREFORMATTED_TAGS = new Set(["pre", "textarea", "listing", "plaintext", "xmp"]);
+
+/**
+ * The separator to place between an element's compiled children: none inside a preformatted
+ * subtree, a newline plus `indent` elsewhere.
+ *
+ * @param {boolean | undefined} preformatted
+ * @param {string} [indent]
+ * @returns {string}
+ */
+export function childSeparator(preformatted: boolean | undefined, indent = "  "): string {
+  return preformatted ? "" : `\n${indent}`;
+}
+
+/**
  * Build the inner HTML (textContent or children) for a node.
  *
  * @param {JxElement} def
@@ -622,6 +644,7 @@ export function buildAttrs(def: JxElement | JxMutableNode, scope: Record<string,
  *   scope: Record<string, unknown>;
  *   scopeDefs: Record<string, unknown>;
  *   media: Record<string, string>;
+ *   preformatted?: boolean;
  * }} context
  * @param {(def: unknown, raw: unknown, context: unknown) => string} childCompiler
  * @returns {string}
@@ -633,6 +656,7 @@ export function buildInner(
     scope: Record<string, unknown> | null;
     scopeDefs: Record<string, unknown>;
     media: Record<string, string>;
+    preformatted?: boolean;
   },
   childCompiler: (def: unknown, raw: unknown, context: unknown) => string,
 ) {
@@ -652,7 +676,7 @@ export function buildInner(
         const childRaw = (rawChildren as (JxElement | string)[] | undefined)?.[i] ?? c;
         return childCompiler(c, childRaw, context);
       })
-      .join("\n  ");
+      .join(childSeparator(context.preformatted));
   }
   return "";
 }
