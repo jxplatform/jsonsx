@@ -830,6 +830,26 @@ describe("formats (session backend registry)", () => {
     expect(await projectless.listExtensions?.()).toEqual([]);
   });
 
+  /* The cloud composes the entry documents server-side from bundled artifacts (it has no
+     node_modules and no filesystem), so the studio just registers what it is handed. Before this
+     member existed the cloud always fell back to the core schemas, and extension sections got no
+     editor validation at all. */
+  test("fetchProjectSchemas reads the session's pre-bundled entry documents", async () => {
+    const project = { $comment: "generated", allOf: [{ $ref: "#/$defs/project-core-v2" }] };
+    const document = { $comment: "generated", allOf: [{ $ref: "#/$defs/v1" }] };
+    const calls = mockFetch({ "/project-schemas": { body: { document, project } } });
+    const p = createCloudPlatform(PROJECT);
+    expect(await p.fetchProjectSchemas?.()).toEqual({ document, project });
+    expect(calls.every((c) => c.url === `${BASE}/project-schemas`)).toBe(true);
+  });
+
+  test("fetchProjectSchemas degrades to the core-schema fallback, never throwing", async () => {
+    mockFetch({ "/project-schemas": { status: 404, body: { error: "no such route" } } });
+    expect(await createCloudPlatform(PROJECT).fetchProjectSchemas?.()).toEqual({});
+    // Project-less mode has no session to ask.
+    expect(await createCloudPlatform(null).fetchProjectSchemas?.()).toEqual({});
+  });
+
   test("formatAction posts to the session format route and unwraps result", async () => {
     const calls = mockFetch({
       "/format": { body: { result: { children: [{ tagName: "h1", textContent: "Hello" }] } } },

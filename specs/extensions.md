@@ -2,7 +2,7 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.2-draft
+**Version:** 0.3.3-draft
 **Status:** Partial
 **Updated:** 2026-07-25
 **License:** MIT
@@ -375,6 +375,31 @@ names) are emitted by the generator, which is the single aggregation party.
   Where a client fetches the canonical URLs instead (they are served from
   jxsuite.com), it gets the shipped defaults — degradation is
   _under-suggestion_ of extension field extras, never false errors.
+
+### 5.5 Composition is host-agnostic
+
+Composition itself — core fragment plus each enabled extension's fragments,
+bundled then flattened — is one pure function taking an injected JSON loader.
+Every host supplies only the loader and the refs; none supplies the algorithm.
+A project's entry documents therefore cannot depend on which host generated
+them, which is what lets a project move between a laptop, the desktop app and
+the cloud without its validation changing.
+
+The loader is the entire host-specific surface:
+
+| Host                             | Loader                                                                                    | Refs                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `jx schema`, dev server, desktop | Filesystem, restricted to the project root, with host resolution for `./node_modules/...` | Project-relative paths                                                        |
+| Cloud session                    | A build-time table of bundled artifacts, plus the session's working tree                  | Bare specifiers for bundled packages; tree paths for project-local extensions |
+
+The cloud composes **on demand and writes nothing back**: a cloud project needs
+no committed `*.schema.json` to get full editor validation. Its constraint is
+that a Worker ships a fixed set of extension packages, so an extension the
+platform does not bundle is dropped from the registry before composition rather
+than passed to it — the composer fails loudly on a fragment it cannot load,
+because emitting an entry document that silently under-validates would be worse
+than an error. Dropping the extension instead lands on the §5.3 degradation:
+under-suggestion of that extension's extras, never false errors.
 
 ---
 
@@ -956,6 +981,7 @@ requiring changes to any core package.
 
 ## Changelog
 
+- **0.3.3-draft** (2026-07-25) — Composition is host-agnostic: one pure function with an injected loader, so the cloud session composes the same entry documents in-Worker with no filesystem (§5.5).
 - **0.3.2-draft** (2026-07-25) — $schema bindings must be satisfied by by-id registration, never fetching — an in-document $schema overrides fileMatch and an unresolvable one voids validation entirely (§5.4).
 - **0.3.1-draft** (2026-07-25) — $paths validates against the source union instead of accepting any object (§5.3).
 - **0.3.0-draft** (2026-07-25) — Committed entry documents are single-resource: every $ref a root pointer (§5.2, §5.4).
@@ -973,4 +999,4 @@ requiring changes to any core package.
 
 ---
 
-_Jx Extensions Specification v0.3.2-draft_
+_Jx Extensions Specification v0.3.3-draft_

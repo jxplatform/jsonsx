@@ -20,6 +20,7 @@ import {
   PROJECT_CORE_SCHEMA_ID,
   PROJECT_FIELDS_SCHEMA_ID,
   emitDocumentSchema,
+  composeProjectSchemas,
   emitProjectSchema,
 } from "../src/project-schemas";
 import {
@@ -276,5 +277,150 @@ describe("generated core fragment, union defaults, and manifest schema", () => {
     ).toBe(true);
     expect(validate({ classes: {} })).toBe(false); // Missing name
     expect(validate({ extra: true, name: "@x/y" })).toBe(false);
+  });
+});
+
+/* ComposeProjectSchemas is the host-agnostic half of `jx schema`: the filesystem host (the compiler)
+   and the cloud session (a Worker with no filesystem and no node_modules) must produce the SAME two
+   entry documents for the same project, because a project's schemas cannot depend on which host
+   generated them. These tests drive it over an in-memory loader — the shape the cloud uses. */
+describe("composeProjectSchemas (host-agnostic composition)", () => {
+  const CORE_PROJECT = {
+    $id: PROJECT_CORE_SCHEMA_ID,
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    properties: { name: { type: "string" } },
+    type: "object",
+    $defs: {
+      JxFieldSchema: { type: "object" },
+      RelationshipRef: { type: "object" },
+    },
+  };
+  const CORE_DOCUMENT = {
+    $id: "https://jxsuite.com/schema/v1",
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    properties: { tagName: { type: "string" } },
+    type: "object",
+  };
+  const EXT_PROJECT = {
+    $id: "https://jxsuite.com/schema/ext/parser/project/v1",
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    properties: { content: { type: "object" } },
+  };
+  const EXT_DOCUMENT = {
+    $id: "https://jxsuite.com/schema/ext/parser/document/v1",
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    $defs: { ContentPathsSource: { type: "object", required: ["contentType"] } },
+  };
+  const EXT_FIELDS = {
+    $id: "https://jxsuite.com/schema/ext/connector/fields/v1",
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    $defs: { ColumnExtras: { type: "object" } },
+  };
+
+  /** Bare-specifier loader: exactly what a Worker has — a table, no filesystem. */
+  const FILES: Record<string, object> = {
+    "@jxsuite/connector/schemas/fields.fragment.schema.json": EXT_FIELDS,
+    "@jxsuite/parser/schemas/document.fragment.schema.json": EXT_DOCUMENT,
+    "@jxsuite/parser/schemas/project.fragment.schema.json": EXT_PROJECT,
+    "@jxsuite/schema/schema.json": CORE_DOCUMENT,
+    "@jxsuite/schema/schemas/project.core.schema.json": CORE_PROJECT,
+  };
+  const loadJson = (path: string): Promise<Record<string, unknown>> => {
+    // Refs resolve against baseDir "", so the bundler hands over a leading slash.
+    const file = FILES[path.replace(/^\//, "")];
+    return file
+      ? Promise.resolve(structuredClone(file) as Record<string, unknown>)
+      : Promise.reject(new Error(`No such file: ${path}`));
+  };
+  const compose = (extensions: Parameters<typeof composeProjectSchemas>[0]["extensions"]) =>
+    composeProjectSchemas({
+      baseDir: "",
+      coreDocumentRef: "@jxsuite/schema/schema.json",
+      coreProjectRef: "@jxsuite/schema/schemas/project.core.schema.json",
+      extensions,
+      loadJson,
+    });
+
+  test("composes self-contained entry documents with no external refs left", async () => {
+    const { document, project } = await compose([
+      {
+        document: "@jxsuite/parser/schemas/document.fragment.schema.json",
+        project: "@jxsuite/parser/schemas/project.fragment.schema.json",
+      },
+    ]);
+
+    // Self-containment is the contract (§5.4): every ref a root-relative JSON pointer.
+    for (const entry of [project, document]) {
+      const refs: string[] = [];
+      JSON.stringify(entry, (key, value) => {
+        if (key === "$ref" && typeof value === "string") {
+          refs.push(value);
+        }
+        return value as unknown;
+      });
+      expect(refs.length).toBeGreaterThan(0);
+      expect(refs.every((ref) => ref.startsWith("#/"))).toBe(true);
+    }
+  });
+
+  test("both entry documents compile and enforce the composition under ajv", async () => {
+    const { document, project } = await compose([
+      {
+        document: "@jxsuite/parser/schemas/document.fragment.schema.json",
+        project: "@jxsuite/parser/schemas/project.fragment.schema.json",
+      },
+    ]);
+    const ajv = new Ajv2020({ allErrors: true, strict: false });
+
+    const validateProject = ajv.compile(project);
+    expect(validateProject({ content: {}, name: "Demo" })).toBe(true);
+    // Closed by `unevaluatedProperties: false` over the composition over core + the extension's fragment.
+    expect(validateProject({ name: "Demo", typodSection: {} })).toBe(false);
+
+    expect(ajv.compile(document)({ tagName: "div" })).toBe(true);
+  });
+
+  test("an extension's document $defs join the paths union; its fragment is embedded", async () => {
+    const { document } = await compose([
+      { document: "@jxsuite/parser/schemas/document.fragment.schema.json" },
+    ]);
+    const serialized = JSON.stringify(document);
+    expect(serialized).toContain("ContentPathsSource");
+    // Referenced by canonical $id only, so it must be embedded explicitly or the ref dangles.
+    expect(new Ajv2020({ allErrors: true, strict: false }).compile(document)).toBeTruthy();
+  });
+
+  test("a fields fragment contributes its $defs to the field union", async () => {
+    const { project } = await compose([
+      { fields: "@jxsuite/connector/schemas/fields.fragment.schema.json" },
+    ]);
+    expect(JSON.stringify(project)).toContain("ColumnExtras");
+  });
+
+  test("no extensions still yields the core-only pair", async () => {
+    const { document, project } = await compose([]);
+    expect(project.$comment).toBe(GENERATED_SCHEMA_COMMENT);
+    expect(document.$comment).toBe(GENERATED_SCHEMA_COMMENT);
+    const ajv = new Ajv2020({ allErrors: true, strict: false });
+    expect(ajv.compile(project)({ name: "Demo" })).toBe(true);
+    expect(ajv.compile(document)({ tagName: "div" })).toBe(true);
+  });
+
+  /* A fragment the host cannot supply fails LOUDLY rather than being dropped: a silently
+     incomplete entry document would under-validate the project with nothing to show for it. Hosts
+     that cannot supply an extension's fragments leave the extension out of the list instead — what
+     the cloud session does for packages it does not bundle. */
+  test("an unreadable fragment fails the composition rather than being dropped", async () => {
+    await expect(compose([{ fields: "@jxsuite/missing/fields.json" }])).rejects.toThrow(
+      /cannot load \$ref target/,
+    );
+  });
+
+  test("a fragment without $id or $defs contributes no union members", async () => {
+    FILES["@jxsuite/bare/fields.json"] = { type: "object" };
+    const { project } = await compose([{ fields: "@jxsuite/bare/fields.json" }]);
+    const fields = (project.$defs as Record<string, { anyOf?: unknown[] }>).Fields;
+    // Core JxFieldSchema + RelationshipRef only.
+    expect(fields?.anyOf).toHaveLength(2);
   });
 });

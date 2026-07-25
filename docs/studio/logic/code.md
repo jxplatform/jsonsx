@@ -41,7 +41,7 @@ The **Code** entry in the toolbar's mode switcher shows the open file itself as 
 - **Export** in the tab bar saves a copy of the file elsewhere.
 
 :::doc-note
-Studio regenerates those two schema files whenever they are missing or older than `project.json`, so a project you have never run `jx schema` on still validates, and turning an extension on or off updates the rules without a restart.
+You never have to generate those files yourself: Studio refreshes them whenever they are missing or out of date, so a project you have never run `jx schema` on still validates, and turning an extension on or off updates the rules without a restart. In the browser at [studio.jxsuite.com](https://studio.jxsuite.com) the rules are composed for you on the server and nothing is written to your repository at all.
 :::
 
 ## When to drop down

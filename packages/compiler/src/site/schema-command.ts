@@ -20,8 +20,7 @@ import { createRequire } from "node:module";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import {
   bundleSchema,
-  emitDocumentSchema,
-  emitProjectSchema,
+  composeProjectSchemas,
   flattenSchema,
 } from "@jxsuite/schema/project-schemas";
 import { buildProjectExtensionRegistry } from "./format-host.ts";
@@ -42,48 +41,22 @@ export async function writeProjectSchemas(projectRoot: string) {
   const { config } = loadProjectConfig(projectRoot);
   const registry = await buildProjectExtensionRegistry(projectRoot, config);
 
-  const corePath = coreSchemaRef(projectRoot, CORE_PROJECT_SPECIFIER);
-  const fragments: string[] = [];
-  const pathsValueRefs: string[] = [];
-  const documentFragments: string[] = [];
-  const fieldSchemaRefs: string[] = [];
-  for (const ext of registry.extensions) {
-    const projectFragment = ext.schemas.project;
-    if (projectFragment) {
-      fragments.push(fragmentRef(projectRoot, ext, projectFragment));
-    }
-    const documentFragment = ext.schemas.document;
-    if (documentFragment) {
-      const documentRefs = fragmentDefsRefs(documentFragment);
-      pathsValueRefs.push(...documentRefs);
-      /* The paths union names this fragment's shapes by canonical $id only, so the bundler needs
-         the path handed to it explicitly or those refs stay dangling. A fragment that contributed
-         nothing (no $id, or no $defs) is left out rather than embedded unreferenced. */
-      if (documentRefs.length > 0) {
-        documentFragments.push(fragmentRef(projectRoot, ext, documentFragment));
-      }
-    }
-    // The `schemas.fields` manifest convention: a fragment whose $defs members are extension
-    // Field extras, unioned into the per-project field resource (specs/extensions.md §5.3).
-    const fieldsFragment = ext.schemas.fields;
-    if (fieldsFragment) {
-      fieldSchemaRefs.push(...fragmentDefsRefs(fieldsFragment));
-      fragments.push(fragmentRef(projectRoot, ext, fieldsFragment));
-    }
-  }
-
-  // Bundle then flatten before committing: the emitted relative refs are an intermediate form only.
+  /* Composition itself is host-agnostic (@jxsuite/schema `composeProjectSchemas`) — the filesystem
+     appears only in what this host contributes: project-relative refs for the fragments the
+     registry resolved, and a loader restricted to the project root. The cloud session composes the
+     same two documents from bundled artifacts through the same function. */
   const root = resolve(projectRoot);
-  const loadJson = restrictedSchemaLoader(root);
-  const projectEntry = emitProjectSchema({ corePath, fieldSchemaRefs, fragments });
-  const documentEntry = emitDocumentSchema({
-    corePath: coreSchemaRef(projectRoot, CORE_DOCUMENT_SPECIFIER),
-    pathsValueRefs,
+  const { document: documentSchema, project: projectSchema } = await composeProjectSchemas({
+    baseDir: root,
+    coreDocumentRef: coreSchemaRef(projectRoot, CORE_DOCUMENT_SPECIFIER),
+    coreProjectRef: coreSchemaRef(projectRoot, CORE_PROJECT_SPECIFIER),
+    extensions: registry.extensions.map((ext) => ({
+      document: ext.schemas.document && fragmentRef(projectRoot, ext, ext.schemas.document),
+      fields: ext.schemas.fields && fragmentRef(projectRoot, ext, ext.schemas.fields),
+      project: ext.schemas.project && fragmentRef(projectRoot, ext, ext.schemas.project),
+    })),
+    loadJson: restrictedSchemaLoader(root),
   });
-  const projectSchema = flattenSchema(await bundleSchema(projectEntry, loadJson, root));
-  const documentSchema = flattenSchema(
-    await bundleSchema(documentEntry, loadJson, root, documentFragments),
-  );
 
   const projectSchemaPath = resolve(projectRoot, "project.schema.json");
   const documentSchemaPath = resolve(projectRoot, "document.schema.json");
@@ -239,26 +212,4 @@ function projectRelativeRef(projectRoot: string, absPath: string, conventional: 
     return conventional;
   }
   return rel.startsWith("./") ? rel : `./${rel}`;
-}
-
-/**
- * Canonical "uri#/pointer" refs into a fragment's `$defs` shapes: one per `$defs` entry, addressed
- * by the fragment's own `$id` (refs inside the entry document's embeds resolve against canonical
- * URIs, never file locations). Serves both the document paths union and the fields-extras union.
- *
- * @param {string} fragmentPath - Resolved absolute fragment path
- * @returns {string[]}
- */
-function fragmentDefsRefs(fragmentPath: string): string[] {
-  let fragment: { $id?: unknown; $defs?: Record<string, unknown> };
-  try {
-    fragment = JSON.parse(readFileSync(fragmentPath, "utf8")) as typeof fragment;
-  } catch {
-    return [];
-  }
-  const { $id } = fragment;
-  if (typeof $id !== "string" || !fragment.$defs) {
-    return [];
-  }
-  return Object.keys(fragment.$defs).map((name) => `${$id}#/$defs/${name}`);
 }

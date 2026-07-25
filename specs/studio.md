@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.1.27-draft
+**Version:** 0.1.28-draft
 **Status:** Partial
 **Updated:** 2026-07-25
 **License:** MIT
@@ -100,7 +100,8 @@ Three platform targets:
 
 - **DevServer** (`platforms/devserver.js`) — Wraps `/__studio/*` fetch calls for Chrome-based development.
 - **Desktop** (`@jxsuite/desktop`) — ElectroBun app with RPC to Bun process for native file I/O.
-- **Cloud** — Future SaaS target.
+- **Cloud** (`platforms/cloud.js`) — Hosted sessions over the platform's session API; the backend
+  composes per-project schemas in-Worker (extensions.md §5.5), so §4.2.1 holds there too.
 
 Registration: `registerPlatform(impl)` at startup, `getPlatform()` for access.
 
@@ -601,6 +602,7 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.1.28-draft** (2026-07-25) — The Cloud platform target composes per-project schemas server-side (§3.4).
 - **0.1.27-draft** (2026-07-25) — Source-mode schema validation contract: per-project entry documents, offline $schema-id registration, worker self-location (§4.2.1); fetchProjectSchemas in the PAL table (§3.4).
 - **0.1.26-draft** (2026-07-25) — PAL table records the destination members: createDestination, createProject's user-chosen destination, and pickDirectory.
 - **0.1.25-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -632,4 +634,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.1.27-draft_
+_`@jxsuite/studio` Specification v0.1.28-draft_
