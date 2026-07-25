@@ -1,6 +1,59 @@
 {
   "$id": "https://jxsuite.com/schema/document/paths/v2",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Default $paths-value union for documents. Per-project entry documents override this resource with the union of extension-contributed paths shapes.",
+  "anyOf": [
+    {
+      "additionalProperties": false,
+      "description": "Explicit value list: generates one page per value, bound to `param` (default \"value\").",
+      "properties": {
+        "param": {
+          "description": "Route parameter to fill (default \"value\").",
+          "type": "string"
+        },
+        "values": {
+          "description": "The values to expand.",
+          "type": "array"
+        }
+      },
+      "required": ["values"],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "JSON data-file source: loads a project-relative file that must contain an array, and generates one page per item.",
+      "properties": {
+        "$ref": {
+          "description": "Project-relative path to a .json file containing an array.",
+          "type": "string"
+        },
+        "field": {
+          "description": "Item field providing the parameter value (default \"id\").",
+          "type": "string"
+        },
+        "param": {
+          "description": "Route parameter to fill (default \"id\").",
+          "type": "string"
+        }
+      },
+      "required": ["$ref"],
+      "type": "object"
+    },
+    {
+      "description": "Legacy explicit form: an array of ready-made parameter objects, used as-is with no expansion. Prefer one of the source shapes above.",
+      "items": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    {
+      "description": "A source shape contributed by an extension this schema cannot see. The project's generated document.schema.json validates these exactly; enable the owning extension and regenerate with `jx schema` to get precise checking here.",
+      "minProperties": 1,
+      "type": "object"
+    }
+  ],
+  "description": "Default $paths-value union for documents: the core source shapes. Per-project entry documents override this resource with those members PLUS every extension-contributed paths shape.",
   "title": "Jx Document Paths Union"
 }

@@ -2,7 +2,7 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.0-draft
+**Version:** 0.3.1-draft
 **Status:** Partial
 **Updated:** 2026-07-25
 **License:** MIT
@@ -273,18 +273,34 @@ to the root pointer of the entry's embed, so the committed file states the
 outcome outright and no consumer has to implement `$id` shadowing to get it
 right.
 
-| Resource $id                                   | Position                                                                                                                               | Shipped default → entry-document union                                                                                               |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `https://jxsuite.com/schema/project/fields/v2` | Field-schema values inside section entry schemas (content frontmatter fields, table columns) — recursive through `properties`/`items`. | Default: core `JxFieldSchema` + `RelationshipRef`. Entry adds extension field extras (e.g. connector column shapes).                 |
-| `https://jxsuite.com/schema/document/paths/v2` | Values of `$paths` in documents.                                                                                                       | Default: permissive. Entry unions each extension's paths shape (parser's `ContentPathsSource`; a connector table source is planned). |
+| Resource $id                                   | Position                                                                                                                               | Shipped default → entry-document union                                                                                                                                                                                                                     |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `https://jxsuite.com/schema/project/fields/v2` | Field-schema values inside section entry schemas (content frontmatter fields, table columns) — recursive through `properties`/`items`. | Default: core `JxFieldSchema` + `RelationshipRef`. Entry adds extension field extras (e.g. connector column shapes).                                                                                                                                       |
+| `https://jxsuite.com/schema/document/paths/v2` | The `$paths` value of a document.                                                                                                      | Default: the core source shapes (`values`, data-file `$ref`, legacy array) plus an unknown-source escape hatch. Entry drops the escape hatch and unions each extension's paths shape (parser's `ContentPathsSource`; a connector table source is planned). |
 
 Fragments write `{ "$ref": "https://jxsuite.com/schema/project/fields/v2" }`
-at field positions — no local fallbacks needed. Standalone validation
-registers the shipped defaults (`@jxsuite/schema/schemas/project.fields.schema.json`,
+at field positions — no local fallbacks needed.
+
+**Unions are additive, and the two differ in one member.** An entry embed
+shadows the shipped default outright rather than extending it, so it must
+restate the core members or they stop validating the moment an extension
+contributes one. The paths union carries one member the entry union does not:
+a permissive "source shape from an extension this schema cannot see" branch.
+A shipped default has no way to know which extensions a project enables, so
+without it every `{ "contentType": "blog" }` would be a false error wherever
+the default is what is in play — the studio's offline fallback before
+per-project schemas arrive, and clients fetching the canonical URL. The entry
+document does know, so it omits that branch and validates `$paths` exactly:
+an unrecognized source (a misspelled discriminator, a shape whose extension is
+not enabled) is an error rather than a route that silently expands to nothing.
+
+Standalone validation registers the shipped defaults
+(`@jxsuite/schema/schemas/project.fields.schema.json`,
 `schemas/document.paths.schema.json`); composed validation gets the entry
-embeds. Because `RelationshipRef` is part of the shipped default, a validator
-that only sees the defaults never reports false errors on relationship
-fields — extension extras are the only entry-exclusive shapes.
+embeds. Because `RelationshipRef` is part of the shipped default, and because
+the paths default carries its unknown-source branch, a validator that only sees
+the defaults never reports false errors — extension extras are the only
+entry-exclusive shapes, and the entry is where they are checked exactly.
 
 > **Why not `$dynamicRef`?** The 2020-12 dynamic-anchor keywords are the
 > textbook fit on paper, but ajv (8.x) supports `$dynamicAnchor` only at
@@ -919,6 +935,7 @@ requiring changes to any core package.
 
 ## Changelog
 
+- **0.3.1-draft** (2026-07-25) — $paths validates against the source union instead of accepting any object (§5.3).
 - **0.3.0-draft** (2026-07-25) — Committed entry documents are single-resource: every $ref a root pointer (§5.2, §5.4).
 - **0.2.9-draft** (2026-07-24) — §2 package layout: correct the auth package description, note that /_jx/auth serves the Better Auth routes while table permission rules are enforced at /_jx/data, and add the missing search extension to the tree.
 - **0.2.8-draft** (2026-07-23) — Add the assets capability (§8.5): section owners publish source directories at site URLs.
@@ -934,4 +951,4 @@ requiring changes to any core package.
 
 ---
 
-_Jx Extensions Specification v0.3.0-draft_
+_Jx Extensions Specification v0.3.1-draft_

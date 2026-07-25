@@ -109,10 +109,14 @@ describe("writeProjectSchemas", () => {
     expect(document.$ref).toBeUndefined();
     expect(document.allOf!.map((entry) => entry.$ref)).toEqual(["#/$defs/v1"]);
     expect(document.$defs!.v1).toBeDefined();
-    // Parser's fragment contributes its canonical paths shape; the $id-less local fragment none.
-    expect(document.$defs!.PathsValue!.anyOf).toEqual([
-      { $ref: "#/$defs/ext-parser-document-v1/$defs/ContentPathsSource" },
-    ]);
+    /* Parser's fragment contributes its paths shape; the $id-less local fragment none. The union
+       also restates the core source shapes — it shadows the shipped default rather than extending
+       it — so assert on the contributed tail. */
+    const pathsMembers = document.$defs!.PathsValue!.anyOf as Record<string, unknown>[];
+    expect(pathsMembers.at(-1)).toEqual({
+      $ref: "#/$defs/ext-parser-document-v1/$defs/ContentPathsSource",
+    });
+    expect(pathsMembers.length).toBeGreaterThan(1);
     // And the shape it names is embedded, so the union actually resolves.
     expect(
       (document.$defs!["ext-parser-document-v1"]!.$defs as Record<string, unknown>)
@@ -129,7 +133,9 @@ describe("writeProjectSchemas", () => {
     });
     await writeProjectSchemas(TMP);
     let document = readJson("document.schema.json");
-    expect(document.$defs!.PathsValue!.anyOf).toEqual([
+    const contributed = (defs: SchemaDoc) =>
+      (defs.$defs!.PathsValue!.anyOf as Record<string, unknown>[]).filter((m) => "$ref" in m);
+    expect(contributed(document)).toEqual([
       { $ref: "#/$defs/ext-parser-document-v1/$defs/ContentPathsSource" },
     ]);
 
@@ -145,7 +151,7 @@ describe("writeProjectSchemas", () => {
     });
     await writeProjectSchemas(TMP);
     document = readJson("document.schema.json");
-    expect(document.$defs!.PathsValue!.anyOf).toEqual([
+    expect(contributed(document)).toEqual([
       { $ref: "#/$defs/ext-parser-document-v1/$defs/ContentPathsSource" },
     ]);
   });

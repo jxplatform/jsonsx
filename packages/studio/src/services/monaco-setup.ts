@@ -6,6 +6,7 @@ import "monaco-editor/esm/vs/editor/editor.api.js";
 import "monaco-editor/esm/vs/language/typescript/monaco.contribution.js";
 import "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js";
 
+import { flattenSchema } from "@jxsuite/schema/project-schemas";
 import jxSchema from "@jxsuite/schema/schema.json";
 import projectSchema from "@jxsuite/schema/project-schema.json";
 
@@ -72,8 +73,16 @@ function applyJsonSchemas(documentSchema: unknown, projectJsonSchema: unknown) {
   });
 }
 
+/* Flattened once at module load: the shipped core schemas reference the well-known union resources
+   by canonical $id (the `$paths` source union, extensions.md §5.3), and Monaco resolves anything with
+   a URI before the `#` by FETCHING it — with `enableSchemaRequest` off that just fails, leaving
+   `$paths` reporting an unresolvable ref. Flattening rewrites those refs onto the shipped defaults
+   embedded in the same document, which is exactly the right fallback semantics. */
+const FALLBACK_DOCUMENT_SCHEMA = flattenSchema(jxSchema as Record<string, unknown>);
+const FALLBACK_PROJECT_SCHEMA = flattenSchema(projectSchema as Record<string, unknown>);
+
 // Bundled core schemas register at module init — the offline fallback every platform starts from.
-applyJsonSchemas(jxSchema, projectSchema);
+applyJsonSchemas(FALLBACK_DOCUMENT_SCHEMA, FALLBACK_PROJECT_SCHEMA);
 
 /**
  * Swap Monaco's JSON schemas to the ACTIVE project's generated entry documents, fetched pre-bundled
@@ -102,11 +111,11 @@ export async function refreshProjectSchemas(platform: {
   if (!document && !project) {
     return false;
   }
-  applyJsonSchemas(document ?? jxSchema, project ?? projectSchema);
+  applyJsonSchemas(document ?? FALLBACK_DOCUMENT_SCHEMA, project ?? FALLBACK_PROJECT_SCHEMA);
   return true;
 }
 
 /** Restore the bundled core schemas (project closed / tests). */
 export function resetProjectSchemas(): void {
-  applyJsonSchemas(jxSchema, projectSchema);
+  applyJsonSchemas(FALLBACK_DOCUMENT_SCHEMA, FALLBACK_PROJECT_SCHEMA);
 }

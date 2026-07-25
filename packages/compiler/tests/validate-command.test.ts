@@ -6,6 +6,7 @@
  * formatting, and the self-containment gate on the committed entry documents — every ref form that
  * resolves for some consumer but not all of them (relative path, absolute URI, `$anchor`, pointer
  * to nothing) is rejected, while `$ref`-shaped strings in instance-data keywords are left alone.
+ * Also pins the strict `$paths` source union the generated document schema now carries.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
@@ -174,6 +175,34 @@ describe("validateProjectTree", () => {
         expect(JSON.stringify(issue!.errors)).toContain(reason);
       } finally {
         writeFileSync(resolve(TMP, "project.schema.json"), pristine, "utf8");
+      }
+    });
+  }
+
+  /* `$paths` used to be declared `type: "object"`, which accepted literally any object — a typo or
+     a source shape whose extension is not enabled passed validation and then expanded to zero pages
+     at build time with only a console warning. The generated entry document now unions the core
+     source shapes with each enabled extension's. */
+  const PATHS_CASES: [string, unknown, boolean][] = [
+    ["parser contentType source", { contentType: "posts", field: "id", param: "slug" }, true],
+    ["core explicit values", { param: "lang", values: ["en", "fr"] }, true],
+    ["core data-file $ref", { $ref: "./data/products.json", field: "sku", param: "id" }, true],
+    ["legacy parameter array", [{ slug: "hello" }], true],
+    ["misspelled discriminator", { contentTyp: "posts", param: "slug" }, false],
+    ["empty object", {}, false],
+    ["stray key beside values", { bogus: 1, values: ["a"] }, false],
+    ["source for a disabled extension", { param: "id", table: "products" }, false],
+    ["not an object at all", "posts", false],
+  ];
+  for (const [label, $paths, expected] of PATHS_CASES) {
+    it(`${expected ? "accepts" : "rejects"} a $paths ${label}`, async () => {
+      writeFile("pages/[slug].json", { $paths, children: [], tagName: "article" });
+      try {
+        const result = await validateProjectTree(TMP);
+        const issue = result.issues.find((entry) => entry.file === "pages/[slug].json");
+        expect(issue === undefined).toBe(expected);
+      } finally {
+        rmSync(resolve(TMP, "pages/[slug].json"), { force: true });
       }
     });
   }

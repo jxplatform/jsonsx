@@ -18,7 +18,11 @@
  * relative refs resolve (the committed files stay machine-path-free).
  */
 
-import { DOCUMENT_PATHS_SCHEMA_ID, PROJECT_FIELDS_SCHEMA_ID } from "../defs/field-schema.schema";
+import {
+  DOCUMENT_PATHS_SCHEMA_ID,
+  PROJECT_FIELDS_SCHEMA_ID,
+  documentPathsCoreMembers,
+} from "../defs/field-schema.schema";
 
 export { DOCUMENT_PATHS_SCHEMA_ID, PROJECT_FIELDS_SCHEMA_ID } from "../defs/field-schema.schema";
 
@@ -472,15 +476,15 @@ export function emitDocumentSchema(inputs: DocumentSchemaInputs): Record<string,
   return {
     $comment: GENERATED_SCHEMA_COMMENT,
     $defs: {
-      // With no contributed paths shapes the embed stays permissive — core `$paths` forms
-      // (arrays, values, $ref) are validated by the core schema itself.
-      PathsValue:
-        pathsValueRefs.length > 0
-          ? {
-              $id: DOCUMENT_PATHS_SCHEMA_ID,
-              anyOf: pathsValueRefs.map((ref) => ({ $ref: ref })),
-            }
-          : { $id: DOCUMENT_PATHS_SCHEMA_ID },
+      /* The EFFECTIVE paths union: the core source shapes plus every extension-contributed one.
+         Carrying the core members here (rather than leaving them to the core schema) is what makes
+         the override additive — this embed shadows the shipped default by $id, so anything it omits
+         stops validating. Mirrors the field union in emitProjectSchema, which names its core
+         members the same way. */
+      PathsValue: {
+        $id: DOCUMENT_PATHS_SCHEMA_ID,
+        anyOf: [...documentPathsCoreMembers, ...pathsValueRefs.map((ref) => ({ $ref: ref }))],
+      },
     },
     $schema: "https://json-schema.org/draft/2020-12/schema",
     allOf: [{ $ref: corePath }],

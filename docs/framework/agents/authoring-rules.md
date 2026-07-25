@@ -235,7 +235,7 @@ Pages are documents with a few extra top-level fields:
 
 - `$layout` — a path resolved from the **project root**, or `false` for no layout. Omit it to use `defaults.layout` from `project.json`.
 - `$head` — merges with the layout's and the project's entries; the page wins on conflicts.
-- `$paths` — the concrete routes a `[param]` page generates.
+- `$paths` — the concrete routes a `[param]` page generates. One source shape, checked strictly by the generated document schema: `{ contentType, param, field }` (needs `@jxsuite/parser`), `{ values, param }`, `{ "$ref": "./data.json", param, field }`, or a bare array of parameter objects. A key that is not part of one of these is an error, not a silently empty build.
 - `tagName` is optional on a page that uses a layout.
 
 Dynamic route (`pages/blog/[slug].json`):
