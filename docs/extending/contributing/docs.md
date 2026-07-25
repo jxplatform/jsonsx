@@ -5,6 +5,7 @@ code:
   - scripts/docs/check-doc-refs.ts
   - scripts/docs/check-doc-sync.ts
   - scripts/docs/generate-reference.ts
+  - scripts/docs/build-llm-export.ts
   - scripts/screenshots/manifest.json
 ---
 
@@ -31,6 +32,8 @@ code:
 In the other direction, code comments may carry `@docs <slug>` tags (e.g. `@docs framework/concepts/reactivity`) pointing at the page that documents them — also validated.
 
 These associations also power `bun run docs:sync`: given your working diff, it lists the pages and spec sections tied to the source files you changed. It runs automatically as a pre-commit advisory (and as an agent stop-check), so behavior changes and their documentation land together. It never blocks — a pure refactor needs no doc update.
+
+Your page is also published for machines. After `jx build`, the site build runs `scripts/docs/build-llm-export.ts`, which regenerates `llms.txt` and `/docs/full-docs.json` from the same frontmatter and Markdown — the whole corpus, in nav order, served verbatim to whatever fetches it. In `llms.txt` each page is one line — `- [Title](url): description` — so your `description` is nearly everything an agent has before deciding whether to open the page. Make it say what the page covers rather than restate the title. See [Machine-readable docs](/docs/framework/agents/machine-readable).
 
 ## Voice and style
 
@@ -70,7 +73,15 @@ Use at most a couple per screenful, and never open a page with one.
 - **Studio surface page**: definition sentence (what it is, where it lives) → hero screenshot → "Open …" click path first → verb-first task sections with numbered steps and a screenshot after each state-changing step → a `:::doc-note` naming what Studio writes, linking the Framework counterpart → related links.
 - **Framework concept page**: a "Studio writes this format for you" note linking the Studio surface → smallest complete JSON example first → one H2 per variant with a short example each → how it compiles → hard rules → related links.
 - **Tutorial**: outcome + finished screenshot + rough duration + prerequisites → numbered steps with expected-result sentences ("You should now see…") → "What you built" recap → next steps.
-- **Generated reference**: do not edit these — they carry a `GENERATED` banner and are produced by `bun run docs:generate` from package data, the specs' status markers, and the specs' changelogs; CI fails on drift. Releasing a spec (`bun run spec:bump`) changes [Implementation status](../reference/implementation-status.md) and [Spec changelog](../reference/spec-changelog.md), so regenerate in the same change set.
+- **Generated reference**: do not edit these — they carry a `GENERATED` banner and are produced by `bun run docs:generate` from package data, the specs' status markers, and the specs' changelogs; CI fails on drift. Releasing a spec (`bun run spec:bump`) changes [Implementation status](/docs/extending/reference/implementation-status) and [Spec changelog](/docs/extending/reference/spec-changelog), so regenerate in the same change set.
+
+## Internal links
+
+Write them as root-absolute slugs — `/docs/framework/site/routing` — with no `.md` extension and no trailing slash. Never use a relative `../foo.md` link: the site serves the target verbatim rather than rewriting it to a URL, so the link is broken the moment it publishes.
+
+:::doc-warning
+**No gate checks internal links.** `docs:check` validates frontmatter, spec anchors, `code:` paths, images, and the nav bijection — nothing resolves a link target. A typo, or a renamed page, ships silently. Verify each slug against `docs/nav.json` as you write it, and grep for the old slug whenever you rename a page.
+:::
 
 ## Screenshots
 

@@ -48,6 +48,8 @@ Collections translate directly. A **[content type](/docs/studio/projects/content
 
 Two differences worth knowing. Entries are files (Markdown, CSV, or JSON) in a folder, not rows in a hosted database — which means you can edit a whole collection like a spreadsheet in [Grid mode](/docs/studio/editing/grid), and there are no plan-based item limits because there are no plans. And there's no hosted Editor for clients: content editing happens in Studio, and collaborators work through the shared repository.
 
+Collections cover the content you author. Data that arrives while the site is running — form submissions, sign-ups, orders — belongs somewhere else: a real database you connect deliberately through **[Databases](/docs/studio/data)**, with **[accounts and sessions](/docs/studio/data/auth-and-secrets)** for the visitors who sign in. Content being files doesn't rule any of that out; it just keeps the two kinds of data apart.
+
 ## Interactions, honestly
 
 Behavior in Jx comes from three surfaces working together: **[State](/docs/studio/logic/state)** declares what a page knows, the **[Events](/docs/studio/logic/events)** tab binds behavior to clicks, typing, and submits, and **[formulas](/docs/studio/logic/formulas)** compute values live. Toggles, tabs, filtered lists, form behavior — the logic side of interactions — is covered, often more directly than a timeline can express it.
@@ -56,7 +58,7 @@ What Jx doesn't have is Webflow's scroll-driven animation timeline. Hover and fo
 
 ## Publishing and the missing lock-in
 
-When you publish, Studio commits your files and pushes them to your repository; your host builds the static site and serves it from a CDN — **[Cloudflare Pages](/docs/studio/publish/cloudflare)** has a built-in flow, and **[Netlify, GitHub Pages, and others](/docs/studio/publish/other-hosts)** take a two-line setup. Hosting costs whatever your host charges, which for sites this shape is often nothing. Collaborators clone the repository — there are no seats.
+When you publish, Studio commits your files and pushes them to your repository; your host builds the site and serves the prebuilt pages from a CDN — **[Cloudflare Pages](/docs/studio/publish/cloudflare)** has a built-in flow, and **[Netlify, GitHub Pages, and others](/docs/studio/publish/other-hosts)** take a two-line setup. Hosting costs whatever your host charges, which for sites this shape is often nothing. Collaborators clone the repository — there are no seats.
 
 In Webflow, code export is a snapshot that leaves the CMS behind. In Jx there's nothing to export, because the project already _is_ files: readable documents for pages and components, Markdown for content. Open them in any editor, diff them in git, hand them to other tools — Studio is how you edit your project, not where it's kept. The format underneath is fully documented in **[Framework](/docs/framework)**.
 

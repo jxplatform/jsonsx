@@ -5,7 +5,7 @@ description: "What Jx Suite is, how to install Jx Studio, and where to go first 
 
 # Start here
 
-Jx Suite is a visual site builder (**Jx Studio**), a JSON-native component format (**the Jx framework**), and a static-site compiler — working on plain files you own and publish with git.
+Jx Suite is a visual site builder (**Jx Studio**), a JSON-native component format (**the Jx framework**), and a compiler that prerenders every page — working on plain files you own and publish with git. Sites that need more than pages get a server tier too: databases, signed-in users, and server functions compile into a small worker alongside the prebuilt output.
 
 Pick your path:
 

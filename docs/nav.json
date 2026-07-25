@@ -118,6 +118,9 @@
         { "path": "framework/build", "label": "How compilation works" },
         { "path": "framework/build/dev-server", "label": "The dev server" },
         { "path": "framework/build/cli", "label": "CLI commands" },
+        { "path": "framework/agents", "label": "Working with agents" },
+        { "path": "framework/agents/authoring-rules", "label": "Authoring rules for agents" },
+        { "path": "framework/agents/machine-readable", "label": "Machine-readable docs" },
         { "path": "framework/reference", "label": "Reference" },
         { "path": "framework/reference/formulas", "label": "Formula catalog" },
         { "path": "framework/reference/operators", "label": "Operator reference" }
@@ -148,7 +151,8 @@
         { "path": "extending/reference/implementation-status", "label": "Implementation status" },
         { "path": "extending/reference/spec-changelog", "label": "Spec changelog" },
         { "path": "extending/contributing/monorepo", "label": "Working in the monorepo" },
-        { "path": "extending/contributing/docs", "label": "Contributing to these docs" }
+        { "path": "extending/contributing/docs", "label": "Contributing to these docs" },
+        { "path": "extending/contributing/ai-evals", "label": "AI assistant evals" }
       ]
     }
   ]

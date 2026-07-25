@@ -7,11 +7,11 @@ spec:
 
 # Other hosts
 
-A Jx site doesn't need a special host. The build turns your project into an ordinary folder of web files, so any host that can run one build command and serve a folder can serve your site. Studio's built-in flow covers **[Cloudflare Pages](/docs/studio/publish/cloudflare)**; for everything else, the recipe below is the whole story.
+A Jx site doesn't need a special host. The build turns your project into an ordinary folder of web files, so any host that can run one build command and serve a folder can serve your site — and a host that also runs a small server can carry a site with a database or sign-ins. Studio's built-in flow covers **[Cloudflare Pages](/docs/studio/publish/cloudflare)**; for everything else, the recipe below is the whole story.
 
 ## The recipe
 
-1. **Pick the deployment adapter.** In _Settings > General_, set **Platform Adapter** for your target. **Static** is the safe default — it works on any host that serves files. **Node** and **Bun** are for hosts that run a server for you. See **[Project settings](/docs/studio/projects/settings)**.
+1. **Pick the deployment adapter.** In _Settings > General_, set **Platform Adapter** for your target. **Static** is the choice for a site made only of pages and content — it works on any host that serves files. If the project has a database, sign-ins, or `timing: "server"` functions, pick **Node**, **Bun**, **Cloudflare Workers**, or **Cloudflare Pages** instead: those also package the worker that serves your `/_jx/*` routes. A database or sign-ins make that mandatory — the build stops with an error on **Static**. Server functions don't stop the build, but on **Static** nothing ends up serving them, so they need an adapter just the same. See **[Project settings](/docs/studio/projects/settings)**.
 2. **Put the project on GitHub** (or another repository host) so your host can see it — **[GitHub](/docs/studio/publish/github)** does this from inside Studio.
 3. **Tell the host two things**: the build command is `bunx jx build`, and the folder to publish is `dist`.
 
@@ -32,10 +32,10 @@ GitHub Pages serves files but doesn't take a build command directly — the buil
 
 ## Anywhere else
 
-The same two values — build with `bunx jx build`, serve `dist` — fit Vercel, Render, a plain web server, or your own CI. If a host can't run the build, you can even run `bunx jx build` yourself and upload the `dist` folder by hand; it's a complete site.
+The same two values — build with `bunx jx build`, serve `dist` — fit Vercel, Render, a plain web server, or your own CI. If a host can't run the build, you can even run `bunx jx build` yourself and upload the `dist` folder by hand: for a site of pages and content, that folder _is_ the site. A project with a database, sign-ins, or server functions has one of the server-capable adapters set, so its `dist/` carries a worker beside the pages — and that needs a host which actually runs it.
 
 :::doc-note
-With an adapter set, the build may add small host-specific files (like a server worker for Node, Bun, or Cloudflare) alongside the static output in `dist/`. The full list of adapters and what each one emits is in [Site architecture](/docs/framework/site).
+With an adapter set, the build writes host-specific files alongside the static output in `dist/` — for Node, Bun, and Cloudflare, the worker that serves `/_jx/*`. The full list of adapters and what each one emits is in [Build output and adapters](/docs/framework/site/deployment).
 :::
 
 ## Next

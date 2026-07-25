@@ -52,7 +52,7 @@ The trade is real, and so is the payoff: nothing is locked in.
 - A lapsed subscription can never take your site down or hold your content — the files are on your machine and in your repository either way.
 - You can switch hosts without rebuilding anything; the same files publish anywhere.
 - Your pages and writing are readable files today and in twenty years, openable without Jx at all.
-- Hosting a site like this is typically free, and the published site is plain, fast pages — there's no server of yours to break or maintain.
+- Hosting a site like this is typically free, and the published site is plain, fast pages. Adding sign-ins or a database later gives your host one small program to run alongside them — but the build writes that program for you, and the pages themselves stay prebuilt either way. There's no server of yours to write or patch.
 
 :::doc-tip
 You don't have to set up publishing on day one. Create a project, build, and explore entirely on your own machine — the repository and host can come when you're ready to go live.

@@ -5,6 +5,7 @@ code:
   - packages/studio/src/panels/chat-panel.ts
   - packages/studio/src/services/ai-system-prompt.ts
   - packages/studio/src/services/ai-settings.ts
+  - packages/studio/src/services/tool-executor.ts
   - packages/studio/src/ui/ai-credentials-form.ts
 ---
 
@@ -26,7 +27,7 @@ Open it with the **Toggle Assistant** chat-bubble button at the right end of the
 
 In every state it also answers questions — "what does this page's state do?", "which component renders the header?" — by reading the same files you see.
 
-Each request gets a limited number of working rounds. If a big request runs out, the assistant stops and lists what it finished and what went wrong; send another message to continue.
+Each request gets five working rounds — five turns of thinking and calling tools before it must reply. If a big request runs out, the assistant stops and lists what it finished and what went wrong; send another message to continue, or split the request into smaller ones.
 
 ## Connect a provider
 
@@ -64,3 +65,4 @@ Requests travel through Studio's own local proxy straight to the endpoint you co
 
 - Create a project for the assistant to work in: **[New Project](/docs/studio/projects/create)**
 - The state entries it can add for you are explained in the **[State panel](/docs/studio/logic/state)**
+- Working the same project from outside Studio — with a coding agent, or in CI: **[Working with agents](/docs/framework/agents)**

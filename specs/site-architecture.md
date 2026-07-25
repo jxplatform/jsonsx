@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.36-draft
+**Version:** 0.1.37-draft
 **Status:** Pending
-**Updated:** 2026-07-23
+**Updated:** 2026-07-24
 **License:** MIT
 
 ---
@@ -25,6 +25,7 @@
 12. [Multi-Page Compilation](#12-multi-page-compilation)
 13. [Internationalization](#13-internationalization)
 14. [Deployment](#14-deployment)
+15. [Application Tier](#15-application-tier)
 
 ---
 
@@ -32,21 +33,23 @@
 
 Jx Studio is a visual IDE for the development and management of local-first, statically compiled applications and websites which are composed and deployed via the Jx schema and pipeline.
 
+"Statically compiled" describes how pages are produced, not a ceiling on what a project may be. Every page is prerendered at build time — that never changes — but a project may also carry signed-in users, application data, and server-side logic, served by a generated worker deployed alongside those pages (§14.1, §15).
+
 ### 1.1 Design Principles
 
-1. **File-based is canonical.** The filesystem is the source of truth. Every page, component, layout, and content entry has a location on disk. There is no database, no CMS backend, no proprietary store. Studio is a filesystem editor with a visual canvas.
+1. **File-based is canonical.** The filesystem is the source of truth for the project itself. Every page, component, layout, and content entry has a location on disk — no CMS backend and no proprietary store holds what an author edits. Studio is a filesystem editor with a visual canvas. Application data (accounts, sessions, rows an end user creates) is a separate concern living in a database the project connects to, declared in `project.json` by identifier and env-var name only (§15).
 
 2. **Convention over configuration.** Sensible defaults derived from well-known prior art (Astro, Next.js, Eleventy). A `pages/` directory means file-based routing. A `content/` directory means content collections. A `layouts/` directory means shared page shells. Zero configuration required — but overridable.
 
-3. **Static-first.** All output is static HTML/CSS/JS. The compiler processes every page at build time. No server runtime ships by default. Server functions (`timing: "server"`) are an opt-in escape hatch, compiled to standalone handlers.
+3. **Static-first, with a real server tier.** All page output is static HTML/CSS/JS: the compiler prerenders every page at build time, and interactivity hydrates as islands in the browser. There is no per-request page rendering. **No server runtime ships by default** — the worker is opt-in via `build.adapter`, and a project that leaves it unset deploys as plain static files. Setting an adapter emits a worker serving `/_jx/*` alongside the same prerendered pages: a single Hono app carrying the site's server entries, deduplicated by export name, plus registry-driven extension mounts (§14.1). With no adapter, a page's own `timing: "server"` entries still compile to a per-route `_server.js` written beside that page, but nothing site-wide is produced.
 
 4. **JSON all the way down.** Site configuration is JSON. Page templates are JSON. Content schemas are JSON Schema. Layouts are JSON. The only non-JSON files are content entries (Markdown, CSV, media) and user-authored JavaScript sidecar functions. This makes the entire project machine-readable and Studio-editable.
 
-5. **Local-first.** No cloud services required. The dev server runs on localhost. The build writes to a `dist/` folder. Deployment is a static file upload to any host.
+5. **Local-first.** No hosted Jx service sits between an author and their project. The dev server runs on localhost and the build writes to a `dist/` folder on disk; nothing in that loop requires an account or a hosted service. (A project that connects to a remote database does reach that database in development too — only connectors declaring a local stand-in, D1 among them, are served from disk instead; §15.4.) Deployment is a file upload to any host — static files alone for a purely static project, those same files plus the generated worker when the project has a server tier (§14). A project that connects to a database points at one the author controls; `project.json` records its name, never its credentials (§15).
 
 ### 1.2 What This Spec Covers
 
-This spec defines everything that sits _above_ the component model: how components compose into pages, how pages compose into sites, how content enters the system, and how Studio manages all of it. It answers:
+This spec defines everything that sits _above_ the component model: how components compose into pages, how pages compose into sites, how content enters the system, how a site grows into an application with accounts and data, and how Studio manages all of it. It answers:
 
 - How to compose a new site with Jx
 - How to define datatypes and content collections
@@ -56,6 +59,12 @@ This spec defines everything that sits _above_ the component model: how componen
 - How to manage redirects, rewrites, and other CMS concerns
 - How to manage media assets
 - How the inheritance model works (global styles, variables, `<head>` tags, application-wide state)
+- How a project builds and deploys, and what each adapter emits
+- Where the application tier fits: signed-in users, application data, and server functions (§15)
+
+Content collections (§6) and the application tier (§15) are deliberately different things. A collection is authored content, read at build time and baked into the prerendered page. An application table is end-user data, read and written at request time over `/_jx/data`. Both are declared in committed files — a collection's schema and a table's schema both sit in `project.json` — and both appear in Studio. What differs is where the entries live: a collection's are files in the repository, a table's rows are in the connected database.
+
+Two neighboring specs carry the detail this one only points at: `extensions.md` §11–§13 defines the server-mount, connector, and secrets contracts that `@jxsuite/auth` and `@jxsuite/connector` implement, and `server.md` defines the dev server that stands in for the generated worker locally.
 
 ---
 
@@ -1495,12 +1504,12 @@ The collection config can specify locale awareness:
 
 The build output is standard static files deployable anywhere. When `build.adapter` is set, the compiler additionally generates platform-specific files:
 
-| Provider               | Extra Output                                                                                                      |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| _(none)_               | Just `dist/` with HTML/CSS/JS/assets                                                                              |
-| `"cloudflare-workers"` | `dist/worker.js` (Hono server with asset fallback), `_redirects`                                                  |
-| `"cloudflare-pages"`   | `dist/_worker.js` (advanced-mode Hono server) + `dist/_routes.json`, only when server entries exist; `_redirects` |
-| `"node"` / `"bun"`     | `dist/worker.js` (Hono server, no asset fallback)                                                                 |
+| Provider               | Extra Output                                                                                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _(none)_               | Just `dist/` with HTML/CSS/JS/assets                                                                                                                      |
+| `"cloudflare-workers"` | `dist/worker.js` (Hono server with asset fallback), `_redirects`                                                                                          |
+| `"cloudflare-pages"`   | `dist/_worker.js` (advanced-mode Hono server) + `dist/_routes.json`, unless the site has neither server entries nor active extension mounts; `_redirects` |
+| `"node"` / `"bun"`     | `dist/worker.js` (Hono server, no asset fallback)                                                                                                         |
 
 Configured in `project.json`:
 
@@ -1522,15 +1531,16 @@ Configured in `project.json`:
 | `sitemap`       | `boolean`        | `true`        | Generate `sitemap.xml` from the route table (requires `url`; §8.4.1)                                                                          |
 | `adapter`       | `string \| null` | `null`        | Deployment adapter: `"cloudflare-workers"`, `"cloudflare-pages"`, `"node"`, `"bun"`                                                           |
 
-When `adapter` is set and the site contains `timing: "server"` entries, the compiler:
+Worker generation is gated on `adapter` alone — not on the project having server functions or extension mounts. When `adapter` is set, the compiler:
 
-1. Collects all server entries from components and pages
+1. Collects `timing: "server"` entries from the project's components
 2. Deduplicates by export name
-3. Skips per-route `_server.js` generation
-4. Emits a single Hono worker via `compileSiteServer()` — `dist/worker.js`, or `dist/_worker.js` for `"cloudflare-pages"` ([advanced mode](https://developers.cloudflare.com/pages/functions/advanced-mode/), the only Functions convention that lives inside the build output; the root-level `functions/` directory convention is not used). For Pages, a `dist/_routes.json` limiting worker invocation to `/_jx/*` is emitted alongside, so static assets are served without invoking the worker.
-5. Adds the Cloudflare asset fallback (`app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))`) for both Cloudflare adapters
+3. Skips per-route `_server.js` generation. Because that per-route path is the only one that reads a page's own server entries, a `timing: "server"` entry declared directly on a page is not served once an adapter is set — declare server functions on a component. **This is a known gap, not a design intent**: the site-wide collector in step 1 walks `componentDefs` only, so a page-level entry is dropped silently, with no build warning. Until the collector also walks page documents, a page-level server function is a build-time footgun.
+4. Collects the active extension server mounts (§15.1) and registers each under its `basePath` in `order`
+5. Emits a single Hono worker via `compileSiteServer()` — `dist/worker.js`, or `dist/_worker.js` for `"cloudflare-pages"` ([advanced mode](https://developers.cloudflare.com/pages/functions/advanced-mode/), the only Functions convention that lives inside the build output; the root-level `functions/` directory convention is not used). For Pages, a `dist/_routes.json` limiting worker invocation to `/_jx/*` is emitted alongside, so static assets are served without invoking the worker.
+6. Adds the Cloudflare asset fallback (`app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))`) for both Cloudflare adapters
 
-For `"cloudflare-pages"` with no server entries, no worker is emitted at all — the deployment stays purely static. The generated worker is a build artifact inside `dist/` and is excluded by the standard `dist/` gitignore rule.
+`"cloudflare-pages"` is the one adapter that can decline: with no server entries _and_ no active mounts, no worker and no `_routes.json` are emitted and the deployment stays purely static. The other adapters emit their worker unconditionally — with nothing to serve, it carries only the asset fallback (`"cloudflare-workers"`) or no routes at all (`"node"` / `"bun"`). The generated worker is a build artifact inside `dist/` and is excluded by the standard `dist/` gitignore rule.
 
 #### 14.1.2 Cloudflare Image Transformation
 
@@ -1564,11 +1574,56 @@ dist/
 ├── robots.txt                   # From public/, with a Sitemap: line appended
 ├── favicon.svg                  # Copied from public/
 ├── _redirects                   # Platform-specific
-└── worker.js                    # Server worker (when adapter set + server entries exist;
-                                 # named _worker.js + paired with _routes.json on cloudflare-pages)
+└── worker.js                    # Server worker (whenever adapter is set; on cloudflare-pages it is
+                                 # named _worker.js, paired with _routes.json, and skipped entirely
+                                 # when there are no server entries and no active mounts)
 ```
 
 Page and layout styles are inlined into each page's `<style>` block — there is no site-wide bundled stylesheet and no hashed `_assets/` directory. Pages reference the components they use via `<link rel="stylesheet" href="/components/<tag>.css">` and `<script type="module" src="/components/<tag>.js">` (the script is omitted for fully static components).
+
+---
+
+## 15. Application Tier
+
+Sections 1–14 describe a project's static surface: pages prerendered from files on disk. That surface is not the ceiling. A Jx project may also have signed-in users, application data, and server-side logic — the **application tier** — and this section is the map of where those pieces live and what they change about the build. It is an orientation section: the normative contracts are in `extensions.md` §11–§13 (server mounts, connectors, secrets), `spec.md` §11.4 (`timing: "server"`), and §14.1 above (adapter output).
+
+> **Status: Implemented.** Server functions compile to worker routes (`compileSiteServer()`) or, with no adapter, per-route handlers (`compileServer()`), and are proxied in development by `server.md` §3.3. `@jxsuite/auth` and `@jxsuite/connector` ship as extensions declaring `server` mounts; the build wires them into the generated worker.
+
+### 15.1 The Three Mechanisms
+
+| Mechanism            | Declared as                                                            | Serves                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Server functions** | a `state` entry with `timing: "server"` on a component (spec.md §11.4) | `POST /_jx/server/<export>` — the named export runs on the server, called as `(args, env)`                                                      |
+| **Authentication**   | the `auth` section of `project.json`, from `@jxsuite/auth`             | `/_jx/auth/*` — Better Auth sessions, email/password and social sign-in, roles, and the system tables `user`/`session`/`account`/`verification` |
+| **Application data** | the `data` section of `project.json`, from `@jxsuite/connector`        | `/_jx/data/*` — CRUD over rows in a connected database (Cloudflare D1, Supabase, SQLite); wire contract in extensions.md §11                    |
+
+All three land in the **same** generated worker (§14.1). Extension mounts are registry-driven: the compiler collects every class carrying a `server` block that is _active_ — one owning no project section, or one whose section is present and non-empty in `project.json` — imports its mount module, and registers it under its `basePath` in `order`. No extension name is hardcoded in the compiler. Auth mounts first and publishes `ctx.auth` on the shared server context; the data mount consumes it to enforce per-table permission rules, and fails closed when it is absent.
+
+Two scoping rules are easy to trip over. First, `@jxsuite/connector` also contributes a `connections` section, naming the databases a `data` table binds to — but `Connections` carries no `server` block, so it is configuration rather than a mount: it serves no routes, and a project that declares connections while leaving `data` and `auth` empty has no active mounts at all. Second, only component-declared server functions reach the generated worker; an entry declared directly on a page is served by the per-route `_server.js` path, which the build skips as soon as an adapter is set (§14.1).
+
+### 15.2 Configuration Surface
+
+Extensions contribute their own `project.json` sections through schema composition (extensions.md §5), so `auth`, `connections`, and `data` appear in the generated project schema — and in Studio's project settings (extensions.md §9) — only when the extension is enabled. They sit alongside the sections in §3.1 and follow the same rule as the rest of the file: **committed config carries identifiers and env-var _names_ only**. `secretEnv: "BETTER_AUTH_SECRET"` and `urlEnv: "SUPABASE_DB_URL"` name a variable; the value lives in `.dev.vars` locally (git-ignored) and in the host's secret store in production. See extensions.md §13.
+
+Table schemas declared under `data` are synced to their connection by `jx db push` (§12.2), which is **additive-only** — it creates missing tables and columns and never drops or rewrites existing ones. Sections may contribute their own push steps (extensions.md §11.1); the auth extension's Better Auth system tables arrive that way.
+
+### 15.3 Prerendering Still Holds
+
+The application tier does **not** introduce per-request page rendering. Every page is still prerendered by the build exactly as §12.1 describes, and the worker serves `/_jx/*` plus (on the Cloudflare adapters) the static asset fallback — never HTML assembled per request.
+
+The consequence to design around is that build-time and browser-time see different session state. `Session` resolves to `{ userId, role?, user }` or `null`, and is **always `null` outside a browser**. A prerendered page therefore ships its signed-out view; the signed-in view appears when the island hydrates and the session resolves against `/_jx/auth`. Anything that must never reach an unauthenticated reader belongs behind `/_jx/data` permission rules or a server function — not behind a conditional in the page, since both branches ship to the browser in the emitted markup or element module.
+
+Reads and form actions against `data` tables lower at build time (extensions.md §8.3): table queries and single-entry lookups become core `Request` defs, and insert/update/delete actions become inline `Function` handlers that call the wire contract. No connector code ships to the browser.
+
+### 15.4 Consequences for the Build
+
+A project with an **active extension mount** — a non-empty `auth` or `data` section — **requires a server-capable adapter**. `build.adapter` must be `"cloudflare-workers"`, `"cloudflare-pages"`, `"node"`, or `"bun"`; with no adapter (a purely static build) the build **fails** with an error naming the offending sections, because a static deployment cannot serve them.
+
+Nothing else forces that error. Server functions do not: a project whose only server tier is `timing: "server"` state builds fine with no adapter, its entries compiling to per-route `_server.js` files (§14.1). Neither does a `connections` section on its own, since `Connections` is not a mount (§15.1). And the converse of the rule does _not_ hold: whether a worker is emitted turns on `build.adapter`, not on the project using any of the three mechanisms. With an adapter set and nothing to serve, the build still writes a worker — except under `"cloudflare-pages"`, the one adapter that skips it when there are neither server entries nor active mounts (§14.1).
+
+The tier does not change the shape of publishing. There is no `jx deploy` command (§12.2 lists the full CLI surface); the build writes `dist/` — including the worker when one is generated — and publishing is git-push-driven, with the host running the build and serving the output.
+
+Locally, `jx dev` (server.md) stands in for the worker: it dispatches to the same mount handlers directly, merges `.dev.vars` over `process.env` when constructing mount environments, and substitutes a local SQLite file for any connector declaring `local: "sqlite"`. That stand-in is narrow: of the shipped connectors only Cloudflare D1 declares it, so a D1-backed project's auth and data run entirely on the machine, while a connection to a hosted service (Supabase, say) needs the real endpoint reachable and its `urlEnv` set in `.dev.vars`.
 
 ---
 
@@ -1696,6 +1751,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.1.37-draft** (2026-07-24) — Document the application tier and correct the static-only framing: §1 vision, §1.1 principles 1/3/5, §1.2 coverage, §14.1/§14.2 adapter output (worker generation is gated on build.adapter alone), and new §15 Application Tier covering server functions, auth, and data mounts.
 - **0.1.36-draft** (2026-07-23) — Note the mounted-asset copy step in the build pipeline (§12.1).
 - **0.1.35-draft** (2026-07-23) — Content entries address media relative to themselves; collections publish their directory at /content/<type> (§9.3).
 - **0.1.34-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).

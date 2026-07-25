@@ -51,21 +51,33 @@ The `build` section of `project.json`:
 
 ## Adapters
 
-Without an adapter (the **Static** choice in Studio), the build is just `dist/` — HTML, CSS, JS, and assets for any static host or CDN. Setting `build.adapter` additionally packages the site's server functions (state entries with `timing: "server"`) into a single deployable worker:
+Without an adapter (the **Static** choice in Studio), the build is just `dist/` — HTML, CSS, JS, and assets for any static host or CDN. Setting `build.adapter` additionally packages the site's server tier — state entries with `timing: "server"`, plus the server mounts of enabled extensions — into a single deployable worker:
 
 | Adapter                | Extra output                                                              |
 | ---------------------- | ------------------------------------------------------------------------- |
 | _(none / static)_      | Nothing — plain `dist/`                                                   |
 | `"cloudflare-workers"` | `dist/worker.js`, a Hono server that also serves the static assets        |
-| `"cloudflare-pages"`   | `dist/_worker.js` + `dist/_routes.json`, only when server functions exist |
+| `"cloudflare-pages"`   | `dist/_worker.js` + `dist/_routes.json`, only when there is a server tier |
 | `"node"` / `"bun"`     | `dist/worker.js`, a Hono server for that runtime                          |
+
+### What the worker serves
+
+Three route families, and nothing else:
+
+| Route                  | Served by                                                       |
+| ---------------------- | --------------------------------------------------------------- |
+| `/_jx/auth/*`          | The auth extension — sign-up, sign-in, sign-out, session lookup |
+| `/_jx/data/*`          | The connector extension — table CRUD                            |
+| `/_jx/server/<export>` | One route per `timing: "server"` state entry                    |
+
+**Pages are never rendered per request.** Every route is prerendered at build time and served as static HTML; the worker answers the `/_jx/*` API surface and falls through to the assets for everything else. Interactivity arrives by hydration, so a page that shows signed-in content ships its signed-out state in the HTML and swaps once the session resolves in the browser — see [Auth and secrets](/docs/studio/data/auth-and-secrets).
 
 Details worth knowing:
 
 - Server functions are collected from every component and page, deduplicated by export name, and bundled once — there are no per-route server files when an adapter is set.
 - The worker is **self-contained**: hono, extension mounts, database connectors, and your server modules are inlined at build time, so `dist/` deploys and runs with no `node_modules` and no deploy-time bundling step.
-- On Cloudflare Pages, `_routes.json` limits worker invocation to `/_jx/*`, so static assets are served without waking the worker. A Pages site with no server functions gets no worker at all — the deployment stays purely static.
-- A project with dynamic sections (connection-backed tables served by extension mounts) **must** set a server-capable adapter; the build fails on static, since a static site can't serve live data.
+- On Cloudflare Pages, `_routes.json` limits worker invocation to `/_jx/*`, so static assets are served without waking the worker. A Pages site with no server functions and no mounts gets no worker at all — the deployment stays purely static.
+- A project with dynamic sections (a non-empty `data`/`connections` or `auth` section, served by extension mounts) **must** set a server-capable adapter. On static the build stops with an error naming the offending sections, since a static site has nothing to serve live data with.
 - Switching hosts means switching the adapter — your source never changes.
 
 ## Hooking up a host
@@ -77,3 +89,5 @@ The recipe is the same everywhere: build command `bunx jx build`, publish direct
 - [The build pipeline](/docs/framework/build) — what happens between source and `dist/`
 - [Redirects](/docs/framework/site/redirects) — the `_redirects` file in the output
 - [SEO and metadata](/docs/framework/site/seo) — `sitemap.xml` and `robots.txt` generation
+- [Databases](/docs/studio/data) — the tables behind `/_jx/data`, and why they need an adapter
+- [Timing](/docs/framework/concepts/timing) — how a `timing: "server"` entry becomes a `/_jx/server/` route

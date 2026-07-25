@@ -2,9 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.2.8-draft
+**Version:** 0.2.9-draft
 **Status:** Partial
-**Updated:** 2026-07-23
+**Updated:** 2026-07-24
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -67,8 +67,9 @@ extensions/
     src/
       *.class.json           # class descriptors (format/project/server/connector blocks)
       *.ts                   # implementations
-  connector/                 # @jxsuite/connector — connections + dynamic data tables
-  auth/                      # @jxsuite/auth — Better Auth user convention
+  connector/                 # @jxsuite/connector — database connections + dynamic data tables over /_jx/data
+  auth/                      # @jxsuite/auth — Better Auth sessions and sign-in flows over /_jx/auth, plus the ctx.auth permission evaluator the data mount authorizes against
+  search/                    # @jxsuite/search — build-time search index + headless browser query client
 ```
 
 Rules:
@@ -891,6 +892,7 @@ requiring changes to any core package.
 
 ## Changelog
 
+- **0.2.9-draft** (2026-07-24) — §2 package layout: correct the auth package description, note that /_jx/auth serves the Better Auth routes while table permission rules are enforced at /_jx/data, and add the missing search extension to the tree.
 - **0.2.8-draft** (2026-07-23) — Add the assets capability (§8.5): section owners publish source directories at site URLs.
 - **0.2.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.6-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -904,4 +906,4 @@ requiring changes to any core package.
 
 ---
 
-_Jx Extensions Specification v0.2.8-draft_
+_Jx Extensions Specification v0.2.9-draft_

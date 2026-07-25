@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.1.22-draft
+**Version:** 0.1.23-draft
 **Status:** Partial
-**Updated:** 2026-07-23
+**Updated:** 2026-07-24
 **License:** MIT
 
 ---
@@ -12,6 +12,8 @@
 ## 1. Overview
 
 The Jx compiler transforms `.json` component files into optimized production artifacts. It erases all Jx abstractions at build time — no JSON, no runtime, and no Jx code ships to production. The compiler auto-detects the appropriate output target based on document analysis.
+
+Pages are always prerendered at build time — there is no per-request page rendering — and interactive regions compile to custom elements that hydrate in place. Server output is gated on `build.adapter`: when it is set, every `timing: "server"` entry and every enabled extension server mount (authentication, data) is bundled into a single generated Hono worker serving `/_jx/*` alongside the static output (§6.3). With no adapter, no site worker is emitted at all: `timing: "server"` entries compile instead to a standalone per-page `_server.js` handler (§6.2). A mount has no such fallback, so a project with a non-empty `data` or `auth` section fails the build until an adapter is chosen (§6.3).
 
 **Production dependencies:** `@vue/reactivity` (~7 kB gzip) + `lit-html` (~3 kB gzip).
 
@@ -363,19 +365,25 @@ export default app;
 
 ### 6.3 Site-Wide Server Bundling (`compileSiteServer`)
 
-When `build.adapter` is set in `project.json`, the site build collects all `timing: "server"` entries across every component and page, deduplicates by export name, and emits a single Hono worker via `compileSiteServer()` — `dist/worker.js`, or `dist/_worker.js` ([Pages advanced mode](https://developers.cloudflare.com/pages/functions/advanced-mode/)) plus a `dist/_routes.json` limiting invocation to `/_jx/*` for `"cloudflare-pages"`. Per-route `_server.js` files are not generated in this mode. A `"cloudflare-pages"` site with zero server entries emits no worker at all.
+When `build.adapter` is set in `project.json`, the site build collects all `timing: "server"` entries across every component and page, deduplicates by export name, and emits a single Hono worker via `compileSiteServer()` — `dist/worker.js`, or `dist/_worker.js` ([Pages advanced mode](https://developers.cloudflare.com/pages/functions/advanced-mode/)) plus a `dist/_routes.json` limiting invocation to `/_jx/*` for `"cloudflare-pages"`. Per-route `_server.js` files are not generated in this mode. A `"cloudflare-pages"` site with no server entries **and** no active extension mounts emits no worker at all.
 
 The function signature for server entries is `(args, env)` — the second parameter receives the platform's environment bindings (e.g., Cloudflare `env` with KV, D1, email, etc.). Old functions that accept only `(args)` are unaffected since the extra parameter is ignored.
 
 ```js
-compileSiteServer(entries, { adapter, baseUrl });
+compileSiteServer(entries, { adapter, baseUrl, mounts, connectors });
 ```
 
-| Parameter | Type                       | Default         | Description                                       |
-| --------- | -------------------------- | --------------- | ------------------------------------------------- |
-| `entries` | `Array<{exportName, src}>` | —               | Pre-collected server entries from all components  |
-| `adapter` | `string \| null`           | `null`          | Deployment adapter; adds platform-specific output |
-| `baseUrl` | `string`                   | `"/_jx/server"` | Base path prefix for all server endpoints         |
+| Parameter    | Type                                                   | Default         | Description                                                            |
+| ------------ | ------------------------------------------------------ | --------------- | ---------------------------------------------------------------------- |
+| `entries`    | `Array<{exportName, src}>`                             | —               | Pre-collected server entries from all components                       |
+| `adapter`    | `string \| null`                                       | `null`          | Deployment adapter; adds platform-specific output                      |
+| `baseUrl`    | `string`                                               | `"/_jx/server"` | Base path prefix for all server endpoints                              |
+| `mounts`     | `Array<{className, module, basePath, order, options}>` | `[]`            | Extension server mounts to register (extensions.md §11)                |
+| `connectors` | `Array<{provider, className, module}>`                 | `[]`            | Connector provider classes the mounts receive via `options.connectors` |
+
+**Extension server mounts.** Classes carrying a `server` block ([extensions.md §11](./extensions.md)) — `@jxsuite/auth` at `/_jx/auth`, the connector data mount at `/_jx/data` — are emitted into the same worker: a static import per mount module and per connector provider class, one shared `ctx` object, `mount()` awaited at module init in ascending `order`, and `app.all()` wrappers for both `<basePath>/*` and the bare `<basePath>` registered **before** the `/_jx/server` routes and the asset fallthrough. Mount options are inlined as JSON — the project's section manifest, identifiers and env-var names only, never secret values (extensions.md §13). A mount is active when its class owns no project section, or when the project declares a non-empty value for its section key.
+
+**Dynamic sections require a server-capable adapter.** A project with active extension mounts and no `build.adapter` fails the build with an error naming the offending sections: a static-only output cannot serve `/_jx/data` or `/_jx/auth`. Set `build.adapter` to `"cloudflare-workers"`, `"cloudflare-pages"`, `"node"`, or `"bun"`.
 
 Adapter-specific behavior:
 
@@ -660,6 +668,7 @@ The site build bundles Function-def `$src` modules for the browser
 
 ## Changelog
 
+- **0.1.23-draft** (2026-07-24) — §1 Overview: condition the generated Hono worker on build.adapter (per-page _server.js without one) and scope the static-build failure to active data/auth mounts; §6.3 document compileSiteServer's mounts/connectors parameters and extension mount emission.
 - **0.1.22-draft** (2026-07-23) — Image src resolution consults extension asset mounts before public/ (§7.3).
 - **0.1.21-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.20-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -686,4 +695,4 @@ The site build bundles Function-def `$src` modules for the browser
 
 ---
 
-_`@jxsuite/compiler` Specification v0.1.22-draft_
+_`@jxsuite/compiler` Specification v0.1.23-draft_

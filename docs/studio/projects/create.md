@@ -37,7 +37,7 @@ The second screen — **New Project Parameters** — shows which source you pick
 2. **Directory** — the folder name for the project. Studio derives it from the name as you type (`My Site` becomes `my-site`); edit it to take over.
 3. **Description** — a short line about the site.
 4. **Production URL** — where the site will live once published, e.g. `https://example.com`.
-5. **Deployment Adapter** — how the build packages the site for your host: **Static**, **Cloudflare Pages**, **Node**, or **Bun**. If you're not sure, **Static** works for any host that serves files.
+5. **Deployment Adapter** — how the build packages the site for your host: **Static**, **Cloudflare Pages**, **Node**, or **Bun**. **Static** emits plain files for any host that serves them, which is all a site of pages and content needs. Pick one of the others if the site will have a database, sign-ins, or server functions: those adapters also package the small server that answers those requests. A database or sign-ins make that mandatory — the build refuses to run on **Static**. Server functions still build there; they just never get served. The choice isn't final — change it later in **[Project settings](/docs/studio/projects/settings)**.
 
 On the Import tab, this step shows only the name and directory plus the import's progress — the remaining fields and the design quickstart don't apply.
 

@@ -13,7 +13,7 @@ Download the desktop app for [macOS, Windows, or Linux](/docs/start/install) —
 
 ## 2. Create a project
 
-In Studio, choose **New Project**. Give it a name and a folder, set your production URL, and pick a **deployment adapter** — Static, Cloudflare, Node, or Bun.
+In Studio, choose **New Project**. Give it a name and a folder, set your production URL, and pick a **deployment adapter** — Static, Cloudflare Pages, Node, or Bun. **Static** suits a site that's purely pages and content; if it will have a database, sign-ins, or server functions, pick one of the others — those hosts can run the small worker Jx builds for them. You can change this later in [project settings](/docs/studio/projects/settings).
 
 Then pick a **template**. Start from **Blank** for an empty project, or clone one of the [starter sites](/templates) — a restaurant, shop, portfolio, SaaS landing, blog, and more. Each one is a complete, themed site (pages, components, content, and images) you can reshape into your own. Studio copies it in as plain files and opens it on the canvas.
 
@@ -49,7 +49,7 @@ When you're happy, open **Source Control**. Review your changes, write a message
 
 ![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](../images/git-commit.png)
 
-Here's the one boundary worth knowing: **Studio publishes code; it doesn't build or deploy the site.** It commits and pushes, and it sets the deploy adapter you chose in step 2. Your host takes it from there — building the static site (`bunx jx build`) on every push and serving the `dist/` output from a CDN. See **[Git & publish](/docs/studio/publish)** for the full flow.
+Here's the one boundary worth knowing: **Studio publishes code; it doesn't build or deploy the site.** It commits and pushes, and it sets the deploy adapter you chose in step 2. Your host takes it from there — building the site (`bunx jx build`) on every push and serving the `dist/` output from a CDN. If you picked one of the server-capable adapters in step 2, the build emits a small worker beside those files as well — that's the piece that runs a database, sign-ins, or server functions. See **[Git & publish](/docs/studio/publish)** for the full flow.
 
 ## What's next
 

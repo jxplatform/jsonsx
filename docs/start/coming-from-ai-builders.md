@@ -28,11 +28,13 @@ Because the assistant changes files, its work shows up in **[Source Control](/do
 
 ## Ownership
 
-A Jx project is plain files on your machine, versioned in your repository, published to a host you choose — [no hosted database, no account the work lives behind](/docs/studio/publish). The assistant is optional: everything it does, you can do by hand in Studio, and the format it writes is documented in the open. If you stopped using the assistant — or Jx entirely — your project would still be a folder of readable files.
+A Jx project is plain files on your machine, versioned in your repository, published to a host you choose — [no hosted service holding it, no account your work lives behind](/docs/studio/publish). (Your _site_ can have a database and signed-in users of its own; those run on infrastructure you control too.) The assistant is optional: everything it does, you can do by hand in Studio, and the format it writes is documented in the open. If you stopped using the assistant — or Jx entirely — your project would still be a folder of readable files.
 
-## What Jx is not
+## Where Jx is different
 
-Two honest boundaries. Lovable builds full-stack applications — databases, user accounts, server logic. Jx builds websites: pages, components, and content compiled to a static site your host serves. If your goal is an app with logged-in users, Jx isn't aimed at that. And where Builder.io is a hosted platform your app plugs into, Jx is the opposite shape: a local tool that holds none of your work on anyone's servers.
+Two differences are worth stating plainly, and neither is the one people expect. Jx builds full applications, not just brochure sites: [database connections](/docs/studio/data/connections), [user accounts and sessions](/docs/studio/data/auth-and-secrets), and [server-side logic](/docs/framework/concepts/timing) all ship, and your secrets stay on the server. The honest boundary is a rendering one — Jx has no per-request page rendering. Every page is prerendered at build time and interactivity hydrates as islands, so the set of routes is fixed when you build. That fits apps whose pages are known ahead of time; it does not fit one that assembles a different page structure for every visitor on every request.
+
+The other difference is shape. Where Builder.io is a hosted platform your app plugs into, Jx is the opposite: a local tool that holds none of your work on anyone's servers.
 
 ## Start here
 

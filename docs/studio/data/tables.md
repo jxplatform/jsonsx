@@ -5,6 +5,9 @@ code:
   - extensions/connector/src/Data.class.json
   - extensions/connector/src/columns.ts
   - extensions/connector/src/ddl.ts
+  - extensions/connector/src/worker.ts
+  - extensions/connector/src/TableQuery.class.json
+  - extensions/connector/src/TableEntry.class.json
   - packages/studio/src/panels/data-grid.ts
   - packages/studio/src/ui/form-controls.ts
 ---
@@ -51,11 +54,23 @@ From the Data Tables section a push covers every connection; from the Connection
 
 Pushes are **additive only**: they create missing tables and columns and never drop, rename, or retype anything that exists. Removing a field from a schema leaves its column (and its data) in place — the plan notes such drift as a warning instead of destroying data. This makes pushing safe to run repeatedly.
 
-The same push runs from a terminal or CI as `jx db push`, with the same plan and `--dry-run` flag — see the **[CLI reference](/docs/framework/build/cli)**.
+A terminal or CI can push too: `jx db push` applies the same additive rules and takes the same `--dry-run` flag — see the **[CLI reference](/docs/framework/build/cli)**. Two differences matter. The CLI pushes the tables you define here and nothing else, so the auth extension's account tables come only from the button above. And the CLI talks to each connection exactly as declared, while the button goes through Studio's local backend — so for a **Cloudflare D1** connection, which is stood in by a local SQLite file while you develop, `jx db push` is what creates the tables in the real D1 database.
 
 ## Using tables from pages
 
-Rows never pass through your project files — pages talk to the tables live. In the **[State panel](/docs/studio/logic/state)**, the connector's sources appear in the **+ Add…** picker alongside the built-in **[data sources](/docs/studio/logic/data-sources)**: a table query lists rows with filter, sort, and limit rules (the same grammar as content collections); a table entry fetches one row by id; and the insert, update, and delete actions are made to be wired to a form's submit event. After a successful write, queries on the page refresh themselves.
+Rows never pass through your project files — pages talk to the tables live. In the **[State panel](/docs/studio/logic/state)**, the connector's sources appear in the **+ Add…** picker alongside the built-in **[data sources](/docs/studio/logic/data-sources)**:
+
+- **Table query** — a list of rows. **filter** and **sort** take the same rules as a content collection query; **limit** and **offset** page through a longer list; **include** names reference fields to expand, so a query on `comments` can come back with each row's linked `post` filled in — the whole row, not just its id — and to-many references expand into arrays the same way.
+- **Table entry** — one row by **id**. The id can be a fixed value, a `${…}` expression, or the current route's parameter, which is how a detail page like `pages/posts/[id].json` fetches exactly the row its URL names.
+- **Table insert**, **update**, and **delete** — write actions, made to be wired to a form's submit event. After a successful write, every query on the page refreshes itself.
+
+Filtering, sorting, and paging all happen in the database rather than in the browser, so a query with a limit fetches only that many rows.
+
+:::doc-note
+Compiled pages carry no extension code. Each source is lowered at build time into a plain request to your site's own `/_jx/data` routes — `GET /_jx/data/comments?filter=…&sort=…&limit=…&offset=…&include=…` for a query, `GET /_jx/data/comments/<id>` for an entry, `POST`/`PATCH`/`DELETE` for the actions — and each write action into an inline handler that reads the submitted form. Permission rules are evaluated on the server for every one of those requests.
+
+In the JSON, a route parameter binds as `{ "$ref": "#/$params/id" }` (the same way a **[dynamic route](/docs/framework/site/routing)** binds a content entry), and a form points at a write action with `"onsubmit": { "$ref": "#/state/addComment" }`. That last one is written in **[Code mode](/docs/studio/logic/code)** today — the **[Events panel](/docs/studio/logic/events)** picker offers plain functions only.
+:::
 
 To see and fix the rows by hand, open the **[Data grid](/docs/studio/data/grid)**.
 

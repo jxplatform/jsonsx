@@ -192,7 +192,7 @@
                     "props.name": "Script",
                     "props.image": "/content/docs/images/mode-script.png",
                     "props.imageAlt": "Jx Studio editing a component state function in the Monaco code editor",
-                    "props.description": "State, data, and events in structured panels, plus a Monaco editor for functions and integrations. When a client asks for 'one little interactive thing,' you stop saying no."
+                    "props.description": "State, data, and events in structured panels, plus a Monaco editor for functions and integrations. Switch a fetch from the browser to the server with one picker, and — once the connector and auth extensions are added — bind a list to a database table or wire up a sign-in form. Hover effects and logged-in apps, same panels."
                   }
                 }
               ]
@@ -366,7 +366,7 @@
                     "lineHeight": "1.7",
                     "margin": "0 0 2rem"
                   },
-                  "textContent": "Review changes, write a message, and commit-and-sync — right from Studio. Starting fresh? Publish to GitHub in a click and Studio creates the repo for you. From there, your host builds the static site on every push."
+                  "textContent": "Review changes, write a message, and commit-and-sync — right from Studio. Starting fresh? Publish to GitHub in a click and Studio creates the repo for you. From there, your host builds and publishes the site on every push — pages, assets, and the server tier if your project has one."
                 },
                 {
                   "tagName": "div",

@@ -2,9 +2,9 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.4.23-draft
+**Version:** 0.4.24-draft
 **Status:** Partial
-**Updated:** 2026-07-22
+**Updated:** 2026-07-24
 **License:** MIT
 
 ---
@@ -431,7 +431,7 @@ A function with only `body` (no `arguments`) and no event binding acts as a comp
 
 `parameters` entries may be bare string names (`["item"]`, as in §20.1's example), CEM-compatible parameter objects (`{ "name": "id", "type": { "text": "number" }, "default": 1 }`), or a mix — the schema and runtime accept both forms, and the runtime normalizes every entry to its name. Prefer objects when tooling metadata (types, defaults, descriptions) matters; bare names suffice otherwise.
 
-**Compiled-site delivery.** In compiled sites, bundleable `$src` specifiers — `npm:<pkg>[/subpath]` and project-relative `./…` files (TypeScript included) — are bundled per the entry's `timing`. Client-timing functions compile to self-contained ESM bundles under `/assets/` with deterministic, hash-free names (relative specifiers key on their project-relative path); emitted page and element modules import the bundle URL instead of the raw specifier, so external libraries work on purely static hosts with no `node_modules/` at runtime. `timing: "compiler"` functions are never bundled — they execute in the build host. Absolute URL specifiers (`/lib/x.js`, `https://…`) are emitted verbatim and served as-is. Server-timing functions are imported by the generated site worker (server.md §6). The bundler backend is `Bun.build` under Bun and esbuild under Node (see compiler.md).
+**Compiled-site delivery.** In compiled sites, bundleable `$src` specifiers — `npm:<pkg>[/subpath]` and project-relative `./…` files (TypeScript included) — are bundled per the entry's `timing`. Client-timing functions compile to self-contained ESM bundles under `/assets/` with deterministic, hash-free names (relative specifiers key on their project-relative path); emitted page and element modules import the bundle URL instead of the raw specifier, so external libraries work on purely static hosts with no `node_modules/` at runtime. `timing: "compiler"` functions are never bundled — they execute in the build host. Absolute URL specifiers (`/lib/x.js`, `https://…`) are emitted verbatim and served as-is. Server-timing functions are imported by the generated server output — the site worker when `build.adapter` is set, a per-page `_server.js` handler otherwise (compiler.md §6). The bundler backend is `Bun.build` under Bun and esbuild under Node (see compiler.md).
 
 ##### 4e — Data Source (External Class)
 
@@ -1081,13 +1081,13 @@ When any `arguments` value is a signal `$ref`, the call becomes reactive.
 
 #### Security Boundary
 
-**In a compiled deployment**, private environment variables and server-only credentials remain in the server process: the compiler emits the function into a `_worker.js` route the browser can only call over HTTP, and the browser receives only the serialized return value. The `env` parameter gives server functions access to platform bindings (KV namespaces, D1 databases, email workers, secrets) without exposing them to the client.
+**In a compiled deployment**, private environment variables and server-only credentials remain in the server process: the compiler emits the function into a route in the generated server output that the browser can only call over HTTP, and the browser receives only the serialized return value. Where that route lands depends on `build.adapter`: with an adapter set it goes into the generated site worker (`dist/worker.js`, or `dist/_worker.js` under the Cloudflare Pages adapter); with no adapter the compiler emits a standalone per-page `_server.js` handler beside the page instead (compiler.md §6.2). The `env` parameter gives server functions access to platform bindings (KV namespaces, D1 databases, email workers, secrets) without exposing them to the client.
 
 > **Status: Partial (dev boundary).** During `jx dev`, the interpreting runtime currently attempts a browser-side `import()` of the `$src` module before falling back to the `/__jx_server__` proxy. A `*.server.js` that is browser-loadable therefore has its **source delivered to the client** in dev — so do not embed secrets in the module body; read them from `env` inside the function, which only the proxy (and the compiled worker) provides. The compiled deployment does not have this gap. Making the dev path proxy-first is a tracked follow-up.
 
 #### Site-Wide Bundling
 
-When `build.adapter` is set in `project.json`, all `timing: "server"` entries across the entire site (components and pages) are collected, deduplicated by export name, and bundled into a single `_worker.js` entry point. See compiler spec §6.3 for details.
+When `build.adapter` is set in `project.json`, all `timing: "server"` entries across the entire site (components and pages) are collected, deduplicated by export name, and bundled into a single worker entry point — `dist/worker.js`, or `dist/_worker.js` for `"cloudflare-pages"`. That same worker also carries the extension server mounts (extensions.md §11): authentication at `/_jx/auth`, connector data CRUD at `/_jx/data`. See compiler spec §6.3 for details.
 
 > **Status: Implemented.** Runtime handles `timing: "server"` entries. Dev server provides `/__jx_server__` proxy. Compiler emits per-route Hono handlers (`compileServer`) or a site-wide bundled worker (`compileSiteServer`) when `build.adapter` is set.
 
@@ -2285,6 +2285,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.4.24-draft** (2026-07-24) — §5.3 and §11.4: a timing: "server" route lands in the generated site worker only when build.adapter is set; without an adapter the compiler emits a per-page _server.js handler instead.
 - **0.4.23-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.4.22-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.4.21-draft** (2026-07-22) — Reconcile spec with shipped behavior; document the eval surface (`c8d1d580`).
@@ -2328,4 +2329,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.4.23-draft — subject to revision_
+_Jx Specification v0.4.24-draft — subject to revision_

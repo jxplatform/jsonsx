@@ -8,7 +8,7 @@ code:
 
 # Publish to Cloudflare Pages
 
-The Publish panel connects your project to Cloudflare Pages — a free static-site host — so that every commit you sync builds and publishes automatically. Open it with the **Publish** button in the toolbar.
+The Publish panel connects your project to Cloudflare Pages — a free host that serves your prebuilt pages from a CDN and, if your project has a database or sign-ins, runs the small worker Jx emits for their `/_jx/*` routes — so that every commit you sync builds and publishes automatically. Open it with the **Publish** button in the toolbar.
 
 ![The Publish modal showing the connected state with the latest deployment status](../../images/publish-panel.png)
 
@@ -44,6 +44,16 @@ After connecting, the panel becomes a status view:
 - **Refresh** re-checks; **Disconnect** removes the connection (your Pages project and site stay up — only the link from Studio is removed).
 
 There is no publish button, because publishing is automatic: every **Commit and sync** in **[Source control](/docs/studio/publish/source-control)** triggers a fresh build and deployment. Right after connecting, the panel shows _No deployments yet_ — your next commit starts the first one.
+
+## Sites with a database or sign-in
+
+Pages serves both halves of a Jx site, but a project with **[data tables](/docs/studio/data)** or accounts needs three things arranged once:
+
+1. **Set the adapter.** In _Settings > General_, set **Platform Adapter** to **Cloudflare Pages** — or **Cloudflare Workers** if you deploy the site as a Worker instead. Connecting this panel doesn't change it for you, and the build stops with an error on **Static** as soon as the project declares data tables.
+2. **Push the schema to the real database, from a terminal.** While you develop, a [D1 connection](/docs/studio/data/connections) is stood in by a local SQLite file — and Studio's **Push Schema** button goes through that same local backend, so it creates your tables in `.jx/data/<connection>.sqlite` and never touches D1 or `wrangler.jsonc`. `jx db push` is the path that talks to the connection as declared: it applies the same additive plan to D1 itself, and writes D1's binding into your project's `wrangler.jsonc` on the way through. Reaching D1 from outside a deployed worker goes over Cloudflare's API, which needs three things together — the connection's **database ID**, a `CLOUDFLARE_API_TOKEN`, and an account ID (the connection's own **account ID**, or `CLOUDFLARE_ACCOUNT_ID`). Miss one and the push reports the connection as unreachable. Accounts need a second pass: the auth extension's own tables aren't part of the CLI push — **[Auth and secrets](/docs/studio/data/auth-and-secrets)** covers where they come from.
+3. **Set the secret values on Cloudflare.** `project.json` records only the _names_ of environment variables — the session signing secret, a database URL, OAuth credentials. Give each name a value on the Pages project, with `wrangler pages secret put <NAME>` or the environment settings in Cloudflare's dashboard; locally the same names are read from `.dev.vars`. **[Auth and secrets](/docs/studio/data/auth-and-secrets)** covers the whole arrangement.
+
+Your pages stay prerendered and CDN-served either way — only the `/_jx/*` routes reach the worker. The two adapters arrange that differently: **Cloudflare Pages** ships a `_routes.json` alongside the worker that tells Cloudflare to wake it for `/_jx/*` and nothing else, while a **Cloudflare Workers** deploy puts the worker in front of every request and hands anything that isn't one of its routes straight to the static assets.
 
 :::doc-note
 Studio records the connection under `build.deploy` in `project.json` — provider, account, project name, and live address — so it travels with the repository, and any copy of Studio that opens the project knows publishing is already set up. Cloudflare builds with `bunx jx build` and serves the `dist/` output.

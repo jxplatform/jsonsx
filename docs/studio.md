@@ -13,6 +13,7 @@ Everything Studio does is organized around a few surfaces:
 - **[Edit mode](/docs/studio/editing)** — inline writing on the real page, with slash commands and frontmatter forms.
 - **[Design mode](/docs/studio/design)** — a live canvas per breakpoint with a full style inspector.
 - **[Logic](/docs/studio/logic)** — state, formulas, events, and data without leaving the visual editor.
+- **[Databases](/docs/studio/data)** — connect SQLite, D1, or Supabase, define tables, decide who can read and write them, and browse the rows in a grid.
 - **[Publish](/docs/studio/publish)** — commit, branch, and push; your host builds and serves the site.
 
 :::doc-note

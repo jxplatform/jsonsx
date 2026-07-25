@@ -24,7 +24,7 @@ Changes save as you make them — there is no separate save button.
 The basics of the site:
 
 - **Favicon** — click **Upload Favicon** and pick an image; Studio copies it into your project and shows the current one beside the button.
-- **Platform Adapter** — how the build packages the site for your host: **Static**, **Bun**, **Node**, **Cloudflare Workers**, or **Cloudflare Pages**. This is the same choice you made when [creating the project](/docs/studio/projects/create); **Static** works for any host that serves files.
+- **Platform Adapter** — how the build packages the site for your host: **Static**, **Bun**, **Node**, **Cloudflare Workers**, or **Cloudflare Pages**. This is the same choice you made when [creating the project](/docs/studio/projects/create). **Static** emits plain files for any host that serves them; the other four additionally package the site's server tier, which is what answers a database, sign-ins, or server functions. One of them becomes _required_ once the project has a database or sign-ins — the build stops with an error on **Static**. Server functions still build on **Static**, but only these four actually serve them. See [Build output and adapters](/docs/framework/site/deployment) for what each one writes into `dist/`.
 - **Breakpoints** — the screen sizes your design responds to, as name/value rows. The **Base** row is your default canvas width; **+ Add Breakpoint** adds another, and the × button removes one.
 - **Global Styles** — a shortcut that opens the project file where site-wide default styles live.
 

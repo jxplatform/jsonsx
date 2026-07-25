@@ -6,7 +6,7 @@
       "tagName": "meta",
       "attributes": {
         "name": "description",
-        "content": "Everything Jx Suite offers: file-based CMS, reactive framework, visual composer, and static site generator. One toolkit, zero lock-in."
+        "content": "Everything Jx Suite offers: file-based CMS, reactive framework, visual composer, static site generator, accounts, databases, and server functions."
       }
     }
   ],
@@ -65,7 +65,7 @@
                 "margin": "0 auto",
                 "maxWidth": "640px"
               },
-              "textContent": "Jx Studio is how you build. Underneath it runs a file-based CMS, a reactive framework, and a static generator — all plain files, zero lock-in."
+              "textContent": "Jx Studio is how you build. Underneath it runs a file-based CMS, a reactive framework, a static generator, and an optional server tier for accounts and data — all plain files, zero lock-in."
             }
           ]
         }
@@ -229,7 +229,7 @@
                     "lineHeight": "1.7",
                     "margin": "0 0 2rem"
                   },
-                  "textContent": "Your content lives as JSON documents and Markdown files in a git repository. No database to manage, no admin panel to secure, no migration scripts to run. Branch, review, merge — the same workflow you use for code."
+                  "textContent": "Your content lives as JSON documents and Markdown files in a git repository. No content database to manage, no admin panel to secure. Branch, review, merge — the same workflow you use for code."
                 },
                 {
                   "tagName": "div",
@@ -421,6 +421,78 @@
           "children": [
             {
               "tagName": "div",
+              "children": [
+                {
+                  "tagName": "section-label",
+                  "attributes": {
+                    "props.text": "The engine · Accounts & data"
+                  }
+                },
+                {
+                  "tagName": "h2",
+                  "style": {
+                    "fontSize": "clamp(1.5rem, 3vw, 2.25rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.02em",
+                    "lineHeight": "1.2",
+                    "margin": "0 0 1rem"
+                  },
+                  "textContent": "Add a login. Add a database."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "fontSize": "1.0625rem",
+                    "lineHeight": "1.7",
+                    "margin": "0 0 2rem"
+                  },
+                  "textContent": "Some sites are more than pages. The auth extension serves sessions and sign-in at /_jx/auth; the connector extension serves your tables at /_jx/data, where the roles you declare in project.json become per-table permission rules. Declare both in project.json, pick a server adapter, and the build emits the worker that runs them. Pages stay prerendered either way: every visitor is served the same logged-out HTML, and the logged-in view renders in the browser once the session resolves."
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.75rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Email + password and social sign-in, via Better Auth"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Per-table rules: public, authenticated, owner, or by role"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Connect Cloudflare D1, Supabase, or SQLite"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Read and write rows with filter, sort, and pagination"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Server functions keep API keys and secrets off the client"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
               "style": {
                 "backgroundColor": "var(--color-bg-secondary)",
                 "border": "1px solid var(--color-border)",
@@ -432,7 +504,44 @@
                 "color": "var(--color-text-secondary)",
                 "whiteSpace": "pre-wrap"
               },
-              "textContent": "$ jx build\n\n✓ Compiled pages\n✓ Optimized images (webp, avif)\n✓ Generated sitemap.xml\n✓ Output: ./dist\n\n$ deploy ./dist  # Any static host works"
+              "textContent": "// project.json\n{\n  \"extensions\": [\"@jxsuite/connector\", \"@jxsuite/auth\"],\n  \"connections\": {\n    \"main\": { \"provider\": \"d1\", \"binding\": \"DB\" }\n  },\n  \"auth\": {\n    \"connection\": \"main\",\n    \"providers\": { \"github\": {} },\n    \"roles\": [\"admin\"]\n  },\n  \"data\": {\n    \"comments\": {\n      \"connection\": \"main\",\n      \"ownerField\": \"author_id\",\n      \"permissions\": {\n        \"read\": \"public\",\n        \"insert\": \"authenticated\",\n        \"update\": \"owner\"\n      },\n      \"schema\": {\n        \"type\": \"object\",\n        \"properties\": { \"message\": { \"type\": \"string\" } }\n      }\n    }\n  },\n  \"build\": { \"adapter\": \"cloudflare-workers\" }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "display": "grid",
+            "gridTemplateColumns": "1fr 1fr",
+            "gap": "clamp(3rem, 6vw, 5rem)",
+            "alignItems": "center"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "backgroundColor": "var(--color-bg-secondary)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius-lg)",
+                "padding": "2rem",
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.75rem",
+                "lineHeight": "1.8",
+                "color": "var(--color-text-secondary)",
+                "whiteSpace": "pre-wrap"
+              },
+              "textContent": "$ jx build\n\n✓ Compiled pages\n✓ Optimized images (webp, avif)\n✓ Generated sitemap.xml\n✓ Output: ./dist\n\n# Static host? Ship ./dist.\n# Accounts or data? Set an\n# adapter and a worker ships\n# alongside it."
             },
             {
               "tagName": "div",
@@ -462,7 +571,7 @@
                     "lineHeight": "1.7",
                     "margin": "0 0 2rem"
                   },
-                  "textContent": "The build step produces pure HTML and CSS — no origin server, no serverless functions, no database connections. Static files on a CDN. Fast everywhere. Costs pennies. Online forever."
+                  "textContent": "Every page is prerendered at build time and served from a CDN — static pages are HTML and CSS with no JavaScript at all. Fast everywhere. Costs pennies. Online forever. Add accounts or a database, pick a server adapter, and the same command also writes a self-contained Hono worker for Cloudflare, Node, or Bun."
                 },
                 {
                   "tagName": "div",
@@ -499,7 +608,13 @@
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "No PHP, no Node server, no containers"
+                        "props.text": "Adapters for Cloudflare Workers, Pages, Node, and Bun"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "No PHP, no containers — and no server unless you need one"
                       }
                     }
                   ]
@@ -539,7 +654,7 @@
                 "letterSpacing": "-0.03em",
                 "margin": "0 0 3rem"
               },
-              "textContent": "From brochure sites to interactive applications."
+              "textContent": "From brochure sites to apps with accounts and data."
             },
             {
               "tagName": "div",
@@ -634,6 +749,33 @@
                     "fontSize": "0.9375rem"
                   },
                   "textContent": "Component libraries"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "Community sites with comments"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "Internal tools with a login"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "Customer portals"
                 }
               ]
             }
@@ -675,7 +817,7 @@
                 "fontSize": "1.0625rem",
                 "lineHeight": "1.7"
               },
-              "textContent": "Start your first project in under a minute. No accounts. No credit card. Just code."
+              "textContent": "Start your first project in under a minute. No sign-up. No credit card. Just code."
             },
             {
               "tagName": "div",

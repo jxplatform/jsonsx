@@ -176,6 +176,19 @@
                                 "color": "var(--color-text-muted)",
                                 "fontWeight": "500"
                               },
+                              "textContent": "Accounts & Data"
+                            },
+                            {
+                              "tagName": "th",
+                              "style": {
+                                "padding": "1rem",
+                                "fontFamily": "var(--font-mono)",
+                                "fontSize": "0.6875rem",
+                                "letterSpacing": "0.08em",
+                                "textTransform": "uppercase",
+                                "color": "var(--color-text-muted)",
+                                "fontWeight": "500"
+                              },
                               "textContent": "Maintenance"
                             },
                             {
@@ -250,6 +263,14 @@
                               "tagName": "td",
                               "style": {
                                 "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
+                              "textContent": "✓ Built-in"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
                                 "color": "var(--color-text-muted)"
                               },
                               "textContent": "Heavy"
@@ -301,6 +322,14 @@
                                 "color": "var(--color-accent)"
                               },
                               "textContent": "✓"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
+                              "textContent": "Varies by plan"
                             },
                             {
                               "tagName": "td",
@@ -362,6 +391,14 @@
                               "tagName": "td",
                               "style": {
                                 "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
+                              "textContent": "Varies by plan"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
                                 "color": "var(--color-accent)"
                               },
                               "textContent": "Light"
@@ -413,6 +450,14 @@
                                 "color": "var(--color-text-muted)"
                               },
                               "textContent": "✗"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-secondary)"
+                              },
+                              "textContent": "Bring your own"
                             },
                             {
                               "tagName": "td",
@@ -474,6 +519,14 @@
                               "tagName": "td",
                               "style": {
                                 "padding": "1rem",
+                                "color": "var(--color-text-secondary)"
+                              },
+                              "textContent": "Bring your own"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
                                 "color": "var(--color-accent)"
                               },
                               "textContent": "Light"
@@ -527,6 +580,15 @@
                                 "fontWeight": "600"
                               },
                               "textContent": "✓ Studio"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)",
+                                "fontWeight": "600"
+                              },
+                              "textContent": "✓ First-party extensions"
                             },
                             {
                               "tagName": "td",
@@ -621,7 +683,7 @@
                     "margin": "0 auto",
                     "fontSize": "1.0625rem"
                   },
-                  "textContent": "A typical 40-page brochure site for a small business. Illustrative estimates — your costs will vary."
+                  "textContent": "A typical 40-page brochure site for a small business. Illustrative estimates — your costs will vary. Projects that add accounts or a database ship a worker alongside the same static output — on Cloudflare Pages it goes out inside the same deploy, so there is no second service to provision; other hosts price it their own way."
                 }
               ]
             },
@@ -929,7 +991,7 @@
                                 "fontFamily": "var(--font-mono)",
                                 "color": "var(--color-accent)"
                               },
-                              "textContent": "N/A — static HTML"
+                              "textContent": "N/A — static pages"
                             }
                           ]
                         },
@@ -1017,7 +1079,7 @@
                     "fontSize": "1.0625rem",
                     "lineHeight": "1.7"
                   },
-                  "textContent": "Your content is Markdown. Your components are JSON. Your output is HTML. Every layer is a standard format that other tools can read. There is no proprietary intermediate representation."
+                  "textContent": "Your content is Markdown. Your components are JSON. Your output is prerendered HTML — plus a self-contained JavaScript worker when you build for a server-capable target like Cloudflare, Node, or Bun. Every layer is a standard format that other tools can read. There is no proprietary intermediate representation."
                 }
               ]
             },
@@ -1089,7 +1151,7 @@
                         "color": "var(--color-text-secondary)",
                         "lineHeight": "1.6"
                       },
-                      "textContent": "Plain HTML, CSS, and JavaScript. Deployable on any web server in the world."
+                      "textContent": "Plain HTML, CSS, and JavaScript — deployable on any web server in the world. Use the server tier and you also get one standard JS worker, which runs on Cloudflare, Node, or Bun."
                     }
                   ]
                 },

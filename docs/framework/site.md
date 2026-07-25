@@ -47,7 +47,7 @@ Files and directories whose names start with `_` inside `pages/` are excluded fr
 
 ## Configuration
 
-`project.json` at the project root is the only required configuration file. It names the site, sets the default layout and language, declares global `<head>` entries, breakpoints, and design tokens, and holds the `content`, `redirects`, `copy`, and `build` sections. Site-level `state` and `$defs` cascade into every page. See [project.json](/docs/framework/site/project-json).
+`project.json` at the project root is the only required configuration file. It names the site, sets the default layout and language, declares global `<head>` entries, breakpoints, and design tokens, and holds the `content`, `redirects`, `copy`, and `build` sections — plus any section an enabled extension contributes: `connections` and `data` for databases, `auth` for visitor accounts, `search` for the build-time search index. Site-level `state` and `$defs` cascade into every page. See [project.json](/docs/framework/site/project-json).
 
 ## Routing
 
@@ -77,6 +77,10 @@ Images referenced from pages and content are optimized during the build — resi
 
 The `redirects` map in `project.json` declares old-URL-to-new-URL rules, including `:param` patterns and per-rule HTTP status codes. See [Redirects](/docs/framework/site/redirects).
 
+## Databases, accounts, and server functions
+
+Not everything a site shows has to be a file. With the `@jxsuite/connector` extension enabled, `connections` names the databases the site talks to and `data` declares the tables inside them, served over `/_jx/data`; with `@jxsuite/auth`, the `auth` section gives visitors accounts and sessions at `/_jx/auth` and unlocks the table permission rules that depend on knowing who is asking. Separately, any `state` entry marked `timing: "server"` compiles into its own route at `/_jx/server/<export>`, so secrets and privileged calls stay off the client. The connection-backed sections require a server-capable `build.adapter` — the build stops without one — and server functions need somewhere to run for the same reason. See [Databases](/docs/studio/data), [Auth and secrets](/docs/studio/data/auth-and-secrets), and [Timing](/docs/framework/concepts/timing).
+
 ## Building and deploying
 
-`bunx jx build` discovers routes, compiles each page, and emits static HTML, CSS, and minimal JS into `dist/` — deployable to any static host. Adapters package the output for specific targets such as Cloudflare Pages. See [the build pipeline](/docs/framework/build) and [Deployment](/docs/framework/site/deployment); Studio itself never runs this step — it [commits and pushes your source](/docs/studio/publish), and your host builds on push.
+`bunx jx build` discovers routes, compiles each page, and emits static HTML, CSS, and minimal JS into `dist/` — deployable to any static host. With `build.adapter` set, the same command also bundles the site's server tier — `timing: "server"` functions and extension mounts such as `/_jx/data` and `/_jx/auth` — into one self-contained worker. Pages are prerendered either way; the worker only answers `/_jx/*` and, on some adapters, serves the static files. See [the build pipeline](/docs/framework/build) and [Deployment](/docs/framework/site/deployment); Studio itself never runs this step — it [commits and pushes your source](/docs/studio/publish), and your host builds on push.

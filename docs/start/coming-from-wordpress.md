@@ -1,11 +1,11 @@
 ---
 title: "Coming from WordPress"
-description: "How WordPress concepts map to Jx — themes, blocks, custom post types, media, plugins, publishing — and what's honestly different without a database."
+description: "How WordPress concepts map to Jx — themes, blocks, custom post types, media, plugins, publishing — and what's honestly different when content is files."
 ---
 
 # Coming from WordPress
 
-Most of what you know transfers. You still design visually, write in place, model structured content, and publish from the same tool. What changes is the machinery underneath: there is no database, no `wp-admin`, and no server running PHP. A Jx site is a folder of plain files that [Jx Studio](/docs/studio) edits on your machine, and publishing means pushing those files to git so your host can build them into a static site.
+Most of what you know transfers. You still design visually, write in place, model structured content, and publish from the same tool. What changes is the machinery underneath: your content isn't in a database, there's no `wp-admin`, and no PHP running anywhere — your pages are built ahead of time instead of assembled on every request. A Jx site is a folder of plain files that [Jx Studio](/docs/studio) edits on your machine, and publishing means pushing those files to git so your host can build them into the finished site. A site that needs a real database or server-side logic can have both — see [Databases](/docs/studio/data) — but that's a layer you opt into, not the substrate your pages sit on.
 
 If Cwicly's shutdown is what brought you here: welcome — losing a good tool mid-project is rough, and you're in familiar company. It's also the failure mode Jx is designed to rule out. Your site is plain files in your own folder and your own repository, so it can't disappear with anyone's product.
 
@@ -53,7 +53,7 @@ Drag files into the Manage view and they land in your project's `public/` folder
 
 This is the honest gap. Jx has an [extension system](/docs/extending) — first-party extensions like the Markdown parser use the same public hooks yours would — and Studio can pull in npm packages of ready-made components through the [Imports panel](/docs/studio/projects/dependencies). But there is no plugin marketplace yet, and the catalog is a fraction of the WordPress directory's.
 
-The counterweight: much of what plugins did for you is built in (image optimization, SEO metadata, forms UI, caching — a static site _is_ the cache) or unnecessary (security scanners, backup plugins — your repository is the backup).
+The counterweight: much of what plugins did for you is built in (image optimization, SEO metadata, forms UI, caching — a prebuilt page _is_ the cache) or unnecessary (security scanners, backup plugins — your repository is the backup). The server-backed ones — a members area, a form that stores what visitors send — are a third case: the parts ship with Jx, as [database tables](/docs/studio/data/tables) and [accounts and sessions](/docs/studio/data/auth-and-secrets), but you assemble the feature instead of activating someone else's.
 
 ## Publishing
 
@@ -61,20 +61,20 @@ There's no Publish button mutating a live server. When you're happy, open **Sour
 
 ## What's different, in one list
 
-- **No database.** Content lives in files you can read, search, and diff.
-- **No admin login.** Studio runs on your machine against your files — there's no hosted dashboard, and nothing for bots to brute-force.
+- **Content isn't in a database.** Pages and posts are files you can read, search, and diff. The data that arrives while the site runs — comments, sign-ups, orders — goes in a real database you add on purpose ([Databases](/docs/studio/data)), kept apart from your writing.
+- **No admin login.** _Editing_ happens in Studio on your machine, against your files — there's no hosted dashboard for bots to brute-force. Your site's own visitors can still have accounts; that's the [auth extension](/docs/studio/data/auth-and-secrets), and it's separate from how you edit.
 - **No plugin marketplace yet.** Extensions and npm components exist; a browsable ecosystem doesn't, yet.
 - **Publishing is git.** Studio handles the git parts with buttons, but a repository and a host are part of the setup.
 
 ## What you'll miss
 
-- **The plugin directory.** Decades of plugins for every niche — commerce, memberships, event calendars. On a static Jx site, features that need a server (comments, carts, logged-in users) come from outside services or wait for the ecosystem to grow.
+- **The plugin directory.** Decades of plugins for every niche — commerce, memberships, event calendars. The server-backed pieces are buildable today: [data tables](/docs/studio/data/tables) give you real reads and writes, [auth](/docs/studio/data/auth-and-secrets) gives you accounts, sessions, and per-table permissions, and server-side functions cover the logic between them. What's missing is the shortcut — you build the feature instead of installing someone's finished one.
 - **Editing from any browser.** `wp-admin` is a website; Studio is an app where your files are. Git lets you set up a second machine, but it's a clone, not a login.
 - **The sheer size of the ecosystem** — hosts, agencies, themes, and twenty years of tutorials.
 
 ## What you gain
 
-- **Nothing to maintain.** No core, plugin, or PHP updates; no security patching; the published site is static files that can't be hacked through an admin page.
+- **Nothing to maintain.** No core, plugin, or PHP updates; no security patching; the published pages are prebuilt files, with no admin login to break into.
 - **Fast by default.** Prebuilt pages from a CDN and automatically optimized images, with no caching plugins to tune.
 - **Version control of everything.** Design, settings, and content all live in git — every change is a reviewable commit you can roll back.
 - **Portability.** Your content is Markdown any tool can open; moving hosts is a settings change, not a database migration.

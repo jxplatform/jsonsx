@@ -81,7 +81,7 @@ for (const section of nav.sections) {
 const llms: string[] = [
   "# Jx Suite",
   "",
-  "> Jx Suite is a visual site builder (Jx Studio), a JSON-native component format, and a static-site compiler working on plain files. These docs cover using Studio, the Jx framework format, and extending Jx.",
+  "> Jx Suite is a visual site builder (Jx Studio), a JSON-native component format, and a compiler that prerenders every page — working on plain files you own and publish with git. Projects that need more than pages get a server tier as well: databases, signed-in users, and server functions compile into a small worker alongside the prebuilt output. These docs cover using Studio, the Jx framework format, and extending Jx.",
   "",
 ];
 for (const section of nav.sections) {

@@ -8,7 +8,7 @@ code:
 
 # Projects
 
-A Jx project is a folder on your computer. There is no database and no account that owns your site — everything you build in Studio is a plain file inside that folder, which you can back up, copy, or put under version control like any other document.
+A Jx project is a folder on your computer. No hosted service holds your work and no account owns it — everything you build in Studio is a plain file inside that folder, which you can back up, copy, or put under version control like any other document. A published site can still keep its own runtime data in a real database (see **[Databases](/docs/studio/data)**); the project you edit is always just files.
 
 ## What's in the folder
 

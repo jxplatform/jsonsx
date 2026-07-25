@@ -12,6 +12,7 @@ code:
   - packages/compiler/bin/jx.js
   - packages/compiler/src/cli.ts
   - packages/compiler/src/site/schema-command.ts
+  - packages/compiler/src/site/validate-command.ts
   - packages/compiler/src/site/db-push.ts
 ---
 
@@ -107,6 +108,8 @@ Checks, in order: `project.json` against the generated `project.schema.json`; th
 
 Prints `Project is valid (N files checked)` on success; otherwise lists each file's violations with their instance paths and exits `1`.
 
+The output shape is meant to be read by whatever wrote the file — a person or a generator: one line naming the file, then one `- <instance path>: <message>` line per violation. Paired with the non-zero exit it drops straight into a write-check-fix loop. Because `jx schema` embeds every core and fragment resource under `$defs` keyed by its canonical `$id`, the document checks resolve from the committed entry documents alone — no network fetch and no module resolution — so an editor's inline squiggles and this command are looking at exactly the same schema.
+
 ## `jx db push`
 
 Additively sync the tables declared in `project.json`'s `data` section to their `connections` databases, through each connection's connector. Credentials come from the environment merged with the project's `.dev.vars` file. After a real (non-dry-run) apply, each connector's binding fragments are merged into `wrangler.jsonc`, preserving your keys.
@@ -122,6 +125,12 @@ jx db push [root] [--dry-run] [--connection <name>]
 
 The sync is additive-only — it creates missing tables and columns and never drops or rewrites existing ones. Per-connection output lists the tables, statements, and warnings; a missing `connections` section or an unknown connection name is an error.
 
+The CLI talks to each connection exactly as declared: a `d1` connection reaches the real D1 database (through its binding, or the D1 HTTP API with `CLOUDFLARE_API_TOKEN` plus the account and database ids). Studio's **Push Schema** button runs through the dev server, which substitutes a local stand-in for any provider that declares one — so a D1 connection pushed from Studio lands in `.jx/data/<connection>.sqlite`, while the same connection pushed from a terminal lands in D1 itself.
+
+:::doc-warning
+`jx db push` covers the `data` section only. The auth extension's account tables (`user`, `session`, `account`, `verification`) come from a separate push step that Studio's **Push Schema** button and the dev server run, and the dev server also creates them on its first request to `/_jx/auth` — the CLI push does not include them today. A database whose schema only ever came from `jx db push` has no account tables, and sign-in fails against it at runtime.
+:::
+
 ## What the scaffolded scripts run
 
 | Script                     | Runs                                             |
@@ -136,3 +145,4 @@ The sync is additive-only — it creates missing tables and columns and never dr
 - [How compilation works](/docs/framework/build) — what `jx build` produces and why
 - [The dev server](/docs/framework/build/dev-server) — local development without a build
 - [Site architecture](/docs/framework/site) — the project layout these commands operate on
+- [Data tables](/docs/studio/data/tables) — the tables and push plan behind `jx db push`

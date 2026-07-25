@@ -6,6 +6,9 @@ spec:
   - site-architecture.md#10
 code:
   - packages/compiler/src/site/context-injection.ts
+  - packages/schema/schemas/project.core.schema.json
+  - extensions/connector/schemas/project.fragment.schema.json
+  - extensions/auth/schemas/project.fragment.schema.json
 ---
 
 # project.json
@@ -44,6 +47,15 @@ code:
 | `copy`       | `object` | Extra source → destination file mappings copied into the build output                    |
 | `build`      | `object` | `outDir`, `trailingSlash`, `adapter` — see [Deployment](/docs/framework/site/deployment) |
 | `images`     | `object` | Image optimization settings — see [Images](/docs/framework/site/images)                  |
+
+Enabled extensions add sections of their own alongside these. The first-party ones:
+
+| Key           | Type     | Contributed by       | Purpose                                                                                    |
+| ------------- | -------- | -------------------- | ------------------------------------------------------------------------------------------ |
+| `connections` | `object` | `@jxsuite/connector` | Named database connections — see [Connections](/docs/studio/data/connections)              |
+| `data`        | `object` | `@jxsuite/connector` | Dynamic tables served over `/_jx/data` — see [Data tables](/docs/studio/data/tables)       |
+| `auth`        | `object` | `@jxsuite/auth`      | Visitor accounts and sessions — see [Auth and secrets](/docs/studio/data/auth-and-secrets) |
+| `search`      | `object` | `@jxsuite/search`    | Build-time search index — see [Search](/docs/framework/site/search)                        |
 
 ## Identity and defaults
 
@@ -156,6 +168,44 @@ Sources resolve relative to the project root; destinations are paths inside `dis
 ## Extensions and imports
 
 `extensions` lists extension packages (bare package names or relative paths) that contribute format classes such as `Markdown` and `Csv`, project sections such as `content`, and `$prototype` classes. `imports` maps a `$prototype` name to a class file for all pages at once; a page-level `imports` entry wins on collision. See [Data prototypes](/docs/framework/concepts/data-prototypes) and [Dependencies and imports](/docs/studio/projects/dependencies).
+
+## Extension-contributed sections
+
+An extension can own a whole top-level key. Listing the package in `extensions` is what turns that key on: `jx schema` composes each enabled extension's schema fragment into `project.schema.json`, so an unlisted extension's section is an unknown key that `jx validate` rejects. Re-run `jx schema` whenever the list changes.
+
+```json
+{
+  "extensions": ["@jxsuite/parser", "@jxsuite/connector", "@jxsuite/auth"],
+  "connections": {
+    "main": { "provider": "sqlite" }
+  },
+  "data": {
+    "comments": {
+      "connection": "main",
+      "permissions": { "read": "public", "insert": "authenticated", "update": "owner" },
+      "ownerField": "author_id",
+      "schema": {
+        "type": "object",
+        "properties": { "message": { "type": "string" }, "author_id": { "type": "string" } },
+        "required": ["message"]
+      }
+    }
+  },
+  "auth": {
+    "connection": "main",
+    "methods": { "emailPassword": true },
+    "redirects": { "afterSignIn": "/", "afterSignOut": "/" }
+  },
+  "build": { "adapter": "cloudflare-pages" }
+}
+```
+
+Two rules run through all of them:
+
+- **Names, never values.** Sections carry identifiers and env-var _names_ (`urlEnv`, `secretEnv`, `clientIdEnv`); the secret values live in the git-ignored `.dev.vars` locally and your host's secret store in production. See [Auth and secrets](/docs/studio/data/auth-and-secrets).
+- **A section served at runtime needs an adapter.** `connections`/`data` and `auth` are served by extension mounts under `/_jx/`, so `build.adapter` must name a server-capable target — the build fails on static. See [Build output and adapters](/docs/framework/site/deployment).
+
+Studio writes these sections for you from _Settings > Connections_, _Data Tables_, and _Authentication_ — see [Databases](/docs/studio/data).
 
 ## What documents inherit
 

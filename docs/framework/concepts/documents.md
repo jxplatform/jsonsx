@@ -31,7 +31,7 @@ Every document is a JSON object with up to six top-level fields:
 
 | Field      | Required    | Description                                                                                                                             |
 | ---------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `$schema`  | Recommended | URI identifying the Jx dialect version                                                                                                  |
+| `$schema`  | Recommended | Schema the file is checked against — the dialect URI, or the project's generated bundle (below)                                         |
 | `$id`      | Recommended | Component identifier, used by tooling                                                                                                   |
 | `$defs`    | Optional    | Pure JSON Schema type definitions — tooling only, never rendered                                                                        |
 | `state`    | Optional    | Reactive state: values, computed entries, functions, and data sources — see [State](/docs/framework/concepts/state)                     |
@@ -39,6 +39,10 @@ Every document is a JSON object with up to six top-level fields:
 | `children` | Optional    | Array of child [elements](/docs/framework/concepts/elements), text nodes, and [repeaters](/docs/framework/concepts/lists), mixed freely |
 
 Only `tagName` is required. A document can also carry `$media` (named breakpoints, see [Styling](/docs/framework/concepts/styling)) and `$elements` (custom-element dependencies, see [Components](/docs/framework/concepts/components)).
+
+:::doc-note
+`https://jxsuite.com/schema/v1` names the dialect, which is what you want for a document that travels on its own. Inside a project, point `$schema` at the `document.schema.json` that [`jx schema`](/docs/framework/build/cli) writes into the project root instead, relative to the file — `"../document.schema.json"` from `pages/` or `components/`. That bundle is the core schema _plus_ every enabled extension's contributions, so your editor's autocomplete and `jx validate` are reading the same rules. See [Schema composition](/docs/extending/extensions/schema-composition).
+:::
 
 ## `$defs` — type definitions
 
