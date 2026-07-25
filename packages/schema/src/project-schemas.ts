@@ -83,6 +83,9 @@ export type SchemaJsonLoader = (path: string) => Promise<Record<string, unknown>
  * @param {Record<string, unknown>} entry - The entry document (e.g. a parsed project.schema.json)
  * @param {SchemaJsonLoader} loadJson - Loader for `$ref` target files (host-restricted)
  * @param {string} baseDir - Directory the entry document's relative refs resolve against
+ * @param {string[]} [alsoEmbed] - Relative paths of resources to embed even though no path-`$ref`
+ *   reaches them, because they are referenced only by canonical `$id` (a document fragment whose
+ *   `$defs` feed the paths union). Without this they would stay dangling.
  * @returns {Promise<Record<string, unknown>>} A new, self-contained schema (the input is not
  *   mutated)
  */
@@ -90,6 +93,7 @@ export async function bundleSchema(
   entry: Record<string, unknown>,
   loadJson: SchemaJsonLoader,
   baseDir: string,
+  alsoEmbed: string[] = [],
 ): Promise<Record<string, unknown>> {
   const bundled = structuredClone(entry);
   const embeddedByPath = new Map<string, string>();
@@ -167,7 +171,218 @@ export async function bundleSchema(
   };
 
   await rewrite(bundled, normalizeSchemaPath(baseDir), true);
+  for (const path of alsoEmbed) {
+    await embed(`${normalizeSchemaPath(baseDir)}/${path}`);
+  }
   return bundled;
+}
+
+// ─── Single-resource flattening (specs/extensions.md §5.4) ───────────────────
+
+/**
+ * Keywords whose value is a single subschema (or, for draft-07 tuple `items`, an array of them).
+ * The flattener walks ONLY these keyword positions, never every object key: `examples`, `default`,
+ * `const` and `enum` hold arbitrary instance data, and Jx document examples legitimately contain
+ * `$ref` strings (`#/state/cart`) that must survive untouched.
+ */
+const SINGLE_SUBSCHEMA_KEYWORDS = [
+  "additionalItems",
+  "additionalProperties",
+  "contains",
+  "contentSchema",
+  "else",
+  "if",
+  "items",
+  "not",
+  "propertyNames",
+  "then",
+  "unevaluatedItems",
+  "unevaluatedProperties",
+] as const;
+
+/** Keywords whose value maps names to subschemas. */
+const MAP_SUBSCHEMA_KEYWORDS = [
+  "$defs",
+  "definitions",
+  "dependencies",
+  "dependentSchemas",
+  "patternProperties",
+  "properties",
+] as const;
+
+/** Keywords whose value is an array of subschemas. */
+const LIST_SUBSCHEMA_KEYWORDS = ["allOf", "anyOf", "oneOf", "prefixItems"] as const;
+
+/** True for a plain object node (a candidate subschema); booleans and arrays are not. */
+function isSchemaObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Escape a `$defs` key for use as a JSON Pointer segment (RFC 6901). */
+function escapePointerSegment(segment: string): string {
+  return segment.replaceAll("~", "~0").replaceAll("/", "~1");
+}
+
+/**
+ * Walk the known subschema keyword positions of `node`.
+ *
+ * @param {Record<string, unknown>} node - The schema object to walk
+ * @param {string} pointer - JSON Pointer of `node` within the document
+ * @yields {[Record<string, unknown>, string]} Each subschema paired with its own JSON Pointer
+ */
+function* subschemaEntries(
+  node: Record<string, unknown>,
+  pointer: string,
+): Generator<[Record<string, unknown>, string]> {
+  for (const keyword of SINGLE_SUBSCHEMA_KEYWORDS) {
+    const value = node[keyword];
+    if (Array.isArray(value)) {
+      for (const [index, item] of value.entries()) {
+        if (isSchemaObject(item)) {
+          yield [item, `${pointer}/${keyword}/${index}`];
+        }
+      }
+    } else if (isSchemaObject(value)) {
+      yield [value, `${pointer}/${keyword}`];
+    }
+  }
+  for (const keyword of MAP_SUBSCHEMA_KEYWORDS) {
+    const value = node[keyword];
+    if (!isSchemaObject(value)) {
+      continue;
+    }
+    for (const [name, item] of Object.entries(value)) {
+      if (isSchemaObject(item)) {
+        yield [item, `${pointer}/${keyword}/${escapePointerSegment(name)}`];
+      }
+    }
+  }
+  for (const keyword of LIST_SUBSCHEMA_KEYWORDS) {
+    const value = node[keyword];
+    if (!Array.isArray(value)) {
+      continue;
+    }
+    for (const [index, item] of value.entries()) {
+      if (isSchemaObject(item)) {
+        yield [item, `${pointer}/${keyword}/${index}`];
+      }
+    }
+  }
+}
+
+/**
+ * A readable, collision-free `$defs` key for an embedded resource's `$id`: drop the scheme, the
+ * authority, and the conventional `schema/` namespace segment, then join the remainder with dashes
+ * (`https://jxsuite.com/schema/project/core/v2` → `project-core-v2`, `urn:jx:bundled:1` →
+ * `jx-bundled-1`). Collisions get a numeric suffix, so output stays deterministic given the
+ * emitters' stable `$defs` order.
+ *
+ * @param {string} id - The resource's canonical `$id`
+ * @param {Set<string>} used - Keys already taken in the target `$defs` (mutated)
+ * @returns {string}
+ */
+function slugForSchemaId(id: string, used: Set<string>): string {
+  let rest = id.replace(/^[a-zA-Z][a-zA-Z\d+.-]*:/, "");
+  if (rest.startsWith("//")) {
+    const slash = rest.indexOf("/", 2);
+    rest = slash === -1 ? "" : rest.slice(slash + 1);
+  }
+  rest = rest.replace(/^schema\//, "");
+  const base =
+    rest
+      .split(/[^a-zA-Z0-9]+/)
+      .filter(Boolean)
+      .join("-") || "resource";
+  let key = base;
+  for (let n = 2; used.has(key); n += 1) {
+    key = `${base}-${n}`;
+  }
+  used.add(key);
+  return key;
+}
+
+/**
+ * Collapse a bundled compound document into a SINGLE schema resource: embedded resources are
+ * rekeyed from their canonical `$id`s to readable `$defs` slugs, their `$id`s are dropped, and
+ * every `$ref` becomes a root-relative JSON Pointer (`#/$defs/project-core-v2/$defs/StyleObject`).
+ *
+ * Why this is required rather than cosmetic: VS Code's JSON language service (and Monaco, which
+ * embeds it) implements neither half of compound-document resolution. It resolves a `#/pointer` ref
+ * against the DOCUMENT ROOT — never re-based on an enclosing `$id` — so a fragment's own
+ * `#/$defs/StyleObject` reports "can not be resolved"; and it treats any ref with a non-empty part
+ * before `#` as EXTERNAL, fetching `https://jxsuite.com/schema/...` over the network instead of
+ * matching the embedded resource, which fails offline and (when it succeeds) silently substitutes
+ * the shipped defaults for the project's effective unions. Root-pointer-only refs are the one form
+ * every consumer resolves identically — ajv, the language service, and Monaco alike.
+ *
+ * `$id` shadowing (§5.3) still decides the outcome; it is simply resolved AT FLATTEN TIME, since
+ * refs to a shadowed `$id` rewrite to the pointer of the entry document's embed.
+ *
+ * @param {Record<string, unknown>} entry - A bundled compound document (output of
+ *   {@link bundleSchema})
+ * @returns {Record<string, unknown>} A new single-resource schema (the input is not mutated)
+ */
+export function flattenSchema(entry: Record<string, unknown>): Record<string, unknown> {
+  const flat = structuredClone(entry);
+
+  // 1. Rekey URI-keyed `$defs` entries to readable slugs (pointers address them by key).
+  if (isSchemaObject(flat.$defs)) {
+    const used = new Set(Object.keys(flat.$defs).filter((key) => !hasUriScheme(key)));
+    const renamed: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(flat.$defs)) {
+      const id = isSchemaObject(value) && typeof value.$id === "string" ? value.$id : key;
+      renamed[hasUriScheme(key) ? slugForSchemaId(id, used) : key] = value;
+    }
+    flat.$defs = renamed;
+  }
+
+  // 2. Map each embedded resource's `$id` to its pointer here (first wins, as the bundler embeds).
+  const idToPointer = new Map<string, string>();
+  const scan = (node: Record<string, unknown>, pointer: string): void => {
+    const { $id } = node;
+    if (typeof $id === "string" && hasUriScheme($id) && !idToPointer.has($id)) {
+      idToPointer.set($id, pointer);
+    }
+    for (const [child, childPointer] of subschemaEntries(node, pointer)) {
+      scan(child, childPointer);
+    }
+  };
+  scan(flat, "#");
+
+  // 3. Rewrite refs against the enclosing resource, then dissolve the resource boundary.
+  const rewrite = (node: Record<string, unknown>, scope: string): void => {
+    let inner = scope;
+    const { $id } = node;
+    if (typeof $id === "string" && hasUriScheme($id)) {
+      inner = idToPointer.get($id) ?? scope;
+      if (inner !== "#") {
+        // The root keeps its identity; nested resources must not remain ref targets.
+        delete node.$id;
+      }
+    }
+    const ref = node.$ref;
+    if (typeof ref === "string") {
+      const hashIndex = ref.indexOf("#");
+      const target = hashIndex === -1 ? ref : ref.slice(0, hashIndex);
+      const fragment = hashIndex === -1 ? "" : ref.slice(hashIndex + 1);
+      if (target === "") {
+        // A local pointer resolves against the resource it appears in, not the file.
+        if (fragment.startsWith("/")) {
+          node.$ref = `${inner}${fragment}`;
+        }
+      } else {
+        const base = idToPointer.get(target);
+        if (base !== undefined) {
+          node.$ref = fragment ? `${base}${fragment}` : base;
+        }
+      }
+    }
+    for (const [child] of subschemaEntries(node, inner)) {
+      rewrite(child, inner);
+    }
+  };
+  rewrite(flat, "#");
+  return flat;
 }
 
 /** Collect every absolute `$id` already present in a document (embeds like the field union). */
@@ -240,7 +455,18 @@ export interface DocumentSchemaInputs {
   pathsValueRefs: string[];
 }
 
-/** Emit the `document.schema.json` entry document for a project. */
+/**
+ * Emit the `document.schema.json` entry document for a project.
+ *
+ * The core reference goes in a single-member `allOf`, never a root-level `$ref`. They are
+ * equivalent to a compliant validator, but VS Code's JSON language service resolves a `$ref` by
+ * SHALLOW-MERGING the target's keys into the referencing node — from the root, that overwrites the
+ * root's own `$defs` with the core resource's `$defs`, and every later `#/$defs/<embed>/...`
+ * pointer stops resolving. Wrapping in `allOf` keeps the merge target off the root.
+ *
+ * @param {DocumentSchemaInputs} inputs - Core path and the contributed paths-union refs
+ * @returns {Record<string, unknown>}
+ */
 export function emitDocumentSchema(inputs: DocumentSchemaInputs): Record<string, unknown> {
   const { corePath, pathsValueRefs } = inputs;
   return {
@@ -256,7 +482,7 @@ export function emitDocumentSchema(inputs: DocumentSchemaInputs): Record<string,
             }
           : { $id: DOCUMENT_PATHS_SCHEMA_ID },
     },
-    $ref: corePath,
     $schema: "https://json-schema.org/draft/2020-12/schema",
+    allOf: [{ $ref: corePath }],
   };
 }

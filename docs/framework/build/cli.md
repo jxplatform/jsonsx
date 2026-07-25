@@ -104,7 +104,7 @@ Validate the whole project tree (run `jx schema` first). No flags.
 jx validate [root]
 ```
 
-Checks, in order: `project.json` against the generated `project.schema.json`; that both committed entry documents are self-contained (no relative `$ref`s — otherwise it asks you to regenerate with `jx schema`); every document under `components/`, `pages/`, and `layouts/` against the bundled document schema; every project-local `*.class.json` against the class schema; and each enabled extension's schema fragments compile standalone.
+Checks, in order: that both committed entry documents are self-contained (every `$ref` a root-relative JSON Pointer that resolves in the same file — otherwise it asks you to regenerate with `jx schema`, and stops there, since the remaining checks compile those files); `project.json` against the generated `project.schema.json`; every document under `components/`, `pages/`, and `layouts/` against the bundled document schema; every project-local `*.class.json` against the class schema; and each enabled extension's schema fragments compile standalone.
 
 Prints `Project is valid (N files checked)` on success; otherwise lists each file's violations with their instance paths and exits `1`.
 

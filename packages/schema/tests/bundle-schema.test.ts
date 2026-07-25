@@ -244,6 +244,27 @@ describe("bundleSchema mechanics", () => {
     expect(Object.keys(bundled.$defs as object)).toEqual([FRAG_ID]);
   });
 
+  test("alsoEmbed pulls in resources only a canonical-$id ref reaches", async () => {
+    /* A document fragment's shapes are named by canonical URI from the paths union, so no
+       path-`$ref` walks to the file — without alsoEmbed the union ref would dangle. */
+    writeJson("frags/document.fragment.schema.json", {
+      $defs: { ContentPathsSource: { properties: { collection: { type: "string" } } } },
+      $id: "https://test.invalid/parser/document/v1",
+    });
+    const entry = {
+      $defs: {
+        PathsValue: { $ref: "https://test.invalid/parser/document/v1#/$defs/ContentPathsSource" },
+      },
+    };
+    const bundled = await bundleSchema(entry, loadJson, TMP, [
+      "./frags/document.fragment.schema.json",
+    ]);
+    const defs = bundled.$defs as Record<string, Record<string, unknown>>;
+    expect(defs["https://test.invalid/parser/document/v1"]).toBeDefined();
+    // Self-contained: ajv compiles it with no external resolution.
+    expect(() => new Ajv2020({ strict: false }).compile(bundled)).not.toThrow();
+  });
+
   test("unloadable ref targets throw with the loader failure as cause", async () => {
     const entry = { $ref: "./does-not-exist.schema.json" };
     const failing = async () => {

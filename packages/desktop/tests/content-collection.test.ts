@@ -105,14 +105,17 @@ describe("ContentCollection desktop integration", () => {
     setProjectRoot(PROJECT);
     try {
       const { project, document } = await fetchProjectSchemas();
+      // Root pointers only: Monaco gets these as inline objects and never fetches a URI.
       const { allOf } = project as { allOf: { $ref: string }[] };
       expect(allOf.map((entry) => entry.$ref)).toEqual([
-        "https://jxsuite.com/schema/project/core/v2",
-        "https://jxsuite.com/schema/ext/parser/project/v1",
+        "#/$defs/project-core-v2",
+        "#/$defs/ext-parser-project-v1",
       ]);
       const projectDefs = (project as { $defs: Record<string, unknown> }).$defs;
-      expect(projectDefs["https://jxsuite.com/schema/ext/parser/project/v1"]).toBeDefined();
-      expect((document as { $ref: string }).$ref).toBe("https://jxsuite.com/schema/v1");
+      expect(projectDefs["ext-parser-project-v1"]).toBeDefined();
+      const doc = document as { $ref?: string; allOf: { $ref: string }[] };
+      expect(doc.$ref).toBeUndefined();
+      expect(doc.allOf.map((entry) => entry.$ref)).toEqual(["#/$defs/v1"]);
     } finally {
       // The bundler regenerates the entry documents on demand — keep the fixture pristine.
       rmSync(join(PROJECT, "project.schema.json"), { force: true });

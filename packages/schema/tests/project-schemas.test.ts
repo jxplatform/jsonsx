@@ -199,10 +199,18 @@ describe("emitDocumentSchema", () => {
       corePath: "./node_modules/@jxsuite/schema/schema.json",
       pathsValueRefs: [`${FRAG_ID}#/$defs/ContentPathsSource`],
     });
-    expect(doc.$ref).toBe("./node_modules/@jxsuite/schema/schema.json");
+    expect(doc.allOf).toEqual([{ $ref: "./node_modules/@jxsuite/schema/schema.json" }]);
     const defs = doc.$defs as Record<string, Record<string, unknown>>;
     expect(defs.PathsValue!.$id).toBe("https://jxsuite.com/schema/document/paths/v2");
     expect(defs.PathsValue!.anyOf).toEqual([{ $ref: `${FRAG_ID}#/$defs/ContentPathsSource` }]);
+  });
+
+  test("references the core via allOf, never a root $ref beside $defs", () => {
+    /* A root-level $ref makes VS Code shallow-merge the core resource's $defs over the entry's
+       own, breaking every `#/$defs/<embed>/...` pointer downstream. */
+    const doc = emitDocumentSchema({ corePath: "./core.json", pathsValueRefs: [] });
+    expect(doc.$ref).toBeUndefined();
+    expect(doc.allOf).toEqual([{ $ref: "./core.json" }]);
   });
 
   test("stays permissive with no contributed paths shapes", () => {

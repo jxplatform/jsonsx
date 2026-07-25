@@ -56,6 +56,7 @@
     "test:coverage:workspaces": "bun run --workspaces test:coverage",
     "typecheck": "tsc",
     "upgrade": "bunx npm-check-updates -u && bun install && bun run --workspaces --if-present upgrade",
+    "schema:generate-all": "bun scripts/generate-schemas.ts",
     "schema:validate-all": "bun scripts/validate-schemas.ts"
   },
   "dependencies": {

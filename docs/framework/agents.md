@@ -41,7 +41,7 @@ Claude Code, Cursor, or your own script, working on the project folder like any 
 
 **1. Generate the project's schemas — `jx schema`.**
 
-Run it once per project, and again after any change to `project.json`'s `extensions` array. It composes the core schemas with the fragments each enabled extension ships and writes two entry documents into the project root, `project.schema.json` and `document.schema.json`. Both are **self-contained**: every referenced resource is embedded under `$defs`, so they resolve with no `node_modules` and no network. One resolution behavior for every consumer — your editor, Studio's Monaco, and `jx validate` alike. See [Schema composition](/docs/extending/extensions/schema-composition).
+Run it once per project, and again after any change to `project.json`'s `extensions` array. It composes the core schemas with the fragments each enabled extension ships and writes two entry documents into the project root, `project.schema.json` and `document.schema.json`. Both are **self-contained single-resource schemas**: every referenced resource is embedded under `$defs` and every `$ref` is a root-relative JSON Pointer, so they resolve with no `node_modules` and no network. One resolution behavior for every consumer — your editor, Studio's Monaco, and `jx validate` alike. See [Schema composition](/docs/extending/extensions/schema-composition).
 
 **2. Let the agent write files.**
 
@@ -51,8 +51,8 @@ Run it once per project, and again after any change to `project.json`'s `extensi
 
 The deterministic gate, run after every edit. It walks the project in five passes:
 
-1. `project.json` against the generated entry schema.
-2. Both committed entry documents, for self-containment — a leftover relative `$ref` means they are stale, and the fix is to re-run `jx schema`.
+1. Both committed entry documents, for self-containment — a `$ref` that is a relative path, a URI, or a pointer to nothing means they are stale, and the fix is to re-run `jx schema`. This runs first and stops the walk, because every later pass compiles one of these files.
+2. `project.json` against the generated entry schema.
 3. Every document under `components/`, `pages/`, and `layouts/` against the bundled document schema.
 4. Every project-local `*.class.json` against the class schema.
 5. Each enabled extension's schema fragments, compiled standalone.

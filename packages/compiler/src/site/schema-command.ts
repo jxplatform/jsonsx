@@ -3,12 +3,16 @@
  *
  * Composes the per-project entry documents (project.schema.json and document.schema.json) from the
  * core schemas and each enabled extension's shipped fragments, then writes them into the project
- * root as committed, SELF-CONTAINED bundles: every fragment ref is resolved through
- * {@link bundleSchema}, embedding the core + fragment resources under `$defs` keyed by their
- * canonical `$id`s. Relative `./node_modules/...` refs only resolve through Node module resolution,
- * which editors do not perform (hoisted workspaces leave projects without their own node_modules) —
- * the bundled form resolves offline for ajv `jx validate`, VS Code's JSON language service, and the
- * studio's Monaco alike, with one resolution behavior for all consumers.
+ * root as committed, SELF-CONTAINED, SINGLE-RESOURCE schemas: every fragment ref is resolved
+ * through {@link bundleSchema} (embedding the core + fragment resources under `$defs`) and then
+ * collapsed by {@link flattenSchema}, which drops the embedded `$id`s and rewrites every ref to a
+ * root-relative JSON Pointer. Both passes are needed for one resolution behavior across all
+ * consumers: relative `./node_modules/...` refs only resolve through Node module resolution, which
+ * editors do not perform (hoisted workspaces leave projects without their own node_modules), while
+ * `$id`-scoped refs inside a compound document resolve only in a fully compliant validator — VS
+ * Code's JSON language service and Monaco resolve `#/...` against the document root and fetch
+ * anything with a URI before the `#` over the network. Root pointers are what ajv, the language
+ * service, and Monaco all agree on.
  */
 
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -18,6 +22,7 @@ import {
   bundleSchema,
   emitDocumentSchema,
   emitProjectSchema,
+  flattenSchema,
 } from "@jxsuite/schema/project-schemas";
 import { buildProjectExtensionRegistry } from "./format-host.ts";
 import { loadProjectConfig } from "./site-loader.ts";
@@ -40,6 +45,7 @@ export async function writeProjectSchemas(projectRoot: string) {
   const corePath = coreSchemaRef(projectRoot, CORE_PROJECT_SPECIFIER);
   const fragments: string[] = [];
   const pathsValueRefs: string[] = [];
+  const documentFragments: string[] = [];
   const fieldSchemaRefs: string[] = [];
   for (const ext of registry.extensions) {
     const projectFragment = ext.schemas.project;
@@ -48,7 +54,14 @@ export async function writeProjectSchemas(projectRoot: string) {
     }
     const documentFragment = ext.schemas.document;
     if (documentFragment) {
-      pathsValueRefs.push(...fragmentDefsRefs(documentFragment));
+      const documentRefs = fragmentDefsRefs(documentFragment);
+      pathsValueRefs.push(...documentRefs);
+      /* The paths union names this fragment's shapes by canonical $id only, so the bundler needs
+         the path handed to it explicitly or those refs stay dangling. A fragment that contributed
+         nothing (no $id, or no $defs) is left out rather than embedded unreferenced. */
+      if (documentRefs.length > 0) {
+        documentFragments.push(fragmentRef(projectRoot, ext, documentFragment));
+      }
     }
     // The `schemas.fields` manifest convention: a fragment whose $defs members are extension
     // Field extras, unioned into the per-project field resource (specs/extensions.md §5.3).
@@ -59,21 +72,17 @@ export async function writeProjectSchemas(projectRoot: string) {
     }
   }
 
-  // Bundle before committing: the emitted relative refs are an intermediate form only.
+  // Bundle then flatten before committing: the emitted relative refs are an intermediate form only.
   const root = resolve(projectRoot);
   const loadJson = restrictedSchemaLoader(root);
-  const projectSchema = await bundleSchema(
-    emitProjectSchema({ corePath, fieldSchemaRefs, fragments }),
-    loadJson,
-    root,
-  );
-  const documentSchema = await bundleSchema(
-    emitDocumentSchema({
-      corePath: coreSchemaRef(projectRoot, CORE_DOCUMENT_SPECIFIER),
-      pathsValueRefs,
-    }),
-    loadJson,
-    root,
+  const projectEntry = emitProjectSchema({ corePath, fieldSchemaRefs, fragments });
+  const documentEntry = emitDocumentSchema({
+    corePath: coreSchemaRef(projectRoot, CORE_DOCUMENT_SPECIFIER),
+    pathsValueRefs,
+  });
+  const projectSchema = flattenSchema(await bundleSchema(projectEntry, loadJson, root));
+  const documentSchema = flattenSchema(
+    await bundleSchema(documentEntry, loadJson, root, documentFragments),
   );
 
   const projectSchemaPath = resolve(projectRoot, "project.schema.json");
@@ -115,16 +124,16 @@ export async function readBundledProjectSchemas(projectRoot: string) {
   }
 
   const loadJson = restrictedSchemaLoader(root);
-  const project = await bundleSchema(
-    JSON.parse(readFileSync(projectSchemaPath, "utf8")) as Record<string, unknown>,
-    loadJson,
-    root,
-  );
-  const document = await bundleSchema(
-    JSON.parse(readFileSync(documentSchemaPath, "utf8")) as Record<string, unknown>,
-    loadJson,
-    root,
-  );
+  const projectFile = JSON.parse(readFileSync(projectSchemaPath, "utf8")) as Record<
+    string,
+    unknown
+  >;
+  const documentFile = JSON.parse(readFileSync(documentSchemaPath, "utf8")) as Record<
+    string,
+    unknown
+  >;
+  const project = flattenSchema(await bundleSchema(projectFile, loadJson, root));
+  const document = flattenSchema(await bundleSchema(documentFile, loadJson, root));
   return { document, project };
 }
 

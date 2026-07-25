@@ -1412,15 +1412,17 @@ describe("format endpoints", () => {
     const res = await callApi(req, url, FMT_DIR);
     expect(res.status).toBe(200);
     const data = await res.json();
-    // Self-contained: the entry allOf refs are canonical URIs, with the targets embedded.
+    /* Self-contained AND single-resource: the entry refs are root pointers into embeds. Monaco
+       registers these as inline objects with schema requests disabled, so a canonical URI here
+       would simply fail to resolve. */
     const refs = data.project.allOf.map((entry: { $ref: string }) => entry.$ref);
-    expect(refs).toEqual([
-      "https://jxsuite.com/schema/project/core/v2",
-      "https://jxsuite.com/schema/ext/parser/project/v1",
+    expect(refs).toEqual(["#/$defs/project-core-v2", "#/$defs/ext-parser-project-v1"]);
+    expect(data.project.$defs["ext-parser-project-v1"]).toBeDefined();
+    expect(data.document.$ref).toBeUndefined();
+    expect(data.document.allOf.map((entry: { $ref: string }) => entry.$ref)).toEqual([
+      "#/$defs/v1",
     ]);
-    expect(data.project.$defs["https://jxsuite.com/schema/ext/parser/project/v1"]).toBeDefined();
-    expect(data.document.$ref).toBe("https://jxsuite.com/schema/v1");
-    expect(data.document.$defs["https://jxsuite.com/schema/v1"]).toBeDefined();
+    expect(data.document.$defs.v1).toBeDefined();
     // The entry documents were regenerated into the fixture project root on demand.
     const { existsSync } = await import("node:fs");
     expect(existsSync(join(FMT_DIR, "project.schema.json"))).toBe(true);

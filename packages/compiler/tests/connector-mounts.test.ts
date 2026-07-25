@@ -446,11 +446,11 @@ describe("schemas.fields plumbing", () => {
         allOf: { $ref: string }[];
       };
       const refs = schema.$defs.Fields.anyOf.map((r) => r.$ref);
-      expect(refs).toContain("https://acme.test/schema/fields/v1#/$defs/ColumnExtra");
-      // The fragment joins the allOf (by canonical $id — committed docs are bundled) and its
-      // Resource embeds under $defs so the union refs resolve without file access.
-      expect(schema.allOf.some((r) => r.$ref === "https://acme.test/schema/fields/v1")).toBe(true);
-      expect(schema.$defs["https://acme.test/schema/fields/v1"]).toBeDefined();
+      expect(refs).toContain("#/$defs/fields-v1/$defs/ColumnExtra");
+      /* The fragment joins the allOf and its resource embeds under $defs, both addressed by root
+         pointer — committed entry documents are bundled AND flattened to one resource. */
+      expect(schema.allOf.some((r) => r.$ref === "#/$defs/fields-v1")).toBe(true);
+      expect(schema.$defs["fields-v1"]).toBeDefined();
     } finally {
       rmSync(dir, { force: true, recursive: true });
     }

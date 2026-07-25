@@ -1,10 +1,11 @@
 /**
  * Schema-command.test.ts — `jx schema` entry-document emission
  *
- * Verifies the project-relative ref computation: bare-specifier packages that resolve through the
- * workspace (outside the fixture root) fall back to conventional ./node_modules paths, local
- * extensions keep in-project relative paths, and document fragments contribute canonical
- * "$id#/$defs/*" paths refs (skipping fragments without $id/$defs or unreadable ones).
+ * Verifies the project-relative ref computation and the shape of the committed output:
+ * bare-specifier packages that resolve through the workspace (outside the fixture root) fall back
+ * to conventional ./node_modules paths, local extensions keep in-project relative paths, document
+ * fragments contribute their $defs to the paths union (skipping fragments without $id/$defs or
+ * unreadable ones), and every ref in the written files is a root-relative pointer into an embed.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
@@ -90,24 +91,33 @@ describe("writeProjectSchemas", () => {
 
     const project = readJson("project.schema.json");
     expect(project.$comment).toBe(GENERATED_SCHEMA_COMMENT);
-    // The committed form is bundled: every fragment ref lands on the canonical $id of the
-    // Resource embedded under $defs — no ./node_modules or in-project relative refs remain.
+    /* The committed form is bundled AND flattened into one resource: every fragment ref is a
+       root-relative pointer into the embed under $defs — no ./node_modules or in-project relative
+       refs, and no canonical URIs an editor would try to fetch. */
     expect(project.allOf!.map((entry) => entry.$ref)).toEqual([
-      "https://jxsuite.com/schema/project/core/v2",
-      "https://jxsuite.com/schema/ext/parser/project/v1",
-      "https://test.invalid/local-ext/project/v1",
+      "#/$defs/project-core-v2",
+      "#/$defs/ext-parser-project-v1",
+      "#/$defs/local-ext-project-v1",
     ]);
-    expect(project.$defs!["https://jxsuite.com/schema/project/core/v2"]).toBeDefined();
-    expect(project.$defs!["https://test.invalid/local-ext/project/v1"]).toBeDefined();
+    expect(project.$defs!["project-core-v2"]).toBeDefined();
+    expect(project.$defs!["local-ext-project-v1"]).toBeDefined();
+    expect(project.$defs!["project-core-v2"]!.$id).toBeUndefined();
     expect(project.unevaluatedProperties).toBe(false);
 
     const document = readJson("document.schema.json");
-    expect(document.$ref).toBe("https://jxsuite.com/schema/v1");
-    expect(document.$defs!["https://jxsuite.com/schema/v1"]).toBeDefined();
+    // A root $ref beside $defs would make VS Code merge the core's $defs over the entry's own.
+    expect(document.$ref).toBeUndefined();
+    expect(document.allOf!.map((entry) => entry.$ref)).toEqual(["#/$defs/v1"]);
+    expect(document.$defs!.v1).toBeDefined();
     // Parser's fragment contributes its canonical paths shape; the $id-less local fragment none.
     expect(document.$defs!.PathsValue!.anyOf).toEqual([
-      { $ref: "https://jxsuite.com/schema/ext/parser/document/v1#/$defs/ContentPathsSource" },
+      { $ref: "#/$defs/ext-parser-document-v1/$defs/ContentPathsSource" },
     ]);
+    // And the shape it names is embedded, so the union actually resolves.
+    expect(
+      (document.$defs!["ext-parser-document-v1"]!.$defs as Record<string, unknown>)
+        .ContentPathsSource,
+    ).toBeDefined();
   });
 
   it("skips unreadable and $defs-less document fragments", async () => {
@@ -120,7 +130,7 @@ describe("writeProjectSchemas", () => {
     await writeProjectSchemas(TMP);
     let document = readJson("document.schema.json");
     expect(document.$defs!.PathsValue!.anyOf).toEqual([
-      { $ref: "https://jxsuite.com/schema/ext/parser/document/v1#/$defs/ContentPathsSource" },
+      { $ref: "#/$defs/ext-parser-document-v1/$defs/ContentPathsSource" },
     ]);
 
     // An $id-bearing fragment without $defs contributes nothing either.
@@ -136,7 +146,7 @@ describe("writeProjectSchemas", () => {
     await writeProjectSchemas(TMP);
     document = readJson("document.schema.json");
     expect(document.$defs!.PathsValue!.anyOf).toEqual([
-      { $ref: "https://jxsuite.com/schema/ext/parser/document/v1#/$defs/ContentPathsSource" },
+      { $ref: "#/$defs/ext-parser-document-v1/$defs/ContentPathsSource" },
     ]);
   });
 
@@ -144,7 +154,7 @@ describe("writeProjectSchemas", () => {
     // A project root outside the monorepo: project-first resolution fails (the empty node_modules
     // Disables Bun's install-cache fallback), so the intermediate refs land on the conventional
     // ./node_modules form — and the bundler's host fallback then embeds the real resources, so
-    // The committed files still carry only canonical $id refs.
+    // The committed files still carry only root pointers.
     const root = mkdtempSync(resolve(tmpdir(), "jx-schema-command-"));
     try {
       mkdirSync(resolve(root, "node_modules"));
@@ -159,15 +169,13 @@ describe("writeProjectSchemas", () => {
       const project = JSON.parse(
         readFileSync(resolve(root, "project.schema.json"), "utf8"),
       ) as SchemaDoc;
-      expect(project.allOf!.map((entry) => entry.$ref)).toEqual([
-        "https://jxsuite.com/schema/project/core/v2",
-      ]);
-      expect(project.$defs!["https://jxsuite.com/schema/project/core/v2"]).toBeDefined();
+      expect(project.allOf!.map((entry) => entry.$ref)).toEqual(["#/$defs/project-core-v2"]);
+      expect(project.$defs!["project-core-v2"]).toBeDefined();
       const document = JSON.parse(
         readFileSync(resolve(root, "document.schema.json"), "utf8"),
       ) as SchemaDoc;
-      expect(document.$ref).toBe("https://jxsuite.com/schema/v1");
-      expect(document.$defs!["https://jxsuite.com/schema/v1"]).toBeDefined();
+      expect(document.allOf!.map((entry) => entry.$ref)).toEqual(["#/$defs/v1"]);
+      expect(document.$defs!.v1).toBeDefined();
     } finally {
       rmSync(root, { force: true, recursive: true });
     }
@@ -175,8 +183,6 @@ describe("writeProjectSchemas", () => {
 });
 
 describe("readBundledProjectSchemas", () => {
-  const PARSER_FRAGMENT_ID = "https://jxsuite.com/schema/ext/parser/project/v1";
-
   beforeAll(() => {
     // Restore the local extension's full schema declaration (earlier tests rewrote the manifest).
     writeFile("local-ext/jx-extension.json", {
@@ -214,26 +220,32 @@ describe("readBundledProjectSchemas", () => {
       }
       return out;
     };
+    /* Not merely relative-ref-free: every ref is a root pointer. A canonical URI would send an
+       editor to the network instead of the embed sitting right there in the document. */
     for (const ref of [...scanRefs(project), ...scanRefs(document)]) {
-      expect(ref.startsWith("./")).toBe(false);
+      expect(ref.startsWith("#/")).toBe(true);
     }
 
     // The parser fragment (host-fallback: TMP has no node_modules) and the local fragment embed
-    // Under $defs keyed by their canonical $ids; the entry allOf refs land on them.
+    // Under $defs keyed by slugs of their $ids; the entry allOf refs point at them.
     const projectDefs = project.$defs as Record<string, Record<string, unknown>>;
-    expect(projectDefs[PARSER_FRAGMENT_ID]!.$id).toBe(PARSER_FRAGMENT_ID);
-    expect(projectDefs["https://test.invalid/local-ext/project/v1"]).toBeDefined();
+    expect(projectDefs["ext-parser-project-v1"]).toBeDefined();
+    expect(projectDefs["ext-parser-project-v1"]!.$id).toBeUndefined();
+    expect(projectDefs["local-ext-project-v1"]).toBeDefined();
     const allOf = project.allOf as { $ref: string }[];
     expect(allOf.map((entry) => entry.$ref)).toEqual([
-      "https://jxsuite.com/schema/project/core/v2",
-      PARSER_FRAGMENT_ID,
-      "https://test.invalid/local-ext/project/v1",
+      "#/$defs/project-core-v2",
+      "#/$defs/ext-parser-project-v1",
+      "#/$defs/local-ext-project-v1",
     ]);
 
-    // The document bundle inlines the core document schema under its canonical $id.
-    expect(document.$ref).toBe("https://jxsuite.com/schema/v1");
+    // The document bundle inlines the core document schema, reached through allOf (never a root $ref).
+    expect(document.$ref).toBeUndefined();
+    expect((document.allOf as { $ref: string }[]).map((entry) => entry.$ref)).toEqual([
+      "#/$defs/v1",
+    ]);
     const documentDefs = document.$defs as Record<string, Record<string, unknown>>;
-    expect(documentDefs["https://jxsuite.com/schema/v1"]).toBeDefined();
+    expect(documentDefs.v1).toBeDefined();
   });
 
   it("reuses fresh entry documents but regenerates stale ones", async () => {
