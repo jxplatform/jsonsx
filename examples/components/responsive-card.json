@@ -1,5 +1,5 @@
 {
-  "$schema": "https://declarative-dom.org/schema/v1",
+  "$schema": "../document.schema.json",
   "$id": "ResponsiveCard",
   "$media": {
     "--sm": "(min-width: 640px)",
