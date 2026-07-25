@@ -444,10 +444,17 @@ describe("chromium launcher RPC dispatch", () => {
     expect(await rpc("getProjectRoot")).toEqual({ root: projectRootValue });
   });
 
-  test("createProject dispatches to the createProject handler", async () => {
-    const result = await rpc("createProject", { directory: "n", name: "New" });
+  test("createProject dispatches to the createProject handler with the caller's destination", async () => {
+    // The launcher is a pass-through: the destination the modal chose reaches the handler unchanged
+    // (the handler, not this route, is what refuses a create without one).
+    const params = {
+      destination: { kind: "path", parent: "/home/dev/Sites" },
+      directory: "n",
+      name: "New",
+    };
+    const result = await rpc("createProject", params);
     expect(result).toEqual({ config: { name: "New" }, root: "/new" });
-    expect(handlerMocks.createProject).toHaveBeenCalledWith({ directory: "n", name: "New" });
+    expect(handlerMocks.createProject).toHaveBeenCalledWith(params);
   });
 
   test("listStarters dispatches to the real starter registry", async () => {

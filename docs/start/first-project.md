@@ -13,7 +13,7 @@ Download the desktop app for [macOS, Windows, or Linux](/docs/start/install) —
 
 ## 2. Create a project
 
-In Studio, choose **New Project**. Give it a name and a folder, set your production URL, and pick a **deployment adapter** — Static, Cloudflare Pages, Node, or Bun. **Static** suits a site that's purely pages and content; if it will have a database, sign-ins, or server functions, pick one of the others — those hosts can run the small worker Jx builds for them. You can change this later in [project settings](/docs/studio/projects/settings).
+In Studio, choose **New Project**. Give it a name, choose the **Location** to create it in — **Browse…** opens your system's folder picker — name the folder, set your production URL, and pick a **deployment adapter** — Static, Cloudflare Pages, Node, or Bun. **Static** suits a site that's purely pages and content; if it will have a database, sign-ins, or server functions, pick one of the others — those hosts can run the small worker Jx builds for them. You can change this later in [project settings](/docs/studio/projects/settings).
 
 Then pick a **template**. Start from **Blank** for an empty project, or clone one of the [starter sites](/templates) — a restaurant, shop, portfolio, SaaS landing, blog, and more. Each one is a complete, themed site (pages, components, content, and images) you can reshape into your own. Studio copies it in as plain files and opens it on the canvas.
 

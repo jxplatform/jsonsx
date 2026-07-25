@@ -1,10 +1,20 @@
 /**
  * New Project modal tests (E9). Drives the real two-step wizard through the layer system: the
- * source tab strip, the Next/Back transitions, field input with directory-slug derivation,
- * validation, platform createProject success/failure, template/starter selection, and the various
- * dismissal paths.
+ * source tab strip, the Next/Back transitions, field input with directory-slug derivation, the
+ * destination block (Location + Browse…, on a `createDestination: "path"` platform), validation,
+ * platform createProject success/failure, template/starter selection, and the various dismissal
+ * paths.
  */
-import { flush, installMockPlatform } from "./harness";
+import {
+  flush,
+  installMockPlatform,
+  npFillLocation,
+  npLocation,
+  npName,
+  npPreview,
+  npSlug,
+  npType,
+} from "./harness";
 import { afterEach, describe, expect, test } from "bun:test";
 
 const { closeNewProjectModal, openNewProjectModal } =
@@ -22,14 +32,23 @@ function modal(): HTMLElement | null {
   return document.querySelector("#layer-modal .new-project-modal");
 }
 
-/** Textfields in form order on the Parameters step: name, directory, description, url, …design. */
+/**
+ * Textfields in form order on the Parameters step of a `createDestination: "path"` platform: name,
+ * location, directory, description, url, …design. The identity and destination fields carry stable
+ * classes (use the harness accessors); only the unclassed description/url fields need an index.
+ */
 function field(index: number): any {
   return document.querySelectorAll("#layer-modal sp-textfield")[index];
 }
 
-function typeInto(el: any, value: string) {
-  el.value = value;
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+/** The Description textfield — it follows the whole destination block. */
+function npDescription(): any {
+  return field(3);
+}
+
+/** The Production URL textfield. */
+function npUrl(): any {
+  return field(4);
 }
 
 function footerButtons(): any[] {
@@ -48,6 +67,20 @@ function clickCreate() {
 
 function errorText(): string | null {
   return document.querySelector("#layer-modal .new-project-error")?.textContent?.trim() ?? null;
+}
+
+/** The inline destination-validation message rendered under the Location/Directory fields. */
+function destinationError(): string | null {
+  return (
+    document
+      .querySelector("#layer-modal .new-project-modal-body .new-project-error")
+      ?.textContent?.trim() ?? null
+  );
+}
+
+/** The Browse… button beside the Location field (absent without `platform.pickDirectory`). */
+function browseButton(): any {
+  return document.querySelector("#layer-modal .new-project-location-row sp-button");
 }
 
 /** The inline validation message slotted into the Project Name textfield. */
@@ -103,8 +136,11 @@ describe("openNewProjectModal — wizard lifecycle", () => {
     expect(document.querySelector("#layer-modal .new-project-step-context")?.textContent).toContain(
       "Template · Blank",
     );
-    // Identity fields + adapter picker + the design quickstart sections.
-    expect(document.querySelectorAll("#layer-modal sp-textfield").length).toBeGreaterThanOrEqual(4);
+    // Identity + destination fields, adapter picker, and the design quickstart sections.
+    expect(document.querySelectorAll("#layer-modal sp-textfield").length).toBeGreaterThanOrEqual(5);
+    expect(npName()).toBeTruthy();
+    expect(npLocation()).toBeTruthy();
+    expect(npSlug()).toBeTruthy();
     expect(document.querySelector("#layer-modal sp-picker")).toBeTruthy();
     expect(document.querySelectorAll("#layer-modal .new-project-design-section")).toHaveLength(4);
     // The tab strip is hidden on the Parameters step.
@@ -177,19 +213,147 @@ describe("openNewProjectModal — directory derivation", () => {
     installMockPlatform();
     void openNewProjectModal();
     goNext();
-    typeInto(field(0), "My Cool Site!");
-    expect(field(1).value).toBe("my-cool-site");
-    typeInto(field(0), "Renamed Site");
-    expect(field(1).value).toBe("renamed-site");
+    npType(npName(), "My Cool Site!");
+    expect(npSlug().value).toBe("my-cool-site");
+    npType(npName(), "Renamed Site");
+    expect(npSlug().value).toBe("renamed-site");
   });
 
   test("manual directory entry stops further derivation", () => {
     installMockPlatform();
     void openNewProjectModal();
     goNext();
-    typeInto(field(1), "custom-dir");
-    typeInto(field(0), "Some Project");
-    expect(field(1).value).toBe("custom-dir");
+    npType(npSlug(), "custom-dir");
+    npType(npName(), "Some Project");
+    expect(npSlug().value).toBe("custom-dir");
+  });
+});
+
+describe("openNewProjectModal — destination", () => {
+  test("blocks create with an inline error when the Location is empty", async () => {
+    const { state } = installMockPlatform();
+    void openNewProjectModal();
+    goNext();
+    npType(npName(), "Homeless Site");
+    clickCreate();
+
+    // The destination message replaces the name error and the modal stays open for a fix.
+    expect(destinationError()).toBe("Choose a location for the project folder");
+    expect(nameError()).toBeNull();
+    expect(modal()).toBeTruthy();
+    expect(state.calls.filter((c) => c[0] === "createProject")).toHaveLength(0);
+    // The scroll-to-top + focus helper runs without throwing.
+    await flush();
+  });
+
+  test("rejects a relative Location as not an absolute path", async () => {
+    const { state } = installMockPlatform();
+    void openNewProjectModal();
+    goNext();
+    npType(npName(), "Relative Site");
+    npType(npLocation(), "sites/relative");
+    clickCreate();
+
+    expect(destinationError()).toBe("Location must be an absolute path");
+    expect(modal()).toBeTruthy();
+    expect(state.calls.filter((c) => c[0] === "createProject")).toHaveLength(0);
+    await flush();
+  });
+
+  test("typing a Location clears the inline destination error", async () => {
+    installMockPlatform();
+    void openNewProjectModal();
+    goNext();
+    npType(npName(), "Fixable Site");
+    clickCreate();
+    expect(destinationError()).toBe("Choose a location for the project folder");
+    npFillLocation();
+    expect(destinationError()).toBeNull();
+    await flush();
+  });
+
+  test("the preview tracks the location and the slug", () => {
+    installMockPlatform();
+    void openNewProjectModal();
+    goNext();
+    // Both halves are still unknown before anything is typed.
+    expect(npPreview()).toBe("Creates: …/…");
+
+    npType(npName(), "My Cool Site");
+    expect(npPreview()).toBe("Creates: …/my-cool-site");
+
+    // A trailing separator on the typed location is not doubled up.
+    npFillLocation("/home/dev/Sites/");
+    expect(npPreview()).toBe("Creates: /home/dev/Sites/my-cool-site");
+
+    npType(npSlug(), "cool-dir");
+    expect(npPreview()).toBe("Creates: /home/dev/Sites/cool-dir");
+  });
+
+  test("createProject receives the typed Location as a path destination", async () => {
+    const { state } = installMockPlatform();
+    const promise = openNewProjectModal();
+    goNext();
+    npType(npName(), "Placed Site");
+    npFillLocation("/home/dev/Sites/");
+    clickCreate();
+
+    const result = await promise;
+    const call = state.calls.find((c) => c[0] === "createProject") as any[];
+    expect(call[1].destination).toEqual({ kind: "path", parent: "/home/dev/Sites" });
+    expect(call[1].directory).toBe("placed-site");
+    // The mock scaffolds under exactly the parent the user named.
+    expect(result?.root).toBe("/home/dev/Sites/placed-site");
+  });
+
+  test("no Browse… button when the platform cannot open a directory dialog", () => {
+    installMockPlatform();
+    void openNewProjectModal();
+    goNext();
+    expect(browseButton()).toBeNull();
+    expect(npLocation().getAttribute("placeholder")).toBe("/absolute/path/to/your/projects");
+  });
+
+  test("Browse… fills the Location from pickDirectory", async () => {
+    let picks = 0;
+    installMockPlatform({
+      pickDirectory: (async () => {
+        picks += 1;
+        return "/Users/dev/Projects";
+      }) as never,
+    });
+    void openNewProjectModal();
+    goNext();
+    expect(npLocation().getAttribute("placeholder")).toBe(
+      "Choose a folder to create the project in",
+    );
+    expect(browseButton()).toBeTruthy();
+
+    browseButton().dispatchEvent(new Event("click", { bubbles: true }));
+    // While the native dialog is open the button is busy and further clicks are ignored.
+    expect(browseButton().textContent).toContain("Choosing…");
+    expect(browseButton().hasAttribute("disabled")).toBe(true);
+    browseButton().dispatchEvent(new Event("click", { bubbles: true }));
+    await flush();
+
+    expect(picks).toBe(1);
+    expect(npLocation().value).toBe("/Users/dev/Projects");
+    expect(npPreview()).toBe("Creates: /Users/dev/Projects/…");
+    expect(browseButton().textContent).toContain("Browse…");
+    expect(browseButton().hasAttribute("disabled")).toBe(false);
+  });
+
+  test("a cancelled Browse… leaves the typed Location untouched", async () => {
+    installMockPlatform({ pickDirectory: (async () => null) as never });
+    void openNewProjectModal();
+    goNext();
+    npFillLocation("/home/dev/Sites");
+
+    browseButton().dispatchEvent(new Event("click", { bubbles: true }));
+    await flush();
+
+    expect(npLocation().value).toBe("/home/dev/Sites");
+    expect(npPreview()).toBe("Creates: /home/dev/Sites/…");
   });
 });
 
@@ -219,7 +383,8 @@ describe("openNewProjectModal — Template tab", () => {
     ].map((el: any) => el.value);
     expect(mediaNames).toEqual(["--", "--sm", "--md", "--lg"]);
 
-    typeInto(field(0), "My App");
+    npType(npName(), "My App");
+    npFillLocation();
     clickCreate();
     await flush();
     const call = state.calls.find((c) => c[0] === "createProject");
@@ -276,13 +441,14 @@ describe("openNewProjectModal — Starter Site tab", () => {
       "Bistro & Café",
     );
     // Description prefilled from the tagline; accent prefilled from the registry accent.
-    expect(field(2).value).toBe("A menu-driven site.");
+    expect(npDescription().value).toBe("A menu-driven site.");
     const accentField: any = document.querySelector(
       "#layer-modal .new-project-color-row sp-textfield",
     );
     expect(accentField.value).toBe("#b45309");
 
-    typeInto(field(0), "My Diner");
+    npType(npName(), "My Diner");
+    npFillLocation();
     clickCreate();
     await flush();
     const call = state.calls.find((c) => c[0] === "createProject");
@@ -325,7 +491,9 @@ describe("openNewProjectModal — submit", () => {
     clickCreate();
     // The message renders inside the name field, not in the global strip.
     expect(nameError()).toBe("Project name is required");
-    expect(field(0).hasAttribute("invalid")).toBe(true);
+    expect(npName().hasAttribute("invalid")).toBe(true);
+    // The name is checked before the destination, so no location complaint yet.
+    expect(destinationError()).toBeNull();
     expect(errorText()).toBeNull();
     expect(modal()).toBeTruthy();
     expect(state.calls.filter((c) => c[0] === "createProject")).toHaveLength(0);
@@ -339,9 +507,9 @@ describe("openNewProjectModal — submit", () => {
     goNext();
     clickCreate();
     expect(nameError()).toBe("Project name is required");
-    typeInto(field(0), "My Site");
+    npType(npName(), "My Site");
     expect(nameError()).toBeNull();
-    expect(field(0).hasAttribute("invalid")).toBe(false);
+    expect(npName().hasAttribute("invalid")).toBe(false);
   });
 
   test("creates the project, shows progress, and resolves with the result", async () => {
@@ -358,22 +526,27 @@ describe("openNewProjectModal — submit", () => {
 
     const promise = openNewProjectModal();
     goNext();
-    typeInto(field(0), "My Site");
-    typeInto(field(2), "A demo site");
-    typeInto(field(3), "https://example.com");
+    npType(npName(), "My Site");
+    npFillLocation();
+    npType(npDescription(), "A demo site");
+    npType(npUrl(), "https://example.com");
     clickCreate();
 
     // While createProject is pending the button is disabled and shows progress
     expect(footerButtons()[1].textContent).toContain("Creating…");
     expect(footerButtons()[1].hasAttribute("disabled")).toBe(true);
 
-    resolveCreate({ config: { name: "My Site" }, root: "/projects/my-site" });
+    resolveCreate({ config: { name: "My Site" }, root: "/home/dev/Sites/my-site" });
     const result = await promise;
-    expect(result).toEqual({ config: { name: "My Site" }, root: "/projects/my-site" } as never);
+    expect(result).toEqual({
+      config: { name: "My Site" },
+      root: "/home/dev/Sites/my-site",
+    } as never);
     expect(modal()).toBeNull();
     expect(created[0]).toEqual({
       adapter: "static",
       description: "A demo site",
+      destination: { kind: "path", parent: "/home/dev/Sites" },
       directory: "my-site",
       name: "My Site",
       template: "blank",
@@ -385,8 +558,9 @@ describe("openNewProjectModal — submit", () => {
     const { state } = installMockPlatform();
     const promise = openNewProjectModal();
     goNext();
-    typeInto(field(0), "Site X");
-    typeInto(field(1), ""); // User clears the derived value
+    npType(npName(), "Site X");
+    npType(npSlug(), ""); // User clears the derived value
+    npFillLocation();
     clickCreate();
     await promise;
     const call = state.calls.find((c) => c[0] === "createProject") as any[];
@@ -397,7 +571,8 @@ describe("openNewProjectModal — submit", () => {
     const { state } = installMockPlatform();
     const promise = openNewProjectModal();
     goNext();
-    typeInto(field(0), "Node Site");
+    npType(npName(), "Node Site");
+    npFillLocation();
     const picker: any = document.querySelector("#layer-modal sp-picker");
     picker.value = "node";
     picker.dispatchEvent(new Event("change", { bubbles: true }));
@@ -419,7 +594,8 @@ describe("openNewProjectModal — submit", () => {
       settled = true;
     });
     goNext();
-    typeInto(field(0), "Doomed");
+    npType(npName(), "Doomed");
+    npFillLocation();
     clickCreate();
     await flush();
 
@@ -450,7 +626,8 @@ describe("openNewProjectModal — submit", () => {
     });
     const promise = openNewProjectModal();
     goNext();
-    typeInto(field(0), "Blocked");
+    npType(npName(), "Blocked");
+    npFillLocation();
     clickCreate();
     await flush();
 

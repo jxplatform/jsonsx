@@ -20,6 +20,12 @@ import { createAiCredentialsForm } from "../ui/ai-credentials-form";
 import { PROJECT_TEMPLATES } from "./templates";
 import { collectDesign, renderDesignFields, resetDesignFields } from "./design-fields";
 import {
+  collectDestination,
+  loadLocationOptions,
+  renderLocationFields,
+  resetLocationFields,
+} from "./location-fields";
+import {
   cancelImport,
   importButtonLabel,
   isImportRunning,
@@ -31,7 +37,7 @@ import {
   validateImportSource,
 } from "./import-tab";
 import type { ProjectConfig } from "@jxsuite/schema/types";
-import type { StarterInfo } from "../types";
+import type { CreateProjectDestination, StarterInfo } from "../types";
 import type { ImportTabCtx } from "./import-tab";
 
 type NewProjectTab = "template" | "starter" | "import" | "agent";
@@ -142,10 +148,17 @@ export function openNewProjectModal(options?: { tab?: "template" | "starter" }):
   _dirDerived = true;
   resetImportTab();
   resetDesignFields();
+  resetLocationFields();
 
-  // Load starter templates in the background; re-render when they arrive. Platforms without
-  // Starters leave the Starter Site tab showing its empty note.
+  // Load the destination options (repo-mode owners) and starter templates in the background,
+  // Re-rendering when they arrive. Platforms without starters leave the Starter Site tab showing
+  // Its empty note.
   const platform = getPlatform();
+  loadLocationOptions(() => {
+    if (_handle) {
+      renderModal();
+    }
+  });
   if (platform.listStarters) {
     void platform
       .listStarters()
@@ -226,6 +239,7 @@ function renderModal() {
     form: _form,
     onDone: finish,
     rerender: renderModal,
+    resolveDestination: () => validateParams(),
   };
 
   const onInput =
@@ -326,15 +340,35 @@ function renderModal() {
 
   // ─── Submission ────────────────────────────────────────────────────────────
 
-  const onSubmit = async () => {
+  /**
+   * Validate the Parameters step, returning the destination to create at (null when something is
+   * missing — the reason is already rendered inline and the modal re-drawn). The slug is derived
+   * from the name when left blank, but the destination itself is never guessed.
+   */
+  const validateParams = (): CreateProjectDestination | null => {
     if (!_form.name.trim()) {
       _nameError = "Project name is required";
       renderModal();
       focusNameField();
-      return;
+      return null;
     }
     if (!_form.directory.trim()) {
       _form.directory = deriveSlug(_form.name);
+    }
+    const destination = collectDestination(_form.directory);
+    if (!destination) {
+      _nameError = "";
+      renderModal();
+      focusNameField();
+      return null;
+    }
+    return destination;
+  };
+
+  const onSubmit = async () => {
+    const destination = validateParams();
+    if (!destination) {
+      return;
     }
 
     _creating = true;
@@ -346,6 +380,7 @@ function renderModal() {
       const design = collectDesign();
       const result = await getPlatform().createProject({
         ..._form,
+        destination,
         ...(_tab === "starter" && _starter ? { starter: _starter } : { template: _template }),
         ...(design ? { design } : {}),
       });
@@ -358,14 +393,9 @@ function renderModal() {
   };
 
   const onAgentSubmit = async () => {
-    if (!_form.name.trim()) {
-      _nameError = "Project name is required";
-      renderModal();
-      focusNameField();
+    const destination = validateParams();
+    if (!destination) {
       return;
-    }
-    if (!_form.directory.trim()) {
-      _form.directory = deriveSlug(_form.name);
     }
 
     _creating = true;
@@ -377,6 +407,7 @@ function renderModal() {
       const design = collectDesign();
       const result = await getPlatform().createProject({
         ..._form,
+        destination,
         template: "blank",
         ...(design ? { design } : {}),
       });
@@ -490,6 +521,7 @@ function renderModal() {
     <label class="new-project-field">
       <span class="new-project-label">Project Name *</span>
       <sp-textfield
+        class="new-project-name"
         placeholder="My Site"
         .value=${_form.name}
         ?invalid=${Boolean(_nameError)}
@@ -502,15 +534,11 @@ function renderModal() {
       </sp-textfield>
     </label>
 
-    <label class="new-project-field">
-      <span class="new-project-label">Directory</span>
-      <sp-textfield
-        placeholder="my-site"
-        .value=${_form.directory}
-        @input=${onInput("directory")}
-        style="width: 100%"
-      ></sp-textfield>
-    </label>
+    ${renderLocationFields({
+      onSlugInput: onInput("directory"),
+      rerender: renderModal,
+      slug: _form.directory,
+    })}
   `;
 
   const paramsBodyTpl = () => html`

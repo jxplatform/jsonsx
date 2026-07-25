@@ -1,10 +1,20 @@
 /**
  * The New Project wizard's Import flow: the credentials gate and URL validation on the source step,
- * the Parameters hand-off, the streaming progress log, success/failure/cancel flows, and the
- * options threaded into platform.importSite.
+ * the Parameters hand-off (identity plus the destination the user chose), the streaming progress
+ * log, success/failure/cancel flows, and the options threaded into platform.importSite.
  */
-import { flush, installMockPlatform } from "./harness";
+import {
+  flush,
+  installMockPlatform,
+  npFillLocation,
+  npLocation,
+  npName,
+  npPreview,
+  npSlug,
+  npType,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import type { ImportTabCtx } from "../src/new-project/import-tab";
 import type { ImportProgressEvent } from "../src/types";
 
 const { closeNewProjectModal, openNewProjectModal } =
@@ -23,14 +33,41 @@ function modal(): HTMLElement | null {
   return document.querySelector("#layer-modal .new-project-modal");
 }
 
-/** Source step: field(0) = Site URL. Parameters step: name(0), directory(1). */
-function field(index: number): any {
-  return document.querySelectorAll("#layer-modal sp-textfield")[index];
+/** The Import source step's only textfield: Site URL. */
+function urlField(): HTMLInputElement {
+  return document.querySelector("#layer-modal sp-textfield") as HTMLInputElement;
 }
 
-function typeInto(el: any, value: string) {
-  el.value = value;
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+/** The Project Name field's inline validation message (Spectrum's negative help text). */
+function nameError(): string {
+  return (
+    document
+      .querySelector('#layer-modal .new-project-name sp-help-text[slot="negative-help-text"]')
+      ?.textContent?.trim() ?? ""
+  );
+}
+
+/** The inline error rendered under the destination fields (or by a failed run). */
+function inlineError(): string {
+  return document.querySelector("#layer-modal .new-project-error")?.textContent?.trim() ?? "";
+}
+
+/**
+ * A hand-built ImportTabCtx for driving startImport directly (the modal only ever hands it a
+ * filesystem destination), paired with a counter for the rerenders it requests.
+ */
+function directCtx(resolveDestination: ImportTabCtx["resolveDestination"]) {
+  const counter = { rerenders: 0 };
+  const ctx: ImportTabCtx = {
+    credsForm: { render: () => "" as never, startEdit: () => {} },
+    form: { directory: "site", name: "Site" },
+    onDone: () => {},
+    rerender: () => {
+      counter.rerenders += 1;
+    },
+    resolveDestination,
+  };
+  return { counter, ctx };
 }
 
 function footerButtons(): any[] {
@@ -88,7 +125,7 @@ function setKey() {
 function reachParams(url = "https://clone.example/") {
   const promise = openNewProjectModal();
   switchTab("import");
-  typeInto(field(0), url);
+  npType(urlField(), url);
   clickFooter("Next");
   return promise;
 }
@@ -137,11 +174,9 @@ describe("Import source step", () => {
     importPlatform();
     void openNewProjectModal();
     switchTab("import");
-    typeInto(field(0), "not a url");
+    npType(urlField(), "not a url");
     clickFooter("Next");
-    expect(document.querySelector("#layer-modal .new-project-error")?.textContent).toContain(
-      "valid URL",
-    );
+    expect(inlineError()).toContain("valid URL");
     // Still on the source step.
     expect(document.querySelector("#layer-modal sp-tabs")).toBeTruthy();
     expect(captured).toBeNull();
@@ -151,9 +186,12 @@ describe("Import source step", () => {
     setKey();
     importPlatform();
     void reachParams("https://www.coffee-shop.example/menu");
-    // Parameters step: name(0) and directory(1) carry the hostname prefill.
-    expect(field(0).value).toBe("coffee-shop.example");
-    expect(field(1).value).toBe("coffee-shop-example");
+    // Parameters step: name and slug carry the hostname prefill; the destination is never guessed,
+    // So the Location field starts empty.
+    expect(npName().value).toBe("coffee-shop.example");
+    expect(npSlug().value).toBe("coffee-shop-example");
+    expect(npLocation()).toBeTruthy();
+    expect(npLocation().value).toBe("");
     // Import parameters are identity-only: no adapter picker, no design sections.
     expect(document.querySelector("#layer-modal sp-picker")).toBeNull();
     expect(document.querySelectorAll("#layer-modal .new-project-design-section")).toHaveLength(0);
@@ -161,30 +199,59 @@ describe("Import source step", () => {
 });
 
 describe("Import — parameters validation", () => {
-  test("an empty project name blocks the import; Back shows the inline error", async () => {
+  test("an empty project name blocks the import and shows the inline name error", async () => {
     setKey();
     importPlatform();
     void reachParams();
-    typeInto(field(0), ""); // Clear the prefilled name.
+    npFillLocation();
+    npType(npName(), ""); // Clear the prefilled name.
     clickFooter("Import Site");
     await flush();
     expect(captured).toBeNull();
+    // The modal — not the tab — owns identity validation now, so the message lands on the field.
+    expect(nameError()).toBe("Project name is required");
+  });
 
-    clickFooter("Back");
-    expect(document.querySelector("#layer-modal .new-project-error")?.textContent).toContain(
-      "Project name is required",
-    );
+  test("a missing Location blocks the import before importSite is called", async () => {
+    setKey();
+    importPlatform();
+    void reachParams();
+    // Location left empty: the name and slug are prefilled, so only the destination is missing.
+    clickFooter("Import Site");
+    await flush();
+    expect(captured).toBeNull();
+    expect(inlineError()).toContain("Choose a location for the project folder");
+    // Still on the Parameters step, ready for the user to choose one.
+    expect(npLocation()).toBeTruthy();
+    expect(importButtonLabel()).toBe("Import Site");
+  });
+
+  test("importSite receives the Location joined with the slug", async () => {
+    setKey();
+    importPlatform();
+    void reachParams();
+    npFillLocation("/home/dev/Sites");
+    npType(npName(), "My Clone");
+    npType(npSlug(), "clone-dir");
+    expect(npPreview()).toContain("/home/dev/Sites/clone-dir");
+    clickFooter("Import Site");
+    await flush();
+    expect(captured!.opts.directory).toBe("/home/dev/Sites/clone-dir");
   });
 
   test("a blank directory defaults to the name's slug", async () => {
     setKey();
     importPlatform();
     void reachParams();
-    typeInto(field(0), "Coffee & Cream");
-    typeInto(field(1), ""); // Clear the derived directory.
+    npFillLocation();
+    npType(npName(), "Coffee & Cream");
+    npType(npSlug(), ""); // Clear the derived directory.
     clickFooter("Import Site");
     await flush();
-    expect(captured!.opts).toMatchObject({ directory: "coffee-cream", name: "Coffee & Cream" });
+    expect(captured!.opts).toMatchObject({
+      directory: "/home/dev/Sites/coffee-cream",
+      name: "Coffee & Cream",
+    });
   });
 
   test("crawl options and the AI-naming switch thread into importSite", async () => {
@@ -192,7 +259,7 @@ describe("Import — parameters validation", () => {
     importPlatform();
     void openNewProjectModal();
     switchTab("import");
-    typeInto(field(0), "https://clone.example/");
+    npType(urlField(), "https://clone.example/");
 
     const numberFields = [
       ...document.querySelectorAll("#layer-modal sp-number-field"),
@@ -208,6 +275,7 @@ describe("Import — parameters validation", () => {
     aiSwitch.dispatchEvent(new Event("change", { bubbles: true }));
 
     clickFooter("Next");
+    npFillLocation();
     clickFooter("Import Site");
     await flush();
     expect(captured!.opts).toMatchObject({ aiComponents: false, depth: 2, maxPages: 50 });
@@ -215,16 +283,51 @@ describe("Import — parameters validation", () => {
 
   test("Import Site is a no-op when the platform lacks importSite", async () => {
     installMockPlatform();
-    let rerenders = 0;
-    await startImport({
-      credsForm: { render: () => "" as never, startEdit: () => {} },
-      form: { directory: "", name: "Site" },
-      onDone: () => {},
-      rerender: () => {
-        rerenders += 1;
-      },
+    const { counter, ctx } = directCtx(() => ({ kind: "path", parent: "/home/dev/Sites" }));
+    await startImport(ctx);
+    expect(counter.rerenders).toBe(0);
+  });
+
+  test("a repository destination never starts an import", async () => {
+    setKey();
+    importPlatform();
+    void openNewProjectModal();
+    switchTab("import");
+    npType(urlField(), "https://clone.example/");
+    // The pipeline writes to a folder; a repo destination is not a place it can clone into.
+    const { counter, ctx } = directCtx(() => ({
+      kind: "repo",
+      owner: "acme",
+      private: true,
+      repo: "site",
+    }));
+    await startImport(ctx);
+    expect(captured).toBeNull();
+    expect(counter.rerenders).toBe(0);
+  });
+
+  test("a missing or non-web URL is refused before the destination is resolved", async () => {
+    setKey();
+    importPlatform();
+    void openNewProjectModal();
+    switchTab("import");
+    let resolved = 0;
+    const { counter, ctx } = directCtx(() => {
+      resolved += 1;
+      return { kind: "path", parent: "/home/dev/Sites" };
     });
-    expect(rerenders).toBe(0);
+
+    // No URL at all (the source step never validated one).
+    await startImport(ctx);
+    expect(captured).toBeNull();
+    expect(counter.rerenders).toBe(1);
+
+    // Parsable, but not an http(s) site.
+    npType(urlField(), "ftp://files.example/");
+    await startImport(ctx);
+    expect(captured).toBeNull();
+    expect(counter.rerenders).toBe(2);
+    expect(resolved).toBe(0);
   });
 });
 
@@ -233,7 +336,8 @@ describe("Import — streaming flow", () => {
     setKey();
     importPlatform();
     const promise = reachParams();
-    typeInto(field(0), "Cloned Site");
+    npFillLocation();
+    npType(npName(), "Cloned Site");
     clickFooter("Import Site");
     await flush();
 
@@ -243,7 +347,7 @@ describe("Import — streaming flow", () => {
       apiKey: "sk-import-test",
       baseUrl: "http://llm.local/v1",
       depth: 1,
-      directory: "cloned-site",
+      directory: "/home/dev/Sites/cloned-site",
       maxPages: 20,
       model: "test-model",
       name: "Cloned Site",
@@ -259,11 +363,11 @@ describe("Import — streaming flow", () => {
     expect(labels).toEqual(["Cancel Import"]);
 
     // Success resolves the modal promise with the imported project.
-    captured!.resolve({ config: { name: "Cloned Site" }, root: "/projects/cloned-site" });
+    captured!.resolve({ config: { name: "Cloned Site" }, root: "/home/dev/Sites/cloned-site" });
     const result = await promise;
     expect(result).toEqual({
       config: { name: "Cloned Site" },
-      root: "/projects/cloned-site",
+      root: "/home/dev/Sites/cloned-site",
     } as never);
     expect(modal()).toBeNull();
   });
@@ -272,6 +376,7 @@ describe("Import — streaming flow", () => {
     setKey();
     importPlatform();
     void reachParams();
+    npFillLocation();
     expect(importButtonLabel()).toBe("Import Site");
     clickFooter("Import Site");
     await flush();
@@ -282,6 +387,7 @@ describe("Import — streaming flow", () => {
     setKey();
     importPlatform();
     void reachParams();
+    npFillLocation();
     clickFooter("Import Site");
     await flush();
 
@@ -290,18 +396,14 @@ describe("Import — streaming flow", () => {
     await flush();
 
     expect(modal()).toBeTruthy();
-    expect(document.querySelector("#layer-modal .new-project-error")?.textContent).toContain(
-      "Chrome not found",
-    );
+    expect(inlineError()).toContain("Chrome not found");
     const labels = footerButtons().map((b) => b.textContent?.trim());
     expect(labels.at(-1)).toContain("Retry Import");
     expect(importButtonLabel()).toBe("Retry Import");
 
     // Back on the Import source step, the error and the retained log both render.
     clickFooter("Back");
-    expect(document.querySelector("#layer-modal .new-project-error")?.textContent).toContain(
-      "Chrome not found",
-    );
+    expect(inlineError()).toContain("Chrome not found");
     expect(logLines()).toEqual(["launch Launching browser..."]);
   });
 
@@ -309,6 +411,7 @@ describe("Import — streaming flow", () => {
     setKey();
     importPlatform();
     void reachParams();
+    npFillLocation();
     clickFooter("Import Site");
     await flush();
 

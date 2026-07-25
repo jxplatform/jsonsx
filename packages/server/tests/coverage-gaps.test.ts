@@ -1,14 +1,16 @@
 /**
  * Coverage-gaps.test.ts — integration coverage for dev-server and project-server branches the other
  * suites do not reach: the /_jx extension-mount route on both servers, the import-site delegation,
- * the absolute-path static miss under an active project, npm exports mappings whose target file is
- * gone, a failed WebSocket upgrade, the project server's AI route, and an npm bundle failure on the
- * project server.
+ * create-project at a user-chosen destination and the activate that follows it, the absolute-path
+ * static miss under an active project, npm exports mappings whose target file is gone, a failed
+ * WebSocket upgrade, the project server's AI route, and an npm bundle failure on the project
+ * server.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { createDevServer, resolveNpmPath } from "../src/server.ts";
 import { createProjectServer } from "../src/project-server.ts";
 import type { ProjectServerHandle } from "../src/project-server.ts";
@@ -60,9 +62,17 @@ function writeEchoExtension(root: string) {
 
 let devServer: { port: number; stop: (force?: boolean) => void };
 let projectServer: ProjectServerHandle;
+/**
+ * Where the New Project modal "chose" to put the project. It has to sit under the home directory
+ * but under neither the server root nor an allowed root, so that the follow-up activate can only
+ * succeed because the server remembered what it just created. Anchoring it to homedir() keeps that
+ * relationship true wherever the checkout lives.
+ */
+let createdParent: string;
 
 beforeAll(async () => {
   rmSync(FIXTURES, { force: true, recursive: true });
+  createdParent = mkdtempSync(join(homedir(), ".jx-server-created-"));
 
   // Dev-server root: echo mounts, an activatable project subdir, and an npm package whose
   // Exports map points at a missing file while the direct subpath exists.
@@ -113,6 +123,7 @@ afterAll(() => {
   devServer.stop(true);
   projectServer.stop();
   rmSync(FIXTURES, { force: true, recursive: true });
+  rmSync(createdParent, { force: true, recursive: true });
 });
 
 // ─── Dev server ───────────────────────────────────────────────────────────────
@@ -178,6 +189,55 @@ describe("dev server — absolute paths under the active project", () => {
     const res = await fetch(`http://localhost:${devServer.port}/external.txt`);
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("external data");
+  });
+});
+
+describe("dev server — create-project at a chosen destination", () => {
+  test("refuses to create anything without a destination", async () => {
+    const res = await fetch(`http://localhost:${devServer.port}/__studio/create-project`, {
+      body: JSON.stringify({ directory: "unwanted", name: "Unwanted" }),
+      method: "POST",
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("A destination folder is required.");
+    expect(existsSync(join(SERVER_ROOT, "unwanted"))).toBe(false);
+  });
+
+  test("scaffolds at the chosen parent and permits activating what it just created", async () => {
+    const res = await fetch(`http://localhost:${devServer.port}/__studio/create-project`, {
+      body: JSON.stringify({
+        destination: { kind: "path", parent: createdParent },
+        directory: "made-here",
+        name: "Made Here",
+      }),
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { config: { name: string }; root: string };
+    // Outside the server root, so the root comes back absolute rather than root-relative.
+    expect(body.root).toBe(join(createdParent, "made-here"));
+    expect(body.config.name).toBe("Made Here");
+    expect(existsSync(join(createdParent, "made-here", "project.json"))).toBe(true);
+
+    // The server remembered the new root, so the activate Studio sends next is permitted even
+    // Though the project sits under neither the server root nor allowedRoots.
+    const activate = await fetch(`http://localhost:${devServer.port}/__studio/activate`, {
+      body: JSON.stringify({ root: body.root }),
+      method: "POST",
+    });
+    expect(activate.status).toBe(200);
+    const activated = (await activate.json()) as { ok: boolean; root: string };
+    expect(activated.ok).toBe(true);
+    expect(activated.root).toBe(join(createdParent, "made-here"));
+  });
+
+  test("still refuses to activate a directory it never created", async () => {
+    const activate = await fetch(`http://localhost:${devServer.port}/__studio/activate`, {
+      body: JSON.stringify({ root: join(createdParent, "never-made") }),
+      method: "POST",
+    });
+    expect(activate.status).toBe(403);
   });
 });
 

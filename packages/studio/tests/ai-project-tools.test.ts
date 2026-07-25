@@ -4,7 +4,8 @@
  * Drives the tools through a real ToolRegistry against the harness's in-memory platform: path
  * traversal guards, listing exclusions/caps, read truncation, write pre-validation (schema +
  * render), open-tab reconciliation (dirty refusal / clean reload), project.json config sync, and
- * the create_project → adopt → re-key handoff.
+ * the create_project → adopt → re-key handoff (including the required destination — "location" on
+ * path platforms, "owner" on repo platforms).
  */
 import { installMockPlatform, resetWorkspaceWithTab } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
@@ -12,7 +13,14 @@ import { createToolRegistry } from "@jxsuite/ai";
 import { registerProjectTools } from "../src/services/ai-project-tools";
 import type { ProjectToolsCtx } from "../src/services/ai-project-tools";
 import { closeAllTabs, setWorkspaceProject } from "../src/workspace/workspace";
-import type { DirEntry } from "../src/types";
+import type { CreateProjectDestination, DirEntry } from "../src/types";
+
+/** The shape of the `createProject` options the create_project tool sends to the platform. */
+interface CreateOpts {
+  name: string;
+  directory: string;
+  destination: CreateProjectDestination;
+}
 
 /** Directory listing over a plain path→content map that also understands the "." root. */
 function listingFor(files: Record<string, string>) {
@@ -311,19 +319,125 @@ describe("ai-project-tools — create_project", () => {
       // Simulate openRecentProject succeeding: the workspace now holds the project.
       setWorkspaceProject(root, { name: "New Site" });
     });
-    const createProject = mock(async (opts: { name: string; directory: string }) => ({
+    const createProject = mock(async (opts: CreateOpts) => ({
       config: { name: opts.name },
       root: `/abs/${opts.directory}`,
     }));
     const { registry } = makeHarness({}, { adoptProject, onProjectAdopted }, { createProject });
 
-    const res = await registry.execute("create_project", { name: "New Site!" });
+    const res = await registry.execute("create_project", {
+      location: "/home/dev/Sites",
+      name: "New Site!",
+    });
     expect(res.success).toBe(true);
     expect(res.summary).toContain("opened it");
-    // The directory slug derives from the name.
+    // The directory slug derives from the name; the location becomes the path destination.
     expect(createProject.mock.calls[0]![0]!.directory).toBe("new-site");
+    expect(createProject.mock.calls[0]![0]!.destination).toEqual({
+      kind: "path",
+      parent: "/home/dev/Sites",
+    });
     expect(adoptProject).toHaveBeenCalledWith("/abs/new-site");
     expect(onProjectAdopted).toHaveBeenCalledWith("/abs/new-site");
+  });
+
+  test("trailing slashes are trimmed off the location parent", async () => {
+    const createProject = mock(async (opts: CreateOpts) => ({
+      config: { name: opts.name },
+      root: `/abs/${opts.directory}`,
+    }));
+    const { registry } = makeHarness({}, {}, { createProject });
+    const res = await registry.execute("create_project", {
+      location: "/home/dev/Sites/",
+      name: "Trimmed",
+    });
+    expect(res.success).toBe(true);
+    expect(createProject.mock.calls[0]![0]!.destination).toEqual({
+      kind: "path",
+      parent: "/home/dev/Sites",
+    });
+  });
+
+  test("refuses without a location on a path platform, before touching the backend", async () => {
+    const { registry, state } = makeHarness();
+    const res = await registry.execute("create_project", { name: "Homeless" });
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("location");
+    expect(state.calls.some(([name]) => name === "createProject")).toBe(false);
+  });
+
+  test("rejects a relative location", async () => {
+    const { registry, state } = makeHarness();
+    const res = await registry.execute("create_project", {
+      location: "Sites/clients",
+      name: "Relative",
+    });
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("absolute path");
+    expect(state.calls.some(([name]) => name === "createProject")).toBe(false);
+  });
+
+  test("refuses without an owner on a repo platform", async () => {
+    const createProject = mock(async (opts: CreateOpts) => ({
+      config: { name: opts.name },
+      root: "owner/repo",
+    }));
+    const { registry } = makeHarness({}, {}, { createDestination: "repo", createProject });
+    // "Location" is meaningless on the cloud — it must still demand an owner.
+    const res = await registry.execute("create_project", {
+      location: "/home/dev/Sites",
+      name: "Cloudy",
+    });
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("owner");
+    expect(createProject).not.toHaveBeenCalled();
+  });
+
+  test("builds a private repo destination from the owner on a repo platform", async () => {
+    const adoptProject = mock(async (root: string) => {
+      setWorkspaceProject(root, { name: "Cloud Site" });
+    });
+    const createProject = mock(async (opts: CreateOpts) => ({
+      config: { name: opts.name },
+      root:
+        opts.destination.kind === "repo"
+          ? `${opts.destination.owner}/${opts.destination.repo}`
+          : "?",
+    }));
+    const { registry } = makeHarness(
+      {},
+      { adoptProject },
+      { createDestination: "repo", createProject },
+    );
+    const res = await registry.execute("create_project", { name: "Cloud Site!", owner: "acme" });
+    expect(res.success).toBe(true);
+    expect(createProject.mock.calls[0]![0]!.destination).toEqual({
+      kind: "repo",
+      owner: "acme",
+      private: true,
+      repo: "cloud-site",
+    });
+    expect(adoptProject).toHaveBeenCalledWith("acme/cloud-site");
+  });
+
+  test("honours an explicit public visibility on a repo platform", async () => {
+    const createProject = mock(async (opts: CreateOpts) => ({
+      config: { name: opts.name },
+      root: "acme/public-site",
+    }));
+    const { registry } = makeHarness({}, {}, { createDestination: "repo", createProject });
+    const res = await registry.execute("create_project", {
+      name: "Public Site",
+      owner: "acme",
+      private: false,
+    });
+    expect(res.success).toBe(true);
+    expect(createProject.mock.calls[0]![0]!.destination).toEqual({
+      kind: "repo",
+      owner: "acme",
+      private: false,
+      repo: "public-site",
+    });
   });
 
   test("refuses while a project is already open", async () => {
@@ -348,7 +462,10 @@ describe("ai-project-tools — create_project", () => {
         createProject: async () => ({ config: {}, root: "/abs/elsewhere" }),
       },
     );
-    const res = await registry.execute("create_project", { name: "Ghost" });
+    const res = await registry.execute("create_project", {
+      location: "/home/dev/Sites",
+      name: "Ghost",
+    });
     expect(res.success).toBe(true);
     expect(res.summary).toContain("not opened in this window");
     expect(onProjectAdopted).not.toHaveBeenCalled();
@@ -364,7 +481,10 @@ describe("ai-project-tools — create_project", () => {
         },
       },
     );
-    const res = await failing.registry.execute("create_project", { name: "Dup" });
+    const res = await failing.registry.execute("create_project", {
+      location: "/home/dev/Sites",
+      name: "Dup",
+    });
     expect(res.success).toBe(false);
     expect(res.error).toContain("directory exists");
 
@@ -377,7 +497,10 @@ describe("ai-project-tools — create_project", () => {
       },
       { createProject: async () => ({ config: {}, root: "/abs/x" }) },
     );
-    const res2 = await adoptFail.registry.execute("create_project", { name: "Solo" });
+    const res2 = await adoptFail.registry.execute("create_project", {
+      location: "/home/dev/Sites",
+      name: "Solo",
+    });
     expect(res2.success).toBe(true);
     expect(res2.summary).toContain("no adopter registered");
   });

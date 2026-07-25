@@ -112,6 +112,20 @@ export interface RepoInfo {
   isJxProject: boolean;
 }
 
+/**
+ * Where a new project is written. The New Project modal collects this from the user and the backend
+ * MUST honor it — no backend may pick a destination on its own (see
+ * `StudioPlatform.createDestination`).
+ *
+ * - `"path"`: `parent` is an absolute filesystem directory; the project lands at
+ *   `parent/<directory>`.
+ * - `"repo"`: a remote repository — `owner` is a GitHub account or organization login, `repo` the
+ *   repository name, `private` its visibility.
+ */
+export type CreateProjectDestination =
+  | { kind: "path"; parent: string }
+  | { kind: "repo"; owner: string; repo: string; private: boolean };
+
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
@@ -249,12 +263,21 @@ export interface StudioPlatform {
   gitClone?: (url: string) => Promise<{ ok: boolean; root: string }>;
   gitInit: () => Promise<void>;
   gitAddRemote: (name: string, url: string) => Promise<void>;
+  /**
+   * How the New Project modal collects a destination, and which `CreateProjectDestination` variant
+   * `createProject` requires. `"path"`: a Location field (absolute parent directory) plus a Browse…
+   * button over `pickDirectory`. `"repo"`: owner / repository-name / visibility fields. Every
+   * backend sets one — a project is never written to a destination the user did not choose.
+   */
+  createDestination: "path" | "repo";
   createProject: (opts: {
     name: string;
     description?: string;
     url?: string;
     adapter?: string;
     directory: string;
+    /** Where to write it. Required; its `kind` matches this platform's `createDestination`. */
+    destination: CreateProjectDestination;
     /** Id of a starter template to clone, or "blank"/undefined for the minimal template. */
     starter?: string;
     /** Id of a built-in template variant (from `@jxsuite/create/templates`); undefined = blank. */
@@ -286,8 +309,9 @@ export interface StudioPlatform {
     signal?: AbortSignal,
   ) => Promise<{ root: string; config: ProjectConfig }>;
   /**
-   * Open a native directory picker and return the chosen absolute path (null when cancelled).
-   * Desktop only; the dev server interprets directories relative to its root instead.
+   * Open a native directory picker and return the chosen absolute path (null when cancelled). Backs
+   * the New Project modal's **Browse…** button on `createDestination: "path"` platforms. Desktop
+   * only — the dev server has no native dialog, so its Location field is typed by hand.
    */
   pickDirectory?: () => Promise<string | null>;
   /** Stack B AI assistant: URL of the OpenAI-compatible SSE chat proxy (`/__studio/ai/chat`). */

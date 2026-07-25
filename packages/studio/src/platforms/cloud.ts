@@ -14,6 +14,7 @@
 import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
+  CreateProjectDestination,
   DirEntry,
   ExtensionsInfo,
   FsEvent,
@@ -212,6 +213,10 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
     /* Open Project routes through Studio's repo picker (write-access repos via listRepos +
        importProject) — sessions are URL-bound, so openProject() below never opens a dialog. */
     openProjectPicker: "repo-list",
+
+    /* A cloud project IS a GitHub repo, so the New Project modal collects the repository location
+       (owner, name, visibility) rather than a folder. */
+    createDestination: "repo",
 
     async activate() {
       if (!project) {
@@ -664,9 +669,17 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
       name: string;
       description?: string | undefined;
       directory: string;
+      destination: CreateProjectDestination;
       starter?: string | undefined;
       template?: string | undefined;
     }) {
+      // The repository location comes from the modal's Owner / Repository / Visibility fields —
+      // Never from a server-side default. The API resolves `owner` against the session login to
+      // Decide between /user/repos and /orgs/<owner>/repos.
+      const { destination } = opts;
+      if (destination.kind !== "repo" || !destination.owner || !destination.repo) {
+        throw new Error("A destination repository is required.");
+      }
       const res = await fetch("/api/v1/projects", {
         method: "POST",
         credentials: "include",
@@ -675,6 +688,9 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
           name: opts.name,
           description: opts.description,
           starter: opts.starter,
+          owner: destination.owner,
+          repo: destination.repo,
+          private: destination.private,
         }),
       });
       if (!res.ok) {

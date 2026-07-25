@@ -16,8 +16,8 @@ When Jx Studio starts with no project open, the canvas area shows the welcome sc
 
 1. Click **New Project…**.
 2. Pick where to start from: a built-in **Template**, a **Starter Site**, an **Import** of an existing site, or an **Agent** prompt describing what you want.
-3. Click **Next**, name the project, and adjust the design quickstart (colors, fonts, logo).
-4. Click **Create Project** — Studio writes the files and opens the project.
+3. Click **Next**, name the project, choose the **Location** to create it in, and adjust the design quickstart (colors, fonts, logo).
+4. Click **Create Project** — Studio writes the files where you pointed it and opens the project.
 
 ![The New Project dialog with the template gallery and project parameters](../../images/new-project-modal.png)
 

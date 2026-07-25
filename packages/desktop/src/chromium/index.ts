@@ -132,6 +132,7 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
         url?: string;
         adapter?: string;
         directory: string;
+        destination: { kind: "path"; parent: string };
         starter?: string;
         template?: string;
         design?: {

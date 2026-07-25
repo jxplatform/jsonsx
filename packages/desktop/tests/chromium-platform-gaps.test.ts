@@ -186,11 +186,18 @@ describe("chromium platform: search, formats and packages", () => {
     expect(packages).toEqual([{ name: "left-pad", version: "^1.0.0" }]);
   });
 
-  test("createProject sends options and returns root and config", async () => {
+  test("createDestination advertises the on-disk Location field", () => {
+    // The chromium backend scaffolds onto disk, so the New Project modal renders a Location field
+    // (with Browse… backed by pickDirectory) rather than the cloud's owner/repository picker.
+    expect(platform.createDestination).toBe("path");
+  });
+
+  test("createProject forwards the caller's destination verbatim and returns root and config", async () => {
     const result = await platform.createProject({
       adapter: "static",
       description: "demo",
-      directory: "/tmp",
+      destination: { kind: "path", parent: "/tmp" },
+      directory: "fresh",
       name: "Fresh",
       url: "https://fresh.example",
     });
@@ -201,7 +208,8 @@ describe("chromium platform: search, formats and packages", () => {
       params: {
         adapter: "static",
         description: "demo",
-        directory: "/tmp",
+        destination: { kind: "path", parent: "/tmp" },
+        directory: "fresh",
         name: "Fresh",
         url: "https://fresh.example",
       },

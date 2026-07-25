@@ -85,6 +85,10 @@ export function createDesktopPlatform(): StudioPlatform {
   return {
     id: "desktop" as const,
 
+    /* New projects go where the user says: the modal's Location field, with Browse… backed by the
+       XDG portal dialog below. The backend refuses a create without one. */
+    createDestination: "path" as const,
+
     projectRoot: "",
 
     // The chromium project server serves the canvas iframe doc under /__studio__/. Only chromium
@@ -398,6 +402,7 @@ export function createDesktopPlatform(): StudioPlatform {
       url?: string;
       adapter?: string;
       directory: string;
+      destination: { kind: "path"; parent: string };
       starter?: string;
       template?: string;
       design?: {
@@ -420,25 +425,30 @@ export function createDesktopPlatform(): StudioPlatform {
       return request("listStarters") as Promise<StarterInfo[]>;
     },
 
+    /**
+     * Folder chooser for the New Project modal. This build has a real native dialog — the XDG
+     * desktop portal, driven from the Bun side — which returns a filesystem path directly. It is
+     * deliberately used in preference to Chrome's `showDirectoryPicker()`, whose handle carries no
+     * path and would have to be placed by writing a marker file and scanning for it (§8.2.1). That
+     * fallback exists only for the plain dev-server browser session, which has no native option at
+     * all.
+     */
     async pickDirectory() {
       const result = (await request("pickDirectory")) as { path: string | null };
       return result.path;
     },
 
-    // AI-guided site import: streams NDJSON progress from the token-gated loopback endpoint. A
-    // Relative directory (the modal's slug) is resolved under a natively-picked parent folder.
+    // AI-guided site import: streams NDJSON progress from the token-gated loopback endpoint. The
+    // Modal resolves the destination before calling (specs/desktop.md §4.5), so `directory` is
+    // Already absolute — a relative one means a caller skipped the Location field.
     async importSite(
       opts: ImportSiteOptions,
       onProgress: (evt: ImportProgressEvent) => void,
       signal?: AbortSignal,
     ) {
-      let { directory } = opts;
+      const { directory } = opts;
       if (!/^(?:[a-zA-Z]:[\\/]|\/)/.test(directory)) {
-        const parentResult = (await request("pickDirectory")) as { path: string | null };
-        if (!parentResult.path) {
-          throw new Error("No destination folder was selected.");
-        }
-        directory = `${parentResult.path}/${directory}`;
+        throw new Error("A destination folder is required.");
       }
       return streamImport(
         `/__studio__/import-site?token=${encodeURIComponent(token)}`,

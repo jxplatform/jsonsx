@@ -25,7 +25,7 @@ Core members are required on every adapter. Grouped by family:
 | Family          | Members                                                                                                                                                                                                        |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Identity        | `id`, `projectRoot` (get/set), `canvasUrl?`                                                                                                                                                                    |
-| Session/project | `activate`, `openProject`, `probeRootProject`, `createProject`, `resolveSiteContext`                                                                                                                           |
+| Session/project | `activate`, `openProject`, `probeRootProject`, `createDestination`, `createProject`, `resolveSiteContext`                                                                                                      |
 | Filesystem      | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `createDirectory`, `locateFile`, `searchFiles`, `discoverComponents`                                                       |
 | Git             | `gitStatus`, `gitBranches`, `gitLog`, `gitStage`, `gitUnstage`, `gitCommit`, `gitPush`, `gitPull`, `gitFetch`, `gitCheckout`, `gitCreateBranch`, `gitDiff`, `gitShow`, `gitDiscard`, `gitInit`, `gitAddRemote` |
 | Packages        | `listPackages`, `addPackage`, `removePackage`                                                                                                                                                                  |
@@ -33,22 +33,26 @@ Core members are required on every adapter. Grouped by family:
 
 All paths passed into adapter methods are project-relative; translating them to whatever the backend expects (a server-root prefix, an absolute path, a repo path) is the adapter's job. A core member may still answer "not available" through its return type — `codeService` resolves `null` on platforms without code tooling — but the member itself must exist.
 
+`createDestination` is a declaration, not a method: set it to `"path"` if your backend writes projects to a filesystem, or `"repo"` if a project is a remote repository. Studio uses it to decide which destination fields the New Project modal collects, and hands the answer back to `createProject` as `opts.destination`. **Your adapter must honor that destination and must not substitute one of its own** — a create with no usable destination is an error, not a cue to fall back to a default directory or account.
+
 ### Optional members and degradation
 
 Everything else on the interface is optional, and each optional member maps to an optional protocol route whose `degradation` field describes exactly what Studio does without it. Omit what your backend can't support:
 
-| Family             | Members                                                                                                      | When absent                                                       |
-| ------------------ | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| Live sync          | `subscribeFileEvents`, `collab`                                                                              | Sidebar is manual-refresh; editing is solo with file-level saves  |
-| Install pipeline   | `installDependencies`, `dependenciesNeedInstall`, `outdatedPackages`, `setPackageVersions`                   | Install/update affordances hide; manifest-only edits still work   |
-| Catalogue/scaffold | `listProjects`, `listStarters`, `importSite`, `pickDirectory`, `gitClone`                                    | Welcome-screen catalogue, starters, import, and clone flows hide  |
-| Formats/schemas    | `listFormats`, `listExtensions`, `fetchProjectSchemas`, `formatAction`, `resolveClass`                       | Only `.json` documents open; editors fall back to bundled schemas |
-| Data + secrets     | `dataConnections`, `dataConnectionTest`, `dataPush`, `dataRows`, row CRUD, `listSecrets`, `setSecrets`       | The Data grid and connection/push/secret controls hide            |
-| Publish            | `cfConnection`, `cfConnect`, `cfApi`, `createPullRequest`                                                    | Publish panel explains git-push publishing; PRs go via user token |
-| Desktop shell      | `getAppInfo`, `openProjectInNewWindow`, `newWindow`, `setWindowProject`, `getProjectRoot`, recents, settings | Single-window; recents and settings persist in `localStorage`     |
-| Cloud identity     | `getUser`, `getAccountStatus`, `listRepos`, `importProject`                                                  | No signed-in identity or repository picker                        |
+| Family             | Members                                                                                                      | When absent                                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Live sync          | `subscribeFileEvents`, `collab`                                                                              | Sidebar is manual-refresh; editing is solo with file-level saves                                                                              |
+| Install pipeline   | `installDependencies`, `dependenciesNeedInstall`, `outdatedPackages`, `setPackageVersions`                   | Install/update affordances hide; manifest-only edits still work                                                                               |
+| Catalogue/scaffold | `listProjects`, `listStarters`, `importSite`, `pickDirectory`, `gitClone`                                    | Welcome-screen catalogue, starters, import, and clone flows hide; without `pickDirectory` the New Project **Location** field is typed by hand |
+| Formats/schemas    | `listFormats`, `listExtensions`, `fetchProjectSchemas`, `formatAction`, `resolveClass`                       | Only `.json` documents open; editors fall back to bundled schemas                                                                             |
+| Data + secrets     | `dataConnections`, `dataConnectionTest`, `dataPush`, `dataRows`, row CRUD, `listSecrets`, `setSecrets`       | The Data grid and connection/push/secret controls hide                                                                                        |
+| Publish            | `cfConnection`, `cfConnect`, `cfApi`, `createPullRequest`                                                    | Publish panel explains git-push publishing; PRs go via user token                                                                             |
+| Desktop shell      | `getAppInfo`, `openProjectInNewWindow`, `newWindow`, `setWindowProject`, `getProjectRoot`, recents, settings | Single-window; recents and settings persist in `localStorage`                                                                                 |
+| Cloud identity     | `getUser`, `getAccountStatus`, `listRepos`, `importProject`                                                  | No signed-in identity or repository picker                                                                                                    |
 
 Studio always checks for presence before calling an optional member, so an omitted member is never an error. The [protocol route reference](/docs/extending/reference/studio-routes) is the complete degradation catalogue.
+
+A browser-hosted adapter can still offer `pickDirectory`: `@jxsuite/studio/directory-picker` exports `canPickDirectory()` and `pickDirectoryPath(locate)`, which drive `showDirectoryPicker()` and hand you the picked folder's `name` plus the random id it wrote into a hidden `.jx-loc-id` there — your `locate` callback resolves that pair to an absolute path (the dev server does it with `GET /__studio/locate-directory`). Omit the member when `canPickDirectory()` is false rather than defining one that always returns null, so Studio hides the button instead of showing a dead one.
 
 ## Registration
 

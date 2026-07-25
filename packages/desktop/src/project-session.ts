@@ -9,7 +9,7 @@
  */
 
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { handleResolve, handleServerFunction } from "@jxsuite/server/resolve";
 import {
@@ -557,6 +557,7 @@ export function createProjectSession(initialRoot: string | null) {
     url?: string;
     adapter?: string;
     directory: string;
+    destination: { kind: "path"; parent: string };
     starter?: string;
     template?: string;
     design?: {
@@ -569,15 +570,22 @@ export function createProjectSession(initialRoot: string | null) {
       logo?: { name: string; base64: string };
     };
   }): Promise<{ root: string; config: SiteConfig }> {
-    if (!directoryDialogFn) {
-      throw new Error("No directory dialog configured");
-    }
     if (!opts.name || !opts.directory) {
       throw new Error("name and directory are required");
     }
-    const parent = await directoryDialogFn();
-    if (!parent) {
-      throw new Error("No destination folder was selected.");
+    // `directory` names the project FOLDER, not a path: a separator or dot-segment would walk out
+    // Of the parent the user chose below.
+    if (/[/\\]/.test(opts.directory) || opts.directory === "." || opts.directory === "..") {
+      throw new Error("Directory must be a folder name, not a path");
+    }
+    // The destination is the caller's to choose (specs/desktop.md §4.5) — the backend never opens
+    // A dialog of its own, so a scripted or AI-driven create is never ambushed by one.
+    const parent = opts.destination?.parent;
+    if (opts.destination?.kind !== "path" || !parent) {
+      throw new Error("A destination folder is required.");
+    }
+    if (!isAbsolute(parent)) {
+      throw new Error(`Destination folder must be an absolute path: ${parent}`);
     }
     const destPath = resolve(parent, opts.directory);
 

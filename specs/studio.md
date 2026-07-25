@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.1.25-draft
+**Version:** 0.1.26-draft
 **Status:** Partial
-**Updated:** 2026-07-22
+**Updated:** 2026-07-25
 **License:** MIT
 
 ---
@@ -91,6 +91,9 @@ Studio uses a platform abstraction (`platform.js`) to decouple UI from backend:
 | `discoverComponents()` | Scan project for custom elements                                                                           |
 | `openProject()`        | Open project picker (unless `openProjectPicker: "repo-list"` routes it through Studio's repository picker) |
 | `probeRootProject()`   | Auto-detect project at startup                                                                             |
+| `createDestination`    | Whether New Project collects a folder (`"path"`) or a repository (`"repo"`) — see specs/desktop.md §4.5    |
+| `createProject(opts)`  | Scaffold a project at the user-chosen `opts.destination`; never defaults a location                        |
+| `pickDirectory?()`     | Native folder picker behind the modal's **Browse…** button (desktop only)                                  |
 
 Three platform targets:
 
@@ -575,6 +578,7 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.1.26-draft** (2026-07-25) — PAL table records the destination members: createDestination, createProject's user-chosen destination, and pickDirectory.
 - **0.1.25-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.24-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.23-draft** (2026-07-17) — Scheme-variant editing — token overrides, scheme-layer routing, live feedback (`49f0c525`).
@@ -604,4 +608,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.1.25-draft_
+_`@jxsuite/studio` Specification v0.1.26-draft_

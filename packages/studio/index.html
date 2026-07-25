@@ -3026,6 +3026,27 @@
         color: var(--danger);
         padding: 4px 0;
       }
+      /* Destination row: the Location field takes the slack, Browse… stays its natural width. */
+      .new-project-location-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .new-project-location-row .new-project-location {
+        flex: 1;
+        min-width: 0;
+      }
+      /* Live preview of where the project will land — the answer to "where did that go?". */
+      .new-project-destination-preview {
+        font-size: var(--spectrum-font-size-75, 12px);
+        color: var(--fg-dim);
+        padding: 2px 0 4px;
+        overflow-wrap: anywhere;
+      }
+      .new-project-destination-preview code {
+        font-family: var(--font-mono, ui-monospace, monospace);
+        color: var(--fg);
+      }
       /* Backend/global creation errors sit between the scroll body and the footer so they are
          visible regardless of scroll position. */
       .new-project-error--global {

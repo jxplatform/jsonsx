@@ -12,17 +12,18 @@ The canonical Studio Backend Protocol route table (protocol version 1), from `@j
 
 ## Session / project
 
-| Route           | Method | Path                       | Summary                                                                         | Optional | Degradation                                           |
-| --------------- | ------ | -------------------------- | ------------------------------------------------------------------------------- | -------- | ----------------------------------------------------- |
-| `activate`      | POST   | `/__studio/activate`       | Bind the backend to a project root                                              | no       | —                                                     |
-| `project`       | GET    | `/__studio/project`        | Root project metadata {name, root}                                              | no       | —                                                     |
-| `projectInfo`   | GET    | `/__studio/project-info`   | Probe a directory: {isSiteProject, projectConfig?, directories?}                | no       | —                                                     |
-| `resolveSite`   | GET    | `/__studio/resolve-site`   | Resolve the owning site of a file path {sitePath, projectConfig?, fileRelPath?} | no       | —                                                     |
-| `sites`         | GET    | `/__studio/sites`          | Enumerate site projects [{config, path}] (backs listProjects)                   | yes      | The welcome screen's Projects catalogue stays hidden. |
-| `findProject`   | GET    | `/__studio/find-project`   | Locate a project directory by name outside the root                             | yes      | openProject falls back to config-matching only.       |
-| `createProject` | POST   | `/__studio/create-project` | Scaffold a project → {root, config}                                             | no       | —                                                     |
-| `starters`      | GET    | `/__studio/starters`       | Starter templates (StarterInfo[])                                               | yes      | The New Project picker offers only blank/templates.   |
-| `importSite`    | POST   | `/__studio/import-site`    | Clone a live website into a project; streams NDJSON progress                    | yes      | The New Project Import tab is unavailable.            |
+| Route             | Method | Path                         | Summary                                                                                 | Optional | Degradation                                                                   |
+| ----------------- | ------ | ---------------------------- | --------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------- |
+| `activate`        | POST   | `/__studio/activate`         | Bind the backend to a project root                                                      | no       | —                                                                             |
+| `project`         | GET    | `/__studio/project`          | Root project metadata {name, root}                                                      | no       | —                                                                             |
+| `projectInfo`     | GET    | `/__studio/project-info`     | Probe a directory: {isSiteProject, projectConfig?, directories?}                        | no       | —                                                                             |
+| `resolveSite`     | GET    | `/__studio/resolve-site`     | Resolve the owning site of a file path {sitePath, projectConfig?, fileRelPath?}         | no       | —                                                                             |
+| `sites`           | GET    | `/__studio/sites`            | Enumerate site projects [{config, path}] (backs listProjects)                           | yes      | The welcome screen's Projects catalogue stays hidden.                         |
+| `findProject`     | GET    | `/__studio/find-project`     | Locate a project directory by name outside the root                                     | yes      | openProject falls back to config-matching only.                               |
+| `locateDirectory` | GET    | `/__studio/locate-directory` | Resolve the absolute path of a showDirectoryPicker() folder by the id in its .jx-loc-id | yes      | The New Project Location field loses its Browse… button and is typed by hand. |
+| `createProject`   | POST   | `/__studio/create-project`   | Scaffold a project at a caller-chosen destination → {root, config}                      | no       | —                                                                             |
+| `starters`        | GET    | `/__studio/starters`         | Starter templates (StarterInfo[])                                                       | yes      | The New Project picker offers only blank/templates.                           |
+| `importSite`      | POST   | `/__studio/import-site`      | Clone a live website into a project; streams NDJSON progress                            | yes      | The New Project Import tab is unavailable.                                    |
 
 ## Filesystem
 

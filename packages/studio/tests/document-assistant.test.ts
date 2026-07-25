@@ -325,7 +325,8 @@ describe("document-assistant — state-gated tools & bootstrap", () => {
       setWorkspaceProject(root, { name: "Fresh" });
     });
     nextRounds = [
-      toolCallRound("c1", "create_project", { name: "Fresh Site" }),
+      // The model must name a destination — create_project refuses without one.
+      toolCallRound("c1", "create_project", { location: "/home/dev/Sites", name: "Fresh Site" }),
       [
         { content: "Project ready", type: "delta" },
         { stopReason: "stop", type: "done" },

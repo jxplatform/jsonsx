@@ -75,6 +75,10 @@ const responses: Record<string, unknown> = {
 // Track forced errors for specific methods
 const forcedErrors = new Map<string, string>();
 
+// Every request the platform actually sent, so a test can assert both that one RPC was used and
+// That another one was NOT (the folder chooser must never fire two dialogs).
+const methodLog: { method: string; params?: Record<string, unknown> }[] = [];
+
 const server = Bun.serve({
   fetch(req, srv) {
     if (srv.upgrade(req)) {
@@ -90,6 +94,7 @@ const server = Bun.serve({
         method: string;
         params?: Record<string, unknown>;
       };
+      methodLog.push({ method: msg.method, params: msg.params });
 
       const forcedError = forcedErrors.get(msg.method);
       if (forcedError) {
@@ -217,36 +222,63 @@ describe("chromium desktop platform", () => {
     await expect(platform.activate()).resolves.toBeUndefined();
   });
 
-  // ─── AI-guided site import ─────────────────────────────────────────────
+  // ─── Folder chooser for the New Project modal ──────────────────────────
+  // This build keeps its native XDG portal dialog, which returns a filesystem path directly. It is
+  // Deliberately NOT Chrome's showDirectoryPicker(): that handle carries no path and would have to
+  // Be placed by writing a marker file and scanning for it, which is the dev server's fallback.
 
   test("pickDirectory returns the natively picked path", async () => {
     await expect(platform.pickDirectory!()).resolves.toBe("/picked/parent");
   });
 
-  test("importSite resolves a relative directory under a picked parent and streams via the tokened endpoint", async () => {
+  test("pickDirectory uses the portal RPC even when a browser chooser is available", async () => {
+    interface PickerGlobal {
+      showDirectoryPicker?: unknown;
+    }
+    const had = "showDirectoryPicker" in (globalThis as PickerGlobal);
+    const saved = (globalThis as PickerGlobal).showDirectoryPicker;
+    (globalThis as PickerGlobal).showDirectoryPicker = () => {
+      throw new Error("the native portal must win on this build");
+    };
+    try {
+      methodLog.length = 0;
+      await expect(platform.pickDirectory!()).resolves.toBe("/picked/parent");
+      expect(methodLog).toEqual([{ method: "pickDirectory", params: undefined }]);
+    } finally {
+      if (had) {
+        (globalThis as PickerGlobal).showDirectoryPicker = saved;
+      } else {
+        delete (globalThis as PickerGlobal).showDirectoryPicker;
+      }
+    }
+  });
+
+  // ─── AI-guided site import ─────────────────────────────────────────────
+
+  test("importSite rejects a relative directory instead of resolving it under a picked parent", async () => {
+    // The modal resolves the destination before calling (Location field + slug), so a bare slug
+    // Means a caller skipped it — the bridge refuses rather than quietly opening a folder dialog.
+    streamImportCalls.length = 0;
+    await expect(
+      platform.importSite!(
+        {
+          aiComponents: false,
+          depth: 1,
+          directory: "my-slug",
+          maxPages: 5,
+          name: "X",
+          url: "https://x.example",
+        },
+        () => {},
+      ),
+    ).rejects.toThrow("A destination folder is required.");
+    expect(streamImportCalls).toHaveLength(0);
+  });
+
+  test("importSite streams an absolute directory via the tokened endpoint without a dialog", async () => {
     streamImportCalls.length = 0;
     const onProgress = () => {};
     const result = await platform.importSite!(
-      {
-        aiComponents: false,
-        depth: 1,
-        directory: "my-slug",
-        maxPages: 5,
-        name: "X",
-        url: "https://x.example",
-      },
-      onProgress,
-    );
-    expect(result).toEqual({ config: { name: "Imported" }, root: "/imported" } as never);
-    const [endpoint, opts, cb] = streamImportCalls[0]!;
-    expect(endpoint).toBe("/__studio__/import-site?token=CHROMIUM_TOK");
-    expect((opts as { directory: string }).directory).toBe("/picked/parent/my-slug");
-    expect(cb).toBe(onProgress);
-  });
-
-  test("importSite passes an absolute directory through without a dialog", async () => {
-    streamImportCalls.length = 0;
-    await platform.importSite!(
       {
         aiComponents: false,
         depth: 0,
@@ -255,30 +287,31 @@ describe("chromium desktop platform", () => {
         name: "X",
         url: "https://x.example",
       },
-      () => {},
+      onProgress,
     );
-    expect((streamImportCalls[0]![1] as { directory: string }).directory).toBe("/abs/dest");
+    expect(result).toEqual({ config: { name: "Imported" }, root: "/imported" } as never);
+    const [endpoint, opts, cb] = streamImportCalls[0]!;
+    expect(endpoint).toBe("/__studio__/import-site?token=CHROMIUM_TOK");
+    expect((opts as { directory: string }).directory).toBe("/abs/dest");
+    expect(cb).toBe(onProgress);
   });
 
-  test("importSite rejects when the directory picker is cancelled", async () => {
-    responses.pickDirectory = { path: null };
-    try {
-      await expect(
-        platform.importSite!(
-          {
-            aiComponents: false,
-            depth: 0,
-            directory: "slug",
-            maxPages: 1,
-            name: "X",
-            url: "https://x.example",
-          },
-          () => {},
-        ),
-      ).rejects.toThrow("No destination folder was selected.");
-    } finally {
-      responses.pickDirectory = { path: "/picked/parent" };
-    }
+  test("importSite rejects an empty destination directory", async () => {
+    streamImportCalls.length = 0;
+    await expect(
+      platform.importSite!(
+        {
+          aiComponents: false,
+          depth: 0,
+          directory: "",
+          maxPages: 1,
+          name: "X",
+          url: "https://x.example",
+        },
+        () => {},
+      ),
+    ).rejects.toThrow("A destination folder is required.");
+    expect(streamImportCalls).toHaveLength(0);
   });
 
   // ─── Class resolution ──────────────────────────────────────────────────

@@ -200,6 +200,10 @@ export function createDesktopPlatform(): StudioPlatform {
   const platform = {
     id: "desktop" as const,
 
+    /* New projects go where the user says: the modal's Location field, with Browse… backed by the
+       native dialog below. The backend refuses a create without one. */
+    createDestination: "path" as const,
+
     projectRoot: "",
 
     /**
@@ -575,6 +579,7 @@ export function createDesktopPlatform(): StudioPlatform {
       url?: string;
       adapter?: string;
       directory: string;
+      destination: { kind: "path"; parent: string };
       starter?: string;
       template?: string;
       design?: {
@@ -602,23 +607,20 @@ export function createDesktopPlatform(): StudioPlatform {
       return result.path;
     },
 
-    // AI-guided site import: streams NDJSON progress from the token-gated shared local server. A
-    // Relative directory (the modal's slug) is resolved under a natively-picked parent folder.
+    // AI-guided site import: streams NDJSON progress from the token-gated shared local server. The
+    // Modal resolves the destination before calling (specs/desktop.md §4.5), so `directory` is
+    // Already absolute — a relative one means a caller skipped the Location field.
     async importSite(
       opts: ImportSiteOptions,
       onProgress: (evt: ImportProgressEvent) => void,
       signal?: AbortSignal,
     ) {
-      let { directory } = opts;
+      const { directory } = opts;
       if (!/^(?:[a-zA-Z]:[\\/]|\/)/.test(directory)) {
-        const parent = await rpc.request.pickDirectory();
-        if (!parent.path) {
-          throw new Error("No destination folder was selected.");
-        }
-        directory = `${parent.path}/${directory}`;
+        throw new Error("A destination folder is required.");
       }
       const endpoint = (await rpc.request.importSiteUrl()) as string;
-      return streamImport(endpoint, { ...opts, directory }, onProgress, signal);
+      return streamImport(endpoint, opts, onProgress, signal);
     },
 
     updater: {
