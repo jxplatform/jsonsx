@@ -36,6 +36,8 @@ Studio opens the project and adds it to **Recent** for next time.
 
 On **studio.jxsuite.com**, projects live in GitHub repositories instead of local folders, so **Open Project…** opens a repository picker: it lists the GitHub repositories you have write access to (Jx projects first), with a filter field to narrow the list. Click one and Studio opens it at `/edit/owner/repo@branch`. Repositories without a `project.json` show an inline explanation instead of opening.
 
+If a repository you expect isn't listed, the App simply hasn't been given access to it — see [Repository access](#repository-access) below.
+
 ## Clone a git repository
 
 This entry appears when your Studio setup can run git.
@@ -57,7 +59,15 @@ A repository must already contain a Jx project (a `project.json` file); if it do
 
 ## Repository access
 
-If your account is connected but Studio can't reach your repositories yet, a **Repository access** section appears with an **Install the Jx Suite GitHub App** link. Follow it and choose **All repositories** so Studio can create and open projects on your behalf.
+Studio only sees the repositories you have granted the **Jx Suite GitHub App** access to. There are two places to change that.
+
+If your account is connected but Studio can't reach any repositories yet, a **Repository access** section appears on the welcome screen with an **Install the Jx Suite GitHub App** link. Follow it and choose **All repositories** so Studio can create and open projects on your behalf.
+
+Once the App is installed, the repository picker (**Open Project…** and **Add Existing Repository…**) carries the same controls in its footer, so you never have to leave the dialog to widen access:
+
+1. Click the account name in **Missing a repository?** — GitHub opens that installation's **Repository access** settings in a new tab, where you can add repositories or switch to **All repositories**. **Another account…** installs the App on an account or organization that doesn't have it yet.
+2. Save the change on GitHub, then come back to Studio.
+3. Click **Refresh** — the picker re-reads your repositories and the newly granted ones appear.
 
 ## Projects and Recent
 

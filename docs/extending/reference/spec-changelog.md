@@ -51,6 +51,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.1-draft** (2026-07-25) — Repo picker gains a repository-access footer: per-installation manage links, install-on-another-account, and Refresh.
 - **0.3.0-draft** (2026-07-25) — New Project requires a user-chosen destination: StudioPlatform gains the required createDestination declaration, createProject takes a required destination (path parent or repo owner/name/visibility), and §4.5 defines the create flow. No backend picks a location.
 - **0.2.7-draft** (2026-07-24) — Cloud platform registers inside studio.js via a window.__jxCloud signal (single yjs for collab).
 - **0.2.6-draft** (2026-07-24) — Document packaged static-data staging into app/bun (create templates, starters) and postBuild bundle verification.

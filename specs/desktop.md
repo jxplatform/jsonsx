@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.0-draft
+**Version:** 0.3.1-draft
 **Status:** Pending
 **Updated:** 2026-07-25
 **License:** MIT
@@ -158,6 +158,16 @@ A project is identified by its `project.json` file. This is the single point of 
 - **Desktop:** User selects `project.json` via native file dialog. The parent directory becomes the project root.
 - **Dev server:** User selects the folder containing `project.json` via `showDirectoryPicker()`. Studio reads `project.json` from the directory to validate it.
 - **Cloud:** User picks from a repository list (`openProjectPicker: "repo-list"` — GitHub repositories with write access, Jx-tagged repos first). Selection runs `importProject`, which probes the repository's `project.json` and resolves the catalogue root key Studio navigates to.
+
+What that list contains is bounded by the App's grant, not by the account's repositories, so the picker (both modes — Open Project and Add Existing Repository) also renders a **repository-access footer** built from `getAccountStatus()`:
+
+| Affordance                | Source                      | Effect                                                                        |
+| ------------------------- | --------------------------- | ----------------------------------------------------------------------------- |
+| One link per installation | `installations[].manageUrl` | Opens that installation's repository-access settings on GitHub (new tab)      |
+| "Another account…"        | `appInstallUrl`             | Installs the App on an account that has none                                  |
+| Refresh                   | —                           | Re-runs `listRepos` + `getAccountStatus` in place, without closing the dialog |
+
+The footer is omitted entirely when the status is unknown or nothing is linkable (a platform without `getAccountStatus`, a failed hydrate, or installations that report no `manageUrl` and no install URL) — Studio never renders a dead access link.
 
 The `project.json` file is **required** for project-level features. Studio can still open individual `.json` files for standalone component editing (see §4.3).
 
@@ -792,6 +802,7 @@ Ensure desktop app matches dev-mode capabilities:
 
 ## Changelog
 
+- **0.3.1-draft** (2026-07-25) — Repo picker gains a repository-access footer: per-installation manage links, install-on-another-account, and Refresh.
 - **0.3.0-draft** (2026-07-25) — New Project requires a user-chosen destination: StudioPlatform gains the required createDestination declaration, createProject takes a required destination (path parent or repo owner/name/visibility), and §4.5 defines the create flow. No backend picks a location.
 - **0.2.7-draft** (2026-07-24) — Cloud platform registers inside studio.js via a window.__jxCloud signal (single yjs for collab).
 - **0.2.6-draft** (2026-07-24) — Document packaged static-data staging into app/bun (create templates, starters) and postBuild bundle verification.
@@ -811,4 +822,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.0-draft_
+_Jx Studio Desktop Architecture Specification v0.3.1-draft_

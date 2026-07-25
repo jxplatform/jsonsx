@@ -507,6 +507,32 @@ describe("identity & cloudflare surface", () => {
     expect(await p.getAccountStatus?.()).toBeNull();
   });
 
+  test("getAccountStatus carries each installation's manage URL through", async () => {
+    mockFetch({
+      "/api/v1/me": {
+        body: {
+          user: { login: "octocat" },
+          installations: [
+            {
+              id: 1,
+              account: "octocat",
+              manageUrl: "https://github.com/settings/installations/1",
+            },
+            { id: 2, account: "acme" },
+          ],
+          appInstallUrl: "https://github.com/apps/jx-suite/installations/new",
+        },
+      },
+    });
+    expect(await createCloudPlatform(null).getAccountStatus?.()).toEqual({
+      installations: [
+        { id: 1, account: "octocat", manageUrl: "https://github.com/settings/installations/1" },
+        { id: 2, account: "acme" },
+      ],
+      appInstallUrl: "https://github.com/apps/jx-suite/installations/new",
+    });
+  });
+
   test("createProject preserves the structured needs_installation_access failure", async () => {
     mockFetch({
       "/api/v1/projects": {
