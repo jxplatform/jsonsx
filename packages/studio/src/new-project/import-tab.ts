@@ -9,9 +9,10 @@ import { html } from "lit-html";
 import { getPlatform } from "../platform";
 import { getBaseUrl, getModel, getOpenAiKey, hasOpenAiKey } from "../services/ai-settings";
 import { errorMessage } from "@jxsuite/schema/parse";
+import { destinationPath } from "./location-fields";
 import type { TemplateResult } from "lit-html";
 import type { ProjectConfig } from "@jxsuite/schema/types";
-import type { ImportProgressEvent } from "../types";
+import type { CreateProjectDestination, ImportProgressEvent } from "../types";
 
 /** Structural view of src/ui/ai-credentials-form's controller (what this tab renders when gated). */
 export interface CredsFormLike {
@@ -22,6 +23,12 @@ export interface CredsFormLike {
 export interface ImportTabCtx {
   /** The modal's shared name/directory state (the import destination slug). */
   form: { name: string; directory: string };
+  /**
+   * Validate the shared Parameters fields and return where to write, or null when something is
+   * missing (the modal has already rendered the reason inline). Import is always a `"path"`
+   * destination — cloud ships no `importSite`, so the Import tab never renders there.
+   */
+  resolveDestination: () => CreateProjectDestination | null;
   rerender: () => void;
   /** Called with the imported project; the modal resolves and closes. */
   onDone: (result: { root: string; config: ProjectConfig }) => void;
@@ -111,13 +118,9 @@ export async function startImport(ctx: ImportTabCtx) {
     ctx.rerender();
     return;
   }
-  if (!ctx.form.name.trim()) {
-    _errorMsg = "Project name is required";
-    ctx.rerender();
+  const destination = ctx.resolveDestination();
+  if (!destination || destination.kind !== "path") {
     return;
-  }
-  if (!ctx.form.directory.trim()) {
-    ctx.form.directory = slugOf(ctx.form.name);
   }
 
   _status = "running";
@@ -134,7 +137,7 @@ export async function startImport(ctx: ImportTabCtx) {
       {
         url: parsed.href,
         name: ctx.form.name.trim(),
-        directory: ctx.form.directory.trim(),
+        directory: destinationPath(destination, ctx.form.directory),
         depth: _depth,
         maxPages: _maxPages,
         aiComponents: _aiNaming,

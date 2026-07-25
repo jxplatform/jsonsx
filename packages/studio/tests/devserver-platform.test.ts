@@ -8,7 +8,8 @@
 import "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createDevServerPlatform } from "../src/platforms/devserver";
-import type { FsEvent } from "../src/types";
+import { LOCATION_ID_FILE } from "@jxsuite/protocol/routes";
+import type { FsEvent, StudioPlatform } from "../src/types";
 
 /** Minimal EventSource stub: records the latest instance and lets tests emit named events. */
 class FakeEventSource {
@@ -122,6 +123,35 @@ function fakeDirHandle(name: string, config: unknown | null) {
 
 function setPicker(fn: unknown): void {
   (window as unknown as Record<string, unknown>).showDirectoryPicker = fn;
+}
+
+// ─── Fake directory handle for pickDirectory ─────────────────────────────────
+
+/**
+ * A picked NEW-project destination. The folder is empty by definition, so the handle carries no
+ * project.json — only the location-tag lifecycle the path recovery depends on. `written` holds the
+ * id the picker put in the tag, which is what the server matches on.
+ */
+function fakeDestHandle(name: string) {
+  const log = { created: [] as string[], removed: [] as string[], written: [] as string[] };
+  const handle = {
+    getFileHandle: async (file: string) => {
+      log.created.push(file);
+      return {
+        createWritable: async () => ({
+          close: async () => {},
+          write: async (data: string) => {
+            log.written.push(data);
+          },
+        }),
+      };
+    },
+    name,
+    removeEntry: async (file: string) => {
+      log.removed.push(file);
+    },
+  };
+  return { handle, log };
 }
 
 // ─── Basic identity, projectRoot, activate ───────────────────────────────────
@@ -347,28 +377,86 @@ describe("probeRootProject", () => {
 // ─── createProject ───────────────────────────────────────────────────────────
 
 describe("createProject", () => {
-  test("posts the options and returns the server response", async () => {
+  const dest = { kind: "path", parent: "/home/dev/Sites" } as const;
+
+  test("collects a path destination, with no picker when the browser lacks the API", () => {
+    // Typed as the interface, not the concrete literal: the point of the test is that an OPTIONAL
+    // Interface member is absent, which the literal's own type cannot express.
+    const p: StudioPlatform = createDevServerPlatform();
+    expect(p.createDestination).toBe("path");
+    // Without showDirectoryPicker there is no path-yielding folder chooser at all, so the modal
+    // Renders a typed Location field instead of a Browse… button.
+    expect(p.pickDirectory).toBeUndefined();
+  });
+
+  test("pickDirectory resolves the picked folder through /__studio/locate-directory", async () => {
+    const { handle, log } = fakeDestHandle("Sites");
+    setPicker(async () => handle);
+    route("/__studio/locate-directory", (c) => {
+      expect(c.search.get("name")).toBe("Sites");
+      // The id written INTO the tag file is what the server is asked to match on.
+      expect(c.search.get("id")).toBe(log.written[0]!);
+      return json({ path: "/home/dev/Sites" });
+    });
+    // The member is spread in at CONSTRUCTION time, so the stub must precede the platform.
+    const p: StudioPlatform = createDevServerPlatform();
+    expect(typeof p.pickDirectory).toBe("function");
+    expect(await p.pickDirectory!()).toBe("/home/dev/Sites");
+    expect(callsTo("/__studio/locate-directory").length).toBe(1);
+    // The tag is a throwaway with a fixed hidden name — it never outlives the pick.
+    expect(log.created).toEqual([LOCATION_ID_FILE]);
+    expect(log.removed).toEqual([LOCATION_ID_FILE]);
+  });
+
+  test("pickDirectory returns null when the locate route responds non-ok", async () => {
+    const { handle } = fakeDestHandle("Elsewhere");
+    setPicker(async () => handle);
+    route("/__studio/locate-directory", () => json({ error: "no home directory" }, 500));
+    const p: StudioPlatform = createDevServerPlatform();
+    // A folder the server cannot place is "no destination chosen", not an error to surface.
+    expect(await p.pickDirectory!()).toBeNull();
+  });
+
+  test("posts the options including the destination and returns the server response", async () => {
     route("/__studio/create-project", (c) => {
-      expect(c.body).toEqual({ directory: "examples", name: "fresh" });
-      return json({ config: { name: "fresh" }, root: "examples/fresh" });
+      expect(c.body).toEqual({ destination: dest, directory: "fresh", name: "fresh" });
+      return json({ config: { name: "fresh" }, root: "/home/dev/Sites/fresh" });
     });
     const p = createDevServerPlatform();
-    const result = await p.createProject({ directory: "examples", name: "fresh" });
-    expect(result).toEqual({ config: { name: "fresh" }, root: "examples/fresh" });
+    const result = await p.createProject({ destination: dest, directory: "fresh", name: "fresh" });
+    expect(result).toEqual({ config: { name: "fresh" }, root: "/home/dev/Sites/fresh" });
   });
 
   test("throws the server error message on failure", async () => {
     route("/__studio/create-project", () => json({ error: "directory exists" }, 400));
     const p = createDevServerPlatform();
-    expect(p.createProject({ directory: "x", name: "y" })).rejects.toThrow("directory exists");
+    expect(p.createProject({ destination: dest, directory: "x", name: "y" })).rejects.toThrow(
+      "directory exists",
+    );
   });
 
   test("throws a generic message when the error body has no error field", async () => {
     route("/__studio/create-project", () => json({}, 500));
     const p = createDevServerPlatform();
-    expect(p.createProject({ directory: "x", name: "y" })).rejects.toThrow(
+    expect(p.createProject({ destination: dest, directory: "x", name: "y" })).rejects.toThrow(
       "Failed to create project",
     );
+  });
+
+  test("surfaces the server's refusal when no destination was supplied", async () => {
+    route("/__studio/create-project", (c) => {
+      expect((c.body as { destination?: unknown }).destination).toBeUndefined();
+      return json({ error: "A destination folder is required." }, 400);
+    });
+    const p = createDevServerPlatform();
+    // The adapter forwards whatever the modal collected.
+    // Refusing an absent destination is the server's job, and its message must reach the caller.
+    expect(
+      p.createProject({
+        directory: "x",
+        name: "y",
+      } as unknown as Parameters<typeof p.createProject>[0]),
+    ).rejects.toThrow("A destination folder is required.");
   });
 });
 

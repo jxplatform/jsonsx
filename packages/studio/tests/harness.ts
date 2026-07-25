@@ -128,10 +128,14 @@ export function installMockPlatform(
     addPackage: log("addPackage", async () => ({})),
     aiChatUrl: log("aiChatUrl", () => "/__mock/ai/chat"),
     codeService: log("codeService", async () => null),
+    createDestination: "path",
     createDirectory: log("createDirectory", async () => {}),
     createProject: log("createProject", async (opts) => ({
       config: { name: opts.name },
-      root: `${opts.directory}/${opts.name}`,
+      root:
+        opts.destination.kind === "path"
+          ? `${opts.destination.parent}/${opts.directory}`
+          : `${opts.destination.owner}/${opts.destination.repo}`,
     })),
     deleteFile: log("deleteFile", async (path) => {
       state.files.delete(path);
@@ -233,6 +237,49 @@ export function setValue(el: HTMLInputElement | HTMLTextAreaElement, value: stri
   el.value = value;
   el.dispatchEvent(new Event("input", { bubbles: true }));
   el.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+// ─── New Project modal field accessors ───────────────────────────────────────
+// The Parameters step renders a destination block between the name and description whose shape
+// Depends on the platform's `createDestination` (specs/desktop.md §4.5), so positional indexing
+// Into the textfield list is not stable. Address the identity/destination fields by class.
+
+/** A New Project Parameters-step field by its stable class suffix. */
+function npField(suffix: string): HTMLInputElement {
+  return document.querySelector(`#layer-modal .new-project-${suffix}`) as HTMLInputElement;
+}
+
+/** The Project Name textfield. */
+export const npName = () => npField("name");
+/** The Location textfield (`createDestination: "path"` platforms). */
+export const npLocation = () => npField("location");
+/** The Directory / Repository textfield — one slug shared by both destination shapes. */
+export const npSlug = () => npField("slug");
+/** The Owner field (`createDestination: "repo"` platforms; a picker once owners have loaded). */
+export const npOwner = () => npField("owner");
+
+/** The resolved-destination preview line under the fields. */
+export function npPreview(): string {
+  return (
+    document
+      .querySelector("#layer-modal .new-project-destination-preview")
+      ?.textContent?.trim()
+      .replaceAll(/\s+/g, " ") ?? ""
+  );
+}
+
+/** Set a New Project textfield's value and fire the input event the modal listens for. */
+export function npType(el: HTMLInputElement, value: string): void {
+  el.value = value;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/**
+ * Fill the Location field so a create can proceed. Every filesystem-platform create needs one — the
+ * modal blocks submit without it and the backend refuses it.
+ */
+export function npFillLocation(parent = "/home/dev/Sites"): void {
+  npType(npLocation(), parent);
 }
 
 // ─── happy-dom gap stubs ──────────────────────────────────────────────────────

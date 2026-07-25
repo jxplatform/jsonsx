@@ -9,9 +9,11 @@
  */
 
 import { streamImport } from "../services/import-client";
+import { canPickDirectory, pickDirectoryPath } from "../services/directory-picker";
 import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
+  CreateProjectDestination,
   DataConnectionsResponse,
   DataConnectionTestResult,
   DataPushResult,
@@ -98,6 +100,11 @@ export function createDevServerPlatform() {
 
   return {
     id: "devserver",
+
+    /* New projects go where the user says — the server refuses a create without a destination
+       rather than defaulting to its own root, which is the jx checkout when serving this
+       monorepo. */
+    createDestination: "path" as const,
 
     /** Get or set the current project root (absolute path). */
     get projectRoot() {
@@ -229,12 +236,16 @@ export function createDevServerPlatform() {
     // ─── Project creation ─────────────────────────────────────────────────
 
     /**
+     * Scaffold a project at `destination.parent/directory`. The dev server refuses the request
+     * outright when no destination is supplied — it will not fall back to its own root.
+     *
      * @param {{
      *   name: string;
      *   description?: string;
      *   url?: string;
      *   adapter?: string;
      *   directory: string;
+     *   destination: CreateProjectDestination;
      * }} opts
      */
     async createProject(opts: {
@@ -243,6 +254,7 @@ export function createDevServerPlatform() {
       url?: string;
       adapter?: string;
       directory: string;
+      destination: CreateProjectDestination;
       starter?: string;
       template?: string;
       design?: Record<string, unknown>;
@@ -258,6 +270,31 @@ export function createDevServerPlatform() {
       }
       return await res.json();
     },
+
+    /**
+     * Native folder chooser for the New Project modal's Browse… button. Present only when the
+     * browser implements `showDirectoryPicker` (Chromium-based); elsewhere the member stays
+     * undefined and the modal falls back to a typed Location field.
+     *
+     * The picked handle carries no filesystem path, so it is resolved by the id the picker tags the
+     * folder with (see `@jxsuite/studio/directory-picker`).
+     */
+    ...(canPickDirectory()
+      ? {
+          async pickDirectory(): Promise<string | null> {
+            return pickDirectoryPath(async ({ id, name }) => {
+              const res = await fetch(
+                `/__studio/locate-directory?name=${encodeURIComponent(name)}&id=${encodeURIComponent(id)}`,
+              );
+              if (!res.ok) {
+                return null;
+              }
+              const found = await readJson<{ path?: string }>(res);
+              return found.path ?? null;
+            });
+          },
+        }
+      : {}),
 
     /** List starter templates from the dev server. */
     async listStarters(): Promise<StarterInfo[]> {

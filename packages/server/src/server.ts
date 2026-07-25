@@ -13,13 +13,13 @@
  *   proxying, and studio filesystem integration as a single createDevServer() call.
  */
 
-import { join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { buildAll } from "./build.ts";
 import { createCollabRegistry } from "./collab.ts";
 import { createWatcher, injectSSE } from "./watch.ts";
 import { handleJxMounts } from "./jx-mounts.ts";
 import { handleResolve, handleServerFunction, projectAssetMounts } from "./resolve.ts";
-import { assertAccessible, handleStudioApi } from "./studio-api.ts";
+import { assertAccessible, assertCreatableParent, handleStudioApi } from "./studio-api.ts";
 import {
   containedPath,
   decodeAndNormalizePath,
@@ -217,6 +217,14 @@ export async function createDevServer(options: {
   }
   const absRoot = resolve(root);
 
+  /**
+   * Projects created through Studio's New Project modal, which land wherever the user pointed the
+   * Location field — normally outside `absRoot`. Remembering them lets the very next
+   * `/__studio/activate` open what was just created without widening the filesystem API to
+   * arbitrary directories.
+   */
+  const createdRoots: string[] = [];
+
   // ─── Build pipeline ─────────────────────────────────────────────────────────
 
   if (builds.length > 0) {
@@ -343,7 +351,8 @@ export async function createDevServer(options: {
           const requested = resolve(absRoot, raw);
           const permitted =
             containedPath(requested, absRoot) !== null ||
-            allowedRoots.some((allowed) => containedPath(requested, resolve(allowed)) !== null);
+            allowedRoots.some((allowed) => containedPath(requested, resolve(allowed)) !== null) ||
+            createdRoots.some((created) => containedPath(requested, created) !== null);
           if (!permitted) {
             return Response.json({ ok: false, error: "root not permitted" }, { status: 403 });
           }
@@ -357,14 +366,26 @@ export async function createDevServer(options: {
           return aiRes;
         }
 
-        // AI-guided site import (/__studio/import-site) — NDJSON progress stream
+        // AI-guided site import (/__studio/import-site) — NDJSON progress stream. An ABSOLUTE
+        // Directory is a destination the user chose in the New Project modal, so it is vetted the
+        // Same way a create is (specs/server.md §4.2). A RELATIVE one predates that field and stays
+        // Contained to the server root — resolving it there and then widening the check to the
+        // Creatable roots would let "../escape" out.
         const importRes = await handleImportApi(req, url, {
           resolveDest: (dir) => {
+            if (isAbsolute(dir)) {
+              assertCreatableParent(dirname(dir), absRoot, allowedRoots);
+              createdRoots.push(dir);
+              return dir;
+            }
             const dest = resolve(absRoot, dir);
             assertAccessible(dest, absRoot, activeProjectRoot);
             return dest;
           },
-          toRoot: (dest) => relative(absRoot, dest).replaceAll("\\", "/"),
+          toRoot: (dest) =>
+            containedPath(dest, absRoot) === null
+              ? dest
+              : relative(absRoot, dest).replaceAll("\\", "/"),
         });
         if (importRes) {
           return importRes;
@@ -375,7 +396,10 @@ export async function createDevServer(options: {
           return codeRes;
         }
 
-        const res = await handleStudioApi(req, url, absRoot, activeProjectRoot);
+        const res = await handleStudioApi(req, url, absRoot, activeProjectRoot, {
+          allowedRoots,
+          onProjectCreated: (created) => createdRoots.push(created),
+        });
         if (res) {
           return res;
         }

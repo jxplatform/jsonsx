@@ -291,6 +291,9 @@ describe("platform methods", () => {
   test("identity and activate", async () => {
     expect(platform.id).toBe("desktop");
     expect(platform.projectRoot).toBe("");
+    // The desktop backend scaffolds onto disk, so the New Project modal renders a Location field
+    // (with Browse…) rather than the cloud's owner/repository picker.
+    expect(platform.createDestination).toBe("path");
     await platform.activate();
   });
 
@@ -445,10 +448,11 @@ describe("platform methods", () => {
     ],
     [
       "createProject",
-      [{ directory: "/tmp/p", name: "p" }],
+      [{ destination: { kind: "path", parent: "/tmp" }, directory: "p", name: "p" }],
       "createProject",
       {
-        directory: "/tmp/p",
+        destination: { kind: "path", parent: "/tmp" },
+        directory: "p",
         name: "p",
       },
     ],
@@ -814,36 +818,38 @@ describe("importSite / pickDirectory", () => {
     await expect(platform.pickDirectory!()).resolves.toBe("/picked/parent");
   });
 
-  test("a relative directory is resolved under a picked parent and streamed to the RPC endpoint", async () => {
+  test("a relative directory is rejected instead of being resolved under a picked parent", async () => {
+    // The modal resolves the destination before calling (Location field + slug), so a bare slug
+    // Means a caller skipped it — the bridge refuses rather than quietly opening a folder dialog.
     streamImportCalls.length = 0;
+    const picksBefore = callsFor("pickDirectory").length;
     impls.set("pickDirectory", () => ({ path: "/picked/parent" }));
     impls.set("importSiteUrl", () => "http://127.0.0.1:9/__studio/import-site?token=T");
-    const onProgress = () => {};
-    const result = await platform.importSite!(
-      {
-        aiComponents: false,
-        depth: 1,
-        directory: "my-slug",
-        maxPages: 5,
-        name: "X",
-        url: "https://x.example",
-      },
-      onProgress,
-    );
-    expect(result).toEqual({ config: { name: "Imported" }, root: "/imported" } as never);
-    const [endpoint, opts, cb] = streamImportCalls[0]!;
-    expect(endpoint).toBe("http://127.0.0.1:9/__studio/import-site?token=T");
-    expect((opts as { directory: string }).directory).toBe("/picked/parent/my-slug");
-    expect(cb).toBe(onProgress);
+    await expect(
+      platform.importSite!(
+        {
+          aiComponents: false,
+          depth: 1,
+          directory: "my-slug",
+          maxPages: 5,
+          name: "X",
+          url: "https://x.example",
+        },
+        () => {},
+      ),
+    ).rejects.toThrow("A destination folder is required.");
+    expect(callsFor("pickDirectory")).toHaveLength(picksBefore);
+    expect(streamImportCalls).toHaveLength(0);
   });
 
-  test("an absolute directory skips the directory dialog", async () => {
+  test("an absolute directory is streamed to the RPC endpoint without a dialog", async () => {
     streamImportCalls.length = 0;
     impls.set("pickDirectory", () => {
       throw new Error("dialog must not open");
     });
     impls.set("importSiteUrl", () => "http://127.0.0.1:9/__studio/import-site?token=T");
-    await platform.importSite!(
+    const onProgress = () => {};
+    const result = await platform.importSite!(
       {
         aiComponents: false,
         depth: 0,
@@ -852,25 +858,49 @@ describe("importSite / pickDirectory", () => {
         name: "X",
         url: "https://x.example",
       },
-      () => {},
+      onProgress,
     );
-    expect((streamImportCalls[0]![1] as { directory: string }).directory).toBe("/abs/dest");
+    expect(result).toEqual({ config: { name: "Imported" }, root: "/imported" } as never);
+    const [endpoint, opts, cb] = streamImportCalls[0]!;
+    expect(endpoint).toBe("http://127.0.0.1:9/__studio/import-site?token=T");
+    expect((opts as { directory: string }).directory).toBe("/abs/dest");
+    expect(cb).toBe(onProgress);
   });
 
-  test("rejects when the directory picker is cancelled", async () => {
-    impls.set("pickDirectory", () => ({ path: null }));
+  test("a windows drive-letter destination counts as absolute", async () => {
+    streamImportCalls.length = 0;
+    impls.set("importSiteUrl", () => "http://127.0.0.1:9/__studio/import-site?token=T");
+    await platform.importSite!(
+      {
+        aiComponents: false,
+        depth: 0,
+        directory: String.raw`C:\Sites\dest`,
+        maxPages: 1,
+        name: "X",
+        url: "https://x.example",
+      },
+      () => {},
+    );
+    expect((streamImportCalls[0]![1] as { directory: string }).directory).toBe(
+      String.raw`C:\Sites\dest`,
+    );
+  });
+
+  test("rejects an empty destination directory", async () => {
+    streamImportCalls.length = 0;
     await expect(
       platform.importSite!(
         {
           aiComponents: false,
           depth: 0,
-          directory: "slug",
+          directory: "",
           maxPages: 1,
           name: "X",
           url: "https://x.example",
         },
         () => {},
       ),
-    ).rejects.toThrow("No destination folder was selected.");
+    ).rejects.toThrow("A destination folder is required.");
+    expect(streamImportCalls).toHaveLength(0);
   });
 });

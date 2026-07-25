@@ -275,7 +275,12 @@ describe("project catalogue", () => {
     expect(await p.listStarters?.()).toEqual([starter]);
   });
 
-  test("createProject posts the starter selection and returns the root key", async () => {
+  test("the platform collects a repository destination, not a folder", () => {
+    expect(createCloudPlatform(null).createDestination).toBe("repo");
+    expect(createCloudPlatform(PROJECT).createDestination).toBe("repo");
+  });
+
+  test("createProject posts the chosen repository plus the starter selection", async () => {
     const calls = mockFetch({
       "/api/v1/projects": {
         body: { owner: "octocat", name: "my-site", defaultBranch: "main" },
@@ -286,6 +291,7 @@ describe("project catalogue", () => {
       name: "My Site",
       description: "hello",
       directory: "my-site",
+      destination: { kind: "repo", owner: "octocat", repo: "my-site", private: true },
       starter: "portfolio",
     });
     expect(created.root).toBe("octocat/my-site@main");
@@ -295,7 +301,59 @@ describe("project catalogue", () => {
       name: "My Site",
       description: "hello",
       starter: "portfolio",
+      owner: "octocat",
+      repo: "my-site",
+      private: true,
     });
+  });
+
+  test("createProject keys the created project off the SERVER's repo, not the request", async () => {
+    // The API may slugify the requested name and pick its own default branch.
+    mockFetch({
+      "/api/v1/projects": {
+        body: { owner: "acme-org", name: "my-site", defaultBranch: "trunk" },
+      },
+    });
+    const p = createCloudPlatform(null);
+    const created = await p.createProject({
+      name: "My Site",
+      directory: "my-site",
+      destination: { kind: "repo", owner: "acme-org", repo: "My Site!", private: false },
+    });
+    expect(created.root).toBe("acme-org/my-site@trunk");
+  });
+
+  test("createProject refuses a destination that names no repository", () => {
+    const calls = mockFetch({
+      "/api/v1/projects": {
+        body: { owner: "octocat", name: "my-site", defaultBranch: "main" },
+      },
+    });
+    const p = createCloudPlatform(null);
+    // A folder destination belongs to a "path" platform; cloud writes to a repository.
+    expect(
+      p.createProject({
+        name: "My Site",
+        directory: "my-site",
+        destination: { kind: "path", parent: "/home/dev/Sites" },
+      }),
+    ).rejects.toThrow("A destination repository is required.");
+    expect(
+      p.createProject({
+        name: "My Site",
+        directory: "my-site",
+        destination: { kind: "repo", owner: "", repo: "my-site", private: false },
+      }),
+    ).rejects.toThrow("A destination repository is required.");
+    expect(
+      p.createProject({
+        name: "My Site",
+        directory: "my-site",
+        destination: { kind: "repo", owner: "octocat", repo: "", private: false },
+      }),
+    ).rejects.toThrow("A destination repository is required.");
+    // Nothing was created server-side.
+    expect(calls).toHaveLength(0);
   });
 
   test("createProject surfaces the server's error message", async () => {
@@ -306,9 +364,13 @@ describe("project catalogue", () => {
       },
     });
     const p = createCloudPlatform(null);
-    expect(p.createProject({ name: "X", directory: "x" })).rejects.toThrow(
-      /GitHub blocked repository creation/,
-    );
+    expect(
+      p.createProject({
+        name: "X",
+        directory: "x",
+        destination: { kind: "repo", owner: "octocat", repo: "x", private: false },
+      }),
+    ).rejects.toThrow(/GitHub blocked repository creation/);
   });
 });
 
@@ -458,7 +520,11 @@ describe("identity & cloudflare surface", () => {
     });
     const p = createCloudPlatform(null);
     const failure = await p
-      .createProject({ directory: "site", name: "Site" })
+      .createProject({
+        directory: "site",
+        name: "Site",
+        destination: { kind: "repo", owner: "acme", repo: "site", private: false },
+      })
       .then(() => null)
       .catch((error: unknown) => error as Error & { code?: string; installUrl?: string });
     expect(failure?.message).toContain("blocked repository creation");

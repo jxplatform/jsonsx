@@ -1,9 +1,9 @@
 /**
  * The design-quickstart section of the New Project Parameters step: color/font/logo/breakpoint
- * overrides threaded into createProject as `design`, prefill-suppression (untouched values are not
- * sent), and the logo file gate.
+ * overrides threaded into createProject as `design` alongside the chosen `destination`,
+ * prefill-suppression (untouched values are not sent), and the logo file gate.
  */
-import { flush, installMockPlatform } from "./harness";
+import { flush, installMockPlatform, npFillLocation, npLocation, npName, npType } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 const { closeNewProjectModal, openNewProjectModal } =
@@ -17,14 +17,8 @@ document.body.innerHTML = `
 `;
 initLayers();
 
-function field(index: number): any {
-  return document.querySelectorAll("#layer-modal sp-textfield")[index];
-}
-
-function typeInto(el: any, value: string) {
-  el.value = value;
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-}
+/** The Location the design tests create into (mirrors the harness default). */
+const LOCATION = "/home/dev/Sites";
 
 function footerButtons(): any[] {
   return [...document.querySelectorAll("#layer-modal .new-project-modal-footer sp-button")];
@@ -45,12 +39,21 @@ function fontField(index: number): any {
   return sections[1]?.querySelectorAll("sp-textfield")[index];
 }
 
+function mediaRows(): NodeListOf<Element> {
+  return document.querySelectorAll("#layer-modal .new-project-media-row");
+}
+
 function mediaRow(index: number): { name: any; value: any } {
-  const rows = document.querySelectorAll("#layer-modal .new-project-media-row");
+  const rows = mediaRows();
   return {
     name: rows[index]?.querySelector(".new-project-media-name"),
     value: rows[index]?.querySelector(".new-project-media-value"),
   };
+}
+
+/** The first inline error in the modal body (destination errors precede the design sections). */
+function inlineError(): string {
+  return document.querySelector("#layer-modal .new-project-error")?.textContent ?? "";
 }
 
 let created: Record<string, unknown>[] = [];
@@ -79,20 +82,23 @@ afterEach(() => {
 describe("design quickstart", () => {
   test("colors, fonts, and edited breakpoints travel as the design payload", async () => {
     const promise = openToParams();
-    typeInto(field(0), "Styled Site");
+    npType(npName(), "Styled Site");
+    npFillLocation(LOCATION);
 
-    typeInto(colorField(0), "#ff2200"); // Accent
-    typeInto(colorField(1), "#fffbe6"); // Background
-    typeInto(colorField(2), "#222222"); // Text
-    typeInto(fontField(0), "'Inter', sans-serif");
-    typeInto(fontField(1), "'Fraunces', serif");
+    npType(colorField(0), "#ff2200"); // Accent
+    npType(colorField(1), "#fffbe6"); // Background
+    npType(colorField(2), "#222222"); // Text
+    npType(fontField(0), "'Inter', sans-serif");
+    npType(fontField(1), "'Fraunces', serif");
     // Edit one of the prefilled breakpoint rows (blank template preset: --, --lg, --md, --sm).
-    typeInto(mediaRow(1).value, "(max-width: 1100px)");
+    npType(mediaRow(1).value, "(max-width: 1100px)");
 
     clickFooter("Create Project");
     await promise;
 
-    const opts = created[0] as { design: Record<string, unknown> };
+    const opts = created[0] as { design: Record<string, unknown>; destination: unknown };
+    // The design overrides ride alongside the destination the user chose, not instead of it.
+    expect(opts.destination).toEqual({ kind: "path", parent: LOCATION });
     expect(opts.design).toEqual({
       accent: "#ff2200",
       background: "#fffbe6",
@@ -110,7 +116,8 @@ describe("design quickstart", () => {
 
   test("removing and adding breakpoint rows counts as an edit", async () => {
     const promise = openToParams();
-    typeInto(field(0), "Break Site");
+    npType(npName(), "Break Site");
+    npFillLocation(LOCATION);
 
     // Remove the last prefilled row, then add a custom one.
     const removeButtons = [
@@ -121,10 +128,9 @@ describe("design quickstart", () => {
       b.textContent?.includes("Add Breakpoint"),
     );
     addBtn!.dispatchEvent(new Event("click", { bubbles: true }));
-    const rows = [...document.querySelectorAll("#layer-modal .new-project-media-row")];
-    const last = rows.at(-1)!;
-    typeInto(last.querySelector(".new-project-media-name"), "--xl");
-    typeInto(last.querySelector(".new-project-media-value"), "(max-width: 1600px)");
+    const last = mediaRow(mediaRows().length - 1);
+    npType(last.name, "--xl");
+    npType(last.value, "(max-width: 1600px)");
 
     clickFooter("Create Project");
     await promise;
@@ -136,7 +142,8 @@ describe("design quickstart", () => {
 
   test("a selected logo file is base64-encoded into the payload; bad extensions are rejected", async () => {
     const promise = openToParams();
-    typeInto(field(0), "Logo Site");
+    npType(npName(), "Logo Site");
+    npFillLocation(LOCATION);
 
     const input = document.querySelector(
       "#layer-modal .new-project-logo-row input[type=file]",
@@ -149,9 +156,7 @@ describe("design quickstart", () => {
     });
     input.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
-    expect(document.querySelector("#layer-modal .new-project-error")?.textContent).toContain(
-      "SVG, PNG",
-    );
+    expect(inlineError()).toContain("SVG, PNG");
 
     // A valid image is read and encoded.
     Object.defineProperty(input, "files", {
@@ -171,9 +176,38 @@ describe("design quickstart", () => {
 
   test("an untouched Parameters step sends no design payload at all", async () => {
     const promise = openToParams();
-    typeInto(field(0), "Plain Site");
+    npType(npName(), "Plain Site");
+    npFillLocation(LOCATION);
     clickFooter("Create Project");
     await promise;
-    expect((created[0] as { design?: unknown }).design).toBeUndefined();
+    const opts = created[0] as { design?: unknown; destination: unknown };
+    expect(opts.design).toBeUndefined();
+    expect(opts.destination).toEqual({ kind: "path", parent: LOCATION });
+  });
+
+  test("a missing Location blocks the create and keeps the design edits for the retry", async () => {
+    const promise = openToParams();
+    npType(npName(), "Homeless Site");
+    npType(colorField(0), "#0a84ff");
+
+    clickFooter("Create Project");
+    await flush();
+    expect(created).toHaveLength(0);
+    expect(inlineError()).toContain("Choose a location for the project folder");
+
+    // A relative path is refused too — the backend only ever writes to an absolute parent.
+    npType(npLocation(), "sites");
+    clickFooter("Create Project");
+    await flush();
+    expect(created).toHaveLength(0);
+    expect(inlineError()).toContain("Location must be an absolute path");
+
+    npFillLocation(LOCATION);
+    clickFooter("Create Project");
+    await promise;
+
+    const opts = created[0] as { design: { accent: string }; destination: unknown };
+    expect(opts.destination).toEqual({ kind: "path", parent: LOCATION });
+    expect(opts.design.accent).toBe("#0a84ff");
   });
 });

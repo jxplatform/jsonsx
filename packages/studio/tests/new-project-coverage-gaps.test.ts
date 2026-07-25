@@ -2,11 +2,21 @@
  * Coverage-gap tests for the New Project wizard and the Add Existing Repository picker:
  *
  * - New-project-modal: the credentials-gate re-render callbacks, the Template context label, starter
- *   selection + missing-selection validation, the busy guards on Back/tab-change, and the agent
- *   submit's directory derivation + failure surface.
+ *   selection + missing-selection validation, the busy guards on Back/tab-change, the agent
+ *   submit's directory derivation + failure surface, and the destination fields surviving a
+ *   Back/Next round-trip.
  * - Add-repo-modal: double-open, double-import, import-less platforms, and Escape dismissal.
  */
-import { flush, installMockPlatform } from "./harness";
+import {
+  flush,
+  installMockPlatform,
+  npFillLocation,
+  npLocation,
+  npName,
+  npPreview,
+  npSlug,
+  npType,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { RepoInfo, StarterInfo } from "../src/types";
 
@@ -24,13 +34,16 @@ initLayers();
 
 type AnyEl = HTMLElement & { value?: string; selected?: string };
 
-function field(index: number): AnyEl {
-  return document.querySelectorAll("#layer-modal sp-textfield")[index] as AnyEl;
-}
-
-function typeInto(el: AnyEl, value: string) {
-  el.value = value;
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+/**
+ * A Parameters-step textfield addressed by its visible label. The identity and destination fields
+ * carry stable classes (see the harness `np*` accessors); the remaining ones don't, and positional
+ * indexing is not stable now that a destination block sits between the name and the description.
+ */
+function labelledField(label: string): AnyEl {
+  const match = [...document.querySelectorAll("#layer-modal .new-project-field")].find(
+    (f) => f.querySelector(".new-project-label")?.textContent?.trim() === label,
+  );
+  return match!.querySelector("sp-textfield") as AnyEl;
 }
 
 function footerButtons(): AnyEl[] {
@@ -147,8 +160,7 @@ describe("new-project modal gaps", () => {
     clickFooter("Next");
     expect(contextText()).toContain("Starter Site · Bakery");
     // The starter's tagline seeds the description field.
-    const description = field(2);
-    expect(description.value).toBe("Fresh daily");
+    expect(labelledField("Description").value).toBe("Fresh daily");
   });
 
   test("Back and tab switches are ignored while a create is in flight", async () => {
@@ -164,7 +176,8 @@ describe("new-project modal gaps", () => {
     const promise = openNewProjectModal();
     const staleTabs = document.querySelector("#layer-modal sp-tabs") as AnyEl;
     clickFooter("Next");
-    typeInto(field(0), "Slow Site");
+    npType(npName(), "Slow Site");
+    npFillLocation();
     clickFooter("Create Project");
     expect(footerButtons().some((b) => b.textContent?.includes("Creating…"))).toBe(true);
 
@@ -193,19 +206,42 @@ describe("new-project modal gaps", () => {
     });
     void openNewProjectModal();
     switchTab("agent");
-    typeInto(field(0), "A tiny site");
+    npType(
+      document.querySelector("#layer-modal .new-project-agent-prompt") as HTMLInputElement,
+      "A tiny site",
+    );
     clickFooter("Next");
-    typeInto(field(0), "Failing Agent Site");
-    typeInto(field(1), ""); // Clear the derived directory — submit must re-derive it.
+    npType(npName(), "Failing Agent Site");
+    npType(npSlug(), ""); // Clear the derived directory — submit must re-derive it.
+    npFillLocation("/home/dev/Sites");
     clickFooter("Create & Start Agent");
     await flush();
 
     expect(attempts[0]).toMatchObject({
+      destination: { kind: "path", parent: "/home/dev/Sites" },
       directory: "failing-agent-site",
       name: "Failing Agent Site",
       template: "blank",
     });
     expect(errorText()).toContain("quota exceeded");
+  });
+
+  test("the chosen Location survives a Back → Next round-trip", () => {
+    installMockPlatform();
+    void openNewProjectModal();
+    clickFooter("Next");
+    npType(npName(), "Round Trip");
+    npFillLocation("/home/dev/Sites");
+    expect(npPreview()).toContain("/home/dev/Sites/round-trip");
+
+    clickFooter("Back");
+    expect(document.querySelector("#layer-modal .new-project-location")).toBeNull();
+    clickFooter("Next");
+
+    // The destination fields keep the user's edits, like the rest of the Parameters step.
+    expect(npLocation().value).toBe("/home/dev/Sites");
+    expect(npSlug().value).toBe("round-trip");
+    expect(npPreview()).toContain("/home/dev/Sites/round-trip");
   });
 });
 

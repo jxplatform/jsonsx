@@ -12,6 +12,17 @@
 /** Bumped when a route's request/response shape changes incompatibly. */
 export const STUDIO_PROTOCOL_VERSION = 1;
 
+/**
+ * Hidden file a browser-hosted Studio drops into a folder chosen with `showDirectoryPicker()` so
+ * the backend can find it (specs/desktop.md §8.2.1). Its contents are a one-shot random id; the
+ * backend matches on those contents, not on the filename, and deletes the file once it matches.
+ *
+ * Lives here because the writer (`@jxsuite/studio/directory-picker`) and the reader (the backend
+ * serving `locateDirectory`) must agree on it, and this package is the contract both already
+ * share.
+ */
+export const LOCATION_ID_FILE = ".jx-loc-id";
+
 export type StudioRouteMethod = "GET" | "POST" | "PUT" | "DELETE";
 
 export interface StudioRoute {
@@ -68,7 +79,17 @@ export const STUDIO_ROUTES = {
     "Locate a project directory by name outside the root",
     "openProject falls back to config-matching only.",
   ),
-  createProject: route("POST", "/__studio/create-project", "Scaffold a project → {root, config}"),
+  locateDirectory: route(
+    "GET",
+    "/__studio/locate-directory",
+    `Resolve the absolute path of a showDirectoryPicker() folder by the id in its ${LOCATION_ID_FILE}`,
+    "The New Project Location field loses its Browse… button and is typed by hand.",
+  ),
+  createProject: route(
+    "POST",
+    "/__studio/create-project",
+    "Scaffold a project at a caller-chosen destination → {root, config}",
+  ),
   starters: route(
     "GET",
     "/__studio/starters",

@@ -32,7 +32,14 @@ const {
   createProject,
 } = await import("../src/handlers");
 
+// The folder picker lives on the session object (the legacy handlers shim does not re-export
+// PickDirectory), so the picker tests below drive it through a session of their own.
+const { createProjectSession } = await import("../src/project-session");
+
 const FIXTURES = join(import.meta.dir, "_fixtures_handlers");
+
+type CreateProjectOpts = Parameters<typeof createProject>[0];
+const noDialog = () => setDirectoryDialog(null as unknown as () => Promise<string | null>);
 
 function setup() {
   mkdirSync(FIXTURES, { recursive: true });
@@ -974,46 +981,133 @@ describe("openProject", () => {
   });
 });
 
-// ─── createProject ─────────────────────────────────────────────────────────
+// ─── pickDirectory ─────────────────────────────────────────────────────────
+// The native folder picker is now the New Project modal's tool (the Browse… button next to the
+// Location field) rather than something the backend triggers on its own, but the RPC is unchanged.
 
-describe("createProject", () => {
-  const clearDialog = () => setDirectoryDialog(null as unknown as () => Promise<string | null>);
+describe("pickDirectory", () => {
+  const session = createProjectSession(null);
 
   test("throws when no directory dialog is configured", async () => {
-    clearDialog();
-    await expect(createProject({ directory: "x", name: "X" })).rejects.toThrow(
-      "No directory dialog configured",
-    );
+    noDialog();
+    await expect(session.pickDirectory()).rejects.toThrow("No directory dialog configured");
   });
 
-  test("throws when name or directory is missing", async () => {
-    setDirectoryDialog(async () => FIXTURES);
+  test("returns the folder the native dialog picked", async () => {
+    setDirectoryDialog(async () => "/picked/parent");
     try {
-      await expect(createProject({ directory: "", name: "" })).rejects.toThrow(
-        "name and directory are required",
-      );
+      expect(await session.pickDirectory()).toEqual({ path: "/picked/parent" });
     } finally {
-      clearDialog();
+      noDialog();
     }
   });
 
-  test("throws when the folder picker is cancelled", async () => {
+  test("reports a cancelled picker as a null path", async () => {
     setDirectoryDialog(async () => null);
     try {
-      await expect(createProject({ directory: "x", name: "X" })).rejects.toThrow(
-        "No destination folder was selected.",
-      );
+      expect(await session.pickDirectory()).toEqual({ path: null });
     } finally {
-      clearDialog();
+      noDialog();
+    }
+  });
+});
+
+// ─── createProject ─────────────────────────────────────────────────────────
+// A new project is written only where the caller said (specs/desktop.md §4.5): the destination
+// Arrives with the request and the backend never opens a folder picker of its own. Every test here
+// Arms a directory dialog precisely so a stray backend-side picker would be observable.
+
+describe("createProject", () => {
+  const dialog = mock(async (): Promise<string | null> => FIXTURES);
+  const armDialog = () => {
+    dialog.mockClear();
+    setDirectoryDialog(dialog);
+  };
+
+  test("throws when name or directory is missing", async () => {
+    armDialog();
+    try {
+      await expect(
+        createProject({
+          destination: { kind: "path", parent: FIXTURES },
+          directory: "",
+          name: "",
+        }),
+      ).rejects.toThrow("name and directory are required");
+    } finally {
+      noDialog();
     }
   });
 
-  test("scaffolds a blank project into the chosen folder and returns its config", async () => {
+  test("throws when the request carries no usable path destination", async () => {
+    armDialog();
+    try {
+      await expect(
+        createProject({ directory: "x", name: "X" } as unknown as CreateProjectOpts),
+      ).rejects.toThrow("A destination folder is required.");
+      await expect(
+        createProject({ destination: { kind: "path", parent: "" }, directory: "x", name: "X" }),
+      ).rejects.toThrow("A destination folder is required.");
+      // A repo destination belongs to the cloud platform; the desktop backend only writes to disk.
+      await expect(
+        createProject({
+          destination: { kind: "repo", owner: "me", private: false, repo: "x" },
+          directory: "x",
+          name: "X",
+        } as unknown as CreateProjectOpts),
+      ).rejects.toThrow("A destination folder is required.");
+      // The missing destination is reported, never papered over by opening a picker.
+      expect(dialog).not.toHaveBeenCalled();
+    } finally {
+      noDialog();
+    }
+  });
+
+  test("throws when the destination parent is a relative path", async () => {
+    armDialog();
+    try {
+      await expect(
+        createProject({
+          destination: { kind: "path", parent: "relative/parent" },
+          directory: "x",
+          name: "X",
+        }),
+      ).rejects.toThrow("Destination folder must be an absolute path: relative/parent");
+      expect(dialog).not.toHaveBeenCalled();
+    } finally {
+      noDialog();
+    }
+  });
+
+  test("rejects a directory that is a path rather than a folder name", async () => {
     setup();
-    setDirectoryDialog(async () => FIXTURES);
+    armDialog();
+    try {
+      // The parent is fine, but joining a dot-segment onto it would land the project outside the
+      // Folder the user actually chose.
+      for (const directory of ["../escape", "nested/dir", ".."]) {
+        await expect(
+          createProject({
+            destination: { kind: "path", parent: FIXTURES },
+            directory,
+            name: "Escape",
+          }),
+        ).rejects.toThrow("Directory must be a folder name, not a path");
+      }
+      expect(existsSync(join(FIXTURES, "..", "escape", "project.json"))).toBe(false);
+      expect(dialog).not.toHaveBeenCalled();
+    } finally {
+      noDialog();
+    }
+  });
+
+  test("scaffolds a blank project under the chosen destination without opening a dialog", async () => {
+    setup();
+    armDialog();
     try {
       const result = await createProject({
         description: "A new site",
+        destination: { kind: "path", parent: FIXTURES },
         directory: "my-new-site",
         name: "My New Site",
         url: "https://new.example",
@@ -1024,17 +1118,20 @@ describe("createProject", () => {
       expect(existsSync(join(FIXTURES, "my-new-site", "pages"))).toBe(true);
       // The freshly-scaffolded project becomes the active project.
       expect(getProjectRoot()).toBe(join(FIXTURES, "my-new-site"));
+      // The caller supplied the destination, so the native picker stayed shut.
+      expect(dialog).not.toHaveBeenCalled();
     } finally {
-      clearDialog();
+      noDialog();
       cleanup();
     }
   });
 
   test("forwards a built-in template id to the generator", async () => {
     setup();
-    setDirectoryDialog(async () => FIXTURES);
+    armDialog();
     try {
       const result = await createProject({
+        destination: { kind: "path", parent: FIXTURES },
         directory: "my-app",
         name: "My App",
         template: "mobile-first",
@@ -1042,25 +1139,28 @@ describe("createProject", () => {
       const media = (result.config as { $media?: Record<string, string> }).$media;
       expect(media?.["--"]).toBe("375px");
       expect(media?.["--lg"]).toBe("(min-width: 1024px)");
+      expect(dialog).not.toHaveBeenCalled();
     } finally {
-      clearDialog();
+      noDialog();
       cleanup();
     }
   });
 
   test("forwards design quickstart options to the generator", async () => {
     setup();
-    setDirectoryDialog(async () => FIXTURES);
+    armDialog();
     try {
       const result = await createProject({
         design: { accent: "#ff5500" },
+        destination: { kind: "path", parent: FIXTURES },
         directory: "my-designed-site",
         name: "My Designed Site",
       });
       const { style } = result.config as { style?: Record<string, string> };
       expect(style?.["--color-primary"]).toBe("#ff5500");
+      expect(dialog).not.toHaveBeenCalled();
     } finally {
-      clearDialog();
+      noDialog();
       cleanup();
     }
   });

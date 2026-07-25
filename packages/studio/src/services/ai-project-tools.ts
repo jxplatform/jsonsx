@@ -15,6 +15,7 @@
  */
 
 import { createToolDefinition } from "@jxsuite/ai/tools";
+import type { CreateProjectDestination } from "../types";
 import type { ToolRegistry, ToolResult } from "@jxsuite/ai/tools";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import { getPlatform } from "../platform";
@@ -400,7 +401,10 @@ export function registerProjectTools(
         "Create a new Jx project (project.json, conventional directories, starter pages) and open " +
         "it in the studio. Only available while no project is open. After it succeeds, the file " +
         "and document tools become available for building out the project. If the directory " +
-        "already exists, retry with a different directory slug.",
+        "already exists, retry with a different directory slug. Requires an explicit destination: " +
+        'on a filesystem platform pass "location" (an absolute parent folder); on the cloud pass ' +
+        '"owner" (a GitHub account or organization). Ask the user where to put it rather than ' +
+        "guessing — nothing is created without one.",
       parameters: {
         type: "object",
         properties: {
@@ -414,7 +418,24 @@ export function registerProjectTools(
           },
           directory: {
             type: "string",
-            description: "Directory slug to create the project in. Defaults to a slug of the name.",
+            description:
+              "Folder (or repository) name to create the project as. Defaults to a slug of the name.",
+          },
+          location: {
+            type: "string",
+            description:
+              "Absolute path of the EXISTING parent folder to create the project folder inside, " +
+              'e.g. "/home/you/Sites". Required on filesystem platforms (desktop, dev server).',
+          },
+          owner: {
+            type: "string",
+            description:
+              "GitHub account or organization to create the repository under. Required on the " +
+              "cloud platform.",
+          },
+          private: {
+            type: "boolean",
+            description: "Cloud only: repository visibility. Defaults to private.",
           },
           design: {
             type: "object",
@@ -426,12 +447,24 @@ export function registerProjectTools(
         required: ["name"],
       },
       async execute(args) {
-        const { name, description, template, directory, design } = args as {
+        const {
+          name,
+          description,
+          template,
+          directory,
+          design,
+          location,
+          owner,
+          private: isPrivate,
+        } = args as {
           name: string;
           description?: string;
           template?: string;
           directory?: string;
           design?: Record<string, string>;
+          location?: string;
+          owner?: string;
+          private?: boolean;
         };
         if (workspace.projectRoot) {
           return {
@@ -450,10 +483,45 @@ export function registerProjectTools(
           return { success: false, error: 'Could not derive a directory slug — pass "directory".' };
         }
 
+        // No destination, no project. The backend refuses one anyway; failing here gives the model
+        // A message it can act on instead of a wire error.
+        const platform = getPlatform();
+        let destination: CreateProjectDestination;
+        if (platform.createDestination === "repo") {
+          if (!owner?.trim()) {
+            return {
+              success: false,
+              error:
+                'Pass "owner" — the GitHub account or organization to create the repository under. ' +
+                "Ask the user which one to use.",
+            };
+          }
+          destination = {
+            kind: "repo",
+            owner: owner.trim(),
+            private: isPrivate ?? true,
+            repo: slug,
+          };
+        } else {
+          if (!location?.trim()) {
+            return {
+              success: false,
+              error:
+                'Pass "location" — the absolute path of the folder to create the project inside. ' +
+                "Ask the user where the project should live.",
+            };
+          }
+          if (!/^(?:[a-zA-Z]:[/\\]|\/)/.test(location.trim())) {
+            return { success: false, error: `"location" must be an absolute path: ${location}` };
+          }
+          destination = { kind: "path", parent: location.trim().replace(/[/\\]+$/, "") };
+        }
+
         let result: { root: string; config: object };
         try {
-          result = await getPlatform().createProject({
+          result = await platform.createProject({
             name,
+            destination,
             directory: slug,
             ...(description ? { description } : {}),
             ...(template ? { template } : {}),

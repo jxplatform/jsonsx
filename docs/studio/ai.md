@@ -19,7 +19,7 @@ Open it with the **Toggle Assistant** chat-bubble button at the right end of the
 
 ## What it can do
 
-**With nothing open** — the assistant bootstraps. Describe a site and it creates a project for you: name, folders, starter pages, and a design quickstart (colors and fonts) derived from your description, then keeps building inside it. The **[New Project](/docs/studio/projects/create)** dialog's **Agent** tab is the same idea as a form: describe the site you want, and the assistant builds it in the editor while you watch.
+**With nothing open** — the assistant bootstraps. Describe a site and it creates a project for you: name, folders, starter pages, and a design quickstart (colors and fonts) derived from your description, then keeps building inside it. It will ask you where to put the project before creating anything — tell it a folder (or, on the cloud, a GitHub account or organization). The **[New Project](/docs/studio/projects/create)** dialog's **Agent** tab is the same idea as a form: describe the site you want, and the assistant builds it in the editor while you watch.
 
 **With a project open** — the assistant works across files. It can list and read any project file, find files by name, create new pages and components, and rewrite files whole. Anything it writes as a Jx document is validated before it touches disk. It can also open a page on the canvas to continue there.
 

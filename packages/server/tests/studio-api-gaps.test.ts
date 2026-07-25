@@ -1,20 +1,30 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { handleStudioApi } from "../src/studio-api";
-import { join, resolve } from "node:path";
+import { assertCreatableParent, handleStudioApi } from "../src/studio-api";
+import { LOCATION_ID_FILE } from "@jxsuite/protocol/routes";
+import type { StudioApiOptions } from "../src/studio-api";
+import { basename, join, resolve } from "node:path";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 
 const FIXTURES = resolve(import.meta.dir, "_studio_gaps_fixtures");
 const ROOT = join(FIXTURES, "root");
 const EXTERNAL = join(FIXTURES, "external");
+/** Parent for projects created outside the server root; reachable only via allowedRoots. */
+const OUTSIDE_PARENT = join(FIXTURES, "elsewhere");
+/**
+ * A parent under neither the server root, an allowed root, nor the home directory — a sibling of
+ * the home directory, so the relationship holds wherever the checkout happens to live.
+ */
+const UNPERMITTED_PARENT = resolve(homedir(), "..", "jx-unpermitted-destination");
 
 async function callApi(
   req: Request,
   url: URL,
   root: string = ROOT,
   activeProjectRoot: string | null = null,
+  opts: StudioApiOptions = {},
 ) {
-  const res = await handleStudioApi(req, url, root, activeProjectRoot);
+  const res = await handleStudioApi(req, url, root, activeProjectRoot, opts);
   if (!res) {
     throw new Error("handleStudioApi returned null");
   }
@@ -41,6 +51,9 @@ beforeAll(() => {
   // External project (outside server root) for activeProjectRoot access checks
   mkdirSync(EXTERNAL, { recursive: true });
   writeFileSync(join(EXTERNAL, "ext.txt"), "external file");
+
+  // Destination parent outside the server root, for create-project's chosen-location path
+  mkdirSync(OUTSIDE_PARENT, { recursive: true });
 
   // Home dir for ~ expansion and find-project
   mkdirSync(join(FIXTURES, "home", "my-site"), { recursive: true });
@@ -323,28 +336,286 @@ describe("find-project — gaps", () => {
   });
 });
 
+// ─── locate-directory ────────────────────────────────────────────────────────
+
+/** Throwaway home directories handed to the locate-directory route, removed after the suite. */
+const LOCATE_HOMES: string[] = [];
+
+/**
+ * Makes a private home directory for one locate-directory case. It lives under the real home so the
+ * route — which only ever scans `$HOME` — stays inside the user's tree, and so the scan sees
+ * nothing but the fixture the test just wrote.
+ */
+function locateHome() {
+  const home = mkdtempSync(join(homedir(), "jx-locate-home-"));
+  LOCATE_HOMES.push(home);
+  return home;
+}
+
+/** Calls the route with `$HOME` pointed at `home`, restoring the ambient environment after. */
+async function locateDirectory(home: string, query: string) {
+  const originalHome = process.env.HOME;
+  process.env.HOME = home;
+  try {
+    const { req, url } = getReq(`/__studio/locate-directory?${query}`);
+    return await callApi(req, url);
+  } finally {
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
+  }
+}
+
+describe("locate-directory", () => {
+  /** A well-formed id — the route accepts only 32 lowercase hex characters. */
+  const ID = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
+  const OTHER_ID = "0f9e8d7c6b5a493827160f5e4d3c2b1a";
+
+  /** Shared by the validation cases, which are refused before anything touches the filesystem. */
+  let emptyHome = "";
+
+  /** Tag `dir` as the picked folder by writing `id` into its hidden location file. */
+  function tag(dir: string, id: string) {
+    writeFileSync(join(dir, LOCATION_ID_FILE), id);
+  }
+
+  beforeAll(() => {
+    emptyHome = locateHome();
+  });
+
+  afterAll(() => {
+    for (const home of LOCATE_HOMES) {
+      rmSync(home, { force: true, recursive: true });
+    }
+  });
+
+  test("rejects a missing name", async () => {
+    const res = await locateDirectory(emptyHome, `id=${ID}`);
+    expect(res.status).toBe(400);
+    const payload = await res.json();
+    expect(payload.error).toBe("Missing or invalid name/id");
+  });
+
+  test("rejects a missing id", async () => {
+    const res = await locateDirectory(emptyHome, "name=new-site");
+    expect(res.status).toBe(400);
+    const payload = await res.json();
+    expect(payload.error).toBe("Missing or invalid name/id");
+  });
+
+  test("rejects an id outside the generated 32-hex shape", async () => {
+    // The id is only ever compared, never used as a pattern — but a strict shape keeps a
+    // Malformed value from reaching the filesystem at all.
+    for (const bad of ["../escape", "not-hex-at-all", "A1B2C3D4E5F60718293A4B5C6D7E8F90", "abc"]) {
+      const res = await locateDirectory(emptyHome, `name=new-site&id=${encodeURIComponent(bad)}`);
+      expect(res.status).toBe(400);
+    }
+  });
+
+  test("rejects a name containing a separator", async () => {
+    // A directory handle's `.name` is a single path segment; anything else is not a real pick.
+    const nested = encodeURIComponent("nested/new-site");
+    const res = await locateDirectory(emptyHome, `name=${nested}&id=${ID}`);
+    expect(res.status).toBe(400);
+    const payload = await res.json();
+    expect(payload.error).toBe("Missing or invalid name/id");
+
+    const backslash = encodeURIComponent(String.raw`nested\new-site`);
+    const winRes = await locateDirectory(emptyHome, `name=${backslash}&id=${ID}`);
+    expect(winRes.status).toBe(400);
+  });
+
+  test("resolves a tag written straight into the home directory to the home directory", async () => {
+    // Picking the home directory itself is legitimate, and no `**/<name>/` glob can match it.
+    const home = locateHome();
+    tag(home, ID);
+    const res = await locateDirectory(home, `name=${basename(home)}&id=${ID}`);
+    expect(res.status).toBe(200);
+    const payload = (await res.json()) as { path: string | null };
+    expect(payload.path).toBe(home);
+    // The route cleans up the moment it matches, rather than leaving the tag for the client.
+    expect(existsSync(join(home, LOCATION_ID_FILE))).toBe(false);
+  });
+
+  test("resolves a tag in a nested directory to that directory, skipping node_modules", async () => {
+    const home = locateHome();
+    const target = join(home, "projects", "sites", "new-site");
+    mkdirSync(target, { recursive: true });
+    tag(target, ID);
+    // A same-named decoy inside node_modules must never win.
+    mkdirSync(join(home, "node_modules", "new-site"), { recursive: true });
+    tag(join(home, "node_modules", "new-site"), ID);
+
+    const res = await locateDirectory(home, `name=new-site&id=${ID}`);
+    expect(res.status).toBe(200);
+    const payload = (await res.json()) as { path: string | null };
+    expect(payload.path).toBe(target);
+    expect(existsSync(join(target, LOCATION_ID_FILE))).toBe(false);
+  });
+
+  test("ignores a same-named folder whose tag holds a different id", async () => {
+    // This is the whole reason identity lives in the CONTENTS: two folders can share a basename,
+    // And a tag left by a crashed session can still be on disk. Only the live id may win.
+    const home = locateHome();
+    const stale = join(home, "a", "new-site");
+    const live = join(home, "b", "new-site");
+    mkdirSync(stale, { recursive: true });
+    mkdirSync(live, { recursive: true });
+    tag(stale, OTHER_ID);
+    tag(live, ID);
+
+    const res = await locateDirectory(home, `name=new-site&id=${ID}`);
+    expect(res.status).toBe(200);
+    const payload = (await res.json()) as { path: string | null };
+    expect(payload.path).toBe(live);
+    // The loser's tag is left untouched — it belongs to someone else's pick.
+    expect(existsSync(join(stale, LOCATION_ID_FILE))).toBe(true);
+  });
+
+  test("returns a null path when no tag anywhere holds the id", async () => {
+    const home = locateHome();
+    const dir = join(home, "new-site");
+    mkdirSync(dir, { recursive: true });
+    tag(dir, OTHER_ID);
+    const res = await locateDirectory(home, `name=new-site&id=${ID}`);
+    expect(res.status).toBe(200);
+    const payload = (await res.json()) as { path: string | null };
+    expect(payload.path).toBeNull();
+  });
+
+  test("returns a null path when there is no home directory", async () => {
+    const originalHome = process.env.HOME;
+    const originalProfile = process.env.USERPROFILE;
+    delete process.env.HOME;
+    delete process.env.USERPROFILE;
+    try {
+      const { req, url } = getReq(`/__studio/locate-directory?name=new-site&id=${ID}`);
+      const res = await callApi(req, url);
+      expect(res.status).toBe(200);
+      const payload = (await res.json()) as { path: string | null };
+      expect(payload.path).toBeNull();
+    } finally {
+      if (originalHome !== undefined) {
+        process.env.HOME = originalHome;
+      }
+      if (originalProfile !== undefined) {
+        process.env.USERPROFILE = originalProfile;
+      }
+    }
+  });
+});
+
+// ─── assertCreatableParent ───────────────────────────────────────────────────
+
+describe("assertCreatableParent", () => {
+  test("rejects a relative parent", () => {
+    expect(() => assertCreatableParent("sites/mine", ROOT)).toThrow(
+      "Destination folder must be an absolute path",
+    );
+  });
+
+  test("rejects an empty parent", () => {
+    expect(() => assertCreatableParent("", ROOT)).toThrow(
+      "Destination folder must be an absolute path",
+    );
+  });
+
+  test("rejects a parent outside the root, the allowed roots, and home", () => {
+    expect(() => assertCreatableParent(UNPERMITTED_PARENT, ROOT, [EXTERNAL])).toThrow(
+      "Destination folder is outside the permitted roots",
+    );
+  });
+
+  test("accepts a parent under the server root", () => {
+    expect(() => assertCreatableParent(join(ROOT, "nested", "deep"), ROOT)).not.toThrow();
+  });
+
+  test("accepts a parent under an allowedRoots entry", () => {
+    expect(() => assertCreatableParent(join(EXTERNAL, "sites"), ROOT, [EXTERNAL])).not.toThrow();
+  });
+
+  test("accepts a parent under the home directory", () => {
+    expect(() => assertCreatableParent(join(homedir(), "jx-sites"), ROOT)).not.toThrow();
+  });
+});
+
 // ─── create-project ──────────────────────────────────────────────────────────
+
+/** A create-project body pointed at `parent`, which the modal always supplies. */
+function createReq(body: Record<string, unknown>, parent: string = ROOT) {
+  return jsonReq("/__studio/create-project", "POST", {
+    destination: { kind: "path", parent },
+    ...body,
+  });
+}
 
 describe("create-project", () => {
   test("requires name and directory", async () => {
-    const { req, url } = jsonReq("/__studio/create-project", "POST", { name: "x" });
+    const { req, url } = createReq({ name: "x" });
     const res = await callApi(req, url);
     expect(res.status).toBe(400);
+    const payload = await res.json();
+    expect(payload.error).toBe("name and directory are required");
   });
 
-  test("rejects directories outside the root", async () => {
+  test("requires a destination — the project never lands somewhere the user did not choose", async () => {
     const { req, url } = jsonReq("/__studio/create-project", "POST", {
-      directory: "../escape",
-      name: "Escape",
+      directory: "nowhere-site",
+      name: "Nowhere",
     });
     const res = await callApi(req, url);
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
     const payload = await res.json();
-    expect(payload.error).toContain("outside");
+    expect(payload.error).toBe("A destination folder is required.");
+    expect(existsSync(join(ROOT, "nowhere-site"))).toBe(false);
+  });
+
+  test("rejects a repo destination — the dev server only scaffolds on disk", async () => {
+    const { req, url } = jsonReq("/__studio/create-project", "POST", {
+      destination: { kind: "repo", owner: "acme", private: false, repo: "site" },
+      directory: "repo-site",
+      name: "Repo Site",
+    });
+    const res = await callApi(req, url);
+    expect(res.status).toBe(400);
+    const payload = await res.json();
+    expect(payload.error).toBe("A destination folder is required.");
+  });
+
+  test("rejects a relative destination parent", async () => {
+    const { req, url } = createReq({ directory: "escape", name: "Escape" }, "relative/parent");
+    const res = await callApi(req, url);
+    // A bad destination is client input, so it answers 400 like the other destination refusals —
+    // Not the catch-all 500.
+    expect(res.status).toBe(400);
+    const payload = await res.json();
+    expect(payload.error).toContain("must be an absolute path");
+  });
+
+  test("rejects a directory that is a path rather than a folder name", async () => {
+    // The parent passes the creatable check, but joining a "../" directory onto it would land the
+    // Project outside the folder the user actually chose.
+    const { req, url } = createReq({ directory: "../../escape", name: "Escape" }, ROOT);
+    const res = await callApi(req, url);
+    expect(res.status).toBe(400);
+    const payload = await res.json();
+    expect(payload.error).toContain("folder name, not a path");
+    // Nothing was scaffolded at the escaped path (which may itself already exist as a plain dir).
+    expect(existsSync(resolve(ROOT, "../../escape/project.json"))).toBe(false);
+  });
+
+  test("rejects a destination parent outside the permitted roots", async () => {
+    const { req, url } = createReq({ directory: "escape", name: "Escape" }, UNPERMITTED_PARENT);
+    const res = await callApi(req, url);
+    expect(res.status).toBe(400);
+    const payload = await res.json();
+    expect(payload.error).toContain("outside the permitted roots");
   });
 
   test("generates a new project and returns its config", async () => {
-    const { req, url } = jsonReq("/__studio/create-project", "POST", {
+    const { req, url } = createReq({
       description: "A test site",
       directory: "generated-site",
       name: "Generated Site",
@@ -359,8 +630,32 @@ describe("create-project", () => {
     );
   });
 
+  test("scaffolds under the chosen parent and returns an absolute root when it is outside the server root", async () => {
+    const { req, url } = createReq({ directory: "away-site", name: "Away Site" }, OUTSIDE_PARENT);
+    const res = await callApi(req, url, ROOT, null, { allowedRoots: [FIXTURES] });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.root).toBe(join(OUTSIDE_PARENT, "away-site"));
+    expect(body.config.name).toBe("Away Site");
+    expect(existsSync(join(OUTSIDE_PARENT, "away-site", "project.json"))).toBe(true);
+    // Nothing was written under the server root.
+    expect(existsSync(join(ROOT, "away-site"))).toBe(false);
+  });
+
+  test("notifies onProjectCreated with the absolute root even when the response root is relative", async () => {
+    const created: string[] = [];
+    const { req, url } = createReq({ directory: "notified-site", name: "Notified Site" });
+    const res = await callApi(req, url, ROOT, null, {
+      onProjectCreated: (projectRoot) => created.push(projectRoot),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.root).toBe("notified-site");
+    expect(created).toEqual([join(ROOT, "notified-site")]);
+  });
+
   test("clones a starter template when one is selected", async () => {
-    const { req, url } = jsonReq("/__studio/create-project", "POST", {
+    const { req, url } = createReq({
       directory: "from-starter",
       name: "My Cafe",
       starter: "restaurant",
@@ -375,7 +670,7 @@ describe("create-project", () => {
   });
 
   test("applies a built-in template variant", async () => {
-    const { req, url } = jsonReq("/__studio/create-project", "POST", {
+    const { req, url } = createReq({
       directory: "from-template",
       name: "My App",
       template: "mobile-first",
@@ -388,7 +683,7 @@ describe("create-project", () => {
   });
 
   test("applies design quickstart options to the generated project", async () => {
-    const { req, url } = jsonReq("/__studio/create-project", "POST", {
+    const { req, url } = createReq({
       design: {
         accent: "#ff5500",
         media: { "--": "1440px", "--sm": "(max-width: 600px)" },
@@ -404,7 +699,7 @@ describe("create-project", () => {
   });
 
   test("rejects an unknown template id", async () => {
-    const { req, url } = jsonReq("/__studio/create-project", "POST", {
+    const { req, url } = createReq({
       directory: "bad-template",
       name: "Bad",
       template: "spaceship",

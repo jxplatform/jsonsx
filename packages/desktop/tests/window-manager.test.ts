@@ -99,8 +99,10 @@ function makeSession(initialRoot: string | null) {
         handle: { name: "Proj", projectConfig: {}, root: "." },
       };
     }),
-    createProject: mock(async (opts: { directory: string }) => {
-      root = `/proj/${opts.directory}`;
+    // Mirrors the real session: the project lands under the destination the caller chose, never
+    // Under a folder the backend picked for itself.
+    createProject: mock(async (opts: { destination: { parent: string }; directory: string }) => {
+      root = `${opts.destination.parent}/${opts.directory}`;
       return { config: { name: "New" }, root };
     }),
   };
@@ -594,15 +596,25 @@ describe("openProject request handler", () => {
 });
 
 describe("createProject request handler", () => {
-  test("scaffolds a project, binds the root and updates the window title", async () => {
+  test("scaffolds at the chosen destination, binds the root and updates the window title", async () => {
     const win = openProjectWindow(null) as unknown as MockWindow;
     const reqs = lastRequests();
     const session = sessions.at(-1)!;
 
-    const result = await reqs.createProject({ directory: "shiny", name: "New" } as never);
+    const params = {
+      destination: { kind: "path", parent: "/home/dev/Sites" },
+      directory: "shiny",
+      name: "New",
+    };
+    const result = await reqs.createProject(params as never);
     expect(session.createProject).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ config: { name: "New" }, root: "/proj/shiny" } as never);
-    expect(listOpenWindows().find((w) => w.id === win.id)?.projectRoot).toBe("/proj/shiny");
+    // The window layer is a pass-through: the destination the modal chose reaches the session
+    // Intact, so the project is written only where the user said.
+    expect(session.createProject).toHaveBeenCalledWith(params);
+    expect(result).toEqual({ config: { name: "New" }, root: "/home/dev/Sites/shiny" } as never);
+    expect(listOpenWindows().find((w) => w.id === win.id)?.projectRoot).toBe(
+      "/home/dev/Sites/shiny",
+    );
     expect(win.setTitle).toHaveBeenLastCalledWith(`shiny ${DASH} Jx Studio`);
   });
 });

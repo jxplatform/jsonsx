@@ -10,7 +10,9 @@
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
+import { homedir } from "node:os";
+import { LOCATION_ID_FILE } from "@jxsuite/protocol/routes";
 import {
   buildExtensionsPayload,
   buildProjectExtensionRegistry,
@@ -175,6 +177,33 @@ export function assertAccessible(filePath: string, root: string, activeProjectRo
   throw new Error("Path outside project root");
 }
 
+/**
+ * Check that a NEW project may be scaffolded under `parent` (specs/server.md §4.2).
+ *
+ * Deliberately wider than {@link assertAccessible}: a new project is normally created _outside_ the
+ * server root — the whole point of the modal's Location field — so root containment cannot apply.
+ * What it still refuses is a destination the user did not name (relative paths) and anything
+ * outside the places a person keeps projects: the server root, any configured `allowedRoots`, and
+ * the account's home directory. That keeps a hostile page on the loopback origin from scaffolding
+ * into system paths while leaving every realistic location reachable.
+ *
+ * @param {string} parent
+ * @param {string} root
+ * @param {string[]} allowedRoots
+ */
+export function assertCreatableParent(parent: string, root: string, allowedRoots: string[] = []) {
+  if (!parent || !isAbsolute(parent)) {
+    throw new Error("Destination folder must be an absolute path");
+  }
+  const bases = [root, ...allowedRoots, homedir()].filter(Boolean);
+  if (bases.some((base) => containedPath(parent, resolve(base)) !== null)) {
+    return;
+  }
+  throw new Error(
+    "Destination folder is outside the permitted roots (the server root, an allowed root, or your home directory)",
+  );
+}
+
 const statusMap: Record<string, string> = {
   A: "A",
   C: "C",
@@ -253,6 +282,18 @@ export function parseGitStatus(out: string) {
   return { ahead, behind, branch, files };
 }
 
+/** Host hooks for the routes that reach outside the server root (project creation). */
+export interface StudioApiOptions {
+  /** Extra roots a new project may be created under, mirroring `createDevServer.allowedRoots`. */
+  allowedRoots?: string[];
+  /**
+   * Called with the absolute root of a project this API just created, so the host can permit a
+   * subsequent `/__studio/activate` on it — a project created outside the server root is otherwise
+   * unreachable by the very request that made it.
+   */
+  onProjectCreated?: (projectRoot: string) => void;
+}
+
 /**
  * Handle /__studio/* requests.
  *
@@ -260,6 +301,7 @@ export function parseGitStatus(out: string) {
  * @param {URL} url
  * @param {string} root
  * @param {string | null} [activeProjectRoot]
+ * @param {StudioApiOptions} [opts]
  * @returns {Promise<Response | null>}
  */
 export async function handleStudioApi(
@@ -267,6 +309,7 @@ export async function handleStudioApi(
   url: URL,
   root: string,
   activeProjectRoot: string | null = null,
+  opts: StudioApiOptions = {},
 ) {
   const path = url.pathname;
 
@@ -416,6 +459,74 @@ export async function handleStudioApi(
     }
   }
 
+  /*
+   * Recover the absolute path of a directory the browser picked with `showDirectoryPicker()`.
+   *
+   * A `FileSystemDirectoryHandle` exposes only `.name`, never a filesystem path (§8.2), and unlike
+   * /__studio/find-project there is no `project.json` to search for — the whole point is that the
+   * folder is empty. So the client tags the folder with a hidden LOCATION_ID_FILE holding a random
+   * id and asks us which directory carries that id.
+   *
+   * Identity lives in the file's CONTENTS, not its name: matching the id is exact where matching a
+   * path shape is only probable — two folders can share a basename, and a file left behind by a
+   * crashed session can still be on disk. A candidate whose contents do not equal `id` is skipped,
+   * so a stale tag can never redirect a create. The winning file is deleted here, the moment it has
+   * served its purpose, rather than being left for the client to tidy up.
+   */
+  if (path === "/__studio/locate-directory" && req.method === "GET") {
+    const name = url.searchParams.get("name");
+    const id = url.searchParams.get("id");
+    // `name` is interpolated into a glob; the id is only ever compared, never used as a pattern.
+    if (!name || !id || !/^[a-f0-9]{32}$/.test(id) || !/^[^/\\]+$/.test(name)) {
+      return Response.json({ error: "Missing or invalid name/id" }, { status: 400 });
+    }
+    try {
+      const home = process.env.HOME || process.env.USERPROFILE || "";
+      if (!home) {
+        return Response.json({ path: null });
+      }
+      /** The tagged directory when this candidate holds our id, else null. */
+      const claim = (dir: string): string | null => {
+        const file = resolve(dir, LOCATION_ID_FILE);
+        try {
+          if (readFileSync(file, "utf8").trim() !== id) {
+            return null;
+          }
+        } catch {
+          return null;
+        }
+        try {
+          unlinkSync(file);
+        } catch {
+          // Read-only or already gone; the client's own cleanup is the backstop.
+        }
+        return dir;
+      };
+
+      // The home directory itself is a legitimate pick, and no `**/<name>/` glob can match it.
+      const atHome = claim(home);
+      if (atHome) {
+        return Response.json({ path: atHome });
+      }
+      // `dot: true` — the tag is a dotfile, so a dot-blind scan would never see it.
+      const glob = new Bun.Glob(`**/${name}/${LOCATION_ID_FILE}`);
+      try {
+        for await (const match of glob.scan({ cwd: home, dot: true })) {
+          if (match.includes("node_modules") || match.includes(".Trash")) {
+            continue;
+          }
+          const claimed = claim(resolve(home, dirname(match)));
+          if (claimed) {
+            return Response.json({ path: claimed });
+          }
+        }
+      } catch {}
+      return Response.json({ path: null });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
+    }
+  }
+
   // Discover site projects — find all project.json files under root
   if (path === "/__studio/sites" && req.method === "GET") {
     try {
@@ -453,6 +564,7 @@ export async function handleStudioApi(
         url?: string;
         adapter?: "static" | "cloudflare-pages" | "cloudflare-workers" | "node" | "bun";
         directory?: string;
+        destination?: { kind?: string; parent?: string };
         starter?: string;
         template?: string;
         design?: DesignOptions;
@@ -463,6 +575,7 @@ export async function handleStudioApi(
         url: siteUrl,
         adapter,
         directory,
+        destination,
         starter,
         template,
         design,
@@ -470,12 +583,32 @@ export async function handleStudioApi(
       if (!name || !directory) {
         return Response.json({ error: "name and directory are required" }, { status: 400 });
       }
+      // The destination is the user's to choose (specs/server.md §4.2). Without one the project
+      // Would silently land under the server root — which, when the dev server is the jx checkout,
+      // Means scaffolding into the monorepo. Refuse instead of guessing.
+      if (destination?.kind !== "path" || !destination.parent) {
+        return Response.json({ error: "A destination folder is required." }, { status: 400 });
+      }
+      // `directory` names the project FOLDER, not a path: a separator or dot-segment would walk out
+      // Of the parent that was just vetted below, which is exactly what the vetting is for.
+      if (/[/\\]/.test(directory) || directory === "." || directory === "..") {
+        return Response.json(
+          { error: "Directory must be a folder name, not a path" },
+          { status: 400 },
+        );
+      }
       const { isTemplateId } = await import("@jxsuite/create/templates");
       if (template !== undefined && !isTemplateId(template)) {
         return Response.json({ error: `Unknown template: "${template}"` }, { status: 400 });
       }
-      const destPath = resolve(root, directory);
-      assertAccessible(destPath, root, activeProjectRoot);
+      // A bad destination is client input, so answer 400 rather than letting the guard's throw fall
+      // Through to the catch-all 500 below.
+      try {
+        assertCreatableParent(destination.parent, root, opts.allowedRoots);
+      } catch (error) {
+        return Response.json({ error: errorMessage(error) }, { status: 400 });
+      }
+      const destPath = resolve(destination.parent, directory);
 
       const { generateProject } = await import("@jxsuite/create/generate");
       await generateProject(destPath, {
@@ -491,8 +624,12 @@ export async function handleStudioApi(
       const config = JSON.parse(
         await readFile(resolve(destPath, "project.json"), "utf8"),
       ) as ProjectConfig;
-      const projectRoot = fwd(relative(root, destPath));
-      return Response.json({ config, root: projectRoot });
+      // Root-relative while the project happens to sit under the server root (the historical
+      // Shape every caller already handles); absolute otherwise, which is the same shape
+      // /__studio/find-project returns for an external project.
+      const inRoot = containedPath(destPath, root) !== null;
+      opts.onProjectCreated?.(destPath);
+      return Response.json({ config, root: inRoot ? fwd(relative(root, destPath)) : destPath });
     } catch (error) {
       return Response.json({ error: errorMessage(error) }, { status: 500 });
     }

@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.2.7-draft
+**Version:** 0.3.0-draft
 **Status:** Pending
-**Updated:** 2026-07-24
+**Updated:** 2026-07-25
 **License:** MIT
 
 ---
@@ -77,18 +77,18 @@ The PAL is a plain JavaScript object conforming to a `StudioPlatform` interface.
 
 The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — roughly 70 members today. This spec deliberately does not duplicate it; the summary below names the member families and the model that governs them. The transport-level view of the same contract is the `STUDIO_ROUTES` table in `@jxsuite/protocol` (§5.1).
 
-| Family                   | Representative members                                                                                                                                                                  |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Session / project**    | `id`, `projectRoot`, `activate`, `openProject`, `openProjectPicker?`, `probeRootProject`, `createProject`, `listStarters?`, `importSite?`, `listProjects?`, recent-projects persistence |
-| **Filesystem**           | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `createDirectory`, `locateFile`, `searchFiles`, `subscribeFileEvents?`                              |
-| **Documents / formats**  | `discoverComponents`, `listFormats?`, `listExtensions?`, `fetchProjectSchemas?`, `formatAction?`, `fetchPluginSchema`                                                                   |
-| **Packages**             | `listPackages`, `addPackage`, `removePackage`, `installDependencies?`, `outdatedPackages?`, `setPackageVersions?`                                                                       |
-| **Git**                  | `gitStatus`, `gitCommit`, `gitPush`, `gitPull`, `gitDiff`, `gitCheckout`, `gitClone?`, `createPullRequest?`, …                                                                          |
-| **Collab**               | `collab?` (realtime co-editing handle per document)                                                                                                                                     |
-| **Data / secrets**       | `dataConnections?`, `dataRows?`, row CRUD, `dataPush?`, `listSecrets?`, `setSecrets?`                                                                                                   |
-| **Publish / identity**   | `getUser?`, `getAccountStatus?`, `listRepos?`, `importProject?`, `cfConnection?`, `cfApi?`                                                                                              |
-| **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                                      |
-| **Multi-window / shell** | `openProjectInNewWindow?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                                              |
+| Family                   | Representative members                                                                                                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Session / project**    | `id`, `projectRoot`, `activate`, `openProject`, `openProjectPicker?`, `probeRootProject`, `createDestination`, `createProject`, `pickDirectory?`, `listStarters?`, `importSite?`, `listProjects?`, recent-projects persistence |
+| **Filesystem**           | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `createDirectory`, `locateFile`, `searchFiles`, `subscribeFileEvents?`                                                                     |
+| **Documents / formats**  | `discoverComponents`, `listFormats?`, `listExtensions?`, `fetchProjectSchemas?`, `formatAction?`, `fetchPluginSchema`                                                                                                          |
+| **Packages**             | `listPackages`, `addPackage`, `removePackage`, `installDependencies?`, `outdatedPackages?`, `setPackageVersions?`                                                                                                              |
+| **Git**                  | `gitStatus`, `gitCommit`, `gitPush`, `gitPull`, `gitDiff`, `gitCheckout`, `gitClone?`, `createPullRequest?`, …                                                                                                                 |
+| **Collab**               | `collab?` (realtime co-editing handle per document)                                                                                                                                                                            |
+| **Data / secrets**       | `dataConnections?`, `dataRows?`, row CRUD, `dataPush?`, `listSecrets?`, `setSecrets?`                                                                                                                                          |
+| **Publish / identity**   | `getUser?`, `getAccountStatus?`, `listRepos?`, `importProject?`, `cfConnection?`, `cfApi?`                                                                                                                                     |
+| **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                                                                             |
+| **Multi-window / shell** | `openProjectInNewWindow?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                                                                                     |
 
 **Core vs. optional, and degradation.** Required members are the minimal backend every platform implements. Optional members (marked `?` in the interface) each back an optional protocol route; Studio feature-detects them and degrades gracefully when they are absent — hiding the corresponding UI or falling back to a client-side path. Each optional route's `degradation` note in `STUDIO_ROUTES` records exactly what turns off (e.g. no `collab` → Studio edits solo with file-level saves; no `importSite` → the New Project modal hides its Import tab).
 
@@ -223,6 +223,50 @@ projectState = {
 };
 ```
 
+### 4.5 Project Create Flow
+
+> **Status: Implemented.**
+
+A new project is written **only** where the user said to put it. No backend picks a destination on its own, and none falls back to its own root — an unspecified destination is an error, not a default.
+
+`StudioPlatform.createDestination` declares which kind of destination the platform takes, and the New Project modal renders the matching fields on its Parameters step:
+
+| `createDestination` | Platforms           | Fields collected                            | `createProject({ destination })`                             |
+| ------------------- | ------------------- | ------------------------------------------- | ------------------------------------------------------------ |
+| `"path"`            | Desktop, dev server | **Location** (absolute parent), folder name | `{ kind: "path", parent }` → project at `parent/<directory>` |
+| `"repo"`            | Cloud               | **Owner**, **Repository**, **Visibility**   | `{ kind: "repo", owner, repo, private }`                     |
+
+```
+User fills the Parameters step (name, destination, slug)
+        │
+        ├─── createDestination: "path"
+        │    Location field, prefilled by nothing — required.
+        │    Browse… renders only when the platform implements pickDirectory()
+        │      ├── Electrobun desktop: native Utils.openFileDialog
+        │      ├── NixOS chromium desktop: native XDG desktop portal
+        │      ├── Dev server: showDirectoryPicker(), path recovered via a marker file (§8.2.1)
+        │      └── A browser without the File System Access API: omitted — the path is typed
+        │
+        └─── createDestination: "repo"
+             Owner picker over getAccountStatus().installations + listRepos() owners
+             (free-text when neither is available), repository name, visibility
+        ▼
+platform.createProject({ …, destination })
+        │
+        ├─── Desktop: RPC → session refuses a non-"path" or relative destination,
+        │    then scaffolds at resolve(destination.parent, directory)
+        ├─── Dev server: POST /__studio/create-project → 400 without a destination;
+        │    the parent is checked with assertCreatableParent (specs/server.md §4.2)
+        └─── Cloud: POST /api/v1/projects { owner, repo, private, … } → the repo is
+             created under the chosen account, never a server-side default
+        ▼
+Returns { root, config } and the modal opens it
+```
+
+A live preview under the fields shows the resolved destination (`/home/you/Sites/my-site`, or `acme/my-site`) before anything is written.
+
+**Import shares this destination.** The Import tab is one of the four New Project sources, so it collects the same Location field and sends the resolved absolute path as `ImportSiteOptions.directory`. A relative directory reaching a backend means a caller skipped the field and is refused.
+
 ---
 
 ## 5. Backend API Contract
@@ -253,10 +297,12 @@ A few illustrative rows (see the table for the rest):
 
 ### 5.2 Project Operations
 
-| Operation        | `@jxsuite/server` endpoint | PAL method                   |
-| ---------------- | -------------------------- | ---------------------------- |
-| Open project     | N/A (client-side dialog)   | `openProject()`              |
-| Project metadata | `GET /__studio/project`    | Derived from `ProjectHandle` |
+| Operation        | `@jxsuite/server` endpoint       | PAL method                              |
+| ---------------- | -------------------------------- | --------------------------------------- |
+| Open project     | N/A (client-side dialog)         | `openProject()`                         |
+| Project metadata | `GET /__studio/project`          | Derived from `ProjectHandle`            |
+| Create project   | `POST /__studio/create-project`  | `createProject({ destination })` (§4.5) |
+| Pick a folder    | `GET /__studio/locate-directory` | `pickDirectory?()` (§8.2.1)             |
 
 ### 5.3 Code Services
 
@@ -571,6 +617,30 @@ In Chrome, `showOpenFilePicker` returns a `FileSystemFileHandle` with no way to 
 
 For the **desktop app**, `Utils.openFileDialog` with `canChooseFiles: true` and `allowedFileTypes: "json"` gives us the file path directly, so the user can pick `project.json` explicitly.
 
+#### 8.2.1 Picking a destination folder
+
+> **Status: Implemented.**
+
+Choosing where a **new** project goes (§4.5) cannot use any of the three steps above: the folder is empty by definition, so there is no `project.json` to read and nothing for `/__studio/sites` to match. The handle still carries no path.
+
+**This applies only to the plain dev-server browser session.** Every packaged build already has a real native folder dialog that returns a filesystem path directly, and keeps it — electrobun uses `Utils.openFileDialog`, and the NixOS chromium build uses the XDG desktop portal. A browser page has no such option, so it gets the fallback below rather than no **Browse…** button at all.
+
+There, the handle is made to identify itself. Using the `readwrite` grant the picker just issued, `pickDirectoryPath` (`@jxsuite/studio/directory-picker`) tags the folder with a hidden `LOCATION_ID_FILE` — `.jx-loc-id`, defined in `@jxsuite/protocol` because the writer and the reader must agree on it — whose **contents** are a freshly generated 128-bit id, and asks the backend which directory carries that id:
+
+```
+Browse… (user gesture)
+  → showDirectoryPicker({ id: "jx-new-project-location", mode: "readwrite" })
+  → write <random 32-hex id> into <picked>/.jx-loc-id
+  → GET /__studio/locate-directory?name=&id=
+      ($HOME/.jx-loc-id holds the id → $HOME; else scan **/<name>/.jx-loc-id under $HOME)
+      → on match: delete the tag, return the directory
+  → finally: handle.removeEntry(".jx-loc-id")
+```
+
+**Identity is in the contents, not the filename.** A candidate whose `.jx-loc-id` does not hold this exact id is skipped, so neither a second folder sharing the basename nor a tag left behind by a crashed session can redirect a create — a fixed filename plus a content match is exact where a path shape is only probable. `name` still narrows the scan the way `/__studio/find-project` does. The backend deletes the winning tag as soon as it has served its purpose, and the client removes it too, so nothing is left in the user's new project folder on any path.
+
+Every failure — no API, cancel, a read-only grant, a folder the backend cannot place — resolves `null`, which the modal treats identically to "no folder chosen" and leaves the Location field untouched. On a browser without the File System Access API the dev-server adapter omits `pickDirectory` entirely, so the button is hidden rather than dead, and the Location field is typed.
+
 ---
 
 ## 9. NixOS Chromium App-Mode
@@ -637,6 +707,8 @@ $ ./result/bin/jx-studio [project-root]
 ### 10.1 Cloud Platform Adapter
 
 A cloud adapter replaces filesystem operations with API calls to a remote service. The project root becomes a project ID rather than a filesystem path. All PAL methods translate to REST or WebSocket calls to the cloud API.
+
+Because a cloud project _is_ a repository, the adapter sets `createDestination: "repo"` and the New Project modal collects a repository location — owner (personal account or organization), repository name, and visibility — instead of a folder (§4.5). The adapter forwards all three to the API, which resolves the owner against the session login to choose between the personal and organization creation endpoints. Nothing about the destination is defaulted server-side.
 
 ### 10.2 Storage Backend
 
@@ -720,6 +792,7 @@ Ensure desktop app matches dev-mode capabilities:
 
 ## Changelog
 
+- **0.3.0-draft** (2026-07-25) — New Project requires a user-chosen destination: StudioPlatform gains the required createDestination declaration, createProject takes a required destination (path parent or repo owner/name/visibility), and §4.5 defines the create flow. No backend picks a location.
 - **0.2.7-draft** (2026-07-24) — Cloud platform registers inside studio.js via a window.__jxCloud signal (single yjs for collab).
 - **0.2.6-draft** (2026-07-24) — Document packaged static-data staging into app/bun (create templates, starters) and postBuild bundle verification.
 - **0.2.5-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -738,4 +811,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.2.7-draft_
+_Jx Studio Desktop Architecture Specification v0.3.0-draft_

@@ -373,6 +373,8 @@ export interface StudioRPC {
           url?: string;
           adapter?: string;
           directory: string;
+          /** Chosen by the user in the New Project modal; the backend never picks one. */
+          destination: { kind: "path"; parent: string };
           starter?: string;
           template?: string;
           design?: {
