@@ -228,6 +228,12 @@ function pushHistoryEntry(
   const prev = truncated.at(-1);
   if (coalesceKey && useOps && prev && prev.coalesceKey === coalesceKey && prev.inverseOps) {
     prev.forwardOps = [...(prev.forwardOps ?? []), ...record.docOps.map((pair) => pair.forward)];
+    // BOTH halves accumulate. Keeping only the run's first inverse would cover only the keys that
+    // First commit happened to touch, so a later commit that changes the block's SHAPE — a plain
+    // Block becoming rich, which clears `textContent` and writes `children` — would never be undone,
+    // Leaving the node holding both keys at once. Undo replays inverses in reverse order, so
+    // Appending yields "undo the last commit, then the one before it, …".
+    prev.inverseOps = [...prev.inverseOps, ...record.docOps.map((pair) => pair.inverse)];
     prev.selection = tab.session.selection ? [...tab.session.selection] : null;
     if (prev.document) {
       prev.document = jsonClone(raw);

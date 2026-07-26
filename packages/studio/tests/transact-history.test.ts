@@ -115,6 +115,30 @@ describe("coalescing a typing run", () => {
     expect(tab.history.snapshots.length).toBe(depth + 2);
   });
 
+  test("a run that changes the block's SHAPE still undoes cleanly", () => {
+    // The regression this guards: keeping only the run's FIRST inverse covers only the keys that
+    // Commit touched. A later commit that turns a plain block rich clears `textContent` and writes
+    // `children` — and undo left the node holding BOTH keys at once, an invalid shape.
+    const tab = makeTab();
+    typeInto(tab, "one edited", "shape:1");
+    transactDoc(
+      tab,
+      (t) => {
+        mutateUpdateProperty(t, ["children", 0], "textContent");
+        mutateUpdateProperty(t, ["children", 0], "children", [
+          "one ",
+          { tagName: "strong", textContent: "bold" },
+        ]);
+      },
+      { coalesceKey: "shape:1" },
+    );
+
+    undo(tab);
+    const node = (toRaw(tab.doc.document).children as JxMutableNode[])[0]!;
+    expect(node.textContent).toBe("one");
+    expect(node.children).toBeUndefined();
+  });
+
   test("a coalesced run still undoes to the state before the run, not mid-run", () => {
     const tab = makeTab();
     typeInto(tab, "step one", "run:9");
