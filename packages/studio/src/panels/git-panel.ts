@@ -52,9 +52,28 @@ export async function refreshGitStatus() {
   updateUi("gitLoading", true);
   updateUi("gitError", null);
   try {
-    const [status, branches] = await Promise.all([plat.gitStatus(), plat.gitBranches()]);
-    updateUi("gitStatus", status);
-    updateUi("gitBranches", branches);
+    // Settled independently, not Promise.all: outside a work tree `git branch` exits non-zero
+    // While `git status` answers cleanly with isRepo:false. Letting the branch lookup reject the
+    // Pair discarded that status, so the panel re-rendered its "no status yet" branch, refreshed
+    // Again, and span — a request per render for as long as the tab stayed open.
+    const [status, branches] = await Promise.allSettled([plat.gitStatus(), plat.gitBranches()]);
+    if (status.status === "fulfilled") {
+      updateUi("gitStatus", status.value);
+    }
+    if (branches.status === "fulfilled") {
+      updateUi("gitBranches", branches.value);
+    }
+    // A branch lookup that fails on a repo-less project is expected, not an error worth showing;
+    // Anything else (including a failed status) surfaces.
+    const failure: unknown =
+      status.status === "rejected"
+        ? status.reason
+        : branches.status === "rejected" && status.value?.isRepo
+          ? branches.reason
+          : null;
+    if (failure) {
+      updateUi("gitError", errorMessage(failure));
+    }
     _lastUpdated = new Date();
   } catch (error) {
     updateUi("gitError", errorMessage(error));
@@ -206,7 +225,10 @@ export function renderGitPanel(
   const branches = S.ui.gitBranches;
   const loading = S.ui.gitLoading;
 
-  if (!status && !loading) {
+  // First paint kicks off the fetch. A refresh that already failed must NOT re-arm it here, or the
+  // Render it triggers becomes the next render's reason to fetch again; the Refresh button and the
+  // Poll timer are the ways back.
+  if (!status && !loading && !S.ui.gitError) {
     void refreshGitStatus();
     return html`<div class="git-panel">
       <div class="git-loading">Loading...</div>
