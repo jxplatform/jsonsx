@@ -113,7 +113,12 @@ export function createDevServerPlatform() {
     set projectRoot(v) {
       _projectRoot = v || "";
       if (_projectRoot) {
-        void this.activate(_projectRoot);
+        // Fire-and-forget: callers that need the binding in place before reading await activate()
+        // Themselves. The rejection is reported rather than dropped — an unactivated root leaves
+        // Every rootless endpoint (git especially) operating on the server's OWN root.
+        void this.activate(_projectRoot).catch((error: unknown) => {
+          console.error("Project activation failed:", error);
+        });
       }
     },
 
@@ -121,15 +126,25 @@ export function createDevServerPlatform() {
      * Notify the server which project root to use for resolving static file paths. Returns a
      * promise so callers can await activation before loading assets.
      *
+     * Throws when the server refuses the root. Silence here is worse than an error: the endpoints
+     * that take no `dir` fall back to the server's own root, so a swallowed refusal turns "sync
+     * this project" into git commands against whatever tree the dev server is serving.
+     *
      * @param {string} [root]
      */
     async activate(root?: string) {
       const r = root ?? _projectRoot;
-      await fetch("/__studio/activate", {
+      const res = await fetch("/__studio/activate", {
         body: JSON.stringify({ root: r }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
+      if (!res.ok) {
+        const body = (await readJson<ErrorBody>(res).catch(() => ({}))) as ErrorBody;
+        throw new Error(
+          `Could not open ${r}: ${body.error || `activation failed (${res.status})`}`,
+        );
+      }
     },
 
     // ─── Project opening ──────────────────────────────────────────────────

@@ -204,6 +204,30 @@ export function assertCreatableParent(parent: string, root: string, allowedRoots
   );
 }
 
+/**
+ * True when `dir` is a Jx project this account already owns: an absolute directory holding a
+ * `project.json`, somewhere under the user's home directory (specs/server.md §4.2).
+ *
+ * Existing projects live outside the server root as a matter of course — the dev server serving
+ * this monorepo is not where anyone keeps their sites — so root containment alone would leave
+ * `?project=/abs/path`, the Open Project picker, and the recent-projects list unable to activate
+ * anything but a project inside the checkout. This admits those without opening the filesystem API
+ * to arbitrary directories: a hostile page on the loopback origin still cannot bind the server to
+ * `/etc` or another account's files, only to a project the account already has on disk.
+ *
+ * @param {string} dir
+ */
+export function isOwnedProjectDir(dir: string): boolean {
+  const home = homedir();
+  if (!home || !dir || !isAbsolute(dir)) {
+    return false;
+  }
+  if (containedPath(dir, resolve(home)) === null) {
+    return false;
+  }
+  return existsSync(resolve(dir, "project.json"));
+}
+
 const statusMap: Record<string, string> = {
   A: "A",
   C: "C",

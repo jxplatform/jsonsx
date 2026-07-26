@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { assertCreatableParent, handleStudioApi } from "../src/studio-api";
+import { assertCreatableParent, handleStudioApi, isOwnedProjectDir } from "../src/studio-api";
 import { LOCATION_ID_FILE } from "@jxsuite/protocol/routes";
 import type { StudioApiOptions } from "../src/studio-api";
 import { basename, join, resolve } from "node:path";
@@ -538,6 +538,40 @@ describe("assertCreatableParent", () => {
 
   test("accepts a parent under the home directory", () => {
     expect(() => assertCreatableParent(join(homedir(), "jx-sites"), ROOT)).not.toThrow();
+  });
+});
+
+// ─── isOwnedProjectDir ───────────────────────────────────────────────────────
+
+describe("isOwnedProjectDir", () => {
+  /** A real project of the account's own, which is what Studio deep links point at. */
+  const ownedHome = mkdtempSync(join(homedir(), "jx-owned-project-"));
+  const ownedProject = join(ownedHome, "my-site");
+
+  beforeAll(() => {
+    mkdirSync(ownedProject, { recursive: true });
+    writeFileSync(join(ownedProject, "project.json"), JSON.stringify({ name: "My Site" }));
+  });
+
+  afterAll(() => {
+    rmSync(ownedHome, { force: true, recursive: true });
+  });
+
+  test("accepts a project directory under the home directory", () => {
+    expect(isOwnedProjectDir(ownedProject)).toBe(true);
+  });
+
+  test("rejects a home directory that holds no project.json", () => {
+    expect(isOwnedProjectDir(ownedHome)).toBe(false);
+  });
+
+  test("rejects a directory outside the home directory", () => {
+    expect(isOwnedProjectDir(UNPERMITTED_PARENT)).toBe(false);
+  });
+
+  test("rejects a relative or empty path", () => {
+    expect(isOwnedProjectDir("my-site")).toBe(false);
+    expect(isOwnedProjectDir("")).toBe(false);
   });
 });
 

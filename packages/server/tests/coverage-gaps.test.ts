@@ -69,6 +69,9 @@ let projectServer: ProjectServerHandle;
  * relationship true wherever the checkout lives.
  */
 let createdParent: string;
+/** Temp home-directory sandbox holding {@link ownedProject}, an existing project of the account's. */
+let ownedHome: string;
+let ownedProject: string;
 
 beforeAll(async () => {
   rmSync(FIXTURES, { force: true, recursive: true });
@@ -104,6 +107,14 @@ beforeAll(async () => {
   mkdirSync(EXTERNAL_ROOT, { recursive: true });
   writeFileSync(join(EXTERNAL_ROOT, "external.txt"), "external data");
 
+  // A project the account already has on disk — what a ?project= deep link or the recent-projects
+  // List points at. Permitted by nothing but its own project.json plus living under the home dir.
+  ownedHome = mkdtempSync(join(homedir(), ".jx-owned-project-"));
+  ownedProject = join(ownedHome, "my-site");
+  mkdirSync(ownedProject, { recursive: true });
+  writeFileSync(join(ownedProject, "project.json"), JSON.stringify({ name: "My Site" }));
+  writeFileSync(join(ownedProject, "owned.txt"), "owned data");
+
   devServer = (await createDevServer({
     allowedRoots: [EXTERNAL_ROOT],
     builds: [],
@@ -124,6 +135,7 @@ afterAll(() => {
   projectServer.stop();
   rmSync(FIXTURES, { force: true, recursive: true });
   rmSync(createdParent, { force: true, recursive: true });
+  rmSync(ownedHome, { force: true, recursive: true });
 });
 
 // ─── Dev server ───────────────────────────────────────────────────────────────
@@ -174,6 +186,35 @@ describe("dev server — absolute paths under the active project", () => {
     const abs = join(SERVER_ROOT, "proj", "missing.txt");
     const res = await fetch(`http://localhost:${devServer.port}//${abs.replace(/^\//, "")}`);
     expect(res.status).toBe(404);
+  });
+
+  test("activate permits an existing project of the account's own", async () => {
+    // The ?project=/abs/path deep link: a project under the user's home, outside the server root
+    // And outside allowedRoots, which this server did not create.
+    const activate = await fetch(`http://localhost:${devServer.port}/__studio/activate`, {
+      body: JSON.stringify({ root: ownedProject }),
+      method: "POST",
+    });
+    expect(activate.status).toBe(200);
+    expect(await activate.json()).toEqual({ ok: true, root: ownedProject });
+
+    // Activation is what makes the filesystem API answer for the project — the listing that
+    // Followed the deep link used to 400 with "Path outside project root".
+    const listing = await fetch(
+      `http://localhost:${devServer.port}/__studio/files?dir=${encodeURIComponent(ownedProject)}`,
+    );
+    expect(listing.status).toBe(200);
+    const names = ((await listing.json()) as { name: string }[]).map((e) => e.name);
+    expect(names).toContain("project.json");
+  });
+
+  test("activate still refuses a home directory that holds no project", async () => {
+    const activate = await fetch(`http://localhost:${devServer.port}/__studio/activate`, {
+      body: JSON.stringify({ root: ownedHome }),
+      method: "POST",
+    });
+    expect(activate.status).toBe(403);
+    expect(await activate.json()).toEqual({ error: "root not permitted", ok: false });
   });
 
   test("activate permits an external project dir listed in allowedRoots", async () => {

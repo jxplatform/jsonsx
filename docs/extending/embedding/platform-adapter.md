@@ -95,7 +95,7 @@ Opening a project is the one flow the adapter owns end to end, because the picki
 3. It returns `{ config, handle: { root, name, projectConfig } }`, or `null` if the user cancelled (never throw for a cancel).
 4. Studio initializes project state from the handle: file tree, component registry, expanded directories.
 
-Two supporting members round out the flow. `activate(root)` tells the backend which project root subsequent operations (and static file serving) should resolve against — the dev-server adapter calls it whenever `projectRoot` is set. `probeRootProject()` runs at startup to auto-detect whether the backend's root is itself a project, powering the zero-click open in dev mode.
+Two supporting members round out the flow. `activate(root)` tells the backend which project root subsequent operations (and static file serving) should resolve against — the dev-server adapter calls it whenever `projectRoot` is set. It must **reject when the backend refuses the root**, rather than resolving quietly: operations that carry no explicit directory resolve against the backend's own root, so a swallowed refusal leaves the session reading and writing the wrong tree. `probeRootProject()` runs at startup to auto-detect whether the backend's root is itself a project, powering the zero-click open in dev mode.
 
 ## Two real adapters
 
