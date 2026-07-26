@@ -334,6 +334,148 @@ describe("drag suppression", () => {
   });
 });
 
+describe("the idle commit tick", () => {
+  test("typing arms a tick that commits after the idle delay, without releasing the block", () => {
+    let ticks = 0;
+    const { container, rec } = mount(TWO_BLOCKS, {
+      commitDelayMs: 5,
+      onCommitTick: () => {
+        ticks += 1;
+      },
+    });
+    const p = container.querySelector("p") as HTMLElement;
+    caretInto(p, 3);
+    p.dispatchEvent(new Event("input", { bubbles: true }));
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        expect(ticks).toBe(1);
+        // The point of an IN-PLACE commit: the block stays active and the caret stays put.
+        expect(rec.deactivated).toBe(0);
+        resolve();
+      }, 30);
+    });
+  });
+
+  test("continuous typing pushes the tick out — one commit per burst, not per keystroke", async () => {
+    let ticks = 0;
+    const { container } = mount(TWO_BLOCKS, {
+      commitDelayMs: 20,
+      onCommitTick: () => {
+        ticks += 1;
+      },
+    });
+    const p = container.querySelector("p") as HTMLElement;
+    caretInto(p, 1);
+    for (let i = 0; i < 4; i++) {
+      p.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise<void>((r) => {
+        setTimeout(r, 8);
+      });
+    }
+    expect(ticks).toBe(0); // Still typing.
+    await new Promise<void>((r) => {
+      setTimeout(r, 40);
+    });
+    expect(ticks).toBe(1); // One commit for the whole burst.
+  });
+
+  test("the tick preserves the caret across the commit's DOM normalization", async () => {
+    // Committing normalizes inline content, rewriting the very text nodes the caret sits in. The
+    // Host captures the caret in document coordinates and restores it, so a pause while typing
+    // Never moves the cursor.
+    const { container } = mount(TWO_BLOCKS, {
+      commitDelayMs: 5,
+      onCommitTick: () => {
+        const p = container.querySelector("p") as HTMLElement;
+        p.replaceChildren(document.createTextNode("First block"));
+      },
+    });
+    const p = container.querySelector("p") as HTMLElement;
+    caretInto(p, 6);
+    p.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise<void>((r) => {
+      setTimeout(r, 30);
+    });
+
+    expect(live!.capture()).toEqual({
+      anchor: { offset: 6, path: ["children", 0] },
+      head: { offset: 6, path: ["children", 0] },
+    });
+  });
+
+  test("leaving the block cancels the pending tick — the release commits instead", async () => {
+    let ticks = 0;
+    const { container, rec } = mount(TWO_BLOCKS, {
+      commitDelayMs: 20,
+      onCommitTick: () => {
+        ticks += 1;
+      },
+    });
+    const [first, second] = [...container.querySelectorAll("p")] as HTMLElement[];
+    caretInto(first!, 2);
+    first!.dispatchEvent(new Event("input", { bubbles: true }));
+    caretInto(second!, 2);
+    await new Promise<void>((r) => {
+      setTimeout(r, 50);
+    });
+
+    expect(ticks).toBe(0);
+    expect(rec.deactivated).toBe(1);
+  });
+
+  test("flush() commits immediately and disarms the tick", async () => {
+    let ticks = 0;
+    const { container } = mount(TWO_BLOCKS, {
+      commitDelayMs: 1000,
+      onCommitTick: () => {
+        ticks += 1;
+      },
+    });
+    const p = container.querySelector("p") as HTMLElement;
+    caretInto(p, 3);
+    p.dispatchEvent(new Event("input", { bubbles: true }));
+
+    live!.flush();
+    expect(ticks).toBe(1);
+    await new Promise<void>((r) => {
+      setTimeout(r, 30);
+    });
+    expect(ticks).toBe(1); // Not fired twice.
+  });
+
+  test("flush() with nothing pending is a no-op", () => {
+    let ticks = 0;
+    const { container } = mount(TWO_BLOCKS, {
+      onCommitTick: () => {
+        ticks += 1;
+      },
+    });
+    caretInto(container.querySelector("p") as HTMLElement, 1);
+    live!.flush();
+    expect(ticks).toBe(0);
+  });
+
+  test("teardown cancels a pending tick rather than firing it against a dead host", async () => {
+    let ticks = 0;
+    const { container, root } = mount(TWO_BLOCKS, {
+      commitDelayMs: 10,
+      onCommitTick: () => {
+        ticks += 1;
+      },
+    });
+    const p = container.querySelector("p") as HTMLElement;
+    caretInto(p, 1);
+    p.dispatchEvent(new Event("input", { bubbles: true }));
+    root.stop();
+    live = null;
+    await new Promise<void>((r) => {
+      setTimeout(r, 40);
+    });
+    expect(ticks).toBe(0);
+  });
+});
+
 describe("caret capture and restore", () => {
   test("captureDocSelection returns both endpoints in document coordinates", () => {
     const { container } = mount(TWO_BLOCKS);

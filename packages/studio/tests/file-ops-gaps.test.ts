@@ -9,23 +9,20 @@ import { activeTab, closeAllTabs, openTab } from "../src/workspace/workspace";
 import { setFormats } from "../src/format/format-host";
 import { mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 
-// Controllable inline-edit state so saveFile's isEditing() guard is reachable without standing up
-// A real contenteditable editing session.
-let editing = false;
-let stopEditingCalls = 0;
-void mock.module("../src/editor/inline-edit", () => ({
-  isEditing: () => editing,
-  stopEditing: () => {
-    stopEditingCalls += 1;
-    editing = false;
+// SaveFile now flushes pending canvas text over the iframe bridge instead of calling the parent
+// Realm's `isEditing()` (which was dead — editing lives in the canvas iframe). Stub the bridge so
+// The save path is reachable without mounting a canvas, and record that it was asked to flush.
+let flushCalls = 0;
+void mock.module("../src/canvas/iframe-host", () => ({
+  flushCanvasEdits: async () => {
+    flushCalls += 1;
   },
 }));
 
 const { exportFile, openFile, saveFile, serializeDocument } = await import("../src/files/file-ops");
 
 beforeEach(() => {
-  editing = false;
-  stopEditingCalls = 0;
+  flushCalls = 0;
   closeAllTabs();
   seedMarkdownFormat();
   installMockPlatform({ formatAction: mockFormatAction });
@@ -127,8 +124,9 @@ describe("saveFile gaps", () => {
     expect(state.calls.filter(([name]) => name === "writeFile")).toHaveLength(0);
   });
 
-  test("stops an active inline-edit session before serializing", async () => {
-    editing = true;
+  test("flushes pending canvas text BEFORE serializing", async () => {
+    // Text reaches the document on an idle tick, so without this a save mid-sentence writes the
+    // File without the sentence.
     const { state } = installMockPlatform({ formatAction: mockFormatAction });
     openTab({
       document: { children: [], tagName: "div" },
@@ -138,8 +136,14 @@ describe("saveFile gaps", () => {
 
     await saveFile();
 
-    expect(stopEditingCalls).toBe(1);
+    expect(flushCalls).toBe(1);
     expect(state.files.has("pages/index.json")).toBe(true);
+  });
+
+  test("does not flush when there is no tab to save", async () => {
+    closeAllTabs();
+    await saveFile();
+    expect(flushCalls).toBe(0);
   });
 });
 

@@ -337,6 +337,66 @@ describe("startCanvasIframe — patch", () => {
     return { acks, container, pair };
   }
 
+  test("an ECHOED patch leaves the caret's own block alone", async () => {
+    // The regression that would make the whole feature unusable: a rich commit emits
+    // `set-key children` at the ACTIVE path. `children` is not an in-place key, so the disturbance
+    // Check would tear the block down on the caret's OWN idle tick — committing again on the way
+    // Out and re-entering the commit→patch cycle. The caret vanished every time you paused typing.
+    const { acks, container, pair } = await bootRendered(3);
+    const { caretInto } = await import("./harness");
+    const { getActivePath, isEditing } = await import("../src/editor/inline-edit");
+    // The caret needs a connected tree: bootRendered leaves the container detached.
+    document.body.append(container);
+    const h1 = container.querySelector("h1") as HTMLElement;
+
+    caretInto(h1, 1);
+    pair.flush(); // Drain the activation posts before observing the patch round-trip.
+    expect(isEditing()).toBe(true);
+    const pathBefore = getActivePath();
+    acks.length = 0;
+
+    pair.parent.post({
+      echoPaths: [["children", 0]],
+      forwardOps: [{ key: "children", op: "set-key", path: ["children", 0], value: ["Hi there"] }],
+      gen: 3,
+      kind: "patch",
+    });
+    pair.flush(); // Deliver the patch…
+    pair.flush(); // …then its acknowledgement back.
+
+    expect(isEditing()).toBe(true);
+    expect(getActivePath()).toEqual(pathBefore);
+    expect(acks.some((m) => m.kind === "patchComplete")).toBe(true);
+    // Nothing forced a commit out of the block via a spurious teardown.
+    expect(acks.some((m) => m.kind === "editEnd")).toBe(false);
+  });
+
+  test("an echoed op updates the shadow doc even though its DOM is skipped", async () => {
+    const { acks, container, pair } = await bootRendered(3);
+    const { caretInto } = await import("./harness");
+    document.body.append(container);
+    const h1 = container.querySelector("h1") as HTMLElement;
+    caretInto(h1, 1);
+    h1.textContent = "Typed by hand"; // What the caret produced.
+    pair.flush();
+    acks.length = 0;
+
+    pair.parent.post({
+      echoPaths: [["children", 0]],
+      forwardOps: [
+        { key: "textContent", op: "set-key", path: ["children", 0], value: "Typed by hand" },
+      ],
+      gen: 3,
+      kind: "patch",
+    });
+    pair.flush();
+    pair.flush();
+
+    expect(acks.some((m) => m.kind === "patchComplete")).toBe(true);
+    // The DOM the user typed was not rewritten by the patcher.
+    expect((container.querySelector("h1") as HTMLElement).textContent).toBe("Typed by hand");
+  });
+
   test("applies a value-carrying patch in place and acks patchComplete", async () => {
     const { acks, container, pair } = await bootRendered(1);
     pair.parent.post({

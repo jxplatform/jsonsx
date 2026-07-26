@@ -181,6 +181,45 @@ describe("startIframeInlineEdit", () => {
 
 // ─── Session lifecycle: commit-on-click-away + the parent endEdit message ───────
 
+describe("flushEdits", () => {
+  test("commits the caret's pending text, then acknowledges", async () => {
+    const { channel, deliver, posts } = fakeChannel();
+    const { container, el } = editableContainer();
+    boot(channel, container);
+
+    clickInto(el);
+    el.textContent = "Half a sentence";
+    // The idle tick has not fired yet — the document knows nothing about this text.
+    posts.length = 0;
+
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    deliver({ kind: "flushEdits", reqId: 42 });
+
+    const commitIdx = posts.findIndex((p) => p.kind === "editCommit");
+    const ackIdx = posts.findIndex((p) => p.kind === "flushComplete");
+    expect(commitIdx).toBeGreaterThanOrEqual(0);
+    expect(ackIdx).toBeGreaterThanOrEqual(0);
+    // Ordering is the contract: a parent that has seen the ack has already applied the text.
+    expect(commitIdx).toBeLessThan(ackIdx);
+    expect(posts[commitIdx]).toMatchObject({
+      inPlace: true,
+      path: ["children", 0],
+      textContent: "Half a sentence",
+    });
+    expect(posts[ackIdx]).toEqual({ kind: "flushComplete", reqId: 42 });
+  });
+
+  test("acknowledges even with nothing pending, so a save never hangs", () => {
+    const { channel, deliver, posts } = fakeChannel();
+    const { container } = editableContainer();
+    boot(channel, container);
+    posts.length = 0;
+
+    deliver({ kind: "flushEdits", reqId: 7 });
+    expect(posts).toEqual([{ kind: "flushComplete", reqId: 7 }]);
+  });
+});
+
 describe("session lifecycle", () => {
   test("moving the caret OUT of a block commits it", () => {
     const { channel, posts } = fakeChannel();

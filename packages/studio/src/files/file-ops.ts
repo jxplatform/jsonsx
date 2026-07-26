@@ -15,7 +15,7 @@ import { getPlatform } from "../platform";
 import { getGridController } from "../grid/grid-controller";
 import { activeTab, openTab } from "../workspace/workspace";
 import { collabSave } from "../collab/collab-session";
-import { isEditing, stopEditing } from "../editor/inline-edit";
+import { flushCanvasEdits } from "../canvas/iframe-host";
 import {
   defaultContentFormat,
   formatByName,
@@ -156,13 +156,16 @@ function savedMessage(tab: Tab, savedMsg: string) {
 
 /** Save the current document back to its source location. */
 export async function saveFile() {
-  if (isEditing()) {
-    stopEditing();
-  }
   const tab = activeTab.value;
   if (!tab) {
     return;
   }
+  // Text reaches the document on an idle tick, so the words still sitting in the caret's block have
+  // To be committed before anything serializes it. This used to be `if (isEditing()) stopEditing()`,
+  // Which was dead: editing lives in the canvas IFRAME, and `isEditing()` here reads the parent
+  // Realm's copy of that module, where a session never starts. Saving mid-sentence silently wrote
+  // The file without the sentence.
+  await flushCanvasEdits(tab.id);
   // Grid tabs batch-save through their controller (per-source commit semantics, not a doc write).
   const grid = getGridController(tab);
   if (grid) {

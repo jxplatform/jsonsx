@@ -13,6 +13,7 @@ import {
   renderResolvedDocument,
 } from "./iframe-render";
 import { measureHits, startInteraction } from "./iframe-interaction";
+import { serializeJxPath } from "./path-mapping";
 import {
   AUTO_SCROLL_STEP,
   computeDropInstruction,
@@ -26,7 +27,8 @@ import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
 import { evaluateLiveExprs } from "./iframe-eval";
 import { serializeDataScope } from "./serialize-scope";
-import { getActivePath, isEditing, stopEditing } from "../editor/inline-edit";
+import { getActivePath, isEditableBlock, isEditing, stopEditing } from "../editor/inline-edit";
+import { captureDocSelection, restoreDocSelection } from "./iframe-editable-root";
 import { isAncestor } from "../state";
 import type { JxDocOp } from "../tabs/patch-ops";
 import type { JxPath } from "../state";
@@ -385,14 +387,38 @@ export function startCanvasIframe(opts: {
         channel.post({ gen, kind: "patchError", message: "patch-ahead-of-render" });
         return;
       }
-      // A structural/subtree op that re-renders the active editable (or an ancestor) would detach
-      // The session's element mid-edit — commit and end the session first (in-place style/text
-      // Patches elsewhere leave it alone).
-      if (isEditing() && patchDisturbsActiveEdit(msg.forwardOps)) {
+      // A structural/subtree op that re-renders the active block (or an ancestor) DETACHES the
+      // Element the engine holds, so the block has to be released before the patch lands. But the
+      // Caret must not be released with it: remember where it is in DOCUMENT coordinates — a block
+      // Path plus a character offset — which survives the DOM underneath being rebuilt.
+      //
+      // This is what makes a remote co-author's edit, or a patch from any other surface, land
+      // Without throwing the local writer out of their sentence.
+      // An ECHOED op cannot disturb the edit — it IS the edit, already in the DOM. It must be
+      // Excluded from the disturbance check as well as from the DOM write: a rich commit emits
+      // `set-key children` at the active path, `children` is not an in-place key, so the check
+      // Would tear the block down on the caret's own idle tick — committing again on the way out
+      // And re-entering the commit→patch cycle. The caret would vanish every time you paused.
+      const echoed = new Set((msg.echoPaths ?? []).map((p) => serializeJxPath(p)));
+      const foreignOps =
+        echoed.size === 0
+          ? msg.forwardOps
+          : msg.forwardOps.filter(
+              (op) => !(op.op === "set-key" && echoed.has(serializeJxPath(op.path))),
+            );
+      const disturbs = isEditing() && patchDisturbsActiveEdit(foreignOps);
+      const caret = disturbs ? captureDocSelection(container, isEditableBlock) : null;
+      if (disturbs) {
         stopEditing();
       }
       try {
-        applyIframePatch(shadowDoc, msg.forwardOps, container, renderCtx);
+        applyIframePatch(shadowDoc, msg.forwardOps, container, renderCtx, msg.echoPaths);
+        // Put the caret back where the author left it. Restoring the SELECTION re-activates the
+        // Block through the editing host's own selectionchange path — there is no separate
+        // "re-enter" step, because a caret in a block IS the edit.
+        if (caret) {
+          restoreDocSelection(container, caret);
+        }
         channel.post({ gen, kind: "patchComplete" });
       } catch (error) {
         channel.post({

@@ -267,6 +267,67 @@ export function requestCanvasEval(
   });
 }
 
+// ─── Pending-edit flush ─────────────────────────────────────────────────────────
+// Text reaches the document on an idle tick, so anything that reads the document as authoritative
+// Must first ask every live frame to commit what the caret has typed since. Without this, saving
+// Mid-sentence writes the file WITHOUT the words still sitting in the caret's block.
+
+/** Monotonic flush request id. */
+let flushReqId = 0;
+
+/** Pending flush resolvers keyed by reqId; a timeout resolves anyway rather than blocking a save. */
+const pendingFlushes = new Map<number, () => void>();
+
+/** How long (ms) the parent waits for a frame to acknowledge a flush before saving regardless. */
+export const FLUSH_TIMEOUT_MS = 250;
+
+/**
+ * Ask every live frame rendering `tabId` to commit its pending text, and resolve once they have all
+ * acknowledged (or the timeout elapses — a save must never hang on an unresponsive frame).
+ */
+export function flushCanvasEdits(
+  tabId: string | null,
+  timeoutMs: number = FLUSH_TIMEOUT_MS,
+): Promise<void> {
+  const targets: HostState[] = [];
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    if (host.ready && !host.stylebook && tabId !== null && host.tabId === tabId) {
+      targets.push(host);
+    }
+  }
+  if (targets.length === 0) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    let outstanding = targets.length;
+    const timer = setTimeout(() => {
+      for (const id of ids) {
+        pendingFlushes.delete(id);
+      }
+      resolve();
+    }, timeoutMs);
+    const settle = () => {
+      outstanding -= 1;
+      if (outstanding === 0) {
+        clearTimeout(timer);
+        resolve();
+      }
+    };
+    const ids: number[] = [];
+    for (const host of targets) {
+      flushReqId += 1;
+      const reqId = flushReqId;
+      ids.push(reqId);
+      pendingFlushes.set(reqId, settle);
+      host.channel.post({ kind: "flushEdits", reqId });
+    }
+  });
+}
+
 /** The host backing a given canvas element (or null), for the coordinator's host resolution. */
 export function hostForCanvas(canvasEl: HTMLElement): HostState | null {
   return hosts.get(canvasEl) ?? null;
@@ -542,11 +603,43 @@ export function postPatchToHosts(
       continue;
     }
     if (host.ready && host.tabId === tabId) {
-      host.channel.post({ forwardOps, gen, kind: "patch" });
+      // Only the host that originated this edit already has the DOM the patch describes. A
+      // Split-view panel on the same document did NOT type it and must render normally.
+      const echoPaths = echoOrigin?.host === host ? echoOrigin.paths : undefined;
+      host.channel.post(
+        echoPaths
+          ? { echoPaths, forwardOps, gen, kind: "patch" }
+          : { forwardOps, gen, kind: "patch" },
+      );
       posted += 1;
     }
   }
   return posted;
+}
+
+/**
+ * The host whose own in-place commit is currently being applied, and the paths whose DOM it already
+ * has right.
+ *
+ * Set for the duration of the `transactDoc` call inside the `editCommit` case and read by
+ * {@link postPatchToHosts}, which runs synchronously inside it — the same begin/end shape
+ * `transact.ts` uses for op recording. Never spans an await, so it cannot leak across messages.
+ */
+let echoOrigin: { host: HostState; paths: (string | number)[][] } | null = null;
+
+/**
+ * Apply `fn` with `host`'s echo suppression armed for `paths`.
+ *
+ * This is what lets the caret survive its own edits: committing a block re-enters the patcher,
+ * which would otherwise re-render the very subtree the user is typing in.
+ */
+function withEchoSuppressed(host: HostState, paths: (string | number)[][], fn: () => void): void {
+  echoOrigin = { host, paths };
+  try {
+    fn();
+  } finally {
+    echoOrigin = null;
+  }
 }
 
 /** The tab whose document `state`'s iframe currently renders (null when unknown or closed). */
@@ -1169,16 +1262,41 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       toolbarRefresh?.();
       return;
     }
+    case "flushComplete": {
+      const done = pendingFlushes.get(msg.reqId);
+      if (done) {
+        pendingFlushes.delete(msg.reqId);
+        done();
+      }
+      return;
+    }
     case "editCommit": {
       // Route to the tab this host's iframe renders — NOT activeTab, which may have changed while
       // The message was in flight (the cross-document bleed).
-      applyInlineCommit(hostTab(state), msg.path, msg.children, msg.textContent);
+      const apply = () =>
+        applyInlineCommit(hostTab(state), msg.path, msg.children, msg.textContent);
+      // An in-place commit (the idle tick) leaves the caret in the block, so the echoed patch must
+      // Not re-render it. A commit on release renders normally — the caret has already left.
+      if (msg.inPlace) {
+        withEchoSuppressed(state, [msg.path], apply);
+      } else {
+        apply();
+      }
       return;
     }
     case "editCommitProp": {
       // A prop-bound plain session committed: persist into the instance's $props (same host-tab
       // Routing as editCommit; the unchanged-value no-op lives in the apply).
-      applyInlinePropCommit(hostTab(state), msg.path, msg.prop, msg.value);
+      //
+      // A $props change re-renders the WHOLE component instance, which would tear out the nested
+      // Editing host the caret is typing in — so an in-place commit is echo-suppressed exactly as a
+      // Page block's is. The instance re-renders for real on release.
+      const applyProp = () => applyInlinePropCommit(hostTab(state), msg.path, msg.prop, msg.value);
+      if (msg.inPlace) {
+        withEchoSuppressed(state, [msg.path], applyProp);
+      } else {
+        applyProp();
+      }
       return;
     }
     case "editSplit": {

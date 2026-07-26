@@ -65,7 +65,26 @@ export interface EditableRootDeps {
   onMergeForward?: (at: DocPos) => boolean;
   /** Replace `[from, to)` — possibly spanning blocks — with `text`. Returns whether it was handled. */
   onReplaceRange?: (from: DocPos, to: DocPos, text: string) => boolean;
+  /**
+   * Commit the active block's content to the document WITHOUT releasing it — the idle tick.
+   *
+   * Typing used to reach the document only when the caret left the block, so a crash, a tab switch,
+   * or a co-author's view lost everything since the last block change. This fires after a pause in
+   * typing instead, which also gives undo its granularity: one entry per typing burst.
+   */
+  onCommitTick?: () => void;
+  /** Idle milliseconds before {@link onCommitTick}. Defaults to {@link COMMIT_IDLE_MS}. */
+  commitDelayMs?: number;
 }
+
+/**
+ * How long typing must pause before the active block is committed.
+ *
+ * Long enough that ordinary typing produces one commit per phrase rather than per keystroke (each
+ * commit is a transaction, a patch round-trip, a collab publish, and an undo entry); short enough
+ * that what you see on screen is what a save or a crash would keep.
+ */
+export const COMMIT_IDLE_MS = 500;
 
 /** The selection's current endpoints in document coordinates, or null when it is outside the canvas. */
 export function captureDocSelection(
@@ -121,6 +140,11 @@ export interface EditableRootHandle {
   sync: () => void;
   /** Put the caret at a document position and activate its block. False when the path is gone. */
   placeCaret: (pos: DocPos) => boolean;
+  /**
+   * Commit the active block NOW, cancelling any pending idle tick. Called before anything that
+   * reads the document as authoritative — a save, a tab switch, a mode change.
+   */
+  flush: () => void;
   /** The current selection in document coordinates, or null when it is outside the canvas. */
   capture: () => DocRange | null;
   /** Restore a captured selection and re-activate its block. */
@@ -143,11 +167,53 @@ export function startEditableRoot(
     return mode === undefined || mode === "design" || mode === "edit";
   };
 
+  /** Pending idle-commit timer, or 0 when none is armed. */
+  let commitTimer = 0;
+
+  const cancelCommitTick = () => {
+    if (commitTimer) {
+      clearTimeout(commitTimer);
+      commitTimer = 0;
+    }
+  };
+
+  /**
+   * Commit the active block in place, keeping the caret where the user left it.
+   *
+   * The commit normalizes the block's inline content (merging adjacent text nodes, unwrapping empty
+   * formatting) before serializing, which REWRITES the very text nodes the caret is anchored in.
+   * Capturing the caret in document coordinates first and restoring afterwards is what makes an
+   * idle commit invisible — without it, typing would jump the caret every time you paused.
+   */
+  const commitTick = () => {
+    commitTimer = 0;
+    if (!activeEl || !deps.onCommitTick) {
+      return;
+    }
+    const caret = captureDocSelection(container, deps.isEditableBlock);
+    deps.onCommitTick();
+    if (caret) {
+      restoreDocSelection(container, caret);
+    }
+  };
+
+  /** (Re)arm the idle tick — every keystroke pushes it further out. */
+  const scheduleCommitTick = () => {
+    if (!deps.onCommitTick || !activeEl) {
+      return;
+    }
+    cancelCommitTick();
+    commitTimer = setTimeout(commitTick, deps.commitDelayMs ?? COMMIT_IDLE_MS) as unknown as number;
+  };
+
   /** Release whatever is active, if anything. */
   const deactivate = () => {
     if (!activeEl) {
       return;
     }
+    // Leaving the block commits it through `onDeactivate`, so a pending tick is redundant — and
+    // Firing it afterwards would commit a block that is no longer active.
+    cancelCommitTick();
     activeEl = null;
     activeKey = null;
     deps.onDeactivate();
@@ -326,13 +392,27 @@ export function startEditableRoot(
     e.preventDefault();
   };
 
+  /**
+   * Every applied edit re-arms the idle tick. Listening to `input` (not `beforeinput`) means this
+   * counts what actually landed — including the native single-block edits the chokepoint waved
+   * through, and the DOM changes a structural handler made on our behalf.
+   */
+  const onInput = () => scheduleCommitTick();
+
   doc.addEventListener("selectionchange", syncActiveBlock);
   container.addEventListener("beforeinput", onBeforeInput);
+  container.addEventListener("input", onInput);
   container.addEventListener("dragstart", onDragStart);
   doc.addEventListener("pointerdown", onPointerDownCapture, true);
 
   return {
     capture: () => captureDocSelection(container, deps.isEditableBlock),
+    flush: () => {
+      if (commitTimer) {
+        cancelCommitTick();
+        commitTick();
+      }
+    },
     placeCaret: (pos) => {
       const ok = restoreDocSelection(container, { anchor: pos, head: pos });
       if (ok) {
@@ -350,8 +430,10 @@ export function startEditableRoot(
     stop: () => {
       doc.removeEventListener("selectionchange", syncActiveBlock);
       container.removeEventListener("beforeinput", onBeforeInput);
+      container.removeEventListener("input", onInput);
       container.removeEventListener("dragstart", onDragStart);
       doc.removeEventListener("pointerdown", onPointerDownCapture, true);
+      // Deactivating commits, so the pending tick is cancelled rather than fired.
       deactivate();
     },
     sync: syncActiveBlock,

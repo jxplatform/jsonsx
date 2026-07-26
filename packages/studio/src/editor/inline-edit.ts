@@ -182,8 +182,9 @@ let commitFn:
       path: JxPath,
       children: (JxMutableNode | string)[] | null,
       textContent: string | null,
+      inPlace: boolean,
     ) => void)
-  | null = null; // Function(path, newChildren, newTextContent) to commit changes
+  | null = null; // Function(path, newChildren, newTextContent, inPlace) to commit changes
 /**
  * @type {((path: JxPath, beforeChildren: JxContentResult, afterChildren: JxContentResult) => void)
  *   | null}
@@ -269,6 +270,7 @@ export function startEditing(
       path: JxPath,
       children: (JxMutableNode | string)[] | null,
       textContent: string | null,
+      inPlace: boolean,
     ) => void;
     onSplit: (
       path: JxPath,
@@ -332,7 +334,7 @@ export function stopEditing(silent = false) {
     return;
   }
 
-  commitChanges();
+  commitChanges(false);
   slash.dismiss();
 
   delete activeEl.dataset.jxActiveBlock;
@@ -361,6 +363,21 @@ export function stopEditing(silent = false) {
     endFn = null;
     fn();
   }
+}
+
+/**
+ * Commit the active block's content to the document WITHOUT releasing it.
+ *
+ * The idle-tick counterpart to {@link stopEditing}: the caret stays exactly where it is and the
+ * block stays active, so typing continues uninterrupted while the document keeps up. Callers are
+ * responsible for preserving the caret across the DOM normalization this performs — the editing
+ * host does that in model coordinates (see `commitTick`).
+ *
+ * A no-op when nothing is active, and the apply side no-ops an unchanged value, so calling this on
+ * every pause is cheap.
+ */
+export function commitActiveBlock(): void {
+  commitChanges(true);
 }
 
 /**
@@ -567,7 +584,14 @@ function releaseWithoutCommit(): void {
 
 // ─── Content sync: DOM → Jx ────────────────────────────────────────────
 
-function commitChanges() {
+/**
+ * Serialize the active block and hand it to `onCommit`.
+ *
+ * `inPlace` distinguishes the idle tick (the caret is still in this block) from a release. The
+ * parent uses it to suppress the DOM half of the echoed patch, so a commit mid-typing cannot
+ * re-render the subtree the caret lives in.
+ */
+function commitChanges(inPlace: boolean) {
   if (!commitFn || !activeEl || !activePath) {
     return;
   }
@@ -575,13 +599,13 @@ function commitChanges() {
   if (_plainMode) {
     // A prop value is a plain single-line string (a directive attribute) — flatten any newline
     // That survived plaintext editing and skip the rich DOM→Jx serialization entirely.
-    commitFn(activePath, null, (activeEl.textContent ?? "").replaceAll("\n", " "));
+    commitFn(activePath, null, (activeEl.textContent ?? "").replaceAll("\n", " "), inPlace);
     return;
   }
 
   normalizeInlineContent(activeEl);
   const result = elementToJx(activeEl);
-  commitFn(activePath, result.children ?? null, result.textContent ?? null);
+  commitFn(activePath, result.children ?? null, result.textContent ?? null, inPlace);
 }
 
 /**

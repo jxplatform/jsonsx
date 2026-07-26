@@ -80,9 +80,28 @@ export type ParentToIframe =
   // Draw the selection overlay regardless of where the selection change originated (canvas click,
   // Layers panel, keyboard) — the parent can't measure iframe nodes itself (cross-origin bridge).
   | { kind: "measure"; paths: (string | number)[][]; reqId: number }
+  // Commit any text the caret has typed but not yet flushed, then acknowledge. The parent sends
+  // This before anything that reads the document as authoritative — chiefly a save. Because the
+  // Resulting `editCommit` is posted BEFORE the acknowledgement and postMessage preserves order,
+  // A parent that has seen `flushComplete` has already applied the pending text.
+  | { kind: "flushEdits"; reqId: number }
   // Apply a surgical edit: fold each value-carrying forward op into the shadow doc and patch the DOM
   // In place. `gen` matches the last render so the iframe drops patches superseded by a re-render.
-  | { kind: "patch"; forwardOps: WireDocOp[]; gen: number }
+  | {
+      kind: "patch";
+      forwardOps: WireDocOp[];
+      gen: number;
+      /**
+       * Paths whose DOM the RECIPIENT already has correct, because this patch is the echo of an
+       * edit it originated itself. Their ops are still folded into the shadow doc; only the DOM
+       * write is skipped — re-rendering the subtree the user is typing in would destroy the caret.
+       *
+       * Sent ONLY to the originating host, and only while the block is still active: a split-view
+       * panel showing the same document did NOT type the text, and the final commit-on-exit must
+       * render normally.
+       */
+      echoPaths?: (string | number)[][];
+    }
   // Replace the rendered ROOT's style block in place (stylebook live style editing): the iframe
   // Folds it into the shadow doc and re-runs the runtime's reapplyStyle on the root element, which
   // Regenerates the whole scoped-CSS cascade (real @media included) without a re-render. `style` is
@@ -244,6 +263,8 @@ export interface SerializedKey {
 /** Messages the canvas iframe sends back to the editor (parent). */
 export type IframeToParent =
   | { kind: "ready" }
+  // Acknowledges a `flushEdits`: every pending commit for this frame has been posted.
+  | { kind: "flushComplete"; reqId: number }
   | { kind: "renderComplete"; gen: number }
   | { kind: "renderError"; gen: number; message: string }
   // The iframe's measured content height in CSS px. The host sizes the iframe ELEMENT to this so the
@@ -302,10 +323,18 @@ export type IframeToParent =
       path: (string | number)[];
       children: (JxMutableNode | string)[] | null;
       textContent: string | null;
+      /**
+       * True when the caret is still in the block (the idle tick) rather than leaving it. The
+       * parent echoes such a commit back with the path suppressed, so the patch cannot re-render
+       * the subtree under a live caret.
+       */
+      inPlace?: boolean;
     }
   // Committed prop-bound text: persist `value` into `$props[prop]` of the instance at `path`.
   | {
       kind: "editCommitProp";
+      /** See `editCommit.inPlace` — a prop patch re-renders the whole instance. */
+      inPlace?: boolean;
       path: (string | number)[];
       prop: string;
       value: string;

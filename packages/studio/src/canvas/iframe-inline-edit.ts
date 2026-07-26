@@ -20,6 +20,7 @@
  */
 
 import {
+  commitActiveBlock,
   getActiveElement,
   isEditableBlock,
   isEditing,
@@ -234,8 +235,16 @@ export function startIframeInlineEdit(
     restoreTemplateExpressions(el);
     channel.post({ kind: "editStart", path });
     startEditing(el, path, {
-      onCommit: (p, children, textContent) =>
-        channel.post({ children, kind: "editCommit", path: p, textContent }),
+      // `inPlace` rides along only when set: a release commit is the common case and the flag is
+      // Optional, so omitting it keeps the message shape unchanged for every non-tick commit.
+      onCommit: (p, children, textContent, inPlace) =>
+        channel.post({
+          children,
+          kind: "editCommit",
+          path: p,
+          textContent,
+          ...(inPlace ? { inPlace: true } : {}),
+        }),
       onEnd: () => {
         clearHighlight();
         lastNonEmptyRange = null;
@@ -283,8 +292,14 @@ export function startIframeInlineEdit(
       el,
       hostPath,
       {
-        onCommit: (p, _children, textContent) =>
-          channel.post({ kind: "editCommitProp", path: p, prop, value: textContent ?? "" }),
+        onCommit: (p, _children, textContent, inPlace) =>
+          channel.post({
+            kind: "editCommitProp",
+            path: p,
+            prop,
+            value: textContent ?? "",
+            ...(inPlace ? { inPlace: true } : {}),
+          }),
         onEnd: () => {
           clearHighlight();
           lastNonEmptyRange = null;
@@ -377,6 +392,7 @@ export function startIframeInlineEdit(
         stopEditing();
       }
     },
+    onCommitTick: () => commitActiveBlock(),
     onPropActivate: activateProp,
     onSelectionChange: () => onSelectionChange(),
     onSplit: () => splitActiveBlock(),
@@ -389,6 +405,13 @@ export function startIframeInlineEdit(
   const off = channel.onMessage((msg) => {
     if (msg.kind === "applyFormat") {
       applyFormatIntent(msg.intent);
+      return;
+    }
+    if (msg.kind === "flushEdits") {
+      // Commit anything the idle tick has not yet written, THEN acknowledge. The commit is posted
+      // First, so a parent that has seen the acknowledgement has already applied the text.
+      root.flush();
+      channel.post({ kind: "flushComplete", reqId: msg.reqId });
       return;
     }
     if (msg.kind === "endEdit") {

@@ -377,7 +377,10 @@ describe("keydown guards", () => {
     input.remove();
   });
 
-  test("ctrl+s while inline editing stops editing and saves", () => {
+  test("ctrl+s while the caret is in a block saves WITHOUT ending the block", () => {
+    // The caret must survive a save: saveFile flushes every canvas frame's pending text itself, so
+    // Ending the block here would be a second, racing commit path — and would eject the writer
+    // From their sentence every time they hit save.
     const p = document.createElement("p");
     p.textContent = "edit me";
     document.body.append(p);
@@ -389,8 +392,9 @@ describe("keydown guards", () => {
     });
     expect(isEditing()).toBe(true);
     pressDoc("s", { ctrlKey: true });
-    expect(isEditing()).toBe(false);
     expect(saveFile).toHaveBeenCalledTimes(1);
+    expect(isEditing()).toBe(true);
+    stopEditing();
     p.remove();
   });
 

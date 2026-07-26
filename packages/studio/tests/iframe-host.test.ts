@@ -103,6 +103,7 @@ const {
   setStylebookHitHandler,
   setToolbarRefresh,
 } = await import("../src/canvas/iframe-host");
+const { flushCanvasEdits } = await import("../src/canvas/iframe-host");
 
 beforeEach(() => {
   channels.length = 0;
@@ -728,6 +729,50 @@ describe("iframe canvas inline-edit bridge", () => {
       textContent: "Edited",
     });
     expect(docChildren()[0]!.textContent).toBe("Edited");
+  });
+
+  test("flushCanvasEdits asks the frame to commit, and resolves on its acknowledgement", async () => {
+    // A save must never serialize the document while the words the author just typed are still
+    // Sitting in the caret's block waiting for the idle tick.
+    await mountReady();
+    channels[0]!.posts.length = 0;
+    const done = flushCanvasEdits(activeTab.value!.id);
+
+    const req = channels[0]!.posts.find((p) => p.kind === "flushEdits") as
+      | { reqId: number }
+      | undefined;
+    expect(req).toBeDefined();
+
+    let settled = false;
+    void done.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false); // Still waiting on the frame.
+
+    channels[0]!.deliver({ kind: "flushComplete", reqId: req!.reqId });
+    await done;
+    expect(settled).toBe(true);
+  });
+
+  test("flushCanvasEdits resolves immediately when no frame renders that tab", async () => {
+    await mountReady();
+    channels[0]!.posts.length = 0;
+    await flushCanvasEdits("some-other-tab");
+    expect(channels[0]!.posts.some((p) => p.kind === "flushEdits")).toBe(false);
+  });
+
+  test("flushCanvasEdits gives up after its timeout rather than hanging the save", async () => {
+    // A wedged frame must not be able to block saving.
+    await mountReady();
+    await flushCanvasEdits(activeTab.value!.id, 10);
+  });
+
+  test("a stale flushComplete is ignored", async () => {
+    await mountReady();
+    channels[0]!.deliver({ kind: "flushComplete", reqId: 999_999 });
+    // No throw, no state change — the reqId map simply has no entry.
+    expect(true).toBe(true);
   });
 
   test("editSplit applies and re-enters on the new paragraph once the DOM acks", async () => {
