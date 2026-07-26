@@ -109,7 +109,12 @@ export type ParentToIframe =
   // RenderedGen — a stale update is dropped (the superseding render carries the same style).
   | { kind: "styleUpdate"; style: Record<string, unknown>; gen: number }
   // Enter inline editing on the node at `path` (used to re-enter after a split/insert re-renders).
-  | { kind: "enterEdit"; path: (string | number)[] }
+  | {
+      kind: "enterEdit";
+      path: (string | number)[];
+      /** Character offset for the caret; defaults to the block's start. */
+      offset?: number;
+    }
   // Commit and end the inline-edit session if one is live (a no-op otherwise). Posted by the parent
   // When focus/intent leaves the edit surface in the PARENT realm (tab switch, layers-panel click,
   // Chrome pointerdown outside the edit toolbars) — the iframe can't observe those itself. Carries
@@ -330,6 +335,11 @@ export type IframeToParent =
        */
       inPlace?: boolean;
     }
+  // Join two blocks. `fromPath`'s content is appended to `intoPath`'s and `fromPath` is removed —
+  // Backspace at a block start and Delete at a block end are the same operation from either side.
+  // The iframe names BOTH paths because document order lives in the rendered DOM, where a list
+  // Item, a table cell, and a nested container all resolve without the parent re-deriving it.
+  | { kind: "editMerge"; fromPath: (string | number)[]; intoPath: (string | number)[] }
   // Committed prop-bound text: persist `value` into `$props[prop]` of the instance at `path`.
   | {
       kind: "editCommitProp";

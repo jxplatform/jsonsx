@@ -25,8 +25,10 @@ import {
   mutateUpdateProperty,
   mutateUpdateStyle,
   mutateWrapNode,
+  redo,
   transact,
   transactDoc,
+  undo,
 } from "../src/tabs/transact";
 
 import type { JxPatchOp } from "../src/tabs/patch-ops";
@@ -39,6 +41,8 @@ interface ConsumerLog {
   classified: JxPatchOp[][];
   marked: object[];
   applied: JxPatchOp[][];
+  /** The VALUE-CARRYING forward ops each apply received — what actually crosses to the canvas. */
+  appliedDocOps: unknown[][];
   escalated: string[];
 }
 
@@ -46,10 +50,17 @@ function installConsumer({
   patchable = true,
   applyThrows = false,
 }: { patchable?: boolean; applyThrows?: boolean } = {}): ConsumerLog {
-  const log: ConsumerLog = { applied: [], classified: [], escalated: [], marked: [] };
+  const log: ConsumerLog = {
+    applied: [],
+    appliedDocOps: [],
+    classified: [],
+    escalated: [],
+    marked: [],
+  };
   setPatchConsumer({
-    apply: (_tab, ops) => {
+    apply: (_tab, ops, record) => {
       log.applied.push(ops);
+      log.appliedDocOps.push((record?.docOps ?? []).map((pair) => pair.forward));
       if (applyThrows) {
         throw new Error("boom");
       }
@@ -236,5 +247,53 @@ describe("transactDoc consumer wiring", () => {
         (toRaw(tab.doc.document) as Record<string, unknown>).children as Record<string, unknown>[]
       )[0]!.style,
     ).toEqual({ color: "blue" });
+  });
+});
+
+// ─── Undo/redo must carry values, not just classifications ────────────────────
+
+describe("history replay records value-carrying ops", () => {
+  test("undo posts the ops the canvas needs, not an empty patch", () => {
+    // The canvas lives in an iframe and can only be patched from `record.docOps`. Recording only
+    // The classification patch left this empty, so undo posted an EMPTY patch: the document
+    // Changed, the patch classified as applicable (suppressing the full render), and the canvas
+    // Silently kept showing the pre-undo content.
+    const log = installConsumer();
+    transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 0], "textContent", "edited"));
+    log.appliedDocOps.length = 0;
+
+    undo(tab);
+
+    expect(log.appliedDocOps).toHaveLength(1);
+    expect(log.appliedDocOps[0]).toEqual([
+      { key: "textContent", op: "set-key", path: ["children", 0], value: "hello" },
+    ]);
+  });
+
+  test("redo carries values too", () => {
+    const log = installConsumer();
+    transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 0], "textContent", "edited"));
+    undo(tab);
+    log.appliedDocOps.length = 0;
+
+    redo(tab);
+
+    expect(log.appliedDocOps[0]).toEqual([
+      { key: "textContent", op: "set-key", path: ["children", 0], value: "edited" },
+    ]);
+  });
+
+  test("undoing a structural change carries the reinserted node", () => {
+    const log = installConsumer();
+    transactDoc(tab, (t) => mutateRemoveNode(t, ["children", 1]));
+    log.appliedDocOps.length = 0;
+
+    undo(tab);
+
+    const [op] = log.appliedDocOps[0] as { op: string; index: number; node: unknown }[];
+    expect(op!.op).toBe("insert-child");
+    expect(op!.index).toBe(1);
+    // Without the node itself the canvas could not re-render the restored block.
+    expect(op!.node).toMatchObject({ tagName: "span", textContent: "world" });
   });
 });

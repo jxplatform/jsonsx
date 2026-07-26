@@ -167,6 +167,102 @@ describe("Enter splits the block", () => {
   });
 });
 
+describe("block merges", () => {
+  /** Two stamped paragraphs in the container, ready to be joined. */
+  function twoBlocks(container: HTMLElement) {
+    const first = document.createElement("p");
+    first.dataset.jxPath = '["children",0]';
+    first.textContent = "First";
+    const second = document.createElement("p");
+    second.dataset.jxPath = '["children",1]';
+    second.textContent = "Second";
+    container.append(first, second);
+    return { first, second };
+  }
+
+  test("Backspace at a block start posts a merge onto the previous block", () => {
+    const { container, fromIframe, pair } = boot();
+    const { second } = twoBlocks(container);
+    clickInto(second);
+    caretInto(second, 0);
+
+    const prevented = beforeInput(second, "deleteContentBackward");
+    pair.flush();
+
+    expect(prevented).toBe(true);
+    expect(fromIframe.find((m) => m.kind === "editMerge")).toEqual({
+      fromPath: ["children", 1],
+      intoPath: ["children", 0],
+      kind: "editMerge",
+    });
+  });
+
+  test("Delete at a block end pulls the NEXT block up into this one", () => {
+    const { container, fromIframe, pair } = boot();
+    const { first } = twoBlocks(container);
+    clickInto(first);
+    caretInto(first, "First".length);
+
+    const prevented = beforeInput(first, "deleteContentForward");
+    pair.flush();
+
+    expect(prevented).toBe(true);
+    // Same join, approached from the other side: the earlier block always survives.
+    expect(fromIframe.find((m) => m.kind === "editMerge")).toEqual({
+      fromPath: ["children", 1],
+      intoPath: ["children", 0],
+      kind: "editMerge",
+    });
+  });
+
+  test("Backspace in the FIRST block posts nothing — there is nothing to join onto", () => {
+    const { container, fromIframe, pair } = boot();
+    const { first } = twoBlocks(container);
+    clickInto(first);
+    caretInto(first, 0);
+
+    const prevented = beforeInput(first, "deleteContentBackward");
+    pair.flush();
+
+    // Still suppressed: letting the browser act would restructure the DOM behind the model's back.
+    expect(prevented).toBe(true);
+    expect(fromIframe.some((m) => m.kind === "editMerge")).toBe(false);
+  });
+
+  test("Delete at the END of the last block posts nothing", () => {
+    const { container, fromIframe, pair } = boot();
+    const { second } = twoBlocks(container);
+    clickInto(second);
+    caretInto(second, "Second".length);
+
+    beforeInput(second, "deleteContentForward");
+    pair.flush();
+    expect(fromIframe.some((m) => m.kind === "editMerge")).toBe(false);
+  });
+
+  test("a merge flushes uncommitted text first, so nothing typed is lost", () => {
+    const { container, fromIframe, pair } = boot();
+    const { first, second } = twoBlocks(container);
+    clickInto(first);
+    first.textContent = "First edited";
+    first.dispatchEvent(new Event("input", { bubbles: true }));
+    // Move to the second block WITHOUT waiting for the idle tick, then merge back.
+    clickInto(second);
+    second.textContent = "Second edited";
+    second.dispatchEvent(new Event("input", { bubbles: true }));
+    caretInto(second, 0);
+    beforeInput(second, "deleteContentBackward");
+    pair.flush();
+
+    const commits = fromIframe.filter((m) => m.kind === "editCommit") as {
+      textContent: string | null;
+    }[];
+    // The block being merged away had its typed text committed before the join.
+    expect(commits.some((c) => c.textContent === "Second edited")).toBe(true);
+    expect(fromIframe.some((m) => m.kind === "editMerge")).toBe(true);
+  });
+});
+
 describe("enterEdit mode gate", () => {
   test("a parent enterEdit is refused outside design/edit modes", () => {
     const { container, fromIframe, pair } = boot({ getMode: () => "stylebook" });

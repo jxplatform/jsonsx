@@ -29,6 +29,7 @@ import {
   stopEditing,
 } from "../editor/inline-edit";
 import { startEditableRoot } from "./iframe-editable-root";
+import { adjacentBlock } from "./iframe-position";
 import { isTagActiveInSelection, toggleInlineFormat } from "../editor/inline-format";
 import { applyLink, insertTemplateToken, linkStateForSelection } from "../editor/inline-link";
 import { restoreTemplateExpressions } from "../utils/edit-display";
@@ -368,6 +369,27 @@ export function startIframeInlineEdit(
     return true;
   };
 
+  /**
+   * Post a join between the block at `path` and its document-order neighbour.
+   *
+   * `direction` is which way the caret was deleting: backward joins this block onto the previous
+   * one, forward pulls the next one up into this. Either way the surviving block is the earlier of
+   * the two, so the caret ends at the seam inside it. Returns false at the document's ends, where
+   * the chokepoint then suppresses the keystroke rather than doing nothing visible.
+   */
+  const postMerge = (path: JxPath, direction: -1 | 1): boolean => {
+    const neighbour = adjacentBlock(container, path, direction, isEditableBlock);
+    if (!neighbour) {
+      return false;
+    }
+    const [fromPath, intoPath] = direction === -1 ? [path, neighbour.path] : [neighbour.path, path];
+    // Commit what the caret has typed but not yet flushed, or the merge would join the block's
+    // Last COMMITTED content and silently drop the rest.
+    root.flush();
+    channel.post({ fromPath, intoPath, kind: "editMerge" });
+    return true;
+  };
+
   const onMouseUp = () => cacheRange();
   const onKeyUp = () => cacheRange();
   // Capture-phase blur: cache the range before focus moves out (the bubbling blur fires too late).
@@ -393,6 +415,10 @@ export function startIframeInlineEdit(
       }
     },
     onCommitTick: () => commitActiveBlock(),
+    // Backspace at a block's start and Delete at its end are the same join, approached from either
+    // Side. The neighbour is resolved HERE because document order lives in the rendered DOM.
+    onMergeBackward: (at) => postMerge(at.path, -1),
+    onMergeForward: (at) => postMerge(at.path, 1),
     onPropActivate: activateProp,
     onSelectionChange: () => onSelectionChange(),
     onSplit: () => splitActiveBlock(),
@@ -433,7 +459,7 @@ export function startIframeInlineEdit(
     // Caret is, so there is nothing else to "enter".
     const el = elementForPath(container, msg.path);
     if (el && isEditableBlock(el)) {
-      root.placeCaret({ offset: 0, path: msg.path });
+      root.placeCaret({ offset: msg.offset ?? 0, path: msg.path });
     }
   });
 

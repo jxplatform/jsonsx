@@ -272,27 +272,38 @@ export function startEditableRoot(
   /**
    * Resolve the range a `beforeinput` will affect, in model coordinates.
    *
-   * `getTargetRanges()` is authoritative in Chromium (it reports what the engine is ABOUT to touch,
-   * which for a backward delete is a real range, not the collapsed caret). It is absent on
-   * synthetic events and empty for some input types, so the live selection is the fallback.
+   * A COLLAPSED selection is the author's intent, and it outranks `getTargetRanges()`.
+   *
+   * For Backspace at a block's start, Chromium reports the range it would DELETE — which reaches
+   * back out of this block and into the previous one, because joining them is how the engine
+   * implements the keystroke. Read as the affected range, that makes a boundary merge look like a
+   * cross-block selection edit, and the keystroke gets suppressed: Backspace at a block start
+   * silently does nothing. The caret says what the author meant; the target range says what the
+   * browser would have done about it.
+   *
+   * `getTargetRanges()` still wins for a real selection, where it is authoritative about what will
+   * be removed. It is also absent on synthetic events, so the selection is the fallback there.
+   *
+   * Happy-dom implements no `getTargetRanges()` at all, so unit tests always take the selection
+   * branch and CANNOT distinguish these two readings — this one is pinned by CDP.
    */
   const affectedRange = (
     e: InputEvent,
   ): { from: DocPos; to: DocPos; endEl: HTMLElement } | null => {
     const [target] = typeof e.getTargetRanges === "function" ? e.getTargetRanges() : [];
+    const sel = doc.getSelection();
+    const useSelection = sel && sel.rangeCount > 0 && (sel.isCollapsed || !target);
     let startNode: Node | null;
     let startOffset: number;
     let endNode: Node | null;
     let endOffset: number;
-    if (target) {
-      ({ startContainer: startNode, startOffset, endContainer: endNode, endOffset } = target);
-    } else {
-      const sel = doc.getSelection();
-      if (!sel || sel.rangeCount === 0) {
-        return null;
-      }
+    if (useSelection) {
       const r = sel.getRangeAt(0);
       ({ startContainer: startNode, startOffset, endContainer: endNode, endOffset } = r);
+    } else if (target) {
+      ({ startContainer: startNode, startOffset, endContainer: endNode, endOffset } = target);
+    } else {
+      return null;
     }
     const from = toDocPos(startNode, startOffset, deps.isEditableBlock);
     const to = toDocPos(endNode, endOffset, deps.isEditableBlock);

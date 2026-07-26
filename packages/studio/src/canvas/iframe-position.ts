@@ -190,3 +190,62 @@ export function isAtBlockEnd(block: HTMLElement, pos: DocPos): boolean {
 export function samePath(a: DocPos, b: DocPos): boolean {
   return serializeJxPath(a.path) === serializeJxPath(b.path);
 }
+
+/**
+ * Every block the caret can reach inside `container`, in DOCUMENT ORDER.
+ *
+ * Order comes from the rendered DOM rather than from the document tree because that is where it is
+ * already correct: a list item, a table cell, a block inside a nested container, and a repeater's
+ * rendered rows all fall into the right sequence with no traversal rules to get wrong. Blocks
+ * inside a component island are excluded — {@link activeBlockAt} refuses to resolve out of one, so a
+ * block that does not resolve to ITSELF is not reachable by the caret.
+ */
+export function blocksInOrder(
+  container: HTMLElement,
+  isEditable: EditablePredicate,
+): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  for (const el of container.querySelectorAll<HTMLElement>("[data-jx-path]")) {
+    if (isEditable(el) && !sealedInIsland(el, container)) {
+      out.push(el);
+    }
+  }
+  return out;
+}
+
+/**
+ * Whether any ancestor of `el` up to `container` is a component island.
+ *
+ * {@link activeBlockAt} cannot answer this for a block that is itself stamped — the walk returns
+ * that block immediately and never reaches the barrier above it. Caret navigation has to look
+ * upward explicitly, or arrowing through the document would step into a component's internals.
+ */
+function sealedInIsland(el: HTMLElement, container: HTMLElement): boolean {
+  let cur = el.parentElement;
+  while (cur && cur !== container) {
+    if (isIslandBoundary(cur)) {
+      return true;
+    }
+    cur = cur.parentElement;
+  }
+  return false;
+}
+
+/**
+ * The block immediately before (-1) or after (+1) `path` in document order, or null at the ends of
+ * the document.
+ */
+export function adjacentBlock(
+  container: HTMLElement,
+  path: JxPath,
+  direction: -1 | 1,
+  isEditable: EditablePredicate,
+): { el: HTMLElement; path: JxPath } | null {
+  const blocks = blocksInOrder(container, isEditable);
+  const key = serializeJxPath(path);
+  const index = blocks.findIndex((el) => el.dataset.jxPath === key);
+  const neighbour = index === -1 ? undefined : blocks[index + direction];
+  return neighbour
+    ? { el: neighbour, path: parseJxPath(neighbour.dataset.jxPath as string) }
+    : null;
+}

@@ -6,12 +6,14 @@
 import { resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
+  applyBlockMerge,
   applyInlineCommit,
   applyInlineInsert,
   applyInlinePropCommit,
   applyInlineSplit,
   isEmptyContent,
 } from "../src/editor/inline-edit-apply";
+import { undo } from "../src/tabs/transact";
 import type { SlashCommand } from "../src/editor/inline-edit";
 import type { Tab } from "../src/tabs/tab";
 
@@ -57,6 +59,133 @@ describe("applyInlineCommit", () => {
   test("is a no-op when the text is unchanged", () => {
     applyInlineCommit(tab, ["children", 0], null, "Hello");
     expect(kids()[0]!.textContent).toBe("Hello");
+  });
+});
+
+describe("applyBlockMerge", () => {
+  /** Two plain paragraphs, plus a list whose single item follows them. */
+  const twoParas = () => ({
+    children: [
+      { tagName: "p", textContent: "First" },
+      { tagName: "p", textContent: "Second" },
+    ],
+    tagName: "div",
+  });
+
+  test("joins the second block onto the first and returns the seam", () => {
+    tab = resetWorkspaceWithTab(twoParas());
+    const seam = applyBlockMerge(tab, ["children", 1], ["children", 0]);
+
+    expect(kids()).toHaveLength(1);
+    expect(kids()[0]!.textContent).toBe("FirstSecond");
+    // The caret belongs where the two blocks met — not at the end of the joined text.
+    expect(seam).toEqual({ offset: 5, path: ["children", 0] });
+  });
+
+  test("merging an EMPTY block just removes it, leaving the caret at the previous end", () => {
+    tab = resetWorkspaceWithTab({
+      children: [
+        { tagName: "p", textContent: "Kept" },
+        { tagName: "p", textContent: "" },
+      ],
+      tagName: "div",
+    });
+    const seam = applyBlockMerge(tab, ["children", 1], ["children", 0]);
+    expect(kids()).toHaveLength(1);
+    expect(kids()[0]!.textContent).toBe("Kept");
+    expect(seam).toEqual({ offset: 4, path: ["children", 0] });
+  });
+
+  test("merging INTO an empty block keeps the survivor's tag", () => {
+    // Backspace at the start of a paragraph that follows an empty heading: the heading survives.
+    tab = resetWorkspaceWithTab({
+      children: [
+        { tagName: "h2", textContent: "" },
+        { tagName: "p", textContent: "Body" },
+      ],
+      tagName: "div",
+    });
+    const seam = applyBlockMerge(tab, ["children", 1], ["children", 0]);
+    expect(kids()).toHaveLength(1);
+    expect(kids()[0]).toMatchObject({ tagName: "h2", textContent: "Body" });
+    expect(seam).toEqual({ offset: 0, path: ["children", 0] });
+  });
+
+  test("concatenates rich children, preserving inline markup from both sides", () => {
+    tab = resetWorkspaceWithTab({
+      children: [
+        { children: ["a ", { tagName: "strong", textContent: "bold" }], tagName: "p" },
+        { children: [{ tagName: "em", textContent: "it" }, " c"], tagName: "p" },
+      ],
+      tagName: "div",
+    });
+    const seam = applyBlockMerge(tab, ["children", 1], ["children", 0]);
+    expect(kids()).toHaveLength(1);
+    expect(kids()[0]!.children).toEqual([
+      "a ",
+      { tagName: "strong", textContent: "bold" },
+      { tagName: "em", textContent: "it" },
+      " c",
+    ]);
+    // The seam is the rendered length of the FIRST block: "a " + "bold".
+    expect(seam).toEqual({ offset: 6, path: ["children", 0] });
+  });
+
+  test("a plain block merging a rich one becomes rich", () => {
+    tab = resetWorkspaceWithTab({
+      children: [
+        { tagName: "p", textContent: "plain " },
+        { children: [{ tagName: "strong", textContent: "rich" }], tagName: "p" },
+      ],
+      tagName: "div",
+    });
+    applyBlockMerge(tab, ["children", 1], ["children", 0]);
+    expect(kids()[0]!.children).toEqual(["plain ", { tagName: "strong", textContent: "rich" }]);
+    expect(kids()[0]!.textContent).toBeUndefined();
+  });
+
+  test("prunes the container a removal empties", () => {
+    // Backspacing the only item out of a list must not leave an invisible <ul> behind.
+    tab = resetWorkspaceWithTab({
+      children: [
+        { tagName: "p", textContent: "Intro" },
+        { children: [{ tagName: "li", textContent: "only" }], tagName: "ul" },
+      ],
+      tagName: "div",
+    });
+    applyBlockMerge(tab, ["children", 1, "children", 0], ["children", 0]);
+    expect(kids()).toHaveLength(1);
+    expect(kids()[0]!.textContent).toBe("Introonly");
+  });
+
+  test("refuses a merge between a block and its own ancestor", () => {
+    // A loose list item and the paragraph inside it are adjacent in document order, but joining
+    // Them would mean a node absorbing its own parent.
+    tab = resetWorkspaceWithTab({
+      children: [{ children: [{ tagName: "p", textContent: "inner" }], tagName: "li" }],
+      tagName: "div",
+    });
+    expect(applyBlockMerge(tab, ["children", 0, "children", 0], ["children", 0])).toBeNull();
+    expect(kids()).toHaveLength(1);
+  });
+
+  test("refuses when a path does not resolve, and no-ops without a tab", () => {
+    tab = resetWorkspaceWithTab(twoParas());
+    expect(applyBlockMerge(tab, ["children", 9], ["children", 0])).toBeNull();
+    expect(applyBlockMerge(tab, ["children", 1], ["children", 9])).toBeNull();
+    expect(applyBlockMerge(null, ["children", 1], ["children", 0])).toBeNull();
+    expect(kids()).toHaveLength(2);
+  });
+
+  test("the whole merge undoes as one step", () => {
+    tab = resetWorkspaceWithTab(twoParas());
+    applyBlockMerge(tab, ["children", 1], ["children", 0]);
+    expect(kids()).toHaveLength(1);
+
+    undo(tab);
+    expect(kids()).toHaveLength(2);
+    expect(kids()[0]!.textContent).toBe("First");
+    expect(kids()[1]!.textContent).toBe("Second");
   });
 });
 

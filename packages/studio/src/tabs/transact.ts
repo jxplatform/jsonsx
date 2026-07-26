@@ -340,6 +340,16 @@ function applyDocOp(tab: Tab, op: JxDocOp) {
   const prev =
     op.op === "set-key" ? (getNodeAtPath(tab.doc.document, op.path)?.[op.key] as unknown) : null;
   applyDocOpToDoc(tab.doc.document, op);
+  // The canvas lives in an iframe and can only be patched from VALUE-CARRYING ops (`record.docOps`),
+  // Which is what crosses the bridge. Recording only the classification patch below left docOps
+  // Empty on this path, so undo/redo posted an EMPTY patch: the document changed, the patch
+  // Classified as applicable (suppressing the full render), and the canvas silently kept showing
+  // The pre-undo content. Replaying an op IS a forward op — record it as one.
+  //
+  // History never reads the inverse here: undo/redo run with `skipHistory`, and the entry they
+  // Replay already holds the pair. `markNonInvertible` would be wrong (it forces a whole-document
+  // Checkpoint), so the op is paired with itself.
+  recordDocOp({ forward: op, inverse: op });
   switch (op.op) {
     case "set-key": {
       if (DOC_META_KEYS.has(op.key)) {

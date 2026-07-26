@@ -8,15 +8,18 @@
  */
 
 import { childIndex, getNodeAtPath, parentElementPath } from "../store";
+import { isAncestor } from "../state";
 import { isTabActive } from "../workspace/workspace";
 import {
   mutateInsertNode,
+  mutateRemoveNode,
   mutateUpdateProp,
   mutateUpdateProperty,
   transactDoc,
 } from "../tabs/transact";
 import { defaultDef } from "../panels/shared";
 
+import { normalizeChildren } from "./inline-edit";
 import type { JxContentResult, SlashCommand } from "./inline-edit";
 import type { JxPath } from "../state";
 import type { Tab } from "../tabs/tab";
@@ -125,6 +128,116 @@ export function applyInlinePropCommit(
   transactDoc(tab, (t) => {
     mutateUpdateProp(t, path, prop, value);
   });
+}
+
+/**
+ * The content of `node` as a children array, whichever way it is stored.
+ *
+ * A block holds its text either as `textContent` (all-plain) or as `children` (mixed inline
+ * markup); merging has to concatenate the two blocks' content regardless of which form each is in.
+ */
+function contentOf(node: JxMutableNode | undefined): (JxMutableNode | string)[] {
+  if (!node) {
+    return [];
+  }
+  if (Array.isArray(node.children)) {
+    return node.children as (JxMutableNode | string)[];
+  }
+  return typeof node.textContent === "string" && node.textContent.length > 0
+    ? [node.textContent]
+    : [];
+}
+
+/** The rendered text length of a children array — where the caret belongs after a merge. */
+function contentLength(children: (JxMutableNode | string)[]): number {
+  let n = 0;
+  for (const child of children) {
+    n +=
+      typeof child === "string"
+        ? child.length
+        : contentLength(contentOf(child as JxMutableNode)).valueOf();
+  }
+  return n;
+}
+
+/**
+ * Join the block at `fromPath` onto the end of the block at `intoPath`, removing the former.
+ *
+ * Backspace at a block's start and Delete at a block's end are the same operation approached from
+ * either side, so both land here. Returns the caret's document position at the seam — the join
+ * point, not the end — or null when the merge was refused.
+ *
+ * Refused when either block is missing, or when one contains the other: a `<li>` and the `<p>`
+ * inside it are adjacent in document order but merging them would mean a node absorbing its own
+ * parent.
+ */
+export function applyBlockMerge(
+  tab: Tab | null,
+  fromPath: JxPath,
+  intoPath: JxPath,
+): { path: JxPath; offset: number } | null {
+  if (!tab) {
+    return null;
+  }
+  const from = getNodeAtPath(tab.doc.document, fromPath) as JxMutableNode | undefined;
+  const into = getNodeAtPath(tab.doc.document, intoPath) as JxMutableNode | undefined;
+  if (!from || !into) {
+    return null;
+  }
+  if (isAncestor(fromPath, intoPath) || isAncestor(intoPath, fromPath)) {
+    return null;
+  }
+
+  const head = contentOf(into);
+  const tail = contentOf(from);
+  const seam = contentLength(head);
+  const merged = normalizeChildren({ children: [...head, ...tail] });
+
+  transactDoc(tab, (t) => {
+    // Write the joined content BEFORE removing the source: updating a node never shifts indices,
+    // So `fromPath` is still valid when the removal runs.
+    if (merged.children) {
+      if (into.textContent != null) {
+        mutateUpdateProperty(t, intoPath, "textContent");
+      }
+      mutateUpdateProperty(t, intoPath, "children", merged.children);
+    } else {
+      if (into.children) {
+        mutateUpdateProperty(t, intoPath, "children");
+      }
+      mutateUpdateProperty(t, intoPath, "textContent", merged.textContent ?? "");
+    }
+    mutateRemoveNode(t, fromPath);
+    // A container emptied by the removal (the `<ul>` behind a list's last item) would otherwise
+    // Linger as invisible structure that still occupies layout and shows up in the layers panel.
+    pruneEmptyAncestors(t, parentElementPath(fromPath) as JxPath);
+    if (isTabActive(tab)) {
+      t.session.selection = intoPath;
+    }
+  });
+
+  return { offset: seam, path: intoPath };
+}
+
+/**
+ * Remove `path` and its now-childless ancestors, stopping at the document root or the first
+ * ancestor that still has content.
+ */
+function pruneEmptyAncestors(tab: Tab, path: JxPath): void {
+  let cur = path;
+  while (cur.length > 0) {
+    const node = getNodeAtPath(tab.doc.document, cur) as JxMutableNode | undefined;
+    const kids = node?.children;
+    if (!node || !Array.isArray(kids) || kids.length > 0) {
+      return;
+    }
+    const parent = parentElementPath(cur) as JxPath | null;
+    mutateRemoveNode(tab, cur);
+    if (!parent) {
+      return;
+    }
+    cur = parent;
+  }
 }
 
 /**

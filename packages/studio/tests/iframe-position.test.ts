@@ -2,6 +2,8 @@ import "./with-dom.js";
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   activeBlockAt,
+  adjacentBlock,
+  blocksInOrder,
   blockTextLength,
   domPositionAt,
   elementForPath,
@@ -241,5 +243,72 @@ describe("boundary predicates", () => {
         { offset: 0, path: ["children", 0, "children", 0] },
       ),
     ).toBe(false);
+  });
+});
+
+describe("document-order block navigation", () => {
+  test("lists blocks in rendered order, across nesting", () => {
+    const c = mount(
+      `<p data-jx-path='["children",0]'>one</p>` +
+        `<ul data-jx-path='["children",1]'>` +
+        `<li data-jx-path='["children",1,"children",0]'>a</li>` +
+        `<li data-jx-path='["children",1,"children",1]'>b</li>` +
+        `</ul>` +
+        `<p data-jx-path='["children",2]'>two</p>`,
+    );
+    // The <ul> is not an editable block, so it is not a caret stop — its items are.
+    expect(blocksInOrder(c, EDITABLE).map((el) => el.textContent)).toEqual([
+      "one",
+      "a",
+      "b",
+      "two",
+    ]);
+  });
+
+  test("excludes blocks sealed inside a component island", () => {
+    const c = mount(
+      `<p data-jx-path='["children",0]'>page</p>` +
+        `<x-card data-jx-path='["children",1]' contenteditable="false">` +
+        `<p data-jx-path='["children",1,"children",0]'>internal</p></x-card>`,
+    );
+    expect(blocksInOrder(c, EDITABLE).map((el) => el.textContent)).toEqual(["page"]);
+  });
+
+  test("finds the previous and next block", () => {
+    const c = mount(
+      `<p data-jx-path='["children",0]'>one</p><p data-jx-path='["children",1]'>two</p>`,
+    );
+    expect(adjacentBlock(c, ["children", 1], -1, EDITABLE)?.path).toEqual(["children", 0]);
+    expect(adjacentBlock(c, ["children", 0], 1, EDITABLE)?.path).toEqual(["children", 1]);
+  });
+
+  test("crosses a container boundary — a paragraph's neighbour can be a list item", () => {
+    // The case a naive index-1 lookup gets wrong: the block before this paragraph is the LAST
+    // Item of the list above it, not the list.
+    const c = mount(
+      `<ul data-jx-path='["children",0]'>` +
+        `<li data-jx-path='["children",0,"children",0]'>a</li>` +
+        `<li data-jx-path='["children",0,"children",1]'>b</li></ul>` +
+        `<p data-jx-path='["children",1]'>after</p>`,
+    );
+    expect(adjacentBlock(c, ["children", 1], -1, EDITABLE)?.path).toEqual([
+      "children",
+      0,
+      "children",
+      1,
+    ]);
+  });
+
+  test("returns null at the ends of the document", () => {
+    const c = mount(
+      `<p data-jx-path='["children",0]'>one</p><p data-jx-path='["children",1]'>two</p>`,
+    );
+    expect(adjacentBlock(c, ["children", 0], -1, EDITABLE)).toBeNull();
+    expect(adjacentBlock(c, ["children", 1], 1, EDITABLE)).toBeNull();
+  });
+
+  test("returns null for a path that is not a rendered block", () => {
+    const c = mount(`<p data-jx-path='["children",0]'>one</p>`);
+    expect(adjacentBlock(c, ["children", 7], -1, EDITABLE)).toBeNull();
   });
 });

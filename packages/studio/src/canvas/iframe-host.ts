@@ -11,6 +11,7 @@ import { postMessageChannel } from "./iframe-channel";
 import { canvasBaseOrigin } from "./canvas-origin";
 import { resolveCanvasDocument } from "./canvas-live-render";
 import {
+  applyBlockMerge,
   applyInlineCommit,
   applyInlinePropCommit,
   applyInlineInsert,
@@ -136,7 +137,7 @@ interface HostState {
    * render acks (`renderComplete`) at a bumped one — both satisfy `gen >= minGen`. An immediate
    * `enterEdit` would race the escalated ASYNC render and silently fail to find the element.
    */
-  pendingEnterEdit: { path: (string | number)[]; minGen: number } | null;
+  pendingEnterEdit: { path: (string | number)[]; minGen: number; offset?: number } | null;
   /**
    * Stylebook capability (set by {@link mountStylebookCanvas}, cleared by page mounts). The specimen
    * doc's paths decode to TAGS, not tab-document paths: hits route to the injected stylebook
@@ -1309,6 +1310,15 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       }
       return;
     }
+    case "editMerge": {
+      // Joining two blocks removes one of them, so the caret has to be re-placed — at the SEAM,
+      // Where the two blocks met, which is where the author's cursor visually was.
+      const seam = applyBlockMerge(hostTab(state), msg.fromPath, msg.intoPath);
+      if (seam) {
+        deferEnterEdit(state, seam.path, seam.offset);
+      }
+      return;
+    }
     case "editSplit": {
       // The mutation lands now (surgical patch or escalated render); re-entry on the new paragraph
       // Is deferred until this host acks the DOM that contains it (see deferEnterEdit).
@@ -1394,13 +1404,13 @@ function onDomUpdated(state: HostState, gen: number): void {
   requestPresence(state);
   hideInsertZoneNow(state);
   if (state.pendingEnterEdit && gen >= state.pendingEnterEdit.minGen) {
-    const { path } = state.pendingEnterEdit;
+    const { offset, path } = state.pendingEnterEdit;
     state.pendingEnterEdit = null;
     // Re-enter only when this host still shows the ACTIVE tab — a background tab's iframe renders a
     // Different doc, so re-entering there would grab the wrong element (the commit itself already
     // Landed in the right tab via hostTab routing).
     if (state.tabId !== null && state.tabId === workspace.activeTabId) {
-      reenterEdit(state, path);
+      reenterEdit(state, path, offset);
     }
   }
 }
@@ -1411,13 +1421,21 @@ function onDomUpdated(state: HostState, gen: number): void {
  * that same gen; an escalated full render acks at a bumped one — both satisfy `gen >= minGen`,
  * while a stale ack cannot. Latest-wins on overwrite.
  */
-function deferEnterEdit(state: HostState, path: (string | number)[]): void {
-  state.pendingEnterEdit = { minGen: state.lastRenderedGen, path: [...path] };
+function deferEnterEdit(state: HostState, path: (string | number)[], offset?: number): void {
+  state.pendingEnterEdit = {
+    minGen: state.lastRenderedGen,
+    path: [...path],
+    ...(offset === undefined ? {} : { offset }),
+  };
 }
 
 /** Ask the host's iframe to (re-)enter inline editing on `path` (a plain copy crosses the bridge). */
-function reenterEdit(state: HostState, path: (string | number)[]): void {
-  state.channel.post({ kind: "enterEdit", path: [...path] });
+function reenterEdit(state: HostState, path: (string | number)[], offset?: number): void {
+  state.channel.post({
+    kind: "enterEdit",
+    path: [...path],
+    ...(offset === undefined ? {} : { offset }),
+  });
 }
 
 /**
