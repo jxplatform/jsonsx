@@ -8,7 +8,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { fakeChannelPair } from "../src/canvas/iframe-channel";
 import { startIframeInlineEdit } from "../src/canvas/iframe-inline-edit";
 import { isEditing, stopEditing } from "../src/editor/inline-edit";
-import { beforeInput, caretInto } from "./harness";
+import { beforeInput, caretInto, selectAcross } from "./harness";
 import type { IframeToParent, ParentToIframe } from "../src/canvas/iframe-protocol";
 
 let teardown: (() => void) | undefined;
@@ -260,6 +260,82 @@ describe("block merges", () => {
     // The block being merged away had its typed text committed before the join.
     expect(commits.some((c) => c.textContent === "Second edited")).toBe(true);
     expect(fromIframe.some((m) => m.kind === "editMerge")).toBe(true);
+  });
+});
+
+describe("cross-block range edits", () => {
+  /** Four stamped paragraphs. */
+  function fourBlocks(container: HTMLElement) {
+    const els = ["AAAA", "BBBB", "CCCC", "DDDD"].map((t, i) => {
+      const p = document.createElement("p");
+      p.dataset.jxPath = JSON.stringify(["children", i]);
+      p.textContent = t;
+      container.append(p);
+      return p;
+    });
+    return els;
+  }
+
+  test("deleting a selection across blocks posts the range with the blocks between", () => {
+    const { container, fromIframe, pair } = boot();
+    const els = fourBlocks(container);
+    clickInto(els[0]!);
+    selectAcross(els[0]!.firstChild!, 2, els[3]!.firstChild!, 2);
+
+    const prevented = beforeInput(els[0]!, "deleteContentBackward");
+    pair.flush();
+
+    expect(prevented).toBe(true);
+    expect(fromIframe.find((m) => m.kind === "editRangeReplace")).toEqual({
+      between: [
+        ["children", 1],
+        ["children", 2],
+      ],
+      from: { offset: 2, path: ["children", 0] },
+      kind: "editRangeReplace",
+      text: "",
+      to: { offset: 2, path: ["children", 3] },
+    });
+  });
+
+  test("typing over a cross-block selection carries the typed text", () => {
+    const { container, fromIframe, pair } = boot();
+    const els = fourBlocks(container);
+    clickInto(els[0]!);
+    selectAcross(els[0]!.firstChild!, 1, els[1]!.firstChild!, 3);
+
+    beforeInput(els[0]!, "insertText", "Z");
+    pair.flush();
+
+    expect(fromIframe.find((m) => m.kind === "editRangeReplace")).toMatchObject({
+      between: [],
+      text: "Z",
+    });
+  });
+
+  test("a cut across blocks collapses the range", () => {
+    const { container, fromIframe, pair } = boot();
+    const els = fourBlocks(container);
+    clickInto(els[1]!);
+    selectAcross(els[1]!.firstChild!, 0, els[2]!.firstChild!, 4);
+
+    beforeInput(els[1]!, "deleteByCut");
+    pair.flush();
+
+    expect(fromIframe.some((m) => m.kind === "editRangeReplace")).toBe(true);
+  });
+
+  test("a selection inside ONE block is left to the browser", () => {
+    const { container, fromIframe, pair } = boot();
+    const els = fourBlocks(container);
+    clickInto(els[0]!);
+    selectAcross(els[0]!.firstChild!, 1, els[0]!.firstChild!, 3);
+
+    const prevented = beforeInput(els[0]!, "deleteContentBackward");
+    pair.flush();
+
+    expect(prevented).toBe(false);
+    expect(fromIframe.some((m) => m.kind === "editRangeReplace")).toBe(false);
   });
 });
 

@@ -13,6 +13,7 @@ import { resolveCanvasDocument } from "./canvas-live-render";
 import {
   applyBlockMerge,
   applyInlineCommit,
+  applyRangeReplace,
   applyInlinePropCommit,
   applyInlineInsert,
   applyInlineSplit,
@@ -1316,6 +1317,13 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       const seam = applyBlockMerge(hostTab(state), msg.fromPath, msg.intoPath);
       if (seam) {
         deferEnterEdit(state, seam.path, seam.offset);
+      }
+      return;
+    }
+    case "editRangeReplace": {
+      const caret = applyRangeReplace(hostTab(state), msg.from, msg.to, msg.between, msg.text);
+      if (caret) {
+        deferEnterEdit(state, caret.path, caret.offset);
       }
       return;
     }

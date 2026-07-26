@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import {
   applyBlockMerge,
   applyInlineCommit,
+  applyRangeReplace,
   applyInlineInsert,
   applyInlinePropCommit,
   applyInlineSplit,
@@ -186,6 +187,178 @@ describe("applyBlockMerge", () => {
     expect(kids()).toHaveLength(2);
     expect(kids()[0]!.textContent).toBe("First");
     expect(kids()[1]!.textContent).toBe("Second");
+  });
+});
+
+describe("applyRangeReplace", () => {
+  const fourParas = () => ({
+    children: [
+      { tagName: "p", textContent: "AAAA" },
+      { tagName: "p", textContent: "BBBB" },
+      { tagName: "p", textContent: "CCCC" },
+      { tagName: "p", textContent: "DDDD" },
+    ],
+    tagName: "div",
+  });
+
+  test("collapses a selection spanning blocks, removing the ones between", () => {
+    tab = resetWorkspaceWithTab(fourParas());
+    const caret = applyRangeReplace(
+      tab,
+      { offset: 2, path: ["children", 0] },
+      { offset: 2, path: ["children", 3] },
+      [
+        ["children", 1],
+        ["children", 2],
+      ],
+      "",
+    );
+
+    expect(kids()).toHaveLength(1);
+    expect(kids()[0]!.textContent).toBe("AADD");
+    expect(caret).toEqual({ offset: 2, path: ["children", 0] });
+  });
+
+  test("typing over a cross-block selection inserts the text at the join", () => {
+    tab = resetWorkspaceWithTab(fourParas());
+    const caret = applyRangeReplace(
+      tab,
+      { offset: 2, path: ["children", 0] },
+      { offset: 2, path: ["children", 3] },
+      [
+        ["children", 1],
+        ["children", 2],
+      ],
+      "X",
+    );
+    expect(kids()[0]!.textContent).toBe("AAXDD");
+    expect(caret).toEqual({ offset: 3, path: ["children", 0] });
+  });
+
+  test("two adjacent blocks need no intermediate removals", () => {
+    tab = resetWorkspaceWithTab(fourParas());
+    applyRangeReplace(
+      tab,
+      { offset: 1, path: ["children", 0] },
+      { offset: 3, path: ["children", 1] },
+      [],
+      "",
+    );
+    expect(kids()).toHaveLength(3);
+    expect(kids()[0]!.textContent).toBe("AB");
+  });
+
+  test("preserves inline markup on both sides of the collapse", () => {
+    tab = resetWorkspaceWithTab({
+      children: [
+        { children: ["keep ", { tagName: "strong", textContent: "bold" }, " cut"], tagName: "p" },
+        { children: ["cut ", { tagName: "em", textContent: "it" }, " keep"], tagName: "p" },
+      ],
+      tagName: "div",
+    });
+    applyRangeReplace(
+      tab,
+      { offset: 9, path: ["children", 0] },
+      { offset: 4, path: ["children", 1] },
+      [],
+      "",
+    );
+    expect(kids()).toHaveLength(1);
+    expect(kids()[0]!.children).toEqual([
+      "keep ",
+      { tagName: "strong", textContent: "bold" },
+      { tagName: "em", textContent: "it" },
+      " keep",
+    ]);
+  });
+
+  test("removals run deepest-last so an earlier one cannot shift a later path", () => {
+    // The between-blocks are given in document order; removing index 1 first would renumber 2.
+    tab = resetWorkspaceWithTab(fourParas());
+    applyRangeReplace(
+      tab,
+      { offset: 4, path: ["children", 0] },
+      { offset: 0, path: ["children", 3] },
+      [
+        ["children", 1],
+        ["children", 2],
+      ],
+      "",
+    );
+    expect(kids()).toHaveLength(1);
+    expect(kids()[0]!.textContent).toBe("AAAADDDD");
+  });
+
+  test("prunes a container the collapse empties", () => {
+    tab = resetWorkspaceWithTab({
+      children: [
+        { tagName: "p", textContent: "before" },
+        { children: [{ tagName: "li", textContent: "item" }], tagName: "ul" },
+        { tagName: "p", textContent: "after" },
+      ],
+      tagName: "div",
+    });
+    applyRangeReplace(
+      tab,
+      { offset: 6, path: ["children", 0] },
+      { offset: 0, path: ["children", 2] },
+      [["children", 1, "children", 0]],
+      "",
+    );
+    // The list item went, and the empty <ul> did not survive it.
+    expect(kids()).toHaveLength(1);
+    expect(kids()[0]!.textContent).toBe("beforeafter");
+  });
+
+  test("refuses an ancestor/descendant pair, and no-ops without a tab", () => {
+    tab = resetWorkspaceWithTab({
+      children: [{ children: [{ tagName: "p", textContent: "inner" }], tagName: "li" }],
+      tagName: "div",
+    });
+    expect(
+      applyRangeReplace(
+        tab,
+        { offset: 0, path: ["children", 0] },
+        { offset: 1, path: ["children", 0, "children", 0] },
+        [],
+        "",
+      ),
+    ).toBeNull();
+    expect(
+      applyRangeReplace(null, { offset: 0, path: [] }, { offset: 0, path: [] }, [], ""),
+    ).toBeNull();
+  });
+
+  test("refuses when an endpoint does not resolve", () => {
+    tab = resetWorkspaceWithTab(fourParas());
+    expect(
+      applyRangeReplace(
+        tab,
+        { offset: 0, path: ["children", 9] },
+        { offset: 0, path: ["children", 1] },
+        [],
+        "",
+      ),
+    ).toBeNull();
+    expect(kids()).toHaveLength(4);
+  });
+
+  test("the whole collapse undoes as one step", () => {
+    tab = resetWorkspaceWithTab(fourParas());
+    applyRangeReplace(
+      tab,
+      { offset: 2, path: ["children", 0] },
+      { offset: 2, path: ["children", 3] },
+      [
+        ["children", 1],
+        ["children", 2],
+      ],
+      "",
+    );
+    expect(kids()).toHaveLength(1);
+    undo(tab);
+    expect(kids()).toHaveLength(4);
+    expect(kids().map((k) => k.textContent)).toEqual(["AAAA", "BBBB", "CCCC", "DDDD"]);
   });
 });
 

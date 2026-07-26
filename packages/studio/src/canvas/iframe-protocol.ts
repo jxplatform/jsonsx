@@ -340,6 +340,16 @@ export type IframeToParent =
   // The iframe names BOTH paths because document order lives in the rendered DOM, where a list
   // Item, a table cell, and a nested container all resolve without the parent re-deriving it.
   | { kind: "editMerge"; fromPath: (string | number)[]; intoPath: (string | number)[] }
+  // Collapse a selection that spans blocks, replacing it with `text` (empty for a deletion). The
+  // Iframe supplies the blocks strictly BETWEEN the endpoints, since document order lives in the
+  // Rendered DOM — the same reason a boundary merge names its neighbour there.
+  | {
+      kind: "editRangeReplace";
+      from: { path: (string | number)[]; offset: number };
+      to: { path: (string | number)[]; offset: number };
+      between: (string | number)[][];
+      text: string;
+    }
   // Committed prop-bound text: persist `value` into `$props[prop]` of the instance at `path`.
   | {
       kind: "editCommitProp";

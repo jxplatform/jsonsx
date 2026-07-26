@@ -29,7 +29,7 @@ import {
   stopEditing,
 } from "../editor/inline-edit";
 import { startEditableRoot } from "./iframe-editable-root";
-import { adjacentBlock } from "./iframe-position";
+import { adjacentBlock, blocksInOrder } from "./iframe-position";
 import { isTagActiveInSelection, toggleInlineFormat } from "../editor/inline-format";
 import { applyLink, insertTemplateToken, linkStateForSelection } from "../editor/inline-link";
 import { restoreTemplateExpressions } from "../utils/edit-display";
@@ -44,6 +44,7 @@ import type {
   SelectionSnapshot,
   SerializableRect,
 } from "./iframe-protocol";
+import type { DocPos } from "./iframe-position";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -390,6 +391,32 @@ export function startIframeInlineEdit(
     return true;
   };
 
+  /**
+   * Post a collapse of the selection spanning `from`..`to`.
+   *
+   * The blocks strictly between the endpoints are listed here, from the rendered DOM, because that
+   * is where document order is already correct — a range can span list items, table cells, and
+   * nested containers, none of which is a flat index walk.
+   */
+  const postRangeReplace = (from: DocPos, to: DocPos, text: string): boolean => {
+    const blocks = blocksInOrder(container, isEditableBlock);
+    const fromKey = serializeJxPath(from.path);
+    const toKey = serializeJxPath(to.path);
+    const start = blocks.findIndex((el) => el.dataset.jxPath === fromKey);
+    const end = blocks.findIndex((el) => el.dataset.jxPath === toKey);
+    if (start === -1 || end === -1 || end <= start) {
+      return false;
+    }
+    const between = blocks
+      .slice(start + 1, end)
+      .map((el) => parseJxPath(el.dataset.jxPath as string));
+    // Commit pending text in the active block first, or the collapse would splice the block's last
+    // COMMITTED content and silently drop whatever was typed since.
+    root.flush();
+    channel.post({ between, from, kind: "editRangeReplace", text, to });
+    return true;
+  };
+
   const onMouseUp = () => cacheRange();
   const onKeyUp = () => cacheRange();
   // Capture-phase blur: cache the range before focus moves out (the bubbling blur fires too late).
@@ -419,6 +446,7 @@ export function startIframeInlineEdit(
     // Side. The neighbour is resolved HERE because document order lives in the rendered DOM.
     onMergeBackward: (at) => postMerge(at.path, -1),
     onMergeForward: (at) => postMerge(at.path, 1),
+    onReplaceRange: (from, to, text) => postRangeReplace(from, to, text),
     onPropActivate: activateProp,
     onSelectionChange: () => onSelectionChange(),
     onSplit: () => splitActiveBlock(),

@@ -19,7 +19,7 @@ import {
 } from "../tabs/transact";
 import { defaultDef } from "../panels/shared";
 
-import { normalizeChildren } from "./inline-edit";
+import { contentLength, contentOf, spliceAcross, toStored } from "./content-slice";
 import type { JxContentResult, SlashCommand } from "./inline-edit";
 import type { JxPath } from "../state";
 import type { Tab } from "../tabs/tab";
@@ -131,36 +131,6 @@ export function applyInlinePropCommit(
 }
 
 /**
- * The content of `node` as a children array, whichever way it is stored.
- *
- * A block holds its text either as `textContent` (all-plain) or as `children` (mixed inline
- * markup); merging has to concatenate the two blocks' content regardless of which form each is in.
- */
-function contentOf(node: JxMutableNode | undefined): (JxMutableNode | string)[] {
-  if (!node) {
-    return [];
-  }
-  if (Array.isArray(node.children)) {
-    return node.children as (JxMutableNode | string)[];
-  }
-  return typeof node.textContent === "string" && node.textContent.length > 0
-    ? [node.textContent]
-    : [];
-}
-
-/** The rendered text length of a children array — where the caret belongs after a merge. */
-function contentLength(children: (JxMutableNode | string)[]): number {
-  let n = 0;
-  for (const child of children) {
-    n +=
-      typeof child === "string"
-        ? child.length
-        : contentLength(contentOf(child as JxMutableNode)).valueOf();
-  }
-  return n;
-}
-
-/**
  * Join the block at `fromPath` onto the end of the block at `intoPath`, removing the former.
  *
  * Backspace at a block's start and Delete at a block's end are the same operation approached from
@@ -191,7 +161,7 @@ export function applyBlockMerge(
   const head = contentOf(into);
   const tail = contentOf(from);
   const seam = contentLength(head);
-  const merged = normalizeChildren({ children: [...head, ...tail] });
+  const merged = toStored([...head, ...tail]);
 
   transactDoc(tab, (t) => {
     // Write the joined content BEFORE removing the source: updating a node never shifts indices,
@@ -337,4 +307,86 @@ export function applyInlineInsert(
     }
   });
   return newPath;
+}
+
+/**
+ * Replace a selection that spans blocks with `text` (empty for a deletion).
+ *
+ * Collapsing a cross-block range is a merge with both ends clipped: the first block keeps what
+ * precedes the selection, the last keeps what follows it, the two are joined, and every block
+ * between them is removed. `between` is supplied by the iframe because document order lives in the
+ * rendered DOM — the same reason a boundary merge names its neighbour there.
+ *
+ * Returns the caret's position after the collapse (the join point, plus any typed text), or null
+ * when the range does not resolve.
+ */
+export function applyRangeReplace(
+  tab: Tab | null,
+  from: { path: JxPath; offset: number },
+  to: { path: JxPath; offset: number },
+  between: JxPath[],
+  text: string,
+): { path: JxPath; offset: number } | null {
+  if (!tab) {
+    return null;
+  }
+  const head = getNodeAtPath(tab.doc.document, from.path) as JxMutableNode | undefined;
+  const tail = getNodeAtPath(tab.doc.document, to.path) as JxMutableNode | undefined;
+  if (!head || !tail) {
+    return null;
+  }
+  if (isAncestor(from.path, to.path) || isAncestor(to.path, from.path)) {
+    return null;
+  }
+
+  const joined = toStored(
+    spliceAcross(contentOf(head), from.offset, contentOf(tail), to.offset, text),
+  );
+  // Remove the deepest/last paths first so an earlier removal cannot shift a later one's index.
+  const removals = [...between, to.path].toSorted(comparePathsDescending);
+
+  transactDoc(tab, (t) => {
+    if (joined.children) {
+      if (head.textContent != null) {
+        mutateUpdateProperty(t, from.path, "textContent");
+      }
+      mutateUpdateProperty(t, from.path, "children", joined.children);
+    } else {
+      if (head.children) {
+        mutateUpdateProperty(t, from.path, "children");
+      }
+      mutateUpdateProperty(t, from.path, "textContent", joined.textContent ?? "");
+    }
+    for (const path of removals) {
+      if (getNodeAtPath(t.doc.document, path)) {
+        mutateRemoveNode(t, path);
+        pruneEmptyAncestors(t, parentElementPath(path) as JxPath);
+      }
+    }
+    if (isTabActive(tab)) {
+      t.session.selection = from.path;
+    }
+  });
+
+  return { offset: from.offset + text.length, path: from.path };
+}
+
+/**
+ * Order two paths so the LATER one in the document sorts first — the order removals must run in,
+ * since removing an earlier sibling renumbers every path after it.
+ */
+function comparePathsDescending(a: JxPath, b: JxPath): number {
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    const av = a[i];
+    const bv = b[i];
+    if (av === bv) {
+      continue;
+    }
+    if (typeof av === "number" && typeof bv === "number") {
+      return bv - av;
+    }
+    return String(bv).localeCompare(String(av));
+  }
+  return b.length - a.length;
 }
