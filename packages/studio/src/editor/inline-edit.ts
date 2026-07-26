@@ -680,8 +680,13 @@ function domNodeToJx(node: Node) {
   }
 
   // Attributes
-  if (tag === "a" && (el as HTMLAnchorElement).href) {
-    result.attributes = { href: el.getAttribute("href") ?? "" };
+  // A canvas anchor is DE-LINKED in design/edit: the runtime stamps its URL as `data-jx-href` so a
+  // Click selects the anchor instead of navigating the iframe (see setCanvasDelinkAnchors). Reading
+  // Only `href` here would serialize every edited link as `[text]()` — silently destroying the URL
+  // Of any paragraph that happens to contain one.
+  const href = el.dataset.jxHref ?? el.getAttribute("href");
+  if (tag === "a" && href != null) {
+    result.attributes = { href };
     if ((el as HTMLAnchorElement).title) {
       result.attributes.title = (el as HTMLAnchorElement).title;
     }

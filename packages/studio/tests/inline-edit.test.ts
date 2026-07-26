@@ -63,6 +63,51 @@ describe("isEditableBlock", () => {
   });
 });
 
+describe("committing an anchor keeps its URL", () => {
+  let el: HTMLElement;
+  const commits: { children: unknown }[] = [];
+
+  function editAndCommit(innerHTML: string) {
+    el = document.createElement("p");
+    el.innerHTML = innerHTML;
+    document.body.append(el);
+    startEditing(el, ["children", 0], {
+      onCommit: (_p, children) => commits.push({ children }),
+      onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    stopEditing();
+    return commits.at(-1)!.children as { tagName: string; attributes?: { href: string } }[];
+  }
+
+  afterEach(() => {
+    commits.length = 0;
+    el?.remove();
+  });
+
+  test("reads the URL from data-jx-href on a DE-LINKED canvas anchor", () => {
+    // Design/edit renders anchors de-linked (the runtime stamps the URL as `data-jx-href` so a
+    // Click selects instead of navigating). Reading only `href` serialized every edited link as
+    // `[text]()` — silently destroying the URL of any paragraph that contained one.
+    const children = editAndCommit(`before <a data-jx-href="/spec">full spec</a> after`);
+    const anchorNode = children.find((c) => typeof c === "object" && c.tagName === "a")!;
+    expect(anchorNode.attributes).toEqual({ href: "/spec" });
+  });
+
+  test("still reads a plain href when the anchor is not de-linked", () => {
+    const children = editAndCommit(`go <a href="/plain">there</a>`);
+    const anchorNode = children.find((c) => typeof c === "object" && c.tagName === "a")!;
+    expect(anchorNode.attributes).toEqual({ href: "/plain" });
+  });
+
+  test("an anchor with no URL at all commits without inventing one", () => {
+    const children = editAndCommit(`an <a>anchor</a> here`);
+    const anchorNode = children.find((c) => typeof c === "object" && c.tagName === "a")!;
+    expect(anchorNode.attributes).toBeUndefined();
+  });
+});
+
 describe("isInlineInContext", () => {
   test("returns true for inline tags without parent context", () => {
     expect(isInlineInContext("em", "")).toBe(true);
