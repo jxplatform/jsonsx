@@ -31,7 +31,7 @@ There are three ways to end up with a project open in Studio, all available from
 
 1. **Create a new one.** Click **New Project…** and pick a template or a complete starter site — or jump straight to the starter gallery with **Start from an Example…**. You choose the folder it's created in (on studio.jxsuite.com, the GitHub repository); Studio never picks one for you. The whole modal is walked through in **[Create a project](/docs/studio/projects/create)**.
 2. **Open an existing folder.** Click **Open Project…** and point Studio at a Jx project already on your machine. On studio.jxsuite.com the same button lists the GitHub repositories you can write to instead — pick one and Studio opens it, or use the links in the picker's footer to grant the Jx Suite GitHub App access to more of them. Recently opened projects also appear on the Welcome screen for one-click reopening.
-3. **Clone a repository.** Click **Clone Git Repository…** and paste a repository URL — Studio downloads the project and opens it. On platforms linked to a GitHub account, **Add Existing Repository…** lets you pick from your repositories instead of pasting a URL.
+3. **Clone a repository.** Click **Clone Git Repository…**, paste a repository URL, and click **Clone** — Studio downloads the project and opens it. On platforms linked to a GitHub account, **Add Existing Repository…** lets you pick from your repositories instead of pasting a URL.
 
 :::doc-note
 Because a project is just a folder, "moving to Jx" or "leaving Jx" is copying files. Studio never locks your work into a format only it can read.

@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.1.28-draft
+**Version:** 0.1.29-draft
 **Status:** Partial
-**Updated:** 2026-07-25
+**Updated:** 2026-07-26
 **License:** MIT
 
 ---
@@ -286,7 +286,7 @@ Each file row displays:
 
 #### Branch Management
 
-The branch picker lists all local branches and includes a "+ New branch..." option that prompts for a name and creates + checks out a new branch.
+The branch picker lists all local branches and includes a "+ New branch..." option that opens a New Branch dialog (`showPromptDialog`, studio-ui-guidelines.md §8.7) and creates + checks out the branch on confirm. Cloning a repository asks for its URL through the same dialog.
 
 #### Server Endpoints
 
@@ -437,7 +437,7 @@ Color-scheme variants add **no extra tabs**: the tab-bar Auto/Light/Dark control
 
 #### Nested Selector Context
 
-Nested CSS selectors (`:hover`, `:focus`, `:active`, `& childTag`) are editable as separate style contexts. The selector picker is inline in the media tabs toolbar bar, right-aligned.
+Nested CSS selectors (`:hover`, `:focus`, `:active`, `& childTag`) are editable as separate style contexts. The selector picker is inline in the media tabs toolbar bar, right-aligned. The Relative Styling section's "+ Add" affordance opens an Add Nested Selector dialog (`showPromptDialog`, studio-ui-guidelines.md §8.7) and creates an empty rule for the entered selector.
 
 #### Property Filter Bar
 
@@ -544,6 +544,20 @@ The studio tracks:
 - Selected file path
 - Component discovery results
 
+### 9.1.1 Create, Rename, Delete
+
+Every name the user supplies is collected through the Spectrum dialogs in §8.7 of
+studio-ui-guidelines.md — no native browser prompts:
+
+| Action                                                        | Dialog                                                                                               |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Files panel **New File** (toolbar and directory context menu) | New File — pre-filled `untitled.json`, extension preserved on retype, scoped to the target directory |
+| Files / Browse **Rename**                                     | Rename — pre-filled with the current name                                                            |
+| Browse **New ›** _entity_                                     | New _Type_ — pre-filled `untitled`, slugified into the type's directory                              |
+| Files / Browse **Delete**                                     | Confirmation dialog                                                                                  |
+
+Blank input is rejected in place: the dialog stays open with negative help text rather than closing.
+
 ### 9.2 Server Integration
 
 All file operations go through the Platform Abstraction Layer, which maps to `@jxsuite/server` Studio API endpoints:
@@ -602,6 +616,7 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.1.29-draft** (2026-07-26) — File create/rename/delete naming dialogs (§9.1.1); branch, clone, and nested-selector flows now open Spectrum dialogs instead of native prompts.
 - **0.1.28-draft** (2026-07-25) — The Cloud platform target composes per-project schemas server-side (§3.4).
 - **0.1.27-draft** (2026-07-25) — Source-mode schema validation contract: per-project entry documents, offline $schema-id registration, worker self-location (§4.2.1); fetchProjectSchemas in the PAL table (§3.4).
 - **0.1.26-draft** (2026-07-25) — PAL table records the destination members: createDestination, createProject's user-chosen destination, and pickDirectory.
@@ -634,4 +649,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.1.28-draft_
+_`@jxsuite/studio` Specification v0.1.29-draft_

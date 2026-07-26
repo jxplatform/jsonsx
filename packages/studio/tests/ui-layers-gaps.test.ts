@@ -13,6 +13,7 @@ import {
   renderPopover,
   showConfirmDialog,
   showDialog,
+  showPromptDialog,
   showSaveDiscardDialog,
 } from "../src/ui/layers";
 
@@ -126,6 +127,173 @@ describe("layers after init", () => {
         new Event("close"),
       );
       expect(await p2).toBe("cancel");
+    });
+  });
+
+  describe("showPromptDialog", () => {
+    function wrapper(): HTMLElement {
+      return layer("dialog").querySelector("sp-dialog-wrapper") as HTMLElement;
+    }
+    function field(): HTMLElement {
+      return layer("dialog").querySelector("sp-textfield") as HTMLElement;
+    }
+    /** Type into the field the way the sp-textfield input event reaches the handler. */
+    function type(text: string): void {
+      (field() as unknown as { value: string }).value = text;
+      field().dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    /** Give the field a shadow-root <input> so the focus rAF has something to select. */
+    function stubShadowInput(value: string): { input: HTMLInputElement; ranges: number[][] } {
+      const tf = field();
+      const shadow = tf.shadowRoot ?? tf.attachShadow({ mode: "open" });
+      const input = document.createElement("input");
+      input.value = value;
+      const ranges: number[][] = [];
+      input.select = () => {
+        ranges.push([0, -1]);
+      };
+      input.setSelectionRange = (start, end) => {
+        ranges.push([start ?? 0, end ?? 0]);
+      };
+      shadow.append(input);
+      return { input, ranges };
+    }
+
+    test("confirm resolves the trimmed value; defaults render OK/Cancel", async () => {
+      const promise = showPromptDialog("Name it");
+      expect(wrapper().getAttribute("headline")).toBe("Name it");
+      expect(wrapper().getAttribute("confirm-label")).toBe("OK");
+      expect(wrapper().getAttribute("cancel-label")).toBe("Cancel");
+      // No message option → no explanatory paragraph.
+      expect(wrapper().querySelector("p")).toBeNull();
+
+      type("  spaced  ");
+      wrapper().dispatchEvent(new Event("confirm"));
+      expect(await promise).toBe("spaced");
+      expect(layer("dialog").querySelector("sp-dialog-wrapper")).toBeNull();
+    });
+
+    test("cancel and close both resolve null", async () => {
+      const cancelled = showPromptDialog("A");
+      wrapper().dispatchEvent(new Event("cancel"));
+      expect(await cancelled).toBeNull();
+
+      const closed = showPromptDialog("B");
+      wrapper().dispatchEvent(new Event("close"));
+      expect(await closed).toBeNull();
+    });
+
+    test("Enter in the field confirms; other keys do not", async () => {
+      const promise = showPromptDialog("C", { value: "seed" });
+      field().dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "a" }));
+      expect(layer("dialog").querySelector("sp-dialog-wrapper")).not.toBeNull();
+      field().dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+      expect(await promise).toBe("seed");
+    });
+
+    test("a blank value blocks confirm and shows the default help text", async () => {
+      const promise = showPromptDialog("D");
+      wrapper().dispatchEvent(new Event("confirm"));
+      expect(layer("dialog").querySelector("sp-dialog-wrapper")).not.toBeNull();
+      expect(field().getAttribute("invalid")).not.toBeNull();
+      expect(layer("dialog").querySelector("sp-help-text")?.textContent).toContain(
+        "Enter a value.",
+      );
+
+      // Typing something valid clears the error in place, then confirm goes through.
+      type("ok");
+      expect(layer("dialog").querySelector("sp-help-text")).toBeNull();
+      wrapper().dispatchEvent(new Event("confirm"));
+      expect(await promise).toBe("ok");
+    });
+
+    test("a custom validate() message blocks confirm until it passes", async () => {
+      const promise = showPromptDialog("E", {
+        confirmLabel: "Create",
+        message: "Pick a slug",
+        validate: (v) => (v.startsWith("x") ? "" : "Must start with x."),
+        value: "nope",
+      });
+      expect(wrapper().querySelector("p")?.textContent).toContain("Pick a slug");
+      expect(wrapper().getAttribute("confirm-label")).toBe("Create");
+
+      wrapper().dispatchEvent(new Event("confirm"));
+      expect(layer("dialog").querySelector("sp-help-text")?.textContent).toContain(
+        "Must start with x.",
+      );
+
+      type("xyz");
+      wrapper().dispatchEvent(new Event("confirm"));
+      expect(await promise).toBe("xyz");
+    });
+
+    test("input that leaves the error state unchanged does not re-render", async () => {
+      const promise = showPromptDialog("F");
+      const before = field();
+      type("aa");
+      type("bb");
+      // Still valid throughout, so lit never rebuilt the tree.
+      expect(field()).toBe(before);
+      expect(field().getAttribute("value")).toBe("");
+      wrapper().dispatchEvent(new Event("confirm"));
+      expect(await promise).toBe("bb");
+    });
+
+    test("select:'all' selects the whole value once the rAF fires", async () => {
+      const promise = showPromptDialog("G", { value: "hello" });
+      const { ranges } = stubShadowInput("hello");
+      await flush();
+      expect(ranges).toEqual([[0, -1]]);
+
+      // The focus ref only fires once — a re-render must not re-select mid-edit.
+      type("");
+      await flush();
+      expect(ranges).toEqual([[0, -1]]);
+
+      wrapper().dispatchEvent(new Event("cancel"));
+      await promise;
+    });
+
+    test("select:'stem' stops at the last dot, and falls back to the full value without one", async () => {
+      const dotted = showPromptDialog("H", { select: "stem", value: "note.md" });
+      const withDot = stubShadowInput("note.md");
+      await flush();
+      expect(withDot.ranges).toEqual([[0, 4]]);
+      wrapper().dispatchEvent(new Event("cancel"));
+      await dotted;
+
+      const bare = showPromptDialog("H", { select: "stem", value: "README" });
+      const noDot = stubShadowInput("README");
+      await flush();
+      expect(noDot.ranges).toEqual([[0, 6]]);
+      wrapper().dispatchEvent(new Event("cancel"));
+      await bare;
+
+      // A leading dot is an extension-less dotfile, not a stem boundary.
+      const dotfile = showPromptDialog("H", { select: "stem", value: ".env" });
+      const leading = stubShadowInput(".env");
+      await flush();
+      expect(leading.ranges).toEqual([[0, 4]]);
+      wrapper().dispatchEvent(new Event("cancel"));
+      await dotfile;
+    });
+
+    test("select:'none' focuses without selecting", async () => {
+      const promise = showPromptDialog("I", { select: "none", value: "keep" });
+      const { ranges } = stubShadowInput("keep");
+      await flush();
+      expect(ranges).toEqual([]);
+      wrapper().dispatchEvent(new Event("cancel"));
+      await promise;
+    });
+
+    test("a textfield with no shadow input is tolerated", async () => {
+      const promise = showPromptDialog("J", { placeholder: "type here", value: "v" });
+      expect(field().getAttribute("placeholder")).toBe("type here");
+      await flush();
+      expect(layer("dialog").querySelector("sp-dialog-wrapper")).not.toBeNull();
+      wrapper().dispatchEvent(new Event("cancel"));
+      expect(await promise).toBeNull();
     });
   });
 

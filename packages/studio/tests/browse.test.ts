@@ -5,7 +5,14 @@
  * "New +" entity menu (including content types), uploads, and the per-file context menu
  * (open/rename/duplicate/delete) with its Spectrum dialogs.
  */
-import { flush, installMockPlatform, pointer, resetStudioState } from "./harness";
+import {
+  answerPromptDialog,
+  flush,
+  installMockPlatform,
+  pointer,
+  resetStudioState,
+  topDialog,
+} from "./harness";
 import type { MockPlatformState } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { initLayers } from "../src/ui/layers";
@@ -567,25 +574,24 @@ function newMenu(container: HTMLElement): HTMLElement & { value: string } {
   };
 }
 
-async function chooseNewEntity(container: HTMLElement, value: string) {
+/**
+ * Pick an entity type from the "New +" menu. When `answer` is supplied the resulting name dialog is
+ * answered with it (`null` cancels). Returns the dialog's headline, or null when none opened.
+ */
+async function chooseNewEntity(container: HTMLElement, value: string, answer?: string | null) {
   const menu = newMenu(container);
   menu.value = value;
   menu.dispatchEvent(new Event("change", { bubbles: false }));
   await flush(4);
+  const headline = topDialog()?.getAttribute("headline") ?? null;
+  if (answer !== undefined) {
+    await answerPromptDialog(answer);
+    await flush(2);
+  }
+  return headline;
 }
 
 describe("new entity menu", () => {
-  let promptValue: string | null = "untitled";
-  let promptCalls: string[];
-  beforeEach(() => {
-    promptCalls = [];
-    promptValue = "untitled";
-    globalThis.prompt = (message?: string) => {
-      promptCalls.push(message ?? "");
-      return promptValue;
-    };
-  });
-
   test("lists base entity types plus content types behind a divider", async () => {
     const container = await mountWithDefaults();
     const items = [...container.querySelectorAll("overlay-trigger sp-menu-item")].map((i) =>
@@ -597,32 +603,53 @@ describe("new entity menu", () => {
 
   test("creates a page as JSON by default and opens it", async () => {
     const container = await mountWithDefaults();
-    promptValue = "My Page!";
-    await chooseNewEntity(container, "page");
-    expect(promptCalls).toEqual(["Page name:"]);
+    const headline = await chooseNewEntity(container, "page", "My Page!");
+    expect(headline).toBe("New Page");
     expect(state.files.get("pages/my-page.json")).toBe(
       JSON.stringify({ children: [], tagName: "div" }, null, "\t"),
     );
     expect(opened).toContain("pages/my-page.json");
   });
 
+  test("the name dialog is a Spectrum dialog, prefilled and scoped to the target directory", async () => {
+    const container = await mountWithDefaults();
+    await chooseNewEntity(container, "page");
+
+    const wrapper = topDialog();
+    expect(wrapper).not.toBeNull();
+    expect(wrapper!.getAttribute("confirm-label")).toBe("Create");
+    expect(wrapper!.textContent).toContain("Creating in pages/");
+    expect(wrapper!.querySelector("sp-textfield")!.getAttribute("value")).toBe("untitled");
+
+    await answerPromptDialog(null);
+  });
+
+  test("a blank name keeps the dialog open and creates nothing", async () => {
+    const container = await mountWithDefaults();
+    const before = writeCalls().length;
+    await chooseNewEntity(container, "page", "  ");
+
+    expect(writeCalls().length).toBe(before);
+    expect(topDialog()).not.toBeNull();
+    expect(topDialog()!.querySelector("sp-help-text")?.textContent).toContain("Enter a page name.");
+
+    await answerPromptDialog(null);
+  });
+
   test("uses format extension and newFileTemplate when a format is registered", async () => {
     setFormats([MD_FORMAT]);
     const container = await mountWithDefaults();
-    promptValue = "Read Me";
-    await chooseNewEntity(container, "content");
+    await chooseNewEntity(container, "content", "Read Me");
     expect(state.files.get("content/read-me.md")).toBe("# New file\n");
 
-    promptValue = "Landing";
-    await chooseNewEntity(container, "page");
+    await chooseNewEntity(container, "page", "Landing");
     expect(state.files.get("pages/landing.md")).toBe("# New file\n");
   });
 
   test("content-type creation writes frontmatter from the schema", async () => {
     setFormats([MD_FORMAT]);
     const container = await mountWithDefaults();
-    promptValue = "Hello World";
-    await chooseNewEntity(container, "contentType:posts");
+    await chooseNewEntity(container, "contentType:posts", "Hello World");
     const content = state.files.get("content/posts/hello-world.md");
     expect(content).toBeDefined();
     expect(content).toStartWith("---\n");
@@ -642,15 +669,13 @@ describe("new entity menu", () => {
     });
     invalidateBrowseCache();
     const container = await mountWithDefaults();
-    promptValue = "A B";
-    await chooseNewEntity(container, "contentType:plain");
+    await chooseNewEntity(container, "contentType:plain", "A B");
     expect(state.files.get("stuff/a-b.md")).toBe("---\ntitle: Untitled\n---\n\n");
   });
 
   test("content type without source uses its name as directory and JSON fallback", async () => {
     const container = await mountWithDefaults();
-    promptValue = "Sketch";
-    await chooseNewEntity(container, "contentType:draft");
+    await chooseNewEntity(container, "contentType:draft", "Sketch");
     expect(state.files.get("draft/sketch.json")).toBe(
       JSON.stringify({ children: [], tagName: "div" }, null, "\t"),
     );
@@ -662,30 +687,27 @@ describe("new entity menu", () => {
     });
     invalidateBrowseCache();
     const container = await mountWithDefaults();
-    promptValue = "Row One";
-    await chooseNewEntity(container, "contentType:records");
+    await chooseNewEntity(container, "contentType:records", "Row One");
     expect(state.files.has("data/row-one.json")).toBe(true);
   });
 
-  test("cancelled prompt creates nothing", async () => {
+  test("cancelled dialog creates nothing", async () => {
     const container = await mountWithDefaults();
-    promptValue = null;
     const before = writeCalls().length;
-    await chooseNewEntity(container, "page");
+    await chooseNewEntity(container, "page", null);
     expect(writeCalls().length).toBe(before);
     expect(opened).toEqual([]);
+    expect(topDialog()).toBeNull();
   });
 
-  test("unknown type key is ignored before prompting", async () => {
+  test("unknown type key is ignored before the dialog opens", async () => {
     const container = await mountWithDefaults();
-    await chooseNewEntity(container, "bogus");
-    expect(promptCalls).toEqual([]);
+    expect(await chooseNewEntity(container, "bogus")).toBeNull();
   });
 
   test("names are slugified", async () => {
     const container = await mountWithDefaults();
-    promptValue = "Wild  Name?? 42";
-    await chooseNewEntity(container, "component");
+    await chooseNewEntity(container, "component", "Wild  Name?? 42");
     expect(state.files.has("components/wild-name-42.json")).toBe(true);
   });
 });

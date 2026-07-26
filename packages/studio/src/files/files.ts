@@ -4,14 +4,17 @@
  * File tree management — project loading, file tree rendering, and file CRUD.
  *
  * Functions that mutate state accept a context object with callbacks, following the same pattern as
- * file-ops.js.
+ * file-ops.js. Every name the user supplies (new file, rename) is collected with the Spectrum
+ * prompt dialog from ui/layers.ts — never a native browser prompt (studio-ui-guidelines.md §8.7).
+ *
+ * @docs studio/interface
  */
 
 import { html, nothing } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ref } from "lit-html/directives/ref.js";
-import { renderPopover, showConfirmDialog, showDialog } from "../ui/layers";
+import { renderPopover, showConfirmDialog, showPromptDialog } from "../ui/layers";
 import { createState, projectState, requireProjectState, setProjectState } from "../store";
 import { getPlatform } from "../platform";
 import { statusMessage } from "../panels/statusbar";
@@ -834,8 +837,14 @@ function showFileContextMenu(
 // ─── File CRUD ────────────────────────────────────────────────────────────────
 
 async function createNewFile(dirPath: string, renderLeftPanel: () => void) {
-  // oxlint-disable-next-line no-alert -- native prompt is the intended quick-input UX here
-  const name = prompt("File name:", "untitled.json");
+  const name = await showPromptDialog("New File", {
+    confirmLabel: "Create",
+    message: dirPath === "." ? "Creating in the project root." : `Creating in ${dirPath}/`,
+    placeholder: "untitled.json",
+    select: "stem",
+    validate: (v) => (v.trim() ? "" : "Enter a file name."),
+    value: "untitled.json",
+  });
   if (!name) {
     return;
   }
@@ -861,53 +870,11 @@ async function createNewFile(dirPath: string, renderLeftPanel: () => void) {
 
 /** @param {string} currentName @returns {Promise<string | null>} */
 function showRenameFileDialog(currentName: string): Promise<string | null> {
-  let value = currentName;
-  return showDialog<string | null>((done) => {
-    function confirm() {
-      const trimmed = value.trim();
-      if (!trimmed) {
-        return;
-      }
-      done(trimmed);
-    }
-    const tpl = html`
-      <sp-dialog-wrapper
-        open
-        underlay
-        headline="Rename"
-        confirm-label="Rename"
-        cancel-label="Cancel"
-        size="s"
-        @confirm=${confirm}
-        @cancel=${() => done(null)}
-        @close=${() => done(null)}
-      >
-        <sp-textfield
-          style="width:100%"
-          value=${currentName}
-          @input=${(e: Event) => {
-            value = (e.target as HTMLInputElement).value || "";
-          }}
-          @keydown=${(e: KeyboardEvent) => {
-            if (e.key === "Enter") {
-              confirm();
-            }
-          }}
-        ></sp-textfield>
-      </sp-dialog-wrapper>
-    `;
-    requestAnimationFrame(() => {
-      const layer = document.querySelector("#layer-dialog");
-      const tf = layer?.querySelector("sp-textfield") as HTMLElement | null;
-      if (tf) {
-        tf.focus();
-        const input = tf.shadowRoot?.querySelector("input");
-        if (input) {
-          input.select();
-        }
-      }
-    });
-    return tpl;
+  return showPromptDialog("Rename", {
+    confirmLabel: "Rename",
+    select: "stem",
+    validate: (v) => (v.trim() ? "" : "Enter a file name."),
+    value: currentName,
   });
 }
 

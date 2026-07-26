@@ -1,4 +1,11 @@
-import { renderInto, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import {
+  answerPromptDialog,
+  flush,
+  renderInto,
+  resetStudioState,
+  resetWorkspaceWithTab,
+  topDialog,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import * as storeActual from "../src/store";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
@@ -21,12 +28,24 @@ void mock.module("../src/panels/stylebook-panel", () => ({
 
 const { _fieldRow, renderStylePanelTemplate } = await import("../src/panels/style-panel");
 const { initCssData } = await import("../src/panels/style-utils");
+const { initLayers } = await import("../src/ui/layers");
 const { getNodeAtPath } = await import("../src/store");
 const { resetSlotModeMemory } = await import("../src/ui/dynamic-slot");
 
 // Happy-dom may not provide requestAnimationFrame in all versions.
 (globalThis as Record<string, unknown>).requestAnimationFrame ??= (cb: (t: number) => void) =>
   setTimeout(() => cb(0), 0);
+
+// The nested-selector "+ Add" affordance opens a real Spectrum prompt dialog, so the panel needs
+// The overlay layers mounted.
+for (const id of ["layer-popover", "layer-modal", "layer-dialog"]) {
+  if (!document.querySelector(`#${id}`)) {
+    const el = document.createElement("div");
+    el.id = id;
+    document.body.append(el);
+  }
+}
+initLayers();
 
 const MEDIA = { md: "(min-width: 768px)", sm: "(min-width: 640px)" };
 
@@ -774,32 +793,44 @@ describe("relative styling section", () => {
     expect(table.textTransform).toBe("uppercase");
   });
 
-  test("+ Add prompts for a name and creates an empty rule; blank or cancel is ignored", async () => {
+  test("+ Add opens a selector dialog and creates an empty rule; blank or cancel is ignored", async () => {
     nestedTab();
-    const originalPrompt = globalThis.prompt;
-    try {
-      globalThis.prompt = () => " td ";
-      let c = await renderPanel();
-      let section = accordionItem(c, "Relative Styling");
-      const addBtn = [...section!.querySelectorAll("button")].find((b) =>
-        b.textContent?.includes("+ Add"),
-      );
-      click(addBtn);
-      const table = selectedNode().style?.table as Record<string, unknown>;
-      expect(table.td).toEqual({});
 
-      globalThis.prompt = () => null;
-      c = await renderPanel();
-      section = accordionItem(c, "Relative Styling");
+    /** Click the section's "+ Add" and let the prompt dialog render. */
+    async function clickAdd(container: HTMLElement) {
+      const section = accordionItem(container, "Relative Styling");
       click([...section!.querySelectorAll("button")].find((b) => b.textContent?.includes("+ Add")));
-      globalThis.prompt = () => "   ";
-      click([...section!.querySelectorAll("button")].find((b) => b.textContent?.includes("+ Add")));
-      expect(
-        Object.keys(selectedNode().style?.table as Record<string, unknown>).toSorted(),
-      ).toEqual(["td", "textTransform", "th"].toSorted());
-    } finally {
-      globalThis.prompt = originalPrompt;
+      await flush();
     }
+
+    let c = await renderPanel();
+    await clickAdd(c);
+
+    // A Spectrum dialog, not a native prompt.
+    expect(topDialog()).not.toBeNull();
+    expect(topDialog()!.getAttribute("headline")).toBe("Add Nested Selector");
+    expect(topDialog()!.getAttribute("confirm-label")).toBe("Add");
+
+    await answerPromptDialog(" td ");
+    const table = selectedNode().style?.table as Record<string, unknown>;
+    expect(table.td).toEqual({});
+
+    // Cancelling adds nothing.
+    c = await renderPanel();
+    await clickAdd(c);
+    await answerPromptDialog(null);
+
+    // A blank selector is rejected in place, leaving the dialog open and the style untouched.
+    c = await renderPanel();
+    await clickAdd(c);
+    await answerPromptDialog("   ");
+    expect(topDialog()).not.toBeNull();
+    expect(topDialog()!.querySelector("sp-help-text")?.textContent).toContain("Enter a selector.");
+    await answerPromptDialog(null);
+
+    expect(Object.keys(selectedNode().style?.table as Record<string, unknown>).toSorted()).toEqual(
+      ["td", "textTransform", "th"].toSorted(),
+    );
   });
 
   test("absent in base mode and toggle persists nested open state", async () => {

@@ -1,5 +1,14 @@
 /// <reference lib="dom" />
+/**
+ * The overlay layers — the only sanctioned way to open a popover, modal, or dialog in Studio.
+ *
+ * Everything renders into one of the three fixed hosts declared in index.html (#layer-popover,
+ * #layer-modal, #layer-dialog), bound once at boot by initLayers(). Native browser dialogs
+ * (`prompt`, `confirm`, `alert`) are not permitted anywhere in Studio — use `showPromptDialog`,
+ * `showConfirmDialog`, or `showSaveDiscardDialog`. See studio-ui-guidelines.md §8.7.
+ */
 import { html, render as litRender, nothing } from "lit-html";
+import { ref } from "lit-html/directives/ref.js";
 import type { TemplateResult } from "lit-html";
 
 let _popoverLayer: HTMLElement;
@@ -116,6 +125,161 @@ export function showSaveDiscardDialog(
       </sp-dialog-wrapper>
     `,
   );
+}
+
+/** Options accepted by {@link showPromptDialog}. */
+export interface PromptDialogOptions {
+  /** Label on the confirming button. */
+  confirmLabel?: string;
+  /** Label on the dismissing button. */
+  cancelLabel?: string;
+  /** Explanatory copy rendered above the text field. */
+  message?: string | TemplateResult;
+  /** Placeholder shown while the field is empty. */
+  placeholder?: string;
+  /** How much of the pre-filled value to select once the field takes focus. */
+  select?: "all" | "stem" | "none";
+  /**
+   * Validate the raw field value. Return an empty string when valid, or a message to show as
+   * negative help text (which also blocks confirmation). Defaults to "must not be blank".
+   */
+  validate?: (value: string) => string;
+  /** Pre-filled value. */
+  value?: string;
+}
+
+/**
+ * Show a single-field text-entry dialog — the Spectrum replacement for `window.prompt()`.
+ *
+ * Resolves the trimmed value, or `null` when cancelled/dismissed. Confirming with an invalid value
+ * keeps the dialog open and surfaces the validation message as negative help text.
+ *
+ * @param {string} headline
+ * @param {PromptDialogOptions} [opts]
+ * @returns {Promise<string | null>}
+ */
+export function showPromptDialog(
+  headline: string,
+  opts: PromptDialogOptions = {},
+): Promise<string | null> {
+  const {
+    cancelLabel = "Cancel",
+    confirmLabel = "OK",
+    message,
+    placeholder = "",
+    select = "all",
+    validate,
+    value: initialValue = "",
+  } = opts;
+
+  const check = (candidate: string) =>
+    validate ? validate(candidate) : candidate.trim() ? "" : "Enter a value.";
+
+  let value = initialValue;
+  let error = "";
+  let wrapperEl: HTMLElement | null = null;
+  let focusRequested = false;
+
+  return showDialog<string | null>((done) => {
+    function rerender() {
+      // Resolved lazily: lit commits element refs before inserting the fragment, so the host is
+      // Only reachable once the first render has landed.
+      const host = wrapperEl?.parentElement;
+      if (host) {
+        litRender(buildTpl(), host);
+      }
+    }
+
+    function confirm() {
+      error = check(value);
+      if (error) {
+        rerender();
+        return;
+      }
+      done(value.trim());
+    }
+
+    function onInput(e: Event) {
+      value = (e.target as HTMLInputElement).value || "";
+      const next = check(value);
+      if (next !== error) {
+        error = next;
+        rerender();
+      }
+    }
+
+    function onKeydown(e: KeyboardEvent) {
+      if (e.key === "Enter") {
+        confirm();
+      }
+    }
+
+    /** Capture the dialog element so validation errors can re-render in place. */
+    function onWrapperRef(el?: Element) {
+      if (el) {
+        wrapperEl = el as HTMLElement;
+      }
+    }
+
+    /** Focus (and optionally select) the field once, on first render only. */
+    function onFieldRef(el?: Element) {
+      if (!el || focusRequested) {
+        return;
+      }
+      focusRequested = true;
+      const field = el as HTMLElement;
+      requestAnimationFrame(() => {
+        field.focus();
+        const input = field.shadowRoot?.querySelector("input");
+        if (!input || select === "none") {
+          return;
+        }
+        if (select === "stem") {
+          const dot = input.value.lastIndexOf(".");
+          input.setSelectionRange(0, dot > 0 ? dot : input.value.length);
+          return;
+        }
+        input.select();
+      });
+    }
+
+    function buildTpl() {
+      return html`
+        <sp-dialog-wrapper
+          open
+          underlay
+          headline=${headline}
+          confirm-label=${confirmLabel}
+          cancel-label=${cancelLabel}
+          size="s"
+          @confirm=${confirm}
+          @cancel=${() => done(null)}
+          @close=${() => done(null)}
+          ${ref(onWrapperRef)}
+        >
+          ${
+            // Spectrum resets <p> margins to 0, so without this the copy sits flush on the field.
+            message ? html`<p style="margin:0 0 8px">${message}</p>` : nothing
+          }
+          <sp-textfield
+            style="width:100%"
+            placeholder=${placeholder}
+            value=${value}
+            ?invalid=${Boolean(error)}
+            @input=${onInput}
+            @keydown=${onKeydown}
+            ${ref(onFieldRef)}
+          >
+            ${error
+              ? html`<sp-help-text slot="negative-help-text">${error}</sp-help-text>`
+              : nothing}
+          </sp-textfield>
+        </sp-dialog-wrapper>
+      `;
+    }
+
+    return buildTpl();
+  });
 }
 
 /**

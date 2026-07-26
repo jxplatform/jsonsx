@@ -49,7 +49,7 @@ A project with no remote yet shows **Local only (no remote)** here, with a **Pub
 
 ## Branches
 
-The **Active branch** row shows which branch you're on. Use its picker to switch to another branch, or choose **+ New branch…** and type a name to create one. Branches let you try a redesign on the side and only merge it when it's ready.
+The **Active branch** row shows which branch you're on. Use its picker to switch to another branch, or choose **+ New branch…** — Studio opens a **New Branch** dialog; type a name and click **Create**. Branches let you try a redesign on the side and only merge it when it's ready.
 
 ## History
 

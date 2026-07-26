@@ -1,6 +1,8 @@
 ---
 title: "Browse your project"
 description: "The Manage surface in Jx Studio: browse your project, create pages and content, upload media, and define content models."
+code:
+  - packages/studio/src/browse/browse.ts
 ---
 
 # Manage
@@ -17,7 +19,7 @@ Right-click any file to **open**, **rename**, **duplicate**, or **delete** it.
 
 ## Create pages and content
 
-Use **New** to add a Page, Layout, or Component. Studio also lists an entry for each **content type** your project defines, so creating a blog post or a doc is one click — Studio pre-fills the frontmatter from that type's schema.
+Use **New** to add a Page, Layout, or Component. Studio asks for a name in a dialog — it tells you which folder the file lands in, and turns what you type into a file name (`About Us` becomes `about-us`). Studio also lists an entry for each **content type** your project defines, so creating a blog post or a doc is one click — Studio pre-fills the frontmatter from that type's schema.
 
 ## Upload media
 

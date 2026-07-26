@@ -22,6 +22,8 @@ let confirmCalls: string[] = [];
 let confirmResult = true;
 let publishCalls: unknown[] = [];
 let dialogHosts: HTMLElement[] = [];
+let promptCalls: { headline: string; opts: Record<string, any> }[] = [];
+let promptResult: string | null = null;
 
 void mock.module("../src/platform.js", () => ({
   getPlatform: () => mockPlatform,
@@ -59,6 +61,12 @@ void mock.module("../src/ui/layers.js", () => ({
         host,
       );
     }),
+  // The prompt dialog's own rendering/validation is covered in tests/ui-layers-gaps.test.ts; here
+  // Only the options the panel passes and how it handles the resolved value matter.
+  showPromptDialog: async (headline: string, opts: Record<string, any> = {}) => {
+    promptCalls.push({ headline, opts });
+    return promptResult;
+  },
 }));
 
 void mock.module("../src/panels/statusbar.js", () => ({
@@ -185,6 +193,8 @@ beforeEach(() => {
   confirmCalls = [];
   confirmResult = true;
   publishCalls = [];
+  promptCalls = [];
+  promptResult = null;
   for (const host of dialogHosts) {
     host.remove();
   }
@@ -265,52 +275,40 @@ describe("cloneRepository", () => {
   test("reports unsupported platform when gitClone is missing", async () => {
     await cloneRepository(noopCtx);
     expect(statusMessages).toContain("Clone not supported on this platform");
-    expect(dialogHosts).toEqual([]);
+    expect(promptCalls).toEqual([]);
   });
 
-  test("confirm with URL clones and opens the project", async () => {
+  test("asks for the URL through the Spectrum prompt dialog", async () => {
+    mockPlatform.gitClone = log("gitClone", async () => ({ ok: true, root: "/x" }));
+    await cloneRepository(noopCtx);
+    expect(promptCalls).toHaveLength(1);
+    const { headline, opts } = promptCalls[0]!;
+    expect(headline).toBe("Clone Git Repository");
+    expect(opts.confirmLabel).toBe("Clone");
+    expect(opts.placeholder).toBe("https://github.com/user/repo.git");
+    expect(opts.validate("")).toBe("Enter a repository URL.");
+    expect(opts.validate("https://github.com/u/r.git")).toBe("");
+  });
+
+  test("a confirmed URL clones and opens the project", async () => {
     mockPlatform.gitClone = log("gitClone", async () => ({ ok: true, root: "/tmp/clone" }));
+    promptResult = "https://github.com/u/r.git";
     const opened: string[] = [];
-    const promise = cloneRepository({
+    await cloneRepository({
       openRecentProject: async (root: string) => {
         opened.push(root);
       },
     });
-    await flush();
-    const host = dialogHosts.at(-1)!;
-    (host.querySelector("sp-textfield") as any).value = " https://github.com/u/r.git ";
-    host.querySelector("sp-dialog-wrapper")!.dispatchEvent(new Event("confirm"));
-    await promise;
     expect(calls).toContainEqual(["gitClone", "https://github.com/u/r.git"]);
     expect(opened).toEqual(["/tmp/clone"]);
     expect(statusMessages).toContain("Cloning repository...");
     expect(statusMessages).toContain("Clone complete");
   });
 
-  test("cancel dismisses without cloning", async () => {
+  test("a dismissed dialog clones nothing", async () => {
     mockPlatform.gitClone = log("gitClone", async () => ({ ok: true, root: "/x" }));
-    const promise = cloneRepository(noopCtx);
-    await flush();
-    dialogHosts.at(-1)!.querySelector("sp-dialog-wrapper")!.dispatchEvent(new Event("cancel"));
-    await promise;
-    expect(callNames()).not.toContain("gitClone");
-  });
-
-  test("underlay close dismisses without cloning", async () => {
-    mockPlatform.gitClone = log("gitClone", async () => ({ ok: true, root: "/x" }));
-    const promise = cloneRepository(noopCtx);
-    await flush();
-    dialogHosts.at(-1)!.querySelector("sp-underlay")!.dispatchEvent(new Event("close"));
-    await promise;
-    expect(callNames()).not.toContain("gitClone");
-  });
-
-  test("confirm with empty URL resolves to null and skips clone", async () => {
-    mockPlatform.gitClone = log("gitClone", async () => ({ ok: true, root: "/x" }));
-    const promise = cloneRepository(noopCtx);
-    await flush();
-    dialogHosts.at(-1)!.querySelector("sp-dialog-wrapper")!.dispatchEvent(new Event("confirm"));
-    await promise;
+    promptResult = null;
+    await cloneRepository(noopCtx);
     expect(callNames()).not.toContain("gitClone");
   });
 
@@ -318,12 +316,8 @@ describe("cloneRepository", () => {
     mockPlatform.gitClone = log("gitClone", async () => {
       throw new Error("denied");
     });
-    const promise = cloneRepository(noopCtx);
-    await flush();
-    const host = dialogHosts.at(-1)!;
-    (host.querySelector("sp-textfield") as any).value = "https://github.com/u/r.git";
-    host.querySelector("sp-dialog-wrapper")!.dispatchEvent(new Event("confirm"));
-    await promise;
+    promptResult = "https://github.com/u/r.git";
+    await cloneRepository(noopCtx);
     expect(statusMessages.some((m) => m.includes("Clone failed") && m.includes("denied"))).toBe(
       true,
     );
@@ -331,17 +325,13 @@ describe("cloneRepository", () => {
 
   test("clone result without root does not open a project", async () => {
     mockPlatform.gitClone = log("gitClone", async () => ({ ok: false, root: "" }));
+    promptResult = "https://github.com/u/r.git";
     const opened: string[] = [];
-    const promise = cloneRepository({
+    await cloneRepository({
       openRecentProject: async (root: string) => {
         opened.push(root);
       },
     });
-    await flush();
-    const host = dialogHosts.at(-1)!;
-    (host.querySelector("sp-textfield") as any).value = "https://github.com/u/r.git";
-    host.querySelector("sp-dialog-wrapper")!.dispatchEvent(new Event("confirm"));
-    await promise;
     expect(opened).toEqual([]);
     expect(statusMessages).not.toContain("Clone complete");
   });
@@ -500,33 +490,31 @@ describe("branch selector", () => {
     expect(callNames()).not.toContain("gitCheckout");
   });
 
-  test("new-branch option prompts and creates a trimmed branch", async () => {
+  test("new-branch option opens the prompt dialog and creates the branch", async () => {
     seedRepoUi();
     const div = renderPanel();
-    const originalPrompt = (globalThis as any).prompt;
-    (globalThis as any).prompt = () => "  feat-x  ";
-    try {
-      const picker = changeBranch(div, "__new__");
-      await flush();
-      expect(picker.value).toBe("main");
-      expect(calls).toContainEqual(["gitCreateBranch", "feat-x"]);
-    } finally {
-      (globalThis as any).prompt = originalPrompt;
-    }
+    promptResult = "feat-x";
+    const picker = changeBranch(div, "__new__");
+    await flush();
+
+    expect(picker.value).toBe("main");
+    expect(promptCalls).toHaveLength(1);
+    const { headline, opts } = promptCalls[0]!;
+    expect(headline).toBe("New Branch");
+    expect(opts.confirmLabel).toBe("Create");
+    expect(opts.message).toContain("main");
+    expect(opts.validate("  ")).toBe("Enter a branch name.");
+    expect(opts.validate("feat-x")).toBe("");
+    expect(calls).toContainEqual(["gitCreateBranch", "feat-x"]);
   });
 
-  test("cancelled new-branch prompt creates nothing", async () => {
+  test("a dismissed new-branch dialog creates nothing", async () => {
     seedRepoUi();
     const div = renderPanel();
-    const originalPrompt = (globalThis as any).prompt;
-    (globalThis as any).prompt = () => null;
-    try {
-      changeBranch(div, "__new__");
-      await flush();
-      expect(callNames()).not.toContain("gitCreateBranch");
-    } finally {
-      (globalThis as any).prompt = originalPrompt;
-    }
+    promptResult = null;
+    changeBranch(div, "__new__");
+    await flush();
+    expect(callNames()).not.toContain("gitCreateBranch");
   });
 });
 

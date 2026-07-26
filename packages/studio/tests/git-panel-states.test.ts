@@ -24,6 +24,7 @@ void mock.module("../src/view.js", () => ({
 void mock.module("../src/ui/layers.js", () => ({
   showConfirmDialog: async () => true,
   showDialog: async () => null,
+  showPromptDialog: async () => null,
 }));
 
 void mock.module("../src/panels/statusbar.js", () => ({

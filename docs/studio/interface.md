@@ -7,6 +7,7 @@ code:
   - packages/studio/src/panels/right-panel.ts
   - packages/studio/src/panels/statusbar.ts
   - packages/studio/src/ui/panel-resize.ts
+  - packages/studio/src/files/files.ts
 ---
 
 # The workspace
@@ -41,7 +42,7 @@ In the desktop app, the window's minimize, maximize, and close controls also liv
 
 The vertical icon strip on the far left picks what the left panel shows. From top to bottom:
 
-- **Files** — the project file tree. Open, rename, and organize the files in your project folder.
+- **Files** — the project file tree. Open, rename, and organize the files in your project folder. **New File…** — from the panel's toolbar, or from a folder's right-click menu — opens a dialog with `untitled.json` pre-filled and the extension left unselected, so typing replaces just the name. Studio picks the starting content from the extension you give it.
 - **Layers** — the element structure of the open page or component, as a tree you can select and reorder. In **Stylebook** mode it lists the style targets instead.
 - **Imports** — the components and packages the open document (or project) pulls in.
 - **Elements** — the palette of elements and components you can insert, organized by category with a search filter.

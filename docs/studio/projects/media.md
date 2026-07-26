@@ -17,7 +17,7 @@ Your site's media — images, video, audio, PDFs, and fonts — lives in the pro
 1. Drag files from your computer anywhere onto the Manage view — or click **Upload** and pick them in the file dialog. You can drop several at once.
 2. The new files appear in the **Media** section immediately, ready to use.
 
-Studio accepts images (including SVG), video, audio, PDFs, and font files. Right-click any asset to **rename**, **duplicate**, or **delete** it.
+Studio accepts images (including SVG), video, audio, PDFs, and font files. Right-click any asset to **rename**, **duplicate**, or **delete** it. Renaming preselects just the name, so typing replaces `hero` in `hero.jpg` and leaves the extension alone.
 
 ![The Manage view highlighted as a drop target while files are dragged onto it](../../images/media-upload.png)
 

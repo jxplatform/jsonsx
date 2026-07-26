@@ -21,7 +21,7 @@ import { formatForPath } from "../format/format-host";
 import { projectState, renderOnly, updateUi } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import { showConfirmDialog, showDialog } from "../ui/layers";
+import { showConfirmDialog, showPromptDialog } from "../ui/layers";
 import { statusMessage } from "./statusbar";
 import { publishToGithub } from "../github/github-publish";
 import { pullWithPackageSync } from "../packages/pull-package-sync";
@@ -95,32 +95,12 @@ export async function cloneRepository(ctx: { openRecentProject: (root: string) =
     return;
   }
 
-  const url = await showDialog<string | null>(
-    (done) => html`
-      <sp-underlay open @close=${() => done(null)}></sp-underlay>
-      <sp-dialog-wrapper
-        headline="Clone Git Repository"
-        confirmLabel="Clone"
-        cancelLabel="Cancel"
-        open
-        @confirm=${(e: Event) => {
-          const input = ((e.target as HTMLElement).parentElement as HTMLElement).querySelector(
-            "sp-textfield",
-          ) as HTMLInputElement | null;
-          done(input?.value?.trim() || null);
-        }}
-        @cancel=${() => done(null)}
-        @close=${() => done(null)}
-      >
-        <sp-textfield
-          label="Repository URL"
-          placeholder="https://github.com/user/repo.git"
-          style="width: 100%"
-          autofocus
-        ></sp-textfield>
-      </sp-dialog-wrapper>
-    `,
-  );
+  const url = await showPromptDialog("Clone Git Repository", {
+    confirmLabel: "Clone",
+    message: "Repository URL",
+    placeholder: "https://github.com/user/repo.git",
+    validate: (v) => (v.trim() ? "" : "Enter a repository URL."),
+  });
 
   if (!url) {
     return;
@@ -434,10 +414,14 @@ export function renderGitPanel(
           const val = (e.target as HTMLInputElement).value;
           if (val === "__new__") {
             (e.target as HTMLInputElement).value = branches?.current || "";
-            // oxlint-disable-next-line no-alert -- native prompt is the intended quick-input UX here
-            const name = prompt("New branch name:");
-            if (name?.trim()) {
-              await gitAction("gitCreateBranch", name.trim());
+            const name = await showPromptDialog("New Branch", {
+              confirmLabel: "Create",
+              message: `Branching from ${branches?.current || status?.branch || "the current branch"}.`,
+              placeholder: "feature/my-change",
+              validate: (v) => (v.trim() ? "" : "Enter a branch name."),
+            });
+            if (name) {
+              await gitAction("gitCreateBranch", name);
             }
             return;
           }

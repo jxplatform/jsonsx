@@ -1,7 +1,7 @@
 /**
- * Gap tests for src/browse/browse.ts — covers the rename dialog's input.select() path (line 620),
- * which requires the sp-textfield shadow root to contain an <input> when the focus rAF fires, plus
- * a few never-invoked event handlers (search submit prevention, rename dialog close).
+ * Gap tests for src/browse/browse.ts — covers the rename dialog's focus/select path, which requires
+ * the sp-textfield shadow root to contain an <input> when the focus rAF fires, plus a few
+ * never-invoked event handlers (search submit prevention, rename dialog close).
  */
 import { flush, installMockPlatform, pointer, resetStudioState } from "./harness";
 import type { MockPlatformState } from "./harness";
@@ -81,7 +81,7 @@ beforeEach(() => {
 // ─── Rename dialog focus/select ──────────────────────────────────────────────
 
 describe("rename dialog focus", () => {
-  test("selects the shadow-root input contents when the focus rAF fires", async () => {
+  test("selects the file-name stem in the shadow-root input when the focus rAF fires", async () => {
     const container = await mount();
     await openRenameDialogWithoutFlush(container);
 
@@ -90,14 +90,16 @@ describe("rename dialog focus", () => {
     expect(tf).not.toBeNull();
     const shadow = tf.shadowRoot ?? tf.attachShadow({ mode: "open" });
     const input = document.createElement("input");
-    let selected = 0;
-    input.select = () => {
-      selected += 1;
+    input.value = "logo.png";
+    const ranges: number[][] = [];
+    input.setSelectionRange = (start, end) => {
+      ranges.push([start ?? 0, end ?? 0]);
     };
     shadow.append(input);
 
     await flush();
-    expect(selected).toBe(1);
+    // "logo.png" → the extension stays out of the selection so a retype keeps it.
+    expect(ranges).toEqual([[0, 4]]);
 
     dialogLayer().querySelector("sp-dialog-wrapper")?.dispatchEvent(new Event("cancel"));
     await flush();
