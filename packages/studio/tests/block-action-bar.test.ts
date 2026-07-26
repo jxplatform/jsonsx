@@ -727,6 +727,18 @@ describe("block action bar", () => {
       expect(host.posted).toEqual([{ command: "italic" }, { command: "code" }]);
     });
 
+    test("a modal surface suppresses the format shortcut", () => {
+      host.editing = true;
+      const slot = document.createElement("div");
+      slot.innerHTML = "<sp-dialog-wrapper open></sp-dialog-wrapper>";
+      document.querySelector("#layer-dialog")!.append(slot);
+      handleParentFormatShortcut(ctrl("b"));
+      expect(host.posted).toEqual([]);
+      slot.remove();
+      handleParentFormatShortcut(ctrl("b"));
+      expect(host.posted).toEqual([{ command: "bold" }]);
+    });
+
     test("Ctrl+K opens the link popover (anchored to the bar's Link button)", () => {
       setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
       startEditingState();

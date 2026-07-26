@@ -118,6 +118,20 @@ describe("startInteraction", () => {
     expect(posts.at(-1)).toEqual({ hit: null, kind: "hover" });
   });
 
+  test("an inner element's pointerleave is not a canvas leave (capture sees every descendant)", () => {
+    const { channel, posts } = fakeChannel();
+    const { inner, outer } = stampedTree('["children",0]', { height: 20, width: 100, x: 10, y: 5 });
+    stop = startInteraction(channel, document);
+
+    inner.dispatchEvent(new MouseEvent("pointermove", { bubbles: true }));
+    expect(posts).toHaveLength(1);
+    // Moving from the inner span to a sibling fires pointerleave on the elements being exited; a
+    // Document CAPTURE listener sees those too, and must not read them as "left the canvas".
+    inner.dispatchEvent(new MouseEvent("pointerleave", { bubbles: true }));
+    outer.dispatchEvent(new MouseEvent("pointerleave", { bubbles: true }));
+    expect(posts).toHaveLength(1);
+  });
+
   test("teardown removes the listeners", () => {
     const { channel, posts } = fakeChannel();
     const { inner } = stampedTree('["children",0]', { height: 1, width: 1, x: 0, y: 0 });
@@ -188,6 +202,46 @@ describe("startInteraction — insertion '+' zones (deps)", () => {
     // A second leave while already cleared posts nothing new.
     document.body.dispatchEvent(new MouseEvent("pointerleave", { bubbles: true }));
     expect(posts.filter((p) => p.kind === "insertZones" && p.zones === null)).toHaveLength(1);
+  });
+
+  test("an inner element's pointerleave never clears the zones", () => {
+    const { channel, posts } = fakeChannel();
+    const el = stampedSibling('["children",1]', { height: 100, width: 300, x: 0, y: 200 });
+    stop = startInteraction(channel, document, { getShadowDoc: () => SHADOW });
+
+    el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 50, clientY: 205 }));
+    // The stamped element and its container leaving under the cursor are ordinary intra-canvas
+    // Boundary crossings — the "+" must survive them (only body/root/document leaves clear it).
+    el.dispatchEvent(new MouseEvent("pointerleave", { bubbles: true }));
+    el.parentElement?.dispatchEvent(new MouseEvent("pointerleave", { bubbles: true }));
+    expect(posts.some((p) => p.kind === "insertZones" && p.zones === null)).toBe(false);
+  });
+
+  test("a gen bump re-posts the same zone (the parent dropped the '+' on the render ack)", () => {
+    const { channel, posts } = fakeChannel();
+    const el = stampedSibling('["children",1]', { height: 100, width: 300, x: 0, y: 200 });
+    let gen = 4;
+    stop = startInteraction(channel, document, { getGen: () => gen, getShadowDoc: () => SHADOW });
+
+    el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 50, clientY: 205 }));
+    expect(posts.filter((p) => p.kind === "insertZones")).toHaveLength(1);
+
+    // Same edge, same key → still deduped while the DOM is unchanged.
+    el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 60, clientY: 206 }));
+    expect(posts.filter((p) => p.kind === "insertZones")).toHaveLength(1);
+
+    // A render/patch landed: the parent hid the "+", so the next move must re-post the zone.
+    gen = 5;
+    el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 60, clientY: 207 }));
+    const zonePosts = posts.filter((p) => p.kind === "insertZones");
+    expect(zonePosts).toHaveLength(2);
+    expect(zonePosts.at(-1)).toMatchObject({ zones: [{ edge: "top", index: 1 }] });
+
+    // A bump with the cursor mid-element posts NOTHING: the reset models the parent's post-ack
+    // State ("+" already hidden), which is exactly what a mid-element cursor resolves to.
+    gen = 6;
+    el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 60, clientY: 250 }));
+    expect(posts.filter((p) => p.kind === "insertZones")).toHaveLength(2);
   });
 
   test("no deps → never posts insertZones (hover/hit only)", () => {

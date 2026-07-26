@@ -109,6 +109,17 @@ interface HostState {
    */
   insertHideTimer: ReturnType<typeof setTimeout> | null;
   /**
+   * Whether the cursor is currently ON the "+" (button mouseenter → true, mouseleave → false).
+   *
+   * The parent MUST hold this itself: the iframe cannot see the cursor once it lands on the button
+   * (a parent-realm element overlaying the iframe), so it reports a full pointer-leave and posts
+   * `insertZones: null` — which crosses the bridge ASYNCHRONOUSLY and therefore lands just AFTER
+   * the button's own synchronous `mouseenter` cancelled the grace timer. Re-arming would then hide
+   * the "+" ~300ms into the author's click, which is the whole flighty-affordance bug. The hide
+   * checks this at FIRE time, so the ordering of the two signals no longer matters.
+   */
+  insertHover: boolean;
+  /**
    * Id of the tab whose document this host's iframe DOM currently reflects. Adopted from
    * {@link HostState.pendingTabIds} ONLY when the render acks (`renderComplete`), so on the FIFO
    * channel any edit-session commit the iframe posts ahead of that ack still routes to the tab the
@@ -412,7 +423,7 @@ export function setNativeDragEnterHandler(fn: (host: HostState) => void): void {
 }
 
 /** Delay (ms) before hiding the insertion "+" so the cursor can reach it (SALVAGED HIDE_DELAY). */
-const INSERT_HIDE_DELAY = 300;
+export const INSERT_HIDE_DELAY = 300;
 
 /**
  * The parent-realm insertion handler: open the slash menu anchored at the "+" `btn` and, on select,
@@ -768,6 +779,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     editingProp: null,
     iframe,
     insertHideTimer: null,
+    insertHover: false,
     insertZone: null,
     lastRenderedGen: -1,
     lastSelectionRect: null,
@@ -787,11 +799,18 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     tabId: null,
   };
   // The insertion "+" lives on the overlay (the one pointer-events:auto element there). Clicking it
-  // Opens the slash menu → mutateInsertNode for the captured zone; mouseenter/leave drive the same
-  // Grace timer the zone posts use, so moving the cursor onto the button never drops it.
+  // Opens the slash menu → mutateInsertNode for the captured zone; mouseenter/leave record whether
+  // The cursor is ON it, which both drives the grace timer and VETOES a hide the iframe's (async,
+  // Later-arriving) leave post armed underneath the author — see {@link HostState.insertHover}.
   overlay.insertButton.addEventListener("click", (e) => onInsertButtonClick(state, e));
-  overlay.insertButton.addEventListener("mouseenter", () => cancelInsertHide(state));
-  overlay.insertButton.addEventListener("mouseleave", () => scheduleInsertHide(state));
+  overlay.insertButton.addEventListener("mouseenter", () => {
+    state.insertHover = true;
+    cancelInsertHide(state);
+  });
+  overlay.insertButton.addEventListener("mouseleave", () => {
+    state.insertHover = false;
+    scheduleInsertHide(state);
+  });
   channel.onMessage((msg) => handleMessage(state, msg));
   hosts.set(canvasEl, state);
   liveHosts.add(state);
@@ -813,14 +832,33 @@ function showInsertZone(state: HostState, zone: InsertZone): void {
 function hideInsertZoneNow(state: HostState): void {
   cancelInsertHide(state);
   state.insertZone = null;
+  state.insertHover = false;
   state.overlay.setInsertZone(null);
 }
 
-/** Arm the grace timer to hide the "+" (SALVAGED HIDE_DELAY), unless one is already pending. */
+/**
+ * Whether the cursor is on the "+" right now. {@link HostState.insertHover} is the primary signal;
+ * the live `:hover` match is a belt-and-braces second one for a button that materialised UNDER an
+ * already-stationary cursor (the browser updates `:hover` on that layout change, but a `mouseenter`
+ * is not guaranteed).
+ */
+function insertButtonHovered(state: HostState): boolean {
+  const btn = state.overlay.insertButton;
+  return state.insertHover || (typeof btn.matches === "function" && btn.matches(":hover"));
+}
+
+/**
+ * Arm the grace timer to hide the "+" (SALVAGED HIDE_DELAY), replacing any pending one. The hide is
+ * SKIPPED when the cursor turns out to be on the button by the time it fires — see
+ * {@link HostState.insertHover} for why a cancel-on-mouseenter alone loses that race.
+ */
 function scheduleInsertHide(state: HostState): void {
   cancelInsertHide(state);
   state.insertHideTimer = setTimeout(() => {
     state.insertHideTimer = null;
+    if (insertButtonHovered(state)) {
+      return;
+    }
     hideInsertZoneNow(state);
   }, INSERT_HIDE_DELAY);
 }

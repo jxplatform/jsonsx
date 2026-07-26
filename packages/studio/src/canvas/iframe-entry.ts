@@ -225,6 +225,7 @@ export function startCanvasIframe(opts: {
   // Accessor feeds the insertion "+" zone computation hung off the same pointermove (the parent
   // Draws the clickable "+" and runs the slash-menu → mutateInsertNode flow on click).
   const stopInteraction = startInteraction(channel, container.ownerDocument, {
+    getGen: () => renderedGen,
     getMode: () => currentMode,
     getShadowDoc: () => shadowDoc,
   });

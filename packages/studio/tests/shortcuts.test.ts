@@ -468,6 +468,27 @@ describe("mod shortcuts", () => {
     expect(openQuickSearch).toHaveBeenCalledTimes(1);
   });
 
+  test("every shortcut stands down while a modal surface is up", () => {
+    // The underlay already swallows the mouse across the viewport; the keyboard must follow, or
+    // ⌘P/⌘S/Delete keep driving the document behind a dialog the author cannot click.
+    const slot = document.createElement("div");
+    slot.innerHTML = "<sp-dialog-wrapper open></sp-dialog-wrapper>";
+    document.querySelector("#layer-dialog")!.append(slot);
+    const tab = activeTab.value!;
+    tab.session.selection = ["children", 0];
+
+    pressDoc("p", { ctrlKey: true });
+    pressDoc("s", { metaKey: true });
+    pressDoc("Delete");
+    expect(openQuickSearch).not.toHaveBeenCalled();
+    expect(saveFile).not.toHaveBeenCalled();
+    expect((tab.doc.document.children as unknown[]).length).toBe(3);
+
+    slot.remove();
+    pressDoc("p", { ctrlKey: true });
+    expect(openQuickSearch).toHaveBeenCalledTimes(1);
+  });
+
   test("meta+s saves the file", () => {
     pressDoc("s", { metaKey: true });
     expect(saveFile).toHaveBeenCalledTimes(1);

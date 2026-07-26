@@ -21,8 +21,63 @@ export function initLayers() {
   _dialogLayer = document.querySelector("#layer-dialog") as HTMLElement;
 }
 
+/** Anything in the modal/dialog layers that paints a viewport-wide underlay over the app. */
+const UNDERLAID = "sp-dialog-wrapper[open], sp-underlay[open]";
+
+/**
+ * Whether a surface with an underlay is up — a dialog from {@link showDialog}, or an
+ * {@link openModal} body that renders its own `sp-underlay`.
+ *
+ * Read by the app-level keyboard handlers, which must stand down while one is: an underlay swallows
+ * every pointer event across the viewport, so leaving shortcuts live means <kbd>Delete</kbd>,
+ * <kbd>Enter</kbd>, ⌘S and ⌘W keep hitting the document BEHIND a surface the author cannot even
+ * click on. Derived from the live DOM rather than a registration counter, so the rule is simply
+ * "whatever blocks the mouse blocks the keyboard" — no bookkeeping for a new modal to forget.
+ */
+export function isModalOpen(): boolean {
+  return Boolean(_dialogLayer?.querySelector(UNDERLAID) || _modalLayer?.querySelector(UNDERLAID));
+}
+
+/** Focusable candidates in a dialog BODY, in the order a keyboard user would reach them. */
+const BODY_FOCUSABLE =
+  'input, textarea, select, button, sp-textfield, sp-button, sp-picker, sp-checkbox, [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Hand the keyboard to a freshly opened dialog.
+ *
+ * `sp-dialog-wrapper` only throws focus into itself when an `<sp-overlay>` drives it. Opened
+ * directly through its `open` attribute — Studio's pattern, because this layer stack owns stacking
+ * rather than Spectrum's overlay system — NOTHING does, so focus stays on whatever sits behind the
+ * underlay: the dialog is unreachable by keyboard, <kbd>Escape</kbd> never reaches it, and
+ * keystrokes keep landing in the app the underlay is blocking.
+ *
+ * Prefers the first focusable in the dialog BODY (a bespoke form's opening field), else the
+ * wrapper's own cancel button — DialogWrapper renders cancel → secondary → confirm, so the first
+ * shadow button is the least destructive landing spot. A body that already claimed focus
+ * ({@link showPromptDialog}'s field) is left alone.
+ */
+function focusDialog(slot: HTMLElement): void {
+  // Deferred a frame: the wrapper's buttons live in a shadow root Spectrum renders asynchronously.
+  requestAnimationFrame(() => {
+    if (!slot.isConnected || slot.contains(document.activeElement)) {
+      return;
+    }
+    const wrapper = slot.querySelector("sp-dialog-wrapper");
+    const target =
+      slot.querySelector<HTMLElement>(BODY_FOCUSABLE) ??
+      wrapper?.shadowRoot?.querySelector<HTMLElement>("sp-button") ??
+      null;
+    target?.focus();
+  });
+}
+
 /**
  * Show an ephemeral dialog. Returns a Promise that resolves when the dialog is dismissed.
+ *
+ * Takes the keyboard on open ({@link focusDialog}) and hands it back to the previously focused
+ * element on close. <kbd>Escape</kbd> dismisses by firing the wrapper's `close` event, so each
+ * helper's own `@close` binding decides what "dismissed" resolves to; a bespoke body with no
+ * `sp-dialog-wrapper` owns its own keys.
  *
  * @template T
  * @param {(done: (value: T) => void) => import("lit-html").TemplateResult} templateFn
@@ -35,17 +90,39 @@ export function showDialog<T>(
     const slot = document.createElement("div");
     slot.style.pointerEvents = "auto";
     _dialogLayer.append(slot);
+    // Whoever held focus before the modal took it, so it can be handed back (a dialog opened from a
+    // Toolbar button returns the caret to that button, not to <body>).
+    const restoreTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     let resolved = false;
+    const onKeydown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") {
+        return;
+      }
+      const wrapper = slot.querySelector("sp-dialog-wrapper");
+      if (!wrapper) {
+        return;
+      }
+      // Stop it ALSO reaching the app behind (which clears the canvas selection on Escape).
+      e.preventDefault();
+      e.stopPropagation();
+      wrapper.dispatchEvent(new Event("close", { bubbles: true }));
+    };
+    slot.addEventListener("keydown", onKeydown);
     const done = (value: T) => {
       if (resolved) {
         return;
       }
       resolved = true;
+      slot.removeEventListener("keydown", onKeydown);
       litRender(nothing, slot);
       slot.remove();
+      if (restoreTo?.isConnected) {
+        restoreTo.focus();
+      }
       resolve(value);
     };
     litRender(templateFn(done), slot);
+    focusDialog(slot);
   });
 }
 

@@ -249,6 +249,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio-ui-guidelines.md`
 
+- **0.1.8** (2026-07-26) — Modal surfaces own the keyboard: showDialog focus handoff, Escape dismissal, and the isModalOpen() shortcut gate (§8.7).
 - **0.1.7** (2026-07-26) — Dialogs and overlay layers (§8.7): the ui/layers.ts contract, showPromptDialog as the replacement for window.prompt(), and a ban on native browser dialogs.
 - **0.1.6** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.5** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).

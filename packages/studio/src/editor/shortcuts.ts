@@ -21,7 +21,7 @@ import { isEditing, stopEditing } from "./inline-edit";
 import { copyNode, cutNode, pasteNode } from "./context-menu";
 import { openQuickSearch } from "../panels/quick-search";
 import { shouldWarnOnClose } from "../panels/tab-strip";
-import { showConfirmDialog } from "../ui/layers";
+import { isModalOpen, showConfirmDialog } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
 
 import type { JxPath } from "../state";
@@ -142,6 +142,12 @@ export function initShortcuts(
   });
 
   document.addEventListener("keydown", (e) => {
+    // A modal surface owns the keyboard while it is up. Its underlay already swallows every click,
+    // So leaving these live let Delete/Enter mutate the document — and ⌘S/⌘W/⌘Z drive the app —
+    // Behind a dialog the author cannot reach (the dialog's own keys are handled inside its layer).
+    if (isModalOpen()) {
+      return;
+    }
     const { canvasMode, setPan, applyTransform, saveFile, openProject } = getContext();
     const tab = activeTab.value;
     const mod = e.ctrlKey || e.metaKey;

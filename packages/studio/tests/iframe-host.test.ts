@@ -82,6 +82,7 @@ const {
   getEditSnapshot,
   hostDragGeometry,
   hostForCanvas,
+  INSERT_HIDE_DELAY,
   liveDragHostAt,
   mountIframeCanvas,
   mountStylebookCanvas,
@@ -1595,6 +1596,50 @@ describe("iframe canvas insertion '+' affordance", () => {
     const canvasEl = await mountReady();
     channels[0]!.deliver({ kind: "insertZones", zones: [topZone] });
     channels[0]!.deliver({ gen: 1, kind: "patchComplete" });
+    expect(plus(canvasEl).style.display).toBe("none");
+  });
+
+  /** Wait past the grace timer (plus slack) so a pending hide has definitely run — or been skipped. */
+  const pastGrace = () =>
+    new Promise((resolve) => {
+      setTimeout(resolve, INSERT_HIDE_DELAY + 80);
+    });
+
+  test("a null zones post while the cursor sits ON the '+' never hides it", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ kind: "insertZones", zones: [topZone] });
+    const btn = plus(canvasEl);
+
+    // Real ordering (verified in Chrome): the cursor reaching the button fires its mouseenter
+    // Synchronously, and only THEN does the iframe's leave-driven `null` arrive over the async
+    // Bridge — so a cancel-on-mouseenter alone gets re-armed and yanks the "+" mid-click.
+    btn.dispatchEvent(new MouseEvent("mouseenter"));
+    channels[0]!.deliver({ kind: "insertZones", zones: null });
+    await pastGrace();
+
+    expect(btn.style.display).toBe("grid");
+    expect(btn.classList.contains("visible")).toBe(true);
+  });
+
+  test("the '+' still hides once the cursor moves off it", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ kind: "insertZones", zones: [topZone] });
+    const btn = plus(canvasEl);
+    btn.dispatchEvent(new MouseEvent("mouseenter"));
+    channels[0]!.deliver({ kind: "insertZones", zones: null });
+
+    btn.dispatchEvent(new MouseEvent("mouseleave"));
+    await pastGrace();
+    expect(btn.style.display).toBe("none");
+    expect(btn.classList.contains("visible")).toBe(false);
+  });
+
+  test("a null zones post with the cursor elsewhere hides the '+' after the grace delay", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ kind: "insertZones", zones: [topZone] });
+    channels[0]!.deliver({ kind: "insertZones", zones: null });
+    expect(plus(canvasEl).style.display).toBe("grid");
+    await pastGrace();
     expect(plus(canvasEl).style.display).toBe("none");
   });
 

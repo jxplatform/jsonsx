@@ -90,6 +90,10 @@ The block menu opens when :kbd[/] is typed at the start of a line or after a spa
 
 In **Grid** mode the table owns the editing keys: copy, paste, delete, arrows, and :kbd[Enter] act on cells and ranges, and the zoom keys stay with the grid too. The app-level shortcuts — Save, Quick Access, Open project, Close tab, and Undo/Redo — still work as listed above.
 
+## While a dialog is open
+
+A dialog takes the keyboard for as long as it is up: it gets focus when it opens, :kbd[Esc] dismisses it, and focus returns to whatever you were on. Every shortcut on this page stands down meanwhile — the dialog dims the app behind it, so :kbd[Delete], :kbd[Enter], :kbd[⌘S] and the rest cannot reach the page you can't click.
+
 ## Next
 
 - See where these fit on the surface itself in **[The canvas](/docs/studio/interface/canvas)**

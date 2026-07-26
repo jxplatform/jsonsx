@@ -1,6 +1,6 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.1.7
+**Version:** 0.1.8
 **Status:** Implemented
 **Updated:** 2026-07-26
 **Applies to:** `packages/studio/`
@@ -415,6 +415,26 @@ Dialog attributes are kebab-case on `sp-dialog-wrapper` (`confirm-label`, `cance
 `secondary-label`). The camelCase property names are not observed attributes; using them silently
 renders a dialog with no buttons.
 
+**Modal surfaces own the keyboard.** Studio opens `sp-dialog-wrapper` through its `open` attribute
+rather than Spectrum's `sp-overlay` (this layer stack owns stacking), and the wrapper only manages
+focus when an overlay drives it. `showDialog` therefore does it:
+
+- On open it moves focus into the dialog — the first focusable in the body, else the wrapper's own
+  cancel button (DialogWrapper renders cancel → secondary → confirm, so the first shadow button is
+  the least destructive landing spot). A body that already claimed focus (`showPromptDialog`'s
+  field) keeps it.
+- On close it hands focus back to whatever held it before the dialog opened.
+- <kbd>Escape</kbd> dismisses by firing the wrapper's `close` event, so each helper's own `@close`
+  binding decides what "dismissed" resolves to. A bespoke body with no `sp-dialog-wrapper` owns its
+  own keys.
+
+`isModalOpen()` reports whether a surface with an underlay is up — a `showDialog` dialog, or an
+`openModal` body that renders its own `sp-underlay`. It is derived from the live DOM, not a
+registration counter, so the rule is simply _whatever blocks the mouse blocks the keyboard_: the
+app-level keydown handlers (`editor/shortcuts.ts`, `panels/block-action-bar.ts`) return early while
+it is true. Without that gate, <kbd>Delete</kbd>, <kbd>Enter</kbd>, ⌘S, ⌘W and ⌘Z keep driving the
+document behind a surface the author cannot even click on.
+
 - Auto-hides when no selection
 
 ---
@@ -472,6 +492,7 @@ When building new UI in Studio, verify:
 
 ## Changelog
 
+- **0.1.8** (2026-07-26) — Modal surfaces own the keyboard: showDialog focus handoff, Escape dismissal, and the isModalOpen() shortcut gate (§8.7).
 - **0.1.7** (2026-07-26) — Dialogs and overlay layers (§8.7): the ui/layers.ts contract, showPromptDialog as the replacement for window.prompt(), and a ban on native browser dialogs.
 - **0.1.6** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.5** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).

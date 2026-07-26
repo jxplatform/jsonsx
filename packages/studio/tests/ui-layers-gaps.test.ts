@@ -9,6 +9,7 @@ import {
   clearLayerSlot,
   getLayerSlot,
   initLayers,
+  isModalOpen,
   openModal,
   renderPopover,
   showConfirmDialog,
@@ -68,6 +69,96 @@ describe("layers after init", () => {
       doneFn!(1);
       doneFn!(2);
       expect(await promise).toBe(1);
+    });
+
+    test("takes the keyboard on open and hands focus back on close", async () => {
+      const opener = document.createElement("button");
+      document.body.append(opener);
+      opener.focus();
+      expect(document.activeElement).toBe(opener);
+
+      let doneFn: ((v: string) => void) | null = null;
+      const promise = showDialog<string>((done) => {
+        doneFn = done;
+        return html`<sp-dialog-wrapper open><input id="dlg-field" /></sp-dialog-wrapper>`;
+      });
+      // Focus lands a frame later — the wrapper's own buttons live in a shadow root Spectrum
+      // Renders asynchronously.
+      await flush();
+      expect(document.activeElement).toBe(layer("dialog").querySelector("#dlg-field"));
+
+      doneFn!("x");
+      await promise;
+      expect(document.activeElement).toBe(opener);
+      opener.remove();
+    });
+
+    test("does not steal focus from a body that already claimed it", async () => {
+      let doneFn: ((v: string) => void) | null = null;
+      const promise = showDialog<string>((done) => {
+        doneFn = done;
+        return html`<sp-dialog-wrapper open
+          ><input id="first" /><input id="second"
+        /></sp-dialog-wrapper>`;
+      });
+      (layer("dialog").querySelector("#second") as HTMLElement).focus();
+      await flush();
+      expect((document.activeElement as HTMLElement).id).toBe("second");
+      doneFn!("x");
+      await promise;
+    });
+
+    test("Escape fires the wrapper's close event (each helper maps its own cancel value)", async () => {
+      const promise = showConfirmDialog("Hm", "really?");
+      const dlg = layer("dialog").querySelector("sp-dialog-wrapper") as HTMLElement;
+      dlg.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+      expect(await promise).toBe(false);
+      expect(layer("dialog").children).toHaveLength(0);
+    });
+
+    test("Escape in a bespoke body with no wrapper is left to the body", async () => {
+      let doneFn: ((v: string) => void) | null = null;
+      const promise = showDialog<string>((done) => {
+        doneFn = done;
+        return html`<div id="bespoke">no wrapper here</div>`;
+      });
+      const body = layer("dialog").querySelector("#bespoke") as HTMLElement;
+      body.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+      expect(layer("dialog").querySelector("#bespoke")).not.toBeNull();
+      doneFn!("still here");
+      expect(await promise).toBe("still here");
+    });
+  });
+
+  describe("isModalOpen", () => {
+    test("false when the layers are empty", () => {
+      expect(isModalOpen()).toBe(false);
+    });
+
+    test("true while a dialog is up, false once it resolves", async () => {
+      const promise = showConfirmDialog("Blocking?", "yes");
+      expect(isModalOpen()).toBe(true);
+      (layer("dialog").querySelector("sp-dialog-wrapper") as HTMLElement).dispatchEvent(
+        new Event("close"),
+      );
+      await promise;
+      expect(isModalOpen()).toBe(false);
+    });
+
+    test("true for an openModal body that paints its own underlay", () => {
+      const handle = openModal(
+        html`<sp-underlay open></sp-underlay>
+          <div>settings</div>`,
+      );
+      expect(isModalOpen()).toBe(true);
+      handle.close();
+      expect(isModalOpen()).toBe(false);
+    });
+
+    test("false for a modal-layer body with no underlay (the mouse still gets through)", () => {
+      const handle = openModal(html`<div class="progress">working…</div>`);
+      expect(isModalOpen()).toBe(false);
+      handle.close();
     });
   });
 

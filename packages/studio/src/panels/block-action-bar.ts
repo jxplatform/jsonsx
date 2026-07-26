@@ -29,7 +29,7 @@ import { projectState } from "../state";
 import { componentRegistry } from "../files/components";
 import { convertToComponent } from "../editor/convert-to-component";
 import { getEditBarAnchorRect, getEditSnapshot, postApplyFormat } from "../canvas/iframe-host";
-import { getLayerSlot } from "../ui/layers";
+import { getLayerSlot, isModalOpen } from "../ui/layers";
 import { showSlashMenu } from "../editor/slash-menu";
 import { getConvertTargets } from "../editor/convert-targets";
 import { rectOf } from "../utils/geometry";
@@ -187,7 +187,9 @@ export function handleParentFormatShortcut(e: KeyboardEvent): void {
   if (!(e.ctrlKey || e.metaKey) || e.altKey) {
     return;
   }
-  if (!getEditSnapshot().editing) {
+  // Same rule as the global shortcuts: a modal surface owns the keyboard, so ⌘B never reformats the
+  // Document behind an underlay the author cannot click through.
+  if (isModalOpen() || !getEditSnapshot().editing) {
     return;
   }
   // Focus inside the cross-origin canvas iframe surfaces as the <iframe> element being active.
