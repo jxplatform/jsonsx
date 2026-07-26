@@ -21,7 +21,9 @@ export function mount() {
       const tab = activeTab.value;
       if (tab) {
         const gs = tab.session.ui.gitStatus;
-        if (!gs && !tab.session.ui.gitLoading) {
+        // The badge needs a status once. A refresh that already failed must not re-arm this: the
+        // Effect re-runs on the very state the failure writes, so retrying here spins.
+        if (!gs && !tab.session.ui.gitLoading && !tab.session.ui.gitError) {
           void refreshGitStatus();
         }
       }

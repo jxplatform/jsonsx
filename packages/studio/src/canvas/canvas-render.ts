@@ -223,7 +223,10 @@ export function renderCanvas() {
     // A stale Lit part, a dead Monaco editor, or a mismatched prevCanvasMode (the toxic states that
     // Previously left the canvas unrenderable until a full reload).
     resetCanvasView();
-    if (!projectState) {
+    // Nothing is open. A dev-server root that is only a workspace/monorepo (no project.json) still
+    // Populates projectState, but it is not an open project — the file tree prompts to open one and
+    // The canvas must keep showing the welcome screen rather than going blank.
+    if (!projectState?.isSiteProject) {
       renderWelcome(canvasWrap);
     }
     return;

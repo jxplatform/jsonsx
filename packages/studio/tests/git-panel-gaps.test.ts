@@ -228,6 +228,33 @@ describe("refreshGitStatus", () => {
     await refreshGitStatus();
     expect(calls).toEqual([]);
   });
+
+  test("keeps the status when the branch lookup fails on a repo-less project", async () => {
+    // `git branch` exits non-zero outside a work tree while `git status` answers isRepo:false.
+    mockPlatform.gitStatus = log("gitStatus", async () => ({
+      ahead: 0,
+      behind: 0,
+      branch: "",
+      files: [],
+      isRepo: false,
+      remotes: [],
+    }));
+    mockPlatform.gitBranches = log("gitBranches", async () => {
+      throw new Error("not a git repository");
+    });
+    await refreshGitStatus();
+    expect(ui.gitStatus.isRepo).toBe(false);
+    expect(ui.gitError).toBeNull();
+  });
+
+  test("surfaces a branch failure on a project that IS a repo", async () => {
+    mockPlatform.gitBranches = log("gitBranches", async () => {
+      throw new Error("branches boom");
+    });
+    await refreshGitStatus();
+    expect(ui.gitStatus.isRepo).toBe(true);
+    expect(String(ui.gitError)).toContain("branches boom");
+  });
 });
 
 // ─── cloneRepository ──────────────────────────────────────────────────────────
@@ -329,6 +356,15 @@ describe("panel bootstrap", () => {
     await flush();
     expect(callNames()).toContain("gitStatus");
     expect(ui.gitStatus.isRepo).toBe(true);
+  });
+
+  test("a failed refresh does not re-arm the background fetch", async () => {
+    // Otherwise the render triggered by the failure is the next render's reason to fetch again.
+    ui.gitError = "status boom";
+    const div = renderPanel();
+    await flush();
+    expect(callNames()).not.toContain("gitStatus");
+    expect(div.textContent).toContain("status boom");
   });
 
   test("initialize repository button runs gitInit and refreshes", async () => {

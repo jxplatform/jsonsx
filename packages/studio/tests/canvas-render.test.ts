@@ -359,10 +359,20 @@ describe("renderCanvas without a tab", () => {
   });
 
   test("clears the canvas when a project is loaded but no tab is open", () => {
+    resetStudioState({ isSiteProject: true });
     canvasWrap.textContent = "leftover";
     renderCanvas();
     expect(renderWelcome).not.toHaveBeenCalled();
     expect(canvasWrap.textContent).toBe("");
+  });
+
+  // The dev server probes its root into projectState even when that root is only a workspace
+  // (no project.json). That is not an open project — the welcome screen must stay put instead of
+  // Being replaced by a blank canvas a moment after boot.
+  test("keeps the welcome screen when the root is not a site project", () => {
+    resetStudioState({ isSiteProject: false, projectRoot: ".", root: "/repo" });
+    renderCanvas();
+    expect(renderWelcome).toHaveBeenCalledWith(canvasWrap);
   });
 });
 
@@ -373,6 +383,8 @@ describe("tab close/reopen lifecycle", () => {
   const litPart = () => (canvasWrap as unknown as Record<string, unknown>)["_$litPart$"];
 
   test("reopening after closing all tabs re-renders without a dangling Lit part", async () => {
+    // A project is open, so closing every tab leaves a bare canvas (not the welcome screen).
+    resetStudioState({ isSiteProject: true });
     openSyncedTab();
     setMode("edit");
     renderCanvas();
