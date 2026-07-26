@@ -608,18 +608,24 @@ export function renderBlockActionBar() {
   const tag = (node.tagName ?? "div").toLowerCase();
 
   // Inline format state, sourced from the iframe's selection snapshot.
-  const { editing, editingProp, snapshot } = getEditSnapshot();
-  const inlineEditing = editing;
+  const { editingProp, snapshot } = getEditSnapshot();
   const actions = getInlineActions(tag) || [];
-  // A prop-bound plain session edits a single plain string — never show the format group (belt and
-  // Braces: component tags have no $inlineActions, so `actions` is empty there anyway).
-  const showFormat = inlineEditing && !editingProp && actions.length > 0;
+  // ONE bar, one shape. The format group used to appear only during an "inline edit session", so
+  // The toolbar rearranged itself under the author's cursor the moment they started typing. With a
+  // Document-wide caret there is no session to be in or out of: the group is shown whenever the
+  // Selected block can carry inline markup, and the buttons enable when there is a range to apply
+  // Them to.
+  //
+  // A prop-bound block still suppresses it — it edits a single plain string (belt and braces:
+  // Component tags have no $inlineActions, so `actions` is empty there anyway).
+  const showFormat = !editingProp && actions.length > 0;
   const activeValues =
     showFormat && snapshot
       ? actions.filter((a) => snapshot.activeTags.includes(a.tag)).map((a) => a.tag)
       : [];
-  // A collapsed caret can't format a range — disable format buttons (link/insertData stay enabled).
-  const formatDisabled = snapshot?.collapsed ?? false;
+  // Formatting applies to a RANGE: disabled for a collapsed caret, and for a block selected without
+  // One at all (from the layers panel, or by a structural edit moving the selection).
+  const formatDisabled = snapshot?.collapsed ?? true;
 
   // Conversion targets for badge click
   const isComponent =
@@ -650,8 +656,7 @@ export function renderBlockActionBar() {
           @click=${badgeInteractive
             ? (e: MouseEvent) => onTagBadgeClick(e, convertTargets, selection)
             : nothing}
-          >${isRepeater ? nodeLabel(node) : node.$id || (node.tagName ?? "div")}${inlineEditing &&
-          editingProp
+          >${isRepeater ? nodeLabel(node) : node.$id || (node.tagName ?? "div")}${editingProp
             ? ` · ${editingProp}`
             : ""}</span
         >
