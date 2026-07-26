@@ -57,6 +57,7 @@ export function applyInlineCommit(
   path: JxPath,
   children: (JxMutableNode | string)[] | null,
   textContent: string | null,
+  opts: { coalesceKey?: string | null } = {},
 ): void {
   if (!tab) {
     return;
@@ -69,22 +70,30 @@ export function applyInlineCommit(
     if (node && JSON.stringify(node.children) === JSON.stringify(children)) {
       return;
     }
-    transactDoc(tab, (t) => {
-      if (node?.textContent != null) {
-        mutateUpdateProperty(t, path, "textContent");
-      }
-      mutateUpdateProperty(t, path, "children", children);
-    });
+    transactDoc(
+      tab,
+      (t) => {
+        if (node?.textContent != null) {
+          mutateUpdateProperty(t, path, "textContent");
+        }
+        mutateUpdateProperty(t, path, "children", children);
+      },
+      { coalesceKey: opts.coalesceKey ?? null },
+    );
   } else if (textContent != null) {
     if (node && node.textContent === textContent && !node.children) {
       return;
     }
-    transactDoc(tab, (t) => {
-      if (node?.children) {
-        mutateUpdateProperty(t, path, "children");
-      }
-      mutateUpdateProperty(t, path, "textContent", textContent);
-    });
+    transactDoc(
+      tab,
+      (t) => {
+        if (node?.children) {
+          mutateUpdateProperty(t, path, "children");
+        }
+        mutateUpdateProperty(t, path, "textContent", textContent);
+      },
+      { coalesceKey: opts.coalesceKey ?? null },
+    );
   }
 }
 

@@ -628,6 +628,13 @@ export function postPatchToHosts(
 let echoOrigin: { host: HostState; paths: (string | number)[][] } | null = null;
 
 /**
+ * Identifies the current visit to a block. Text commits sharing a run fold into ONE history entry —
+ * typing commits on every pause, and without this a minute of writing would evict every structural
+ * edit from the 100-entry ring and make ⌘Z walk back through the prose one pause at a time.
+ */
+let editRunSeq = 0;
+
+/**
  * Apply `fn` with `host`'s echo suppression armed for `paths`.
  *
  * This is what lets the caret survive its own edits: committing a block re-enters the patcher,
@@ -1245,6 +1252,9 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         activeEditHost.snapshot = null;
       }
       activeEditHost = state;
+      // Each visit to a block is one undoable edit. Bumping the run id here breaks the history
+      // Coalescing run, so returning to the same paragraph later is a separate ⌘Z step.
+      editRunSeq += 1;
       state.editing = true;
       state.editingProp = msg.prop ?? null;
       state.snapshot = null;

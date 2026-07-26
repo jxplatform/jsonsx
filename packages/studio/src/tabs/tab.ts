@@ -93,6 +93,14 @@ interface HistorySnapshot {
   inverseOps?: JxDocOp[] | null;
   /** Frontmatter key changes in this transaction (before/after values, replayed both ways). */
   fmOps?: JxFmOp[] | null;
+  /**
+   * Identifies a run of edits that undo as ONE step (successive text commits to the same block).
+   *
+   * Typing commits on every pause, so without coalescing a minute of writing would push dozens of
+   * entries and evict every structural edit before it from the 100-entry ring — and ⌘Z would walk
+   * back through the prose one pause at a time instead of undoing the edit.
+   */
+  coalesceKey?: string | null;
 }
 
 export interface Tab {
