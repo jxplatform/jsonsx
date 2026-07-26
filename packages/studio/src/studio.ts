@@ -705,9 +705,16 @@ if (!_projectParam) {
   // Loopback one (see iframe-host ensureHost's canvasUrl-changed rebuild).
   const _bootPlatform = getPlatform();
   // oxlint-disable-next-line unicorn/prefer-top-level-await -- fire-and-forget: must not block the initial render
-  void _bootPlatform.activate?.()?.then(() => {
-    render();
-  });
+  void _bootPlatform
+    .activate?.()
+    // No project is bound yet, so this call only warms the canvasUrl; a backend that refuses it
+    // Still gets the render below rather than an unhandled rejection.
+    ?.catch((error: unknown) => {
+      console.error("Boot activation failed:", error);
+    })
+    .then(() => {
+      render();
+    });
 }
 
 if (_projectParam) {

@@ -189,6 +189,49 @@ describe("devserver platform basics", () => {
     await p.activate("some/dir");
     expect(callsTo("/__studio/activate")[0]!.body).toEqual({ root: "some/dir" });
   });
+
+  test("activate throws when the server refuses the root", async () => {
+    // A swallowed refusal is the dangerous case: the endpoints that take no dir fall back to the
+    // Server's own root, so the session would silently act on the tree the dev server serves.
+    route("/__studio/activate", () => json({ error: "root not permitted", ok: false }, 403));
+    const p = createDevServerPlatform();
+    expect(p.activate("/elsewhere/site")).rejects.toThrow(
+      "Could not open /elsewhere/site: root not permitted",
+    );
+  });
+
+  test("activate reports the status when the refusal carries no error body", async () => {
+    route("/__studio/activate", () => textRes("nope", 500));
+    const p = createDevServerPlatform();
+    expect(p.activate("/elsewhere/site")).rejects.toThrow("activation failed (500)");
+  });
+
+  test("a refused activation from the projectRoot setter is reported, not thrown", async () => {
+    // The setter is fire-and-forget, so its rejection has to land somewhere other than the caller.
+    route("/__studio/activate", () => json({ error: "root not permitted", ok: false }, 403));
+    const logged: unknown[][] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      logged.push(args);
+    };
+    try {
+      const p = createDevServerPlatform();
+      p.projectRoot = "/elsewhere/site";
+      // The fetch + JSON read settle over several turns, so drain macrotasks, not just microtasks.
+      for (let i = 0; i < 5; i++) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
+      }
+    } finally {
+      console.error = originalError;
+    }
+    const [entry] = logged;
+    const message = (entry ?? [])
+      .map((a) => (a instanceof Error ? a.message : String(a)))
+      .join(" ");
+    expect(message).toContain("root not permitted");
+  });
 });
 
 // ─── Path prefix logic (serverPath / stripRoot) ──────────────────────────────
@@ -1244,9 +1287,9 @@ describe("collab capability", () => {
 describe("data surface + secrets", () => {
   test("dataConnections GETs the connections route scoped to the project dir", async () => {
     route("/__studio/data/connections", () => json({ connections: [] }));
+    route("/__studio/activate", () => json({ ok: true }));
     const p = createDevServerPlatform();
     p.projectRoot = "examples/site-demo";
-    route("/__studio/activate", () => json({ ok: true }));
     expect(await p.dataConnections()).toEqual({ connections: [] });
     const [call] = callsTo("/__studio/data/connections");
     expect(call!.search.get("dir")).toBe("examples/site-demo");

@@ -2,7 +2,7 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.0
+**Version:** 0.2.1
 **Status:** Implemented
 **Updated:** 2026-07-25
 **License:** MIT
@@ -147,7 +147,7 @@ Both server entry points share one set of primitives (`src/net-guard.ts`), appli
 - **Loopback bind** (`127.0.0.1`) by default is the primary control; a `hostname` option (`--host` on the `jx dev` CLI) can widen it for containers, which removes that control and must only be used behind trusted isolation
 - **Origin/Host gate** on every privileged surface — the RCE-capable `/__jx_resolve__` / `/__jx_server__` routes (both do dynamic `import()`), the `/_jx/` extension mounts, and the whole `/__studio/*` API: a loopback (or absent) Origin is accepted, a non-loopback Origin or Host is rejected (anti-CSRF, anti-DNS-rebinding). The browser Studio and the served site are same-origin, so they pass; an external page does not. No token is used — same-origin does not need one
 - **File containment**: every static path and every caller-supplied relative or absolute `$src` / `$base` / `$implementation` resolved before a dynamic `import()` passes a lexical `relative()` check **plus a realpath re-check** (`containedPath`), so a `../` or absolute path cannot escape and a symlink cannot point outside the tree; over-encoded paths are rejected after a single decode. A **bare-specifier** `$src` is exempt: it resolves only through Node's `node_modules` lookup (an installed package), so the class file — and the sibling `$implementation` it names, even one above the class directory — is trusted as that package's own code; the containment check still binds a project-local relative `$src`
-- **Two-root activation**: filesystem operations go through `assertAccessible(filePath, root, activeProjectRoot)` — the path must sit under the server root **or** the active project root Studio bound via `POST /__studio/activate`, which itself only accepts a root contained under the server root, an explicit `allowedRoots` entry, or a project this server just created (below)
+- **Two-root activation**: filesystem operations go through `assertAccessible(filePath, root, activeProjectRoot)` — the path must sit under the server root **or** the active project root Studio bound via `POST /__studio/activate`, which itself only accepts a root contained under the server root, an explicit `allowedRoots` entry, a project this server just created (below), or **a project the account already owns** — an absolute directory holding a `project.json` somewhere under the user's home directory (`isOwnedProjectDir`). That last clause is what makes an _existing_ project openable at all: projects live outside the server root as a matter of course, so `?project=/abs/path`, the Open Project picker and the recent-projects list would otherwise be able to bind nothing but a project inside the served checkout. Requiring both the `project.json` and home containment keeps a hostile page on the loopback origin from binding the server to `/etc` or to another account's files. A refused activation is an **error the client must surface**, never a silent fallback: the endpoints that take no `dir` (the git surface especially) resolve against `activeProjectRoot || root`, so a swallowed refusal would silently run against whatever tree the server is serving
 - **Project creation is the one deliberate exception to root containment.** A new project belongs wherever the user pointed the New Project modal's Location field (specs/desktop.md §4.5), which is normally _outside_ the server root — containing it there would mean scaffolding into whatever tree the dev server happens to serve. `POST /__studio/create-project` and `POST /__studio/import-site` therefore take an explicit absolute parent and check it with `assertCreatableParent(parent, root, allowedRoots)` instead of `assertAccessible`. That guard **requires** an absolute path (a request without a destination is a 400 — the server never falls back to its own root) and admits only the server root, a configured `allowedRoots` entry, or the account's home directory, so a hostile page on the loopback origin cannot scaffold into system paths. Roots created this way are remembered for the duration of the process so the very next `/__studio/activate` can open them; the create response reports a root-relative path when the project landed under the server root and an absolute one otherwise
 
 **Loopback project server (`src/project-server.ts`, used by the desktop launchers).** Adds, on top of the above, a **per-server token** as the hard gate on the WebSocket RPC upgrade and the resolve/import routes — the desktop canvas iframe is cross-origin, so it carries the token in its URL where the same-origin dev server does not need one.
@@ -203,6 +203,7 @@ Incremental rebuild triggered by the file watcher: only entries whose `match` (R
 
 ## Changelog
 
+- **0.2.1** (2026-07-25) — Activation admits an existing project of the account's own (project.json under the home directory); a refused activation must surface as an error rather than fall back to the server root.
 - **0.2.0** (2026-07-25) — POST /__studio/create-project requires an explicit absolute destination parent — the server no longer falls back to its own root. Adds assertCreatableParent (root, allowedRoots, or home; absolute only), remembers created roots for a following activate, and returns an absolute root for projects outside the server root.
 - **0.1.9** (2026-07-23) — Serve extension asset mounts ahead of the project root in the static-file chain (§3).
 - **0.1.8** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -217,4 +218,4 @@ Incremental rebuild triggered by the file watcher: only entries whose `match` (R
 
 ---
 
-_`@jxsuite/server` Specification v0.2.0_
+_`@jxsuite/server` Specification v0.2.1_

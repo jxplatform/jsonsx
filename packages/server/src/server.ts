@@ -19,7 +19,12 @@ import { createCollabRegistry } from "./collab.ts";
 import { createWatcher, injectSSE } from "./watch.ts";
 import { handleJxMounts } from "./jx-mounts.ts";
 import { handleResolve, handleServerFunction, projectAssetMounts } from "./resolve.ts";
-import { assertAccessible, assertCreatableParent, handleStudioApi } from "./studio-api.ts";
+import {
+  assertAccessible,
+  assertCreatableParent,
+  handleStudioApi,
+  isOwnedProjectDir,
+} from "./studio-api.ts";
 import {
   containedPath,
   decodeAndNormalizePath,
@@ -339,8 +344,10 @@ export async function createDevServer(options: {
         }
 
         // Activate project — tells the server which project root to use for static file fallback.
-        // Contain the requested root: it must be under absRoot or an explicitly allowed root, so a
-        // Hostile activate cannot widen the filesystem API to arbitrary directories.
+        // Contain the requested root: it must be under absRoot, an explicitly allowed root, a
+        // Project this server just created, or an existing project of the account's own
+        // (`isOwnedProjectDir`), so a hostile activate cannot widen the filesystem API to arbitrary
+        // Directories.
         if (path === "/__studio/activate" && req.method === "POST") {
           const body = (await req.json()) as { root?: string };
           const raw = body.root || null;
@@ -352,7 +359,8 @@ export async function createDevServer(options: {
           const permitted =
             containedPath(requested, absRoot) !== null ||
             allowedRoots.some((allowed) => containedPath(requested, resolve(allowed)) !== null) ||
-            createdRoots.some((created) => containedPath(requested, created) !== null);
+            createdRoots.some((created) => containedPath(requested, created) !== null) ||
+            isOwnedProjectDir(requested);
           if (!permitted) {
             return Response.json({ ok: false, error: "root not permitted" }, { status: 403 });
           }

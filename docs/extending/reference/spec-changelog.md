@@ -149,6 +149,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.1** (2026-07-25) — Activation admits an existing project of the account's own (project.json under the home directory); a refused activation must surface as an error rather than fall back to the server root.
 - **0.2.0** (2026-07-25) — POST /__studio/create-project requires an explicit absolute destination parent — the server no longer falls back to its own root. Adds assertCreatableParent (root, allowedRoots, or home; absolute only), remembers created roots for a following activate, and returns an absolute root for projects outside the server root.
 - **0.1.9** (2026-07-23) — Serve extension asset mounts ahead of the project root in the static-file chain (§3).
 - **0.1.8** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
