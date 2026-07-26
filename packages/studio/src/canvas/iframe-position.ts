@@ -14,6 +14,8 @@
  *
  * Everything here is pure DOM traversal with NO layout reads, so it is fully exercisable under
  * happy-dom — unlike the caret-from-point and line-geometry paths, which are Chromium-only.
+ *
+ * @docs studio/editing/writing
  */
 
 import { parseJxPath, serializeJxPath } from "./path-mapping";

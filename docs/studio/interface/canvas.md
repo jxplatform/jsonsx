@@ -1,6 +1,9 @@
 ---
 title: "The canvas"
 description: "Working on the Jx Studio canvas — pan, zoom, selection, the block action bar, inserting elements, drag and drop, and the context menu."
+spec:
+  - studio.md#4.4
+  - studio-ui-guidelines.md#8.1
 code:
   - packages/studio/src/editor/shortcuts.ts
   - packages/studio/src/panels/block-action-bar.ts
@@ -11,7 +14,7 @@ code:
 
 # The canvas
 
-The canvas is the center of the workspace, where your page renders live — the real thing, not a mock-up. You work on it directly: click to select, drag to rearrange, double-click to type. How it behaves depends on the current [mode](/docs/studio/interface/modes); this page covers the interactions shared by the visual modes.
+The canvas is the center of the workspace, where your page renders live — the real thing, not a mock-up. You work on it directly: click to put the cursor in the text and select the block, drag the block bar's handle to rearrange. How it behaves depends on the current [mode](/docs/studio/interface/modes); this page covers the interactions shared by the visual modes.
 
 ![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](../../images/mode-design.png)
 
@@ -62,7 +65,7 @@ Right-click any element for the full action list: **Copy**, **Cut**, **Duplicate
 
 ## Editing text
 
-Double-click any text to start typing in place. Everything about writing on the canvas — formatting, the slash menu, links — is covered in **[Edit mode](/docs/studio/editing)**.
+Click any text to put the cursor there and start typing. Everything about writing on the canvas — formatting, the slash menu, links — is covered in **[Edit mode](/docs/studio/editing)**.
 
 ## Next
 

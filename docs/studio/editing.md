@@ -10,7 +10,7 @@ code:
 
 # Edit mode
 
-Edit is for writing. Open a content page and the canvas becomes the page itself — double-click any text and type, right where it renders. It feels like working in a doc editor; it saves as clean Markdown.
+Edit is for writing. Open a content page and the canvas becomes the page itself — click any text and type, right where it renders. It feels like working in a doc editor; it saves as clean Markdown.
 
 ![Jx Studio editing markdown content inline with a WYSIWYG editor](../images/mode-edit.png)
 

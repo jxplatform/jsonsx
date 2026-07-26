@@ -1,7 +1,14 @@
 ---
 title: "Writing and formatting"
 description: "Write directly on the page in Jx Studio's Edit mode: paragraphs, the inline formatting toolbar, links, clean pasting, and text inside components."
+spec:
+  - studio.md#8.2
+  - studio-ui-guidelines.md#8.3
 code:
+  - packages/studio/src/canvas/iframe-editable-root.ts
+  - packages/studio/src/canvas/iframe-position.ts
+  - packages/studio/src/canvas/editable-actions.ts
+  - packages/studio/src/editor/content-slice.ts
   - packages/studio/src/editor/inline-edit.ts
   - packages/studio/src/editor/inline-format.ts
   - packages/studio/src/editor/inline-link.ts
@@ -11,31 +18,38 @@ code:
 
 # Writing and formatting
 
-In Edit mode you write on the real page: double-click any text — a heading, a paragraph, a list item, a table cell — and the cursor lands in it, ready to type. There is no separate preview to keep in sync; the page you're editing is the page.
+In Edit mode you write on the real page: click any text — a heading, a paragraph, a list item, a table cell — and the cursor lands exactly where you clicked, ready to type. There is no separate preview to keep in sync; the page you're editing is the page.
 
 ![A paragraph mid-edit on the canvas with the formatting toolbar above it](../../images/inline-editing.png)
 
-## Start and stop
+## Moving around
 
-- **Double-click** any text to start editing. An outline marks the block you're in.
-- **Click anywhere else** on the page to finish — your changes are kept.
-- :kbd[Esc] also finishes editing.
-- :kbd[⌘S] (macOS) / :kbd[Ctrl+S] (Windows/Linux) finishes editing and saves the file.
+There is nothing to start or stop. The cursor is simply on the page, the way it is in a document editor:
+
+- **Click** any text to put the cursor there.
+- **Arrow keys** move it through the whole page, from the end of one block into the next.
+- :kbd[Home] / :kbd[End], word motion, and :kbd[Page Up] / :kbd[Page Down] all work as they do anywhere else.
+- **Drag** — or hold :kbd[Shift] and move — to select, including across several blocks at once.
+- :kbd[Esc] puts the cursor away.
+
+Your writing is saved into the document as you pause, so :kbd[⌘S] (macOS) / :kbd[Ctrl+S] (Windows/Linux) always writes what is on screen, mid-sentence or not.
 
 ## Paragraphs
 
 Press :kbd[Enter] to end the paragraph and start a new one. Split a paragraph in the middle and everything after the cursor moves into the new one, with your cursor following — you just keep typing. :kbd[Shift+Enter] stays in the same paragraph instead of starting a new block.
 
+:kbd[Backspace] at the very start of a block joins it onto the one above, and :kbd[Delete] at the very end pulls the next one up — the cursor lands where the two met. Deleting a selection that spans blocks does the same thing: what is left of the first and last block joins together.
+
 To make the next block something other than a paragraph — a heading, a list, an image — type :kbd[/] and pick from the menu: **[Slash commands](/docs/studio/editing/slash-commands)**.
 
 ## The formatting toolbar
 
-While you edit, formatting buttons join the floating toolbar above the block (the same bar described in **[The canvas](/docs/studio/interface/canvas)**). Select some text first, then click a button to format it — click again to remove the format:
+The floating toolbar above the block carries the formatting buttons (the same bar described in **[The canvas](/docs/studio/interface/canvas)**). Select some text first, then click a button to format it — click again to remove the format:
 
 - Paragraphs, list items, and table cells offer **Bold**, **Italic**, **Underline**, **Strikethrough**, **Superscript**, **Subscript**, **Code**, and **Link**.
 - Headings offer the shorter set: **Bold**, **Italic**, **Code**, and **Link**.
 
-With nothing selected the format buttons are disabled — only **Link** stays clickable. The keyboard versions: :kbd[⌘B] / :kbd[Ctrl+B] for bold, :kbd[⌘I] / :kbd[Ctrl+I] for italic, :kbd[⌘`] / :kbd[Ctrl+`] for code.
+With nothing selected the format buttons are disabled — they act on a range — and only **Link** stays clickable. The keyboard versions: :kbd[⌘B] / :kbd[Ctrl+B] for bold, :kbd[⌘I] / :kbd[Ctrl+I] for italic, :kbd[⌘`] / :kbd[Ctrl+`] for code.
 
 ## Links
 
@@ -55,7 +69,7 @@ Paste is always plain text: copy from a website or a Word document and you get t
 
 ## Text inside components
 
-Double-click text inside a component instance — a card title, a button label — and you edit that one instance's text in place. It's a single plain value rather than free-form content, so the rules tighten:
+Click text inside a component instance — a card title, a button label — and you edit that one instance's text in place. It's a single plain value rather than free-form content, so the rules tighten:
 
 - :kbd[Enter] finishes and keeps the change; :kbd[Esc] cancels it.
 - Formatting, slash commands, and paragraph splits are off.

@@ -1,6 +1,8 @@
 ---
 title: "Modes and the preview toggle"
 description: "Edit, Design, Grid, Code, and Stylebook — what each canvas mode is for, which files offer which modes, and how the Preview toggle fits in."
+spec:
+  - studio.md#4.2
 code:
   - packages/studio/src/panels/toolbar.ts
   - packages/studio/src/tabs/tab.ts

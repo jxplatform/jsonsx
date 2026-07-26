@@ -14,6 +14,8 @@
  * `beforeinput`, so this is the layer where correctness is actually pinned down.
  *
  * Reference: the `inputType` vocabulary is the UI Events / Input Events spec.
+ *
+ * @docs studio/editing/writing
  */
 
 import { samePath } from "./iframe-position";

@@ -21,6 +21,8 @@
  * A structural handler that is absent SUPPRESSES its action rather than falling back to the
  * browser's own restructuring — an unimplemented merge must leave the document untouched, never let
  * the engine silently join two blocks behind the model's back.
+ *
+ * @docs studio/editing/writing
  */
 
 import { classifyBeforeInput } from "./editable-actions";

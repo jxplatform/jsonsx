@@ -10,6 +10,8 @@
  * DOM, so a caret position and a content slice always agree on what "offset 3" means.
  *
  * Pure: no DOM, no document, no reactivity — the whole thing is exercisable as data.
+ *
+ * @docs studio/editing/writing
  */
 
 import type { JxMutableNode } from "@jxsuite/schema/types";
