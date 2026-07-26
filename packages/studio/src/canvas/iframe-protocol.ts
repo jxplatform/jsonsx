@@ -365,7 +365,6 @@ export type IframeToParent =
   // Coordinator session as a `tree-node` source with this `path` and synthesizes dragMove from its
   // Own pointermove over the iframe. `dragSeq` is the iframe's pre-allocated session hint; the parent
   // Bumps its own authoritative seq in beginDragSession.
-  | { kind: "dragOriginate"; path: (string | number)[]; dragSeq: number }
   // A NATIVE drag stream entered this iframe with NO session bound here. Chromium delivers
   // Dragover/drop to the frame UNDER THE CURSOR, so a parent-originated drag (palette/layers)
   // Crosses onto the canvas without the parent ever seeing a cursor inside the iframe rect — it

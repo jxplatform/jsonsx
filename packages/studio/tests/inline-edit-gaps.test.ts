@@ -15,8 +15,14 @@ void mock.module("../src/editor/inline-format.js", () => ({
   toggleInlineFormat,
 }));
 
-const { getActiveElement, isEditing, setSlashController, startEditing, stopEditing } =
-  await import("../src/editor/inline-edit");
+const {
+  getActiveElement,
+  isEditing,
+  setSlashController,
+  splitActiveBlock,
+  startEditing,
+  stopEditing,
+} = await import("../src/editor/inline-edit");
 const { dismissSlashMenu, isSlashMenuOpen, showSlashMenu } =
   await import("../src/editor/slash-menu");
 // Inline-edit no longer hard-imports the slash menu (kept out of the slim iframe bundle) — wire the
@@ -207,14 +213,9 @@ describe("editing interactions", () => {
     expect(execCommand).toHaveBeenCalledWith("insertText", false, "pasted!");
   });
 
-  test("paste without clipboard data inserts an empty string", () => {
-    edit();
-    const e = new Event("paste", { bubbles: true, cancelable: true }) as ClipboardEvent;
-    el.dispatchEvent(e);
-    expect(execCommand).toHaveBeenCalledWith("insertText", false, "");
-  });
-
-  test("blur stops editing once focus has moved elsewhere", async () => {
+  test("a blur does NOT end the block — the editing host outlives focus changes", async () => {
+    // The parent's format toolbar takes focus across the frame boundary on every click; tearing the
+    // Block down on blur is what used to make the toolbar unusable.
     edit();
     const other = document.createElement("input");
     document.body.append(other);
@@ -223,32 +224,53 @@ describe("editing interactions", () => {
     await new Promise((resolve) => {
       setTimeout(resolve, 200);
     });
-    expect(isEditing()).toBe(false);
-    expect(endCount).toBe(1);
+    expect(isEditing()).toBe(true);
+    expect(endCount).toBe(0);
+    other.remove();
   });
 
-  test("blur while the slash menu is open keeps editing", async () => {
-    el.textContent = "";
+  test("paste without clipboard data inserts an empty string", () => {
     edit();
-    caretAt(el, 0);
-    keydown(el, "/");
-    await flush();
-    expect(isSlashMenuOpen()).toBe(true);
-    el.dispatchEvent(new FocusEvent("blur"));
-    await new Promise((resolve) => {
-      setTimeout(resolve, 200);
-    });
-    expect(isEditing()).toBe(true);
+    const e = new Event("paste", { bubbles: true, cancelable: true }) as ClipboardEvent;
+    el.dispatchEvent(e);
+    expect(execCommand).toHaveBeenCalledWith("insertText", false, "");
   });
 });
 
 // ─── Enter / split ────────────────────────────────────────────────────────────
 
-describe("Enter splits", () => {
+// Enter reaches the engine through the editing host's `beforeinput` chokepoint, which calls
+// SplitActiveBlock — the keydown path is gone.
+describe("splitActiveBlock guards", () => {
+  test("returns false with no active block", () => {
+    expect(splitActiveBlock()).toBe(false);
+    expect(splits).toHaveLength(0);
+  });
+
+  test("returns false when there is no live selection to split at", () => {
+    edit();
+    window.getSelection()?.removeAllRanges();
+    expect(splitActiveBlock()).toBe(false);
+    expect(splits).toHaveLength(0);
+  });
+
+  test("a split releases the block WITHOUT committing it", () => {
+    // The split writes both halves itself; a commit racing it would re-apply the pre-split text
+    // Over the first half.
+    edit();
+    caretAt(el.firstChild!, 2);
+    expect(splitActiveBlock()).toBe(true);
+    expect(commits).toHaveLength(0);
+    expect(isEditing()).toBe(false);
+    expect(endCount).toBe(1);
+  });
+});
+
+describe("splitActiveBlock", () => {
   test("split passes before and after content and ends editing", async () => {
     edit();
     caretAt(el.firstChild!, 2);
-    keydown(el, "Enter");
+    splitActiveBlock();
     expect(splits.length).toBe(1);
     expect(splits[0]!.path).toEqual(["children", 0]);
     expect(splits[0]!.before).toEqual({ textContent: "He" });
@@ -262,7 +284,7 @@ describe("Enter splits", () => {
     el.innerHTML = "ab<em>cd</em>";
     edit();
     caretAt(el.firstChild!, 2); // End of "ab"
-    keydown(el, "Enter");
+    splitActiveBlock();
     expect(splits[0]!.before).toEqual({ textContent: "ab" });
     expect(splits[0]!.after).toEqual({
       children: [{ tagName: "em", textContent: "cd" }],
@@ -273,7 +295,7 @@ describe("Enter splits", () => {
     el.innerHTML = "ab<span>cd</span>";
     edit();
     caretAt(el.firstChild!, 2);
-    keydown(el, "Enter");
+    splitActiveBlock();
     expect(splits[0]!.after).toEqual({ textContent: "cd" });
   });
 

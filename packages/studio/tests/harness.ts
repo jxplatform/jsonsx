@@ -232,6 +232,67 @@ export function key(
   );
 }
 
+// ─── Caret helpers ────────────────────────────────────────────────────────────
+//
+// The canvas is a single `contenteditable` root, so putting the caret somewhere IS how editing
+// Starts — there is no gesture to simulate. Happy-dom implements Range/Selection but does not
+// Dispatch `selectionchange` when a script moves the selection, so these helpers fire it, matching
+// What a real click or arrow key produces.
+
+/**
+ * Place a collapsed caret at `offset` within `node`, then notify listeners.
+ *
+ * Moves the selection ATOMICALLY (`collapse`, not `removeAllRanges` + `addRange`): happy-dom fires
+ * `selectionchange` on every selection mutation, so the two-step form would emit a spurious
+ * empty-selection event that no real click produces.
+ */
+export function caretAt(node: Node, offset = 0): void {
+  window.getSelection()!.collapse(node, offset);
+  document.dispatchEvent(new Event("selectionchange"));
+}
+
+/**
+ * Put the caret inside `el`'s text at `offset` characters, then notify. The common way to say "the
+ * user clicked here" — resolves through the element's first text node when it has one.
+ */
+export function caretInto(el: HTMLElement, offset = 0): void {
+  const text = el.firstChild;
+  if (text && text.nodeType === Node.TEXT_NODE) {
+    caretAt(text, Math.min(offset, text.textContent?.length ?? 0));
+    return;
+  }
+  caretAt(el, 0);
+}
+
+/** Select from one DOM position to another (possibly across blocks), then notify. */
+export function selectAcross(
+  startNode: Node,
+  startOffset: number,
+  endNode: Node,
+  endOffset: number,
+): void {
+  window.getSelection()!.setBaseAndExtent(startNode, startOffset, endNode, endOffset);
+  document.dispatchEvent(new Event("selectionchange"));
+}
+
+/**
+ * Dispatch a `beforeinput` on `el`. Returns whether the default was prevented — i.e. whether the
+ * editing host claimed the edit as structural rather than letting the browser apply it.
+ *
+ * Happy-dom has no `getTargetRanges`, so the host falls back to the live selection: place the caret
+ * with {@link caretInto} / {@link selectAcross} first.
+ */
+export function beforeInput(el: Element, inputType: string, data = ""): boolean {
+  const event = new InputEvent("beforeinput", {
+    bubbles: true,
+    cancelable: true,
+    data,
+    inputType,
+  });
+  el.dispatchEvent(event);
+  return event.defaultPrevented;
+}
+
 /** Dispatch an input + change pair after setting a form control's value. */
 export function setValue(el: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   el.value = value;

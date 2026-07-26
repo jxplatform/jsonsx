@@ -10,7 +10,6 @@
  *
  * Sources: palette/element/component cards ({type:'block'}, flow 1) and layer rows + the
  * block-action-bar ⠿ handle ({type:'tree-node', path}, flows 2 & 4). Flow 3 (grab-anywhere) enters
- * the SAME coordinator via the iframe's `dragOriginate` ({@link startIframeOriginatedDrag}). The
  * iframe's drop math rejects a tree-node dropped onto its own ancestor/self (canDrop), so no
  * coordinator-side guard is needed.
  *
@@ -27,7 +26,6 @@
 
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import {
-  adoptDragSession,
   beginDragSession,
   clearDropIndicator,
   currentDragSession,
@@ -36,7 +34,6 @@ import {
   liveDragHostAt,
   postDragMessage,
   sawIframeDragOver,
-  setIframeOriginateHandler,
   setNativeDragEnterHandler,
 } from "../canvas/iframe-host";
 import { parentCursorToIframe } from "../canvas/iframe-overlay";
@@ -120,32 +117,6 @@ export function ghostLabel(src: DragSrcKind, data: Record<string, unknown>): str
   const doc = activeTab.value?.doc.document as JxMutableNode | undefined;
   const node = doc ? (getNodeAtPath(doc, src.path) as JxMutableNode | undefined) : undefined;
   return node?.tagName ?? "node";
-}
-
-/**
- * Adopt a flow-3 (iframe-ORIGINATED + iframe-DRIVEN) drag session. A drag that begins inside the
- * canvas iframe gets its held-button pointermoves in the IFRAME document (implicit pointer
- * capture), so the parent would never receive them — the iframe therefore drives the whole gesture
- * itself, computing the preview/drop locally and posting `dragOver`/`dropResult` directly.
- *
- * The parent's only job here is to ADOPT the iframe's `seq` (so those replies pass the host's seq
- * gate, see {@link file://../canvas/iframe-host.ts}'s `adoptDragSession`) and SHOW the ghost; the
- * host's `dragOver` handler then positions the ghost from the `cursor` the iframe posts. The parent
- * attaches NO document pointer listeners — it has no pointer of its own during this drag. `path` is
- * the grabbed node's document path; `seq` is the iframe's pre-allocated session id.
- */
-export function startIframeOriginatedDrag(
-  host: DragHost,
-  path: (string | number)[],
-  seq: number,
-): void {
-  const src: DragSrcKind = { path: [...path], type: "tree-node" };
-  const srcData = { path: [...path], type: "tree-node" };
-  // Adopt the iframe's seq + retain the (path-only) source data; do NOT post dragStart (the iframe
-  // Is driving) and do NOT attach parent-document listeners (the iframe owns the pointer it started).
-  adoptDragSession(host, src, srcData, seq);
-  // Show the ghost; the host's dragOver handler moves it from the iframe-posted cursor each move.
-  setDragGhost(ghostLabel(src, srcData), 0, 0);
 }
 
 /**
@@ -291,10 +262,6 @@ export function registerCanvasDndBridge(): () => void {
   // The in-flight pragmatic source (set in onDragStart, cleared in onDrop) so a nativeDragEnter can
   // Bind a session for a drag whose cursor entered an iframe before the parent ever bound a host.
   let pending: { src: DragSrcKind; srcData: Record<string, unknown> } | null = null;
-
-  // Install the flow-3 handler so the iframe-host's `dragOriginate` case enters this coordinator.
-  // The iframe drives the gesture; the parent only adopts the seq + shows the ghost (no listeners).
-  setIframeOriginateHandler((host, path, seq) => startIframeOriginatedDrag(host, path, seq));
 
   // Bind/migrate the live pragmatic session when its NATIVE stream enters an unclaimed iframe:
   // Chromium delivers dragover to the frame under the cursor, so a drag from the palette/layers

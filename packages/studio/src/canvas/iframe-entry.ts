@@ -15,11 +15,9 @@ import {
 import { measureHits, startInteraction } from "./iframe-interaction";
 import {
   AUTO_SCROLL_STEP,
-  clearIframeDrag,
   computeDropInstruction,
   resolveDropTarget,
   scrollDirection,
-  startGrabDetector,
 } from "./iframe-drop";
 import { startIframeInlineEdit } from "./iframe-inline-edit";
 import { startIframeSlashBridge } from "./iframe-slash";
@@ -241,20 +239,6 @@ export function startCanvasIframe(opts: {
   });
   // Bridge the engine's slash menu to the parent's Spectrum menu (show/nav/select over the channel).
   const stopSlashBridge = startIframeSlashBridge(channel, container.ownerDocument);
-  // Flow 3 (grab-anywhere): detect an element-body drag and DRIVE it locally. A drag that begins in
-  // The iframe gets its held-button moves in the IFRAME document (not the parent), so the iframe
-  // Computes the preview/drop from its own cursor and posts dragOver/dropResult directly; the parent
-  // Only adopts the seq, draws the indicator, and positions the ghost from the posted cursor. The
-  // Detector reuses the SAME previewAt + auto-scroll loop the dragMove/drop handlers use.
-  const stopGrabDetector = startGrabDetector(channel, container.ownerDocument, {
-    armAutoScroll: (cursor, dragSeq, src) =>
-      updateAutoScroll(cursor, dragSeq, { gen: renderedGen, src }),
-    gen: () => renderedGen,
-    getMode: () => currentMode,
-    previewAt: (cursor, src) =>
-      shadowDoc ? previewAt(cursor, src, shadowDoc, container.ownerDocument) : null,
-    stopAutoScroll,
-  });
   // Auto-recover canvas images that 404 on a cold first render (component <img>s created in
   // ConnectedCallback fire late, before the loopback server is warm). Re-fires the failed request a
   // Few times — what the manual data-sidebar "Refresh" does, but without a full re-render.
@@ -360,7 +344,6 @@ export function startCanvasIframe(opts: {
     dragGen = -1;
     sessionSeq = -1;
     stopAutoScroll();
-    clearIframeDrag();
   };
   container.ownerDocument.addEventListener("dragenter", onNativeDragOver, true);
   container.ownerDocument.addEventListener("dragover", onNativeDragOver, true);
@@ -453,7 +436,6 @@ export function startCanvasIframe(opts: {
       dragGen = -1;
       sessionSeq = -1;
       stopAutoScroll();
-      clearIframeDrag();
       return;
     }
     if (msg.kind === "dragMove") {
@@ -485,7 +467,6 @@ export function startCanvasIframe(opts: {
       dragGen = -1;
       sessionSeq = -1;
       stopAutoScroll();
-      clearIframeDrag();
       return;
     }
     if (msg.kind === "setColorScheme") {
@@ -574,7 +555,6 @@ export function startCanvasIframe(opts: {
     stopKeyForwarding();
     stopInlineEdit();
     stopSlashBridge();
-    stopGrabDetector();
     stopImageRetry();
     stopAutoScroll();
     heightObserver?.disconnect();

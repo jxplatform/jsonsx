@@ -392,25 +392,6 @@ export function clearDropIndicator(host: HostState): void {
 }
 
 /**
- * The coordinator's handler for an iframe-originated (flow 3) drag. Installed by the bridge to
- * avoid a host→bridge import cycle; invoked from the `dragOriginate` message case with the host,
- * the grabbed node path, AND the iframe's pre-allocated dragSeq. The iframe DRIVES the gesture
- * itself (its held-button moves stay in the iframe document), so the coordinator only ADOPTS this
- * seq (no dragStart, no parent-document listeners) and shows the ghost — the iframe's
- * dragOver/dropResult carry the same seq and so pass the parent's seq gate.
- */
-let iframeOriginateHandler:
-  | ((host: HostState, path: (string | number)[], dragSeq: number) => void)
-  | null = null;
-
-/** Register the coordinator's iframe-originated-drag handler (see {@link iframeOriginateHandler}). */
-export function setIframeOriginateHandler(
-  fn: (host: HostState, path: (string | number)[], dragSeq: number) => void,
-): void {
-  iframeOriginateHandler = fn;
-}
-
-/**
  * The coordinator's handler for a NATIVE drag stream entering an iframe with no session bound there
  * (the `nativeDragEnter` message) — the bridge binds/migrates its live pragmatic session to that
  * host. Installed by the bridge to avoid a host→bridge import cycle.
@@ -429,7 +410,7 @@ export const INSERT_HIDE_DELAY = 300;
  * The parent-realm insertion handler: open the slash menu anchored at the "+" `btn` and, on select,
  * run `transactDoc → mutateInsertNode` for the captured `zone`. Injected from studio.ts (which owns
  * the slash-menu / transact / defaultDef wiring) so this host module — and its tests — stay free of
- * the lit/Spectrum slash-menu and the mutation pipeline, mirroring {@link iframeOriginateHandler}.
+ * the lit/Spectrum slash-menu and the mutation pipeline, mirroring the native-drag handler.
  */
 let insertZoneClickHandler: ((btn: HTMLElement, zone: InsertZone) => void) | null = null;
 
@@ -1109,16 +1090,6 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         const g = hostDragGeometry(state);
         moveDragGhost(msg.cursor.x * g.scale + g.rect.left, msg.cursor.y * g.scale + g.rect.top);
       }
-      return;
-    }
-    case "dragOriginate": {
-      if (state.stylebook) {
-        return; // Specimens can't be reordered (belt-and-braces with the iframe-side gate).
-      }
-      // Flow 3: the iframe began a body-grab drag and DRIVES it locally. Hand off to the coordinator,
-      // Which ADOPTS the iframe's seq (so its dragOver/dropResult pass the gate) and shows the ghost
-      // — it attaches NO parent-document listeners (the iframe owns the pointer it started).
-      iframeOriginateHandler?.(state, msg.path, msg.dragSeq);
       return;
     }
     case "nativeDragEnter": {

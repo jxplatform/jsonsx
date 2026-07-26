@@ -145,7 +145,7 @@ export const EDIT_PLACEHOLDER_CSS = `
   pointer-events: none;
   white-space: nowrap;
 }
-[contenteditable="true"]:empty::after {
+[data-jx-active-block]:empty::after {
   content: "Type / for commands";
   color: color-mix(in srgb, #808080 40%, transparent);
   font-style: italic;
@@ -158,7 +158,7 @@ export const EDIT_PLACEHOLDER_CSS = `
   outline-offset: 1px;
 }
 [data-jx-bound-prop]:empty:not([contenteditable="plaintext-only"]):not([contenteditable="true"])::after {
-  content: "Empty \\2014  double-click to edit";
+  content: "Empty \\2014  click to edit";
   color: color-mix(in srgb, #808080 40%, transparent);
   font-style: italic;
   font-size: 13px;
@@ -184,6 +184,42 @@ export function syncEditModeCss(doc: Document, mode: CanvasMode): void {
   style.id = EDIT_PLACEHOLDER_STYLE_ID;
   style.textContent = EDIT_PLACEHOLDER_CSS;
   doc.head.append(style);
+}
+
+/**
+ * Whether a canvas mode gets a live caret. Design and edit are the interactive modes; preview must
+ * look and behave like the shipped page, and stylebook specimens are not documents.
+ */
+export function isEditableMode(mode: CanvasMode | string): boolean {
+  return mode === "design" || mode === "edit";
+}
+
+/**
+ * Make the render container the document's single editing host (or take that back for preview /
+ * stylebook renders).
+ *
+ * Putting `contenteditable` on the CONTAINER rather than on one block at a time is what buys the
+ * fluid caret: click-to-caret, line-aware Up/Down across blocks, Home/End, IME, and cross-block
+ * drag-select all become the browser's job. What the browser must NOT do is restructure the
+ * document, and that is taken back at the `beforeinput` chokepoint — see
+ * {@link file://./editable-actions.ts}.
+ *
+ * `spellcheck` is left on (it is a writing surface), but the native
+ * `autocorrect`/`writingsuggestions` affordances are declined: they mutate text without a
+ * `beforeinput` we can attribute to a user intent, which would desync the shadow doc.
+ */
+export function syncEditableRoot(container: HTMLElement, mode: CanvasMode): void {
+  if (!isEditableMode(mode)) {
+    container.removeAttribute("contenteditable");
+    container.removeAttribute("spellcheck");
+    return;
+  }
+  container.contentEditable = "true";
+  container.spellcheck = true;
+  container.setAttribute("autocorrect", "off");
+  container.setAttribute("writingsuggestions", "false");
+  // The caret must never look like a drag handle: reordering is the block action bar's handle only.
+  container.setAttribute("draggable", "false");
 }
 
 /** Id of the injected stylebook-mode chrome stylesheet (section/card scaffolding). */
@@ -387,8 +423,22 @@ export function makeStamper(ctx: PathMapCtx) {
     // Hosts persist across tab switches), the upgrade's connectedCallback would wipe the stamped
     // Editable tree and re-render a live instance with default state. Mark the root so the
     // Runtime's element class leaves it alone (see defineElement's connectedCallback guard).
-    if (path.length === 0 && (def as { tagName?: string } | null)?.tagName?.includes("-")) {
+    const isDefinitionRoot =
+      path.length === 0 && (def as { tagName?: string } | null)?.tagName?.includes("-");
+    if (isDefinitionRoot) {
       created.dataset.jxDefinitionRoot = "";
+    }
+    // A component INSTANCE is an atomic island inside the editing host: its internals are rendered
+    // By the component's own connectedCallback from another document, so a caret must never wander
+    // Into them and native editing must never restructure them. `contenteditable="false"` makes the
+    // Browser treat the whole instance as one uneditable unit — arrow past it, select it whole,
+    // Delete it whole — which is exactly the desired behaviour. The prop-bound text INSIDE it stays
+    // Editable via a nested editing host (see iframe-editable-root's prop-bound activation).
+    //
+    // The opened document's own root is excluded: when a component definition is the file being
+    // Edited, its subtree IS the document and must stay editable.
+    if (!isDefinitionRoot && created.tagName.includes("-") && isEditableMode(ctx.canvasMode)) {
+      created.contentEditable = "false";
     }
     const classified = classifyRenderNode(path, def, ctx);
     if (classified.kind === "layout") {
@@ -490,6 +540,9 @@ export async function renderResolvedDocument(opts: {
     () => renderNode(opts.doc, $defs, { _path: [], onNodeCreated }) as HTMLElement,
   );
   opts.container.replaceChildren(el);
+  // Claim (or release) the editing host AFTER the tree lands, so the browser computes editability
+  // Against the final DOM rather than an empty container.
+  syncEditableRoot(opts.container, opts.mode);
   return {
     ctx: { defs: $defs, docBase: opts.docBase, mapperCtx: opts.mapperCtx, mode: opts.mode },
     dispose: stop,

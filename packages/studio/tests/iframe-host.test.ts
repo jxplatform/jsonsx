@@ -97,7 +97,6 @@ const {
   sawIframeDragOver,
   setCanvasContextMenuHandler,
   setCanvasSlashHandler,
-  setIframeOriginateHandler,
   setIframePatchEscalation,
   setNativeDragEnterHandler,
   setInsertZoneClickHandler,
@@ -1403,19 +1402,6 @@ describe("cross-frame drag session (Phase 4c)", () => {
     expect((activeTab.value!.doc.document.children as unknown[]).length).toBe(1);
   });
 
-  test("dragOriginate routes to the installed coordinator handler with the host + path + seq", async () => {
-    const { host } = await readyHostAt(4);
-    const seen: { host: unknown; path: unknown; seq: unknown }[] = [];
-    setIframeOriginateHandler((h, p, s) => seen.push({ host: h, path: p, seq: s }));
-    channels[0]!.deliver({ dragSeq: 11, kind: "dragOriginate", path: ["children", 0] });
-    expect(seen).toHaveLength(1);
-    expect(seen[0]!.host).toBe(host as never);
-    expect(seen[0]!.path).toEqual(["children", 0]);
-    // The iframe's seq is threaded through so the parent can adopt it (replies pass the seq gate).
-    expect(seen[0]!.seq).toBe(11);
-    setIframeOriginateHandler(() => {});
-  });
-
   test("adoptDragSession sets the seq + retains data so a matching dropResult applies", async () => {
     const { host } = await readyHostAt(4);
     // Adopt an iframe-driven session at seq 77 (no dragStart posted), then a matching dropResult.
@@ -2115,13 +2101,9 @@ describe("stylebook host capability", () => {
     expect(hover.style.display).toBe("none");
   });
 
-  test("insertZones, contextMenu, and dragOriginate are inert on stylebook hosts", async () => {
+  test("insertZones and contextMenu are inert on stylebook hosts", async () => {
     const shows: unknown[] = [];
     setCanvasContextMenuHandler({ dismiss: () => {}, show: (a) => shows.push(a) });
-    const originates: unknown[] = [];
-    setIframeOriginateHandler((...a) => {
-      originates.push(a);
-    });
     const { canvasEl, channel } = await mountStylebookReady();
 
     channel.deliver({
@@ -2142,14 +2124,6 @@ describe("stylebook host capability", () => {
     channel.deliver({ kind: "contextMenu", path: SPECIMEN_PATH, x: 5, y: 7 });
     expect(shows).toHaveLength(0);
 
-    channel.deliver({
-      cursor: { x: 1, y: 2 },
-      dragSeq: 1,
-      kind: "dragOriginate",
-      path: SPECIMEN_PATH,
-      rect: { height: 10, width: 10, x: 0, y: 0 },
-    });
-    expect(originates).toHaveLength(0);
     setCanvasContextMenuHandler({ dismiss: () => {}, show: () => {} });
   });
 

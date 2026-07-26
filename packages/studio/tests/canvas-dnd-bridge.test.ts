@@ -24,8 +24,6 @@ const fakeHost = { id: "host" } as unknown as AnyRec;
 const calls: AnyRec[] = [];
 let hostAt: AnyRec | null = fakeHost;
 let dragSeq = 5;
-// The flow-3 handler the bridge installs via setIframeOriginateHandler (captured for direct drive).
-let originateHandler: ((host: AnyRec, path: AnyRec, seq: number) => void) | null = null;
 // The native-drag-enter handler the bridge installs via setNativeDragEnterHandler.
 let nativeEnterHandler: ((host: AnyRec) => void) | null = null;
 // The session sawIframeDragOver reports as iframe-driven (-1 = none; set to a seq to simulate the
@@ -56,9 +54,6 @@ void mock.module("../src/canvas/iframe-host", () => ({
   },
   postDragMessage: (host: AnyRec, msg: AnyRec) => calls.push({ fn: "post", host, msg }),
   sawIframeDragOver: (seq: number) => seq === iframeDroveSeq,
-  setIframeOriginateHandler: (fn: (host: AnyRec, path: AnyRec, seq: number) => void) => {
-    originateHandler = fn;
-  },
   setNativeDragEnterHandler: (fn: (host: AnyRec) => void) => {
     nativeEnterHandler = fn;
   },
@@ -84,7 +79,6 @@ beforeEach(() => {
   calls.length = 0;
   hostAt = fakeHost;
   dragSeq = 5;
-  originateHandler = null;
   nativeEnterHandler = null;
   iframeDroveSeq = -1;
   registerCanvasDndBridge();
@@ -408,37 +402,5 @@ describe("isCancelDrop (pure)", () => {
         initial: { input: { clientX: 5, clientY: 99 } },
       }),
     ).toBe(false);
-  });
-});
-
-describe("startIframeOriginatedDrag (flow 3 — iframe-driven)", () => {
-  test("the bridge installs an originate handler that ADOPTS the iframe's seq + session", () => {
-    expect(originateHandler).toBeTruthy();
-    // The handler receives (host, path, seq); the iframe drives, so the parent adopts the seq.
-    originateHandler!(fakeHost, ["children", 2], 42);
-    const adopt = calls.find((c) => c.fn === "adopt");
-    expect(adopt).toBeTruthy();
-    expect(adopt!.host).toBe(fakeHost);
-    expect(adopt!.seq).toBe(42);
-    expect(adopt!.src).toEqual({ path: ["children", 2], type: "tree-node" });
-    expect(adopt!.srcData).toEqual({ path: ["children", 2], type: "tree-node" });
-    // It does NOT begin a parent-driven session (no dragStart for an iframe-driven drag).
-    expect(calls.find((c) => c.fn === "begin")).toBeUndefined();
-    // It shows the ghost (the host's dragOver handler then moves it from the posted cursor).
-    expect(calls.find((c) => c.fn === "ghostShow")).toBeTruthy();
-  });
-
-  test("attaches NO parent-document listeners: a parent pointermove posts nothing", () => {
-    originateHandler!(fakeHost, ["children", 0], 7);
-    calls.length = 0;
-    // The iframe owns the pointer it started; the parent must not synthesize any move/drop.
-    document.dispatchEvent(
-      new MouseEvent("pointermove", { bubbles: true, clientX: 300, clientY: 250 }),
-    );
-    document.dispatchEvent(
-      new MouseEvent("pointerup", { bubbles: true, clientX: 300, clientY: 250 }),
-    );
-    expect(calls.find((c) => c.fn === "post" && c.msg.kind === "dragMove")).toBeUndefined();
-    expect(calls.find((c) => c.fn === "post" && c.msg.kind === "drop")).toBeUndefined();
   });
 });

@@ -88,7 +88,17 @@ const INLINE_TAGS = new Set([
   "s",
 ]);
 
-/** Tags that can be edited inline (text-bearing block elements) */
+/**
+ * Tags that can hold a caret — every text-bearing block.
+ *
+ * With a document-wide caret this set decides where a click lands, so a missing tag reads to the
+ * author as "this text is not editable". It therefore covers the prose blocks markdown produces
+ * (headings, paragraphs, list items, table cells, quotes) AND the text-bearing HTML blocks that
+ * reach the canvas through directives — captions, definition lists, disclosure summaries.
+ *
+ * Deliberately excluded: containers that hold blocks rather than text (`ul`, `table`, `tr`,
+ * `figure`), and `pre`, whose whitespace and lack of inline formatting need their own treatment.
+ */
 const EDITABLE_BLOCKS = new Set([
   "h1",
   "h2",
@@ -104,6 +114,11 @@ const EDITABLE_BLOCKS = new Set([
   "span",
   "a",
   "label",
+  "figcaption",
+  "caption",
+  "summary",
+  "dt",
+  "dd",
 ]);
 
 // ─── Context-aware inline scoping ─────────────────────────────────────────
@@ -186,14 +201,6 @@ let insertFn:
 let endFn: (() => void) | null = null; // Function() called when editing stops
 
 /**
- * When a parent toolbar (or its link popover) may take focus during a live session, the iframe sets
- * this so {@link handleBlur} does NOT schedule a `stopEditing()` (the BLOCKER focus-loss race fix —
- * a parent-toolbar click blurs the iframe editable, which must NOT tear the session down). Only an
- * explicit commit (Escape/Enter/click-away-in-iframe) ends the session while suspended.
- */
-let _blurCloseSuspended = false;
-
-/**
  * Plain (plaintext-only) session state — used for prop-bound text, where the committed value is a
  * plain string (a directive attribute), so rich formatting, Enter-split, and the slash menu are all
  * disabled: Enter commits, Escape restores `_plainOriginal` and commits unchanged (the host no-ops
@@ -201,16 +208,6 @@ let _blurCloseSuspended = false;
  */
 let _plainMode = false;
 let _plainOriginal = "";
-
-/** Suspend blur-driven `stopEditing` (call while the parent toolbar/popover may steal focus). */
-export function suspendBlurClose() {
-  _blurCloseSuspended = true;
-}
-
-/** Resume blur-driven `stopEditing` (call on real editEnd/teardown). */
-export function resumeBlurClose() {
-  _blurCloseSuspended = false;
-}
 
 /**
  * Check if an element is a text-bearing editable block.
@@ -298,7 +295,13 @@ export function startEditing(
   _plainMode = opts?.plainText === true;
   _plainOriginal = _plainMode ? (el.textContent ?? "") : "";
 
-  // Enable editing
+  // Mark the caret's block so the empty-block slash hint can target it. The editing host itself is
+  // The canvas container (see syncEditableRoot) — activating a block does NOT make it a separate
+  // Contenteditable, which is exactly what lets the caret cross block boundaries natively.
+  //
+  // A prop-bound block is the one exception: it lives inside a `contenteditable="false"` component
+  // Island, so it needs its own nested editing host to be reachable at all.
+  el.dataset.jxActiveBlock = "";
   if (_plainMode) {
     try {
       el.contentEditable = "plaintext-only";
@@ -307,28 +310,14 @@ export function startEditing(
       // HandlePaste, and the keydown plain branch inertifies the format shortcuts.
       el.contentEditable = "true";
     }
-  } else {
-    el.contentEditable = "true";
+    el.focus();
   }
-  el.style.pointerEvents = "auto";
-  el.style.outline = "2px solid var(--accent, #4a9eff)";
-  el.style.outlineOffset = "1px";
-  el.style.cursor = "text";
-  el.focus();
 
-  // Place cursor at end
-  const sel = window.getSelection();
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  range.collapse(false);
-  if (sel) {
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
+  // The caret is NOT moved here. It is already wherever the user clicked or arrowed to — moving it
+  // To the end of the block (as this used to) is precisely what made editing feel modal.
 
   el.addEventListener("keydown", handleKeydown);
   el.addEventListener("input", handleInput);
-  el.addEventListener("blur", handleBlur);
   el.addEventListener("paste", handlePaste);
 }
 
@@ -346,15 +335,15 @@ export function stopEditing(silent = false) {
   commitChanges();
   slash.dismiss();
 
-  activeEl.contentEditable = "false";
-  activeEl.style.pointerEvents = "";
-  activeEl.style.outline = "";
-  activeEl.style.outlineOffset = "";
-  activeEl.style.cursor = "";
+  delete activeEl.dataset.jxActiveBlock;
+  // Only a prop-bound block ever claimed its own editing host; page blocks are edited through the
+  // Container's, which must stay editable after the caret leaves this block.
+  if (_plainMode) {
+    activeEl.contentEditable = "false";
+  }
 
   activeEl.removeEventListener("keydown", handleKeydown);
   activeEl.removeEventListener("input", handleInput);
-  activeEl.removeEventListener("blur", handleBlur);
   activeEl.removeEventListener("paste", handlePaste);
 
   activeEl = null;
@@ -439,22 +428,9 @@ function handleKeydown(e: KeyboardEvent) {
     return;
   }
 
-  if (e.key === "Escape") {
-    e.preventDefault();
-    e.stopPropagation();
-    stopEditing();
-    return;
-  }
-
-  if (e.key === "Enter" && !e.shiftKey) {
-    if (slash.isOpen()) {
-      return;
-    } // Shared slash menu captures Enter
-    e.preventDefault();
-    e.stopPropagation();
-    handleEnterKey();
-    return;
-  }
+  // Escape and Enter are NOT handled here. Enter arrives as a `beforeinput` (`insertParagraph`),
+  // Which is the one place structural intent is classified; Escape belongs to the editing host,
+  // Which owns dismissing the caret. See {@link file://../canvas/iframe-editable-root.ts}.
 
   // Slash command trigger
   if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
@@ -494,11 +470,6 @@ function handleKeydown(e: KeyboardEvent) {
       }
     }
   }
-
-  // Dismiss slash menu on non-matching keys
-  if (slash.isOpen() && !["ArrowUp", "ArrowDown", "Enter", "Backspace", "Delete"].includes(e.key)) {
-    // Let the input handler deal with filtering
-  }
 }
 
 function handleInput() {
@@ -506,30 +477,6 @@ function handleInput() {
   if (slash.isOpen()) {
     updateSlashMenu();
   }
-}
-
-/** @param {FocusEvent} _e */
-function handleBlur(_e: FocusEvent) {
-  // Don't close if focus moved to slash menu
-  if (slash.isOpen()) {
-    return;
-  }
-
-  // The parent format toolbar/link popover may have taken focus across the bridge — blur must NOT
-  // Tear the session down (Phase 4b-2 focus-loss BLOCKER). Only an explicit commit ends it.
-  if (_blurCloseSuspended) {
-    return;
-  }
-
-  // Delay to allow click events to fire
-  setTimeout(() => {
-    if (_blurCloseSuspended) {
-      return;
-    }
-    if (activeEl && document.activeElement !== activeEl) {
-      stopEditing();
-    }
-  }, 150);
 }
 
 /** @param {ClipboardEvent} e */
@@ -540,21 +487,34 @@ function handlePaste(e: ClipboardEvent) {
   document.execCommand("insertText", false, text);
 }
 
-// ─── Enter key: split paragraph ────────────────────────────────────────────
+// ─── Enter: split the active block ─────────────────────────────────────────
 
-function handleEnterKey() {
+/**
+ * Split the active block at the caret, reporting the two halves through `onSplit`.
+ *
+ * Called from the editing host's `beforeinput` chokepoint (`insertParagraph`), never from a keydown
+ * — Enter is a structural intent, and `beforeinput` is the one place those are recognised.
+ *
+ * A non-collapsed selection INSIDE the block is dropped by construction: the "before" half ends at
+ * the selection's start and the "after" half begins at its end. A selection spanning two blocks is
+ * the caller's to reject (the `after` range could not be built against this block).
+ *
+ * The active block is released WITHOUT committing — the split writes both halves itself, and a
+ * commit racing it would re-apply the pre-split text over the first one. Returns false when there
+ * is nothing to split.
+ */
+export function splitActiveBlock(): boolean {
   if (!splitFn || !activeEl || !activePath) {
-    return;
+    return false;
   }
 
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) {
-    return;
+    return false;
   }
 
   const range = sel.getRangeAt(0);
 
-  // Create two ranges: before cursor and after cursor
   const beforeRange = document.createRange();
   beforeRange.setStart(activeEl, 0);
   beforeRange.setEnd(range.startContainer, range.startOffset);
@@ -563,35 +523,46 @@ function handleEnterKey() {
   afterRange.setStart(range.endContainer, range.endOffset);
   afterRange.setEnd(activeEl, activeEl.childNodes.length);
 
-  // Extract content from both ranges
-  const beforeFrag = beforeRange.cloneContents();
-  const afterFrag = afterRange.cloneContents();
+  const beforeChildren = fragmentToJx(beforeRange.cloneContents());
+  const afterChildren = fragmentToJx(afterRange.cloneContents());
 
-  const beforeChildren = fragmentToJx(beforeFrag);
-  const afterChildren = fragmentToJx(afterFrag);
-
-  // Stop editing before mutating state (which will re-render)
   const path = [...activePath];
   const split = splitFn;
 
-  activeEl.contentEditable = "false";
+  releaseWithoutCommit();
+  split(path, beforeChildren, afterChildren);
+  return true;
+}
+
+/**
+ * Drop the active block's bookkeeping without committing it, firing `onEnd`. Used by the paths that
+ * write the block's content themselves (split, slash-insert) — a commit afterwards would clobber
+ * what they just wrote.
+ */
+function releaseWithoutCommit(): void {
+  if (!activeEl) {
+    return;
+  }
+  delete activeEl.dataset.jxActiveBlock;
+  if (_plainMode) {
+    activeEl.contentEditable = "false";
+  }
   activeEl.removeEventListener("keydown", handleKeydown);
   activeEl.removeEventListener("input", handleInput);
-  activeEl.removeEventListener("blur", handleBlur);
   activeEl.removeEventListener("paste", handlePaste);
   activeEl = null;
   activePath = null;
   commitFn = null;
   splitFn = null;
   insertFn = null;
+  _plainMode = false;
+  _plainOriginal = "";
 
   if (endFn) {
     const fn = endFn;
     endFn = null;
     fn();
   }
-
-  split(path, beforeChildren, afterChildren);
 }
 
 // ─── Content sync: DOM → Jx ────────────────────────────────────────────
@@ -874,22 +845,9 @@ function handleSlashSelect(cmd: SlashCommand) {
   const path = [...activePath];
   const insert = insertFn;
 
-  activeEl.contentEditable = "false";
-  activeEl.removeEventListener("keydown", handleKeydown);
-  activeEl.removeEventListener("input", handleInput);
-  activeEl.removeEventListener("blur", handleBlur);
-  activeEl.removeEventListener("paste", handlePaste);
-  activeEl = null;
-  activePath = null;
-  commitFn = null;
-  splitFn = null;
-  insertFn = null;
-
-  if (endFn) {
-    const fn = endFn;
-    endFn = null;
-    fn();
-  }
+  // The insert carries `commitResult`, so it writes this block's content itself — releasing without
+  // A commit keeps the two from racing.
+  releaseWithoutCommit();
 
   // Pass commit data so onInsert can batch commit + insert into a single update()
   insert(path, cmd, commitResult);

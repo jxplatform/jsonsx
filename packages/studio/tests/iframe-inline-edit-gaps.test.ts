@@ -8,6 +8,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { fakeChannelPair } from "../src/canvas/iframe-channel";
 import { startIframeInlineEdit } from "../src/canvas/iframe-inline-edit";
 import { isEditing, stopEditing } from "../src/editor/inline-edit";
+import { beforeInput, caretInto } from "./harness";
 import type { IframeToParent, ParentToIframe } from "../src/canvas/iframe-protocol";
 
 let teardown: (() => void) | undefined;
@@ -25,8 +26,10 @@ function boot(opts?: Parameters<typeof startIframeInlineEdit>[2]) {
   return { container, fromIframe, pair };
 }
 
-function dblclick(el: Element) {
-  el.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+/** Click into `el` — pointerdown (opens a prop-bound nested host) then the caret landing inside. */
+function clickInto(el: Element) {
+  el.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+  caretInto(el as HTMLElement);
 }
 
 afterEach(() => {
@@ -47,7 +50,7 @@ describe("dblclick target walks", () => {
     outer.append(inner);
     container.append(outer);
 
-    dblclick(inner);
+    clickInto(inner);
     pair.flush();
     expect(isEditing()).toBe(false);
     expect(fromIframe.some((m) => m.kind === "editStart")).toBe(false);
@@ -63,7 +66,7 @@ describe("dblclick target walks", () => {
     wrap.append(marker);
     container.append(wrap);
 
-    dblclick(marker);
+    clickInto(marker);
     pair.flush();
     expect(isEditing()).toBe(false);
     expect(fromIframe.some((m) => m.kind === "editStart")).toBe(false);
@@ -79,7 +82,7 @@ describe("dblclick target walks", () => {
     host.append(marker);
     container.append(host);
 
-    dblclick(marker);
+    clickInto(marker);
     pair.flush();
     expect(isEditing()).toBe(true);
     const start = fromIframe.find((m) => m.kind === "editStart") as
@@ -97,7 +100,7 @@ describe("range caching triggers", () => {
     p.dataset.jxPath = '["children",0]';
     p.textContent = "cache me";
     container.append(p);
-    dblclick(p);
+    clickInto(p);
     pair.flush();
     expect(isEditing()).toBe(true);
 
@@ -119,32 +122,48 @@ describe("range caching triggers", () => {
   });
 });
 
-describe("enter-key split", () => {
+describe("Enter splits the block", () => {
   test("Enter mid-text posts editSplit with the before/after halves", () => {
     const { container, fromIframe, pair } = boot();
     const p = document.createElement("p");
     p.dataset.jxPath = '["children",0]';
     p.textContent = "before|after";
     container.append(p);
-    dblclick(p);
+    clickInto(p);
     pair.flush();
     expect(isEditing()).toBe(true);
 
-    // Caret between the halves, then Enter (no shift) → the split callback posts editSplit.
-    const range = document.createRange();
-    range.setStart(p.firstChild!, "before".length + 1);
-    range.collapse(true);
-    const sel = window.getSelection()!;
-    sel.removeAllRanges();
-    sel.addRange(range);
-    p.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+    // Enter reaches the editing host as `beforeinput`/insertParagraph, not as a keydown — the
+    // Chokepoint is the one place structural intent is recognised.
+    caretInto(p, "before|".length);
+    const prevented = beforeInput(p, "insertParagraph");
     pair.flush();
 
+    // The browser must NOT be allowed to split the DOM itself; the document model does it.
+    expect(prevented).toBe(true);
     const split = fromIframe.find((m) => m.kind === "editSplit") as
       | { path: unknown; before: unknown; after: unknown }
       | undefined;
     expect(split).toBeDefined();
     expect(split!.path).toEqual(["children", 0]);
+    expect(split!.before).toEqual({ textContent: "before|" });
+    expect(split!.after).toEqual({ textContent: "after" });
+  });
+
+  test("Shift+Enter stays inside the block and is left to the browser", () => {
+    const { container, fromIframe, pair } = boot();
+    const p = document.createElement("p");
+    p.dataset.jxPath = '["children",0]';
+    p.textContent = "one line";
+    container.append(p);
+    clickInto(p);
+    caretInto(p, 3);
+
+    const prevented = beforeInput(p, "insertLineBreak");
+    pair.flush();
+
+    expect(prevented).toBe(false);
+    expect(fromIframe.some((m) => m.kind === "editSplit")).toBe(false);
   });
 });
 

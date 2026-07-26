@@ -677,50 +677,6 @@ describe("startCanvasIframe — cross-frame drag (Phase 4c)", () => {
       win.scrollBy = origScrollBy;
     }
   });
-
-  // Flow 3 is fully iframe-driven: the detector (wired with the entry's previewAt/gen/auto-scroll
-  // Deps) computes + posts dragOver/dropResult LOCALLY from its own pointer. Happy-dom has no
-  // ElementFromPoint, so previewAt resolves null — this proves the message FLOW + the deps wiring
-  // (cursor carried, gen threaded, auto-scroll armed), not the (CDP-only) geometry.
-  test("a body-grab pointer gesture drives dragOriginate → dragOver(cursor) → dropResult locally", async () => {
-    const { acks, container, pair } = await bootRendered(7);
-    const h1 = container.querySelector("h1")!;
-    acks.length = 0;
-
-    h1.dispatchEvent(
-      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 200 }),
-    );
-    // A move past threshold (and into the bottom edge band, y large) originates + drives + arms.
-    container.ownerDocument.dispatchEvent(
-      new MouseEvent("pointermove", { bubbles: true, clientX: 40, clientY: 200 }),
-    );
-    pair.flush();
-
-    const originate = acks.find((m) => m.kind === "dragOriginate") as
-      | { dragSeq: number; path: unknown }
-      | undefined;
-    expect(originate).toMatchObject({ kind: "dragOriginate", path: ["children", 0] });
-    const over = acks.find((m) => m.kind === "dragOver") as
-      | { cursor?: { x: number; y: number }; gen: number }
-      | undefined;
-    // The dragOver carries the iframe-local cursor (for the parent ghost) + the rendered gen.
-    expect(over?.cursor).toEqual({ x: 40, y: 200 });
-    expect(over?.gen).toBe(7);
-
-    container.ownerDocument.dispatchEvent(
-      new MouseEvent("pointerup", { bubbles: true, clientX: 40, clientY: 210 }),
-    );
-    pair.flush();
-    const result = acks.find((m) => m.kind === "dropResult");
-    // Null target (no layout) → null instruction, but the result is posted with the session seq+gen.
-    expect(result).toMatchObject({
-      dragSeq: originate!.dragSeq,
-      gen: 7,
-      instruction: null,
-      kind: "dropResult",
-      targetPath: null,
-    });
-  });
 });
 
 // ─── Live expression eval (M6): evalExpr → evalResult against the LIVE scope ────
@@ -1239,6 +1195,8 @@ describe("startCanvasIframe — stylebook mode", () => {
     expect(acks.some((m) => m.kind === "hover")).toBe(true);
     expect(acks.some((m) => m.kind === "insertZones")).toBe(false);
 
+    // A press-and-drag on a specimen selects text at most; it never originates a reorder — canvas
+    // Drags come only from the block action bar's handle.
     p.dispatchEvent(
       new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
     );
@@ -1246,7 +1204,7 @@ describe("startCanvasIframe — stylebook mode", () => {
       new MouseEvent("pointermove", { bubbles: true, clientX: 60, clientY: 10 }),
     );
     pair.flush();
-    expect(acks.some((m) => m.kind === "dragOriginate")).toBe(false);
+    expect(acks.some((m) => m.kind === "dragOver")).toBe(false);
   });
 
   test("clicks still post hits (the parent decodes them to stylebook tags)", async () => {

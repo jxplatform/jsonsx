@@ -6,12 +6,8 @@
 import "./with-dom.js";
 import { afterEach, describe, expect, test } from "bun:test";
 import { startIframeInlineEdit } from "../src/canvas/iframe-inline-edit";
-import {
-  isEditing,
-  resumeBlurClose,
-  setSlashController,
-  stopEditing,
-} from "../src/editor/inline-edit";
+import { isEditing, setSlashController, stopEditing } from "../src/editor/inline-edit";
+import { caretInto } from "./harness";
 import type { SlashCommand } from "../src/editor/inline-edit";
 import { serializeJxPath } from "../src/canvas/path-mapping";
 import type {
@@ -51,8 +47,15 @@ function editableContainer(tag = "p") {
   return { container, el };
 }
 
-const dblclick = (el: HTMLElement) =>
-  el.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+/**
+ * Click into `el`: a pointerdown (which is what opens a prop-bound nested host) followed by the
+ * caret landing inside it. There is no "enter edit" gesture any more — activation is a consequence
+ * of where the caret is, so this is the whole interaction.
+ */
+function clickInto(el: HTMLElement) {
+  el.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+  caretInto(el);
+}
 
 /** Select the full contents of `node` (sets the live Selection used by buildSnapshot). */
 function selectContents(node: Node): Range {
@@ -79,23 +82,47 @@ function lastSnapshot(posts: IframeToParent[]): SelectionSnapshot | undefined {
   return posts.findLast((p) => p.kind === "selectionChanged") as SelectionSnapshot | undefined;
 }
 
+/**
+ * Every editing host listens on the DOCUMENT for `selectionchange`, so one left attached would
+ * react to a later test's caret and deactivate its block. Booting through here guarantees teardown
+ * even for tests that throw before their own `stop()`.
+ */
+const teardowns: (() => void)[] = [];
+function boot(...args: Parameters<typeof startIframeInlineEdit>) {
+  const stop = startIframeInlineEdit(...args);
+  let stopped = false;
+  const once = () => {
+    if (!stopped) {
+      stopped = true;
+      stop();
+    }
+  };
+  teardowns.push(once);
+  return once;
+}
+
 afterEach(() => {
+  while (teardowns.length > 0) {
+    teardowns.pop()!();
+  }
   if (isEditing()) {
     stopEditing();
   }
-  resumeBlurClose();
   window.getSelection()?.removeAllRanges();
   document.body.innerHTML = "";
 });
 
 describe("startIframeInlineEdit", () => {
-  test("double-click on an editable element starts editing and posts editStart", () => {
+  test("a click into an editable element activates it and posts editStart", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
-    expect(el.isContentEditable).toBe(true);
+    clickInto(el);
+    // The block is ACTIVE, but it is not itself contenteditable — the canvas container is the
+    // Single editing host, which is what lets the caret cross block boundaries.
+    expect(el.dataset.jxActiveBlock).toBe("");
+    expect(el.hasAttribute("contenteditable")).toBe(false);
     expect(posts).toContainEqual({ kind: "editStart", path: ["children", 0] });
     stop();
   });
@@ -103,9 +130,9 @@ describe("startIframeInlineEdit", () => {
   test("committing the session posts editCommit with the serialized content", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     el.textContent = "Edited";
     stopEditing();
 
@@ -118,23 +145,23 @@ describe("startIframeInlineEdit", () => {
     stop();
   });
 
-  test("an enterEdit message re-enters editing on the given path", () => {
+  test("an enterEdit message puts the caret in the given path", () => {
     const { channel, deliver, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
     deliver({ kind: "enterEdit", path: ["children", 0] });
-    expect(el.isContentEditable).toBe(true);
+    expect(el.dataset.jxActiveBlock).toBe("");
     expect(posts).toContainEqual({ kind: "editStart", path: ["children", 0] });
     stop();
   });
 
-  test("double-click on a non-editable element does nothing", () => {
+  test("a click into a non-editable element does nothing", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = editableContainer("div"); // <div> is not an editable block.
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     expect(posts).toEqual([]);
     expect(isEditing()).toBe(false);
     stop();
@@ -143,9 +170,9 @@ describe("startIframeInlineEdit", () => {
   test("teardown removes the listener and stops an active session", () => {
     const { channel } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     expect(isEditing()).toBe(true);
     stop();
     expect(isEditing()).toBe(false);
@@ -155,17 +182,17 @@ describe("startIframeInlineEdit", () => {
 // ─── Session lifecycle: commit-on-click-away + the parent endEdit message ───────
 
 describe("session lifecycle", () => {
-  test("a pointerdown OUTSIDE the active editable commits and ends the session", () => {
+  test("moving the caret OUT of a block commits it", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const other = document.createElement("div");
+    const other = document.createElement("div"); // Not an editable block.
     container.append(other);
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     el.textContent = "Edited";
     posts.length = 0;
-    other.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    clickInto(other);
 
     expect(isEditing()).toBe(false);
     expect(posts).toContainEqual({
@@ -178,14 +205,42 @@ describe("session lifecycle", () => {
     stop();
   });
 
-  test("a pointerdown INSIDE the active editable keeps the session alive", () => {
+  test("moving the caret to ANOTHER block commits the first and activates the second", () => {
+    // The heart of fluid editing: no teardown, no re-entry gesture — just the caret moving.
     const { channel, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const second = document.createElement("p");
+    second.dataset.jxPath = serializeJxPath(["children", 1]);
+    second.textContent = "Second";
+    container.append(second);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
+    el.textContent = "Edited";
     posts.length = 0;
-    el.firstChild!.parentElement!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    clickInto(second);
+
+    expect(posts).toContainEqual({
+      children: null,
+      kind: "editCommit",
+      path: ["children", 0],
+      textContent: "Edited",
+    });
+    expect(posts).toContainEqual({ kind: "editStart", path: ["children", 1] });
+    expect(isEditing()).toBe(true);
+    expect(second.dataset.jxActiveBlock).toBe("");
+    expect(el.dataset.jxActiveBlock).toBeUndefined();
+    stop();
+  });
+
+  test("the caret moving WITHIN a block does not commit it", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, el } = editableContainer();
+    const stop = boot(channel, container);
+
+    clickInto(el);
+    posts.length = 0;
+    caretInto(el, 3);
 
     expect(isEditing()).toBe(true);
     expect(posts.some((p) => p.kind === "editCommit" || p.kind === "editEnd")).toBe(false);
@@ -195,13 +250,13 @@ describe("session lifecycle", () => {
   test("an endEdit message commits and ends a live session (no-op without one)", () => {
     const { channel, deliver, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
     // No session yet — nothing happens.
     deliver({ kind: "endEdit" });
     expect(posts).toEqual([]);
 
-    dblclick(el);
+    clickInto(el);
     el.textContent = "Committed by parent";
     posts.length = 0;
     deliver({ kind: "endEdit" });
@@ -224,7 +279,7 @@ describe("guards and inserts", () => {
   test("mouseup/keyup/selectionchange without a session are guarded no-ops", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
     document.dispatchEvent(new Event("selectionchange"));
     el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
@@ -246,10 +301,10 @@ describe("guards and inserts", () => {
     });
     const { channel, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
     try {
-      dblclick(el);
+      clickInto(el);
       // Caret at the very start → the "/" trigger sees empty text-before and opens the menu.
       const range = document.createRange();
       range.setStart(el.firstChild!, 0);
@@ -302,9 +357,9 @@ describe("selection snapshot + applyFormat", () => {
   test("a selectionchange while editing posts a snapshot (path/collapsed/rect-shape)", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     posts.length = 0;
     selectContents(el.firstChild!);
     document.dispatchEvent(new Event("selectionchange"));
@@ -320,23 +375,27 @@ describe("selection snapshot + applyFormat", () => {
     stop();
   });
 
-  test("selectionchange is gated when not editing (no snapshot)", () => {
+  test("a selection outside any editable block posts no snapshot", () => {
     const { channel, posts } = fakeChannel();
-    const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const { container } = editableContainer();
+    // A <div> is not an editable block, so a caret in it activates nothing.
+    const chrome = document.createElement("div");
+    chrome.textContent = "not a block";
+    container.append(chrome);
+    const stop = boot(channel, container);
 
-    selectContents(el.firstChild!);
-    document.dispatchEvent(new Event("selectionchange"));
+    caretInto(chrome);
     expect(lastSnapshot(posts)).toBeUndefined();
+    expect(isEditing()).toBe(false);
     stop();
   });
 
   test("entering an edit posts an initial (collapsed-caret) snapshot", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     const snap = lastSnapshot(posts)!;
     expect(snap).toBeDefined();
     expect(snap.path).toEqual(["children", 0]);
@@ -346,9 +405,9 @@ describe("selection snapshot + applyFormat", () => {
   test("teardown removes the selection listeners (no snapshot after stop)", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     stop();
     posts.length = 0;
     selectContents(el.firstChild!);
@@ -361,9 +420,9 @@ describe("selection snapshot + applyFormat", () => {
   test("(a) a selection fully inside <strong> reports 'strong' active", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = richContainer("<strong>bold</strong>");
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     posts.length = 0;
     selectContents(el.querySelector("strong")!.firstChild!);
     document.dispatchEvent(new Event("selectionchange"));
@@ -374,9 +433,9 @@ describe("selection snapshot + applyFormat", () => {
   test("(b) a selection with one endpoint outside <strong> does NOT report 'strong'", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = richContainer("<strong>bold</strong>plain");
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     posts.length = 0;
     // Anchor inside <strong>, focus in the trailing plain text node.
     const range = document.createRange();
@@ -393,9 +452,9 @@ describe("selection snapshot + applyFormat", () => {
   test("(c) a collapsed caret inside <strong> reports 'strong' active + collapsed", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = richContainer("<strong>bold</strong>");
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     posts.length = 0;
     caretAtEnd(el.querySelector("strong")!.firstChild!);
     document.dispatchEvent(new Event("selectionchange"));
@@ -408,9 +467,9 @@ describe("selection snapshot + applyFormat", () => {
   test("link state surfaces in the snapshot when the caret is inside an <a>", () => {
     const { channel, posts } = fakeChannel();
     const { container, el } = richContainer(`<a href="https://x">go</a>`);
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     posts.length = 0;
     selectContents(el.querySelector("a")!.firstChild!);
     document.dispatchEvent(new Event("selectionchange"));
@@ -425,9 +484,9 @@ describe("selection snapshot + applyFormat", () => {
   test("a real blur during a live session does not end it; applyFormat bold then applies", () => {
     const { channel, deliver, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     selectContents(el.firstChild!);
     document.dispatchEvent(new Event("selectionchange")); // Caches the non-empty range.
 
@@ -453,9 +512,9 @@ describe("selection snapshot + applyFormat", () => {
   test("applyFormat re-emits a snapshot after applying", () => {
     const { channel, deliver, posts } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     selectContents(el.firstChild!);
     document.dispatchEvent(new Event("selectionchange"));
     posts.length = 0;
@@ -468,7 +527,7 @@ describe("selection snapshot + applyFormat", () => {
   test("applyFormat is a no-op when no session is active", () => {
     const { channel, deliver, posts } = fakeChannel();
     const { container } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
     deliver({ intent: { command: "bold" }, kind: "applyFormat" });
     expect(lastSnapshot(posts)).toBeUndefined();
@@ -478,9 +537,9 @@ describe("selection snapshot + applyFormat", () => {
   test("link intent creates a link via execCommand stub; href:null unwraps an <a>", () => {
     const { channel, deliver } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     selectContents(el.firstChild!);
     document.dispatchEvent(new Event("selectionchange"));
 
@@ -507,9 +566,9 @@ describe("selection snapshot + applyFormat", () => {
   test("insertData intent inserts a token via the execCommand insertText stub", () => {
     const { channel, deliver } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     caretAtEnd(el.firstChild!);
     document.dispatchEvent(new Event("selectionchange"));
 
@@ -571,9 +630,9 @@ describe("selection snapshot + applyFormat", () => {
     const { built, map, restore } = installHighlightStub();
     const { channel } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     selectContents(el.firstChild!);
     document.dispatchEvent(new Event("selectionchange"));
 
@@ -592,10 +651,10 @@ describe("selection snapshot + applyFormat", () => {
     map.set("jx-pending-format", {}); // Pre-seed so we can observe the delete.
     const { channel } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
     // Enter editing with only a collapsed caret (no non-empty range cached) → highlight deleted.
-    dblclick(el);
+    clickInto(el);
     expect(map.has("jx-pending-format")).toBe(false);
     expect(built).toHaveLength(0); // Nothing painted for an empty range.
 
@@ -606,9 +665,9 @@ describe("selection snapshot + applyFormat", () => {
   test("applyFormat does not throw when the cached range was detached by a re-render", () => {
     const { channel, deliver } = fakeChannel();
     const { container, el } = editableContainer();
-    const stop = startIframeInlineEdit(channel, container);
+    const stop = boot(channel, container);
 
-    dblclick(el);
+    clickInto(el);
     selectContents(el.firstChild!);
     document.dispatchEvent(new Event("selectionchange")); // Caches a range into el.
 
@@ -646,12 +705,12 @@ function propBoundContainer(rawProps?: Record<string, unknown>) {
 }
 
 describe("prop-bound inline editing", () => {
-  test("double-click on marked internals starts a plain session and posts editStart with prop", () => {
+  test("a click into marked internals starts a plain session and posts editStart with prop", () => {
     const { channel, posts } = fakeChannel();
     const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
-    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
 
-    dblclick(h3);
+    clickInto(h3);
     expect(h3.isContentEditable).toBe(true);
     expect(posts).toContainEqual({ kind: "editStart", path: ["children", 1], prop: "title" });
     stop();
@@ -660,9 +719,9 @@ describe("prop-bound inline editing", () => {
   test("committing posts editCommitProp with the instance path, prop, and value", () => {
     const { channel, posts } = fakeChannel();
     const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
-    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
 
-    dblclick(h3);
+    clickInto(h3);
     h3.textContent = "Regional";
     stopEditing();
 
@@ -680,9 +739,9 @@ describe("prop-bound inline editing", () => {
   test("an unset raw prop is editable (the commit ADDS the instance override)", () => {
     const { channel, posts } = fakeChannel();
     const { container, h3, shadowDoc } = propBoundContainer();
-    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
 
-    dblclick(h3);
+    clickInto(h3);
     expect(posts).toContainEqual({ kind: "editStart", path: ["children", 1], prop: "title" });
     stop();
   });
@@ -691,9 +750,9 @@ describe("prop-bound inline editing", () => {
     const { channel, posts } = fakeChannel();
     const { container, h3, host, shadowDoc } = propBoundContainer({ title: "Local" });
     delete host.dataset.jxPath;
-    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
 
-    dblclick(h3);
+    clickInto(h3);
     expect(h3.isContentEditable).toBe(false);
     expect(posts).toHaveLength(0);
     stop();
@@ -703,9 +762,9 @@ describe("prop-bound inline editing", () => {
     for (const raw of ["${$defs.headline}", { $ref: "#/$defs/x" }]) {
       const { channel, posts } = fakeChannel();
       const { container, h3, shadowDoc } = propBoundContainer({ title: raw });
-      const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+      const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
 
-      dblclick(h3);
+      clickInto(h3);
       expect(h3.isContentEditable).toBe(false);
       expect(posts).toHaveLength(0);
       stop();
@@ -721,9 +780,9 @@ describe("prop-bound inline editing", () => {
     const inner = document.createElement("y-inner");
     h3.replaceWith(inner);
     inner.append(h3);
-    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
 
-    dblclick(h3);
+    clickInto(h3);
     expect(h3.isContentEditable).toBe(false);
     expect(posts).toHaveLength(0);
     stop();
@@ -737,22 +796,27 @@ describe("prop-bound inline editing", () => {
     li.dataset.jxPath = serializeJxPath(["children", 0]);
     host.replaceWith(li);
     li.append(host);
-    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
 
-    dblclick(h3);
-    expect(li.isContentEditable).toBe(false);
+    clickInto(h3);
+    // Blocked: the prop is template-valued. The ancestor <li> must not be rich-edited as a
+    // Consolation prize — that would let typing overwrite the whole component instance.
     expect(posts).toHaveLength(0);
+    expect(isEditing()).toBe(false);
+    expect(li.dataset.jxActiveBlock).toBeUndefined();
     stop();
   });
 
-  test("pointerdown outside the active prop editable commits the session", () => {
+  test("the caret leaving a prop editable commits it", () => {
     const { channel, posts } = fakeChannel();
     const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
-    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+    const outside = document.createElement("div");
+    container.append(outside);
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
 
-    dblclick(h3);
+    clickInto(h3);
     h3.textContent = "Changed";
-    document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    clickInto(outside);
 
     expect(posts).toContainEqual({
       kind: "editCommitProp",
@@ -766,9 +830,9 @@ describe("prop-bound inline editing", () => {
   test("a parent endEdit message commits a live prop session", () => {
     const { channel, deliver, posts } = fakeChannel();
     const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
-    const stop = startIframeInlineEdit(channel, container, { getShadowDoc: () => shadowDoc });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
 
-    dblclick(h3);
+    clickInto(h3);
     h3.textContent = "Via endEdit";
     deliver({ kind: "endEdit" });
 

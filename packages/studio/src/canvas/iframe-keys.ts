@@ -10,7 +10,6 @@
  * is focused inside the iframe are left alone so typing still works.
  */
 
-import { cancelIframeDrag, isDragActive } from "./iframe-drop";
 import type { IframeChannel } from "./iframe-channel";
 import type { IframeToParent, ParentToIframe, SerializedKey } from "./iframe-protocol";
 
@@ -26,6 +25,12 @@ const BARE_FORWARD_KEYS: ReadonlySet<string> = new Set([
   "ArrowRight",
 ]);
 
+/**
+ * Chords the EDITOR owns even while the caret is in text. Everything else with a modifier is a
+ * document-level command (save, undo, duplicate, zoom) and must reach the parent.
+ */
+const EDITOR_OWNED_CHORDS: ReadonlySet<string> = new Set(["b", "i", "u", "`"]);
+
 /** Whether `el` is a text-entry target whose own keystrokes must not be hijacked. */
 function isEditableTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) {
@@ -37,12 +42,25 @@ function isEditableTarget(el: EventTarget | null): boolean {
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT";
 }
 
-/** Whether this keydown belongs to the global-shortcut subset the parent handles. */
+/**
+ * Whether this keydown belongs to the global-shortcut subset the parent handles.
+ *
+ * The canvas is now a persistent `contenteditable` root, so "is the target editable" is true for
+ * essentially every keystroke on the canvas — using it alone (as this once did) would mean ⌘S, ⌘Z
+ * and ⌘C never reached the parent at all while the caret was in a document. The split is instead by
+ * INTENT:
+ *
+ * - Bare editing/navigation keys (Backspace, Enter, the arrows) belong to the caret when there is
+ *   one, and to structural selection when there is not.
+ * - Modifier chords are app commands and always forward, EXCEPT the inline-formatting ones the
+ *   editing engine implements itself.
+ */
 export function shouldForwardKey(e: KeyboardEvent): boolean {
-  if (isEditableTarget(e.target)) {
-    return false;
+  const editable = isEditableTarget(e.target);
+  if (e.ctrlKey || e.metaKey) {
+    return !(editable && EDITOR_OWNED_CHORDS.has(e.key.toLowerCase()));
   }
-  return e.ctrlKey || e.metaKey || BARE_FORWARD_KEYS.has(e.key);
+  return !editable && BARE_FORWARD_KEYS.has(e.key);
 }
 
 /** Flatten a KeyboardEvent to the structured-cloneable subset the bridge carries. */
@@ -66,14 +84,6 @@ export function startKeyForwarding(
   doc: Document = document,
 ): () => void {
   const onKey = (e: KeyboardEvent) => {
-    // Escape during a flow-3 (iframe-originated) drag cancels locally — the iframe owns cancel for
-    // That case (single-sourced through iframe-drop), so it must NOT also forward Escape to the
-    // Parent (which would tear down via a second path and double-fire).
-    if (e.key === "Escape" && isDragActive()) {
-      e.preventDefault();
-      cancelIframeDrag();
-      return;
-    }
     if (!shouldForwardKey(e)) {
       return;
     }
