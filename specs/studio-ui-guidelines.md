@@ -1,8 +1,8 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.1.6
+**Version:** 0.1.7
 **Status:** Implemented
-**Updated:** 2026-07-22
+**Updated:** 2026-07-26
 **Applies to:** `packages/studio/`
 
 ---
@@ -289,12 +289,13 @@ const collapsed = new Set();
 
 ### 6.1 Spectrum Components in Use
 
-Registered in `packages/studio/src/ui/spectrum.js`:
+Registered in `packages/studio/src/ui/spectrum.ts`:
 
 **Layout:** `sp-theme`, `sp-tabs`, `sp-tab`, `sp-tab-panel`, `sp-divider`
-**Inputs:** `sp-textfield`, `sp-number-field`, `sp-picker`, `sp-combobox`, `sp-checkbox`, `sp-switch`, `sp-field-label`, `sp-search`
+**Inputs:** `sp-textfield`, `sp-number-field`, `sp-picker`, `sp-combobox`, `sp-checkbox`, `sp-switch`, `sp-field-label`, `sp-search`, `sp-help-text`
 **Actions:** `sp-action-button`, `sp-action-group`, `sp-action-bar`, `sp-picker-button`
 **Overlays:** `sp-overlay`, `sp-popover`, `sp-tooltip`
+**Dialogs:** `sp-dialog`, `sp-dialog-wrapper`, `sp-underlay`
 **Menus:** `sp-menu`, `sp-menu-item`, `sp-menu-divider`, `sp-menu-group`
 **Data:** `sp-accordion`, `sp-accordion-item`, `sp-swatch`, `sp-swatch-group`
 **Color:** `sp-color-area`, `sp-color-slider`, `sp-color-handle`
@@ -373,6 +374,47 @@ Fixed-position toolbar that follows the selected element:
 - Shows element tag name, drag handle, and context actions
 - Z-index: 100
 - Shadow: standard elevation shadow
+
+### 8.7 Dialogs and Overlay Layers
+
+Studio renders every transient surface into one of three fixed, full-viewport hosts declared in
+`packages/studio/index.html` — `#layer-popover`, `#layer-modal`, `#layer-dialog` — bound once at boot
+by `initLayers()`. Each host is `pointer-events: none`; individual slots re-enable pointer events, so
+the layers never swallow canvas input.
+
+`packages/studio/src/ui/layers.ts` is the only sanctioned way to open one:
+
+| Helper                  | Resolves                               | Use for                                          |
+| ----------------------- | -------------------------------------- | ------------------------------------------------ |
+| `showDialog<T>`         | `T` (whatever `done()` is called with) | Bespoke dialog bodies (multi-field forms)        |
+| `showConfirmDialog`     | `boolean`                              | Confirm / cancel, `destructive: true` for danger |
+| `showSaveDiscardDialog` | `"save" \| "discard" \| "cancel"`      | Unsaved-work decisions                           |
+| `showPromptDialog`      | `string \| null` (trimmed)             | Single-value text entry                          |
+| `openModal`             | handle with `update()` / `close()`     | Persistent modals (New Project, About)           |
+| `renderPopover`         | handle with `update()` / `dismiss()`   | Anchored popovers and context menus              |
+
+**Native browser dialogs are not permitted.** `window.prompt()`, `window.confirm()`, and
+`window.alert()` are unstyled, untranslatable, block the entire renderer, and are unavailable in
+sandboxed contexts. The `no-alert` lint rule (oxlint `restriction` category, enabled repo-wide in
+`.oxlintrc.json`) enforces this; suppressing it requires justification in the change set.
+
+`showPromptDialog(headline, opts)` is the replacement for `window.prompt()`:
+
+- `value` pre-fills the field; `select` controls what is highlighted on focus — `"all"`, `"stem"`
+  (everything before the last dot, so renaming a file keeps its extension), or `"none"`.
+- `validate(value)` returns `""` for valid input, or a message. A non-empty message renders as
+  `sp-help-text[slot="negative-help-text"]`, marks the field `invalid`, and blocks confirmation
+  without closing the dialog. The default rejects blank input.
+- `message` renders explanatory copy above the field; `placeholder`, `confirmLabel`, and
+  `cancelLabel` follow the usual Spectrum semantics.
+- Confirming resolves the **trimmed** value; cancel, close, and dismissal all resolve `null`.
+- <kbd>Enter</kbd> in the field confirms. The field takes focus on open, once — re-renders triggered
+  by validation must not steal the caret back.
+
+Dialog attributes are kebab-case on `sp-dialog-wrapper` (`confirm-label`, `cancel-label`,
+`secondary-label`). The camelCase property names are not observed attributes; using them silently
+renders a dialog with no buttons.
+
 - Auto-hides when no selection
 
 ---
@@ -425,9 +467,12 @@ When building new UI in Studio, verify:
 - [ ] State mutations are immutable (produce new objects)
 - [ ] Custom components use light DOM (`createRenderRoot() { return this; }`)
 - [ ] Event handlers call `e.stopPropagation()` when wrapping Spectrum events in light DOM components
+- [ ] Text entry and confirmation go through `ui/layers.ts` (§8.7) — never `prompt()`, `confirm()`, or `alert()`
+- [ ] `sp-dialog-wrapper` labels use kebab-case attributes (`confirm-label`, not `confirmLabel`)
 
 ## Changelog
 
+- **0.1.7** (2026-07-26) — Dialogs and overlay layers (§8.7): the ui/layers.ts contract, showPromptDialog as the replacement for window.prompt(), and a ban on native browser dialogs.
 - **0.1.6** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.5** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.4** (2026-07-17) — Color-scheme canvas preview — Auto/Light/Dark tab-bar control (`ccdc1d3e`).

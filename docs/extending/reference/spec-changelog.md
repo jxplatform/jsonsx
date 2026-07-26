@@ -249,6 +249,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio-ui-guidelines.md`
 
+- **0.1.7** (2026-07-26) — Dialogs and overlay layers (§8.7): the ui/layers.ts contract, showPromptDialog as the replacement for window.prompt(), and a ban on native browser dialogs.
 - **0.1.6** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.5** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.4** (2026-07-17) — Color-scheme canvas preview — Auto/Light/Dark tab-bar control (`ccdc1d3e`).
@@ -259,6 +260,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.1.29-draft** (2026-07-26) — File create/rename/delete naming dialogs (§9.1.1); branch, clone, and nested-selector flows now open Spectrum dialogs instead of native prompts.
 - **0.1.28-draft** (2026-07-25) — The Cloud platform target composes per-project schemas server-side (§3.4).
 - **0.1.27-draft** (2026-07-25) — Source-mode schema validation contract: per-project entry documents, offline $schema-id registration, worker self-location (§4.2.1); fetchProjectSchemas in the PAL table (§3.4).
 - **0.1.26-draft** (2026-07-25) — PAL table records the destination members: createDestination, createProject's user-chosen destination, and pickDirectory.

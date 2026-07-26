@@ -239,6 +239,37 @@ export function setValue(el: HTMLInputElement | HTMLTextAreaElement, value: stri
   el.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+// ─── Dialog helpers ───────────────────────────────────────────────────────────
+
+/** The topmost `sp-dialog-wrapper` currently mounted in the #layer-dialog layer, if any. */
+export function topDialog(): HTMLElement | null {
+  const wrappers = [...document.querySelectorAll("#layer-dialog sp-dialog-wrapper")];
+  return (wrappers.at(-1) as HTMLElement | undefined) ?? null;
+}
+
+/**
+ * Drive an open `showPromptDialog()`: type `value` into its field and confirm, or pass `null` to
+ * cancel. Returns the dialog element it acted on, or null when no dialog is open.
+ */
+export async function answerPromptDialog(value: string | null): Promise<HTMLElement | null> {
+  const wrapper = topDialog();
+  if (!wrapper) {
+    return null;
+  }
+  if (value === null) {
+    wrapper.dispatchEvent(new Event("cancel"));
+  } else {
+    const field = wrapper.querySelector("sp-textfield") as HTMLInputElement | null;
+    if (field) {
+      field.value = value;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    wrapper.dispatchEvent(new Event("confirm"));
+  }
+  await flush();
+  return wrapper;
+}
+
 // ─── New Project modal field accessors ───────────────────────────────────────
 // The Parameters step renders a destination block between the name and description whose shape
 // Depends on the platform's `createDestination` (specs/desktop.md §4.5), so positional indexing

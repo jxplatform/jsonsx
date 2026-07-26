@@ -22,6 +22,7 @@ import {
 } from "../tabs/transact";
 import { inferInputType, propLabel } from "../utils/studio-utils";
 import { renderFieldRow } from "../ui/field-row";
+import { showPromptDialog } from "../ui/layers";
 import { renderDynamicSlot } from "../ui/dynamic-slot";
 import { parseMediaEntries, schemeOfQuery } from "../utils/canvas-media";
 import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
@@ -876,11 +877,15 @@ function styleSidebarTemplate(
               )}
               <button
                 style="padding:6px 10px;background:none;border:1px dashed var(--spectrum-gray-400, #333);border-radius:var(--radius);color:var(--spectrum-gray-700, #a1a1aa);font-size:var(--spectrum-font-size-75, 12px);cursor:pointer"
-                @click=${() => {
-                  // oxlint-disable-next-line no-alert -- native prompt is the intended quick-input UX here
-                  const name = prompt("Selector name (e.g. th, :hover, .active):");
-                  if (name && name.trim()) {
-                    commitStyle(name.trim(), {});
+                @click=${async () => {
+                  const name = await showPromptDialog("Add Nested Selector", {
+                    confirmLabel: "Add",
+                    message: "Enter a selector to nest under the current rule.",
+                    placeholder: "th, :hover, .active",
+                    validate: (v) => (v.trim() ? "" : "Enter a selector."),
+                  });
+                  if (name) {
+                    commitStyle(name, {});
                   }
                 }}
               >

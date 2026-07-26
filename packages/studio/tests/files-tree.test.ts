@@ -3,7 +3,14 @@
  * search), keyboard navigation, the context menu with rename/delete dialogs, and drag-and-drop (via
  * a mocked pragmatic-drag-and-drop adapter so registrations and drops are deterministic).
  */
-import { flush, installMockPlatform, key, pointer, renderInto } from "./harness";
+import {
+  answerPromptDialog,
+  flush,
+  installMockPlatform,
+  key,
+  pointer,
+  renderInto,
+} from "./harness";
 import type { MockPlatformState } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { requireProjectState, setProjectState } from "../src/store";
@@ -162,7 +169,6 @@ async function dismissOutside(): Promise<void> {
 }
 
 let host: HTMLElement;
-const origPrompt = globalThis.prompt;
 
 beforeEach(() => {
   closeAllTabs();
@@ -189,7 +195,6 @@ beforeEach(() => {
 afterEach(async () => {
   await dismissOutside();
   host.remove();
-  globalThis.prompt = origPrompt;
 });
 
 // ─── renderFilesTemplate — empty / welcome states ─────────────────────────────
@@ -386,22 +391,61 @@ describe("file tree listing", () => {
 // ─── New file ─────────────────────────────────────────────────────────────────
 
 describe("createNewFile (toolbar + context menu)", () => {
-  async function clickNewFile(out: HTMLElement) {
+  /** Open the New File dialog from the toolbar and answer it (null cancels). */
+  async function clickNewFile(out: HTMLElement, answer: string | null) {
     pointer(out.querySelector('sp-action-button[label="New File"]')!, "click");
     await flush();
+    await answerPromptDialog(answer);
   }
 
-  test("cancelled prompt writes nothing", async () => {
-    const { state } = installFsPlatform();
+  test("opens a Spectrum prompt dialog rather than a native prompt", async () => {
+    installFsPlatform();
     siteState();
     seedTreeState();
-    globalThis.prompt = () => null;
     const { ctx } = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(ctx), host);
 
-    await clickNewFile(out);
+    pointer(out.querySelector('sp-action-button[label="New File"]')!, "click");
+    await flush();
+
+    const wrapper = dialogWrapper();
+    expect(wrapper).not.toBeNull();
+    expect(wrapper!.getAttribute("headline")).toBe("New File");
+    expect(wrapper!.getAttribute("confirm-label")).toBe("Create");
+    expect(wrapper!.querySelector("sp-textfield")!.getAttribute("value")).toBe("untitled.json");
+
+    await answerPromptDialog(null);
+  });
+
+  test("cancelled dialog writes nothing", async () => {
+    const { state } = installFsPlatform();
+    siteState();
+    seedTreeState();
+    const { ctx } = makeTreeCtx();
+    const out = await renderInto(renderFilesTemplate(ctx), host);
+
+    await clickNewFile(out, null);
 
     expect(state.calls.filter(([name]) => name === "writeFile")).toHaveLength(0);
+    expect(dialogWrapper()).toBeNull();
+  });
+
+  test("a blank name keeps the dialog open and writes nothing", async () => {
+    const { state } = installFsPlatform();
+    siteState();
+    seedTreeState();
+    const { ctx } = makeTreeCtx();
+    const out = await renderInto(renderFilesTemplate(ctx), host);
+
+    await clickNewFile(out, "   ");
+
+    expect(state.calls.filter(([name]) => name === "writeFile")).toHaveLength(0);
+    expect(dialogWrapper()).not.toBeNull();
+    expect(dialogWrapper()!.querySelector("sp-help-text")?.textContent).toContain(
+      "Enter a file name.",
+    );
+
+    await answerPromptDialog(null);
   });
 
   test("unknown extension gets the default JSON scaffold", async () => {
@@ -409,11 +453,10 @@ describe("createNewFile (toolbar + context menu)", () => {
     const { state } = installFsPlatform();
     siteState();
     seedTreeState();
-    globalThis.prompt = () => "untitled.json";
     const { counters, ctx } = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(ctx), host);
 
-    await clickNewFile(out);
+    await clickNewFile(out, "untitled.json");
 
     expect(JSON.parse(state.files.get("untitled.json")!)).toEqual({
       children: [{ children: [], tagName: "p" }],
@@ -426,13 +469,24 @@ describe("createNewFile (toolbar + context menu)", () => {
     const { state } = installFsPlatform();
     siteState();
     seedTreeState();
-    globalThis.prompt = () => "note.md";
     const { ctx } = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(ctx), host);
 
-    await clickNewFile(out);
+    await clickNewFile(out, "note.md");
 
     expect(state.files.get("note.md")).toBe("---\ntitle: Untitled\n---\n\n");
+  });
+
+  test("the entered name is trimmed before it becomes a path", async () => {
+    const { state } = installFsPlatform();
+    siteState();
+    seedTreeState();
+    const { ctx } = makeTreeCtx();
+    const out = await renderInto(renderFilesTemplate(ctx), host);
+
+    await clickNewFile(out, "  spaced.md  ");
+
+    expect(state.files.has("spaced.md")).toBe(true);
   });
 
   test("format without a template creates an empty file", async () => {
@@ -440,11 +494,10 @@ describe("createNewFile (toolbar + context menu)", () => {
     const { state } = installFsPlatform();
     siteState();
     seedTreeState();
-    globalThis.prompt = () => "bare.md";
     const { ctx } = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(ctx), host);
 
-    await clickNewFile(out);
+    await clickNewFile(out, "bare.md");
 
     expect(state.files.get("bare.md")).toBe("");
   });
@@ -460,11 +513,10 @@ describe("createNewFile (toolbar + context menu)", () => {
     );
     siteState();
     seedTreeState();
-    globalThis.prompt = () => "fail.json";
     const { counters, ctx } = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(ctx), host);
 
-    await clickNewFile(out);
+    await clickNewFile(out, "fail.json");
 
     expect(state.files.has("fail.json")).toBe(false);
     expect(counters.left).toBe(0);
@@ -474,7 +526,6 @@ describe("createNewFile (toolbar + context menu)", () => {
     const { state } = installFsPlatform();
     siteState();
     seedTreeState();
-    globalThis.prompt = () => "inner.md";
     const { ctx } = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(ctx), host);
 
@@ -482,6 +533,9 @@ describe("createNewFile (toolbar + context menu)", () => {
     await flush();
     await clickMenuItem("New File…");
     await flush();
+
+    expect(dialogWrapper()?.textContent).toContain("Creating in pages/");
+    await answerPromptDialog("inner.md");
 
     expect(state.files.get("pages/inner.md")).toBe("---\ntitle: Untitled\n---\n\n");
   });

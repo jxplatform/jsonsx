@@ -53,7 +53,7 @@ When a value comes from somewhere earlier in the cascade — the Base tab, an ea
 Two sections close the list:
 
 - **Custom** — any CSS property by name. Type the property, press :kbd[Enter], and fill in its value; each row shows the property's browser default as a placeholder.
-- **Relative Styling** — rules for elements _inside_ the selection (the rows inside a table, the links inside a nav). Click a rule to drill into it and edit it with the full inspector; **+ Add** creates a new one.
+- **Relative Styling** — rules for elements _inside_ the selection (the rows inside a table, the links inside a nav). Click a rule to drill into it and edit it with the full inspector; **+ Add** opens a dialog where you type the selector (`th`, `:hover`, `.active`) and click **Add**.
 
 :::doc-note
 Everything here writes plain CSS into the element's `style` object in the open file — the same nested format documented in **[Styling](/docs/framework/concepts/styling)**.

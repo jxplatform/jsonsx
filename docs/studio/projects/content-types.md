@@ -46,7 +46,7 @@ With a type selected, edit its name in the editor's header to rename it, or clic
 Back in the [Manage view](/docs/studio/projects/browse), the **New** menu lists an item for every content type you've defined:
 
 1. Click **New** and pick the type — for example **Blog-posts**.
-2. Name the entry. Studio creates the file in the type's source folder with every schema field pre-filled with a sensible blank, and opens it.
+2. Name the entry in the dialog and click **Create**. Studio creates the file in the type's source folder with every schema field pre-filled with a sensible blank, and opens it.
 
 Entries show up under Manage's **Content** filter labeled with their type, and when you open one, Studio recognizes which type it belongs to and presents its fields as a form — see **[Frontmatter and page metadata](/docs/studio/editing/frontmatter)**.
 

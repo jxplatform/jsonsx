@@ -20,7 +20,7 @@ import { statusMessage } from "../panels/statusbar";
 import { componentRegistry } from "../files/components";
 import { rectOf } from "../utils/geometry";
 
-import { renderPopover, showDialog } from "../ui/layers";
+import { renderPopover, showDialog, showPromptDialog } from "../ui/layers";
 import { loopbackAssetSrc } from "../canvas/canvas-origin";
 import { renderComponentPreview } from "../panels/component-preview";
 import { buildScope, renderNode, setSkipServerFunctions } from "@jxsuite/runtime";
@@ -322,8 +322,13 @@ async function handleNewEntity(
     return;
   }
 
-  // oxlint-disable-next-line no-alert -- native prompt is the intended quick-input UX here
-  const name = prompt(`${typeInfo.label} name:`, "untitled");
+  const name = await showPromptDialog(`New ${typeInfo.label}`, {
+    confirmLabel: "Create",
+    message: `Creating in ${typeInfo.dir}/`,
+    placeholder: "untitled",
+    validate: (v) => (v.trim() ? "" : `Enter a ${typeInfo.label.toLowerCase()} name.`),
+    value: "untitled",
+  });
   if (!name) {
     return;
   }
@@ -571,57 +576,11 @@ async function browseDeleteFile(
  * @returns {Promise<string | null>}
  */
 function showRenameDialog(currentName: string): Promise<string | null> {
-  let value = currentName;
-
-  return showDialog<string | null>((done) => {
-    function confirm() {
-      const trimmed = value.trim();
-      if (!trimmed) {
-        return;
-      }
-      done(trimmed);
-    }
-
-    const tpl = html`
-      <sp-dialog-wrapper
-        open
-        underlay
-        headline="Rename"
-        confirm-label="Rename"
-        cancel-label="Cancel"
-        size="s"
-        @confirm=${confirm}
-        @cancel=${() => done(null)}
-        @close=${() => done(null)}
-      >
-        <sp-textfield
-          style="width:100%"
-          value=${value}
-          @input=${(e: Event) => {
-            value = (e.target as HTMLInputElement).value || "";
-          }}
-          @keydown=${(e: KeyboardEvent) => {
-            if (e.key === "Enter") {
-              confirm();
-            }
-          }}
-        ></sp-textfield>
-      </sp-dialog-wrapper>
-    `;
-
-    requestAnimationFrame(() => {
-      const layer = document.querySelector("#layer-dialog");
-      const tf = layer?.querySelector("sp-textfield") as HTMLElement | null;
-      if (tf) {
-        tf.focus();
-        const input = tf.shadowRoot?.querySelector("input");
-        if (input) {
-          input.select();
-        }
-      }
-    });
-
-    return tpl;
+  return showPromptDialog("Rename", {
+    confirmLabel: "Rename",
+    select: "stem",
+    validate: (v) => (v.trim() ? "" : "Enter a file name."),
+    value: currentName,
   });
 }
 

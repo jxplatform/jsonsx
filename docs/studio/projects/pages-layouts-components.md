@@ -35,7 +35,7 @@ All three are created the same way, from the [Manage view](/docs/studio/projects
 
 1. Click **Manage** in the toolbar.
 2. Click **New** and choose **Page**, **Layout**, or **Component**. (The menu also lists your project's content types — see [Browse your project](/docs/studio/projects/browse).)
-3. Type a name. Studio turns it into a file name (`About Us` becomes `about-us`), writes the file into the matching folder, and opens it in a tab, ready to edit.
+3. Type a name in the dialog and click **Create**. Studio turns it into a file name (`About Us` becomes `about-us`), writes the file into the matching folder, and opens it in a tab, ready to edit.
 
 ![Jx Studio Manage Files modal with live previews of every project file](../../images/mode-manage.png)
 
