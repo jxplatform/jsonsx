@@ -36,6 +36,8 @@ import {
   updateUi,
 } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
+import { formatEditableVerdicts } from "../format/constraints";
+import { formatByName } from "../format/format-host";
 import { collabState } from "../collab/collab-state";
 import { getPlatform, hasPlatform } from "../platform";
 import type {
@@ -1540,6 +1542,15 @@ export async function mountIframeCanvas(
   // The RAW page doc (forward-op + data-jx-path coordinate space) crosses as the iframe's shadow doc.
   // oxlint-disable-next-line unicorn/prefer-structured-clone
   const cloneableShadow = JSON.parse(JSON.stringify(doc)) as unknown;
+  // Which tags can hold a caret depends on the document's vocabulary, so the format's verdicts ride
+  // With the render rather than being baked into the frame. Absent for a native document, where the
+  // Studio's own element metadata answers on its own.
+  // Resolve from THIS render's tab, not `state.tabId` — that is only adopted when the render is
+  // Acknowledged, so at post time it still names the previous render's document (null on first
+  // Mount, which is exactly the render that matters).
+  const renderTab = tabId ? (workspace.tabs.get(tabId) ?? null) : null;
+  const formatElements = formatByName(renderTab?.doc.sourceFormat)?.studio?.elements;
+  const editableTags = formatElements ? formatEditableVerdicts(formatElements) : undefined;
   const message: ParentToIframe = {
     colorScheme: activeSchemeWire(),
     doc: cloneableDoc,
@@ -1550,6 +1561,7 @@ export async function mountIframeCanvas(
     mode: resolved.mapperCtx.canvasMode as CanvasMode,
     shadowDoc: cloneableShadow,
     siteStyle: resolved.siteStyle,
+    ...(editableTags ? { editableTags } : {}),
   };
   // A mode switch to preview mid-split must not start an edit session in the preview render.
   if (message.mode === "preview") {

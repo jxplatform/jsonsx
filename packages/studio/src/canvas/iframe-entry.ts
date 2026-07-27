@@ -27,7 +27,13 @@ import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
 import { evaluateLiveExprs } from "./iframe-eval";
 import { serializeDataScope } from "./serialize-scope";
-import { getActivePath, isEditableBlock, isEditing, stopEditing } from "../editor/inline-edit";
+import {
+  getActivePath,
+  isEditableBlock,
+  isEditing,
+  setEditableVerdicts,
+  stopEditing,
+} from "../editor/inline-edit";
 import { captureDocSelection, restoreDocSelection } from "./iframe-editable-root";
 import { isAncestor } from "../state";
 import type { JxDocOp } from "../tabs/patch-ops";
@@ -517,6 +523,10 @@ export function startCanvasIframe(opts: {
       stopEditing();
     }
     latestGen = msg.gen;
+    // Adopt the document's caret vocabulary BEFORE rendering: which tags hold a caret depends on
+    // The format class, and a `.md` page and a native `.json` component do not agree. Absent means
+    // A document with no format, where the studio's own element metadata answers on its own.
+    setEditableVerdicts(msg.editableTags ?? null);
     const { gen, mapperCtx } = msg;
     const rawDoc = msg.shadowDoc as JxMutableNode;
     void (async () => {

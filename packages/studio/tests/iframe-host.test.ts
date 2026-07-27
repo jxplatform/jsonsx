@@ -731,6 +731,42 @@ describe("iframe canvas inline-edit bridge", () => {
     expect(docChildren()[0]!.textContent).toBe("Edited");
   });
 
+  test("a format-backed tab ships its caret vocabulary with the render", async () => {
+    // Which tags hold a caret is a property of the DOCUMENT, so it rides with the render rather
+    // Than being baked into the frame.
+    const { seedMarkdownFormat } = await import("./format-fixture");
+    const { setFormats } = await import("../src/format/format-host");
+    seedMarkdownFormat();
+    resetWorkspaceWithTab({ children: [{ tagName: "p", textContent: "Hi" }], tagName: "div" });
+    activeTab.value!.doc.sourceFormat = "Markdown";
+
+    await mountReady();
+    const render = channels[0]!.posts.find((p) => p.kind === "render") as
+      | { editableTags?: Record<string, boolean> }
+      | undefined;
+    expect(render?.editableTags).toBeDefined();
+    // Markdown's own verdicts: a paragraph holds a caret, a blockquote holds paragraphs, and a
+    // Link is markup inside a block rather than a block.
+    expect(render!.editableTags!.p).toBe(true);
+    expect(render!.editableTags!.blockquote).toBe(false);
+    expect(render!.editableTags!.a).toBe(false);
+    // Tags markdown never mentions are left to the studio's own metadata.
+    expect(render!.editableTags!.figcaption).toBeUndefined();
+    setFormats([]);
+  });
+
+  test("a native tab ships none — the built-in vocabulary answers alone", async () => {
+    const { setFormats } = await import("../src/format/format-host");
+    setFormats([]);
+    resetWorkspaceWithTab({ children: [{ tagName: "p", textContent: "Hi" }], tagName: "div" });
+    await mountReady();
+    const render = channels[0]!.posts.find((p) => p.kind === "render") as
+      | { editableTags?: unknown }
+      | undefined;
+    expect(render).toBeDefined();
+    expect(render!.editableTags).toBeUndefined();
+  });
+
   test("flushCanvasEdits asks the frame to commit, and resolves on its acknowledgement", async () => {
     // A save must never serialize the document while the words the author just typed are still
     // Sitting in the caret's block waiting for the idle tick.

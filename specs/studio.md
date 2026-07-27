@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.2.0-draft
+**Version:** 0.3.0-draft
 **Status:** Partial
-**Updated:** 2026-07-26
+**Updated:** 2026-07-27
 **License:** MIT
 
 ---
@@ -568,7 +568,30 @@ the range it would delete — reaching out of the block and into the previous on
 them is how it implements the keystroke. The caret says what the author meant; the target range says
 what the browser would have done about it.
 
-#### 8.2.2 Caret positions
+#### 8.2.2 Which tags hold a caret
+
+A tag holds a caret when its element vocabulary says it accepts inline children. This is DERIVED,
+never a hand-maintained list, from two sources resolved PER TAG:
+
+1. **The document's format class** (`$studio.elements`, §8.1) for the tags it declares:
+   `nesting[tag].inline === true` holds a caret; a container (`inline: false`, or an `only: [...]`
+   rule) does not; and a tag in the format's `inline` list is markup within a block, never a block.
+2. **The studio's element metadata** for every tag the format does not mention — HTML reaching the
+   canvas through a directive, and native documents, which have no format class at all. The rule is
+   the same: a non-empty `$inlineChildren` declaration.
+
+Per-tag resolution rather than a union, because the format's verdict must be able to say NO. Under
+Markdown a `blockquote` holds paragraphs, so the caret belongs in the `<p>` inside it; and an `<a>`
+is inline, so clicking a link puts the caret in the enclosing paragraph rather than making the link
+itself the edited block.
+
+`pre` is excluded throughout: its content is preformatted code, where whitespace is significant and
+the inline-markup path does not apply.
+
+The format's verdicts are computed per render and cross to the canvas frame with it, because the
+answer belongs to the document, not to the frame.
+
+#### 8.2.3 Caret positions
 
 A caret position is a **block path plus a character offset into that block's rendered text**. The
 offset counts rendered characters, not DOM child indices, so it is agnostic to inline markup: in
@@ -577,7 +600,7 @@ offset counts rendered characters, not DOM child indices, so it is agnostic to i
 Expressed this way a caret survives the DOM underneath it being rebuilt, which is what lets a
 surgical patch — including a co-author's edit — land without moving the author's cursor.
 
-#### 8.2.3 Structural edits
+#### 8.2.4 Structural edits
 
 - **Split** — `Enter` divides the block at the caret; the caret lands at the start of the new block.
 - **Merge** — Backspace at a block's start and Delete at its end are the same join from either side.
@@ -591,19 +614,19 @@ Document order for "the previous block" comes from the **rendered DOM**, not the
 range or a boundary may cross list items, table cells and nested containers, none of which is a flat
 index walk.
 
-#### 8.2.4 Dragging
+#### 8.2.5 Dragging
 
 Reordering on the canvas is initiated **only** from the block action bar's drag handle (§4.4).
 Pressing and dragging within text selects text. Native drag inside the editable region is
 suppressed.
 
-#### 8.2.5 Prop-bound text
+#### 8.2.6 Prop-bound text
 
 Text inside a component instance that is an invertible prop binding opens a nested, plaintext-only
 editing host on press. It commits to the instance's `$props`, and takes no rich formatting, split or
 slash menu.
 
-#### 8.2.6 Serialization
+#### 8.2.7 Serialization
 
 **Text node output**: When inline editing produces mixed content (text + inline formatting elements), text runs are represented as bare strings in the `children` array — not as `{ tagName: "span", textContent: ... }` wrapper elements.
 
@@ -731,6 +754,7 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.3.0-draft** (2026-07-27) — Derive the caret's editable tag set from the document's element vocabulary (§8.2.2): the format class decides per tag and can say no, so a Markdown blockquote holds paragraphs and a link is markup within a block; subsections after it renumber (nothing referenced them).
 - **0.2.0-draft** (2026-07-26) — Fluid document editing: the canvas carries a live caret (§8.2), one block action bar (§4.4), both editable modes behave identically for text (§4.2), and a rewritten keyboard contract (§10).
 - **0.1.29-draft** (2026-07-26) — File create/rename/delete naming dialogs (§9.1.1); branch, clone, and nested-selector flows now open Spectrum dialogs instead of native prompts.
 - **0.1.28-draft** (2026-07-25) — The Cloud platform target composes per-project schemas server-side (§3.4).
@@ -765,4 +789,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.2.0-draft_
+_`@jxsuite/studio` Specification v0.3.0-draft_

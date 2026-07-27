@@ -9,6 +9,8 @@
 
 import elementsMeta from "../../data/elements-meta.json";
 import { normalizeInlineContent, toggleInlineFormat } from "./inline-format";
+import { isEditableTag } from "./editable-tags";
+import type { EditableVerdicts } from "./editable-tags";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -86,39 +88,6 @@ const INLINE_TAGS = new Set([
   "sub",
   "sup",
   "s",
-]);
-
-/**
- * Tags that can hold a caret — every text-bearing block.
- *
- * With a document-wide caret this set decides where a click lands, so a missing tag reads to the
- * author as "this text is not editable". It therefore covers the prose blocks markdown produces
- * (headings, paragraphs, list items, table cells, quotes) AND the text-bearing HTML blocks that
- * reach the canvas through directives — captions, definition lists, disclosure summaries.
- *
- * Deliberately excluded: containers that hold blocks rather than text (`ul`, `table`, `tr`,
- * `figure`), and `pre`, whose whitespace and lack of inline formatting need their own treatment.
- */
-const EDITABLE_BLOCKS = new Set([
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "p",
-  "li",
-  "td",
-  "th",
-  "blockquote",
-  "span",
-  "a",
-  "label",
-  "figcaption",
-  "caption",
-  "summary",
-  "dt",
-  "dd",
 ]);
 
 // ─── Context-aware inline scoping ─────────────────────────────────────────
@@ -211,13 +180,25 @@ let _plainMode = false;
 let _plainOriginal = "";
 
 /**
- * Check if an element is a text-bearing editable block.
+ * The live document's format overrides for which tags hold a caret. Injected per render (the same
+ * shape as `setSlashController`), because the answer depends on the document's format class — a
+ * `.md` page and a native `.json` component have different vocabularies.
+ */
+let editableVerdicts: EditableVerdicts = null;
+
+/** Adopt the format's per-tag caret verdicts for the live render (null = built-in metadata only). */
+export function setEditableVerdicts(verdicts: EditableVerdicts): void {
+  editableVerdicts = verdicts;
+}
+
+/**
+ * Whether an element can hold a text caret.
  *
- * @param {HTMLElement} el
- * @returns {boolean}
+ * Derived from the document's element vocabulary rather than a hand-maintained list — see
+ * {@link file://./editable-tags.ts}.
  */
 export function isEditableBlock(el: HTMLElement) {
-  return EDITABLE_BLOCKS.has(el.tagName.toLowerCase());
+  return isEditableTag(el.tagName, editableVerdicts);
 }
 
 /**

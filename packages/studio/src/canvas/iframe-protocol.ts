@@ -57,6 +57,12 @@ export type ParentToIframe =
       // Resolved render doc (layout-wrapped); this raw doc's paths match the forward-op paths and
       // The stamped data-jx-path attributes.
       shadowDoc: unknown;
+      /**
+       * The document format's per-tag verdicts on which tags can hold a text caret, or absent for a
+       * native document with no format class. Overrides only — tags the format says nothing about
+       * fall back to the studio's own element metadata. See `formatEditableVerdicts`.
+       */
+      editableTags?: Record<string, boolean>;
       mode: CanvasMode;
       docBase: string;
       mapperCtx: WireMapperCtx;

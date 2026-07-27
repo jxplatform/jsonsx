@@ -262,6 +262,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.3.0-draft** (2026-07-27) — Derive the caret's editable tag set from the document's element vocabulary (§8.2.2): the format class decides per tag and can say no, so a Markdown blockquote holds paragraphs and a link is markup within a block; subsections after it renumber (nothing referenced them).
 - **0.2.0-draft** (2026-07-26) — Fluid document editing: the canvas carries a live caret (§8.2), one block action bar (§4.4), both editable modes behave identically for text (§4.2), and a rewritten keyboard contract (§10).
 - **0.1.29-draft** (2026-07-26) — File create/rename/delete naming dialogs (§9.1.1); branch, clone, and nested-selector flows now open Spectrum dialogs instead of native prompts.
 - **0.1.28-draft** (2026-07-25) — The Cloud platform target composes per-project schemas server-side (§3.4).

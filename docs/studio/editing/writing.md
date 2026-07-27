@@ -34,6 +34,21 @@ There is nothing to start or stop. The cursor is simply on the page, the way it 
 
 Your writing is saved into the document as you pause, so :kbd[⌘S] (macOS) / :kbd[Ctrl+S] (Windows/Linux) always writes what is on screen, mid-sentence or not.
 
+## What you can click into
+
+Anything that holds text: headings, paragraphs, list items, table cells, captions, definition
+lists, a disclosure's summary. Which ones those are comes from the page's own format rather than a
+fixed list, so a Markdown page and a component page each get the right answer.
+
+Two cases where the cursor lands somewhere you might not expect, and both are deliberate:
+
+- **A block quote** holds paragraphs, so clicking one puts the cursor in the paragraph inside it —
+  which is the thing you actually want to type in.
+- **A link** is part of a paragraph, not a block of its own. Clicking one puts the cursor in the
+  paragraph, so you can type through and around the link and it stays intact.
+
+Code blocks are not editable this way; their whitespace is significant, so they are left alone.
+
 ## Paragraphs
 
 Press :kbd[Enter] to end the paragraph and start a new one. Split a paragraph in the middle and everything after the cursor moves into the new one, with your cursor following — you just keep typing. :kbd[Shift+Enter] stays in the same paragraph instead of starting a new block.

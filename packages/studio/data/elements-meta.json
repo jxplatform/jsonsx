@@ -184,7 +184,137 @@
     },
     "blockquote": {
       "$convertTo": "text",
-      "$inlineChildren": []
+      "$inlineChildren": [
+        "em",
+        "strong",
+        "del",
+        "code",
+        "a",
+        "span",
+        "br",
+        "img",
+        "b",
+        "i",
+        "u",
+        "sub",
+        "sup",
+        "s"
+      ],
+      "$inlineActions": "p"
+    },
+    "figcaption": {
+      "$inlineChildren": [
+        "em",
+        "strong",
+        "del",
+        "code",
+        "a",
+        "span",
+        "br",
+        "img",
+        "b",
+        "i",
+        "u",
+        "sub",
+        "sup",
+        "s"
+      ],
+      "$inlineActions": "p"
+    },
+    "caption": {
+      "$inlineChildren": [
+        "em",
+        "strong",
+        "del",
+        "code",
+        "a",
+        "span",
+        "br",
+        "img",
+        "b",
+        "i",
+        "u",
+        "sub",
+        "sup",
+        "s"
+      ],
+      "$inlineActions": "p"
+    },
+    "summary": {
+      "$inlineChildren": [
+        "em",
+        "strong",
+        "del",
+        "code",
+        "a",
+        "span",
+        "br",
+        "img",
+        "b",
+        "i",
+        "u",
+        "sub",
+        "sup",
+        "s"
+      ],
+      "$inlineActions": "p"
+    },
+    "dt": {
+      "$inlineChildren": [
+        "em",
+        "strong",
+        "del",
+        "code",
+        "a",
+        "span",
+        "br",
+        "img",
+        "b",
+        "i",
+        "u",
+        "sub",
+        "sup",
+        "s"
+      ],
+      "$inlineActions": "p"
+    },
+    "dd": {
+      "$inlineChildren": [
+        "em",
+        "strong",
+        "del",
+        "code",
+        "a",
+        "span",
+        "br",
+        "img",
+        "b",
+        "i",
+        "u",
+        "sub",
+        "sup",
+        "s"
+      ],
+      "$inlineActions": "p"
+    },
+    "label": {
+      "$inlineChildren": [
+        "em",
+        "strong",
+        "del",
+        "code",
+        "a",
+        "span",
+        "br",
+        "img",
+        "b",
+        "i",
+        "u",
+        "sub",
+        "sup",
+        "s"
+      ],
+      "$inlineActions": "p"
     },
     "a": {
       "$inlineChildren": ["em", "strong", "code", "span", "br", "b", "i", "u", "sub", "sup"],

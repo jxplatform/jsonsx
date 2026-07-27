@@ -337,6 +337,49 @@ describe("startCanvasIframe — patch", () => {
     return { acks, container, pair };
   }
 
+  test("a render adopts the document format's caret vocabulary", async () => {
+    // Which tags hold a caret depends on the document: markdown's blockquote holds paragraphs, so
+    // The caret belongs in the <p> inside it, while a native document's may hold text directly.
+    const { container, pair } = await bootRendered(3);
+    const { isEditableBlock, setEditableVerdicts } = await import("../src/editor/inline-edit");
+    const quote = document.createElement("blockquote");
+
+    // The boot render carried no verdicts, so the built-in vocabulary answers.
+    expect(isEditableBlock(quote)).toBe(true);
+
+    pair.parent.post({
+      ...(renderMsg(4, freshH1(), freshH1()) as Extract<ParentToIframe, { kind: "render" }>),
+      editableTags: { a: false, blockquote: false },
+    });
+    pair.flush();
+    await flush();
+
+    expect(isEditableBlock(quote)).toBe(false);
+    expect(isEditableBlock(document.createElement("a"))).toBe(false);
+    // A tag the format never mentions still falls back to the built-in vocabulary.
+    expect(isEditableBlock(document.createElement("figcaption"))).toBe(true);
+    expect(container).toBeTruthy();
+    setEditableVerdicts(null);
+  });
+
+  test("a render with no format verdicts resets to the built-in vocabulary", async () => {
+    const { pair } = await bootRendered(3);
+    const { isEditableBlock } = await import("../src/editor/inline-edit");
+    pair.parent.post({
+      ...(renderMsg(4, freshH1(), freshH1()) as Extract<ParentToIframe, { kind: "render" }>),
+      editableTags: { blockquote: false },
+    });
+    pair.flush();
+    await flush();
+    expect(isEditableBlock(document.createElement("blockquote"))).toBe(false);
+
+    // Switching to a document with no format class must not leave the previous one's verdicts.
+    pair.parent.post(renderMsg(5, freshH1(), freshH1()));
+    pair.flush();
+    await flush();
+    expect(isEditableBlock(document.createElement("blockquote"))).toBe(true);
+  });
+
   test("an ECHOED patch leaves the caret's own block alone", async () => {
     // The regression that would make the whole feature unusable: a rich commit emits
     // `set-key children` at the ACTIVE path. `children` is not an in-place key, so the disturbance
