@@ -13,13 +13,12 @@ import {
   renderResolvedDocument,
 } from "./iframe-render";
 import { measureHits, startInteraction } from "./iframe-interaction";
+import { serializeJxPath } from "./path-mapping";
 import {
   AUTO_SCROLL_STEP,
-  clearIframeDrag,
   computeDropInstruction,
   resolveDropTarget,
   scrollDirection,
-  startGrabDetector,
 } from "./iframe-drop";
 import { startIframeInlineEdit } from "./iframe-inline-edit";
 import { startIframeSlashBridge } from "./iframe-slash";
@@ -28,7 +27,14 @@ import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
 import { evaluateLiveExprs } from "./iframe-eval";
 import { serializeDataScope } from "./serialize-scope";
-import { getActivePath, isEditing, stopEditing } from "../editor/inline-edit";
+import {
+  getActivePath,
+  isEditableBlock,
+  isEditing,
+  setEditableVerdicts,
+  stopEditing,
+} from "../editor/inline-edit";
+import { captureDocSelection, restoreDocSelection } from "./iframe-editable-root";
 import { isAncestor } from "../state";
 import type { JxDocOp } from "../tabs/patch-ops";
 import type { JxPath } from "../state";
@@ -241,20 +247,6 @@ export function startCanvasIframe(opts: {
   });
   // Bridge the engine's slash menu to the parent's Spectrum menu (show/nav/select over the channel).
   const stopSlashBridge = startIframeSlashBridge(channel, container.ownerDocument);
-  // Flow 3 (grab-anywhere): detect an element-body drag and DRIVE it locally. A drag that begins in
-  // The iframe gets its held-button moves in the IFRAME document (not the parent), so the iframe
-  // Computes the preview/drop from its own cursor and posts dragOver/dropResult directly; the parent
-  // Only adopts the seq, draws the indicator, and positions the ghost from the posted cursor. The
-  // Detector reuses the SAME previewAt + auto-scroll loop the dragMove/drop handlers use.
-  const stopGrabDetector = startGrabDetector(channel, container.ownerDocument, {
-    armAutoScroll: (cursor, dragSeq, src) =>
-      updateAutoScroll(cursor, dragSeq, { gen: renderedGen, src }),
-    gen: () => renderedGen,
-    getMode: () => currentMode,
-    previewAt: (cursor, src) =>
-      shadowDoc ? previewAt(cursor, src, shadowDoc, container.ownerDocument) : null,
-    stopAutoScroll,
-  });
   // Auto-recover canvas images that 404 on a cold first render (component <img>s created in
   // ConnectedCallback fire late, before the loopback server is warm). Re-fires the failed request a
   // Few times — what the manual data-sidebar "Refresh" does, but without a full re-render.
@@ -360,7 +352,6 @@ export function startCanvasIframe(opts: {
     dragGen = -1;
     sessionSeq = -1;
     stopAutoScroll();
-    clearIframeDrag();
   };
   container.ownerDocument.addEventListener("dragenter", onNativeDragOver, true);
   container.ownerDocument.addEventListener("dragover", onNativeDragOver, true);
@@ -402,14 +393,38 @@ export function startCanvasIframe(opts: {
         channel.post({ gen, kind: "patchError", message: "patch-ahead-of-render" });
         return;
       }
-      // A structural/subtree op that re-renders the active editable (or an ancestor) would detach
-      // The session's element mid-edit — commit and end the session first (in-place style/text
-      // Patches elsewhere leave it alone).
-      if (isEditing() && patchDisturbsActiveEdit(msg.forwardOps)) {
+      // A structural/subtree op that re-renders the active block (or an ancestor) DETACHES the
+      // Element the engine holds, so the block has to be released before the patch lands. But the
+      // Caret must not be released with it: remember where it is in DOCUMENT coordinates — a block
+      // Path plus a character offset — which survives the DOM underneath being rebuilt.
+      //
+      // This is what makes a remote co-author's edit, or a patch from any other surface, land
+      // Without throwing the local writer out of their sentence.
+      // An ECHOED op cannot disturb the edit — it IS the edit, already in the DOM. It must be
+      // Excluded from the disturbance check as well as from the DOM write: a rich commit emits
+      // `set-key children` at the active path, `children` is not an in-place key, so the check
+      // Would tear the block down on the caret's own idle tick — committing again on the way out
+      // And re-entering the commit→patch cycle. The caret would vanish every time you paused.
+      const echoed = new Set((msg.echoPaths ?? []).map((p) => serializeJxPath(p)));
+      const foreignOps =
+        echoed.size === 0
+          ? msg.forwardOps
+          : msg.forwardOps.filter(
+              (op) => !(op.op === "set-key" && echoed.has(serializeJxPath(op.path))),
+            );
+      const disturbs = isEditing() && patchDisturbsActiveEdit(foreignOps);
+      const caret = disturbs ? captureDocSelection(container, isEditableBlock) : null;
+      if (disturbs) {
         stopEditing();
       }
       try {
-        applyIframePatch(shadowDoc, msg.forwardOps, container, renderCtx);
+        applyIframePatch(shadowDoc, msg.forwardOps, container, renderCtx, msg.echoPaths);
+        // Put the caret back where the author left it. Restoring the SELECTION re-activates the
+        // Block through the editing host's own selectionchange path — there is no separate
+        // "re-enter" step, because a caret in a block IS the edit.
+        if (caret) {
+          restoreDocSelection(container, caret);
+        }
         channel.post({ gen, kind: "patchComplete" });
       } catch (error) {
         channel.post({
@@ -453,7 +468,6 @@ export function startCanvasIframe(opts: {
       dragGen = -1;
       sessionSeq = -1;
       stopAutoScroll();
-      clearIframeDrag();
       return;
     }
     if (msg.kind === "dragMove") {
@@ -485,7 +499,6 @@ export function startCanvasIframe(opts: {
       dragGen = -1;
       sessionSeq = -1;
       stopAutoScroll();
-      clearIframeDrag();
       return;
     }
     if (msg.kind === "setColorScheme") {
@@ -510,6 +523,10 @@ export function startCanvasIframe(opts: {
       stopEditing();
     }
     latestGen = msg.gen;
+    // Adopt the document's caret vocabulary BEFORE rendering: which tags hold a caret depends on
+    // The format class, and a `.md` page and a native `.json` component do not agree. Absent means
+    // A document with no format, where the studio's own element metadata answers on its own.
+    setEditableVerdicts(msg.editableTags ?? null);
     const { gen, mapperCtx } = msg;
     const rawDoc = msg.shadowDoc as JxMutableNode;
     void (async () => {
@@ -574,7 +591,6 @@ export function startCanvasIframe(opts: {
     stopKeyForwarding();
     stopInlineEdit();
     stopSlashBridge();
-    stopGrabDetector();
     stopImageRetry();
     stopAutoScroll();
     heightObserver?.disconnect();

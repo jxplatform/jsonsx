@@ -136,7 +136,11 @@ export function setTransactGate(fn: TransactGate | null) {
 export function transactDoc(
   tab: Tab | null,
   mutationFn: (tab: Tab) => void,
-  { skipHistory = false, origin = "user" }: { skipHistory?: boolean; origin?: TransactOrigin } = {},
+  {
+    skipHistory = false,
+    origin = "user",
+    coalesceKey = null,
+  }: { skipHistory?: boolean; origin?: TransactOrigin; coalesceKey?: string | null } = {},
 ) {
   if (!tab) {
     return;
@@ -186,7 +190,7 @@ export function transactDoc(
   }
 
   if (!skipHistory && !_batchTab) {
-    pushHistoryEntry(tab, raw, record, selectionBefore);
+    pushHistoryEntry(tab, raw, record, selectionBefore, coalesceKey);
   }
 
   tab.doc.dirty = true;
@@ -210,18 +214,42 @@ function pushHistoryEntry(
   raw: JxMutableNode,
   record: TransactionRecord,
   selectionBefore: JxPath | null,
+  coalesceKey: string | null = null,
 ) {
   const truncated = tab.history.snapshots.slice(0, tab.history.index + 1);
   const useOps =
     patchHistoryEnabled() &&
     record.invertible &&
     (record.docOps.length > 0 || record.fmOps.length > 0);
+
+  // Successive commits to the same block are ONE undoable edit. Fold this transaction into the
+  // Previous entry: its inverse already restores the state before the run began (undoing A→B then
+  // B→C is C→A), so only the forward ops and the resulting document advance.
+  const prev = truncated.at(-1);
+  if (coalesceKey && useOps && prev && prev.coalesceKey === coalesceKey && prev.inverseOps) {
+    prev.forwardOps = [...(prev.forwardOps ?? []), ...record.docOps.map((pair) => pair.forward)];
+    // BOTH halves accumulate. Keeping only the run's first inverse would cover only the keys that
+    // First commit happened to touch, so a later commit that changes the block's SHAPE — a plain
+    // Block becoming rich, which clears `textContent` and writes `children` — would never be undone,
+    // Leaving the node holding both keys at once. Undo replays inverses in reverse order, so
+    // Appending yields "undo the last commit, then the one before it, …".
+    prev.inverseOps = [...prev.inverseOps, ...record.docOps.map((pair) => pair.inverse)];
+    prev.selection = tab.session.selection ? [...tab.session.selection] : null;
+    if (prev.document) {
+      prev.document = jsonClone(raw);
+    }
+    tab.history.snapshots = truncated;
+    tab.history.index = truncated.length - 1;
+    return;
+  }
+
   const needCheckpoint = !useOps || truncated.length % CHECKPOINT_INTERVAL === 0;
   truncated.push({
     document: needCheckpoint ? jsonClone(raw) : null,
     fmOps: useOps && record.fmOps.length > 0 ? record.fmOps : null,
     forwardOps: useOps ? record.docOps.map((p) => p.forward) : null,
     inverseOps: useOps ? record.docOps.map((p) => p.inverse) : null,
+    coalesceKey,
     selection: tab.session.selection ? [...tab.session.selection] : null,
     selectionBefore,
   });
@@ -318,6 +346,16 @@ function applyDocOp(tab: Tab, op: JxDocOp) {
   const prev =
     op.op === "set-key" ? (getNodeAtPath(tab.doc.document, op.path)?.[op.key] as unknown) : null;
   applyDocOpToDoc(tab.doc.document, op);
+  // The canvas lives in an iframe and can only be patched from VALUE-CARRYING ops (`record.docOps`),
+  // Which is what crosses the bridge. Recording only the classification patch below left docOps
+  // Empty on this path, so undo/redo posted an EMPTY patch: the document changed, the patch
+  // Classified as applicable (suppressing the full render), and the canvas silently kept showing
+  // The pre-undo content. Replaying an op IS a forward op — record it as one.
+  //
+  // History never reads the inverse here: undo/redo run with `skipHistory`, and the entry they
+  // Replay already holds the pair. `markNonInvertible` would be wrong (it forces a whole-document
+  // Checkpoint), so the op is paired with itself.
+  recordDocOp({ forward: op, inverse: op });
   switch (op.op) {
     case "set-key": {
       if (DOC_META_KEYS.has(op.key)) {

@@ -30,7 +30,10 @@ export function linkStateForSelection(root: HTMLElement): { active: boolean; hre
   let node: Node | null = sel.anchorNode;
   while (node && node !== root) {
     if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName.toLowerCase() === "a") {
-      return { active: true, href: (node as Element).getAttribute("href") };
+      // Design/edit renders anchors de-linked, with the URL on `data-jx-href` — so the toolbar's
+      // Link field must read that first or it shows an empty URL for every existing link.
+      const el = node as HTMLElement;
+      return { active: true, href: el.dataset.jxHref ?? el.getAttribute("href") };
     }
     node = node.parentNode;
   }

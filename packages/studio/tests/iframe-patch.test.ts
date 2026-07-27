@@ -511,3 +511,78 @@ describe("applyIframePatch — subtree render", () => {
     expectConsistent(container, shadow);
   });
 });
+
+// ─── Echo suppression ────────────────────────────────────────────────────────
+
+describe("applyIframePatch — echoed ops", () => {
+  test("folds an echoed op into the shadow doc but leaves the DOM alone", () => {
+    // The echo of this frame's OWN commit: the DOM already holds what the user typed, so applying
+    // The patch would re-render the subtree the caret lives in and throw them out of it.
+    const { container, shadow } = mount(BASE);
+    const el = elAt(container, ["children", 0]);
+    el.textContent = "hello there"; // What the user typed.
+
+    const op: WireDocOp = {
+      key: "textContent",
+      op: "set-key",
+      path: ["children", 0],
+      value: "hello there",
+    };
+    applyIframePatch(shadow, [op], container, CTX, [["children", 0]]);
+
+    // Shadow doc took it (it is the patch source of truth) …
+    expect(getNodeAtPath(shadow, ["children", 0])?.textContent).toBe("hello there");
+    // … and the DOM was not touched by the patcher.
+    expect(elAt(container, ["children", 0])).toBe(el);
+    expect(el.textContent).toBe("hello there");
+  });
+
+  test("suppression is per PATH — other ops in the same batch still patch the DOM", () => {
+    const { container, shadow } = mount(BASE);
+    const echoed: WireDocOp = {
+      key: "textContent",
+      op: "set-key",
+      path: ["children", 0],
+      value: "typed",
+    };
+    const other: WireDocOp = {
+      key: "textContent",
+      op: "set-key",
+      path: ["children", 1],
+      value: "remote",
+    };
+    applyIframePatch(shadow, [echoed, other], container, CTX, [["children", 0]]);
+
+    expect(elAt(container, ["children", 0]).textContent).toBe("hello"); // Untouched.
+    expect(elAt(container, ["children", 1]).textContent).toBe("remote"); // Applied.
+  });
+
+  test("an empty or absent echo list patches everything, as normal", () => {
+    for (const echo of [undefined, []]) {
+      const { container, shadow } = mount(BASE);
+      const op: WireDocOp = {
+        key: "textContent",
+        op: "set-key",
+        path: ["children", 0],
+        value: "changed",
+      };
+      applyIframePatch(shadow, [op], container, CTX, echo);
+      expect(elAt(container, ["children", 0]).textContent).toBe("changed");
+    }
+  });
+
+  test("only set-key ops are suppressed — a structural op at an echoed path still applies", () => {
+    // Echo suppression exists for the commit shape (set-key on textContent/children). A structural
+    // Op arriving for the same path is something else entirely and must not be silently dropped.
+    const { container, shadow } = mount(BASE);
+    const op: WireDocOp = {
+      index: 0,
+      node: { tagName: "em", textContent: "new" },
+      op: "insert-child",
+      parentPath: [],
+    };
+    applyIframePatch(shadow, [op], container, CTX, [[]]);
+    expect((shadow.children as unknown[]).length).toBe(3);
+    expect(container.querySelector("em")?.textContent).toBe("new");
+  });
+});

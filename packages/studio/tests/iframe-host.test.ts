@@ -97,13 +97,13 @@ const {
   sawIframeDragOver,
   setCanvasContextMenuHandler,
   setCanvasSlashHandler,
-  setIframeOriginateHandler,
   setIframePatchEscalation,
   setNativeDragEnterHandler,
   setInsertZoneClickHandler,
   setStylebookHitHandler,
   setToolbarRefresh,
 } = await import("../src/canvas/iframe-host");
+const { flushCanvasEdits } = await import("../src/canvas/iframe-host");
 
 beforeEach(() => {
   channels.length = 0;
@@ -729,6 +729,86 @@ describe("iframe canvas inline-edit bridge", () => {
       textContent: "Edited",
     });
     expect(docChildren()[0]!.textContent).toBe("Edited");
+  });
+
+  test("a format-backed tab ships its caret vocabulary with the render", async () => {
+    // Which tags hold a caret is a property of the DOCUMENT, so it rides with the render rather
+    // Than being baked into the frame.
+    const { seedMarkdownFormat } = await import("./format-fixture");
+    const { setFormats } = await import("../src/format/format-host");
+    seedMarkdownFormat();
+    resetWorkspaceWithTab({ children: [{ tagName: "p", textContent: "Hi" }], tagName: "div" });
+    activeTab.value!.doc.sourceFormat = "Markdown";
+
+    await mountReady();
+    const render = channels[0]!.posts.find((p) => p.kind === "render") as
+      | { editableTags?: Record<string, boolean> }
+      | undefined;
+    expect(render?.editableTags).toBeDefined();
+    // Markdown's own verdicts: a paragraph holds a caret, a blockquote holds paragraphs, and a
+    // Link is markup inside a block rather than a block.
+    expect(render!.editableTags!.p).toBe(true);
+    expect(render!.editableTags!.blockquote).toBe(false);
+    expect(render!.editableTags!.a).toBe(false);
+    // Tags markdown never mentions are left to the studio's own metadata.
+    expect(render!.editableTags!.figcaption).toBeUndefined();
+    setFormats([]);
+  });
+
+  test("a native tab ships none — the built-in vocabulary answers alone", async () => {
+    const { setFormats } = await import("../src/format/format-host");
+    setFormats([]);
+    resetWorkspaceWithTab({ children: [{ tagName: "p", textContent: "Hi" }], tagName: "div" });
+    await mountReady();
+    const render = channels[0]!.posts.find((p) => p.kind === "render") as
+      | { editableTags?: unknown }
+      | undefined;
+    expect(render).toBeDefined();
+    expect(render!.editableTags).toBeUndefined();
+  });
+
+  test("flushCanvasEdits asks the frame to commit, and resolves on its acknowledgement", async () => {
+    // A save must never serialize the document while the words the author just typed are still
+    // Sitting in the caret's block waiting for the idle tick.
+    await mountReady();
+    channels[0]!.posts.length = 0;
+    const done = flushCanvasEdits(activeTab.value!.id);
+
+    const req = channels[0]!.posts.find((p) => p.kind === "flushEdits") as
+      | { reqId: number }
+      | undefined;
+    expect(req).toBeDefined();
+
+    let settled = false;
+    void done.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false); // Still waiting on the frame.
+
+    channels[0]!.deliver({ kind: "flushComplete", reqId: req!.reqId });
+    await done;
+    expect(settled).toBe(true);
+  });
+
+  test("flushCanvasEdits resolves immediately when no frame renders that tab", async () => {
+    await mountReady();
+    channels[0]!.posts.length = 0;
+    await flushCanvasEdits("some-other-tab");
+    expect(channels[0]!.posts.some((p) => p.kind === "flushEdits")).toBe(false);
+  });
+
+  test("flushCanvasEdits gives up after its timeout rather than hanging the save", async () => {
+    // A wedged frame must not be able to block saving.
+    await mountReady();
+    await flushCanvasEdits(activeTab.value!.id, 10);
+  });
+
+  test("a stale flushComplete is ignored", async () => {
+    await mountReady();
+    channels[0]!.deliver({ kind: "flushComplete", reqId: 999_999 });
+    // No throw, no state change — the reqId map simply has no entry.
+    expect(true).toBe(true);
   });
 
   test("editSplit applies and re-enters on the new paragraph once the DOM acks", async () => {
@@ -1401,19 +1481,6 @@ describe("cross-frame drag session (Phase 4c)", () => {
       targetPath: ["children", 0],
     });
     expect((activeTab.value!.doc.document.children as unknown[]).length).toBe(1);
-  });
-
-  test("dragOriginate routes to the installed coordinator handler with the host + path + seq", async () => {
-    const { host } = await readyHostAt(4);
-    const seen: { host: unknown; path: unknown; seq: unknown }[] = [];
-    setIframeOriginateHandler((h, p, s) => seen.push({ host: h, path: p, seq: s }));
-    channels[0]!.deliver({ dragSeq: 11, kind: "dragOriginate", path: ["children", 0] });
-    expect(seen).toHaveLength(1);
-    expect(seen[0]!.host).toBe(host as never);
-    expect(seen[0]!.path).toEqual(["children", 0]);
-    // The iframe's seq is threaded through so the parent can adopt it (replies pass the seq gate).
-    expect(seen[0]!.seq).toBe(11);
-    setIframeOriginateHandler(() => {});
   });
 
   test("adoptDragSession sets the seq + retains data so a matching dropResult applies", async () => {
@@ -2115,13 +2182,9 @@ describe("stylebook host capability", () => {
     expect(hover.style.display).toBe("none");
   });
 
-  test("insertZones, contextMenu, and dragOriginate are inert on stylebook hosts", async () => {
+  test("insertZones and contextMenu are inert on stylebook hosts", async () => {
     const shows: unknown[] = [];
     setCanvasContextMenuHandler({ dismiss: () => {}, show: (a) => shows.push(a) });
-    const originates: unknown[] = [];
-    setIframeOriginateHandler((...a) => {
-      originates.push(a);
-    });
     const { canvasEl, channel } = await mountStylebookReady();
 
     channel.deliver({
@@ -2142,14 +2205,6 @@ describe("stylebook host capability", () => {
     channel.deliver({ kind: "contextMenu", path: SPECIMEN_PATH, x: 5, y: 7 });
     expect(shows).toHaveLength(0);
 
-    channel.deliver({
-      cursor: { x: 1, y: 2 },
-      dragSeq: 1,
-      kind: "dragOriginate",
-      path: SPECIMEN_PATH,
-      rect: { height: 10, width: 10, x: 0, y: 0 },
-    });
-    expect(originates).toHaveLength(0);
     setCanvasContextMenuHandler({ dismiss: () => {}, show: () => {} });
   });
 

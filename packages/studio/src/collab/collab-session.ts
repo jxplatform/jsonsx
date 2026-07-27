@@ -48,6 +48,17 @@ const SYNC_TIMEOUT_MS = 8000;
 /** Debounce for the elected reconciler's structure→source mirror. */
 const MIRROR_DEBOUNCE_MS = 800;
 
+/**
+ * The longest the shared source text may lag behind local edits while typing continues.
+ *
+ * The debounce above is re-armed on EVERY transaction, so any commit cadence faster than it starves
+ * the mirror completely — and the canvas now commits on a ~500ms typing pause. Without a ceiling,
+ * sustained writing would leave the source Y.Text (what peers preview and what providers persist)
+ * frozen for the whole session. This bounds the lag instead: the debounce still coalesces bursts,
+ * but a mirror is forced once the text is this stale.
+ */
+const MIRROR_MAX_LAG_MS = 2500;
+
 let collabModulePromise: Promise<CollabModule> | null = null;
 
 function loadCollab(): Promise<CollabModule> {
@@ -108,6 +119,8 @@ interface ActiveSession {
   /** True while THIS client is in the code view (its structural freeze exempts itself). */
   inSourceMode: boolean;
   mirrorTimer: ReturnType<typeof setTimeout> | null;
+  /** When the shared source text was last brought up to date; bounds the debounce's max lag. */
+  lastMirrorAt?: number;
   /** Debounce for the source reconciler's Y.Text → structure parse mirror. */
   sourceParseTimer: ReturnType<typeof setTimeout> | null;
   disposers: (() => void)[];
@@ -306,11 +319,25 @@ function scheduleMirror(session: ActiveSession): void {
   if (session.collab.canonicalOf(session.handle.doc) === "source") {
     return;
   }
+  // Re-arming on every transaction means a faster commit cadence would push the mirror out
+  // Forever. Once the shared text is MIRROR_MAX_LAG_MS stale, stop deferring and mirror now.
+  const now = Date.now();
+  session.lastMirrorAt ??= now;
+  if (now - session.lastMirrorAt >= MIRROR_MAX_LAG_MS) {
+    if (session.mirrorTimer) {
+      clearTimeout(session.mirrorTimer);
+      session.mirrorTimer = null;
+    }
+    session.lastMirrorAt = now;
+    void mirrorNow(session);
+    return;
+  }
   if (session.mirrorTimer) {
     clearTimeout(session.mirrorTimer);
   }
   session.mirrorTimer = setTimeout(() => {
     session.mirrorTimer = null;
+    session.lastMirrorAt = Date.now();
     void mirrorNow(session);
   }, MIRROR_DEBOUNCE_MS);
 }

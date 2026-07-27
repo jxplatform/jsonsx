@@ -238,7 +238,9 @@ describe("block action bar", () => {
     expect(barButton("Move up").hasAttribute("disabled")).toBe(true); // Idx 0
     expect(barButton("Move down").hasAttribute("disabled")).toBe(false);
     expect(barButton("Convert to Component")).not.toBeNull();
-    expect(barEl.querySelector("sp-action-group")).toBeNull(); // Not editing
+    // ONE bar: the format group is part of it whenever the block can carry inline markup, whether
+    // Or not a caret is in the block yet.
+    expect(barEl.querySelector("sp-action-group")).not.toBeNull();
   });
 
   test("positions from the bridge anchor rect (viewport space), above when there is headroom", () => {
@@ -485,10 +487,14 @@ describe("block action bar", () => {
 
   // ─── Inline formatting (snapshot-driven) ───────────────────────────────────
 
-  test("format buttons appear only while editing, with shortcuts in their titles", () => {
+  test("format buttons are always present for a block that can carry markup", () => {
+    // The bar used to rearrange itself under the author's cursor the moment they started typing.
+    // With a document-wide caret there is no session to be in or out of.
     setup({ children: [{ tagName: "p", textContent: "hello" }], tagName: "div" }, ["children", 0]);
     renderBlockActionBar();
-    expect(bar()!.querySelector("sp-action-group")).toBeNull(); // Not editing
+    expect(bar()!.querySelector("sp-action-group")).not.toBeNull();
+    // …but inert until there is a range to apply them to.
+    expect(barButton("Bold").hasAttribute("disabled")).toBe(true);
 
     startEditingState();
     const group = bar()!.querySelector("sp-action-group")!;
@@ -521,6 +527,22 @@ describe("block action bar", () => {
     expect(barButton("Link").hasAttribute("disabled")).toBe(false);
   });
 
+  test("a block selected with NO caret has the group, disabled", () => {
+    // Selecting from the layers panel, or a structural edit moving the selection: formatting
+    // Applies to a range, and there is not one.
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    renderBlockActionBar();
+    expect(bar()!.querySelector("sp-action-group")).not.toBeNull();
+    expect(barButton("Bold").hasAttribute("disabled")).toBe(true);
+  });
+
+  test("a component block still has no format group", () => {
+    // Component tags carry no inline actions — there is nothing to format.
+    setup({ children: [{ tagName: "x-card" }], tagName: "div" }, ["children", 0]);
+    renderBlockActionBar();
+    expect(bar()!.querySelector("sp-action-group")).toBeNull();
+  });
+
   test("format button mousedown is prevented (focus guard)", () => {
     setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
     startEditingState();
@@ -539,13 +561,13 @@ describe("block action bar", () => {
     startEditingState();
   }
 
-  test("Insert data button is absent when not editing", () => {
+  test("Insert data rides with the format group, disabled without a range", () => {
     setup(
       { children: [{ tagName: "p", textContent: "A" }], state: { title: "x" }, tagName: "div" },
       ["children", 0],
     );
     renderBlockActionBar();
-    expect(bar()!.querySelector('sp-action-button[title="Insert data"]')).toBeNull();
+    expect(bar()!.querySelector('sp-action-button[title="Insert data"]')).not.toBeNull();
   });
 
   test("Insert data button appears while editing and opens a merge-tag menu", () => {

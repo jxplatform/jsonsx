@@ -9,24 +9,15 @@ import {
   isInlineElement,
   isInlineInContext,
   normalizeChildren,
-  resumeBlurClose,
   setSlashController,
   startEditing,
   stopEditing,
-  suspendBlurClose,
 } from "../src/editor/inline-edit";
 import { dismissSlashMenu, isSlashMenuOpen, showSlashMenu } from "../src/editor/slash-menu";
 
 // Inline-edit no longer hard-imports the slash menu (so it can live in the slim iframe bundle);
 // Wire the real one for the tests that exercise slash commands.
 setSlashController({ dismiss: dismissSlashMenu, isOpen: isSlashMenuOpen, show: showSlashMenu });
-
-/** Wait `ms` real milliseconds (for the 150ms blur-close timer). */
-function waitMs(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
 
 // ─── Pure function tests ─────────────────────────────────────────────────────
 
@@ -53,11 +44,67 @@ describe("isEditableBlock", () => {
     }
   });
 
-  test("returns false for non-editable elements", () => {
-    for (const tag of ["div", "img", "section", "ul", "ol", "table", "tr"]) {
+  test("returns true for the text-bearing HTML blocks directives produce", () => {
+    // With a document-wide caret, a tag missing here reads to the author as "this text is not
+    // Editable" — clicking it simply does nothing.
+    for (const tag of ["figcaption", "caption", "summary", "dt", "dd"]) {
+      const el = document.createElement(tag);
+      expect(isEditableBlock(el)).toBe(true);
+    }
+  });
+
+  test("returns false for containers and for pre", () => {
+    // `pre` is excluded on purpose: its whitespace and absent inline formatting need their own
+    // Treatment, not the rich-text path.
+    for (const tag of ["div", "img", "section", "ul", "ol", "table", "tr", "figure", "pre"]) {
       const el = document.createElement(tag);
       expect(isEditableBlock(el)).toBe(false);
     }
+  });
+});
+
+describe("committing an anchor keeps its URL", () => {
+  let el: HTMLElement;
+  const commits: { children: unknown }[] = [];
+
+  function editAndCommit(innerHTML: string) {
+    el = document.createElement("p");
+    el.innerHTML = innerHTML;
+    document.body.append(el);
+    startEditing(el, ["children", 0], {
+      onCommit: (_p, children) => commits.push({ children }),
+      onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    stopEditing();
+    return commits.at(-1)!.children as { tagName: string; attributes?: { href: string } }[];
+  }
+
+  afterEach(() => {
+    commits.length = 0;
+    el?.remove();
+  });
+
+  test("reads the URL from data-jx-href on a DE-LINKED canvas anchor", () => {
+    // Design/edit renders anchors de-linked (the runtime stamps the URL as `data-jx-href` so a
+    // Click selects instead of navigating). Reading only `href` serialized every edited link as
+    // `[text]()` — silently destroying the URL of any paragraph that contained one.
+    const children = editAndCommit(`before <a data-jx-href="/spec">full spec</a> after`);
+    const anchorNode = children.find((c) => typeof c === "object" && c.tagName === "a")!;
+    expect(anchorNode.attributes).toEqual({ href: "/spec" });
+  });
+
+  test("still reads a plain href when the anchor is not de-linked", () => {
+    const children = editAndCommit(`go <a href="/plain">there</a>`);
+    const anchorNode = children.find((c) => typeof c === "object" && c.tagName === "a")!;
+    expect(anchorNode.attributes).toEqual({ href: "/plain" });
+  });
+
+  test("an anchor with no URL at all commits without inventing one", () => {
+    const children = editAndCommit(`an <a>anchor</a> here`);
+    const anchorNode = children.find((c) => typeof c === "object" && c.tagName === "a")!;
+    expect(anchorNode.attributes).toBeUndefined();
   });
 });
 
@@ -156,7 +203,7 @@ describe("Editing lifecycle", () => {
     expect(getActiveElement()).toBeNull();
   });
 
-  test("startEditing enables contentEditable and marks as editing", () => {
+  test("startEditing marks the block active without making it its own editing host", () => {
     startEditing(el, path, {
       onCommit: () => {},
       onEnd: () => {},
@@ -166,7 +213,10 @@ describe("Editing lifecycle", () => {
 
     expect(isEditing()).toBe(true);
     expect(getActiveElement()).toBe(el);
-    expect(el.contentEditable).toBe("true");
+    // The canvas CONTAINER is the contenteditable; a page block only carries the active marker, so
+    // The caret can walk out of it into the next block natively.
+    expect(el.dataset.jxActiveBlock).toBe("");
+    expect(el.hasAttribute("contenteditable")).toBe(false);
   });
 
   test("stopEditing resets element and marks as not editing", () => {
@@ -181,7 +231,7 @@ describe("Editing lifecycle", () => {
 
     expect(isEditing()).toBe(false);
     expect(getActiveElement()).toBeNull();
-    expect(el.contentEditable).toBe("false");
+    expect(el.dataset.jxActiveBlock).toBeUndefined();
   });
 
   test("stopEditing calls onEnd callback", () => {
@@ -233,144 +283,9 @@ describe("Editing lifecycle", () => {
     // Re-enter must NOT fire the previous session's onEnd (it would reset the parent toolbar).
     expect(endCount).toBe(0);
     expect(getActiveElement()).toBe(el2);
-    expect(el.contentEditable).toBe("false");
+    expect(el.dataset.jxActiveBlock).toBeUndefined();
 
     el2.remove();
-  });
-});
-
-// ─── 4b-2: blur-close suspension ─────────────────────────────────────────────
-
-describe("suspendBlurClose / resumeBlurClose", () => {
-  let el: HTMLElement;
-
-  beforeEach(() => {
-    el = document.createElement("p");
-    el.textContent = "edit me";
-    document.body.append(el);
-  });
-
-  afterEach(() => {
-    if (isEditing()) {
-      stopEditing();
-    }
-    resumeBlurClose();
-    el.remove();
-  });
-
-  test("a REAL blur event does not stop the session while blur-close is suspended", async () => {
-    startEditing(el, ["children", 0], {
-      onCommit: () => {},
-      onEnd: () => {},
-      onInsert: () => {},
-      onSplit: () => {},
-    });
-    suspendBlurClose();
-
-    // Dispatch a real blur and move focus off the editable, then let the 150ms timer elapse.
-    el.blur();
-    el.dispatchEvent(new FocusEvent("blur"));
-    document.body.focus();
-    await waitMs(200);
-
-    expect(isEditing()).toBe(true);
-    expect(getActiveElement()).toBe(el);
-  });
-
-  test("after resumeBlurClose a real blur (focus elsewhere) stops the session", async () => {
-    startEditing(el, ["children", 0], {
-      onCommit: () => {},
-      onEnd: () => {},
-      onInsert: () => {},
-      onSplit: () => {},
-    });
-    suspendBlurClose();
-    resumeBlurClose();
-
-    const other = document.createElement("input");
-    document.body.append(other);
-    other.focus(); // ActiveElement is no longer the editable
-    el.dispatchEvent(new FocusEvent("blur"));
-    await waitMs(200);
-
-    expect(isEditing()).toBe(false);
-    other.remove();
-  });
-});
-
-// ─── Keyboard event propagation ──────────────────────────────────────────────
-
-describe("Keyboard event propagation", () => {
-  let el: HTMLElement;
-  const path = ["children", 0];
-
-  beforeEach(() => {
-    el = document.createElement("p");
-    el.textContent = "test";
-    document.body.append(el);
-  });
-
-  afterEach(() => {
-    if (isEditing()) {
-      stopEditing();
-    }
-    el.remove();
-  });
-
-  test("Enter on editing element does not propagate to document", () => {
-    let documentGotEnter = false;
-    const docHandler = (e: KeyboardEvent) => {
-      if (e.key === "Enter") {
-        documentGotEnter = true;
-      }
-    };
-    document.addEventListener("keydown", docHandler);
-
-    startEditing(el, path, {
-      onCommit: () => {},
-      onEnd: () => {},
-      onInsert: () => {},
-      onSplit: () => {},
-    });
-
-    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
-    expect(documentGotEnter).toBe(false);
-
-    document.removeEventListener("keydown", docHandler);
-  });
-
-  test("Escape on editing element does not propagate to document", () => {
-    let documentGotEscape = false;
-    const docHandler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        documentGotEscape = true;
-      }
-    };
-    document.addEventListener("keydown", docHandler);
-
-    startEditing(el, path, {
-      onCommit: () => {},
-      onEnd: () => {},
-      onInsert: () => {},
-      onSplit: () => {},
-    });
-
-    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
-    expect(documentGotEscape).toBe(false);
-
-    document.removeEventListener("keydown", docHandler);
-  });
-
-  test("Escape stops editing", () => {
-    startEditing(el, path, {
-      onCommit: () => {},
-      onEnd: () => {},
-      onInsert: () => {},
-      onSplit: () => {},
-    });
-
-    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
-    expect(isEditing()).toBe(false);
   });
 });
 
@@ -574,7 +489,10 @@ describe("plain (plaintext-only) sessions", () => {
       onInsert: () => {},
       onSplit: () => {},
     });
-    expect(rich.contentEditable).toBe("true");
+    // The rich block never claims its own editing host — the leak worth guarding is a stale
+    // `plaintext-only` from the previous prop-bound session.
+    expect(rich.hasAttribute("contenteditable")).toBe(false);
+    expect(rich.dataset.jxActiveBlock).toBe("");
     stopEditing();
     expect(commits).toEqual([{ children: null, path: ["children", 5], textContent: "rich" }]);
     rich.remove();

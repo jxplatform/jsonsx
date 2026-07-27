@@ -63,3 +63,37 @@ export function createNestingValidator(elements?: ElementsHints): NestingValidat
     isVoid: (tag) => voidTags.has(tag),
   };
 }
+
+/**
+ * The format's verdict on which of ITS tags can hold a text caret, as a plain `tag → boolean` map.
+ *
+ * A caret belongs in a tag that accepts inline children. The format's `nesting` declaration already
+ * says exactly that, so nothing needs re-deriving from tag names:
+ *
+ * - `nesting[tag].inline === true` — the tag holds text. Headings, paragraphs, list items, cells.
+ * - `nesting[tag]` present without it — a container. Markdown's `blockquote` is `inline: false`
+ *   because it holds paragraphs, so the caret belongs in the `<p>` inside it, not the quote; `ul`,
+ *   `table` and `pre` use `only: [...]` and hold no text at all.
+ * - The tag is in the format's `inline` list — it is markup WITHIN a block, not a block. Without
+ *   this, clicking a link would make the link itself the active block, and typing would commit to
+ *   the anchor's path rather than the paragraph's.
+ *
+ * Only tags the format actually mentions appear here. A tag it says nothing about — HTML that
+ * reaches the canvas through a directive — is left to the studio's own element metadata, so this
+ * map is a set of OVERRIDES rather than a complete answer.
+ *
+ * Returned as a plain object because it crosses to the canvas frame with the render message.
+ */
+export function formatEditableVerdicts(elements?: ElementsHints): Record<string, boolean> {
+  const verdicts: Record<string, boolean> = {};
+  for (const [tag, rule] of Object.entries(elements?.nesting ?? {})) {
+    // "_root" is the document itself, not an element.
+    if (tag !== "_root") {
+      verdicts[tag] = rule?.inline === true;
+    }
+  }
+  for (const tag of elements?.inline ?? []) {
+    verdicts[tag] = false;
+  }
+  return verdicts;
+}

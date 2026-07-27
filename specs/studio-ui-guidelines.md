@@ -1,6 +1,6 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.1.8
+**Version:** 0.2.0
 **Status:** Implemented
 **Updated:** 2026-07-26
 **Applies to:** `packages/studio/`
@@ -338,10 +338,15 @@ No formal spacing scale — use these established values consistently:
 
 ### 8.1 Selection
 
-- Canvas click registers elements via `WeakMap<Element, Path>`
+A canvas click does two things at once: it places the text caret at the clicked character and
+selects that block. There is no separate gesture for "select" versus "edit".
+
+- Canvas click resolves the target through its stamped `data-jx-path`
 - Selection path format: `["children", 0, "children", 2]`
 - Selection highlight: 2px solid accent outline
 - Hover highlight: 1px dashed accent outline at reduced opacity
+- A block may also be selected WITHOUT a caret (from the layers panel, or by a structural edit
+  moving the selection); surfaces that act on a text range must handle that state
 
 ### 8.2 Drag and Drop
 
@@ -350,14 +355,21 @@ Uses `@atlaskit/pragmatic-drag-and-drop` for layer reordering and canvas element
 - Drag indicator: `.dragging` class (opacity 0.4)
 - Drop target: `.drop-target` class (accent-15 background, dashed outline)
 - Drop line: 2px tall accent bar between elements
+- On the CANVAS, a drag may be initiated only from the block action bar's drag handle. Pressing and
+  dragging within text selects text — the canvas is a writing surface first
 
-### 8.3 Inline Editing
+### 8.3 The Canvas Caret
 
-Canvas elements become editable via `contenteditable="true"`:
+The canvas render container is a single `contenteditable`; individual blocks are not toggled in and
+out of it. A caret inside a block IS the edit — there is no session to enter, and no modal state.
 
-- Focus ring: 2px solid accent outline, 1px offset
-- Minimum height: 1.5em (prevents collapse)
-- Escape to cancel, blur to commit
+- The caret lands where the author clicked, never at the end of the block
+- Motion, selection and IME are the browser's; the studio intercepts only structural intent
+- Component instances are `contenteditable="false"` islands the caret treats as atomic
+- The active block carries `data-jx-active-block` for affordances (the empty-block slash hint)
+- Blur does NOT end anything: the parent's toolbar takes focus on every click, and the caret must
+  survive that
+- Escape dismisses the caret; text is committed, not discarded
 
 ### 8.4 Context Menus
 
@@ -365,13 +377,17 @@ Rendered with `sp-menu` inside `sp-overlay` / `sp-popover`. Triggered on right-c
 
 ### 8.5 Slash Menu
 
-Block insertion menu triggered by typing `/` in content mode. Positioned absolutely below the cursor. Filtered by typing after the slash.
+Block insertion menu triggered by typing `/` at a block start or after whitespace. Positioned
+absolutely below the cursor. Filtered by typing after the slash.
 
 ### 8.6 Floating Action Bar
 
 Fixed-position toolbar that follows the selected element:
 
 - Shows element tag name, drag handle, and context actions
+- ONE shape: the bar does not rearrange itself when the author starts typing. Controls that cannot
+  act are disabled, not removed — a toolbar whose buttons move under the cursor is worse than one
+  with a greyed button
 - Z-index: 100
 - Shadow: standard elevation shadow
 
@@ -492,6 +508,7 @@ When building new UI in Studio, verify:
 
 ## Changelog
 
+- **0.2.0** (2026-07-26) — Canvas caret replaces the inline-edit session (§8.3); click selects and places the caret (§8.1); canvas drags start only from the bar handle (§8.2); single-shape action bar (§8.6).
 - **0.1.8** (2026-07-26) — Modal surfaces own the keyboard: showDialog focus handoff, Escape dismissal, and the isModalOpen() shortcut gate (§8.7).
 - **0.1.7** (2026-07-26) — Dialogs and overlay layers (§8.7): the ui/layers.ts contract, showPromptDialog as the replacement for window.prompt(), and a ban on native browser dialogs.
 - **0.1.6** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).

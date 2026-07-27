@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.1.29-draft
+**Version:** 0.3.0-draft
 **Status:** Partial
-**Updated:** 2026-07-26
+**Updated:** 2026-07-27
 **License:** MIT
 
 ---
@@ -143,13 +143,17 @@ Site style is injected into the canvas as a real stylesheet (custom properties i
 
 ### 4.2 Modes
 
-| Mode      | Description                                   |
-| --------- | --------------------------------------------- |
-| Design    | Interactive editing with selection overlays   |
-| Stylebook | Design token management and component gallery |
-| Preview   | Clean preview without editing chrome          |
-| Source    | Raw JSON/code view                            |
-| Content   | Markdown editing mode (inline text editing)   |
+| Mode      | Description                                         |
+| --------- | --------------------------------------------------- |
+| Design    | Fluid document editing, with structural overlays    |
+| Content   | Fluid document editing, for format-backed documents |
+| Stylebook | Design token management and component gallery       |
+| Preview   | Clean preview without editing chrome                |
+| Source    | Raw JSON/code view                                  |
+
+Design and Content are both **editable modes** and behave identically for text: the canvas carries a
+live caret (§8.2). They differ only in what the document is — Content mode opens a format-backed
+document (`.md` via its format class, §8.1), Design mode a native `.json` one.
 
 #### 4.2.1 Source-mode schema validation
 
@@ -186,15 +190,22 @@ The design canvas supports pan and zoom:
 
 Unified floating action bar (Gutenberg-style) attached to the selected element:
 
-| Control           | Description                               |
-| ----------------- | ----------------------------------------- |
-| Parent selector   | Navigate up to parent element (back icon) |
-| Tag indicator     | Shows tag name or `$id`                   |
-| Drag handle       | Plain `<span>` for native drag events     |
-| Move up/down      | Reorder within parent                     |
-| Inline formatting | Bold/italic/code/link (content mode only) |
+| Control           | Description                                          |
+| ----------------- | ---------------------------------------------------- |
+| Parent selector   | Navigate up to parent element (back icon)            |
+| Tag indicator     | Shows tag name or `$id`                              |
+| Drag handle       | The ONLY canvas drag source (§8.2.4)                 |
+| Move up/down      | Reorder within parent                                |
+| Inline formatting | Bold/italic/code/link, for blocks that accept markup |
 
-Formatting buttons only appear in content mode (rich text `contentEditable`), not in component mode (`contentEditable="plaintext-only"`).
+The bar has ONE shape. The formatting group is present whenever the selected block can carry inline
+markup — that is, whenever its element metadata declares `$inlineActions`. It is not gated on an
+editing session, because there is none (§8.2).
+
+Formatting applies to a range, so the buttons are disabled for a collapsed caret and for a block
+selected without a caret at all (from the layers panel, or by a structural edit moving the
+selection). Component instances and prop-bound blocks have no group: a component tag declares no
+inline actions, and prop-bound text is a single plain string.
 
 ---
 
@@ -516,13 +527,110 @@ The studio holds no format knowledge: `.json` is native, and every other extensi
 - `newFileTemplate` — initial source for new files
 - `elements` — the element allowlist + nesting constraints, interpreted generically by `createNestingValidator` (`src/format/constraints.ts`)
 
-### 8.2 Inline Editing
+### 8.2 Fluid Document Editing
 
-In content mode, text elements (headings, paragraphs, list items) are directly editable in the canvas. Changes are synchronized back to the Jx document and can be exported as markdown.
+The canvas carries a **live caret**. There is no editing session to enter and no modal state: a caret
+inside a block _is_ the edit. Clicking anywhere in text places the caret at the clicked character;
+the arrow keys, Home/End and word motion move it through the whole document, across block
+boundaries; and a selection may span any number of blocks.
+
+This is achieved by making the canvas render container a single `contenteditable`, rather than
+toggling `contenteditable` on one block at a time. The browser then owns caret placement,
+line-wrap-aware vertical motion, word and line motion, IME composition, and cross-block selection —
+none of which the studio implements.
+
+Component instances are `contenteditable="false"` islands: the caret treats each as one atomic unit
+and never enters its internals. Prop-bound text inside a component (§8.2.5) is the exception.
+
+Text reaches the document on a **~500 ms typing pause** and whenever the caret leaves a block. Any
+operation that reads the document as authoritative — chiefly saving — first flushes what the caret
+has typed but not yet committed.
+
+#### 8.2.1 The `beforeinput` chokepoint
+
+The browser may edit text; it may not restructure the document. Every `beforeinput` is classified:
+
+| Intent                                            | Handling                             |
+| ------------------------------------------------- | ------------------------------------ |
+| Text insertion or deletion within one block       | Applied natively                     |
+| IME composition                                   | Applied natively — never intercepted |
+| `Enter`                                           | Prevented; block split (§8.2.2)      |
+| Backspace at a block start, Delete at a block end | Prevented; block merge (§8.2.3)      |
+| Any edit spanning two blocks                      | Prevented; range collapse (§8.2.3)   |
+| Native formatting, native history, text drag      | Prevented; the studio owns these     |
+
+A structural intent with no handler is **suppressed**, never delegated back to the browser: an
+unimplemented operation must leave the document untouched rather than let the engine restructure the
+DOM behind the model.
+
+A **collapsed selection outranks `getTargetRanges()`**. For a boundary Backspace the browser reports
+the range it would delete — reaching out of the block and into the previous one, because joining
+them is how it implements the keystroke. The caret says what the author meant; the target range says
+what the browser would have done about it.
+
+#### 8.2.2 Which tags hold a caret
+
+A tag holds a caret when its element vocabulary says it accepts inline children. This is DERIVED,
+never a hand-maintained list, from two sources resolved PER TAG:
+
+1. **The document's format class** (`$studio.elements`, §8.1) for the tags it declares:
+   `nesting[tag].inline === true` holds a caret; a container (`inline: false`, or an `only: [...]`
+   rule) does not; and a tag in the format's `inline` list is markup within a block, never a block.
+2. **The studio's element metadata** for every tag the format does not mention — HTML reaching the
+   canvas through a directive, and native documents, which have no format class at all. The rule is
+   the same: a non-empty `$inlineChildren` declaration.
+
+Per-tag resolution rather than a union, because the format's verdict must be able to say NO. Under
+Markdown a `blockquote` holds paragraphs, so the caret belongs in the `<p>` inside it; and an `<a>`
+is inline, so clicking a link puts the caret in the enclosing paragraph rather than making the link
+itself the edited block.
+
+`pre` is excluded throughout: its content is preformatted code, where whitespace is significant and
+the inline-markup path does not apply.
+
+The format's verdicts are computed per render and cross to the canvas frame with it, because the
+answer belongs to the document, not to the frame.
+
+#### 8.2.3 Caret positions
+
+A caret position is a **block path plus a character offset into that block's rendered text**. The
+offset counts rendered characters, not DOM child indices, so it is agnostic to inline markup: in
+`<p>a<strong>bc</strong>d</p>` offset 3 sits between "c" and "d" however the bold run is nested.
+
+Expressed this way a caret survives the DOM underneath it being rebuilt, which is what lets a
+surgical patch — including a co-author's edit — land without moving the author's cursor.
+
+#### 8.2.4 Structural edits
+
+- **Split** — `Enter` divides the block at the caret; the caret lands at the start of the new block.
+- **Merge** — Backspace at a block's start and Delete at its end are the same join from either side.
+  The earlier block survives, keeps its own tag, and the caret lands at the seam. A container the
+  removal empties is pruned.
+- **Range collapse** — a selection spanning blocks collapses to a merge with both ends clipped: the
+  first block keeps what precedes the selection, the last keeps what follows, and every block
+  between is removed. Typing over the selection inserts at the join.
+
+Document order for "the previous block" comes from the **rendered DOM**, not the document tree: a
+range or a boundary may cross list items, table cells and nested containers, none of which is a flat
+index walk.
+
+#### 8.2.5 Dragging
+
+Reordering on the canvas is initiated **only** from the block action bar's drag handle (§4.4).
+Pressing and dragging within text selects text. Native drag inside the editable region is
+suppressed.
+
+#### 8.2.6 Prop-bound text
+
+Text inside a component instance that is an invertible prop binding opens a nested, plaintext-only
+editing host on press. It commits to the instance's `$props`, and takes no rich formatting, split or
+slash menu.
+
+#### 8.2.7 Serialization
 
 **Text node output**: When inline editing produces mixed content (text + inline formatting elements), text runs are represented as bare strings in the `children` array — not as `{ tagName: "span", textContent: ... }` wrapper elements.
 
-**Normalization rules** (applied on every inline edit commit via `normalizeChildren`):
+**Normalization rules** (applied on every commit via `normalizeChildren`):
 
 1. **Adjacent text merge**: Adjacent bare strings are always joined. `["hello ", "world", { "tagName": "em", ... }]` → `["hello world", { "tagName": "em", ... }]`
 2. **All-text fold**: If all children are bare strings (no element siblings), they collapse into a single `textContent` property on the parent — the simpler representation.
@@ -572,15 +680,45 @@ All file operations go through the Platform Abstraction Layer, which maps to `@j
 
 ## 10. Keyboard Shortcuts
 
-| Shortcut                       | Action                  |
-| ------------------------------ | ----------------------- |
-| `Cmd+Z` / `Ctrl+Z`             | Undo                    |
-| `Cmd+Shift+Z` / `Ctrl+Shift+Z` | Redo                    |
-| `Delete` / `Backspace`         | Delete selected node    |
-| `Cmd+D` / `Ctrl+D`             | Duplicate selected node |
-| `Escape`                       | Deselect                |
-| `Space` + drag                 | Pan canvas              |
-| `Ctrl+scroll` / pinch          | Zoom canvas             |
+**Document commands** (available wherever focus is, including with a caret in the canvas):
+
+| Shortcut                       | Action                                        |
+| ------------------------------ | --------------------------------------------- |
+| `Cmd+S` / `Ctrl+S`             | Save (flushes the caret's pending text first) |
+| `Cmd+Z` / `Ctrl+Z`             | Undo                                          |
+| `Cmd+Shift+Z` / `Ctrl+Shift+Z` | Redo                                          |
+| `Cmd+D` / `Ctrl+D`             | Duplicate selected node                       |
+| `Cmd+0` / `Cmd+=` / `Cmd+-`    | Zoom reset / in / out                         |
+
+**With a caret in the canvas** — the caret owns the editing and navigation keys:
+
+| Shortcut                               | Action                                                         |
+| -------------------------------------- | -------------------------------------------------------------- |
+| Click                                  | Place the caret at the clicked character, and select the block |
+| Arrows, Home/End, word and line motion | Move the caret, across block boundaries                        |
+| `Shift` + motion, or drag              | Extend the selection, across block boundaries                  |
+| `Enter`                                | Split the block                                                |
+| `Shift+Enter`                          | Line break within the block                                    |
+| `Backspace` at a block start           | Join onto the previous block                                   |
+| `Delete` at a block end                | Pull the next block up                                         |
+| `Cmd+B` / `Cmd+I` / `` Cmd+` ``        | Bold / italic / code                                           |
+| `/`                                    | Slash menu (at a block start or after a space)                 |
+| `Escape`                               | Dismiss the caret                                              |
+
+**With a block selected but no caret** (from the layers panel, or after a structural edit):
+
+| Shortcut               | Action                   |
+| ---------------------- | ------------------------ |
+| `Delete` / `Backspace` | Delete the selected node |
+| Arrows                 | Structural navigation    |
+| `Escape`               | Deselect                 |
+
+**Canvas viewport:**
+
+| Shortcut              | Action      |
+| --------------------- | ----------- |
+| `Space` + drag        | Pan canvas  |
+| `Ctrl+scroll` / pinch | Zoom canvas |
 
 ---
 
@@ -616,6 +754,8 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.3.0-draft** (2026-07-27) — Derive the caret's editable tag set from the document's element vocabulary (§8.2.2): the format class decides per tag and can say no, so a Markdown blockquote holds paragraphs and a link is markup within a block; subsections after it renumber (nothing referenced them).
+- **0.2.0-draft** (2026-07-26) — Fluid document editing: the canvas carries a live caret (§8.2), one block action bar (§4.4), both editable modes behave identically for text (§4.2), and a rewritten keyboard contract (§10).
 - **0.1.29-draft** (2026-07-26) — File create/rename/delete naming dialogs (§9.1.1); branch, clone, and nested-selector flows now open Spectrum dialogs instead of native prompts.
 - **0.1.28-draft** (2026-07-25) — The Cloud platform target composes per-project schemas server-side (§3.4).
 - **0.1.27-draft** (2026-07-25) — Source-mode schema validation contract: per-project entry documents, offline $schema-id registration, worker self-location (§4.2.1); fetchProjectSchemas in the PAL table (§3.4).
@@ -649,4 +789,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.1.29-draft_
+_`@jxsuite/studio` Specification v0.3.0-draft_

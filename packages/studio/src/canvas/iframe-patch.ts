@@ -39,11 +39,25 @@ export function applyIframePatch(
   forwardOps: WireDocOp[],
   container: HTMLElement,
   ctx?: IframeRenderCtx,
+  echoPaths?: JxPath[],
 ): void {
   for (const op of forwardOps) {
     applyDocOpToDoc(shadowDoc, op);
   }
+  if (!echoPaths?.length) {
+    for (const op of forwardOps) {
+      applyOpToDom(shadowDoc, op, container, ctx);
+    }
+    return;
+  }
+  // An ECHO: these ops describe DOM this frame already has, because its own caret produced it.
+  // The shadow doc still needs them (it is the patch source of truth), but re-rendering the
+  // Subtree the user is typing in would destroy the caret and the selection inside it.
+  const echoed = new Set(echoPaths.map((p) => serializeJxPath(p)));
   for (const op of forwardOps) {
+    if (op.op === "set-key" && echoed.has(serializeJxPath(op.path))) {
+      continue;
+    }
     applyOpToDom(shadowDoc, op, container, ctx);
   }
 }

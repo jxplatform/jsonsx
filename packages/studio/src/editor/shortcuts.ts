@@ -17,7 +17,7 @@ import {
   transactDoc,
 } from "../tabs/transact";
 import { applyEditZoom, requestEditZoom, setEditZoom } from "../canvas/canvas-utils";
-import { isEditing, stopEditing } from "./inline-edit";
+import { isEditing } from "./inline-edit";
 import { copyNode, cutNode, pasteNode } from "./context-menu";
 import { openQuickSearch } from "../panels/quick-search";
 import { shouldWarnOnClose } from "../panels/tab-strip";
@@ -171,7 +171,8 @@ export function initShortcuts(
     if (isEditing()) {
       if (mod && e.key === "s") {
         e.preventDefault();
-        stopEditing();
+        // SaveFile flushes the canvas frames itself; ending the local session here would be a
+        // Second, racing commit path.
         saveFile();
       }
       if (mod && e.key === "w") {

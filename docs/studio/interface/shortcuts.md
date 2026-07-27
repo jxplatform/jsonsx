@@ -1,9 +1,12 @@
 ---
 title: "Keyboard shortcuts"
 description: "Every keyboard shortcut in Jx Studio, grouped by context, with macOS and Windows/Linux keys."
+spec:
+  - studio.md#10
 code:
   - packages/studio/src/editor/shortcuts.ts
   - packages/studio/src/editor/inline-edit.ts
+  - packages/studio/src/canvas/iframe-editable-root.ts
   - packages/studio/src/panels/block-action-bar.ts
 ---
 
@@ -26,7 +29,8 @@ These work throughout Studio, even while typing in a field.
 
 ## Canvas — with an element selected
 
-These apply on the canvas when you're not typing.
+These apply when a block is selected but the cursor is not in its text — after picking a row in the
+layers panel, for instance. Once the cursor is in the text it owns these keys; see **Writing** below.
 
 | Action                               | macOS                           | Windows / Linux   |
 | ------------------------------------ | ------------------------------- | ----------------- |
@@ -55,22 +59,38 @@ These apply on the canvas when you're not typing.
 
 In **Edit** mode the zoom keys resize the content itself (the text reflows), and the page scrolls instead of panning.
 
-## While editing text
+## Writing
 
-Inside an inline text-editing session on the canvas.
+With the cursor in text on the canvas.
 
-| Action                        | macOS       | Windows / Linux |
-| ----------------------------- | ----------- | --------------- |
-| Bold                          | :kbd[⌘B]    | :kbd[Ctrl+B]    |
-| Italic                        | :kbd[⌘I]    | :kbd[Ctrl+I]    |
-| Inline code                   | :kbd[⌘`]    | :kbd[Ctrl+`]    |
-| Add a link                    | :kbd[⌘K]    | :kbd[Ctrl+K]    |
-| Open the block menu           | :kbd[/]     | :kbd[/]         |
-| New paragraph                 | :kbd[Enter] | :kbd[Enter]     |
-| Finish editing                | :kbd[Esc]   | :kbd[Esc]       |
-| Save (finishes editing first) | :kbd[⌘S]    | :kbd[Ctrl+S]    |
+### Moving and selecting
 
-The block menu opens when :kbd[/] is typed at the start of a line or after a space.
+| Action                                | macOS                           | Windows / Linux                 |
+| ------------------------------------- | ------------------------------- | ------------------------------- |
+| Put the cursor somewhere              | click                           | click                           |
+| Move through the page, block to block | :kbd[↑] :kbd[↓] :kbd[←] :kbd[→] | :kbd[↑] :kbd[↓] :kbd[←] :kbd[→] |
+| Start / end of line                   | :kbd[Home] / :kbd[End]          | :kbd[Home] / :kbd[End]          |
+| Select, including across blocks       | :kbd[Shift] + move, or drag     | :kbd[Shift] + move, or drag     |
+| Put the cursor away                   | :kbd[Esc]                       | :kbd[Esc]                       |
+
+### Changing the text
+
+| Action                     | macOS                                | Windows / Linux   |
+| -------------------------- | ------------------------------------ | ----------------- |
+| Bold                       | :kbd[⌘B]                             | :kbd[Ctrl+B]      |
+| Italic                     | :kbd[⌘I]                             | :kbd[Ctrl+I]      |
+| Inline code                | :kbd[⌘`]                             | :kbd[Ctrl+`]      |
+| Add a link                 | :kbd[⌘K]                             | :kbd[Ctrl+K]      |
+| Open the block menu        | :kbd[/]                              | :kbd[/]           |
+| New paragraph              | :kbd[Enter]                          | :kbd[Enter]       |
+| Line break, same paragraph | :kbd[Shift+Enter]                    | :kbd[Shift+Enter] |
+| Join onto the block above  | :kbd[Backspace] at the block's start | same              |
+| Pull the next block up     | :kbd[Delete] at the block's end      | same              |
+| Save                       | :kbd[⌘S]                             | :kbd[Ctrl+S]      |
+
+The block menu opens when :kbd[/] is typed at the start of a line or after a space. Saving always
+writes what is on screen — your writing reaches the document as you pause, so there is no need to
+finish anything first.
 
 ## Quick Access palette
 

@@ -50,6 +50,109 @@ afterEach(() => {
   closeAllTabs();
 });
 
+describe("coalescing a typing run", () => {
+  const typeInto = (tab: Tab, text: string, key: string | null) =>
+    transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 0], "textContent", text), {
+      coalesceKey: key,
+    });
+
+  test("successive commits in one run become a single undo step", () => {
+    // Typing commits on every pause. Without coalescing, ⌘Z would walk back through the prose one
+    // Pause at a time, and a minute of writing would evict every structural edit from the ring.
+    const tab = makeTab();
+    const before = docJson(tab);
+    const depth = tab.history.snapshots.length;
+
+    typeInto(tab, "o", "run:1");
+    typeInto(tab, "on", "run:1");
+    typeInto(tab, "one more", "run:1");
+
+    expect(tab.history.snapshots.length).toBe(depth + 1);
+    undo(tab);
+    expect(docJson(tab)).toBe(before);
+  });
+
+  test("redo replays the whole run", () => {
+    const tab = makeTab();
+    typeInto(tab, "a", "run:1");
+    typeInto(tab, "ab", "run:1");
+    const after = docJson(tab);
+
+    undo(tab);
+    redo(tab);
+    expect(docJson(tab)).toBe(after);
+  });
+
+  test("a different run does NOT fold in — returning to a block is a separate step", () => {
+    const tab = makeTab();
+    const depth = tab.history.snapshots.length;
+    typeInto(tab, "first visit", "run:1");
+    typeInto(tab, "second visit", "run:2");
+    expect(tab.history.snapshots.length).toBe(depth + 2);
+
+    undo(tab);
+    expect((toRaw(tab.doc.document).children as JxMutableNode[])[0]!.textContent).toBe(
+      "first visit",
+    );
+  });
+
+  test("an unrelated edit between runs breaks the run", () => {
+    const tab = makeTab();
+    const depth = tab.history.snapshots.length;
+    typeInto(tab, "typed", "run:1");
+    // A structural edit lands with no coalesce key…
+    transactDoc(tab, (t) => mutateInsertNode(t, [], 0, { tagName: "hr" }));
+    // …so the next text commit cannot fold into the entry before it.
+    typeInto(tab, "typed again", "run:1");
+    expect(tab.history.snapshots.length).toBe(depth + 3);
+  });
+
+  test("commits with no coalesce key each push their own entry (the default)", () => {
+    const tab = makeTab();
+    const depth = tab.history.snapshots.length;
+    typeInto(tab, "a", null);
+    typeInto(tab, "b", null);
+    expect(tab.history.snapshots.length).toBe(depth + 2);
+  });
+
+  test("a run that changes the block's SHAPE still undoes cleanly", () => {
+    // The regression this guards: keeping only the run's FIRST inverse covers only the keys that
+    // Commit touched. A later commit that turns a plain block rich clears `textContent` and writes
+    // `children` — and undo left the node holding BOTH keys at once, an invalid shape.
+    const tab = makeTab();
+    typeInto(tab, "one edited", "shape:1");
+    transactDoc(
+      tab,
+      (t) => {
+        mutateUpdateProperty(t, ["children", 0], "textContent");
+        mutateUpdateProperty(t, ["children", 0], "children", [
+          "one ",
+          { tagName: "strong", textContent: "bold" },
+        ]);
+      },
+      { coalesceKey: "shape:1" },
+    );
+
+    undo(tab);
+    const node = (toRaw(tab.doc.document).children as JxMutableNode[])[0]!;
+    expect(node.textContent).toBe("one");
+    expect(node.children).toBeUndefined();
+  });
+
+  test("a coalesced run still undoes to the state before the run, not mid-run", () => {
+    const tab = makeTab();
+    typeInto(tab, "step one", "run:9");
+    const midRun = docJson(tab);
+    typeInto(tab, "step two", "run:9");
+    typeInto(tab, "step three", "run:9");
+
+    undo(tab);
+    // Not `midRun` — the whole run is one edit.
+    expect(docJson(tab)).not.toBe(midRun);
+    expect((toRaw(tab.doc.document).children as JxMutableNode[])[0]!.textContent).toBe("one");
+  });
+});
+
 describe("patch-based history entries", () => {
   test("simple edits store ops instead of document snapshots", () => {
     const tab = makeTab();

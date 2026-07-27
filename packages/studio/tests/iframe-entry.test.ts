@@ -337,6 +337,109 @@ describe("startCanvasIframe — patch", () => {
     return { acks, container, pair };
   }
 
+  test("a render adopts the document format's caret vocabulary", async () => {
+    // Which tags hold a caret depends on the document: markdown's blockquote holds paragraphs, so
+    // The caret belongs in the <p> inside it, while a native document's may hold text directly.
+    const { container, pair } = await bootRendered(3);
+    const { isEditableBlock, setEditableVerdicts } = await import("../src/editor/inline-edit");
+    const quote = document.createElement("blockquote");
+
+    // The boot render carried no verdicts, so the built-in vocabulary answers.
+    expect(isEditableBlock(quote)).toBe(true);
+
+    pair.parent.post({
+      ...(renderMsg(4, freshH1(), freshH1()) as Extract<ParentToIframe, { kind: "render" }>),
+      editableTags: { a: false, blockquote: false },
+    });
+    pair.flush();
+    await flush();
+
+    expect(isEditableBlock(quote)).toBe(false);
+    expect(isEditableBlock(document.createElement("a"))).toBe(false);
+    // A tag the format never mentions still falls back to the built-in vocabulary.
+    expect(isEditableBlock(document.createElement("figcaption"))).toBe(true);
+    expect(container).toBeTruthy();
+    setEditableVerdicts(null);
+  });
+
+  test("a render with no format verdicts resets to the built-in vocabulary", async () => {
+    const { pair } = await bootRendered(3);
+    const { isEditableBlock } = await import("../src/editor/inline-edit");
+    pair.parent.post({
+      ...(renderMsg(4, freshH1(), freshH1()) as Extract<ParentToIframe, { kind: "render" }>),
+      editableTags: { blockquote: false },
+    });
+    pair.flush();
+    await flush();
+    expect(isEditableBlock(document.createElement("blockquote"))).toBe(false);
+
+    // Switching to a document with no format class must not leave the previous one's verdicts.
+    pair.parent.post(renderMsg(5, freshH1(), freshH1()));
+    pair.flush();
+    await flush();
+    expect(isEditableBlock(document.createElement("blockquote"))).toBe(true);
+  });
+
+  test("an ECHOED patch leaves the caret's own block alone", async () => {
+    // The regression that would make the whole feature unusable: a rich commit emits
+    // `set-key children` at the ACTIVE path. `children` is not an in-place key, so the disturbance
+    // Check would tear the block down on the caret's OWN idle tick — committing again on the way
+    // Out and re-entering the commit→patch cycle. The caret vanished every time you paused typing.
+    const { acks, container, pair } = await bootRendered(3);
+    const { caretInto } = await import("./harness");
+    const { getActivePath, isEditing } = await import("../src/editor/inline-edit");
+    // The caret needs a connected tree: bootRendered leaves the container detached.
+    document.body.append(container);
+    const h1 = container.querySelector("h1") as HTMLElement;
+
+    caretInto(h1, 1);
+    pair.flush(); // Drain the activation posts before observing the patch round-trip.
+    expect(isEditing()).toBe(true);
+    const pathBefore = getActivePath();
+    acks.length = 0;
+
+    pair.parent.post({
+      echoPaths: [["children", 0]],
+      forwardOps: [{ key: "children", op: "set-key", path: ["children", 0], value: ["Hi there"] }],
+      gen: 3,
+      kind: "patch",
+    });
+    pair.flush(); // Deliver the patch…
+    pair.flush(); // …then its acknowledgement back.
+
+    expect(isEditing()).toBe(true);
+    expect(getActivePath()).toEqual(pathBefore);
+    expect(acks.some((m) => m.kind === "patchComplete")).toBe(true);
+    // Nothing forced a commit out of the block via a spurious teardown.
+    expect(acks.some((m) => m.kind === "editEnd")).toBe(false);
+  });
+
+  test("an echoed op updates the shadow doc even though its DOM is skipped", async () => {
+    const { acks, container, pair } = await bootRendered(3);
+    const { caretInto } = await import("./harness");
+    document.body.append(container);
+    const h1 = container.querySelector("h1") as HTMLElement;
+    caretInto(h1, 1);
+    h1.textContent = "Typed by hand"; // What the caret produced.
+    pair.flush();
+    acks.length = 0;
+
+    pair.parent.post({
+      echoPaths: [["children", 0]],
+      forwardOps: [
+        { key: "textContent", op: "set-key", path: ["children", 0], value: "Typed by hand" },
+      ],
+      gen: 3,
+      kind: "patch",
+    });
+    pair.flush();
+    pair.flush();
+
+    expect(acks.some((m) => m.kind === "patchComplete")).toBe(true);
+    // The DOM the user typed was not rewritten by the patcher.
+    expect((container.querySelector("h1") as HTMLElement).textContent).toBe("Typed by hand");
+  });
+
   test("applies a value-carrying patch in place and acks patchComplete", async () => {
     const { acks, container, pair } = await bootRendered(1);
     pair.parent.post({
@@ -676,50 +779,6 @@ describe("startCanvasIframe — cross-frame drag (Phase 4c)", () => {
       win.cancelAnimationFrame = origCancel;
       win.scrollBy = origScrollBy;
     }
-  });
-
-  // Flow 3 is fully iframe-driven: the detector (wired with the entry's previewAt/gen/auto-scroll
-  // Deps) computes + posts dragOver/dropResult LOCALLY from its own pointer. Happy-dom has no
-  // ElementFromPoint, so previewAt resolves null — this proves the message FLOW + the deps wiring
-  // (cursor carried, gen threaded, auto-scroll armed), not the (CDP-only) geometry.
-  test("a body-grab pointer gesture drives dragOriginate → dragOver(cursor) → dropResult locally", async () => {
-    const { acks, container, pair } = await bootRendered(7);
-    const h1 = container.querySelector("h1")!;
-    acks.length = 0;
-
-    h1.dispatchEvent(
-      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 200 }),
-    );
-    // A move past threshold (and into the bottom edge band, y large) originates + drives + arms.
-    container.ownerDocument.dispatchEvent(
-      new MouseEvent("pointermove", { bubbles: true, clientX: 40, clientY: 200 }),
-    );
-    pair.flush();
-
-    const originate = acks.find((m) => m.kind === "dragOriginate") as
-      | { dragSeq: number; path: unknown }
-      | undefined;
-    expect(originate).toMatchObject({ kind: "dragOriginate", path: ["children", 0] });
-    const over = acks.find((m) => m.kind === "dragOver") as
-      | { cursor?: { x: number; y: number }; gen: number }
-      | undefined;
-    // The dragOver carries the iframe-local cursor (for the parent ghost) + the rendered gen.
-    expect(over?.cursor).toEqual({ x: 40, y: 200 });
-    expect(over?.gen).toBe(7);
-
-    container.ownerDocument.dispatchEvent(
-      new MouseEvent("pointerup", { bubbles: true, clientX: 40, clientY: 210 }),
-    );
-    pair.flush();
-    const result = acks.find((m) => m.kind === "dropResult");
-    // Null target (no layout) → null instruction, but the result is posted with the session seq+gen.
-    expect(result).toMatchObject({
-      dragSeq: originate!.dragSeq,
-      gen: 7,
-      instruction: null,
-      kind: "dropResult",
-      targetPath: null,
-    });
   });
 });
 
@@ -1239,6 +1298,8 @@ describe("startCanvasIframe — stylebook mode", () => {
     expect(acks.some((m) => m.kind === "hover")).toBe(true);
     expect(acks.some((m) => m.kind === "insertZones")).toBe(false);
 
+    // A press-and-drag on a specimen selects text at most; it never originates a reorder — canvas
+    // Drags come only from the block action bar's handle.
     p.dispatchEvent(
       new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
     );
@@ -1246,7 +1307,7 @@ describe("startCanvasIframe — stylebook mode", () => {
       new MouseEvent("pointermove", { bubbles: true, clientX: 60, clientY: 10 }),
     );
     pair.flush();
-    expect(acks.some((m) => m.kind === "dragOriginate")).toBe(false);
+    expect(acks.some((m) => m.kind === "dragOver")).toBe(false);
   });
 
   test("clicks still post hits (the parent decodes them to stylebook tags)", async () => {

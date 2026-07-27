@@ -723,8 +723,7 @@
         },
         {
           "do": "canvasClick",
-          "selector": "xpath/(//p[contains(., 'Come for the coffee')])[1]",
-          "clickCount": 2
+          "selector": "xpath/(//p[contains(., 'Come for the coffee')])[1]"
         },
         {
           "do": "wait",
@@ -1536,8 +1535,7 @@
         },
         {
           "do": "canvasClick",
-          "selector": "xpath/(//p[contains(., 'Come for the coffee')])[1]",
-          "clickCount": 2
+          "selector": "xpath/(//p[contains(., 'Come for the coffee')])[1]"
         },
         {
           "do": "wait",
@@ -2527,8 +2525,7 @@
         },
         {
           "do": "canvasClick",
-          "selector": "xpath/(//h3)[1]",
-          "clickCount": 2
+          "selector": "xpath/(//h3)[1]"
         },
         {
           "do": "wait",

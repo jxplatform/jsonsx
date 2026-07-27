@@ -8,15 +8,18 @@
  */
 
 import { childIndex, getNodeAtPath, parentElementPath } from "../store";
+import { isAncestor } from "../state";
 import { isTabActive } from "../workspace/workspace";
 import {
   mutateInsertNode,
+  mutateRemoveNode,
   mutateUpdateProp,
   mutateUpdateProperty,
   transactDoc,
 } from "../tabs/transact";
 import { defaultDef } from "../panels/shared";
 
+import { contentLength, contentOf, spliceAcross, toStored } from "./content-slice";
 import type { JxContentResult, SlashCommand } from "./inline-edit";
 import type { JxPath } from "../state";
 import type { Tab } from "../tabs/tab";
@@ -57,6 +60,7 @@ export function applyInlineCommit(
   path: JxPath,
   children: (JxMutableNode | string)[] | null,
   textContent: string | null,
+  opts: { coalesceKey?: string | null } = {},
 ): void {
   if (!tab) {
     return;
@@ -69,22 +73,30 @@ export function applyInlineCommit(
     if (node && JSON.stringify(node.children) === JSON.stringify(children)) {
       return;
     }
-    transactDoc(tab, (t) => {
-      if (node?.textContent != null) {
-        mutateUpdateProperty(t, path, "textContent");
-      }
-      mutateUpdateProperty(t, path, "children", children);
-    });
+    transactDoc(
+      tab,
+      (t) => {
+        if (node?.textContent != null) {
+          mutateUpdateProperty(t, path, "textContent");
+        }
+        mutateUpdateProperty(t, path, "children", children);
+      },
+      { coalesceKey: opts.coalesceKey ?? null },
+    );
   } else if (textContent != null) {
     if (node && node.textContent === textContent && !node.children) {
       return;
     }
-    transactDoc(tab, (t) => {
-      if (node?.children) {
-        mutateUpdateProperty(t, path, "children");
-      }
-      mutateUpdateProperty(t, path, "textContent", textContent);
-    });
+    transactDoc(
+      tab,
+      (t) => {
+        if (node?.children) {
+          mutateUpdateProperty(t, path, "children");
+        }
+        mutateUpdateProperty(t, path, "textContent", textContent);
+      },
+      { coalesceKey: opts.coalesceKey ?? null },
+    );
   }
 }
 
@@ -116,6 +128,86 @@ export function applyInlinePropCommit(
   transactDoc(tab, (t) => {
     mutateUpdateProp(t, path, prop, value);
   });
+}
+
+/**
+ * Join the block at `fromPath` onto the end of the block at `intoPath`, removing the former.
+ *
+ * Backspace at a block's start and Delete at a block's end are the same operation approached from
+ * either side, so both land here. Returns the caret's document position at the seam — the join
+ * point, not the end — or null when the merge was refused.
+ *
+ * Refused when either block is missing, or when one contains the other: a `<li>` and the `<p>`
+ * inside it are adjacent in document order but merging them would mean a node absorbing its own
+ * parent.
+ */
+export function applyBlockMerge(
+  tab: Tab | null,
+  fromPath: JxPath,
+  intoPath: JxPath,
+): { path: JxPath; offset: number } | null {
+  if (!tab) {
+    return null;
+  }
+  const from = getNodeAtPath(tab.doc.document, fromPath) as JxMutableNode | undefined;
+  const into = getNodeAtPath(tab.doc.document, intoPath) as JxMutableNode | undefined;
+  if (!from || !into) {
+    return null;
+  }
+  if (isAncestor(fromPath, intoPath) || isAncestor(intoPath, fromPath)) {
+    return null;
+  }
+
+  const head = contentOf(into);
+  const tail = contentOf(from);
+  const seam = contentLength(head);
+  const merged = toStored([...head, ...tail]);
+
+  transactDoc(tab, (t) => {
+    // Write the joined content BEFORE removing the source: updating a node never shifts indices,
+    // So `fromPath` is still valid when the removal runs.
+    if (merged.children) {
+      if (into.textContent != null) {
+        mutateUpdateProperty(t, intoPath, "textContent");
+      }
+      mutateUpdateProperty(t, intoPath, "children", merged.children);
+    } else {
+      if (into.children) {
+        mutateUpdateProperty(t, intoPath, "children");
+      }
+      mutateUpdateProperty(t, intoPath, "textContent", merged.textContent ?? "");
+    }
+    mutateRemoveNode(t, fromPath);
+    // A container emptied by the removal (the `<ul>` behind a list's last item) would otherwise
+    // Linger as invisible structure that still occupies layout and shows up in the layers panel.
+    pruneEmptyAncestors(t, parentElementPath(fromPath) as JxPath);
+    if (isTabActive(tab)) {
+      t.session.selection = intoPath;
+    }
+  });
+
+  return { offset: seam, path: intoPath };
+}
+
+/**
+ * Remove `path` and its now-childless ancestors, stopping at the document root or the first
+ * ancestor that still has content.
+ */
+function pruneEmptyAncestors(tab: Tab, path: JxPath): void {
+  let cur = path;
+  while (cur.length > 0) {
+    const node = getNodeAtPath(tab.doc.document, cur) as JxMutableNode | undefined;
+    const kids = node?.children;
+    if (!node || !Array.isArray(kids) || kids.length > 0) {
+      return;
+    }
+    const parent = parentElementPath(cur) as JxPath | null;
+    mutateRemoveNode(tab, cur);
+    if (!parent) {
+      return;
+    }
+    cur = parent;
+  }
 }
 
 /**
@@ -215,4 +307,86 @@ export function applyInlineInsert(
     }
   });
   return newPath;
+}
+
+/**
+ * Replace a selection that spans blocks with `text` (empty for a deletion).
+ *
+ * Collapsing a cross-block range is a merge with both ends clipped: the first block keeps what
+ * precedes the selection, the last keeps what follows it, the two are joined, and every block
+ * between them is removed. `between` is supplied by the iframe because document order lives in the
+ * rendered DOM — the same reason a boundary merge names its neighbour there.
+ *
+ * Returns the caret's position after the collapse (the join point, plus any typed text), or null
+ * when the range does not resolve.
+ */
+export function applyRangeReplace(
+  tab: Tab | null,
+  from: { path: JxPath; offset: number },
+  to: { path: JxPath; offset: number },
+  between: JxPath[],
+  text: string,
+): { path: JxPath; offset: number } | null {
+  if (!tab) {
+    return null;
+  }
+  const head = getNodeAtPath(tab.doc.document, from.path) as JxMutableNode | undefined;
+  const tail = getNodeAtPath(tab.doc.document, to.path) as JxMutableNode | undefined;
+  if (!head || !tail) {
+    return null;
+  }
+  if (isAncestor(from.path, to.path) || isAncestor(to.path, from.path)) {
+    return null;
+  }
+
+  const joined = toStored(
+    spliceAcross(contentOf(head), from.offset, contentOf(tail), to.offset, text),
+  );
+  // Remove the deepest/last paths first so an earlier removal cannot shift a later one's index.
+  const removals = [...between, to.path].toSorted(comparePathsDescending);
+
+  transactDoc(tab, (t) => {
+    if (joined.children) {
+      if (head.textContent != null) {
+        mutateUpdateProperty(t, from.path, "textContent");
+      }
+      mutateUpdateProperty(t, from.path, "children", joined.children);
+    } else {
+      if (head.children) {
+        mutateUpdateProperty(t, from.path, "children");
+      }
+      mutateUpdateProperty(t, from.path, "textContent", joined.textContent ?? "");
+    }
+    for (const path of removals) {
+      if (getNodeAtPath(t.doc.document, path)) {
+        mutateRemoveNode(t, path);
+        pruneEmptyAncestors(t, parentElementPath(path) as JxPath);
+      }
+    }
+    if (isTabActive(tab)) {
+      t.session.selection = from.path;
+    }
+  });
+
+  return { offset: from.offset + text.length, path: from.path };
+}
+
+/**
+ * Order two paths so the LATER one in the document sorts first — the order removals must run in,
+ * since removing an earlier sibling renumbers every path after it.
+ */
+function comparePathsDescending(a: JxPath, b: JxPath): number {
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    const av = a[i];
+    const bv = b[i];
+    if (av === bv) {
+      continue;
+    }
+    if (typeof av === "number" && typeof bv === "number") {
+      return bv - av;
+    }
+    return String(bv).localeCompare(String(av));
+  }
+  return b.length - a.length;
 }

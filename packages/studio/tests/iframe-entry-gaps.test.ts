@@ -216,7 +216,7 @@ describe("entry-wired accessor seams", () => {
     expect(acks.some((m) => m.kind === "hover" || m.kind === "insertZones")).toBe(true);
   });
 
-  test("a prop-bound dblclick consults the entry's shadow doc and starts a prop session", async () => {
+  test("a prop-bound click consults the entry's shadow doc and starts a prop session", async () => {
     const { acks, container, pair } = await bootRendered(1);
     // A component instance stamped at a real doc path, with a runtime prop-bound marker inside.
     const host = document.createElement("x-card");
@@ -228,7 +228,9 @@ describe("entry-wired accessor seams", () => {
     container.append(host);
     acks.length = 0;
 
-    marker.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    // A single pointerdown opens the nested editing host — prop-bound internals sit inside a
+    // `contenteditable="false"` island, so the press is what makes them reachable at all.
+    marker.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
     pair.flush();
     const { isEditing, stopEditing } = await import("../src/editor/inline-edit");
     // The raw $props value is unset in the shadow doc → editing ADDS the prop (permitted).

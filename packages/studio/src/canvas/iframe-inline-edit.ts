@@ -20,15 +20,16 @@
  */
 
 import {
+  commitActiveBlock,
   getActiveElement,
   isEditableBlock,
   isEditing,
-  isSlashActive,
-  resumeBlurClose,
+  splitActiveBlock,
   startEditing,
   stopEditing,
-  suspendBlurClose,
 } from "../editor/inline-edit";
+import { startEditableRoot } from "./iframe-editable-root";
+import { adjacentBlock, blocksInOrder } from "./iframe-position";
 import { isTagActiveInSelection, toggleInlineFormat } from "../editor/inline-format";
 import { applyLink, insertTemplateToken, linkStateForSelection } from "../editor/inline-link";
 import { restoreTemplateExpressions } from "../utils/edit-display";
@@ -43,6 +44,7 @@ import type {
   SelectionSnapshot,
   SerializableRect,
 } from "./iframe-protocol";
+import type { DocPos } from "./iframe-position";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -63,40 +65,6 @@ const ACTIVE_TAG_PROBES = ["strong", "em", "u", "del", "sub", "sup", "code"];
 /** CSS Custom Highlight name + the id of the injected `::highlight()` style rule. */
 const HIGHLIGHT_NAME = "jx-pending-format";
 const HIGHLIGHT_STYLE_ID = "jx-pending-format-style";
-
-/** Walk up from an event target to the nearest editable element carrying a `data-jx-path`. */
-function findEditableTarget(target: EventTarget | null): { el: HTMLElement; path: JxPath } | null {
-  let el = target instanceof Element ? target : null;
-  while (el) {
-    if (el instanceof HTMLElement && el.dataset.jxPath && isEditableBlock(el)) {
-      return { el, path: parseJxPath(el.dataset.jxPath) };
-    }
-    el = el.parentElement;
-  }
-  return null;
-}
-
-/**
- * Walk up from an event target to the nearest element carrying `data-jx-bound-prop` (a component-
- * internal element whose text is an invertible prop binding — stamped by the runtime, see
- * setStampPropBindings). Component internals are unstamped, so hitting a `data-jx-path` element
- * first means the target sits in page-level DOM (or slotted content) — not a prop-bound target.
- */
-function findPropBoundTarget(target: EventTarget | null): { el: HTMLElement; prop: string } | null {
-  let el = target instanceof Element ? target : null;
-  while (el) {
-    if (el instanceof HTMLElement) {
-      if (el.dataset.jxBoundProp) {
-        return { el, prop: el.dataset.jxBoundProp };
-      }
-      if (el.dataset.jxPath) {
-        return null;
-      }
-    }
-    el = el.parentElement;
-  }
-  return null;
-}
 
 /**
  * The instance that owns a prop-bound element: its nearest custom-element ancestor (that element's
@@ -268,15 +236,18 @@ export function startIframeInlineEdit(
     // Show raw `${expr}` syntax for editing (the render displays it as ❪ expr ❫).
     restoreTemplateExpressions(el);
     channel.post({ kind: "editStart", path });
-    // While the session is live the parent toolbar/popover may take focus — a blur must not tear
-    // The session down across the bridge (focus-loss BLOCKER fix).
-    suspendBlurClose();
     startEditing(el, path, {
-      onCommit: (p, children, textContent) =>
-        channel.post({ children, kind: "editCommit", path: p, textContent }),
+      // `inPlace` rides along only when set: a release commit is the common case and the flag is
+      // Optional, so omitting it keeps the message shape unchanged for every non-tick commit.
+      onCommit: (p, children, textContent, inPlace) =>
+        channel.post({
+          children,
+          kind: "editCommit",
+          path: p,
+          textContent,
+          ...(inPlace ? { inPlace: true } : {}),
+        }),
       onEnd: () => {
-        // A real session end: stop suspending blur-close and drop the selection viz.
-        resumeBlurClose();
         clearHighlight();
         lastNonEmptyRange = null;
         channel.post({ kind: "editEnd" });
@@ -319,15 +290,19 @@ export function startIframeInlineEdit(
    */
   const enterPropEditAt = (el: HTMLElement, hostPath: JxPath, prop: string) => {
     channel.post({ kind: "editStart", path: hostPath, prop });
-    suspendBlurClose();
     startEditing(
       el,
       hostPath,
       {
-        onCommit: (p, _children, textContent) =>
-          channel.post({ kind: "editCommitProp", path: p, prop, value: textContent ?? "" }),
+        onCommit: (p, _children, textContent, inPlace) =>
+          channel.post({
+            kind: "editCommitProp",
+            path: p,
+            prop,
+            value: textContent ?? "",
+            ...(inPlace ? { inPlace: true } : {}),
+          }),
         onEnd: () => {
-          resumeBlurClose();
           clearHighlight();
           lastNonEmptyRange = null;
           channel.post({ kind: "editEnd" });
@@ -375,31 +350,71 @@ export function startIframeInlineEdit(
     onSelectionChange();
   };
 
-  const onDblClick = (e: Event) => {
-    if (!editingAllowed()) {
-      return;
+  /**
+   * Open a nested editing host on a prop-bound component-internal marker. Returns whether it was
+   * activated — a path-less owner is itself internal to another definition, so its `$props` live in
+   * a document that is not open in this tab and there is no write-back target.
+   */
+  const activateProp = (el: HTMLElement): boolean => {
+    const prop = el.dataset.jxBoundProp;
+    const host = ownerInstanceOf(el);
+    const hostPathRaw = host?.dataset.jxPath;
+    if (!prop || !host || !hostPathRaw) {
+      return false;
     }
-    // Prop-bound targets win: they sit in unstamped component internals, deeper than any editable
-    // Page block, and once a marker is hit the event must NOT fall through to rich editing (an
-    // Instance nested inside a page-level editable would otherwise rich-edit that whole ancestor).
-    const propHit = findPropBoundTarget(e.target);
-    if (propHit) {
-      const host = ownerInstanceOf(propHit.el);
-      const hostPathRaw = host?.dataset.jxPath;
-      if (host && hostPathRaw) {
-        const hostPath = parseJxPath(hostPathRaw);
-        if (propEditableAt(hostPath, propHit.prop)) {
-          enterPropEditAt(propHit.el, hostPath, propHit.prop);
-        }
-      }
-      // A path-less host is itself internal to another definition — its $props live in a document
-      // Not open in this tab, so there is no write-back target: blocked.
-      return;
+    const hostPath = parseJxPath(hostPathRaw);
+    if (!propEditableAt(hostPath, prop)) {
+      return false;
     }
-    const hit = findEditableTarget(e.target);
-    if (hit) {
-      enterEditAt(hit.el, hit.path);
+    enterPropEditAt(el, hostPath, prop);
+    return true;
+  };
+
+  /**
+   * Post a join between the block at `path` and its document-order neighbour.
+   *
+   * `direction` is which way the caret was deleting: backward joins this block onto the previous
+   * one, forward pulls the next one up into this. Either way the surviving block is the earlier of
+   * the two, so the caret ends at the seam inside it. Returns false at the document's ends, where
+   * the chokepoint then suppresses the keystroke rather than doing nothing visible.
+   */
+  const postMerge = (path: JxPath, direction: -1 | 1): boolean => {
+    const neighbour = adjacentBlock(container, path, direction, isEditableBlock);
+    if (!neighbour) {
+      return false;
     }
+    const [fromPath, intoPath] = direction === -1 ? [path, neighbour.path] : [neighbour.path, path];
+    // Commit what the caret has typed but not yet flushed, or the merge would join the block's
+    // Last COMMITTED content and silently drop the rest.
+    root.flush();
+    channel.post({ fromPath, intoPath, kind: "editMerge" });
+    return true;
+  };
+
+  /**
+   * Post a collapse of the selection spanning `from`..`to`.
+   *
+   * The blocks strictly between the endpoints are listed here, from the rendered DOM, because that
+   * is where document order is already correct — a range can span list items, table cells, and
+   * nested containers, none of which is a flat index walk.
+   */
+  const postRangeReplace = (from: DocPos, to: DocPos, text: string): boolean => {
+    const blocks = blocksInOrder(container, isEditableBlock);
+    const fromKey = serializeJxPath(from.path);
+    const toKey = serializeJxPath(to.path);
+    const start = blocks.findIndex((el) => el.dataset.jxPath === fromKey);
+    const end = blocks.findIndex((el) => el.dataset.jxPath === toKey);
+    if (start === -1 || end === -1 || end <= start) {
+      return false;
+    }
+    const between = blocks
+      .slice(start + 1, end)
+      .map((el) => parseJxPath(el.dataset.jxPath as string));
+    // Commit pending text in the active block first, or the collapse would splice the block's last
+    // COMMITTED content and silently drop whatever was typed since.
+    root.flush();
+    channel.post({ between, from, kind: "editRangeReplace", text, to });
+    return true;
   };
 
   const onMouseUp = () => cacheRange();
@@ -408,31 +423,49 @@ export function startIframeInlineEdit(
   const onBlurCapture = () => cacheRange();
 
   /**
-   * Commit-on-click-away: a pointerdown INSIDE the iframe but OUTSIDE the active editable ends the
-   * session (committing via the engine's stopEditing → onCommit). Blur-close stays suspended for
-   * the whole session (a parent-toolbar click across the bridge must not kill it), so without this
-   * an in-canvas click-away would never commit — text edits would never reach the document.
+   * The editing host. Activation is now purely a consequence of where the caret is — there is no
+   * gesture to recognise and no session to enter, which is what makes a single click (or an arrow
+   * key, or Home) land you in a block ready to type.
+   *
+   * Only `onSplit` is wired here: block merges and cross-block range edits are recognised by the
+   * chokepoint but have no document mutation behind them yet, and an absent handler SUPPRESSES the
+   * action rather than letting the browser restructure the DOM behind the model's back.
    */
-  const onPointerDownCapture = (e: Event) => {
-    if (!isEditing() || isSlashActive()) {
-      return;
-    }
-    const el = getActiveElement();
-    if (el && e.target instanceof Node && !el.contains(e.target)) {
-      stopEditing();
-    }
-  };
+  const root = startEditableRoot(container, {
+    getMode: () => opts?.getMode?.() ?? "edit",
+    isEditableBlock,
+    onActivate: (el, path) => enterEditAt(el, path),
+    onDeactivate: () => {
+      // Leaving a block is what flushes it to the document.
+      if (isEditing()) {
+        stopEditing();
+      }
+    },
+    onCommitTick: () => commitActiveBlock(),
+    // Backspace at a block's start and Delete at its end are the same join, approached from either
+    // Side. The neighbour is resolved HERE because document order lives in the rendered DOM.
+    onMergeBackward: (at) => postMerge(at.path, -1),
+    onMergeForward: (at) => postMerge(at.path, 1),
+    onReplaceRange: (from, to, text) => postRangeReplace(from, to, text),
+    onPropActivate: activateProp,
+    onSelectionChange: () => onSelectionChange(),
+    onSplit: () => splitActiveBlock(),
+  });
 
-  doc.addEventListener("dblclick", onDblClick, true);
-  doc.addEventListener("selectionchange", onSelectionChange);
   doc.addEventListener("mouseup", onMouseUp, true);
   doc.addEventListener("keyup", onKeyUp, true);
   doc.addEventListener("blur", onBlurCapture, true);
-  doc.addEventListener("pointerdown", onPointerDownCapture, true);
 
   const off = channel.onMessage((msg) => {
     if (msg.kind === "applyFormat") {
       applyFormatIntent(msg.intent);
+      return;
+    }
+    if (msg.kind === "flushEdits") {
+      // Commit anything the idle tick has not yet written, THEN acknowledge. The commit is posted
+      // First, so a parent that has seen the acknowledgement has already applied the text.
+      root.flush();
+      channel.post({ kind: "flushComplete", reqId: msg.reqId });
       return;
     }
     if (msg.kind === "endEdit") {
@@ -449,23 +482,23 @@ export function startIframeInlineEdit(
     if (!editingAllowed()) {
       return;
     }
+    // Follow-the-caret after a split or slash-insert: the parent re-renders and then names the path
+    // The caret belongs in. Placing the caret is the whole job — activation follows from where the
+    // Caret is, so there is nothing else to "enter".
     const el = elementForPath(container, msg.path);
     if (el && isEditableBlock(el)) {
-      enterEditAt(el, msg.path);
+      root.placeCaret({ offset: msg.offset ?? 0, path: msg.path });
     }
   });
 
   return () => {
-    doc.removeEventListener("dblclick", onDblClick, true);
-    doc.removeEventListener("selectionchange", onSelectionChange);
     doc.removeEventListener("mouseup", onMouseUp, true);
     doc.removeEventListener("keyup", onKeyUp, true);
     doc.removeEventListener("blur", onBlurCapture, true);
-    doc.removeEventListener("pointerdown", onPointerDownCapture, true);
+    root.stop();
     off();
     clearHighlight();
     lastNonEmptyRange = null;
-    resumeBlurClose();
     if (isEditing()) {
       stopEditing();
     }

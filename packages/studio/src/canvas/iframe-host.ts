@@ -11,7 +11,9 @@ import { postMessageChannel } from "./iframe-channel";
 import { canvasBaseOrigin } from "./canvas-origin";
 import { resolveCanvasDocument } from "./canvas-live-render";
 import {
+  applyBlockMerge,
   applyInlineCommit,
+  applyRangeReplace,
   applyInlinePropCommit,
   applyInlineInsert,
   applyInlineSplit,
@@ -34,6 +36,8 @@ import {
   updateUi,
 } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
+import { formatEditableVerdicts } from "../format/constraints";
+import { formatByName } from "../format/format-host";
 import { collabState } from "../collab/collab-state";
 import { getPlatform, hasPlatform } from "../platform";
 import type {
@@ -136,7 +140,7 @@ interface HostState {
    * render acks (`renderComplete`) at a bumped one — both satisfy `gen >= minGen`. An immediate
    * `enterEdit` would race the escalated ASYNC render and silently fail to find the element.
    */
-  pendingEnterEdit: { path: (string | number)[]; minGen: number } | null;
+  pendingEnterEdit: { path: (string | number)[]; minGen: number; offset?: number } | null;
   /**
    * Stylebook capability (set by {@link mountStylebookCanvas}, cleared by page mounts). The specimen
    * doc's paths decode to TAGS, not tab-document paths: hits route to the injected stylebook
@@ -267,6 +271,67 @@ export function requestCanvasEval(
   });
 }
 
+// ─── Pending-edit flush ─────────────────────────────────────────────────────────
+// Text reaches the document on an idle tick, so anything that reads the document as authoritative
+// Must first ask every live frame to commit what the caret has typed since. Without this, saving
+// Mid-sentence writes the file WITHOUT the words still sitting in the caret's block.
+
+/** Monotonic flush request id. */
+let flushReqId = 0;
+
+/** Pending flush resolvers keyed by reqId; a timeout resolves anyway rather than blocking a save. */
+const pendingFlushes = new Map<number, () => void>();
+
+/** How long (ms) the parent waits for a frame to acknowledge a flush before saving regardless. */
+export const FLUSH_TIMEOUT_MS = 250;
+
+/**
+ * Ask every live frame rendering `tabId` to commit its pending text, and resolve once they have all
+ * acknowledged (or the timeout elapses — a save must never hang on an unresponsive frame).
+ */
+export function flushCanvasEdits(
+  tabId: string | null,
+  timeoutMs: number = FLUSH_TIMEOUT_MS,
+): Promise<void> {
+  const targets: HostState[] = [];
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    if (host.ready && !host.stylebook && tabId !== null && host.tabId === tabId) {
+      targets.push(host);
+    }
+  }
+  if (targets.length === 0) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    let outstanding = targets.length;
+    const timer = setTimeout(() => {
+      for (const id of ids) {
+        pendingFlushes.delete(id);
+      }
+      resolve();
+    }, timeoutMs);
+    const settle = () => {
+      outstanding -= 1;
+      if (outstanding === 0) {
+        clearTimeout(timer);
+        resolve();
+      }
+    };
+    const ids: number[] = [];
+    for (const host of targets) {
+      flushReqId += 1;
+      const reqId = flushReqId;
+      ids.push(reqId);
+      pendingFlushes.set(reqId, settle);
+      host.channel.post({ kind: "flushEdits", reqId });
+    }
+  });
+}
+
 /** The host backing a given canvas element (or null), for the coordinator's host resolution. */
 export function hostForCanvas(canvasEl: HTMLElement): HostState | null {
   return hosts.get(canvasEl) ?? null;
@@ -392,25 +457,6 @@ export function clearDropIndicator(host: HostState): void {
 }
 
 /**
- * The coordinator's handler for an iframe-originated (flow 3) drag. Installed by the bridge to
- * avoid a host→bridge import cycle; invoked from the `dragOriginate` message case with the host,
- * the grabbed node path, AND the iframe's pre-allocated dragSeq. The iframe DRIVES the gesture
- * itself (its held-button moves stay in the iframe document), so the coordinator only ADOPTS this
- * seq (no dragStart, no parent-document listeners) and shows the ghost — the iframe's
- * dragOver/dropResult carry the same seq and so pass the parent's seq gate.
- */
-let iframeOriginateHandler:
-  | ((host: HostState, path: (string | number)[], dragSeq: number) => void)
-  | null = null;
-
-/** Register the coordinator's iframe-originated-drag handler (see {@link iframeOriginateHandler}). */
-export function setIframeOriginateHandler(
-  fn: (host: HostState, path: (string | number)[], dragSeq: number) => void,
-): void {
-  iframeOriginateHandler = fn;
-}
-
-/**
  * The coordinator's handler for a NATIVE drag stream entering an iframe with no session bound there
  * (the `nativeDragEnter` message) — the bridge binds/migrates its live pragmatic session to that
  * host. Installed by the bridge to avoid a host→bridge import cycle.
@@ -429,7 +475,7 @@ export const INSERT_HIDE_DELAY = 300;
  * The parent-realm insertion handler: open the slash menu anchored at the "+" `btn` and, on select,
  * run `transactDoc → mutateInsertNode` for the captured `zone`. Injected from studio.ts (which owns
  * the slash-menu / transact / defaultDef wiring) so this host module — and its tests — stay free of
- * the lit/Spectrum slash-menu and the mutation pipeline, mirroring {@link iframeOriginateHandler}.
+ * the lit/Spectrum slash-menu and the mutation pipeline, mirroring the native-drag handler.
  */
 let insertZoneClickHandler: ((btn: HTMLElement, zone: InsertZone) => void) | null = null;
 
@@ -561,11 +607,50 @@ export function postPatchToHosts(
       continue;
     }
     if (host.ready && host.tabId === tabId) {
-      host.channel.post({ forwardOps, gen, kind: "patch" });
+      // Only the host that originated this edit already has the DOM the patch describes. A
+      // Split-view panel on the same document did NOT type it and must render normally.
+      const echoPaths = echoOrigin?.host === host ? echoOrigin.paths : undefined;
+      host.channel.post(
+        echoPaths
+          ? { echoPaths, forwardOps, gen, kind: "patch" }
+          : { forwardOps, gen, kind: "patch" },
+      );
       posted += 1;
     }
   }
   return posted;
+}
+
+/**
+ * The host whose own in-place commit is currently being applied, and the paths whose DOM it already
+ * has right.
+ *
+ * Set for the duration of the `transactDoc` call inside the `editCommit` case and read by
+ * {@link postPatchToHosts}, which runs synchronously inside it — the same begin/end shape
+ * `transact.ts` uses for op recording. Never spans an await, so it cannot leak across messages.
+ */
+let echoOrigin: { host: HostState; paths: (string | number)[][] } | null = null;
+
+/**
+ * Identifies the current visit to a block. Text commits sharing a run fold into ONE history entry —
+ * typing commits on every pause, and without this a minute of writing would evict every structural
+ * edit from the 100-entry ring and make ⌘Z walk back through the prose one pause at a time.
+ */
+let editRunSeq = 0;
+
+/**
+ * Apply `fn` with `host`'s echo suppression armed for `paths`.
+ *
+ * This is what lets the caret survive its own edits: committing a block re-enters the patcher,
+ * which would otherwise re-render the very subtree the user is typing in.
+ */
+function withEchoSuppressed(host: HostState, paths: (string | number)[][], fn: () => void): void {
+  echoOrigin = { host, paths };
+  try {
+    fn();
+  } finally {
+    echoOrigin = null;
+  }
 }
 
 /** The tab whose document `state`'s iframe currently renders (null when unknown or closed). */
@@ -1111,16 +1196,6 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       }
       return;
     }
-    case "dragOriginate": {
-      if (state.stylebook) {
-        return; // Specimens can't be reordered (belt-and-braces with the iframe-side gate).
-      }
-      // Flow 3: the iframe began a body-grab drag and DRIVES it locally. Hand off to the coordinator,
-      // Which ADOPTS the iframe's seq (so its dragOver/dropResult pass the gate) and shows the ghost
-      // — it attaches NO parent-document listeners (the iframe owns the pointer it started).
-      iframeOriginateHandler?.(state, msg.path, msg.dragSeq);
-      return;
-    }
     case "nativeDragEnter": {
       if (state.stylebook) {
         return; // A specimen catalog is never a drop target.
@@ -1181,6 +1256,9 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         activeEditHost.snapshot = null;
       }
       activeEditHost = state;
+      // Each visit to a block is one undoable edit. Bumping the run id here breaks the history
+      // Coalescing run, so returning to the same paragraph later is a separate ⌘Z step.
+      editRunSeq += 1;
       state.editing = true;
       state.editingProp = msg.prop ?? null;
       state.snapshot = null;
@@ -1198,16 +1276,57 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       toolbarRefresh?.();
       return;
     }
+    case "flushComplete": {
+      const done = pendingFlushes.get(msg.reqId);
+      if (done) {
+        pendingFlushes.delete(msg.reqId);
+        done();
+      }
+      return;
+    }
     case "editCommit": {
       // Route to the tab this host's iframe renders — NOT activeTab, which may have changed while
       // The message was in flight (the cross-document bleed).
-      applyInlineCommit(hostTab(state), msg.path, msg.children, msg.textContent);
+      const apply = () =>
+        applyInlineCommit(hostTab(state), msg.path, msg.children, msg.textContent);
+      // An in-place commit (the idle tick) leaves the caret in the block, so the echoed patch must
+      // Not re-render it. A commit on release renders normally — the caret has already left.
+      if (msg.inPlace) {
+        withEchoSuppressed(state, [msg.path], apply);
+      } else {
+        apply();
+      }
       return;
     }
     case "editCommitProp": {
       // A prop-bound plain session committed: persist into the instance's $props (same host-tab
       // Routing as editCommit; the unchanged-value no-op lives in the apply).
-      applyInlinePropCommit(hostTab(state), msg.path, msg.prop, msg.value);
+      //
+      // A $props change re-renders the WHOLE component instance, which would tear out the nested
+      // Editing host the caret is typing in — so an in-place commit is echo-suppressed exactly as a
+      // Page block's is. The instance re-renders for real on release.
+      const applyProp = () => applyInlinePropCommit(hostTab(state), msg.path, msg.prop, msg.value);
+      if (msg.inPlace) {
+        withEchoSuppressed(state, [msg.path], applyProp);
+      } else {
+        applyProp();
+      }
+      return;
+    }
+    case "editMerge": {
+      // Joining two blocks removes one of them, so the caret has to be re-placed — at the SEAM,
+      // Where the two blocks met, which is where the author's cursor visually was.
+      const seam = applyBlockMerge(hostTab(state), msg.fromPath, msg.intoPath);
+      if (seam) {
+        deferEnterEdit(state, seam.path, seam.offset);
+      }
+      return;
+    }
+    case "editRangeReplace": {
+      const caret = applyRangeReplace(hostTab(state), msg.from, msg.to, msg.between, msg.text);
+      if (caret) {
+        deferEnterEdit(state, caret.path, caret.offset);
+      }
       return;
     }
     case "editSplit": {
@@ -1295,13 +1414,13 @@ function onDomUpdated(state: HostState, gen: number): void {
   requestPresence(state);
   hideInsertZoneNow(state);
   if (state.pendingEnterEdit && gen >= state.pendingEnterEdit.minGen) {
-    const { path } = state.pendingEnterEdit;
+    const { offset, path } = state.pendingEnterEdit;
     state.pendingEnterEdit = null;
     // Re-enter only when this host still shows the ACTIVE tab — a background tab's iframe renders a
     // Different doc, so re-entering there would grab the wrong element (the commit itself already
     // Landed in the right tab via hostTab routing).
     if (state.tabId !== null && state.tabId === workspace.activeTabId) {
-      reenterEdit(state, path);
+      reenterEdit(state, path, offset);
     }
   }
 }
@@ -1312,13 +1431,21 @@ function onDomUpdated(state: HostState, gen: number): void {
  * that same gen; an escalated full render acks at a bumped one — both satisfy `gen >= minGen`,
  * while a stale ack cannot. Latest-wins on overwrite.
  */
-function deferEnterEdit(state: HostState, path: (string | number)[]): void {
-  state.pendingEnterEdit = { minGen: state.lastRenderedGen, path: [...path] };
+function deferEnterEdit(state: HostState, path: (string | number)[], offset?: number): void {
+  state.pendingEnterEdit = {
+    minGen: state.lastRenderedGen,
+    path: [...path],
+    ...(offset === undefined ? {} : { offset }),
+  };
 }
 
 /** Ask the host's iframe to (re-)enter inline editing on `path` (a plain copy crosses the bridge). */
-function reenterEdit(state: HostState, path: (string | number)[]): void {
-  state.channel.post({ kind: "enterEdit", path: [...path] });
+function reenterEdit(state: HostState, path: (string | number)[], offset?: number): void {
+  state.channel.post({
+    kind: "enterEdit",
+    path: [...path],
+    ...(offset === undefined ? {} : { offset }),
+  });
 }
 
 /**
@@ -1415,6 +1542,15 @@ export async function mountIframeCanvas(
   // The RAW page doc (forward-op + data-jx-path coordinate space) crosses as the iframe's shadow doc.
   // oxlint-disable-next-line unicorn/prefer-structured-clone
   const cloneableShadow = JSON.parse(JSON.stringify(doc)) as unknown;
+  // Which tags can hold a caret depends on the document's vocabulary, so the format's verdicts ride
+  // With the render rather than being baked into the frame. Absent for a native document, where the
+  // Studio's own element metadata answers on its own.
+  // Resolve from THIS render's tab, not `state.tabId` — that is only adopted when the render is
+  // Acknowledged, so at post time it still names the previous render's document (null on first
+  // Mount, which is exactly the render that matters).
+  const renderTab = tabId ? (workspace.tabs.get(tabId) ?? null) : null;
+  const formatElements = formatByName(renderTab?.doc.sourceFormat)?.studio?.elements;
+  const editableTags = formatElements ? formatEditableVerdicts(formatElements) : undefined;
   const message: ParentToIframe = {
     colorScheme: activeSchemeWire(),
     doc: cloneableDoc,
@@ -1425,6 +1561,7 @@ export async function mountIframeCanvas(
     mode: resolved.mapperCtx.canvasMode as CanvasMode,
     shadowDoc: cloneableShadow,
     siteStyle: resolved.siteStyle,
+    ...(editableTags ? { editableTags } : {}),
   };
   // A mode switch to preview mid-split must not start an edit session in the preview render.
   if (message.mode === "preview") {
