@@ -72,6 +72,7 @@ void mock.module("../src/canvas/canvas-live-render", () => ({
 
 const {
   adoptDragSession,
+  allowAutoRequestsOnNextRender,
   beginDragSession,
   clearDropIndicator,
   commitActiveEditSession,
@@ -134,6 +135,35 @@ describe("mountIframeCanvas", () => {
     channels[0]!.deliver({ kind: "ready" });
     expect(channels[0]!.posts).toHaveLength(1);
     expect(channels[0]!.posts[0]).toMatchObject({ gen: 1, kind: "render", mode: "design" });
+  });
+
+  test("Data-panel Refresh arms allowAutoRequests for exactly one render", async () => {
+    resetWorkspaceWithTab();
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+
+    // Unarmed: edit/design renders omit the flag, so the runtime keeps auto-requests suppressed.
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    channels[0]!.deliver({ kind: "ready" });
+    const first = channels[0]!.posts.find((p) => p.kind === "render") as Record<string, unknown>;
+    expect(first.allowAutoRequests).toBeUndefined();
+
+    // Armed by Refresh: the NEXT render carries it.
+    allowAutoRequestsOnNextRender();
+    await mountIframeCanvas(2, { tagName: "div" } as never, canvasEl);
+    const renders = channels[0]!.posts.filter((p) => p.kind === "render") as Record<
+      string,
+      unknown
+    >[];
+    expect(renders.at(-1)!.allowAutoRequests).toBe(true);
+
+    // One-shot: a later render (e.g. an escalation) must not inherit it.
+    await mountIframeCanvas(3, { tagName: "div" } as never, canvasEl);
+    const after = channels[0]!.posts.filter((p) => p.kind === "render") as Record<
+      string,
+      unknown
+    >[];
+    expect(after.at(-1)!.allowAutoRequests).toBeUndefined();
   });
 
   test("the render message carries the active tab's forced preview scheme (auto → null)", async () => {

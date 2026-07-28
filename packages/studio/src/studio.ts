@@ -47,6 +47,7 @@ import {
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
 import {
   commitActiveEditSession,
+  allowAutoRequestsOnNextRender,
   getEditSnapshot,
   postColorSchemeToLiveHosts,
   setCanvasContextMenuHandler,
@@ -646,6 +647,13 @@ leftPanelMod.mount({
   registerFileTreeDnD,
   registerLayersDnD,
   renderCanvas: () => renderCanvas(),
+  // The Data panel's Refresh: a canvas re-render that ALSO lets automatic `Request` state entries
+  // Fetch. Edit/design suppress them (a full render re-resolves every entry, so authoring would
+  // Refetch constantly); re-firing them on demand is what that button is for.
+  refreshData: () => {
+    allowAutoRequestsOnNextRender();
+    renderCanvas();
+  },
   renderDataExplorerTemplate,
   renderFilesTemplate,
   renderGitPanel,

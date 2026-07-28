@@ -64,6 +64,13 @@ export type ParentToIframe =
        */
       editableTags?: Record<string, boolean>;
       mode: CanvasMode;
+      /**
+       * Let automatic `$prototype: "Request"` state entries fetch on THIS render even outside
+       * preview mode. Edit/design suppress them by default (a full render re-resolves every state
+       * entry, so an escalating authoring action would issue a request each time), but the Data
+       * activity's Refresh exists precisely to re-fire them on demand. Absent = follow the mode.
+       */
+      allowAutoRequests?: boolean;
       docBase: string;
       mapperCtx: WireMapperCtx;
       siteStyle: Record<string, unknown> | null;

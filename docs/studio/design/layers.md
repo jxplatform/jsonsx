@@ -37,14 +37,14 @@ The name is a display title only — Studio stores it as a `$title` key on the e
 
 ## Rearrange the page
 
-Hover a row and its actions appear on the right:
+Click a row to select it and its actions appear on the right:
 
 - **Move up** / **Move down** arrows swap the element with its neighbors.
 - The **right arrow** moves the element inside the sibling above it (shown when that sibling can hold children).
 - The **left arrow** moves the element out of its parent, to sit just after it.
 - **✕** deletes the element and everything inside it.
 
-For bigger moves, drag the **⠿** handle — or the row itself. An indicator shows where the element will land: above or below the row under the cursor, or inside it as a child. You can also drag a row straight onto the canvas and drop it at the spot you see. Press :kbd[Esc] mid-drag to cancel with nothing changed. Dropping an element into itself or its own descendants is blocked.
+For bigger moves, drag the **⠿** handle — which appears on any row you hover — or the row itself. An indicator shows where the element will land: above or below the row under the cursor, or inside it as a child. You can also drag a row straight onto the canvas and drop it at the spot you see. Press :kbd[Esc] mid-drag to cancel with nothing changed. Dropping an element into itself or its own descendants is blocked.
 
 ## Right-click for everything else
 

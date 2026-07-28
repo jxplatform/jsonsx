@@ -215,6 +215,28 @@ export function sawIframeDragOver(seq: number): boolean {
 /** Monotonic eval request id (shared across hosts; stale replies carry an older/unknown id). */
 let evalReqId = 0;
 
+/**
+ * One-shot: let automatic `$prototype: "Request"` entries fetch on the NEXT page render even in
+ * edit/design mode.
+ *
+ * Those fetches are suppressed outside preview because a full render re-resolves every state entry,
+ * so an escalating authoring action would issue a request per render. But the Data activity's
+ * Refresh exists to re-fire them on demand — its documented purpose — so it arms this flag and the
+ * next render consumes it. Deliberately one-shot: a subsequent escalation must not inherit it.
+ */
+let _allowAutoRequestsOnce = false;
+
+/** Arm the next page render to allow automatic request fetches (Data activity Refresh). */
+export function allowAutoRequestsOnNextRender(): void {
+  _allowAutoRequestsOnce = true;
+}
+
+function consumeAllowAutoRequests(): boolean {
+  const armed = _allowAutoRequestsOnce;
+  _allowAutoRequestsOnce = false;
+  return armed;
+}
+
 /** Pending eval resolvers keyed by reqId; a timeout or stale reply resolves null. */
 const pendingEvals = new Map<number, (results: EvalExprResult[] | null) => void>();
 
@@ -1681,6 +1703,7 @@ export async function mountIframeCanvas(
     shadowDoc: cloneableShadow,
     siteStyle: resolved.siteStyle,
     ...(editableTags ? { editableTags } : {}),
+    ...(consumeAllowAutoRequests() ? { allowAutoRequests: true } : {}),
   };
   // A mode switch to preview mid-split must not start an edit session in the preview render.
   if (message.mode === "preview") {

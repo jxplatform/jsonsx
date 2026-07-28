@@ -7,6 +7,7 @@ const noop = () => {};
 const callbacks = {
   defBadgeLabel: () => "Request",
   defCategory: () => "data",
+  refreshData: noop,
   renderCanvas: noop,
   renderLeftPanel: noop,
 };

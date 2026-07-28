@@ -500,13 +500,16 @@ export async function renderResolvedDocument(opts: {
   mode: CanvasMode;
   mapperCtx: PathMapCtx;
   siteStyle?: Record<string, unknown> | null;
+  /** This render may fetch automatic `Request` entries even outside preview (Data-panel Refresh). */
+  allowAutoRequests?: boolean;
 }): Promise<RenderHandle> {
   setSkipServerFunctions(opts.mode !== "preview");
   // Same gate for automatic `$prototype: "Request"` state entries. `buildScope` re-resolves every
   // State entry on each full render, so without this an escalating authoring action (a signals-panel
-  // Edit, or Enter inside component-wrapped content) issued an HTTP request per render. Live data is
-  // Preview's job; edit/design render the pre-fetch (null) state.
-  setSkipAutoRequests(opts.mode !== "preview");
+  // Edit, or Enter inside component-wrapped content) issued an HTTP request per render. Edit/design
+  // Render the pre-fetch (null) state; preview fetches, and so does a render the Data activity's
+  // Refresh armed (`allowAutoRequests`) — re-firing fetches on demand is that button's purpose.
+  setSkipAutoRequests(opts.mode !== "preview" && !opts.allowAutoRequests);
   // Transpose viewport units (vh/vw/…) → container units (cqh/cqw/…) so they resolve against the
   // Canvas's fixed-size query container (canvas.html) instead of the iframe element. That decouples
   // Them from the iframe height, letting the host size the iframe to its content without `100vh`

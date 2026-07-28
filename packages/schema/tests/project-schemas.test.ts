@@ -411,9 +411,13 @@ describe("composeProjectSchemas (host-agnostic composition)", () => {
      that cannot supply an extension's fragments leave the extension out of the list instead — what
      the cloud session does for packages it does not bundle. */
   test("an unreadable fragment fails the composition rather than being dropped", async () => {
-    await expect(compose([{ fields: "@jxsuite/missing/fields.json" }])).rejects.toThrow(
-      /cannot load \$ref target/,
-    );
+    let message = "";
+    try {
+      await compose([{ fields: "@jxsuite/missing/fields.json" }]);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch(/cannot load \$ref target/);
   });
 
   test("a fragment without $id or $defs contributes no union members", async () => {

@@ -12,7 +12,7 @@ code:
 There is no single "logic mode" in Studio. Interactivity comes from a few focused surfaces you move between, and each one answers a different question:
 
 - **[State](/docs/studio/logic/state)** — an activity in the left panel. _What does this page or component know?_ Declare values, computed entries, data sources, and functions here.
-- **[Data](/docs/studio/logic/data-explorer)** — the activity right below it. _What are those values right now?_ It shows the live, resolved data as the page runs.
+- **[Data](/docs/studio/logic/data-explorer)** — the activity right below it. _What are those values right now?_ It shows the resolved data as the page runs. Fetches wait for a **Refresh** or for preview mode rather than re-running on every edit.
 - **[Events](/docs/studio/logic/events)** — a tab in the right panel. _What happens when a visitor clicks or types?_ Bind behavior to the selected element here.
 - **[Formulas](/docs/studio/logic/formulas)** — not a place but an affordance: almost any value field carries an **fx** menu that turns a fixed value into a computed one, with live previews as you build it. A **[full-screen workspace](/docs/studio/logic/formula-workspace)** opens when a formula deserves the whole canvas.
 - **[Code](/docs/studio/logic/code)** — the escape hatch. A real code editor for function bodies, and a **Code** canvas mode that shows any file as raw source.

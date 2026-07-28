@@ -637,6 +637,7 @@ export function startCanvasIframe(opts: {
           },
           mode: msg.mode,
           siteStyle: msg.siteStyle,
+          ...(msg.allowAutoRequests ? { allowAutoRequests: true } : {}),
         });
         if (gen === latestGen) {
           // Adopt this generation's shadow doc + render context only once it's the live render.
