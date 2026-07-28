@@ -34,7 +34,13 @@ import {
   mountIframeCanvas,
   postStyleUpdateToStylebookHosts,
 } from "./iframe-host";
-import { canvasPerf } from "./canvas-perf";
+import {
+  canvasPerf,
+  SPAN_FULL_RENDER,
+  SPAN_MOUNT_CANVAS,
+  timeSpan,
+  timeSpanAsync,
+} from "./canvas-perf";
 import { renderStylebookMode } from "../panels/stylebook-panel";
 import { transposeStylebookStyle } from "../panels/stylebook-doc";
 import { dismissBlockActionBar, dismissLinkPopover } from "../panels/block-action-bar";
@@ -216,7 +222,16 @@ function resetCanvasView() {
   view.prevCanvasMode = null;
 }
 
+/**
+ * Render the canvas surface for the active tab. Thin timing wrapper — {@link renderCanvasImpl} has
+ * several early returns, so the span is closed by {@link timeSpan}'s `finally` rather than by
+ * hand.
+ */
 export function renderCanvas() {
+  timeSpan(SPAN_FULL_RENDER, renderCanvasImpl);
+}
+
+function renderCanvasImpl() {
   const tab = activeTab.value;
   if (!tab) {
     // No active tab — reset every piece of canvas view state so reopening a file can never inherit
@@ -822,12 +837,14 @@ function renderCanvasIntoPanel(
 
   // Overrides (git-diff docs) mount with a null tab identity: their iframes must never route doc
   // Mutations anywhere. The real doc carries its tab id so edit/drop messages route to THAT tab.
-  void mountIframeCanvas(
-    gen,
-    docToRender,
-    canvas,
-    panel._width,
-    docOverride ? null : (tab?.id ?? null),
+  void timeSpanAsync(SPAN_MOUNT_CANVAS, () =>
+    mountIframeCanvas(
+      gen,
+      docToRender,
+      canvas,
+      panel._width,
+      docOverride ? null : (tab?.id ?? null),
+    ),
   )
     .then(() => {
       if (gen === view.renderGeneration) {

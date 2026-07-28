@@ -11,7 +11,10 @@
   "files": [
     "*.js",
     "src",
-    "dist",
+    "dist/studio.js",
+    "dist/studio.css",
+    "dist/iframe-entry.js",
+    "dist/workers",
     "index.html",
     "canvas.html",
     "fonts"

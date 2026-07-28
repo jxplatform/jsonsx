@@ -8,10 +8,42 @@
  */
 
 import { $ } from "bun";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+import type { BunPlugin } from "bun";
 import pkg from "../package.json" with { type: "json" };
+
+const studioDir = join(import.meta.dir, "..");
+const outdir = join(studioDir, "dist");
 
 const { version } = pkg as { version: string };
 const buildDate = new Date().toISOString();
+
+// Dist is generated, never curated: wipe it so a renamed entrypoint or a one-off `bun build` cannot
+// Leave an orphan behind that `package.json`'s `files` then publishes. (This repo shipped a stale
+// 12 MB `dist/studio.ts` and a duplicate `dist/canvas/iframe-entry.js` that way.) Safe to do first —
+// The Monaco workers are rebuilt below.
+await rm(outdir, { force: true, recursive: true });
+
+/**
+ * Resolve EVERY `monaco-editor` specifier from the studio package, so all consumers share one
+ * module identity.
+ *
+ * Without this, studio's own `monaco-editor/esm/...` resolves through
+ * `packages/studio/node_modules/monaco-editor` (a symlink into `node_modules/.bun/…`) while
+ * `y-monaco`'s bare `monaco-editor` resolves to the separate physical copy hoisted at the workspace
+ * root. Same version, two paths, so the bundler emits Monaco twice — 5.1 MB, 27% of the bundle.
+ * Delegating to `Bun.resolveSync` from a fixed base keeps this correct across install re-layouts,
+ * which a version pin or an `overrides` entry would not (both copies are already 0.55.1).
+ */
+const dedupeMonaco: BunPlugin = {
+  name: "dedupe-monaco",
+  setup(build) {
+    build.onResolve({ filter: /^monaco-editor(\/|$)/ }, (args) => ({
+      path: Bun.resolveSync(args.path, studioDir),
+    }));
+  },
+};
 
 let gitCommit = "unknown";
 try {
@@ -33,11 +65,12 @@ const define = {
 // Single-entry builds each emit flat at dist/<name>.js.
 for (const entry of ["./src/studio.ts", "./src/canvas/iframe-entry.ts"]) {
   const result = await Bun.build({
+    define,
     entrypoints: [entry],
     outdir: "dist",
-    target: "browser",
+    plugins: [dedupeMonaco],
     sourcemap: "linked",
-    define,
+    target: "browser",
   });
   if (!result.success) {
     for (const log of result.logs) {

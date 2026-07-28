@@ -18,7 +18,7 @@ import { isTabActive } from "../workspace/workspace";
 import { view } from "../view";
 import { toRaw } from "../reactivity";
 import { postPatchToHosts } from "./iframe-host";
-import { canvasPerf, recordEscalation } from "./canvas-perf";
+import { canvasPerf, recordEscalation, SPAN_PATCH_BATCH, timeSpan } from "./canvas-perf";
 import { setPatchConsumer } from "../tabs/patch-ops";
 
 import type { JxPatchOp, TransactionRecord } from "../tabs/patch-ops";
@@ -309,8 +309,10 @@ export function applyPatchBatch(tab: Tab, _ops: JxPatchOp[], record?: Transactio
   // Rendering THIS tab's document (a background tab's iframe must never fold a foreign edit into
   // Its shadow doc). Throwing when no host received it escalates to a full render (the suppressed
   // Render then runs), so an edit is never dropped.
-  const forwardOps = (record?.docOps ?? []).map((pair) => pair.forward);
-  if (postPatchToHosts(forwardOps, view.renderGeneration, tab.id) === 0) {
-    throw new Error("no-ready-iframe-host");
-  }
+  timeSpan(SPAN_PATCH_BATCH, () => {
+    const forwardOps = (record?.docOps ?? []).map((pair) => pair.forward);
+    if (postPatchToHosts(forwardOps, view.renderGeneration, tab.id) === 0) {
+      throw new Error("no-ready-iframe-host");
+    }
+  });
 }
