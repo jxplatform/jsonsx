@@ -266,6 +266,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.3.6-draft** (2026-07-28) — Preview link clicks open the target in a real browser tab instead of navigating the canvas iframe away.
 - **0.3.5-draft** (2026-07-28) — IME composition suspends canvas commits; the editable region gets textbox/aria-multiline/label (§8.2.8).
 - **0.3.4-draft** (2026-07-28) — Document the two-entry code-split bundle layout and the on-demand Monaco load (§11.1).
 - **0.3.3-draft** (2026-07-28) — Layer-row actions follow selection rather than hover; edit/design gate automatic Request fetches; structural splices escalate on the immediate parent only.

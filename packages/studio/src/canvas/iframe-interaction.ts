@@ -130,6 +130,24 @@ export function startInteraction(
   let lastGen = deps?.getGen?.() ?? 0;
 
   const onClick = (e: Event) => {
+    /*
+     * Preview keeps anchors live, so a click would navigate this iframe and destroy the render (and
+     * the editing session with it). Report the intent so the parent can open the real page in a real
+     * browser tab — where routing, project JS and server data behave as they will in production —
+     * rather than replacing the canvas with a half-loaded page.
+     *
+     * Design/edit never reach this: the runtime de-links anchors onto `data-jx-href` there, so there
+     * is no navigation to intercept and a click means "select this element".
+     */
+    if (deps?.getMode?.() === "preview" && e.target instanceof Element) {
+      const anchor = e.target.closest("a[href]");
+      const href = anchor?.getAttribute("href");
+      if (href && !href.startsWith("#")) {
+        e.preventDefault();
+        channel.post({ href, kind: "previewNavigate" });
+        return;
+      }
+    }
     const hit = nearestHit(e.target);
     if (hit) {
       channel.post({ hit, kind: "hit" });

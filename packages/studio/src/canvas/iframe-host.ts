@@ -226,6 +226,38 @@ let evalReqId = 0;
  */
 let _allowAutoRequestsOnce = false;
 
+/**
+ * Where a preview link goes. Defaults to a new browser tab; the desktop platform overrides it so
+ * the link opens in the user's real browser rather than a webview with no chrome.
+ */
+let previewNavigateHandler: ((url: string) => void) | null = null;
+
+export function setPreviewNavigateHandler(handler: ((url: string) => void) | null): void {
+  previewNavigateHandler = handler;
+}
+
+/**
+ * Open a preview link's target for real.
+ *
+ * Resolved against the CANVAS's origin, not the editor's: the canvas iframe is served from the
+ * project's own origin so relative `src`/`href` resolve the way they will in production, and the
+ * editor shell may sit on a different origin entirely (a deep `/edit/:owner/:repo` path in the
+ * cloud). Resolving against `location` would send a root-relative `/about` to the wrong host.
+ */
+function openPreviewHref(href: string, state: HostState): void {
+  let url: string;
+  try {
+    url = new URL(href, state.iframe.src || canvasBaseOrigin()).href;
+  } catch {
+    return; // Unparseable href — nothing sensible to open.
+  }
+  if (previewNavigateHandler) {
+    previewNavigateHandler(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 /** Arm the next page render to allow automatic request fetches (Data activity Refresh). */
 export function allowAutoRequestsOnNextRender(): void {
   _allowAutoRequestsOnce = true;
@@ -1507,6 +1539,10 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
     }
     case "slashDismiss": {
       canvasSlashHandler?.dismiss();
+      return;
+    }
+    case "previewNavigate": {
+      openPreviewHref(msg.href, state);
       return;
     }
     case "contextMenu": {

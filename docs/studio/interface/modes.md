@@ -64,6 +64,12 @@ Alongside the toggle, the tab bar offers:
 
 Switch Preview off to go back to editing — the mode switcher stays on Edit or Design the whole time.
 
+**Clicking a link in Preview opens that page in a new browser tab**, rather than replacing the canvas. Links within the same page — the ones that jump to a heading — still scroll where you would expect.
+
+:::doc-tip
+That new tab is the best way to check a project properly: it is your real browser loading the real page, so navigation between pages, your own JavaScript, server-side data, and anything that depends on a real URL all behave exactly as they will once the site is built. The canvas is for composing; the browser tab is for confirming.
+:::
+
 ## Next
 
 - Learn the canvas itself — pan, zoom, selection, inserting — in **[The canvas](/docs/studio/interface/canvas)**

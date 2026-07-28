@@ -371,3 +371,72 @@ describe("contextmenu forwarding", () => {
     expect(posts.some((p) => p.kind === "contextMenu")).toBe(false);
   });
 });
+
+describe("preview link interception", () => {
+  let stop: (() => void) | undefined;
+  afterEach(() => {
+    stop?.();
+    stop = undefined;
+  });
+
+  function stampedAnchor(href: string) {
+    const a = document.createElement("a");
+    a.setAttribute("href", href);
+    a.dataset.jxPath = '["children",0]';
+    stubRect(a, { height: 20, width: 100, x: 0, y: 0 });
+    const inner = document.createElement("span");
+    a.append(inner);
+    document.body.append(a);
+    return { a, inner };
+  }
+
+  test("a preview click reports the href instead of navigating", () => {
+    const { channel, posts } = fakeChannel();
+    const { inner } = stampedAnchor("/about");
+    stop = startInteraction(channel, document, {
+      getMode: () => "preview",
+      getShadowDoc: () => null,
+    });
+
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    inner.dispatchEvent(event);
+
+    // Prevented, so the canvas iframe is not navigated away (which would destroy the render).
+    expect(event.defaultPrevented).toBe(true);
+    expect(posts).toContainEqual({ href: "/about", kind: "previewNavigate" });
+    // And it is NOT also treated as an element selection.
+    expect(posts.some((p) => p.kind === "hit")).toBe(false);
+  });
+
+  test("design mode still selects — the runtime de-links anchors there", () => {
+    const { channel, posts } = fakeChannel();
+    const { inner } = stampedAnchor("/about");
+    stop = startInteraction(channel, document, {
+      getMode: () => "design",
+      getShadowDoc: () => null,
+    });
+
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    inner.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(posts.some((p) => p.kind === "previewNavigate")).toBe(false);
+    expect(posts.some((p) => p.kind === "hit")).toBe(true);
+  });
+
+  test("an in-page fragment is left to the browser", () => {
+    const { channel, posts } = fakeChannel();
+    const { inner } = stampedAnchor("#section-2");
+    stop = startInteraction(channel, document, {
+      getMode: () => "preview",
+      getShadowDoc: () => null,
+    });
+
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    inner.dispatchEvent(event);
+
+    // Scrolling within the previewed page is exactly what preview is for.
+    expect(event.defaultPrevented).toBe(false);
+    expect(posts.some((p) => p.kind === "previewNavigate")).toBe(false);
+  });
+});

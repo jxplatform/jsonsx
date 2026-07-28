@@ -430,6 +430,13 @@ export type IframeToParent =
   // Browser menu is still suppressed, legacy parity); x/y are IFRAME-VIEWPORT coords for the host
   // To convert via its empirical geometry.
   | { kind: "contextMenu"; path: (string | number)[] | null; x: number; y: number }
+  // ─── Preview navigation ─────────────────────────────────────────────────────
+  // A link was clicked in PREVIEW mode. Preview keeps anchors live (design/edit de-link them onto
+  // `data-jx-href`), so the click would navigate the canvas iframe away and destroy the render —
+  // Taking the editing session with it. The iframe reports the intent instead and the parent opens the
+  // Real page in a real browser tab, which is also the only place project JS, routing and server data
+  // Behave exactly as they will in production.
+  | { kind: "previewNavigate"; href: string }
   // ─── Cross-frame DnD (Phase 4c spike) ──────────────────────────────────────
   // Flow 3 (grab-anywhere): the iframe detected a drag begin on an element body (pointerdown past a
   // Movement threshold on a `[data-jx-path]`, NOT during an inline-edit). The parent starts a

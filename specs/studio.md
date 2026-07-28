@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.3.5-draft
+**Version:** 0.3.6-draft
 **Status:** Partial
 **Updated:** 2026-07-28
 **License:** MIT
@@ -162,6 +162,19 @@ The mapping is render-only: the tab's source document keeps the authored relativ
 Design and Content are both **editable modes** and behave identically for text: the canvas carries a
 live caret (§8.2). They differ only in what the document is — Content mode opens a format-backed
 document (`.md` via its format class, §8.1), Design mode a native `.json` one.
+
+**Following a link in Preview leaves the canvas.** Editable modes de-link anchors — the runtime stamps
+`href` onto `data-jx-href`, so a click selects the element instead of navigating. Preview keeps them
+live, where a click would navigate the canvas iframe and destroy the render along with the editing
+session. So Preview intercepts the click and the shell opens the target in a **real browser tab**,
+resolved against the CANVAS's origin (the project's own), not the editor shell's — which may sit on an
+unrelated deep path. In-page fragments are left to the browser, since scrolling the previewed page is
+what Preview is for.
+
+That browser tab is also the honest place to verify a project: routing, project JavaScript, server
+functions and live data all behave there exactly as they will on the built site, none of which the
+canvas promises. The shell exposes an override for this so a host can redirect it (the desktop app
+wants the user's own browser rather than a chrome-less webview); the default is a new tab.
 
 #### 4.2.1 Source-mode schema validation
 
@@ -827,6 +840,7 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.3.6-draft** (2026-07-28) — Preview link clicks open the target in a real browser tab instead of navigating the canvas iframe away.
 - **0.3.5-draft** (2026-07-28) — IME composition suspends canvas commits; the editable region gets textbox/aria-multiline/label (§8.2.8).
 - **0.3.4-draft** (2026-07-28) — Document the two-entry code-split bundle layout and the on-demand Monaco load (§11.1).
 - **0.3.3-draft** (2026-07-28) — Layer-row actions follow selection rather than hover; edit/design gate automatic Request fetches; structural splices escalate on the immediate parent only.
@@ -867,4 +881,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.3.5-draft_
+_`@jxsuite/studio` Specification v0.3.6-draft_
