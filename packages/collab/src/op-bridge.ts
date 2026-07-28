@@ -14,7 +14,17 @@
 import * as Y from "yjs";
 import type { JxPath } from "@jxsuite/schema/types";
 import type { JxDocOp } from "./ops.ts";
-import { resolveYPath, toYChildren, toYNode, yValueToJson } from "./schema.ts";
+import {
+  applyTextEdit,
+  GRANULAR_OBJECT_KEYS,
+  mergeYObject,
+  resolveYPath,
+  TEXT_KEYS,
+  toYChild,
+  toYChildren,
+  toYObject,
+  yValueToJson,
+} from "./schema.ts";
 
 /** Origin of Y transactions produced by mirroring the local tab's ops. */
 export const LOCAL_ORIGIN = "jx-local";
@@ -59,8 +69,47 @@ function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function toYChild(node: unknown): unknown {
-  return typeof node === "string" ? node : toYNode(node);
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Write a node key, preserving CRDT identity wherever the schema stores it granularly.
+ *
+ * Studio's mutators record whole-value `set-key` ops — `mutateUpdateStyle` replaces the entire
+ * style object, an inline-edit commit replaces the entire `textContent`. Writing those straight
+ * through with `Y.Map.set` mints a fresh Y type each time and throws away whatever a peer
+ * concurrently did to the old one, which is exactly how "two people typing in one paragraph" became
+ * last-writer-wins.
+ *
+ * So a whole-value op is diffed down onto the existing structure: text through {@link applyTextEdit}
+ * (character-level), granular objects through {@link mergeYObject} (per-property). Only a TYPE
+ * change — string text becoming a `$ref`, an object becoming a scalar — falls back to replacement,
+ * because then there is no shared structure left to preserve.
+ */
+function setNodeKey(node: Y.Map<unknown>, key: string, value: unknown): void {
+  const existing = node.get(key);
+  if (key === "children" && Array.isArray(value)) {
+    node.set(key, toYChildren(value));
+    return;
+  }
+  if (TEXT_KEYS.has(key) && typeof value === "string") {
+    if (existing instanceof Y.Text) {
+      applyTextEdit(existing, value);
+    } else {
+      node.set(key, new Y.Text(value));
+    }
+    return;
+  }
+  if (GRANULAR_OBJECT_KEYS.has(key) && isPlainObject(value)) {
+    if (existing instanceof Y.Map) {
+      mergeYObject(existing, value);
+    } else {
+      node.set(key, toYObject(value));
+    }
+    return;
+  }
+  node.set(key, cloneJson(value));
 }
 
 function applyOneOp(doc: Y.Doc, op: JxDocOp): void {
@@ -69,10 +118,8 @@ function applyOneOp(doc: Y.Doc, op: JxDocOp): void {
       const node = requireNode(doc, op.path);
       if (op.value === undefined) {
         node.delete(op.key);
-      } else if (op.key === "children" && Array.isArray(op.value)) {
-        node.set(op.key, toYChildren(op.value));
       } else {
-        node.set(op.key, cloneJson(op.value));
+        setNodeKey(node, op.key, op.value);
       }
       return;
     }
@@ -96,6 +143,14 @@ function applyOneOp(doc: Y.Doc, op: JxDocOp): void {
       const children = childrenOf(doc, op.parentPath, false);
       if (op.index < 0 || op.index >= children.length) {
         throw new CollabPathError([...op.parentPath, "children", op.index]);
+      }
+      // Text child → text child: edit the existing Y.Text in place. A delete+insert would replace the
+      // Whole element and discard a peer's concurrent characters, which is the same clobber
+      // `setNodeKey` avoids for `textContent` — bare-string children are the other half of prose.
+      const existing = children.get(op.index);
+      if (existing instanceof Y.Text && typeof op.node === "string") {
+        applyTextEdit(existing, op.node);
+        return;
       }
       children.delete(op.index, 1);
       children.insert(op.index, [toYChild(op.node)]);
@@ -139,6 +194,34 @@ export function applyDocOpsToY(doc: Y.Doc, ops: readonly JxDocOp[], origin: unkn
   }, origin);
 }
 
+/**
+ * When `path` addresses a granular container (or something nested inside one), the node that owns
+ * it and the key it sits under; otherwise null.
+ *
+ * The event path is relative to the structure map, so the first segment matching a granular key
+ * marks the boundary: everything before it is the node path, and anything after it is interior
+ * detail the op log does not model.
+ *
+ * `children`/index segments need no special handling: they are not granular keys, so the scan
+ * passes over them and the returned node path keeps the full prefix — `["children", 0, "style"]`
+ * resolves to the style of the node at `children/0`, not of the root.
+ */
+function granularOwner(path: JxPath): { nodePath: JxPath; key: string } | null {
+  for (let i = 0; i < path.length; i++) {
+    const segment = path[i];
+    if (typeof segment !== "string") {
+      continue;
+    }
+    if (GRANULAR_OBJECT_KEYS.has(segment)) {
+      return { key: segment, nodePath: path.slice(0, i) };
+    }
+    if (TEXT_KEYS.has(segment)) {
+      return { key: segment, nodePath: path.slice(0, i) };
+    }
+  }
+  return null;
+}
+
 function isStructurePath(segments: readonly (string | number)[]): segments is JxPath {
   return segments.every((seg) => typeof seg === "string" || typeof seg === "number");
 }
@@ -179,6 +262,45 @@ export function yEventsToDocOps(events: readonly Y.YEvent<never>[]): JxDocOp[] |
   const ops: JxDocOp[] = [];
   for (const event of events) {
     const path = event.path as JxPath;
+    /*
+     * A remote edit inside a granular container (a `Y.Text` for prose, a nested `Y.Map` for
+     * style/attributes/$props) reports its event at the CONTAINER's path, not the node's. Studio's op
+     * vocabulary addresses nodes, so those collapse back to one whole-value op for the owning key —
+     * the same shape a local mutator would have produced. Granularity buys merge; it deliberately does
+     * not leak into the op log, the canvas patcher, or the history ring.
+     */
+    const granular = granularOwner(path);
+    if (granular) {
+      const { doc } = event.target as { doc?: Y.Doc | null };
+      if (!doc) {
+        return null;
+      }
+      const container = resolveYPath(doc, [...granular.nodePath, granular.key]);
+      if (container === undefined) {
+        return null;
+      }
+      ops.push({
+        key: granular.key,
+        op: "set-key",
+        path: granular.nodePath,
+        value: yValueToJson(container),
+      });
+      continue;
+    }
+    if (event instanceof Y.YTextEvent) {
+      // A bare-string child: the text IS the child, so it round-trips as a child replacement.
+      const index = path.at(-1);
+      if (path.at(-2) === "children" && typeof index === "number") {
+        ops.push({
+          index,
+          node: (event.target as Y.Text).toString(),
+          op: "set-child",
+          parentPath: path.slice(0, -2),
+        });
+        continue;
+      }
+      return null;
+    }
     if (event instanceof Y.YMapEvent) {
       const target = event.target as Y.Map<unknown>;
       for (const [key, change] of event.changes.keys) {

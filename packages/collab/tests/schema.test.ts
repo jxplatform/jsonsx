@@ -91,9 +91,16 @@ describe("resolveYPath", () => {
     expect(resolveYPath(ydoc, [])).toBe(structureMap(ydoc));
     const h1 = resolveYPath(ydoc, ["children", 0]);
     expect(h1).toBeInstanceOf(Y.Map);
-    expect((h1 as Y.Map<unknown>).get("textContent")).toBe("Title");
-    expect(resolveYPath(ydoc, ["children", 1])).toBe("loose text");
-    expect(resolveYPath(ydoc, ["children", 2, "children", 0, "textContent"])).toBe("deep");
+    // Text is a Y.Text, not an opaque string — that is what makes concurrent typing merge per
+    // Character instead of whole-value last-writer-wins.
+    const title = (h1 as Y.Map<unknown>).get("textContent");
+    expect(title).toBeInstanceOf(Y.Text);
+    expect((title as Y.Text).toString()).toBe("Title");
+    const loose = resolveYPath(ydoc, ["children", 1]);
+    expect(loose).toBeInstanceOf(Y.Text);
+    expect((loose as Y.Text).toString()).toBe("loose text");
+    const deep = resolveYPath(ydoc, ["children", 2, "children", 0, "textContent"]);
+    expect((deep as Y.Text).toString()).toBe("deep");
     expect(resolveYPath(ydoc, ["children"])).toBeInstanceOf(Y.Array);
   });
 
