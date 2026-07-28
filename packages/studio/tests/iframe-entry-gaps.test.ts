@@ -210,6 +210,10 @@ describe("entry-wired accessor seams", () => {
     acks.length = 0;
     const p = container.querySelector("p") as HTMLElement;
     p.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 5, clientY: 5 }));
+    // Hover + insert zones are coalesced into one rAF, so the move's effects land next frame.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
     pair.flush();
     // The interaction layer read the mode + shadow doc through the entry's accessors and posted
     // The hover (and, with a resolvable geometry, the zone set) for the stamped node.

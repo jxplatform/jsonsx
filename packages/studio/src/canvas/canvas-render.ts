@@ -101,22 +101,24 @@ async function sourceContent(tab: Tab, lang: string) {
   return JSON.stringify(tab.doc.document, null, 2);
 }
 
-// Double-RAF scheduling so the canvas render yields to higher-priority panel paints first.
-// Concurrent schedule requests within the same frame are deduped.
+// Single-RAF scheduling; concurrent schedule requests within the same frame are deduped.
+//
+/* Two nested rAFs used to make the canvas render "yield to higher-priority panel paints first".
+   Panels have since grown their own rAF scheduler (see panel-scheduler.ts), so the second frame
+   bought nothing and put a hard ~32 ms floor under every escalated edit — canvas-patcher's
+   escalateToFullRender routes through here. */
 let _canvasRafId = 0;
 export function scheduleCanvasRender() {
   if (_canvasRafId) {
     return;
   }
   _canvasRafId = requestAnimationFrame(() => {
-    _canvasRafId = requestAnimationFrame(() => {
-      _canvasRafId = 0;
-      try {
-        renderCanvas();
-      } catch (error) {
-        console.error("renderCanvas error:", error);
-      }
-    });
+    _canvasRafId = 0;
+    try {
+      renderCanvas();
+    } catch (error) {
+      console.error("renderCanvas error:", error);
+    }
   });
 }
 

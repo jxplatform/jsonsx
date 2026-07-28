@@ -42,17 +42,22 @@ function nearestPathEl(start: Element | null): HTMLElement | null {
   return null;
 }
 
+/** Measure an already-resolved path element. Split out so callers can dedupe BEFORE measuring. */
+function measureHit(el: HTMLElement, serializedPath: string): NodeHit {
+  const r = rectOf(el);
+  return {
+    path: parseJxPath(serializedPath),
+    rect: { height: r.height, width: r.width, x: r.x, y: r.y },
+  };
+}
+
 /** Walk up from an event target to the nearest element carrying a `data-jx-path`; null if none. */
 export function nearestHit(target: EventTarget | null): NodeHit | null {
   const el = nearestPathEl(target instanceof Element ? target : null);
   if (!el) {
     return null;
   }
-  const r = rectOf(el);
-  return {
-    path: parseJxPath(el.dataset.jxPath as string),
-    rect: { height: r.height, width: r.width, x: r.x, y: r.y },
-  };
+  return measureHit(el, el.dataset.jxPath as string);
 }
 
 /**
@@ -131,13 +136,21 @@ export function startInteraction(
     }
   };
 
-  const reportHover = (hit: NodeHit | null) => {
-    const key = hit ? JSON.stringify(hit.path) : null;
+  /**
+   * Post hover only when the hovered element changes — and MEASURE only then.
+   *
+   * The de-dupe key is the element's own `data-jx-path` attribute, which is already the serialized
+   * path, so deciding "did this change?" costs one string compare. The previous form called
+   * {@link nearestHit} first, which ran `getBoundingClientRect` on every single `pointermove` before
+   * the key was ever compared — a forced layout per mouse move, thrown away almost every time.
+   */
+  const reportHover = (el: HTMLElement | null) => {
+    const key = el?.dataset.jxPath ?? null;
     if (key === lastHoverKey) {
       return;
     }
     lastHoverKey = key;
-    channel.post({ hit, kind: "hover" });
+    channel.post({ hit: el && key ? measureHit(el, key) : null, kind: "hover" });
   };
 
   /**
@@ -170,10 +183,41 @@ export function startInteraction(
     channel.post({ kind: "insertZones", zones });
   };
 
+  /**
+   * Hover + insertion zones are coalesced into one frame.
+   *
+   * Chrome already caps `pointermove` at the display rate, but each event did DOM walks, a
+   * `JSON.parse` of the path, and — via `computeInsertZones` — a `getBoundingClientRect` plus a
+   * `getComputedStyle` on the parent. Collapsing to one rAF means at most one such pass per frame,
+   * and only the newest cursor position is used (an intermediate position is never interesting once
+   * a newer one has arrived).
+   */
+  let movePending = 0;
+  let moveTarget: EventTarget | null = null;
+  let moveX = 0;
+  let moveY = 0;
+  const raf = (cb: () => void) =>
+    doc.defaultView?.requestAnimationFrame(cb) ?? requestAnimationFrame(cb);
+  const cancelRaf = (id: number) =>
+    doc.defaultView?.cancelAnimationFrame(id) ?? cancelAnimationFrame(id);
+
+  const flushMove = () => {
+    movePending = 0;
+    const target = moveTarget;
+    moveTarget = null;
+    reportHover(nearestPathEl(target instanceof Element ? target : null));
+    reportInsertZones(target, { x: moveX, y: moveY });
+  };
+
   const onMove = (e: Event) => {
-    reportHover(nearestHit(e.target));
     const pe = e as PointerEvent;
-    reportInsertZones(e.target, { x: pe.clientX, y: pe.clientY });
+    moveTarget = e.target;
+    moveX = pe.clientX;
+    moveY = pe.clientY;
+    if (movePending) {
+      return;
+    }
+    movePending = raf(flushMove);
   };
   const onLeave = (e: Event) => {
     if (!isCanvasLeave(e, doc)) {
@@ -211,6 +255,10 @@ export function startInteraction(
   doc.addEventListener("contextmenu", onContextMenu, true);
 
   return () => {
+    if (movePending) {
+      cancelRaf(movePending);
+      movePending = 0;
+    }
     doc.removeEventListener("click", onClick, true);
     doc.removeEventListener("pointermove", onMove, true);
     doc.removeEventListener("pointerleave", onLeave, true);
