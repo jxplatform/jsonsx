@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.3.1-draft
+**Version:** 0.3.2-draft
 **Status:** Partial
 **Updated:** 2026-07-28
 **License:** MIT
@@ -140,6 +140,10 @@ The canvas renders the current document using `@jxsuite/runtime`. It shows exact
 Site style is injected into the canvas as a real stylesheet (custom properties in a `:root` rule, direct properties in a `body` rule, conditional `@--name` blocks resolved and — for scheme queries — dual-emitted per spec.md §9.5), never as inline root properties, so forced-scheme override selectors can win the cascade.
 
 **Color-scheme preview.** When the effective `$media` declares a pure `prefers-color-scheme` query, the tab bar shows an Auto/Light/Dark control (one per tab; available in edit, design, and stylebook modes). Light/Dark force the scheme by setting `data-color-scheme` on the canvas iframe's root element — a patch-free document-level attribute flip that never re-renders; Auto removes the attribute and follows the OS. Scheme queries no longer render as generic feature toggles. The same tri-state also selects which scheme layer style-sidebar edits target (§6.2).
+
+**Content-entry media.** A content entry references its media relative to ITSELF (`./images/hero.png`), and the built site serves those files from the content type's asset mount (`site-architecture.md` §9.3). Studio opens an entry as a standalone document, so the collection loader that normally performs that mapping never runs — the canvas would otherwise resolve the authored path against `canvas.html`. The render document is therefore mapped onto the mount before it is posted to the iframe, in every mode, so the canvas previews the URL production serves.
+
+The mapping is render-only: the tab's source document keeps the authored relative reference, so serialization and the properties panel are unaffected. Parent-realm previews of the same values — the media picker's thumbnail — apply it too, since panel chrome would otherwise resolve them against `index.html`. Eligibility and URL math are shared with the loader; the browser cannot perform the loader's existence check, so a reference to a missing file maps optimistically and fails at the mount URL instead.
 
 ### 4.2 Modes
 
@@ -791,6 +795,7 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.3.2-draft** (2026-07-28) — Canvas maps a content entry's entry-relative media onto its asset mount (§4.1) so the preview matches the built site; render-only, source doc untouched.
 - **0.3.1-draft** (2026-07-28) — Media upload across four surfaces (§9.3): image-field Upload button, canvas file drop with replace-vs-insert, Files-tree and Manage destinations; collision-safe naming; binary uploadFile on every platform.
 - **0.3.0-draft** (2026-07-27) — Derive the caret's editable tag set from the document's element vocabulary (§8.2.2): the format class decides per tag and can say no, so a Markdown blockquote holds paragraphs and a link is markup within a block; subsections after it renumber (nothing referenced them).
 - **0.2.0-draft** (2026-07-26) — Fluid document editing: the canvas carries a live caret (§8.2), one block action bar (§4.4), both editable modes behave identically for text (§4.2), and a rewritten keyboard contract (§10).
@@ -827,4 +832,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.3.1-draft_
+_`@jxsuite/studio` Specification v0.3.2-draft_

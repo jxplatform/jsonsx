@@ -25,10 +25,10 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `relationships.md`        | 0.1.3-draft  | Partial     | 2026-07-22 |
 | `schema.md`               | 0.2.8-draft  | Partial     | 2026-07-22 |
 | `server.md`               | 0.2.1        | Implemented | 2026-07-25 |
-| `site-architecture.md`    | 0.1.38-draft | Pending     | 2026-07-28 |
+| `site-architecture.md`    | 0.1.39-draft | Pending     | 2026-07-28 |
 | `spec.md`                 | 0.4.24-draft | Partial     | 2026-07-24 |
 | `studio-ui-guidelines.md` | 0.2.1        | Implemented | 2026-07-28 |
-| `studio.md`               | 0.3.1-draft  | Partial     | 2026-07-28 |
+| `studio.md`               | 0.3.2-draft  | Partial     | 2026-07-28 |
 
 ## Sections not yet implemented
 

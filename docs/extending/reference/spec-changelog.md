@@ -164,6 +164,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.1.39-draft** (2026-07-28) — §9.3: editors that open a collection entry standalone must apply the mount rewrite to their render representation only, with the browser-side existence-check divergence stated.
 - **0.1.38-draft** (2026-07-28) — Media browser (§9.4) is Partial: upload ships on four Studio surfaces with content-collection destinations and collision-safe naming; metadata and usage tracking still pending.
 - **0.1.37-draft** (2026-07-24) — Document the application tier and correct the static-only framing: §1 vision, §1.1 principles 1/3/5, §1.2 coverage, §14.1/§14.2 adapter output (worker generation is gated on build.adapter alone), and new §15 Application Tier covering server functions, auth, and data mounts.
 - **0.1.36-draft** (2026-07-23) — Note the mounted-asset copy step in the build pipeline (§12.1).
@@ -264,6 +265,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.3.2-draft** (2026-07-28) — Canvas maps a content entry's entry-relative media onto its asset mount (§4.1) so the preview matches the built site; render-only, source doc untouched.
 - **0.3.1-draft** (2026-07-28) — Media upload across four surfaces (§9.3): image-field Upload button, canvas file drop with replace-vs-insert, Files-tree and Manage destinations; collision-safe naming; binary uploadFile on every platform.
 - **0.3.0-draft** (2026-07-27) — Derive the caret's editable tag set from the document's element vocabulary (§8.2.2): the format class decides per tag and can say no, so a Markdown blockquote holds paragraphs and a link is markup within a block; subsections after it renumber (nothing referenced them).
 - **0.2.0-draft** (2026-07-26) — Fluid document editing: the canvas carries a live caret (§8.2), one block action bar (§4.4), both editable modes behave identically for text (§4.2), and a rewritten keyboard contract (§10).

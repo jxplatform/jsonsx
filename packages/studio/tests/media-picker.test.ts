@@ -1,6 +1,7 @@
 import {
   flush,
   installMockPlatform,
+  resetWorkspaceWithTab,
   pointer,
   renderInto,
   resetStudioState,
@@ -370,5 +371,34 @@ describe("media picker upload", () => {
     await uploadAndAssign([testFile("hero.png")], (v) => commits.push(v));
 
     expect(commits).toEqual([]);
+  });
+});
+
+// ─── Content-relative thumbnails ─────────────────────────────────────────────
+
+describe("media picker thumbnail for a content entry", () => {
+  test("a content-relative value previews at its mounted URL, not against index.html", async () => {
+    resetStudioState({ projectConfig: { content: { posts: { source: "./content/posts/" } } } });
+    resetWorkspaceWithTab(undefined, { documentPath: "content/posts/hello.md" });
+
+    const container = await renderLoaded("./images/hero.png");
+
+    // Without the mapping this would be "./images/hero.png", which the parent document resolves to
+    // /packages/studio/images/hero.png and 404s.
+    expect(container.querySelector(".media-picker-thumb")?.getAttribute("src")).toBe(
+      "/content/posts/images/hero.png",
+    );
+    // The FIELD still shows what the author wrote — the mapping is preview-only.
+    const field = container.querySelector("sp-textfield") as HTMLInputElement;
+    expect(field.value).toBe("./images/hero.png");
+  });
+
+  test("a page document leaves the value alone", async () => {
+    resetStudioState({ projectConfig: { content: { posts: { source: "./content/posts/" } } } });
+    resetWorkspaceWithTab(undefined, { documentPath: "pages/index.json" });
+
+    const container = await renderLoaded("/logo.png");
+
+    expect(container.querySelector(".media-picker-thumb")?.getAttribute("src")).toBe("/logo.png");
   });
 });

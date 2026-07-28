@@ -17,6 +17,7 @@ import { debouncedStyleCommit, renderOnly } from "../store";
 import { getLayerSlot } from "./layers";
 import { rectOf } from "../utils/geometry";
 import { loopbackAssetSrc } from "../canvas/canvas-origin";
+import { previewAssetSrc } from "../canvas/content-assets";
 import {
   IMAGE_EXTENSIONS,
   MEDIA_EXTENSIONS,
@@ -329,7 +330,11 @@ export function renderMediaPicker(prop: string, value: string, onCommit: (val: s
   return html`
     <div class="media-picker">
       ${isImage && currentValue
-        ? html`<img class="media-picker-thumb" src=${loopbackAssetSrc(currentValue)} alt="" />`
+        ? html`<img
+            class="media-picker-thumb"
+            src=${loopbackAssetSrc(previewAssetSrc(currentValue))}
+            alt=""
+          />`
         : nothing}
       <sp-textfield
         size="s"

@@ -9,6 +9,7 @@ code:
   - packages/studio/src/browse/browse.ts
   - packages/studio/src/ui/media-picker.ts
   - packages/studio/src/editor/file-drop-action.ts
+  - packages/studio/src/canvas/content-assets.ts
 ---
 
 # Media
@@ -60,6 +61,8 @@ When you don't pick a folder yourself, Studio decides from what you're editing:
 | Anything else              | `public/`                      | `/hero.jpg`         |
 
 Everything in `public/` is served from your site's root, so `public/hero.jpg` becomes `/hero.jpg` on the published site. Media kept beside a content entry travels with it — useful when a blog post's pictures belong to that post rather than to the site as a whole. The folder layout is documented in [Site architecture](/docs/framework/site).
+
+A post's own pictures are written the way any markdown editor expects — `./images/hero.jpg`, relative to the post — so the file still reads correctly outside Studio. On your published site those become `/content/posts/images/hero.jpg`, and the canvas previews them at that same address, so what you see while editing is what visitors get.
 
 :::doc-note
 Uploads never overwrite. If a file of the same name is already there, the new one becomes `hero-1.jpg`, then `hero-2.jpg`, and so on — the original is left alone.

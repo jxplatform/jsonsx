@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.38-draft
+**Version:** 0.1.39-draft
 **Status:** Pending
 **Updated:** 2026-07-28
 **License:** MIT
@@ -1147,6 +1147,15 @@ The rewrite is deliberately conservative. A value is remapped only when it:
 
 Anything else is left exactly as authored, so existing project-root-relative paths keep their meaning. A relative `src` that resolves to nothing is reported as a warning naming the entry. The raw markdown `body` is never rewritten — it is the round-trip source Studio writes back to disk — and `href` links are out of scope: links between entries are routes, not assets.
 
+#### Editors that open an entry standalone
+
+The rewrite above runs when a **collection** is loaded. An editor that opens a single entry as a document — Studio's canvas does — never triggers it, and would render the authored path against the editor's own document URL instead of the entry's. Such an editor MUST apply the same mapping to whatever it renders, so the preview shows the URL the built site serves. Two rules bound it:
+
+- Map the **render** representation only. The authored relative reference is what round-trips to disk; rewriting the source would break both the markdown-editor property above and serialization.
+- Use the same containment math (`assetUrlFor`) and the same eligibility rules, so a preview can never claim a URL the build would not produce.
+
+A browser-hosted editor cannot perform the existence check, so it maps optimistically: a reference to a missing file resolves to its mount URL and 404s there rather than 404ing against the editor's document. Both are broken; the mount URL is the failure the build would also report.
+
 Only statically referenced files are copied into the build. A `src` computed at runtime belongs in `public/`.
 
 ### 9.4 Studio Media Browser
@@ -1757,6 +1766,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.1.39-draft** (2026-07-28) — §9.3: editors that open a collection entry standalone must apply the mount rewrite to their render representation only, with the browser-side existence-check divergence stated.
 - **0.1.38-draft** (2026-07-28) — Media browser (§9.4) is Partial: upload ships on four Studio surfaces with content-collection destinations and collision-safe naming; metadata and usage tracking still pending.
 - **0.1.37-draft** (2026-07-24) — Document the application tier and correct the static-only framing: §1 vision, §1.1 principles 1/3/5, §1.2 coverage, §14.1/§14.2 adapter output (worker generation is gated on build.adapter alone), and new §15 Application Tier covering server functions, auth, and data mounts.
 - **0.1.36-draft** (2026-07-23) — Note the mounted-asset copy step in the build pipeline (§12.1).
