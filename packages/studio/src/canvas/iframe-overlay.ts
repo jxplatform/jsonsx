@@ -90,6 +90,13 @@ export interface OverlayLayer {
    * {@link insertButton}.
    */
   setInsertZone: (placement: OverlayPlacement | null, edge?: InsertButtonEdge) => void;
+  /**
+   * Highlight the image an external file drop would REPLACE (flow 5). Distinct from
+   * {@link setDropIndicator}, which shows where a new element would be inserted — the two answer
+   * different questions ("this picture is about to change" vs. "the element lands here"), so a drop
+   * shows exactly one of them. `placement` is overlay-local like the others; null hides it.
+   */
+  setReplaceTarget: (placement: OverlayPlacement | null) => void;
   /** The clickable "+" button, so the caller can attach click + hover (grace-timer) listeners. */
   readonly insertButton: HTMLButtonElement;
   /** The layer root element (caller appends it over the iframe). */
@@ -148,11 +155,16 @@ export function createOverlayLayer(doc: Document = document): OverlayLayer {
   insertButton.style.pointerEvents = "auto";
   insertButton.style.display = "none";
 
+  // The "this picture will be replaced" highlight for an external file drop.
+  const replaceBox = doc.createElement("div");
+  replaceBox.className = "canvas-replace-target";
+  replaceBox.style.display = "none";
+
   // Remote collaborators' selection boxes live in their own container, replaced wholesale.
   const presenceGroup = doc.createElement("div");
   presenceGroup.className = "overlay-presence-group";
 
-  root.append(hoverBox, selectionBox, dropBox, insertButton, presenceGroup);
+  root.append(hoverBox, selectionBox, dropBox, replaceBox, insertButton, presenceGroup);
 
   return {
     dispose: () => root.remove(),
@@ -161,6 +173,7 @@ export function createOverlayLayer(doc: Document = document): OverlayLayer {
     setDropIndicator: (placement, edge = "inside") => placeDropIndicator(dropBox, placement, edge),
     setHover: (placement) => place(hoverBox, placement),
     setInsertZone: (placement, edge = "center") => placeInsertButton(insertButton, placement, edge),
+    setReplaceTarget: (placement) => place(replaceBox, placement),
     setPresence: (items) => {
       presenceGroup.replaceChildren();
       for (const item of items) {

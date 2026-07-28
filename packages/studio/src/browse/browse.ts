@@ -15,7 +15,13 @@ import { getPlatform } from "../platform";
 import { projectState } from "../store";
 import { yamlDefault } from "../settings/schema-field-ui";
 import type { SchemaProperty } from "../settings/schema-field-ui";
-import { invalidateMediaCache } from "../ui/media-picker";
+import {
+  MEDIA_EXTENSIONS,
+  UPLOAD_ACCEPT,
+  extensionOf as extOf,
+  isImage,
+  uploadAssets,
+} from "../files/media-upload";
 import { statusMessage } from "../panels/statusbar";
 import { componentRegistry } from "../files/components";
 import { rectOf } from "../utils/geometry";
@@ -48,27 +54,6 @@ const CATEGORIES = [
   { dir: "public", key: "media", label: "Media" },
 ];
 
-const MEDIA_EXTENSIONS = new Set([
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".gif",
-  ".svg",
-  ".webp",
-  ".avif",
-  ".ico",
-  ".mp4",
-  ".webm",
-  ".mp3",
-  ".wav",
-  ".ogg",
-  ".pdf",
-  ".woff",
-  ".woff2",
-  ".ttf",
-  ".otf",
-]);
-
 // ─── Module state ────────────────────────────────────────────────────────────
 
 let activeCategory = "all";
@@ -86,28 +71,6 @@ let loading = false;
 let lastProjectDirsKey = "";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** @param {string} name */
-function extOf(name: string) {
-  const dot = name.lastIndexOf(".");
-  return dot > 0 ? name.slice(dot).toLowerCase() : "";
-}
-
-const IMAGE_EXTENSIONS = new Set([
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".gif",
-  ".svg",
-  ".webp",
-  ".avif",
-  ".ico",
-]);
-
-/** @param {string} ext */
-function isImage(ext: string) {
-  return IMAGE_EXTENSIONS.has(ext);
-}
 
 /** Map a file path to a display category. Media files override by extension. */
 function categoryFor(dir: string, ext: string) {
@@ -357,20 +320,18 @@ async function handleNewEntity(
 
 // ─── Upload ─────────────────────────────────────────────────────────────────
 
-const UPLOAD_ACCEPT = [
-  "image/*",
-  "video/*",
-  "audio/*",
-  ".pdf",
-  ".svg",
-  ".woff",
-  ".woff2",
-  ".ttf",
-  ".otf",
-].join(",");
+/**
+ * The directory a drop on the Manage view targets. The view filters by CATEGORY, not directory —
+ * its cards are files, so there is no folder to drop "into". The active category's own directory is
+ * the closest thing to a dropped location; "All" (and any category without one) falls back to the
+ * active document's media directory.
+ */
+export function uploadDirForCategory(category: string): string | undefined {
+  return CATEGORIES.find((c) => c.key === category)?.dir;
+}
 
 /**
- * Handle file uploads — writes binary files to public/ directory.
+ * Handle file uploads — writes binary files into the active category's directory.
  *
  * @param {FileList | File[]} files
  * @param {HTMLElement} container
@@ -381,13 +342,8 @@ async function handleUpload(
   container: HTMLElement,
   ctx: { openFile: (path: string) => void },
 ) {
-  const platform = getPlatform();
-  for (const file of files) {
-    const destPath = `public/${file.name}`;
-    await platform.uploadFile(destPath, file);
-  }
-  invalidateBrowseCache();
-  invalidateMediaCache();
+  const dir = uploadDirForCategory(activeCategory);
+  await uploadAssets([...files], dir ? { dir } : {});
   void renderBrowse(container, ctx);
 }
 

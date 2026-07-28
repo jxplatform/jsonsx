@@ -44,7 +44,9 @@ import type {
   ApplyFormatIntent,
   CanvasMode,
   DragSrcKind,
+  DropPreview,
   EvalExprResult,
+  FileDropHit,
   IframeToParent,
   InsertZone,
   NodeHit,
@@ -484,6 +486,103 @@ export function setInsertZoneClickHandler(fn: (btn: HTMLElement, zone: InsertZon
   insertZoneClickHandler = fn;
 }
 
+/**
+ * The parent-realm handler for an external file drop on a canvas (flow 5): upload the files and
+ * either replace an existing image's source or insert new elements. Injected from studio.ts for the
+ * same reason as {@link insertZoneClickHandler} — it reaches the platform and the mutation pipeline,
+ * which this module and its tests stay free of.
+ */
+let fileDropHandler:
+  | ((
+      tab: Tab | null,
+      files: File[],
+      hit: FileDropHit | null,
+      preview: DropPreview | null,
+    ) => void | Promise<void>)
+  | null = null;
+
+/** Register the upload → replace-or-insert handler for external file drops (see flow 5). */
+export function setFileDropHandler(
+  fn: (
+    tab: Tab | null,
+    files: File[],
+    hit: FileDropHit | null,
+    preview: DropPreview | null,
+  ) => void | Promise<void>,
+): void {
+  fileDropHandler = fn;
+}
+
+/**
+ * Draw the affordance for a file drag hovering `state`'s canvas: a solid highlight over the image
+ * the drop would REPLACE, or the usual insert indicator. Exactly one shows at a time — they answer
+ * different questions, and both at once would be ambiguous.
+ */
+function showFileDropAffordance(
+  state: HostState,
+  hit: FileDropHit | null,
+  preview: DropPreview | null,
+): void {
+  const replacing = hit ? isReplaceableTag(hit.tagName) : false;
+  if (replacing && hit) {
+    state.overlay.setDropIndicator(null);
+    state.overlay.setReplaceTarget(canvasRectToParent(hit.rect));
+    return;
+  }
+  state.overlay.setReplaceTarget(null);
+  state.overlay.setDropIndicator(
+    preview ? canvasRectToParent(preview.referenceRect) : null,
+    preview?.edge,
+  );
+}
+
+/** Hide both file-drop affordances on `state`. */
+function clearFileDropAffordance(state: HostState): void {
+  state.overlay.setReplaceTarget(null);
+  state.overlay.setDropIndicator(null);
+}
+
+/**
+ * Whether a drop on this tag would replace a picture rather than insert beside it. Kept in sync
+ * with `REPLACE_ATTRS` in editor/file-drop-action.ts, which owns the authoritative decision — this
+ * is the display-only preview, so a custom element (whose verdict needs the component registry) is
+ * shown as an insert and may still resolve to a replace on drop.
+ */
+function isReplaceableTag(tagName: string): boolean {
+  return tagName === "img" || tagName === "video" || tagName === "source";
+}
+
+/**
+ * Accept file drops on the canvas element itself — the margin around the iframe box. The iframe
+ * swallows everything over the rendered page (Chromium routes native drags to the frame under the
+ * cursor), so this only ever sees a drop on the surrounding gutter, which appends to the document
+ * root. Attached once per canvas element; the guard makes a re-mount idempotent.
+ */
+function registerCanvasGutterDrop(canvasEl: HTMLElement, host: () => HostState | null): void {
+  if (canvasEl.dataset.jxGutterDrop === "1") {
+    return;
+  }
+  canvasEl.dataset.jxGutterDrop = "1";
+  canvasEl.addEventListener("dragover", (e: DragEvent) => {
+    if (![...(e.dataTransfer?.types ?? [])].includes("Files")) {
+      return;
+    }
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+  });
+  canvasEl.addEventListener("drop", (e: DragEvent) => {
+    const files = e.dataTransfer?.files;
+    const state = host();
+    if (!files?.length || !state || state.stylebook) {
+      return;
+    }
+    e.preventDefault();
+    void fileDropHandler?.(hostTab(state), [...files], null, null);
+  });
+}
+
 /** A canvas-originated slash-menu request, converted to PARENT-VIEWPORT coords by the host. */
 export interface CanvasSlashRequest {
   rect: { left: number; top: number; bottom: number; width: number; height: number };
@@ -844,6 +943,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
   }
   const overlay = createOverlayLayer(document);
   canvasEl.replaceChildren(iframe, overlay.root);
+  registerCanvasGutterDrop(canvasEl, () => hosts.get(canvasEl) ?? null);
   const channel = postMessageChannel<ParentToIframe, IframeToParent>({
     acceptOrigin: iframeOrigin,
     source: window,
@@ -1229,6 +1329,25 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // The drop resolved (or was empty) — tear down the display affordances on this host.
       state.overlay.setDropIndicator(null);
       clearDragGhost();
+      return;
+    }
+    case "fileDragOver": {
+      if (state.stylebook) {
+        return; // A specimen catalog is never a drop target.
+      }
+      showFileDropAffordance(state, msg.hit, msg.preview);
+      return;
+    }
+    case "fileDragLeave": {
+      clearFileDropAffordance(state);
+      return;
+    }
+    case "fileDrop": {
+      clearFileDropAffordance(state);
+      if (state.stylebook) {
+        return;
+      }
+      void fileDropHandler?.(hostTab(state), msg.files, msg.hit, msg.preview);
       return;
     }
     case "patchError": {

@@ -199,7 +199,7 @@ function canDrop(src: DragSrcKind, targetPath: JxPath): boolean {
 }
 
 /** Read an element's iframe-viewport rect as a {@link DropPreview} `referenceRect`. */
-function rectFor(el: Element): DropPreview["referenceRect"] {
+export function rectFor(el: Element): DropPreview["referenceRect"] {
   const r = rectOf(el);
   return { height: r.height, width: r.width, x: r.x, y: r.y };
 }

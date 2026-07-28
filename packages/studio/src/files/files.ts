@@ -23,6 +23,7 @@ import { ensureDependenciesInstalled } from "../packages/ensure-deps";
 import { maybePromptJxsuiteUpdate } from "../packages/jxsuite-update";
 import { autoSyncProjectOnOpen } from "../packages/pull-package-sync";
 import { markLocalMutation } from "./fs-events";
+import { UPLOAD_ACCEPT, isImage, uploadAssets } from "./media-upload";
 import { isCollabPath } from "../collab/collab-state";
 import {
   draggable,
@@ -274,17 +275,10 @@ function fileTypeIconTpl(name: string, type: string) {
         tag = "sp-icon-file-code";
         break;
       }
-      case "png":
-      case "jpg":
-      case "jpeg":
-      case "svg":
-      case "webp":
-      case "gif": {
-        tag = "sp-icon-image";
-        break;
-      }
       default: {
-        tag = "sp-icon-document";
+        // Every image extension the media layer knows about, so an uploaded .avif/.ico gets the
+        // Same icon as a .png instead of falling through to the generic document glyph.
+        tag = ext && isImage(ext) ? "sp-icon-image" : "sp-icon-document";
         break;
       }
     }
@@ -527,6 +521,90 @@ export function setupTreeKeyboard(tree: HTMLElement) {
 
 let _fileTreeDndCleanups: (() => void)[] = [];
 
+/** Whether a drag carries OS files (as opposed to a pragmatic in-app drag). */
+export function isFileDrag(e: DragEvent): boolean {
+  return [...(e.dataTransfer?.types ?? [])].includes("Files");
+}
+
+/**
+ * Attach external-file drop handling to one tree row. Pragmatic-dnd only sees pragmatic sources, so
+ * an OS file drag needs the native listeners; `dir` is where a drop lands (the row itself for a
+ * directory, its parent for a file, `.` for the tree background).
+ */
+function registerFileDropTarget(
+  element: HTMLElement,
+  dir: string,
+  activeClass: string,
+  renderLeftPanel: () => void,
+): () => void {
+  const onDragOver = (e: DragEvent) => {
+    if (!isFileDrag(e)) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+    element.classList.add(activeClass);
+  };
+  const onDragLeave = () => element.classList.remove(activeClass);
+  const onDrop = (e: DragEvent) => {
+    element.classList.remove(activeClass);
+    const files = e.dataTransfer?.files;
+    if (!files?.length) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    void uploadFilesToDir(files, dir, renderLeftPanel);
+  };
+  element.addEventListener("dragover", onDragOver);
+  element.addEventListener("dragleave", onDragLeave);
+  element.addEventListener("drop", onDrop);
+  return () => {
+    element.removeEventListener("dragover", onDragOver);
+    element.removeEventListener("dragleave", onDragLeave);
+    element.removeEventListener("drop", onDrop);
+  };
+}
+
+/**
+ * Upload files into `dir` and reveal them: expand the target directory so the new entries are
+ * visible. The listing refresh itself runs in the shared post-upload handler.
+ */
+export async function uploadFilesToDir(
+  files: FileList | File[],
+  dir: string,
+  renderLeftPanel: () => void,
+): Promise<void> {
+  const uploaded = await uploadAssets([...files], { dir });
+  if (uploaded.length === 0) {
+    return;
+  }
+  if (dir !== ".") {
+    requireProjectState().expanded.add(dir);
+  }
+  renderLeftPanel();
+}
+
+/**
+ * Open the OS file picker and upload the choice into `dir` (the tree's "Upload Files…" item). The
+ * input is created per invocation and discarded after — the tree template is re-rendered often.
+ */
+export function pickAndUploadTo(dir: string, renderLeftPanel: () => void): void {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.multiple = true;
+  input.accept = UPLOAD_ACCEPT;
+  input.addEventListener("change", () => {
+    if (input.files?.length) {
+      void uploadFilesToDir(input.files, dir, renderLeftPanel);
+    }
+  });
+  input.click();
+}
+
 /**
  * Register drag-and-drop on file tree items. Called after each file tree render.
  *
@@ -567,6 +645,14 @@ export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () =
             row.classList.remove("dragging");
           },
         }),
+        // Files dropped from the OS land in the row's own directory; a file row targets its parent
+        // So dropping next to a sibling puts the upload beside it.
+        registerFileDropTarget(
+          row,
+          type === "directory" ? path : parentDir(path),
+          "drag-over",
+          renderLeftPanel,
+        ),
       ];
 
       if (type === "directory") {
@@ -637,7 +723,12 @@ export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () =
         tree.classList.remove("drag-over-root");
       },
     });
-    _fileTreeDndCleanups.push(rootCleanup);
+    // The tree background is the project root's drop target for OS files. Row handlers
+    // StopPropagation, so a drop on a row never also fires here.
+    _fileTreeDndCleanups.push(
+      rootCleanup,
+      registerFileDropTarget(tree, ".", "drag-over-root", renderLeftPanel),
+    );
 
     // Monitor for drop events
     const monitorCleanup = monitorForElements({
@@ -747,10 +838,16 @@ function showFileContextMenu(
     items.push({ action: () => ctx.openFileFn(entry.path), label: "Open" });
   }
   if (isDir) {
-    items.push({
-      action: () => createNewFile(entry.path, ctx.renderLeftPanel),
-      label: "New File\u2026",
-    });
+    items.push(
+      {
+        action: () => createNewFile(entry.path, ctx.renderLeftPanel),
+        label: "New File\u2026",
+      },
+      {
+        action: () => pickAndUploadTo(entry.path, ctx.renderLeftPanel),
+        label: "Upload Files\u2026",
+      },
+    );
     // Directories backing a content collection get a bulk-edit affordance.
     const collection = collectionDirs().find(
       ({ dir }) => entry.path === dir || entry.path.endsWith(`/${dir}`),

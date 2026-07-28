@@ -25,15 +25,16 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `relationships.md`        | 0.1.3-draft  | Partial     | 2026-07-22 |
 | `schema.md`               | 0.2.8-draft  | Partial     | 2026-07-22 |
 | `server.md`               | 0.2.1        | Implemented | 2026-07-25 |
-| `site-architecture.md`    | 0.1.37-draft | Pending     | 2026-07-24 |
+| `site-architecture.md`    | 0.1.39-draft | Pending     | 2026-07-28 |
 | `spec.md`                 | 0.4.24-draft | Partial     | 2026-07-24 |
-| `studio-ui-guidelines.md` | 0.2.0        | Implemented | 2026-07-26 |
-| `studio.md`               | 0.3.0-draft  | Partial     | 2026-07-27 |
+| `studio-ui-guidelines.md` | 0.2.1        | Implemented | 2026-07-28 |
+| `studio.md`               | 0.3.2-draft  | Partial     | 2026-07-28 |
 
 ## Sections not yet implemented
 
 ### Partial
 
+- `site-architecture.md` §9.4 — Studio Media Browser
 - `spec.md` §5.6 — Private State (`#` prefix)
 - `spec.md` §11.4 — Server Timing — RPC Function Boundary
 - `spec.md` §16.8 — CEM-Compatible Annotations
@@ -43,7 +44,6 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `desktop.md` §4.3 — Single File Mode
 - `site-architecture.md` §7.4 — Content Entry Editor
 - `site-architecture.md` §8.6 — Studio SEO Panel
-- `site-architecture.md` §9.4 — Studio Media Browser
 - `site-architecture.md` §11.4 — Studio Redirect Editor
 
 ### Future

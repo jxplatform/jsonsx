@@ -20,7 +20,7 @@ Studio and the folder are two views of the same thing. Each area of your project
 | `layouts/`     | Shared page shells — headers, footers, wrappers | **Layouts**                                                  |
 | `components/`  | Reusable building blocks                        | **Components**                                               |
 | `content/`     | Posts, entries, and other collection content    | **Content**                                                  |
-| `public/`      | Images, video, fonts, and other media           | **Media**                                                    |
+| `public/`      | Images, video, fonts, and other media           | **Media** (see [Media](/docs/studio/projects/media))         |
 | `project.json` | The site's settings — name, URL, design tokens  | Project settings                                             |
 
 What each kind of file is for — and when to reach for which — is covered in **[Pages, layouts, and components](/docs/studio/projects/pages-layouts-components)**. The full folder anatomy is documented in **[Site architecture](/docs/framework/site)**.

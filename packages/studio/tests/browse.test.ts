@@ -19,7 +19,7 @@ import { initLayers } from "../src/ui/layers";
 import { setFormats } from "../src/format/format-host";
 import type { StudioFormat } from "../src/format/format-host";
 import { componentRegistry } from "../src/files/components";
-import { invalidateBrowseCache, renderBrowse } from "../src/browse/browse";
+import { invalidateBrowseCache, renderBrowse, uploadDirForCategory } from "../src/browse/browse";
 import type { DirEntry, StudioPlatform } from "../src/types";
 
 // ─── Environment setup ───────────────────────────────────────────────────────
@@ -789,6 +789,35 @@ describe("upload", () => {
     input.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
     expect(state.calls.filter((c) => c[0] === "uploadFile")).toHaveLength(0);
+  });
+
+  test("the drop lands in the active category's own directory", async () => {
+    const container = await mountWithDefaults();
+    await setCategory(container, "Layouts");
+    browseView(container).dispatchEvent(dropEvent([new File(["x"], "hero.png")]));
+    await flush(4);
+    const uploads = state.calls.filter((c) => c[0] === "uploadFile").map((c) => c[1]);
+    expect(uploads).toEqual(["layouts/hero.png"]);
+  });
+
+  test("uploads never overwrite an existing file of the same name", async () => {
+    const container = await mountWithDefaults();
+    await setCategory(container, "Media");
+    // The fixture already carries public/logo.png.
+    browseView(container).dispatchEvent(dropEvent([new File(["x"], "logo.png")]));
+    await flush(4);
+    const uploads = state.calls.filter((c) => c[0] === "uploadFile").map((c) => c[1]);
+    expect(uploads).toEqual(["public/logo-1.png"]);
+  });
+});
+
+describe("uploadDirForCategory", () => {
+  test("maps a category to its directory, and 'All' to none", () => {
+    expect(uploadDirForCategory("media")).toBe("public");
+    expect(uploadDirForCategory("layouts")).toBe("layouts");
+    // No directory → uploadAssets falls back to the active document's media directory.
+    expect(uploadDirForCategory("all")).toBeUndefined();
+    expect(uploadDirForCategory("nope")).toBeUndefined();
   });
 });
 

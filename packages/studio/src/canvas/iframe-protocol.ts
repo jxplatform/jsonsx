@@ -239,6 +239,15 @@ export interface NodeHit {
   rect: SerializableRect;
 }
 
+/**
+ * The node under an external file drag. Extends {@link NodeHit} with the resolved `tagName` so the
+ * parent can decide replace-vs-insert without a second round trip — it needs the tag to recognise
+ * an `<img>`/`<video>`/`<source>` and to look a custom element up in the component registry.
+ */
+export interface FileDropHit extends NodeHit {
+  tagName: string;
+}
+
 // ─── Cross-frame insertion affordance ("+") ─────────────────────────────────────
 
 /**
@@ -450,7 +459,20 @@ export type IframeToParent =
       gen: number;
       instruction: DropInstructionType | null;
       targetPath: (string | number)[] | null;
-    };
+    }
+  // ─── External file drop (flow 5) ───────────────────────────────────────────
+  // An OS file drag is moving over / was released on this canvas. Unlike flows 1-4 there is no
+  // Parent session to bind: the parent never saw the gesture start, so the iframe drives the whole
+  // Thing and the parent's only jobs are the overlay and the upload+mutation. The iframe supplies
+  // GEOMETRY only (`hit` = the node under the cursor, `preview` = where an insert would land); the
+  // Parent decides SEMANTICS (replace this image's src vs. insert a new element) because that needs
+  // The component registry, which is parent-realm.
+  | { kind: "fileDragOver"; hit: FileDropHit | null; preview: DropPreview | null }
+  // The pointer left the canvas mid-drag — the parent clears its overlay.
+  | { kind: "fileDragLeave" }
+  // The files were released. `File` is structured-cloneable so the bytes cross the boundary here;
+  // `FileList` is NOT, so the iframe spreads it. The parent uploads and mutates.
+  | { kind: "fileDrop"; files: File[]; hit: FileDropHit | null; preview: DropPreview | null };
 
 /** The iframe→parent selection snapshot that drives the parent format toolbar. */
 export type SelectionSnapshot = Extract<IframeToParent, { kind: "selectionChanged" }>;

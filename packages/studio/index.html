@@ -1738,6 +1738,16 @@
         border: 2px dashed var(--accent);
         background: var(--accent-8);
       }
+      /* An external file drop over an existing image: "this picture is about to be replaced".
+         Solid, not dashed, so it reads differently from the insert indicator above. */
+      .canvas-replace-target {
+        position: absolute;
+        pointer-events: none;
+        z-index: 11;
+        border: 2px solid var(--accent);
+        background: var(--accent-8);
+        border-radius: var(--radius);
+      }
 
       /* ─── Git diff highlighting ──────────────────── */
       .element-diff-added {
@@ -3528,6 +3538,11 @@
       }
       .media-picker sp-textfield {
         flex: 1;
+        min-width: 0;
+      }
+      /* Upload + Browse always render, so the field yields width before the buttons do. */
+      .media-picker sp-action-button {
+        flex-shrink: 0;
       }
       .media-picker-thumb {
         width: 24px;

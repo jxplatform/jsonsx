@@ -1,8 +1,8 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.2.0
+**Version:** 0.2.1
 **Status:** Implemented
-**Updated:** 2026-07-26
+**Updated:** 2026-07-28
 **Applies to:** `packages/studio/`
 
 ---
@@ -358,6 +358,23 @@ Uses `@atlaskit/pragmatic-drag-and-drop` for layer reordering and canvas element
 - On the CANVAS, a drag may be initiated only from the block action bar's drag handle. Pressing and
   dragging within text selects text — the canvas is a writing surface first
 
+#### External (OS) file drags
+
+Files dragged in from the desktop are NOT pragmatic sources — they arrive as native `dragover`/
+`drop` events and need their own handlers. Every such handler opens by testing
+`dataTransfer.types.includes("Files")`, so an in-app pragmatic drag falls straight through.
+
+- `dropEffect` is `"copy"` (never `"move"` — the file stays where it was)
+- A handler that accepts the drag MUST `preventDefault()` on `dragover`, or the browser shows the
+  "not allowed" cursor and swallows the drop
+- Directory rows reuse the tree's own `.drag-over` / `.drag-over-root` highlight
+- Row handlers `stopPropagation()`, so a drop on a row never also fires the container's handler
+- On the CANVAS exactly one affordance draws at a time: `.canvas-replace-target` (a solid accent box
+  over the image the drop would replace) or the usual `.canvas-drop-indicator` (where a new element
+  would be inserted). They answer different questions; both at once would be ambiguous
+- A drop inside the canvas is `preventDefault()`ed in the capture phase before the contenteditable
+  root sees it, so the browser never inserts its own `blob:` image alongside the real mutation
+
 ### 8.3 The Canvas Caret
 
 The canvas render container is a single `contenteditable`; individual blocks are not toggled in and
@@ -508,6 +525,7 @@ When building new UI in Studio, verify:
 
 ## Changelog
 
+- **0.2.1** (2026-07-28) — Drag-and-drop conventions for external OS file drags (§8.2): copy dropEffect, the Files-type guard, tree highlights, and the canvas replace-vs-insert affordance.
 - **0.2.0** (2026-07-26) — Canvas caret replaces the inline-edit session (§8.3); click selects and places the caret (§8.1); canvas drags start only from the bar handle (§8.2); single-shape action bar (§8.6).
 - **0.1.8** (2026-07-26) — Modal surfaces own the keyboard: showDialog focus handoff, Escape dismissal, and the isModalOpen() shortcut gate (§8.7).
 - **0.1.7** (2026-07-26) — Dialogs and overlay layers (§8.7): the ui/layers.ts contract, showPromptDialog as the replacement for window.prompt(), and a ban on native browser dialogs.

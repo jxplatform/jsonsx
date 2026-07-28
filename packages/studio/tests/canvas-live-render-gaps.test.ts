@@ -174,3 +174,68 @@ describe("content-mode component discovery with irregular children", () => {
     expect(refs.some((r) => r?.includes("components/x-card-live.json"))).toBe(true);
   });
 });
+
+// ─── Content-relative asset resolution ───────────────────────────────────────
+
+describe("content-entry asset mapping", () => {
+  const POSTS = { posts: { format: "Markdown", source: "./content/posts/" } };
+
+  const entryDoc = () =>
+    ({
+      children: [
+        { attributes: { src: "./images/hero.png" }, tagName: "img" },
+        { attributes: { src: "/logo.png" }, tagName: "img" },
+      ],
+      tagName: "div",
+    }) as unknown as JxMutableNode;
+
+  test("an entry's relative media is mapped onto the content type's mount for rendering", async () => {
+    resetStudioState({ isSiteProject: true, projectConfig: { content: POSTS } });
+    const tab = resetWorkspaceWithTab(entryDoc(), {
+      documentPath: "content/posts/hello.md",
+    }) as Tab;
+
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    const kids = result.renderDoc.children as Record<string, any>[];
+
+    // The URL the built site serves — not `./images/hero.png` resolved against canvas.html.
+    expect(kids[0]!.attributes.src).toBe("/content/posts/images/hero.png");
+    // A root-absolute ref already names a public/ file and keeps its meaning.
+    expect(kids[1]!.attributes.src).toBe("/logo.png");
+  });
+
+  test("the tab's SOURCE document keeps the authored ref — it is what gets serialized", async () => {
+    resetStudioState({ isSiteProject: true, projectConfig: { content: POSTS } });
+    const tab = resetWorkspaceWithTab(entryDoc(), {
+      documentPath: "content/posts/hello.md",
+    }) as Tab;
+
+    await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+
+    const source = tab.doc.document as unknown as { children: Record<string, any>[] };
+    expect(source.children[0]!.attributes.src).toBe("./images/hero.png");
+  });
+
+  test("a page document is left alone — only content entries carry entry-relative media", async () => {
+    resetStudioState({ isSiteProject: true, projectConfig: { content: POSTS } });
+    const tab = resetWorkspaceWithTab(entryDoc(), { documentPath: "pages/index.json" }) as Tab;
+
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    const kids = result.renderDoc.children as Record<string, any>[];
+
+    expect(kids[0]!.attributes.src).toBe("./images/hero.png");
+  });
+
+  test("preview mode maps too — the preview is what the built page will look like", async () => {
+    canvasMode = "preview";
+    resetStudioState({ isSiteProject: true, projectConfig: { content: POSTS } });
+    const tab = resetWorkspaceWithTab(entryDoc(), {
+      documentPath: "content/posts/hello.md",
+    }) as Tab;
+
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    const kids = result.renderDoc.children as Record<string, any>[];
+
+    expect(kids[0]!.attributes.src).toBe("/content/posts/images/hero.png");
+  });
+});

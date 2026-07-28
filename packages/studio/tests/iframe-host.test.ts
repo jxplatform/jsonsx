@@ -98,6 +98,7 @@ const {
   setCanvasContextMenuHandler,
   setCanvasSlashHandler,
   setIframePatchEscalation,
+  setFileDropHandler,
   setNativeDragEnterHandler,
   setInsertZoneClickHandler,
   setStylebookHitHandler,
@@ -2302,5 +2303,142 @@ describe("stylebook host capability", () => {
     // Routed as a normal document hit: session.selection written, no stylebook decode.
     expect(hits).toHaveLength(0);
     expect(activeTab.value?.session.selection).toEqual(SPECIMEN_PATH);
+  });
+});
+
+// ─── External file drops (flow 5) ─────────────────────────────────────────────
+
+describe("external file drop dispatch", () => {
+  const hit = (tagName: string) => ({
+    path: ["children", 0],
+    rect: { height: 20, width: 100, x: 10, y: 5 },
+    tagName,
+  });
+  const preview = () => ({
+    edge: "top",
+    instruction: "reorder-above",
+    referenceRect: { height: 20, width: 100, x: 0, y: 40 },
+    targetPath: ["children", 1],
+  });
+
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+    setFileDropHandler(() => {});
+  });
+
+  test("hovering an image shows the replace highlight, not the insert indicator", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ hit: hit("img"), kind: "fileDragOver", preview: preview() });
+
+    const replace = canvasEl.querySelector(".canvas-replace-target") as HTMLElement;
+    const drop = canvasEl.querySelector(".canvas-drop-indicator") as HTMLElement;
+    expect(replace.style.display).toBe("block");
+    // The two answer different questions; showing both at once would be ambiguous.
+    expect(drop.style.display).toBe("none");
+  });
+
+  test("hovering anything else shows the insert indicator", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ hit: hit("div"), kind: "fileDragOver", preview: preview() });
+
+    expect((canvasEl.querySelector(".canvas-replace-target") as HTMLElement).style.display).toBe(
+      "none",
+    );
+    expect((canvasEl.querySelector(".canvas-drop-indicator") as HTMLElement).style.display).toBe(
+      "block",
+    );
+  });
+
+  test("fileDragLeave clears both affordances", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ hit: hit("img"), kind: "fileDragOver", preview: preview() });
+    channels[0]!.deliver({ kind: "fileDragLeave" });
+
+    expect((canvasEl.querySelector(".canvas-replace-target") as HTMLElement).style.display).toBe(
+      "none",
+    );
+    expect((canvasEl.querySelector(".canvas-drop-indicator") as HTMLElement).style.display).toBe(
+      "none",
+    );
+  });
+
+  test("fileDrop routes the files, hit and preview to the injected handler", async () => {
+    const calls: Msg[] = [];
+    setFileDropHandler((tab, files, dropHit, dropPreview) => {
+      calls.push({ dropHit, dropPreview, files, tab });
+    });
+    const canvasEl = await mountReady();
+    const file = new File(["x"], "a.png");
+
+    channels[0]!.deliver({ files: [file], hit: hit("img"), kind: "fileDrop", preview: preview() });
+
+    expect(calls).toHaveLength(1);
+    // The drop routes to the host's OWN tab, not activeTab at message time.
+    expect(calls[0]!.tab).toBe(activeTab.value);
+    expect(calls[0]!.files).toEqual([file]);
+    expect(calls[0]!.dropHit).toMatchObject({ tagName: "img" });
+    // The affordance clears on drop, before the async upload starts.
+    expect((canvasEl.querySelector(".canvas-replace-target") as HTMLElement).style.display).toBe(
+      "none",
+    );
+  });
+
+  test("a specimen catalog is never a file-drop target", async () => {
+    const calls: Msg[] = [];
+    setFileDropHandler((_tab, files) => {
+      calls.push({ files });
+    });
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    mountStylebookCanvas(
+      9,
+      { doc: { children: [], tagName: "div" }, pathToTag: new Map(), tagToCardPath: new Map() },
+      canvasEl,
+      480,
+    );
+    const channel = channels.at(-1)!;
+    channel.deliver({ kind: "ready" });
+    channel.deliver({ gen: 9, kind: "renderComplete" });
+
+    channel.deliver({ hit: hit("img"), kind: "fileDragOver", preview: preview() });
+    channel.deliver({ files: [new File(["x"], "a.png")], hit: null, kind: "fileDrop" });
+
+    expect(calls).toEqual([]);
+    expect((canvasEl.querySelector(".canvas-replace-target") as HTMLElement).style.display).toBe(
+      "none",
+    );
+  });
+
+  test("the canvas gutter accepts a file drop and appends to the root", async () => {
+    const calls: Msg[] = [];
+    setFileDropHandler((_tab, files, dropHit, dropPreview) => {
+      calls.push({ dropHit, dropPreview, files });
+    });
+    const canvasEl = await mountReady();
+    const file = new File(["x"], "a.png");
+
+    const over = new MouseEvent("dragover", { bubbles: true, cancelable: true });
+    Object.defineProperty(over, "dataTransfer", {
+      value: { dropEffect: "none", files: [], types: ["Files"] },
+    });
+    canvasEl.dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(true);
+
+    const drop = new MouseEvent("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, "dataTransfer", { value: { files: [file], types: ["Files"] } });
+    canvasEl.dispatchEvent(drop);
+
+    expect(calls).toHaveLength(1);
+    // No position resolved on the gutter — the handler appends to the document root.
+    expect(calls[0]!.dropHit).toBeNull();
+    expect(calls[0]!.dropPreview).toBeNull();
+  });
+
+  test("a non-file drag over the gutter is left alone", async () => {
+    const canvasEl = await mountReady();
+    const over = new MouseEvent("dragover", { bubbles: true, cancelable: true });
+    Object.defineProperty(over, "dataTransfer", { value: { types: ["text/plain"] } });
+    canvasEl.dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(false);
   });
 });

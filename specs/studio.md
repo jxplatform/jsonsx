@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.3.0-draft
+**Version:** 0.3.2-draft
 **Status:** Partial
-**Updated:** 2026-07-27
+**Updated:** 2026-07-28
 **License:** MIT
 
 ---
@@ -140,6 +140,10 @@ The canvas renders the current document using `@jxsuite/runtime`. It shows exact
 Site style is injected into the canvas as a real stylesheet (custom properties in a `:root` rule, direct properties in a `body` rule, conditional `@--name` blocks resolved and — for scheme queries — dual-emitted per spec.md §9.5), never as inline root properties, so forced-scheme override selectors can win the cascade.
 
 **Color-scheme preview.** When the effective `$media` declares a pure `prefers-color-scheme` query, the tab bar shows an Auto/Light/Dark control (one per tab; available in edit, design, and stylebook modes). Light/Dark force the scheme by setting `data-color-scheme` on the canvas iframe's root element — a patch-free document-level attribute flip that never re-renders; Auto removes the attribute and follows the OS. Scheme queries no longer render as generic feature toggles. The same tri-state also selects which scheme layer style-sidebar edits target (§6.2).
+
+**Content-entry media.** A content entry references its media relative to ITSELF (`./images/hero.png`), and the built site serves those files from the content type's asset mount (`site-architecture.md` §9.3). Studio opens an entry as a standalone document, so the collection loader that normally performs that mapping never runs — the canvas would otherwise resolve the authored path against `canvas.html`. The render document is therefore mapped onto the mount before it is posted to the iframe, in every mode, so the canvas previews the URL production serves.
+
+The mapping is render-only: the tab's source document keeps the authored relative reference, so serialization and the properties panel are unaffected. Parent-realm previews of the same values — the media picker's thumbnail — apply it too, since panel chrome would otherwise resolve them against `index.html`. Eligibility and URL math are shared with the loader; the browser cannot perform the loader's existence check, so a reference to a missing file maps optimistically and fails at the mount URL instead.
 
 ### 4.2 Modes
 
@@ -343,11 +347,11 @@ When a Jx component is selected, the property panel renders its declared `state`
 4. `type` has enum/union → combobox (`jx-value-selector`)
 5. Fallback → text field
 
-| `format`  | Control                                                 |
-| --------- | ------------------------------------------------------- |
-| `"image"` | `renderMediaPicker()` — file browser + thumbnail        |
-| `"date"`  | Text field with `placeholder="YYYY-MM-DD"`              |
-| `"color"` | Color picker (reuses style panel `renderColorSelector`) |
+| `format`  | Control                                                          |
+| --------- | ---------------------------------------------------------------- |
+| `"image"` | `renderMediaPicker()` — thumbnail + upload + file browser (§9.3) |
+| `"date"`  | Text field with `placeholder="YYYY-MM-DD"`                       |
+| `"color"` | Color picker (reuses style panel `renderColorSelector`)          |
 
 Each prop also supports dynamic values via the shared dynamic-slot mode button beside its label (caps: literal / `$ref` / `${}` template). Cycling to `$ref` replaces the widget with a signal picker listing available `state` entries; each mode's former value is remembered for the session, so cycling back restores it.
 
@@ -676,6 +680,43 @@ All file operations go through the Platform Abstraction Layer, which maps to `@j
 - Path traversal protection
 - Git operations (status, staging, commit, push/pull/fetch, branch management) via `/__studio/git/*` endpoints
 
+### 9.3 Media Upload
+
+> **Status: Implemented.** Adding media to a project is a direct gesture from wherever the author already is. Every surface funnels through one upload core (`packages/studio/src/files/media-upload.ts`); they differ only in how the destination directory is chosen.
+
+#### Surfaces
+
+| Surface                                            | Gesture                                         | Destination                                                                                       |
+| -------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Image field (`format: "image"`, `$input: "media"`) | **Upload** button beside the path field         | Context-aware (below); the field takes the new ref                                                |
+| Canvas                                             | Drop files from the OS                          | Context-aware                                                                                     |
+| Files tree                                         | Drop on a row, or **Upload Files…** in its menu | The row's directory (a file row targets its parent); the tree background targets the project root |
+| Manage view                                        | Drop anywhere, or the **Upload** button         | The active category's own directory; "All" falls back to context-aware                            |
+
+#### Destination and references
+
+Without an explicit directory, an upload follows the active document: one inside a content collection co-locates its media in `content/<collection>/images/`, everything else lands in `public/`. The reference written into the document follows `site-architecture.md` §9.3 — `public/` contents are referenced from the site root (`/hero.jpg`), a content asset relative to its own entry (`./images/hero.jpg`), anything else relative to the project root.
+
+An upload **never overwrites**: a colliding name gains a `-1`, `-2`, … suffix before its extension, resolved against a single listing of the destination (so a multi-file batch does not collide with itself either). A file that fails to upload is reported and skipped; the rest of the batch still lands.
+
+#### Canvas drop semantics
+
+The canvas iframe owns the gesture — Chromium delivers a native drag to the frame under the cursor, so the parent never sees it start. The iframe accepts the drag, computes GEOMETRY (the node under the cursor and where an insert would land) and posts it; the parent decides SEMANTICS, because that needs the component registry and the mutation pipeline.
+
+| Drop lands on                                                | Result                                                       |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| An `<img>` or `<source>` (image file only)                   | Its `src` is replaced in place (a surgical `set-attr` patch) |
+| A `<video>` (image file only)                                | Its `poster` is replaced                                     |
+| A component instance with exactly one `format: "image"` prop | That `$prop` is replaced                                     |
+| Anything else                                                | A new element is inserted at the resolved position           |
+| The canvas gutter (outside the rendered page)                | A new element is appended to the document root               |
+
+An ambiguous component (two or more image props) falls through to an insert rather than guessing. Inserted elements follow the file's kind: `image` → `<img>`, `video` → `<video controls>`, `audio` → `<audio controls>`, anything else → an `<a href>` labelled with the filename. A multi-file drop keeps its order. While a file drag hovers, exactly one affordance draws — a solid highlight over the image that would be replaced, or the usual insert indicator.
+
+#### Transport
+
+`StudioPlatform.uploadFile` accepts `string | File | Blob | ArrayBuffer`. The HTTP platforms (dev server, cloud) post the binary body directly; the RPC platforms (electrobun, chromium) JSON-serialize their params, so they base64-encode binary before the call and the backend decodes it. A `string` payload is already base64 and passes through untouched.
+
 ---
 
 ## 10. Keyboard Shortcuts
@@ -738,22 +779,24 @@ All file operations go through the Platform Abstraction Layer, which maps to `@j
 
 ## 12. Pending Features
 
-| Feature                      | Description                                                    | Status      |
-| ---------------------------- | -------------------------------------------------------------- | ----------- |
-| CSS custom properties panel  | Declare `--custom-property` interfaces for CEM                 | **Pending** |
-| CSS parts panel              | Declare `::part()` styling hooks for CEM                       | **Pending** |
-| Full CEM document export     | Generate complete Custom Elements Manifest JSON                | **Pending** |
-| Component library management | Browse, install, and manage component packages                 | **Pending** |
-| Content collection browser   | Table/card/calendar views for content entries                  | **Pending** |
-| Content entry editor         | Schema-driven forms for Markdown frontmatter, JSON, CSV        | **Pending** |
-| Media browser                | Grid/list view of project media with upload and usage tracking | **Pending** |
-| SEO panel                    | Title/description/OG preview with schema.org editor            | **Pending** |
-| Redirect editor              | CRUD table for site redirect rules                             | **Pending** |
+| Feature                      | Description                                                    | Status                                                                              |
+| ---------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| CSS custom properties panel  | Declare `--custom-property` interfaces for CEM                 | **Pending**                                                                         |
+| CSS parts panel              | Declare `::part()` styling hooks for CEM                       | **Pending**                                                                         |
+| Full CEM document export     | Generate complete Custom Elements Manifest JSON                | **Pending**                                                                         |
+| Component library management | Browse, install, and manage component packages                 | **Pending**                                                                         |
+| Content collection browser   | Table/card/calendar views for content entries                  | **Pending**                                                                         |
+| Content entry editor         | Schema-driven forms for Markdown frontmatter, JSON, CSV        | **Pending**                                                                         |
+| Media browser                | Grid/list view of project media with upload and usage tracking | **Partial** — upload ships on four surfaces (§9.3); usage tracking is still pending |
+| SEO panel                    | Title/description/OG preview with schema.org editor            | **Pending**                                                                         |
+| Redirect editor              | CRUD table for site redirect rules                             | **Pending**                                                                         |
 
 See the [Site Architecture Specification](site-architecture.md) for full design details on content management UI.
 
 ## Changelog
 
+- **0.3.2-draft** (2026-07-28) — Canvas maps a content entry's entry-relative media onto its asset mount (§4.1) so the preview matches the built site; render-only, source doc untouched.
+- **0.3.1-draft** (2026-07-28) — Media upload across four surfaces (§9.3): image-field Upload button, canvas file drop with replace-vs-insert, Files-tree and Manage destinations; collision-safe naming; binary uploadFile on every platform.
 - **0.3.0-draft** (2026-07-27) — Derive the caret's editable tag set from the document's element vocabulary (§8.2.2): the format class decides per tag and can say no, so a Markdown blockquote holds paragraphs and a link is markup within a block; subsections after it renumber (nothing referenced them).
 - **0.2.0-draft** (2026-07-26) — Fluid document editing: the canvas carries a live caret (§8.2), one block action bar (§4.4), both editable modes behave identically for text (§4.2), and a rewritten keyboard contract (§10).
 - **0.1.29-draft** (2026-07-26) — File create/rename/delete naming dialogs (§9.1.1); branch, clone, and nested-selector flows now open Spectrum dialogs instead of native prompts.
@@ -789,4 +832,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.3.0-draft_
+_`@jxsuite/studio` Specification v0.3.2-draft_

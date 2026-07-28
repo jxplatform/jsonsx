@@ -27,9 +27,11 @@ import {
   substitutePreviewParams,
 } from "../page-params";
 import { isComponentDoc, substitutePreviewProps } from "../component-props";
+import { rewriteContentAssets } from "./content-assets";
 
 import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
+import type { ContentSectionEntry } from "../types";
 import type { WireMapperCtx } from "./iframe-protocol";
 
 let _ctx: { getCanvasMode: () => string } | null = null;
@@ -193,6 +195,16 @@ export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
       renderDoc = substitutePreviewProps(renderDoc, previewProps);
     }
   }
+
+  // A content entry references its media relative to ITSELF; the built site serves those files from
+  // The content type's asset mount. Studio opens the entry standalone, so the collection loader that
+  // Normally performs that mapping never runs — do it here, on the RENDER doc only, so the canvas
+  // Previews the URL production serves while the source doc keeps the authored relative ref.
+  renderDoc = rewriteContentAssets(
+    renderDoc,
+    S.documentPath,
+    projectState?.projectConfig?.content as Record<string, ContentSectionEntry> | undefined,
+  );
 
   const arrayPaths = new Set<string>();
   if (canvasMode === "design" || canvasMode === "edit") {

@@ -1,11 +1,13 @@
 import {
   flush,
   installMockPlatform,
+  resetWorkspaceWithTab,
   pointer,
   renderInto,
   resetStudioState,
   setValue,
   stubRect,
+  testFile,
 } from "./harness";
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import * as storeActual from "../src/store";
@@ -20,7 +22,8 @@ void mock.module("../src/store", () => ({
       fn(...args),
 }));
 
-const { invalidateMediaCache, renderMediaPicker } = await import("../src/ui/media-picker");
+const { invalidateMediaCache, renderMediaPicker, uploadAndAssign } =
+  await import("../src/ui/media-picker");
 const { getLayerSlot } = await import("../src/ui/layers");
 
 // ─── Deterministic requestAnimationFrame ─────────────────────────────────────
@@ -86,9 +89,19 @@ function dismissViaEscape() {
   document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
 }
 
+/** The Browse (popover) button — the field also carries an Upload button ahead of it. */
+function browseButton(container: HTMLElement): HTMLElement {
+  return container.querySelector(".media-picker-browse") as HTMLElement;
+}
+
+/** The Upload button, which opens the OS file picker. */
+function uploadButton(container: HTMLElement): HTMLElement {
+  return container.querySelector(".media-picker-upload") as HTMLElement;
+}
+
 async function renderLoaded(value: string, onCommit: (v: string) => void = () => {}) {
-  // First render kicks off the async cache load; re-render once loaded so the
-  // Browse button (gated on mediaCache.length) appears.
+  // First render kicks off the async cache load; re-render once it resolves so the popover has
+  // Entries to show.
   const container = await renderInto(renderMediaPicker("src", value, onCommit));
   await flush();
   return renderInto(renderMediaPicker("src", value, onCommit), container);
@@ -110,10 +123,7 @@ afterEach(() => {
 describe("media cache collection", () => {
   test("recurses directories, filters by media extension, strips public/ prefix", async () => {
     const container = await renderLoaded("");
-    const button = container.querySelector("sp-action-button");
-    expect(button).not.toBeNull();
-
-    pointer(button!, "click");
+    pointer(browseButton(container), "click");
     const items = [...popoverHost().querySelectorAll("sp-menu-item")];
     const values = items.map((item) => item.getAttribute("value"));
     expect(values).toEqual(["/logo.png", "/clip.mp4", "/img/photo.JPG"]);
@@ -121,7 +131,7 @@ describe("media cache collection", () => {
 
   test("image entries get a thumbnail icon, non-images do not", async () => {
     const container = await renderLoaded("");
-    pointer(container.querySelector("sp-action-button")!, "click");
+    pointer(browseButton(container), "click");
     const items = [...popoverHost().querySelectorAll("sp-menu-item")];
     // No cross-origin loopback registered => the icon src falls back to the relative path.
     expect(items[0]?.querySelector("img")?.getAttribute("src")).toBe("/logo.png");
@@ -132,19 +142,27 @@ describe("media cache collection", () => {
     invalidateMediaCache();
     installTree(defaultTree, "http://127.0.0.1:54321/__studio__/canvas.html");
     const container = await renderLoaded("");
-    pointer(container.querySelector("sp-action-button")!, "click");
+    pointer(browseButton(container), "click");
     const items = [...popoverHost().querySelectorAll("sp-menu-item")];
     expect(items[0]?.querySelector("img")?.getAttribute("src")).toBe(
       "http://127.0.0.1:54321/logo.png",
     );
   });
 
-  test("invalidateMediaCache forces reload; unreadable root yields empty cache and no browse button", async () => {
+  test("invalidateMediaCache forces reload; an unreadable root yields an empty picker", async () => {
     await renderLoaded("");
     invalidateMediaCache();
     installTree({});
     const container = await renderLoaded("");
-    expect(container.querySelector("sp-action-button")).toBeNull();
+    // Both buttons still render — a project with no media yet is exactly when Upload matters, and
+    // The popover states the emptiness rather than the field hiding its own affordances.
+    expect(browseButton(container)).not.toBeNull();
+    expect(uploadButton(container)).not.toBeNull();
+    pointer(browseButton(container), "click");
+    const items = [...popoverHost().querySelectorAll("sp-menu-item")];
+    expect(items).toHaveLength(1);
+    expect(items[0]?.hasAttribute("disabled")).toBe(true);
+    expect(items[0]?.textContent?.trim()).toBe("No matches");
   });
 });
 
@@ -186,7 +204,7 @@ describe("renderMediaPicker field", () => {
     field.dispatchEvent(new Event("focus", { bubbles: true }));
     await flush();
     // Cache still intact — popover still lists media.
-    pointer(container.querySelector("sp-action-button")!, "click");
+    pointer(browseButton(container), "click");
     expect(popoverHost().querySelectorAll("sp-menu-item").length).toBe(3);
   });
 });
@@ -196,7 +214,7 @@ describe("renderMediaPicker field", () => {
 describe("media picker popover", () => {
   async function openPopover(onCommit: (v: string) => void = () => {}) {
     const container = await renderLoaded("", onCommit);
-    const button = container.querySelector("sp-action-button") as HTMLElement;
+    const button = browseButton(container);
     pointer(button, "click");
     return { button, container };
   }
@@ -261,7 +279,7 @@ describe("media picker popover", () => {
 
   test("initial position clamps to the viewport and flips above tall anchors", async () => {
     const container = await renderLoaded("");
-    const button = container.querySelector("sp-action-button") as HTMLElement;
+    const button = browseButton(container);
     const width = window.innerWidth;
     const height = window.innerHeight;
     stubRect(button, { height: 20, left: width - 10, top: height - 10, width: 20 });
@@ -303,5 +321,84 @@ describe("media picker popover", () => {
     const items = [...popoverHost().querySelectorAll("sp-menu-item")];
     expect(items).toHaveLength(51);
     expect(items.at(-1)?.textContent).toContain("10 more");
+  });
+});
+
+// ─── Upload ──────────────────────────────────────────────────────────────────
+
+describe("media picker upload", () => {
+  test("the Upload button opens a multi-file picker restricted to media types", async () => {
+    const container = await renderLoaded("");
+    let created: HTMLInputElement | null = null;
+    const realCreate = document.createElement.bind(document);
+    document.createElement = ((tag: string) => {
+      const el = realCreate(tag);
+      if (tag === "input") {
+        created = el as HTMLInputElement;
+        // The real click() would open an OS dialog; nothing to do in happy-dom.
+        (el as HTMLInputElement).click = () => {};
+      }
+      return el;
+    }) as typeof document.createElement;
+
+    try {
+      pointer(uploadButton(container), "click");
+    } finally {
+      document.createElement = realCreate;
+    }
+
+    expect(created).not.toBeNull();
+    expect(created!.type).toBe("file");
+    expect(created!.multiple).toBe(true);
+    expect(created!.accept).toContain("image/*");
+  });
+
+  test("uploadAndAssign commits the first upload's ref", async () => {
+    const { state } = installMockPlatform();
+    const commits: string[] = [];
+
+    await uploadAndAssign([testFile("hero.png"), testFile("second.png")], (v) => commits.push(v));
+
+    // Both files land, but only the first fills the single-valued field.
+    expect(state.calls.filter((c) => c[0] === "uploadFile")).toHaveLength(2);
+    expect(commits).toEqual(["/hero.png"]);
+  });
+
+  test("uploadAndAssign commits nothing when every upload failed", async () => {
+    installMockPlatform({ uploadFile: () => Promise.reject(new Error("nope")) });
+    const commits: string[] = [];
+
+    await uploadAndAssign([testFile("hero.png")], (v) => commits.push(v));
+
+    expect(commits).toEqual([]);
+  });
+});
+
+// ─── Content-relative thumbnails ─────────────────────────────────────────────
+
+describe("media picker thumbnail for a content entry", () => {
+  test("a content-relative value previews at its mounted URL, not against index.html", async () => {
+    resetStudioState({ projectConfig: { content: { posts: { source: "./content/posts/" } } } });
+    resetWorkspaceWithTab(undefined, { documentPath: "content/posts/hello.md" });
+
+    const container = await renderLoaded("./images/hero.png");
+
+    // Without the mapping this would be "./images/hero.png", which the parent document resolves to
+    // /packages/studio/images/hero.png and 404s.
+    expect(container.querySelector(".media-picker-thumb")?.getAttribute("src")).toBe(
+      "/content/posts/images/hero.png",
+    );
+    // The FIELD still shows what the author wrote — the mapping is preview-only.
+    const field = container.querySelector("sp-textfield") as HTMLInputElement;
+    expect(field.value).toBe("./images/hero.png");
+  });
+
+  test("a page document leaves the value alone", async () => {
+    resetStudioState({ projectConfig: { content: { posts: { source: "./content/posts/" } } } });
+    resetWorkspaceWithTab(undefined, { documentPath: "pages/index.json" });
+
+    const container = await renderLoaded("/logo.png");
+
+    expect(container.querySelector(".media-picker-thumb")?.getAttribute("src")).toBe("/logo.png");
   });
 });
