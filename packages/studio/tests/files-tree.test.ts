@@ -5,11 +5,13 @@
  */
 import {
   answerPromptDialog,
+  dragEvent,
   flush,
   installMockPlatform,
   key,
   pointer,
   renderInto,
+  testFile,
 } from "./harness";
 import type { MockPlatformState } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
@@ -571,7 +573,7 @@ describe("file context menu", () => {
     expect(document.querySelector("#layer-popover sp-popover")).toBeNull();
   });
 
-  test("directory rows offer New File instead of Open", async () => {
+  test("directory rows offer New File and Upload Files instead of Open", async () => {
     const { out } = await renderSeededTree();
 
     pointer(rowFor(out, "assets"), "contextmenu");
@@ -579,6 +581,7 @@ describe("file context menu", () => {
 
     expect(popoverMenuItems().map((el) => el.textContent?.trim())).toEqual([
       "New File…",
+      "Upload Files…",
       "Rename…",
       "Delete",
     ]);
@@ -1206,5 +1209,101 @@ describe("registerFileTreeDnD", () => {
     await flush();
 
     expect(handle.state.files.has("pages/index.json")).toBe(true);
+  });
+});
+
+// ─── External (OS) file drops ─────────────────────────────────────────────────
+
+describe("file tree external file drops", () => {
+  async function renderAndRegister(seed: Record<string, string> = {}) {
+    const handle = installFsPlatform(seed);
+    siteState();
+    seedTreeState();
+    const tree = makeTreeCtx();
+    const out = await renderInto(renderFilesTemplate(tree.ctx), host);
+    registerFileTreeDnD({ renderLeftPanel: tree.ctx.renderLeftPanel });
+    await flush();
+    return { ...tree, handle, out };
+  }
+
+  const uploadPaths = (handle: { state: MockPlatformState }) =>
+    handle.state.calls.filter((c) => c[0] === "uploadFile").map((c) => c[1]);
+
+  test("a directory row accepts files and uploads into itself", async () => {
+    const { handle, out } = await renderAndRegister();
+
+    const over = dragEvent(rowFor(out, "assets"), "dragover", [testFile("hero.png")]);
+    expect(over.event.defaultPrevented).toBe(true);
+    expect(over.dataTransfer.dropEffect).toBe("copy");
+    expect(rowFor(out, "assets").classList.contains("drag-over")).toBe(true);
+
+    dragEvent(rowFor(out, "assets"), "drop", [testFile("hero.png")]);
+    await flush();
+
+    expect(uploadPaths(handle)).toEqual(["assets/hero.png"]);
+    expect(rowFor(out, "assets").classList.contains("drag-over")).toBe(false);
+    // The target expands so the new file is visible without a manual disclosure click.
+    expect(requireProjectState().expanded.has("assets")).toBe(true);
+  });
+
+  test("a file row uploads beside itself, into its parent directory", async () => {
+    const handle = installFsPlatform({ "assets/note.txt": "x" });
+    siteState();
+    seedTreeState();
+    const st = requireProjectState();
+    st.dirs.set("assets", [{ name: "note.txt", path: "assets/note.txt", type: "file" }]);
+    st.expanded.add("assets");
+    const out = await renderInto(renderFilesTemplate(makeTreeCtx().ctx), host);
+    registerFileTreeDnD({ renderLeftPanel: () => {} });
+    await flush();
+
+    dragEvent(rowFor(out, "assets/note.txt"), "drop", [testFile("hero.png")]);
+    await flush();
+
+    expect(uploadPaths(handle)).toEqual(["assets/hero.png"]);
+  });
+
+  test("the tree background uploads to the project root", async () => {
+    const { handle, out } = await renderAndRegister();
+    const tree = out.querySelector(".file-tree") as HTMLElement;
+
+    dragEvent(tree, "drop", [testFile("hero.png")]);
+    await flush();
+
+    // "." contributes no prefix — the file lands at the root, not under "./".
+    expect(uploadPaths(handle)).toEqual(["hero.png"]);
+  });
+
+  test("an in-app pragmatic drag is ignored (no Files type, no preventDefault)", async () => {
+    const { handle, out } = await renderAndRegister();
+
+    const over = dragEvent(rowFor(out, "assets"), "dragover", []);
+    expect(over.event.defaultPrevented).toBe(false);
+    expect(rowFor(out, "assets").classList.contains("drag-over")).toBe(false);
+
+    dragEvent(rowFor(out, "assets"), "drop", []);
+    await flush();
+    expect(uploadPaths(handle)).toEqual([]);
+  });
+
+  test("dragleave clears the highlight without uploading", async () => {
+    const { handle, out } = await renderAndRegister();
+    const row = rowFor(out, "assets");
+
+    dragEvent(row, "dragover", [testFile("hero.png")]);
+    dragEvent(row, "dragleave", [testFile("hero.png")]);
+
+    expect(row.classList.contains("drag-over")).toBe(false);
+    expect(uploadPaths(handle)).toEqual([]);
+  });
+
+  test("a row drop does not also fire the tree-background handler", async () => {
+    const { handle, out } = await renderAndRegister();
+
+    dragEvent(rowFor(out, "assets"), "drop", [testFile("hero.png")]);
+    await flush();
+
+    // One upload, into the row's directory — not a second one at the root.
+    expect(uploadPaths(handle)).toEqual(["assets/hero.png"]);
   });
 });

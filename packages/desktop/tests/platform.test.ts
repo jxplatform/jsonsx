@@ -511,6 +511,23 @@ describe("platform methods", () => {
     });
   }
 
+  // The RPC transport JSON-serializes params, so a File/Blob would arrive as `{}`. The platform
+  // Base64-encodes binary before the call; a string (already base64) passes through untouched.
+  test("uploadFile base64-encodes a File before the RPC", async () => {
+    await platform.uploadFile("img.png", new File(["hi"], "img.png"));
+    expect(lastCall("uploadFile")!.args[0]).toEqual({ data: "aGk=", path: "img.png" });
+  });
+
+  test("uploadFile base64-encodes a Blob before the RPC", async () => {
+    await platform.uploadFile("img.png", new Blob(["hi"]));
+    expect(lastCall("uploadFile")!.args[0]).toEqual({ data: "aGk=", path: "img.png" });
+  });
+
+  test("uploadFile base64-encodes a raw ArrayBuffer before the RPC", async () => {
+    await platform.uploadFile("img.png", new Uint8Array([104, 105]).buffer);
+    expect(lastCall("uploadFile")!.args[0]).toEqual({ data: "aGk=", path: "img.png" });
+  });
+
   const voidDelegations: [string, unknown[], string, unknown][] = [
     ["gitInit", [], "gitInit", undefined],
     [

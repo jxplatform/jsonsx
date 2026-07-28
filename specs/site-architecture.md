@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.37-draft
+**Version:** 0.1.38-draft
 **Status:** Pending
-**Updated:** 2026-07-24
+**Updated:** 2026-07-28
 **License:** MIT
 
 ---
@@ -1151,18 +1151,24 @@ Only statically referenced files are copied into the build. A `src` computed at 
 
 ### 9.4 Studio Media Browser
 
-> **Status: Pending.** The Browse view's "Media" category filter lists all media files by extension (regardless of directory). The features below are planned enhancements.
+> **Status: Partial.** Upload and browsing ship; metadata and usage tracking do not. The full Studio-side contract is `studio.md` §9.3 — this section states only what it means for the media on disk.
 
-Studio will provide a media management panel accessible from:
+Studio adds media to a project from four places: the Upload button on any image field, a file dropped on the canvas, a file dropped on the Files tree, and the Manage view's drop zone. All of them write through the same core, which decides:
 
-- The file picker widget (when editing a `uri-reference` schema field)
-- The Browse view's "Media" category (currently a flat table; planned upgrade to grid)
+- **Destination** — a document inside a content collection co-locates its media in `content/<collection>/images/` (§9.1); everything else lands in `public/`. The Files tree and the Manage view name their destination explicitly instead.
+- **Reference** — written per §9.3: `public/` contents from the site root (`/hero.jpg`), a content asset relative to its own entry (`./images/hero.jpg`) so the collection loader rewrites it to the asset mount, anything else relative to the project root.
+- **Collisions** — an upload never overwrites. A colliding name gains a `-1`, `-2`, … suffix before its extension.
 
-Planned features:
+Uploaded images are ordinary project files and go through the build's optimization pipeline (§9.2) exactly like hand-placed ones.
+
+Shipped:
 
 - **Grid/list view** of all media in the project (thumbnail grid as default, table as alternative)
-- **Upload** — drag-and-drop files into the browser. Files are placed in the selected directory.
-- **Preview** — thumbnail preview for images, video, audio players
+- **Upload** — drag-and-drop or a file picker, on all four surfaces above
+- **Preview** — thumbnails for images, in both the picker and the Manage view
+
+Still planned:
+
 - **Metadata** — file size, dimensions, format shown
 - **Usage tracking** — shows which content entries and components reference each file
 - **Delete** — warns if the file is referenced by content or components
@@ -1751,6 +1757,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.1.38-draft** (2026-07-28) — Media browser (§9.4) is Partial: upload ships on four Studio surfaces with content-collection destinations and collision-safe naming; metadata and usage tracking still pending.
 - **0.1.37-draft** (2026-07-24) — Document the application tier and correct the static-only framing: §1 vision, §1.1 principles 1/3/5, §1.2 coverage, §14.1/§14.2 adapter output (worker generation is gated on build.adapter alone), and new §15 Application Tier covering server functions, auth, and data mounts.
 - **0.1.36-draft** (2026-07-23) — Note the mounted-asset copy step in the build pipeline (§12.1).
 - **0.1.35-draft** (2026-07-23) — Content entries address media relative to themselves; collections publish their directory at /content/<type> (§9.3).

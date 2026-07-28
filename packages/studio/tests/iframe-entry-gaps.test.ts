@@ -279,3 +279,127 @@ describe("native drag session guards", () => {
     expect(acks.some((m) => m.kind === "dropResult")).toBe(false);
   });
 });
+
+// ─── External file drops (flow 5) ─────────────────────────────────────────────
+
+/** Dispatch a native drag event carrying OS files, with a stub dataTransfer. */
+function fileDrag(
+  type: string,
+  files: File[],
+  opts: { clientX?: number; clientY?: number; relatedTarget?: EventTarget | null } = {},
+) {
+  const { relatedTarget = null, ...mouse } = opts;
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, ...mouse });
+  const dataTransfer = { dropEffect: "none", files, types: ["Files"] };
+  Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+  Object.defineProperty(event, "relatedTarget", { value: relatedTarget });
+  document.dispatchEvent(event);
+  return { dataTransfer, event };
+}
+
+describe("external file drag", () => {
+  test("isExternalFileDrag reads the dataTransfer types list", async () => {
+    const { isExternalFileDrag } = await import("../src/canvas/iframe-entry");
+    const withFiles = { dataTransfer: { types: ["Files"] } } as unknown as DragEvent;
+    const withText = { dataTransfer: { types: ["text/plain"] } } as unknown as DragEvent;
+    expect(isExternalFileDrag(withFiles)).toBe(true);
+    expect(isExternalFileDrag(withText)).toBe(false);
+    expect(isExternalFileDrag({} as DragEvent)).toBe(false);
+  });
+
+  test("a file dragover is accepted with the copy effect and posts geometry", async () => {
+    const { acks, container, pair } = await bootRendered(11);
+    const first = container.querySelector("p") as HTMLElement;
+    document.elementFromPoint = () => first;
+    try {
+      acks.length = 0;
+      const { dataTransfer, event } = fileDrag("dragover", [new File(["x"], "a.png")], {
+        clientX: 5,
+        clientY: 5,
+      });
+      pair.flush();
+
+      // Without preventDefault the browser shows "not allowed" and swallows the drop.
+      expect(event.defaultPrevented).toBe(true);
+      expect(dataTransfer.dropEffect).toBe("copy");
+      const over = acks.find((m) => m.kind === "fileDragOver") as
+        | { hit: { path: unknown; tagName: string } | null }
+        | undefined;
+      expect(over).toBeDefined();
+      expect(over?.hit?.path).toEqual(["children", 0]);
+      // The tag comes from the SHADOW DOC — that is the node the parent will mutate.
+      expect(over?.hit?.tagName).toBe("p");
+      // A file drag never claims the parent's pragmatic session.
+      expect(acks.some((m) => m.kind === "nativeDragEnter")).toBe(false);
+    } finally {
+      delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+    }
+  });
+
+  test("a file drop posts the File objects across the boundary", async () => {
+    const { acks, container, pair } = await bootRendered(12);
+    const first = container.querySelector("p") as HTMLElement;
+    document.elementFromPoint = () => first;
+    const file = new File(["x"], "a.png");
+    try {
+      acks.length = 0;
+      const { event } = fileDrag("drop", [file], { clientX: 5, clientY: 5 });
+      pair.flush();
+
+      expect(event.defaultPrevented).toBe(true);
+      const drop = acks.find((m) => m.kind === "fileDrop") as { files: File[] } | undefined;
+      // FileList is not structured-cloneable; the iframe spreads it to a plain array.
+      expect(drop?.files).toEqual([file]);
+    } finally {
+      delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+    }
+  });
+
+  test("a file drag over nothing addressable still posts, with a null hit", async () => {
+    const { acks, pair } = await bootRendered(13);
+    document.elementFromPoint = () => null;
+    try {
+      acks.length = 0;
+      fileDrag("dragover", [new File(["x"], "a.png")], { clientX: 5, clientY: 5 });
+      pair.flush();
+      const over = acks.find((m) => m.kind === "fileDragOver") as
+        | { hit: unknown; preview: unknown }
+        | undefined;
+      expect(over?.hit).toBeNull();
+      expect(over?.preview).toBeNull();
+    } finally {
+      delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+    }
+  });
+
+  test("leaving the frame posts fileDragLeave; an inner boundary crossing does not", async () => {
+    const { acks, container, pair } = await bootRendered(14);
+    acks.length = 0;
+
+    // RelatedTarget set = the cursor moved onto another element INSIDE the frame.
+    fileDrag("dragleave", [new File(["x"], "a.png")], { relatedTarget: container });
+    pair.flush();
+    expect(acks.some((m) => m.kind === "fileDragLeave")).toBe(false);
+
+    fileDrag("dragleave", [new File(["x"], "a.png")], { relatedTarget: null });
+    pair.flush();
+    expect(acks.some((m) => m.kind === "fileDragLeave")).toBe(true);
+  });
+
+  test("a live parent session still wins — a file drag never hijacks it", async () => {
+    const { acks, pair } = await bootRendered(15);
+    pair.parent.post({ dragSeq: 3, gen: 15, kind: "dragStart", src: { type: "block" } });
+    pair.flush();
+    acks.length = 0;
+
+    const { dataTransfer } = fileDrag("dragover", [new File(["x"], "a.png")], {
+      clientX: 5,
+      clientY: 5,
+    });
+    pair.flush();
+
+    expect(dataTransfer.dropEffect).toBe("move");
+    expect(acks.some((m) => m.kind === "fileDragOver")).toBe(false);
+    expect(acks.some((m) => m.kind === "dragOver")).toBe(true);
+  });
+});

@@ -25,7 +25,7 @@ A small dot appears next to any field that has a value; click the dot to clear i
 
 ## Attribute sections
 
-Below the basics, Studio shows only the attributes that apply to the selected element's type, grouped into sections — **Identity**, **Link**, **Media**, **Form**, **Table**, and **Accessibility**. An image gets its source, alt text, and loading behavior; a form input gets its name, placeholder, and validation attributes; a plain `div` gets almost none of these. Sections that already have values open automatically and show a dot on their header.
+Below the basics, Studio shows only the attributes that apply to the selected element's type, grouped into sections — **Identity**, **Link**, **Media**, **Form**, **Table**, and **Accessibility**. An image gets its source, alt text, and loading behavior — the source field has **Upload** and **Browse** buttons beside it, so you can add a new picture to the project or pick one you already have without leaving the panel ([Media](/docs/studio/projects/media)); a form input gets its name, placeholder, and validation attributes; a plain `div` gets almost none of these. Sections that already have values open automatically and show a dot on their header.
 
 Links get special treatment. On an `a` element, the **Link** row pairs a kind picker — **Internal Page**, **External URL**, **Anchor**, **Email**, **Phone** — with the matching input; choosing **Internal Page** lists your site's pages so you pick a destination instead of typing a path. The **Open in** attribute becomes a dropdown of the standard targets.
 

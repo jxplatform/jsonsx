@@ -33,6 +33,8 @@ Core members are required on every adapter. Grouped by family:
 
 All paths passed into adapter methods are project-relative; translating them to whatever the backend expects (a server-root prefix, an absolute path, a repo path) is the adapter's job. A core member may still answer "not available" through its return type — `codeService` resolves `null` on platforms without code tooling — but the member itself must exist.
 
+`uploadFile` is the one member that carries binary. It takes `string | File | Blob | ArrayBuffer`, and every caller — the image field's Upload button, a file dropped on the canvas or the Files panel, the Manage view — hands it whatever the browser gave them, usually a `File`. If your transport is HTTP you can post that body straight through. **If your transport serializes its arguments** (JSON over RPC or a WebSocket, as the desktop adapters do), a `File` becomes `{}` on the wire: base64-encode it in the adapter before the call and decode it in the backend. `@jxsuite/studio/base64` exports `toBase64` for exactly this, and it passes a `string` through untouched so callers that already hold base64 keep working.
+
 `createDestination` is a declaration, not a method: set it to `"path"` if your backend writes projects to a filesystem, or `"repo"` if a project is a remote repository. Studio uses it to decide which destination fields the New Project modal collects, and hands the answer back to `createProject` as `opts.destination`. **Your adapter must honor that destination and must not substitute one of its own** — a create with no usable destination is an error, not a cue to fall back to a default directory or account.
 
 ### Optional members and degradation

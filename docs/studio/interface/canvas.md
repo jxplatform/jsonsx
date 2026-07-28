@@ -59,6 +59,8 @@ Three ways to add something to the page:
 
 You can drag onto and around the canvas from almost anywhere: cards from the **Elements** panel, rows in the **Layers** panel, and the **⠿** handle on the block action bar. While you drag, an indicator line shows exactly where the element will land — before, after, or inside the element under the cursor. Drop to commit, or press :kbd[Esc] to cancel the drag with nothing changed.
 
+Files from your desktop work too. Drop an image on empty space and Studio uploads it and inserts it there; drop it on a picture that's already on the page and it swaps that picture's source instead — the target highlights so you can tell the two apart before you let go. See **[Media](/docs/studio/projects/media)**.
+
 ## The right-click context menu
 
 Right-click any element for the full action list: **Copy**, **Cut**, **Duplicate**, **Copy styles** and **Paste styles**, **Insert before** and **Insert after**, **Wrap in Div**, **Repeat…** (turn the element into a repeating list), **Set Title**, **Edit Component** or **Convert to Component**, and **Delete**. With something on the clipboard, **Paste inside** and **Paste after** appear too.

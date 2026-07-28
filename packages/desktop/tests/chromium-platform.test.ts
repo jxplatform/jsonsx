@@ -420,8 +420,26 @@ describe("chromium desktop platform", () => {
     await platform.writeFile("out.txt", "data");
   });
 
-  test("uploadFile resolves without error", async () => {
+  test("uploadFile passes an already-base64 string through untouched", async () => {
+    methodLog.length = 0;
     await platform.uploadFile("img.png", "base64data");
+    expect(methodLog.at(-1)).toEqual({
+      method: "uploadFile",
+      params: { data: "base64data", path: "img.png" },
+    });
+  });
+
+  test("uploadFile base64-encodes binary — the WS wire is JSON, so a File would become {}", async () => {
+    methodLog.length = 0;
+    await platform.uploadFile("img.png", new File(["hi"], "img.png"));
+    expect(methodLog.at(-1)).toEqual({
+      method: "uploadFile",
+      params: { data: "aGk=", path: "img.png" },
+    });
+
+    methodLog.length = 0;
+    await platform.uploadFile("img.png", new Uint8Array([104, 105]).buffer);
+    expect(methodLog.at(-1)?.params).toEqual({ data: "aGk=", path: "img.png" });
   });
 
   test("deleteFile resolves without error", async () => {

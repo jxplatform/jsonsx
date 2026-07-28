@@ -1,9 +1,12 @@
 /// <reference lib="dom" />
 /**
- * Media Picker — combobox-style widget for selecting project media files.
+ * Media Picker — combobox-style widget for selecting or uploading project media files.
  *
- * Shows an editable text input for manual URL entry combined with a dropdown of available media
- * files from the project's public/ directory, with thumbnail previews for images.
+ * Shows an editable text input for manual URL entry, an Upload button that adds a new file to the
+ * project and assigns it, and a Browse dropdown of media already in the project's public/
+ * directory, with thumbnail previews for images.
+ *
+ * @docs studio/projects/media
  */
 
 import { html, render as litRender, nothing } from "lit-html";
@@ -14,29 +17,15 @@ import { debouncedStyleCommit, renderOnly } from "../store";
 import { getLayerSlot } from "./layers";
 import { rectOf } from "../utils/geometry";
 import { loopbackAssetSrc } from "../canvas/canvas-origin";
+import {
+  IMAGE_EXTENSIONS,
+  MEDIA_EXTENSIONS,
+  UPLOAD_ACCEPT,
+  extensionOf,
+  uploadAssets,
+} from "../files/media-upload";
 
 // ─── Media file cache ────────────────────────────────────────────────────────
-
-const IMAGE_EXTENSIONS = new Set([
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".gif",
-  ".svg",
-  ".webp",
-  ".avif",
-  ".ico",
-]);
-
-const MEDIA_EXTENSIONS = new Set([
-  ...IMAGE_EXTENSIONS,
-  ".mp4",
-  ".webm",
-  ".mp3",
-  ".wav",
-  ".ogg",
-  ".pdf",
-]);
 
 /** @type {{ path: string; name: string; isImage: boolean }[]} */
 let mediaCache: { path: string; name: string; isImage: boolean }[] = [];
@@ -62,8 +51,7 @@ async function collectMedia(
         const sub = await collectMedia(entry.path, platform);
         results.push(...sub);
       } else {
-        const dot = entry.name.lastIndexOf(".");
-        const ext = dot > 0 ? entry.name.slice(dot).toLowerCase() : "";
+        const ext = extensionOf(entry.name);
         if (MEDIA_EXTENSIONS.has(ext)) {
           results.push({
             isImage: IMAGE_EXTENSIONS.has(ext),
@@ -90,9 +78,8 @@ async function loadMediaCache() {
     m.path = m.path.replace(/^\/public\//, "/");
   }
   mediaCacheLoaded = true;
-  // Re-render the host panels so the Browse button (gated on mediaCache.length) appears once the
-  // Async listing resolves — including when an image value is already set, so the current image can
-  // Be replaced. Mirrors loadLayoutEntries()'s renderOnly() in head-panel.
+  // Re-render the host panels so the browse popover has entries to show once the async listing
+  // Resolves. Mirrors loadLayoutEntries()'s renderOnly() in head-panel.
   renderOnly("leftPanel", "rightPanel", "frontmatterPanel");
 }
 
@@ -287,6 +274,44 @@ function showMediaPickerPopover(anchorEl: HTMLElement, onCommit: (val: string) =
 // ─── Render ──────────────────────────────────────────────────────────────────
 
 /**
+ * Upload files chosen in a media field's file input and assign the first one to the field. Exported
+ * for the unit tests — the hidden input is created on demand, so there is no other way to reach
+ * it.
+ *
+ * @param {FileList | File[]} files
+ * @param {(val: string) => void} onCommit
+ */
+export async function uploadAndAssign(
+  files: FileList | File[],
+  onCommit: (val: string) => void,
+): Promise<void> {
+  const uploaded = await uploadAssets([...files]);
+  const [first] = uploaded;
+  if (first) {
+    onCommit(first.ref);
+  }
+}
+
+/**
+ * Open the OS file picker for a media field. The input is created per click and discarded after — a
+ * persistent hidden input in the template would be recreated by lit on every panel re-render.
+ *
+ * @param {(val: string) => void} onCommit
+ */
+function pickAndUpload(onCommit: (val: string) => void) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.multiple = true;
+  input.accept = UPLOAD_ACCEPT;
+  input.addEventListener("change", () => {
+    if (input.files?.length) {
+      void uploadAndAssign(input.files, onCommit);
+    }
+  });
+  input.click();
+}
+
+/**
  * Render the media picker widget for src-type attributes.
  *
  * @param {string} prop — attribute name (e.g. "src")
@@ -299,9 +324,7 @@ export function renderMediaPicker(prop: string, value: string, onCommit: (val: s
   void loadMediaCache();
 
   const currentValue = value || "";
-  const isImage = IMAGE_EXTENSIONS.has(
-    currentValue.slice(currentValue.lastIndexOf(".")).toLowerCase(),
-  );
+  const isImage = IMAGE_EXTENSIONS.has(extensionOf(currentValue));
 
   return html`
     <div class="media-picker">
@@ -317,21 +340,27 @@ export function renderMediaPicker(prop: string, value: string, onCommit: (val: s
         )}
         @focus=${() => loadMediaCache()}
       ></sp-textfield>
-      ${mediaCache.length > 0
-        ? html`
-            <sp-action-button
-              size="xs"
-              quiet
-              title="Browse media"
-              @click=${(e: MouseEvent) => {
-                void loadMediaCache();
-                showMediaPickerPopover(e.currentTarget as HTMLElement, onCommit);
-              }}
-            >
-              <sp-icon-image slot="icon"></sp-icon-image>
-            </sp-action-button>
-          `
-        : nothing}
+      <sp-action-button
+        class="media-picker-upload"
+        size="xs"
+        quiet
+        title="Upload media"
+        @click=${() => pickAndUpload(onCommit)}
+      >
+        <sp-icon-upload slot="icon"></sp-icon-upload>
+      </sp-action-button>
+      <sp-action-button
+        class="media-picker-browse"
+        size="xs"
+        quiet
+        title="Browse media"
+        @click=${(e: MouseEvent) => {
+          void loadMediaCache();
+          showMediaPickerPopover(e.currentTarget as HTMLElement, onCommit);
+        }}
+      >
+        <sp-icon-image slot="icon"></sp-icon-image>
+      </sp-action-button>
     </div>
   `;
 }

@@ -52,6 +52,7 @@ import {
   setCanvasContextMenuHandler,
   setCanvasSlashHandler,
   setIframePatchEscalation,
+  setFileDropHandler,
   setInsertZoneClickHandler,
   setStylebookHitHandler,
   setToolbarRefresh,
@@ -96,6 +97,10 @@ import { renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
 import { installAutomationHook } from "./services/automation";
 import { openBrowseModal } from "./browse/browse-modal";
+import { invalidateBrowseCache } from "./browse/browse";
+import { invalidateMediaCache } from "./ui/media-picker";
+import { setMediaChangedHandler } from "./files/media-upload";
+import { applyFileDrop } from "./editor/file-drop-action";
 import { seedAssistantMessages } from "./panels/ai-panel";
 import { seedPublishConnected } from "./publish/publish-panel";
 import { openConnectorGrid } from "./grid/grid-open";
@@ -460,6 +465,16 @@ initBlockActionBar({
 setToolbarRefresh(renderBlockActionBar);
 // The cross-origin insertion "+" click runs the parent-realm slash-menu → mutateInsertNode flow.
 setInsertZoneClickHandler(runInsertZoneAction);
+// Files dragged from the OS onto a canvas: upload, then replace an image's source or insert.
+setFileDropHandler(applyFileDrop);
+// Every upload surface routes through uploadAssets(); refresh the three caches that list project
+// Files afterwards. Injected here because all three modules import from media-upload.
+setMediaChangedHandler(async (dir) => {
+  invalidateMediaCache();
+  invalidateBrowseCache();
+  await loadDirectory(dir);
+  renderLeftPanel();
+});
 // The in-iframe "/" trigger drives the parent-realm Spectrum slash menu across the bridge.
 setCanvasSlashHandler(canvasSlashHandler);
 // Canvas right-clicks show the parent-realm Jx element context menu across the bridge.

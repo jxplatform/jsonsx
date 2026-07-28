@@ -23,7 +23,9 @@ Use **New** to add a Page, Layout, or Component. Studio asks for a name in a dia
 
 ## Upload media
 
-Drag images, video, audio, PDFs, or fonts into Manage and Studio writes them to your project's `public/` folder, ready to reference. The site build optimizes images automatically (responsive `srcset`, WebP/AVIF).
+Drag images, video, audio, PDFs, or fonts into Manage — or click **Upload** — and Studio writes them into your project, ready to reference. Files land in the folder for whichever category filter is active, so with **Media** selected they go to `public/`. An upload never overwrites: a file whose name is already taken becomes `hero-1.jpg`. The site build optimizes images automatically (responsive `srcset`, WebP/AVIF).
+
+Manage is one of four places you can add media from — see **[Media](/docs/studio/projects/media)** for the canvas, Files-panel, and image-field routes.
 
 ## Model your content
 

@@ -1,7 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { handleStudioApi } from "../src/studio-api";
 import { join, resolve } from "node:path";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 /**
  * Test helper — calls handleStudioApi and asserts a response was returned.
@@ -675,6 +675,58 @@ describe("file — write", () => {
     const req = new Request(url, { body: "x", method: "PUT" });
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(400);
+  });
+});
+
+describe("file — upload", () => {
+  // Upload creates directories that are not part of the committed fixture tree; drop them so a test
+  // Run leaves the working copy clean.
+  afterAll(() => {
+    for (const dir of ["public", "content"]) {
+      rmSync(join(FIXTURES, dir), { force: true, recursive: true });
+    }
+  });
+
+  test("writes raw binary bytes, not a text transcode", async () => {
+    // PNG magic + a 0x00 byte: a text round-trip would mangle both.
+    const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff]);
+    const url = new URL("http://localhost/__studio/file/upload?path=public/hero.png");
+    const req = new Request(url, { body: bytes, method: "POST" });
+
+    const res = await callApi(req, url, FIXTURES);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect([...readFileSync(join(FIXTURES, "public/hero.png"))]).toEqual([...bytes]);
+  });
+
+  test("creates parent directories as needed", async () => {
+    const url = new URL("http://localhost/__studio/file/upload?path=content/blog/images/a.png");
+    const req = new Request(url, { body: new Uint8Array([1]), method: "POST" });
+
+    const res = await callApi(req, url, FIXTURES);
+
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(existsSync(join(FIXTURES, "content/blog/images/a.png"))).toBe(true);
+  });
+
+  test("returns 400 when path is missing", async () => {
+    const url = new URL("http://localhost/__studio/file/upload");
+    const req = new Request(url, { body: new Uint8Array([1]), method: "POST" });
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
+  });
+
+  test("rejects a path that escapes the project root", async () => {
+    const url = new URL("http://localhost/__studio/file/upload?path=../escaped.png");
+    const req = new Request(url, { body: new Uint8Array([1]), method: "POST" });
+
+    const res = await callApi(req, url, FIXTURES);
+
+    expect(res.status).toBe(400);
+    expect(existsSync(resolve(FIXTURES, "../escaped.png"))).toBe(false);
   });
 });
 
@@ -1424,7 +1476,6 @@ describe("format endpoints", () => {
     ]);
     expect(data.document.$defs.v1).toBeDefined();
     // The entry documents were regenerated into the fixture project root on demand.
-    const { existsSync } = await import("node:fs");
     expect(existsSync(join(FMT_DIR, "project.schema.json"))).toBe(true);
     expect(existsSync(join(FMT_DIR, "document.schema.json"))).toBe(true);
     // Keep the committed fixture pristine (they regenerate on the next call anyway).

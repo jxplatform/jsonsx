@@ -214,6 +214,43 @@ export function pointer(el: Element, type: string, opts: MouseEventInit = {}): v
   );
 }
 
+/**
+ * Dispatch a drag event carrying `files`, and report what the handler did with it.
+ *
+ * Happy-dom has no usable `DataTransfer`, so one is stubbed: `types` drives the `includes("Files")`
+ * guard every external-drop handler opens with, and `dropEffect` is writable so a test can assert
+ * the copy cursor was requested. Pass `files: []` to simulate an in-app drag (no `Files` type).
+ */
+export function dragEvent(
+  el: Element,
+  type: string,
+  files: File[] = [],
+  init: MouseEventInit & { relatedTarget?: EventTarget | null } = {},
+): { event: Event; dataTransfer: { dropEffect: string; files: File[]; types: string[] } } {
+  const dataTransfer = {
+    dropEffect: "none",
+    files,
+    types: files.length > 0 ? ["Files"] : [],
+  };
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    ...init,
+  });
+  Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+  if ("relatedTarget" in init) {
+    Object.defineProperty(event, "relatedTarget", { value: init.relatedTarget ?? null });
+  }
+  el.dispatchEvent(event);
+  return { dataTransfer, event };
+}
+
+/** A `File` with real bytes, for upload-path tests. */
+export function testFile(name: string, type = "image/png", body = "x"): File {
+  return new File([body], name, { type });
+}
+
 /** Dispatch a bubbling keyboard event (keydown by default). */
 export function key(
   el: Element,

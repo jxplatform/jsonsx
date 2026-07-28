@@ -13,10 +13,11 @@ import {
   renderResolvedDocument,
 } from "./iframe-render";
 import { measureHits, startInteraction } from "./iframe-interaction";
-import { serializeJxPath } from "./path-mapping";
+import { parseJxPath, serializeJxPath } from "./path-mapping";
 import {
   AUTO_SCROLL_STEP,
   computeDropInstruction,
+  rectFor,
   resolveDropTarget,
   scrollDirection,
 } from "./iframe-drop";
@@ -35,7 +36,7 @@ import {
   stopEditing,
 } from "../editor/inline-edit";
 import { captureDocSelection, restoreDocSelection } from "./iframe-editable-root";
-import { isAncestor } from "../state";
+import { getNodeAtPath, isAncestor } from "../state";
 import type { JxDocOp } from "../tabs/patch-ops";
 import type { JxPath } from "../state";
 // ObserveScope MUST come from the runtime: the $defs refs are created by the runtime's copy of
@@ -43,7 +44,13 @@ import type { JxPath } from "../state";
 // Would never re-run when a dev-proxy data source settles.
 import { observeScope, reapplyStyle, setResolveToken } from "@jxsuite/runtime";
 import type { IframeChannel } from "./iframe-channel";
-import type { CanvasMode, DragSrcKind, IframeToParent, ParentToIframe } from "./iframe-protocol";
+import type {
+  CanvasMode,
+  DragSrcKind,
+  FileDropHit,
+  IframeToParent,
+  ParentToIframe,
+} from "./iframe-protocol";
 import type { JxDocument, JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 import type { IframeRenderCtx, RenderHandle } from "./iframe-render";
 
@@ -63,6 +70,44 @@ function previewAt(
     return null;
   }
   return computeDropInstruction(targetEl, cursor.y, shadowDoc, src);
+}
+
+/**
+ * Whether a native drag carries OS files rather than an in-app pragmatic source. `types` is the one
+ * part of `dataTransfer` readable during dragover (`files` is empty until drop, by design).
+ */
+export function isExternalFileDrag(e: DragEvent): boolean {
+  return [...(e.dataTransfer?.types ?? [])].includes("Files");
+}
+
+/**
+ * The drag source a file drop is placed as. A dropped file becomes a NEW element, so it resolves
+ * exactly like a palette block — `canDrop` never rejects it and `computeDropInstruction` needs no
+ * file-specific branch.
+ */
+const FILE_DRAG_SRC: DragSrcKind = { type: "block" };
+
+/**
+ * Describe the node under a file drag for the parent: its path, rect, and resolved tag. The tag
+ * comes from the SHADOW DOC (the document's own `tagName`) when the path resolves there, because
+ * that is what the parent will mutate; the rendered element's tag can differ for a component
+ * instance, whose custom element renders as its template root.
+ */
+export function fileDropHitFor(
+  targetEl: HTMLElement,
+  shadowDoc: JxMutableNode | null,
+): FileDropHit | null {
+  const serialized = targetEl.dataset?.jxPath;
+  if (serialized == null) {
+    return null;
+  }
+  const path = parseJxPath(serialized);
+  const node = shadowDoc ? (getNodeAtPath(shadowDoc, path as JxPath) as JxMutableNode) : undefined;
+  return {
+    path,
+    rect: rectFor(targetEl),
+    tagName: (node?.tagName ?? targetEl.tagName).toLowerCase(),
+  };
 }
 
 /** Set-key keys the patcher applies IN PLACE (never a subtree re-render) — safe under a live edit. */
@@ -312,8 +357,39 @@ export function startCanvasIframe(opts: {
   // Otherwise spam the channel forever.
   const NATIVE_ENTER_REPOST_MS = 300;
   let lastNativeEnterPost = 0;
+
+  // Flow 5: an OS file drag. There is no parent session to bind and never will be — the parent
+  // Never saw the gesture start. Accept it here (preventDefault, or the browser shows "not allowed"
+  // And swallows the drop) and post geometry; the parent uploads and mutates. stopPropagation keeps
+  // The event away from the contenteditable root, which would otherwise let the browser insert its
+  // Own blob: <img> alongside our mutation.
+  const postFileDragGeometry = (e: DragEvent, kind: "fileDragOver" | "fileDrop") => {
+    e.preventDefault();
+    e.stopPropagation();
+    const cursor = { x: e.clientX, y: e.clientY };
+    const doc = container.ownerDocument;
+    const targetEl = resolveDropTarget(cursor.x, cursor.y, doc);
+    const hit = targetEl ? fileDropHitFor(targetEl, shadowDoc) : null;
+    const preview =
+      shadowDoc && targetEl
+        ? computeDropInstruction(targetEl, cursor.y, shadowDoc, FILE_DRAG_SRC)
+        : null;
+    if (kind === "fileDragOver") {
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = "copy";
+      }
+      channel.post({ hit, kind: "fileDragOver", preview });
+      return;
+    }
+    channel.post({ files: [...(e.dataTransfer?.files ?? [])], hit, kind: "fileDrop", preview });
+  };
+
   const onNativeDragOver = (e: DragEvent) => {
     if (!dragSrc) {
+      if (isExternalFileDrag(e)) {
+        postFileDragGeometry(e, "fileDragOver");
+        return;
+      }
       const now = Date.now();
       if (now - lastNativeEnterPost >= NATIVE_ENTER_REPOST_MS) {
         lastNativeEnterPost = now;
@@ -334,6 +410,9 @@ export function startCanvasIframe(opts: {
   };
   const onNativeDrop = (e: DragEvent) => {
     if (!dragSrc) {
+      if (isExternalFileDrag(e)) {
+        postFileDragGeometry(e, "fileDrop");
+      }
       return;
     }
     e.preventDefault();
@@ -353,8 +432,17 @@ export function startCanvasIframe(opts: {
     sessionSeq = -1;
     stopAutoScroll();
   };
+  // A file drag that leaves the frame entirely (relatedTarget escapes the document) clears the
+  // Parent's overlay. Inner dragleaves fire constantly as the cursor crosses elements, so they are
+  // Filtered out — otherwise the affordance would flicker on every element boundary.
+  const onNativeDragLeave = (e: DragEvent) => {
+    if (!dragSrc && isExternalFileDrag(e) && !e.relatedTarget) {
+      channel.post({ kind: "fileDragLeave" });
+    }
+  };
   container.ownerDocument.addEventListener("dragenter", onNativeDragOver, true);
   container.ownerDocument.addEventListener("dragover", onNativeDragOver, true);
+  container.ownerDocument.addEventListener("dragleave", onNativeDragLeave, true);
   container.ownerDocument.addEventListener("drop", onNativeDrop, true);
 
   const off = channel.onMessage((msg) => {
@@ -596,6 +684,7 @@ export function startCanvasIframe(opts: {
     heightObserver?.disconnect();
     container.ownerDocument.removeEventListener("wheel", onWheel);
     container.ownerDocument.removeEventListener("dragenter", onNativeDragOver, true);
+    container.ownerDocument.removeEventListener("dragleave", onNativeDragLeave, true);
     container.ownerDocument.removeEventListener("dragover", onNativeDragOver, true);
     container.ownerDocument.removeEventListener("drop", onNativeDrop, true);
     stopDataScopeWatch?.();
