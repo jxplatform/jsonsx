@@ -265,6 +265,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.3.4-draft** (2026-07-28) — Document the two-entry code-split bundle layout and the on-demand Monaco load (§11.1).
 - **0.3.3-draft** (2026-07-28) — Layer-row actions follow selection rather than hover; edit/design gate automatic Request fetches; structural splices escalate on the immediate parent only.
 - **0.3.2-draft** (2026-07-28) — Canvas maps a content entry's entry-relative media onto its asset mount (§4.1) so the preview matches the built site; render-only, source doc untouched.
 - **0.3.1-draft** (2026-07-28) — Media upload across four surfaces (§9.3): image-field Upload button, canvas file drop with replace-vs-insert, Files-tree and Manage destinations; collision-safe naming; binary uploadFile on every platform.

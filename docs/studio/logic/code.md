@@ -13,6 +13,10 @@ Everything in the Logic pages so far works without writing code. But Studio does
 
 ![Jx Studio editing a component state function in the Monaco code editor](../../images/mode-script.png)
 
+:::doc-note
+The editor loads the first time you open a code surface, not when Studio starts — it is the single largest piece of the app, and most sessions never need it. Expect a brief pause the first time, and none after that.
+:::
+
 There are two distinct code surfaces, for two different jobs.
 
 ## The function editor

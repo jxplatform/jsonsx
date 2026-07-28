@@ -67,9 +67,23 @@ for (const entry of ["./src/studio.ts", "./src/canvas/iframe-entry.ts"]) {
   const result = await Bun.build({
     define,
     entrypoints: [entry],
+    // Naming is a CONTRACT, not a detail. Entries must stay at flat, unhashed `dist/<name>.js`
+    // Because four consumers address them by fixed path: `index.html`, `canvas.html`,
+    // `packages/desktop/scripts/stage-studio-assets.ts`, and the platform's `scripts/build-assets.ts`.
+    // Split chunks are content-hashed (they are only ever reached through an import in an entry) and
+    // Land in `dist/chunks/`, which those consumers copy wholesale.
+    naming: {
+      asset: "[name].[ext]",
+      chunk: "chunks/[name]-[hash].[ext]",
+      entry: "[name].[ext]",
+    },
     outdir: "dist",
     plugins: [dedupeMonaco],
     sourcemap: "linked",
+    // Splitting is what makes the ~18 `await import()` sites in studio src actually defer payload
+    // Rather than just evaluation — without it Bun inlines them all into the entry, so Monaco, yjs,
+    // Ajv and pragmatic-dnd's element adapter shipped on every cold start regardless.
+    splitting: true,
     target: "browser",
   });
   if (!result.success) {

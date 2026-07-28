@@ -4,7 +4,8 @@
  * completion provider for state scope variables.
  */
 
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
+import type * as monaco from "monaco-editor";
+import { loadMonaco } from "../services/monaco-lazy";
 import { isJsonObject } from "@jxsuite/schema/guards";
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
@@ -101,7 +102,25 @@ export function renderFunctionEditor() {
     activeTab.value?.doc.document,
   );
 
-  view.functionEditor = monaco.editor.create(editorContainer as unknown as HTMLElement, {
+  void mountFunctionEditor(editorContainer as unknown as HTMLElement, body, args, editing);
+}
+
+/**
+ * Create the function-body editor once Monaco has loaded. The container is already in the DOM; a
+ * teardown or mode switch during the load is caught by the `view.functionEditor` re-check in
+ * `resetCanvasView`, which disposes whatever is current.
+ */
+async function mountFunctionEditor(
+  editorContainer: HTMLElement,
+  body: string,
+  args: string[],
+  editing: unknown,
+): Promise<void> {
+  const monacoNs = await loadMonaco();
+  // Completions used to register at studio startup, which would now await the lazy load and undo it.
+  // The editor is the only surface they serve, and the registration is idempotent.
+  void registerFunctionCompletions();
+  view.functionEditor = monacoNs.editor.create(editorContainer, {
     automaticLayout: true,
     fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace",
     fontSize: 12,
@@ -179,12 +198,13 @@ export function renderFunctionEditor() {
 }
 
 // Register Monaco JS completion provider for state scope variables (once)
-export function registerFunctionCompletions() {
+export async function registerFunctionCompletions() {
   if (view._completionRegistered) {
     return;
   }
   view._completionRegistered = true;
-  monaco.languages.registerCompletionItemProvider("javascript", {
+  const monacoNs = await loadMonaco();
+  monacoNs.languages.registerCompletionItemProvider("javascript", {
     provideCompletionItems(model, position) {
       if (!activeTab.value) {
         return { suggestions: [] };
@@ -203,15 +223,15 @@ export function registerFunctionCompletions() {
 
       const suggestions: monaco.languages.CompletionItem[] = Object.entries(defs).map(
         ([key, def]) => {
-          let kind = monaco.languages.CompletionItemKind.Variable;
+          let kind = monacoNs.languages.CompletionItemKind.Variable;
           if (
             (def as JxPrototypeDef)?.$prototype === "Function" ||
             (def as Record<string, unknown>)?.$handler ||
             formulaDocs.has(key)
           ) {
-            kind = monaco.languages.CompletionItemKind.Function;
+            kind = monacoNs.languages.CompletionItemKind.Function;
           } else if ((def as JxPrototypeDef)?.$prototype) {
-            kind = monaco.languages.CompletionItemKind.Property;
+            kind = monacoNs.languages.CompletionItemKind.Property;
           }
           const item: monaco.languages.CompletionItem = {
             insertText: `state.${key}`,
@@ -232,7 +252,7 @@ export function registerFunctionCompletions() {
         suggestions.push({
           documentation: entry.description,
           insertText: `window.${entry.label}`,
-          kind: monaco.languages.CompletionItemKind.Function,
+          kind: monacoNs.languages.CompletionItemKind.Function,
           label: entry.label,
           range,
         });

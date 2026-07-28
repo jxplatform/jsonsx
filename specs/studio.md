@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.3.3-draft
+**Version:** 0.3.4-draft
 **Status:** Partial
 **Updated:** 2026-07-28
 **License:** MIT
@@ -771,15 +771,23 @@ An ambiguous component (two or more image props) falls through to an insert rath
 
 ## 11. Dependencies
 
-| Package                             | Purpose                      |
-| ----------------------------------- | ---------------------------- |
-| `@jxsuite/runtime`                  | Canvas rendering             |
-| `@atlaskit/pragmatic-drag-and-drop` | Layer tree drag-and-drop     |
-| `lit-html`                          | Studio UI template rendering |
-| `monaco-editor`                     | Code editor                  |
-| `yaml`                              | YAML frontmatter parsing     |
-| `unified` / `remark-*`              | Markdown conversion pipeline |
-| `@spectrum-web-components/*` (15+)  | Adobe Spectrum UI components |
+| Package                             | Purpose                                |
+| ----------------------------------- | -------------------------------------- |
+| `@jxsuite/runtime`                  | Canvas rendering                       |
+| `@atlaskit/pragmatic-drag-and-drop` | Layer tree drag-and-drop               |
+| `lit-html`                          | Studio UI template rendering           |
+| `monaco-editor`                     | Code editor (loaded on demand — §11.1) |
+| `yaml`                              | YAML frontmatter parsing               |
+| `unified` / `remark-*`              | Markdown conversion pipeline           |
+| `@spectrum-web-components/*` (15+)  | Adobe Spectrum UI components           |
+
+### 11.1 Bundle Layout
+
+The studio ships **two entry bundles** — the editor shell (`dist/studio.js`) and the slim canvas-iframe bundle (`dist/iframe-entry.js`) — built in separate single-entry passes so each lands flat at `dist/<name>.js`. Four consumers address those paths literally (`index.html`, `canvas.html`, the desktop asset staging, and the cloud platform's asset build), so entry names are a contract and are never hashed.
+
+The build **code-splits**. Everything reached only through a dynamic `import()` — Monaco and its language contributions, the Yjs collab stack, the JSON-Schema validator, drag-and-drop adapters — lands in content-hashed files under `dist/chunks/`, addressed by the entry relative to its own URL. That directory therefore ships and is copied wholesale, with its emitted names intact.
+
+**Monaco is never on the startup path.** It is roughly two thirds of the editor's code and most sessions never open a code view, so `services/monaco-lazy` loads the editor API and its worker/language registration together, memoized, on first use by source mode, the function editor, or the formula workspace. Nothing in the eager import graph may reference `monaco-editor` — including indirectly, via a module whose own top-level imports pull it in (the reason the model-URI helper lives apart from the Monaco setup module).
 
 ---
 
@@ -801,6 +809,7 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.3.4-draft** (2026-07-28) — Document the two-entry code-split bundle layout and the on-demand Monaco load (§11.1).
 - **0.3.3-draft** (2026-07-28) — Layer-row actions follow selection rather than hover; edit/design gate automatic Request fetches; structural splices escalate on the immediate parent only.
 - **0.3.2-draft** (2026-07-28) — Canvas maps a content entry's entry-relative media onto its asset mount (§4.1) so the preview matches the built site; render-only, source doc untouched.
 - **0.3.1-draft** (2026-07-28) — Media upload across four surfaces (§9.3): image-field Upload button, canvas file drop with replace-vs-insert, Files-tree and Manage destinations; collision-safe naming; binary uploadFile on every platform.
@@ -839,4 +848,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.3.3-draft_
+_`@jxsuite/studio` Specification v0.3.4-draft_
