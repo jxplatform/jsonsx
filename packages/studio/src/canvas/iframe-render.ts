@@ -213,6 +213,9 @@ export function syncEditableRoot(container: HTMLElement, mode: CanvasMode): void
   if (!isEditableMode(mode)) {
     container.removeAttribute("contenteditable");
     container.removeAttribute("spellcheck");
+    container.removeAttribute("role");
+    container.removeAttribute("aria-multiline");
+    container.removeAttribute("aria-label");
     return;
   }
   container.contentEditable = "true";
@@ -221,6 +224,19 @@ export function syncEditableRoot(container: HTMLElement, mode: CanvasMode): void
   container.setAttribute("writingsuggestions", "false");
   // The caret must never look like a drag handle: reordering is the block action bar's handle only.
   container.setAttribute("draggable", "false");
+  /*
+   * A bare `contenteditable` div announces as an unlabelled group in most screen readers, so the one
+   * surface an author types into was the least described thing in the editor. `textbox` +
+   * `aria-multiline` is the role the editable region actually plays, and the label names it — the
+   * canvas is inside a cross-origin iframe, so a reader traversing in has no surrounding context to
+   * infer it from.
+   *
+   * Scoped deliberately: this describes the editing REGION. Per-block landmarks and a
+   * keyboard-reachable block action bar are still missing (see specs/studio.md §4.5).
+   */
+  container.setAttribute("role", "textbox");
+  container.setAttribute("aria-multiline", "true");
+  container.setAttribute("aria-label", "Document content");
 }
 
 /** Id of the injected stylebook-mode chrome stylesheet (section/card scaffolding). */

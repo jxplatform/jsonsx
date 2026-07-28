@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.3.4-draft
+**Version:** 0.3.5-draft
 **Status:** Partial
 **Updated:** 2026-07-28
 **License:** MIT
@@ -578,6 +578,24 @@ the range it would delete — reaching out of the block and into the previous on
 them is how it implements the keystroke. The caret says what the author meant; the target range says
 what the browser would have done about it.
 
+**IME composition suspends every commit.** A composition is a multi-keystroke transaction the browser
+owns: the DOM holds provisional text and the input engine holds a selection tied to it. So between
+`compositionstart` and `compositionend` the idle tick is cancelled and not re-armed, an explicit flush
+is a no-op, and exactly one commit runs when the composition ends. Committing inside one would capture
+half-formed text and — because a commit restores the selection — cancel the composition outright. The
+editing host exposes its composition state so nothing else rewrites the editable subtree mid-input
+either.
+
+#### 8.2.8 Accessibility
+
+The editable region carries `role="textbox"`, `aria-multiline="true"` and a label, added and removed
+with `contenteditable` itself. A bare `contenteditable` div announces as an unlabelled group, and the
+canvas lives in a cross-origin iframe, so a screen reader traversing in has no surrounding context to
+infer the region's purpose from.
+
+This describes the REGION only. Per-block landmarks and a keyboard-reachable block action bar
+(§4.4) are not yet implemented.
+
 #### 8.2.2 Which tags hold a caret
 
 A tag holds a caret when its element vocabulary says it accepts inline children. This is DERIVED,
@@ -809,6 +827,7 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.3.5-draft** (2026-07-28) — IME composition suspends canvas commits; the editable region gets textbox/aria-multiline/label (§8.2.8).
 - **0.3.4-draft** (2026-07-28) — Document the two-entry code-split bundle layout and the on-demand Monaco load (§11.1).
 - **0.3.3-draft** (2026-07-28) — Layer-row actions follow selection rather than hover; edit/design gate automatic Request fetches; structural splices escalate on the immediate parent only.
 - **0.3.2-draft** (2026-07-28) — Canvas maps a content entry's entry-relative media onto its asset mount (§4.1) so the preview matches the built site; render-only, source doc untouched.
@@ -848,4 +867,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.3.4-draft_
+_`@jxsuite/studio` Specification v0.3.5-draft_

@@ -16,6 +16,7 @@ import {
   registerElements,
   renderResolvedDocument,
   STYLEBOOK_STYLE_ID,
+  syncEditableRoot,
   syncEditModeCss,
   syncStylebookCss,
 } from "../src/canvas/iframe-render";
@@ -28,6 +29,25 @@ const ctx: PathMapCtx = {
   pageContentOffset: null,
   pageContentPrefix: null,
 };
+
+describe("syncEditableRoot accessibility", () => {
+  test("the editable region announces as a multiline textbox, and drops it when not editable", () => {
+    const container = document.createElement("div");
+    syncEditableRoot(container, "edit" as never);
+    // A bare contenteditable div announces as an unlabelled group; the one surface an author types
+    // Into was the least described thing in the editor.
+    expect(container.getAttribute("role")).toBe("textbox");
+    expect(container.getAttribute("aria-multiline")).toBe("true");
+    expect(container.getAttribute("aria-label")).toBeTruthy();
+    expect(container.getAttribute("contenteditable")).toBe("true");
+
+    syncEditableRoot(container, "preview" as never);
+    expect(container.getAttribute("role")).toBeNull();
+    expect(container.getAttribute("aria-multiline")).toBeNull();
+    expect(container.getAttribute("aria-label")).toBeNull();
+    expect(container.getAttribute("contenteditable")).toBeNull();
+  });
+});
 
 describe("renderResolvedDocument", () => {
   test("renders a resolved doc into the container and stamps data-jx-path", async () => {

@@ -96,6 +96,10 @@ Text that a component fills from data can't be edited this way — typing over i
 Behind the scenes, Studio keeps the markup tidy as you type — adjacent formats merge, empty leftovers are removed — and saves the result as plain Markdown in the page's file, so bold is just `**bold**` on disk.
 :::
 
+## Typing in other scripts
+
+Input methods that compose characters from several keystrokes — Japanese, Chinese, Korean, Vietnamese and others — work the way they do anywhere else on the page. Studio leaves your composition alone until you accept it, then records the finished text as one edit. Nothing is saved mid-composition, and a co-author's change never lands on top of what you are still typing.
+
 ## Next
 
 - Insert whole blocks from the keyboard with **[Slash commands](/docs/studio/editing/slash-commands)**
