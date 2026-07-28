@@ -1382,13 +1382,25 @@
         align-items: center;
         gap: 0;
       }
-      .layer-row:hover .layer-actions {
+      /* Row actions are built for the SELECTED row only — five sp-action-buttons per row is
+         ~5 custom elements with shadow roots per visible row, which is what made a large document's
+         layer tree slow to render. The row itself stays fully draggable (dnd's canDrag excludes
+         only .layer-actions), so reordering non-selected rows is unaffected. */
+      .layer-row.selected .layer-actions {
         display: flex;
+      }
+      .layer-row:hover .layer-drag-handle,
+      .layer-row.selected .layer-drag-handle {
+        display: inline-block;
       }
       .layer-row:has(.layer-title-input) .layer-actions {
         display: none;
       }
+      /* The grab affordance is a plain span, so it stays on every row (revealed on hover) while the
+         Spectrum action buttons are built for the selected row only. It sits OUTSIDE .layer-actions
+         so dnd's canDrag no longer refuses drags that start on it. */
       .layer-drag-handle {
+        display: none;
         color: var(--fg-dim);
         opacity: 0.6;
         font-size: var(--spectrum-font-size-50, 11px);

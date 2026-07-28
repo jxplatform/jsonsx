@@ -268,7 +268,13 @@ describe("layers-panel gaps", () => {
     return host.querySelector(`.layer-row[data-path="${path.join("/")}"]`);
   }
 
-  function moveInButton(path: JxPath): HTMLElement | undefined {
+  /**
+   * Select the row, re-render, and find its move-in button. Row actions are built for the SELECTED
+   * row only, so selecting first is the real interaction (clicking a row does both).
+   */
+  async function moveInButton(path: JxPath): Promise<HTMLElement | undefined> {
+    activeTab.value!.session.selection = path;
+    await renderLayers();
     return [...(rowByKey(path)?.querySelectorAll("sp-action-button") ?? [])].find(
       (b) => b.getAttribute("title") === "Move into previous sibling",
     ) as HTMLElement | undefined;
@@ -304,7 +310,8 @@ describe("layers-panel gaps", () => {
 
   test("move-in is unavailable after a void sibling", async () => {
     await renderLayers();
-    expect(moveInButton(["children", 1])).toBeUndefined();
+    const btn1 = await moveInButton(["children", 1]);
+    expect(btn1).toBeUndefined();
   });
 
   test("a legacy array-object children sibling still counts as a container", async () => {
@@ -315,14 +322,16 @@ describe("layers-panel gaps", () => {
       map: { tagName: "li", textContent: "item" },
     };
     await renderLayers();
-    expect(moveInButton(["children", 3])).toBeDefined();
+    const btn3 = await moveInButton(["children", 3]);
+    expect(btn3).toBeDefined();
   });
 
   test("non-array object children (a $ref) do not count as a container", async () => {
     const doc = activeTab.value!.doc.document as AnyRec;
     doc.children[4].children = { $ref: "#/state/body" };
     await renderLayers();
-    expect(moveInButton(["children", 5])).toBeUndefined();
+    const btn5 = await moveInButton(["children", 5]);
+    expect(btn5).toBeUndefined();
   });
 
   test("clicking a stray toggle outside any row is a no-op", async () => {

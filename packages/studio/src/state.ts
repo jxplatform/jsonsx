@@ -250,9 +250,34 @@ export function flattenTree(
   path: JxPath = [],
   depth = 0,
 ): FlatRow[] {
+  const rows: FlatRow[] = [];
+  collectRows(doc, path, depth, rows, false);
+  return rows;
+}
+
+/**
+ * Pre-order walk that appends into `out`.
+ *
+ * Appending beats returning-and-spreading: `rows.push(...flattenTree(child))` copied every
+ * descendant row once per ancestor level (O(n·depth) copies) and passed the whole subtree as
+ * argument list, which throws `RangeError: too many arguments` on a large enough tree.
+ *
+ * `skipSelf` omits the node's own row and emits only its descendants — the `$switch` case branch
+ * needs that, having already emitted a `case` row with its own nodeType.
+ */
+function collectRows(
+  doc: JxMutableNode | string | number | boolean,
+  path: JxPath,
+  depth: number,
+  out: FlatRow[],
+  skipSelf: boolean,
+): void {
   // Text node children: bare primitives get a "text" row
   if (typeof doc === "string" || typeof doc === "number" || typeof doc === "boolean") {
-    return [{ depth, node: doc, nodeType: "text", path }];
+    if (!skipSelf) {
+      out.push({ depth, node: doc, nodeType: "text", path });
+    }
+    return;
   }
 
   // Array pseudo-element (repeater): a first-class node at its own path. Emit the "map" row, then
@@ -260,19 +285,23 @@ export function flattenTree(
   // A member of a children array (path `[…, "children", i]`) and the legacy whole-children form
   // (path `[…, "children"]`).
   if ((doc as JxMutableNode).$prototype === "Array") {
-    const rows: FlatRow[] = [{ depth, node: doc, nodeType: "map", path }];
+    if (!skipSelf) {
+      out.push({ depth, node: doc, nodeType: "map", path });
+    }
     const mapDef = (doc as JxMutableNode).map;
     if (mapDef && typeof mapDef === "object") {
-      rows.push(...flattenTree(mapDef as JxMutableNode, [...path, "map"], depth + 1));
+      collectRows(mapDef as JxMutableNode, [...path, "map"], depth + 1, out, false);
     }
-    return rows;
+    return;
   }
 
-  const rows: FlatRow[] = [{ depth, node: doc, nodeType: "element", path }];
+  if (!skipSelf) {
+    out.push({ depth, node: doc, nodeType: "element", path });
+  }
 
   // Custom component instances without user-authored children are atomic in the layer tree
   if (doc.$props && (doc.tagName || "").includes("-") && !Array.isArray(doc.children)) {
-    return rows;
+    return;
   }
 
   const { children } = doc;
@@ -280,7 +309,7 @@ export function flattenTree(
   if (Array.isArray(children)) {
     for (let i = 0; i < children.length; i++) {
       const childPath = [...path, "children", i];
-      rows.push(...flattenTree(children[i]!, childPath, depth + 1));
+      collectRows(children[i]!, childPath, depth + 1, out, false);
     }
   } else if (
     children &&
@@ -288,7 +317,7 @@ export function flattenTree(
     (children as JxMutableNode).$prototype === "Array"
   ) {
     // Legacy whole-children repeater: the array occupies the children slot itself.
-    rows.push(...flattenTree(children as JxMutableNode, [...path, "children"], depth + 1));
+    collectRows(children as JxMutableNode, [...path, "children"], depth + 1, out, false);
   }
 
   // $switch — emit each case as a virtual child
@@ -296,27 +325,25 @@ export function flattenTree(
     for (const [caseName, caseDef] of Object.entries(doc.cases)) {
       const casePath = [...path, "cases", caseName];
       if (caseDef && typeof caseDef === "object" && (caseDef as JxMutableNode).$ref) {
-        rows.push({
+        out.push({
           depth: depth + 1,
           node: caseDef as JxMutableNode,
           nodeType: "case-ref",
           path: casePath,
         });
       } else if (caseDef && typeof caseDef === "object") {
-        rows.push({
+        out.push({
           depth: depth + 1,
           node: caseDef as JxMutableNode,
           nodeType: "case",
           path: casePath,
         });
-        // Recurse into case children (skip the case node itself — already emitted)
-        const caseChildren = flattenTree(caseDef as JxMutableNode, casePath, depth + 2);
-        rows.push(...caseChildren.slice(1));
+        // Recurse into case children — skipSelf, because the "case" row above already stands in for
+        // The case node itself (with its own nodeType).
+        collectRows(caseDef as JxMutableNode, casePath, depth + 2, out, true);
       }
     }
   }
-
-  return rows;
 }
 
 /**

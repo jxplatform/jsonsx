@@ -125,17 +125,19 @@ export function renderLayersTemplate(ctx: {
   const collapsed = (view._layersCollapsed ||= new Set());
 
   const layerRows: { key: string; tpl: TemplateResult }[] = [];
+  // Rows arrive in pre-order, so "is any ancestor collapsed?" is a running depth comparison rather
+  // Than a per-row walk back up the path. The old form did `path.slice(0, d)` + `pathKey(sub)` for
+  // Every ancestor of every row — O(depth) array copies and string joins per row, on every render.
+  let collapsedAtDepth: number | null = null;
   for (const { node, path, depth, nodeType } of rows) {
-    let hidden = false;
-    for (let d = 1; d <= path.length; d++) {
-      const sub = path.slice(0, d);
-      if (d < path.length && collapsed.has(pathKey(sub))) {
-        hidden = true;
-        break;
-      }
-    }
-    if (hidden) {
+    if (collapsedAtDepth !== null && depth > collapsedAtDepth) {
       continue;
+    }
+    // Back at or above the collapsed ancestor's depth: it no longer covers this row.
+    collapsedAtDepth = null;
+    const rowKey = pathKey(path);
+    if (collapsed.has(rowKey)) {
+      collapsedAtDepth = depth;
     }
 
     if (tab?.doc.mode === "content" && path.length === 0) {
@@ -145,7 +147,7 @@ export function renderLayersTemplate(ctx: {
     if (nodeType === "text") {
       const textPreview = String(node).length > 40 ? `${String(node).slice(0, 40)}…` : String(node);
       layerRows.push({
-        key: pathKey(path),
+        key: rowKey,
         tpl: html`
           <div
             class="layer-row"
@@ -177,7 +179,7 @@ export function renderLayersTemplate(ctx: {
       }
     }
 
-    const key = pathKey(path);
+    const key = rowKey;
     const isSelected = pathsEqual(path, tab!.session.selection);
     const hasChildren = Array.isArray(jxNode.children) && jxNode.children.length > 0;
     const hasMapChildren =
@@ -330,9 +332,11 @@ export function renderLayersTemplate(ctx: {
             >${labelText}</span
           >
           ${isStructural && !isRoot
+            ? html`<span class="layer-drag-handle" title="Drag to reorder">⠿</span>`
+            : nothing}
+          ${isStructural && !isRoot && isSelected
             ? html`
                 <span class="layer-actions">
-                  <span class="layer-drag-handle" title="Drag to reorder">⠿</span>
                   ${canMoveUp
                     ? html`<sp-action-button
                         quiet
