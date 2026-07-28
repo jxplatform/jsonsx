@@ -315,6 +315,32 @@ describe("custom-element ancestor classification", () => {
     });
   }
 
+  test("a splice with a component ANCESTOR but a plain parent is patchable", () => {
+    addComponentSubtree();
+    // `<eer-intro><p>call <strong>now</strong></p></eer-intro>` — the splice parent is the <p>, a
+    // Plain container whose light-DOM child order is its own. Slot projection at the component
+    // Boundary above it changes where the <p> renders, not the order of the <p>'s children. This is
+    // The real-content case: markdown class-directive pages put every editable block inside a
+    // Component, so pressing Enter there used to force a full render (reloading embedded iframes).
+    const paragraph = ["children", 3, "children", 0];
+    expect(classifyOps(tab, [{ index: 1, op: "insert", parentPath: paragraph }]).patchable).toBe(
+      true,
+    );
+    expect(
+      classifyOps(tab, [{ op: "remove", path: [...paragraph, "children", 1] }]).patchable,
+    ).toBe(true);
+    expect(
+      classifyOps(tab, [
+        {
+          fromPath: [...paragraph, "children", 1],
+          op: "move",
+          toIndex: 0,
+          toParentPath: paragraph,
+        },
+      ]).patchable,
+    ).toBe(true);
+  });
+
   test("a rich text commit INSIDE a component is patchable (embedded-iframe CLS regression)", () => {
     addComponentSubtree();
     // The rich-commit shape: clear text + set children on the paragraph inside <eer-intro>. The
@@ -332,10 +358,11 @@ describe("custom-element ancestor classification", () => {
     ).toBe(true);
   });
 
-  test("index-splicing structural ops inside a component still escalate", () => {
+  test("a splice whose IMMEDIATE parent is a component still escalates", () => {
     addComponentSubtree();
-    // Splices locate the Nth DOM child of the parent — slot redistribution CAN break that, so the
-    // Ancestor rule stays for insert/remove/move.
+    // Splices pick their insertion reference with `parentEl.childNodes[i]`. When the parent itself is
+    // A component its children may be rendered by the component rather than as light DOM, so an
+    // Insert would land in the wrong place rather than fail loudly — stay conservative here.
     expect(classifyOps(tab, [{ index: 1, op: "insert", parentPath: ["children", 3] }]).reason).toBe(
       "structure-in-custom-element",
     );

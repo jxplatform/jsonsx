@@ -108,16 +108,33 @@ function containerVerdict(tab: Tab, parentPath: JxPath, requireArray = true): st
     return "structure-on-map-path";
   }
   const doc = tab.doc.document;
-  for (let i = 0; i <= parentPath.length; i += 2) {
-    const node = getNodeAtPath(doc, parentPath.slice(0, i));
-    if (!node) {
-      return "node-not-found";
-    }
-    if (typeof node.tagName === "string" && node.tagName.includes("-")) {
-      return "structure-in-custom-element";
-    }
-  }
   const parent = getNodeAtPath(doc, parentPath);
+  if (!parent) {
+    return "node-not-found";
+  }
+  /*
+   * Only the IMMEDIATE parent's tag matters, not every ancestor's.
+   *
+   * These ops locate their target by its stamped `data-jx-path` (iframe-patch's `requireElement`);
+   * the one place DOM child-index correspondence is consulted is `domChildReference`, which indexes
+   * `parentEl.childNodes` to pick the insertion reference. That is a property of the immediate
+   * parent alone — a custom element further up the chain projects its own light-DOM children through
+   * slots, which changes where they RENDER, not the child order of some plain container beneath it.
+   *
+   * Scanning every ancestor rejected the common case instead: markdown class-directive pages put
+   * every editable block inside a component, so pressing Enter there forced a full render (reloading
+   * embedded iframes) on a correspondence that was never actually at risk. This mirrors the
+   * reasoning `replaceVerdict` already documents — and if the element turns out to be un-queryable
+   * after all, the iframe throws `element-not-found` and the parent escalates, reaching the same
+   * outcome without the false positives.
+   *
+   * The immediate parent stays conservative: when it IS a component, its children may be rendered
+   * by the component rather than as light DOM, and an insert would land at the wrong position rather
+   * than fail loudly.
+   */
+  if (typeof parent.tagName === "string" && parent.tagName.includes("-")) {
+    return "structure-in-custom-element";
+  }
   if (parent.innerHTML) {
     return "structure-with-innerhtml";
   }

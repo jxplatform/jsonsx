@@ -19,6 +19,7 @@ import {
   setCanvasDelinkAnchors,
   setCanvasViewportTranspose,
   setRootMedia,
+  setSkipAutoRequests,
   setSkipServerFunctions,
   setStampPropBindings,
   transposeCanvasUnits,
@@ -501,6 +502,11 @@ export async function renderResolvedDocument(opts: {
   siteStyle?: Record<string, unknown> | null;
 }): Promise<RenderHandle> {
   setSkipServerFunctions(opts.mode !== "preview");
+  // Same gate for automatic `$prototype: "Request"` state entries. `buildScope` re-resolves every
+  // State entry on each full render, so without this an escalating authoring action (a signals-panel
+  // Edit, or Enter inside component-wrapped content) issued an HTTP request per render. Live data is
+  // Preview's job; edit/design render the pre-fetch (null) state.
+  setSkipAutoRequests(opts.mode !== "preview");
   // Transpose viewport units (vh/vw/…) → container units (cqh/cqw/…) so they resolve against the
   // Canvas's fixed-size query container (canvas.html) instead of the iframe element. That decouples
   // Them from the iframe height, letting the host size the iframe to its content without `100vh`
