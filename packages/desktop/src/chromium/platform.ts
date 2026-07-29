@@ -3,6 +3,8 @@ import { streamImport } from "@jxsuite/studio/import-client";
 import { toBase64 } from "@jxsuite/studio/base64";
 import type {
   ComponentMeta,
+  CreateProjectDestination,
+  ExtensionsInfo,
   ImportProgressEvent,
   ImportSiteOptions,
   RecentProjectEntry,
@@ -35,7 +37,10 @@ import type {
   PackageOpResult,
 } from "../rpc-schema";
 
-export function createDesktopPlatform(): StudioPlatform {
+/* Inferred return type with a `satisfies` conformance check at the bottom, so callers see which of
+   the PAL's OPTIONAL members this launcher actually implements — annotating `StudioPlatform` made
+   every one of them `| undefined` at the call site, including in this package's own tests. */
+export function createDesktopPlatform() {
   // The project server gates the WS upgrade on the token. The launcher passes it in the shell URL
   // (?token=…); read it here before the shell strips it from the address bar after boot.
   const token = new URLSearchParams(location.search).get("token") ?? "";
@@ -83,7 +88,7 @@ export function createDesktopPlatform(): StudioPlatform {
     );
   }
 
-  return {
+  const platform = {
     id: "desktop" as const,
 
     /* New projects go where the user says: the modal's Location field, with Browse… backed by the
@@ -298,7 +303,7 @@ export function createDesktopPlatform(): StudioPlatform {
 
     /** The extensions payload behind descriptor-contributed settings sections. */
     async listExtensions() {
-      return request("listExtensions", {}) as Promise<Record<string, unknown>[]>;
+      return request("listExtensions", {}) as Promise<ExtensionsInfo[]>;
     },
 
     /** Pre-bundled per-project entry schemas for Monaco registration. */
@@ -405,7 +410,10 @@ export function createDesktopPlatform(): StudioPlatform {
       url?: string;
       adapter?: string;
       directory: string;
-      destination: { kind: "path"; parent: string };
+      /* The full PAL union, not just the `path` variant this launcher can act on: the parameter is
+         contravariant, so narrowing it here makes the whole platform object unassignable to
+         StudioPlatform. `createDestination: "path"` is what actually stops Studio sending a repo. */
+      destination: CreateProjectDestination;
       starter?: string;
       template?: string;
       design?: {
@@ -418,7 +426,11 @@ export function createDesktopPlatform(): StudioPlatform {
         logo?: { name: string; base64: string };
       };
     }) {
-      return request("createProject", opts) as Promise<{
+      const { destination } = opts;
+      if (destination.kind !== "path") {
+        throw new Error("This launcher creates projects on disk; repo destinations are cloud-only");
+      }
+      return request("createProject", { ...opts, destination }) as Promise<{
         root: string;
         config: ProjectConfig;
       }>;
@@ -466,4 +478,7 @@ export function createDesktopPlatform(): StudioPlatform {
       return "/__studio__/ai/chat";
     },
   };
+
+  // On the identifier, not the literal: a fresh literal would get excess property checks.
+  return platform satisfies StudioPlatform;
 }

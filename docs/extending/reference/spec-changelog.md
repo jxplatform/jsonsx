@@ -53,6 +53,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.3-draft** (2026-07-29) — PAL: launcher-only capabilities (updater, windowControls) stay off the StudioPlatform interface; adapter factories infer their return type and assert conformance instead of annotating it away.
 - **0.3.2-draft** (2026-07-29) — The desktop shell routes Studio preview links to the user's default browser via Utils.openExternal (§3.5).
 - **0.3.1-draft** (2026-07-25) — Repo picker gains a repository-access footer: per-installation manage links, install-on-another-account, and Refresh.
 - **0.3.0-draft** (2026-07-25) — New Project requires a user-chosen destination: StudioPlatform gains the required createDestination declaration, createProject takes a required destination (path parent or repo owner/name/visibility), and §4.5 defines the create flow. No backend picks a location.

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CapabilityInfo, ExtensionCapability } from "@jxsuite/schema/format-registry";
 import type { ComponentMeta } from "../src/rpc-schema";
 import type { StudioSchema } from "../src/handlers";
 
@@ -16,11 +17,20 @@ void mock.module("electrobun/bun", () => ({
 
 const entryCall = mock(async (..._args: unknown[]): Promise<unknown> => ({ parsed: true }));
 
+/* Shapes here mirror the real FormatRegistry entry: `capabilities` is a
+   Partial<Record<ExtensionCapability, CapabilityInfo>> map keyed by capability, and `documentKinds`
+   is ("page"|"component"|"content")[]. An earlier fixture claimed a string array and a "markdown"
+   document kind — shapes the product cannot produce, so the assertions below proved nothing. */
+const fakeCapabilities: Partial<Record<ExtensionCapability, CapabilityInfo>> = {
+  parse: { identifier: "parse", timing: ["compiler", "server"] },
+  serialize: { identifier: "serialize", timing: ["compiler", "server"] },
+};
+
 const fakeEntry: Record<string, unknown> = {
   call: entryCall,
-  capabilities: ["parse", "serialize"],
-  documentKinds: ["markdown"],
-  exportTarget: "html",
+  capabilities: fakeCapabilities,
+  documentKinds: ["content"],
+  exportTarget: true,
   extensions: [".md"],
   mediaType: "text/markdown",
   name: "Markdown",
@@ -48,6 +58,7 @@ const fakeExtensionsPayload = [
         studio: { settings: { layout: "map" } },
       },
     ],
+    classes: [{ name: "Content", path: "dist/content.class.json" }],
     name: "@jxsuite/parser",
     specifier: "@jxsuite/parser",
   },
@@ -129,9 +140,9 @@ describe("listFormats", () => {
       const formats = await listFormats();
       expect(formats).toHaveLength(1);
       expect(formats[0]).toEqual({
-        capabilities: ["parse", "serialize"],
-        documentKinds: ["markdown"],
-        exportTarget: "html",
+        capabilities: fakeCapabilities,
+        documentKinds: ["content"],
+        exportTarget: true,
         extensions: [".md"],
         mediaType: "text/markdown",
         name: "Markdown",

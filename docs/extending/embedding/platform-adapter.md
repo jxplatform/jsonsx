@@ -54,6 +54,20 @@ Everything else on the interface is optional, and each optional member maps to a
 
 Studio always checks for presence before calling an optional member, so an omitted member is never an error. The [protocol route reference](/docs/extending/reference/studio-routes) is the complete degradation catalogue.
 
+### Capabilities beyond the interface
+
+Your host may be able to do things no other host can. Keep those **off** `StudioPlatform` and let Studio feature-detect them on `globalThis.__jxPlatform` — that is how the desktop's `updater` and window controls work, and it is what lets the same Studio code run where they do not exist.
+
+One consequence worth knowing before it bites you: annotating your factory's return type as `StudioPlatform` erases the extras from every caller, including your own tests. Let the type be inferred and assert conformance instead — that also stops the optional members you _did_ implement from reading as possibly-absent:
+
+```typescript
+export function createMyPlatform() {
+  const platform = {/* … interface members …, plus your extras */};
+  // On the identifier, not the object literal: a fresh literal gets excess property checks.
+  return platform satisfies StudioPlatform;
+}
+```
+
 A browser-hosted adapter can still offer `pickDirectory`: `@jxsuite/studio/directory-picker` exports `canPickDirectory()` and `pickDirectoryPath(locate)`, which drive `showDirectoryPicker()` and hand you the picked folder's `name` plus the random id it wrote into a hidden `.jx-loc-id` there — your `locate` callback resolves that pair to an absolute path (the dev server does it with `GET /__studio/locate-directory`). Omit the member when `canPickDirectory()` is false rather than defining one that always returns null, so Studio hides the button instead of showing a dead one.
 
 ## Registration

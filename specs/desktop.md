@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.2-draft
+**Version:** 0.3.3-draft
 **Status:** Pending
 **Updated:** 2026-07-29
 **License:** MIT
@@ -91,6 +91,8 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | **Multi-window / shell** | `openProjectInNewWindow?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                                                                                     |
 
 **Core vs. optional, and degradation.** Required members are the minimal backend every platform implements. Optional members (marked `?` in the interface) each back an optional protocol route; Studio feature-detects them and degrades gracefully when they are absent — hiding the corresponding UI or falling back to a client-side path. Each optional route's `degradation` note in `STUDIO_ROUTES` records exactly what turns off (e.g. no `collab` → Studio edits solo with file-level saves; no `importSite` → the New Project modal hides its Import tab).
+
+**Launcher-only extras are not interface members.** A platform may carry capabilities that only one shell can have — the desktop's `updater` and `windowControls` are the two today. These deliberately stay **out** of `StudioPlatform`: Studio reaches them by feature-detecting `globalThis.__jxPlatform` against its own local shape (see `resize-edges.ts`, `panels/toolbar.ts`), which is what lets the same shell code run unchanged where they do not exist. The consequence for adapter authors is that a factory annotated `(): StudioPlatform` **erases its own extras** — every caller, including its tests, then sees an object without them. Let the return type be inferred and assert conformance instead (`return platform satisfies StudioPlatform`), which also keeps the optional members the launcher does implement from reading as possibly-absent at the call site.
 
 ### 3.2 Types
 
@@ -811,6 +813,7 @@ Ensure desktop app matches dev-mode capabilities:
 
 ## Changelog
 
+- **0.3.3-draft** (2026-07-29) — PAL: launcher-only capabilities (updater, windowControls) stay off the StudioPlatform interface; adapter factories infer their return type and assert conformance instead of annotating it away.
 - **0.3.2-draft** (2026-07-29) — The desktop shell routes Studio preview links to the user's default browser via Utils.openExternal (§3.5).
 - **0.3.1-draft** (2026-07-25) — Repo picker gains a repository-access footer: per-installation manage links, install-on-another-account, and Refresh.
 - **0.3.0-draft** (2026-07-25) — New Project requires a user-chosen destination: StudioPlatform gains the required createDestination declaration, createProject takes a required destination (path parent or repo owner/name/visibility), and §4.5 defines the create flow. No backend picks a location.
@@ -832,4 +835,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.2-draft_
+_Jx Studio Desktop Architecture Specification v0.3.3-draft_

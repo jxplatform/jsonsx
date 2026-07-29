@@ -219,7 +219,7 @@ describe("chromium platform: search, formats and packages", () => {
   test("listStarters returns the starter template list", async () => {
     const starters = await platform.listStarters!();
     expect(starters).toEqual(responses.listStarters as never);
-    expect(lastRequest().method).toBe("listStarters");
+    expect(lastRequest()!.method).toBe("listStarters");
   });
 
   test("rejects when the server reports an unknown method", async () => {

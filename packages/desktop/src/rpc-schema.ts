@@ -4,6 +4,7 @@ import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload, RenameReport } from "@jxsuite/server/refactor";
 import type { StarterMeta } from "@jxsuite/starters";
 import type {
+  ComponentMeta,
   DataConnectionsResponse,
   DataConnectionTestResult,
   DataPushRequest,
@@ -13,6 +14,7 @@ import type {
   DataRowsQuery,
   DataRowsResult,
   DataRowUpdate,
+  ExtensionsInfo,
   SecretsListResponse,
   SecretsSetRequest,
   SecretsSetResponse,
@@ -28,14 +30,11 @@ export interface DirEntry {
   modified?: string;
 }
 
-export interface ComponentMeta {
-  tagName: string;
-  $id?: string | null;
-  path: string;
-  props?: { name: string; type?: string; default?: unknown }[];
-  slots?: { name: string; description?: string; fallback?: unknown[] }[];
-  hasElements?: boolean;
-}
+/* Re-exported, not re-declared. A hand copy of this lived here and drifted: `default?: unknown` and
+   `fallback?: unknown[]` where the protocol says `JsonValue` and `(JxMutableNode | string)[]`, which
+   made every discoverComponents result unassignable to the PAL's own signature — invisible while this
+   package went untypechecked. The wire shape belongs to @jxsuite/protocol; keep it there. */
+export type { ComponentMeta } from "@jxsuite/protocol";
 
 export interface SiteConfig {
   name?: string;
@@ -285,9 +284,12 @@ export interface StudioRPC {
         response: Record<string, unknown>[];
       };
       // Extensions payload — the formats channel's sibling (specs/extensions.md §9/§9.1)
+      /* The studio wire shape, not `Record<string, unknown>[]`: the PAL declares
+         `listExtensions?: () => Promise<ExtensionsInfo[]>`, so a loose response type here made the
+         whole desktop platform object unassignable to StudioPlatform. */
       listExtensions: {
         params: void;
-        response: Record<string, unknown>[];
+        response: ExtensionsInfo[];
       };
       // Pre-bundled per-project entry schemas for Monaco (project.schema.json / document.schema.json)
       fetchProjectSchemas: {

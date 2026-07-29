@@ -7,12 +7,22 @@ void mock.module("electrobun/bun", () => {
   throw new Error("electrobun unavailable in test env");
 });
 
-const { init, openFileDialog } = await import("../src/utils");
+const { init, openFileDialog, openDirectoryDialog, openExternal } = await import("../src/utils");
 
-describe("openFileDialog before init", () => {
+describe("dialogs and openExternal before init", () => {
   test("returns null when Utils was never initialized", async () => {
     const result = await openFileDialog();
     expect(result).toBeNull();
+  });
+
+  test("openDirectoryDialog returns null without a shell", async () => {
+    expect(await openDirectoryDialog()).toBeNull();
+  });
+
+  /* Without a shell there is nothing to hand the URL to. Reporting false lets the caller fall back
+     to `window.open` in the webview rather than losing the click. */
+  test("openExternal reports false without a shell", () => {
+    expect(openExternal("https://example.com")).toBe(false);
   });
 });
 

@@ -1,3 +1,4 @@
+// oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 /**
  * Shared studio-asset staging (scripts/stage-studio-assets.ts) — the single copy list both desktop
  * pre-build scripts use. Guards the launcher-drift regression where the chromium staging script
@@ -84,6 +85,23 @@ describe("stageStudioAssets", () => {
       "font:jetbrains-mono-400.woff2",
     );
     expect(await readFile(join(out, "fonts", "OFL.txt"), "utf8")).toBe("font:OFL.txt");
+  });
+
+  /* Refusing beats shipping: a staged app whose studio.js imports chunks that are not there dies at
+     boot with a bare module-resolution error and no hint about the missing build step. */
+  test("refuses to stage when the studio build has no chunks", async () => {
+    const bare = mkdtempSync(join(tmpdir(), "jx-stage-nochunks-"));
+    const bareStudio = join(bare, "studio");
+    const bareDesktop = join(bare, "desktop");
+    mkdirSync(join(bareStudio, "dist"), { recursive: true });
+    mkdirSync(bareDesktop, { recursive: true });
+    writeFileSync(join(bareStudio, "dist", "studio.js"), "// studio");
+    writeFileSync(join(bareStudio, "dist", "studio.css"), "/* css */");
+    try {
+      await expect(stageStudioAssets(bareDesktop)).rejects.toThrow("no dist/chunks");
+    } finally {
+      rmSync(bare, { force: true, recursive: true });
+    }
   });
 
   test("a missing optional sourcemap is tolerated; a present one is copied", async () => {

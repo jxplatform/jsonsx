@@ -337,7 +337,8 @@ describe("chromium desktop platform", () => {
 
   test("resolveClass throws on a non-OK response", async () => {
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => new Response("no", { status: 403 })) as typeof fetch;
+    // Via unknown: a bare arrow lacks fetch's `preconnect` sibling, so the direct cast is rejected.
+    globalThis.fetch = (async () => new Response("no", { status: 403 })) as unknown as typeof fetch;
     try {
       expect(platform.resolveClass!({ $src: "x" })).rejects.toThrow("Class resolution failed: 403");
     } finally {

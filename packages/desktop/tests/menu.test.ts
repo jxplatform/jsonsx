@@ -41,7 +41,7 @@ interface MenuItem {
   submenu?: MenuItem[];
 }
 
-function fire(action: string | undefined): Promise<unknown> {
+function fire(action?: string): Promise<unknown> {
   return Promise.resolve(clickHandler!({ data: action == null ? {} : { action } }));
 }
 

@@ -87,7 +87,6 @@ const mod = await import("../src/index");
 // Await it before asserting on its effects and before restoring the real Bun.serve.
 await mod.ready;
 
-// @ts-expect-error restore the real Bun.serve
 Bun.serve = realServe;
 
 const expectedBoot = process.argv[2] || process.env.JSONSX_PROJECT_ROOT || null;

@@ -16,15 +16,19 @@ void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   languages: { registerCompletionItemProvider: () => {} },
 }));
 
+const applyProjectSchemas = mock((_schemas: unknown) => {});
+
 void mock.module("../src/services/monaco-setup", () => ({
+  applyProjectSchemas,
   modelUriFor: (p: string) => `file:///${p}`,
 }));
 
-const { isMonacoLoaded, loadedMonaco, loadMonaco, resetMonacoLazy } =
+const { isMonacoLoaded, loadedMonaco, loadMonaco, resetMonacoLazy, setProjectSchemasForMonaco } =
   await import("../src/services/monaco-lazy");
 
 beforeEach(() => {
   resetMonacoLazy();
+  applyProjectSchemas.mockClear();
 });
 
 afterEach(() => {
@@ -79,5 +83,48 @@ describe("loadedMonaco", () => {
     expect(loadedMonaco()).toBeNull();
     const monaco = await pending;
     expect(loadedMonaco()).toBe(monaco);
+  });
+});
+
+/* The whole point of the holding pen: schemas arrive at PROJECT ACTIVATION, long before anyone opens
+   a code view. Applying them there used to mean importing monaco-setup right then, which fetched all
+   of Monaco on every cold load — the exact cost the lazy path exists to avoid. */
+describe("setProjectSchemasForMonaco", () => {
+  test("holding schemas does not load Monaco", () => {
+    setProjectSchemasForMonaco({ document: { $id: "doc" }, project: { $id: "proj" } });
+    expect(isMonacoLoaded()).toBe(false);
+    expect(applyProjectSchemas).not.toHaveBeenCalled();
+  });
+
+  test("pending schemas are applied when Monaco finally loads", async () => {
+    const schemas = { document: { $id: "doc" }, project: { $id: "proj" } };
+    setProjectSchemasForMonaco(schemas);
+    await loadMonaco();
+    expect(applyProjectSchemas).toHaveBeenCalledWith(schemas);
+  });
+
+  test("schemas arriving after the load are applied straight away", async () => {
+    await loadMonaco();
+    applyProjectSchemas.mockClear();
+    const schemas = { document: { $id: "later" } };
+    setProjectSchemasForMonaco(schemas);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(applyProjectSchemas).toHaveBeenCalledWith(schemas);
+  });
+
+  /* Only the LATEST set matters — reactivation and project.json writes both call this — so a second
+     hand-off overwrites rather than queueing a second apply. */
+  test("only the latest pending set is applied", async () => {
+    setProjectSchemasForMonaco({ project: { $id: "first" } });
+    setProjectSchemasForMonaco({ project: { $id: "second" } });
+    await loadMonaco();
+    expect(applyProjectSchemas).toHaveBeenCalledTimes(1);
+    expect(applyProjectSchemas).toHaveBeenCalledWith({ project: { $id: "second" } });
+  });
+
+  test("a load with nothing pending applies nothing", async () => {
+    await loadMonaco();
+    expect(applyProjectSchemas).not.toHaveBeenCalled();
   });
 });

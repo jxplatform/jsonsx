@@ -10,6 +10,10 @@ coveragePathIgnorePatterns = [
   "../create/**",
   "../markup/**",
   "../parser/**",
+  # Was missing from this list, so `../protocol/src/routes.ts` landed in desktop's coverage data at
+  # 33% functions and failed the per-file gate here — while being 100% under packages/protocol's own
+  # run, where it is gated at 0.99. A sibling's files belong to that sibling's job.
+  "../protocol/**",
   "../runtime/**",
   "../schema/**",
   "../server/**",
