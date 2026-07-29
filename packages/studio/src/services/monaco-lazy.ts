@@ -29,6 +29,49 @@ let _monaco: Monaco | null = null;
 let _loading: Promise<Monaco> | null = null;
 
 /**
+ * The active project's generated entry schemas, held until Monaco exists to receive them.
+ *
+ * These arrive at project activation — long before anyone opens a code view — and applying them
+ * used to mean `import("./monaco-setup")` right then. A dynamic import that EXECUTES at startup
+ * defers evaluation by a tick but still fetches: Monaco went over the wire on every cold load,
+ * which is precisely what the lazy path exists to avoid. So the schemas wait here instead, and the
+ * loader applies whatever is pending once an editor actually needs one.
+ */
+let _pendingSchemas: { project?: unknown; document?: unknown } | null = null;
+let _pendingSchemasDirty = false;
+
+/**
+ * Record the active project's schemas for Monaco's JSON diagnostics.
+ *
+ * Applied immediately when Monaco is already loaded, otherwise on the next {@link loadMonaco}. Only
+ * the LATEST set matters — reactivation and `project.json` writes both call this — so it overwrites
+ * rather than queues.
+ */
+export function setProjectSchemasForMonaco(
+  schemas: { project?: unknown; document?: unknown } | null,
+): void {
+  _pendingSchemas = schemas;
+  _pendingSchemasDirty = true;
+  if (_monaco) {
+    void applyPendingSchemas();
+  }
+}
+
+/** Push any pending schemas into Monaco's JSON diagnostics. No-op when nothing changed. */
+async function applyPendingSchemas(): Promise<void> {
+  if (!_pendingSchemasDirty) {
+    return;
+  }
+  _pendingSchemasDirty = false;
+  try {
+    const { applyProjectSchemas } = await import("./monaco-setup.js");
+    applyProjectSchemas(_pendingSchemas);
+  } catch {
+    // Editor degradation: the bundled core schemas stay in force.
+  }
+}
+
+/**
  * Load Monaco and its Jx configuration (workers, JSON schemas, TS/JS contributions). Memoized.
  *
  * The `monaco-setup` import is what registers the language contributions and the worker factory, so
@@ -48,6 +91,9 @@ export function loadMonaco(): Promise<Monaco> {
       import("./monaco-setup.js"),
     ]);
     _monaco = monaco as unknown as Monaco;
+    // The project's schemas may have arrived long before now; register them before the first editor
+    // Mounts so its very first validation pass uses the right rules.
+    await applyPendingSchemas();
     return _monaco;
   })();
   return _loading;
@@ -72,4 +118,6 @@ export function isMonacoLoaded(): boolean {
 export function resetMonacoLazy(): void {
   _monaco = null;
   _loading = null;
+  _pendingSchemas = null;
+  _pendingSchemasDirty = false;
 }

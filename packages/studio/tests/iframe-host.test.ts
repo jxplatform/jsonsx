@@ -137,6 +137,50 @@ describe("mountIframeCanvas", () => {
     expect(channels[0]!.posts[0]).toMatchObject({ gen: 1, kind: "render", mode: "design" });
   });
 
+  test("a preview link opens externally instead of navigating the canvas", async () => {
+    const { setPreviewNavigateHandler } = await import("../src/canvas/preview-navigate");
+    resetWorkspaceWithTab();
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    channels[0]!.deliver({ kind: "ready" });
+
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    try {
+      channels[0]!.deliver({ href: "/about", kind: "previewNavigate" });
+      // Resolved against the CANVAS's origin (the project's own), not the editor shell's deep path.
+      expect(opened).toHaveLength(1);
+      expect(opened[0]).toContain("/about");
+      expect(opened[0]!.startsWith("http")).toBe(true);
+    } finally {
+      setPreviewNavigateHandler(null);
+    }
+  });
+
+  test("a javascript: preview href is refused, not opened", async () => {
+    const { setPreviewNavigateHandler } = await import("../src/canvas/preview-navigate");
+    resetWorkspaceWithTab();
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    channels[0]!.deliver({ kind: "ready" });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    try {
+      // The shell is the opener, so a javascript:/data: URL would execute in the EDITOR's origin.
+      // oxlint-disable-next-line no-script-url -- asserting this scheme is REFUSED is the point
+      channels[0]!.deliver({ href: "javascript:alert(1)", kind: "previewNavigate" });
+      channels[0]!.deliver({ href: "data:text/html,<b>x</b>", kind: "previewNavigate" });
+      expect(opened).toHaveLength(0);
+      // Ordinary web and contact schemes still go through.
+      channels[0]!.deliver({ href: "mailto:hi@example.com", kind: "previewNavigate" });
+      expect(opened).toEqual(["mailto:hi@example.com"]);
+    } finally {
+      setPreviewNavigateHandler(null);
+    }
+  });
+
   test("Data-panel Refresh arms allowAutoRequests for exactly one render", async () => {
     resetWorkspaceWithTab();
     const canvasEl = document.createElement("div");

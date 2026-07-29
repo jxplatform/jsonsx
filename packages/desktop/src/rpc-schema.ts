@@ -144,6 +144,14 @@ export interface StudioRPC {
         params: void;
         response: OpenProjectResult | null;
       };
+      /**
+       * Hand a URL to the OS. Studio's Preview routes link clicks here so the target opens in the
+       * user's real browser rather than a webview with no address bar, history or devtools.
+       */
+      openExternal: {
+        params: { url: string };
+        response: { ok: boolean };
+      };
       listDirectory: {
         params: { dir: string };
         response: DirEntry[];

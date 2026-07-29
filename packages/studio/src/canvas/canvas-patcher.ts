@@ -128,11 +128,18 @@ function containerVerdict(tab: Tab, parentPath: JxPath, requireArray = true): st
    * after all, the iframe throws `element-not-found` and the parent escalates, reaching the same
    * outcome without the false positives.
    *
-   * The immediate parent stays conservative: when it IS a component, its children may be rendered
-   * by the component rather than as light DOM, and an insert would land at the wrong position rather
-   * than fail loudly.
+   * The immediate parent stays conservative: when it IS a component INSTANCE, its children may be
+   * rendered by the component rather than as light DOM, and an insert would land at the wrong
+   * position rather than fail loudly.
+   *
+   * Except at the document root — the same carve-out `isIslandBoundary` makes for the caret
+   * (iframe-position.ts). A component DEFINITION opened as its own document has a hyphenated tagName,
+   * but its subtree IS the document: the canvas renders the definition's own body, not an instance of
+   * it, so those children are ordinary light DOM. Without this, every structural edit to any component
+   * definition escalated to a full render — in a component-heavy project, the most common authoring
+   * action there is.
    */
-  if (typeof parent.tagName === "string" && parent.tagName.includes("-")) {
+  if (parentPath.length > 0 && typeof parent.tagName === "string" && parent.tagName.includes("-")) {
     return "structure-in-custom-element";
   }
   if (parent.innerHTML) {

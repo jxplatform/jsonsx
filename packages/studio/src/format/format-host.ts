@@ -7,6 +7,7 @@
  * desktop). The studio itself holds zero format knowledge — `.json` is the single native built-in.
  */
 
+import { setProjectSchemasForMonaco } from "../services/monaco-lazy";
 import { getPlatform } from "../platform";
 import type { ExtensionsInfo } from "../types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -142,14 +143,13 @@ async function shareProjectSchemas(platform: {
   } catch {
     // Editor degradation: both consumers keep the bundled core schemas.
   }
-  await Promise.all([
-    import("../services/monaco-setup")
-      .then(({ applyProjectSchemas }) => applyProjectSchemas(schemas))
-      .catch(() => false),
-    import("../services/jx-validate")
-      .then(({ applyProjectSchemas }) => applyProjectSchemas(schemas))
-      .catch(() => false),
-  ]);
+  // Monaco's copy is HELD, not applied: this runs at project activation, and importing monaco-setup
+  // Here would fetch the whole editor on every cold load for a code view most sessions never open.
+  // `services/monaco-lazy` registers them when an editor is actually created.
+  setProjectSchemasForMonaco(schemas);
+  await import("../services/jx-validate")
+    .then(({ applyProjectSchemas }) => applyProjectSchemas(schemas))
+    .catch(() => false);
 }
 
 /**

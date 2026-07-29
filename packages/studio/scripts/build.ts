@@ -10,11 +10,10 @@
 import { $ } from "bun";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
-import type { BunPlugin } from "bun";
+import { STUDIO_DIR, STUDIO_ENTRYPOINTS, studioBundleOptions } from "./build-config.ts";
 import pkg from "../package.json" with { type: "json" };
 
-const studioDir = join(import.meta.dir, "..");
-const outdir = join(studioDir, "dist");
+const outdir = join(STUDIO_DIR, "dist");
 
 const { version } = pkg as { version: string };
 const buildDate = new Date().toISOString();
@@ -24,26 +23,6 @@ const buildDate = new Date().toISOString();
 // 12 MB `dist/studio.ts` and a duplicate `dist/canvas/iframe-entry.js` that way.) Safe to do first —
 // The Monaco workers are rebuilt below.
 await rm(outdir, { force: true, recursive: true });
-
-/**
- * Resolve EVERY `monaco-editor` specifier from the studio package, so all consumers share one
- * module identity.
- *
- * Without this, studio's own `monaco-editor/esm/...` resolves through
- * `packages/studio/node_modules/monaco-editor` (a symlink into `node_modules/.bun/…`) while
- * `y-monaco`'s bare `monaco-editor` resolves to the separate physical copy hoisted at the workspace
- * root. Same version, two paths, so the bundler emits Monaco twice — 5.1 MB, 27% of the bundle.
- * Delegating to `Bun.resolveSync` from a fixed base keeps this correct across install re-layouts,
- * which a version pin or an `overrides` entry would not (both copies are already 0.55.1).
- */
-const dedupeMonaco: BunPlugin = {
-  name: "dedupe-monaco",
-  setup(build) {
-    build.onResolve({ filter: /^monaco-editor(\/|$)/ }, (args) => ({
-      path: Bun.resolveSync(args.path, studioDir),
-    }));
-  },
-};
 
 let gitCommit = "unknown";
 try {
@@ -59,32 +38,16 @@ const define = {
   __JX_GIT_COMMIT__: JSON.stringify(gitCommit),
 };
 
-// Build the editor shell and the slim canvas-iframe bundle in SEPARATE passes. A single multi-entry
-// Build roots its output at the entrypoints' common ancestor (src/), which would nest the iframe
-// Bundle under dist/canvas/ and break canvas.html's flat `./dist/iframe-entry.js` import. Two
-// Single-entry builds each emit flat at dist/<name>.js.
-for (const entry of ["./src/studio.ts", "./src/canvas/iframe-entry.ts"]) {
+// One pass per entrypoint: a single multi-entry build roots its output at the entrypoints' common
+// Ancestor (src/), which would nest the iframe bundle under dist/canvas/ and break canvas.html's flat
+// `./dist/iframe-entry.js` import. The bundler contract itself is shared with the dev-server watcher
+// Via build-config.ts, so the two paths cannot drift.
+for (const entry of STUDIO_ENTRYPOINTS) {
   const result = await Bun.build({
+    ...studioBundleOptions,
     define,
     entrypoints: [entry],
-    // Naming is a CONTRACT, not a detail. Entries must stay at flat, unhashed `dist/<name>.js`
-    // Because four consumers address them by fixed path: `index.html`, `canvas.html`,
-    // `packages/desktop/scripts/stage-studio-assets.ts`, and the platform's `scripts/build-assets.ts`.
-    // Split chunks are content-hashed (they are only ever reached through an import in an entry) and
-    // Land in `dist/chunks/`, which those consumers copy wholesale.
-    naming: {
-      asset: "[name].[ext]",
-      chunk: "chunks/[name]-[hash].[ext]",
-      entry: "[name].[ext]",
-    },
     outdir: "dist",
-    plugins: [dedupeMonaco],
-    sourcemap: "linked",
-    // Splitting is what makes the ~18 `await import()` sites in studio src actually defer payload
-    // Rather than just evaluation — without it Bun inlines them all into the entry, so Monaco, yjs,
-    // Ajv and pragmatic-dnd's element adapter shipped on every cold start regardless.
-    splitting: true,
-    target: "browser",
   });
   if (!result.success) {
     for (const log of result.logs) {

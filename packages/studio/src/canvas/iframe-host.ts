@@ -9,6 +9,7 @@
 
 import { postMessageChannel } from "./iframe-channel";
 import { canvasBaseOrigin } from "./canvas-origin";
+import { getPreviewNavigateHandler } from "./preview-navigate";
 import { resolveCanvasDocument } from "./canvas-live-render";
 import {
   applyBlockMerge,
@@ -227,16 +228,6 @@ let evalReqId = 0;
 let _allowAutoRequestsOnce = false;
 
 /**
- * Where a preview link goes. Defaults to a new browser tab; the desktop platform overrides it so
- * the link opens in the user's real browser rather than a webview with no chrome.
- */
-let previewNavigateHandler: ((url: string) => void) | null = null;
-
-export function setPreviewNavigateHandler(handler: ((url: string) => void) | null): void {
-  previewNavigateHandler = handler;
-}
-
-/**
  * Open a preview link's target for real.
  *
  * Resolved against the CANVAS's origin, not the editor's: the canvas iframe is served from the
@@ -245,14 +236,24 @@ export function setPreviewNavigateHandler(handler: ((url: string) => void) | nul
  * cloud). Resolving against `location` would send a root-relative `/about` to the wrong host.
  */
 function openPreviewHref(href: string, state: HostState): void {
-  let url: string;
+  let resolved: URL;
   try {
-    url = new URL(href, state.iframe.src || canvasBaseOrigin()).href;
+    resolved = new URL(href, state.iframe.src || canvasBaseOrigin());
   } catch {
-    return; // Unparseable href — nothing sensible to open.
+    return; // Unparseable even against a base — nothing sensible to open.
   }
-  if (previewNavigateHandler) {
-    previewNavigateHandler(url);
+  /*
+   * Scheme allowlist. A page can carry any href, and handing `javascript:` or `data:` to
+   * `window.open` would execute it — in the EDITOR's origin, since the shell is the opener. Web pages
+   * and the contact affordances real sites use are all that Preview needs to follow.
+   */
+  if (!["http:", "https:", "mailto:", "tel:"].includes(resolved.protocol)) {
+    return;
+  }
+  const url = resolved.href;
+  const override = getPreviewNavigateHandler();
+  if (override) {
+    override(url);
     return;
   }
   window.open(url, "_blank", "noopener,noreferrer");

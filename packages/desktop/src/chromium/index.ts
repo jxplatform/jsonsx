@@ -31,6 +31,7 @@ import {
   listFormats,
   listSecrets,
   locateFile,
+  openExternal,
   openProject,
   setDirectoryDialog,
   setFileDialog,
@@ -124,6 +125,7 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   setPackageVersions: (params) =>
     setPackageVersions(params as { updates: { name: string; version: string; dev?: boolean }[] }),
   openProject: () => openProject(),
+  openExternal: (params) => openExternal(params as { url: string }),
   createProject: (params) =>
     createProject(
       params as {

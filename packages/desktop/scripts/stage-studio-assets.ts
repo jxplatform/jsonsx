@@ -7,6 +7,7 @@
  */
 import { join, resolve } from "node:path";
 import { copyFile, cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 
 /**
  * Monaco's pre-bundled web workers (packages/studio/scripts/build-workers.ts). Without them the
@@ -38,7 +39,15 @@ export async function stageStudioAssets(desktopDir: string): Promise<void> {
   // Split chunks. The studio build emits content-hashed chunks into dist/chunks/ (Monaco, yjs, ajv
   // And every other on-demand import live there rather than in the entry), and studio.js reaches them
   // By relative URL — so the whole directory has to ship, and its names cannot be rewritten.
-  await cp(join(studioDir, "dist", "chunks"), join(outDir, "dist", "chunks"), { recursive: true });
+  const chunksSrc = join(studioDir, "dist", "chunks");
+  if (!existsSync(chunksSrc)) {
+    throw new Error(
+      `Studio build has no dist/chunks — run \`bun run build\` in packages/studio first. ` +
+        `Staging without them produces an app whose editor fails at boot with a bare ` +
+        `module-resolution error, so this refuses rather than shipping it.`,
+    );
+  }
+  await cp(chunksSrc, join(outDir, "dist", "chunks"), { recursive: true });
 
   // Monaco workers + webfonts. Both are addressed relatively — the workers against the BUNDLE's own
   // Url (monaco-setup.ts), the fonts against the document (index.html @font-face) — so the staged

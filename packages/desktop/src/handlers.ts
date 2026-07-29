@@ -7,6 +7,7 @@
  */
 
 import { createProjectSession } from "./project-session";
+import { openExternal as utilsOpenExternal } from "./utils.ts";
 
 export { setFileDialog, setDirectoryDialog } from "./project-session";
 export type { ProjectSession, ProxyResult, StudioSchema } from "./project-session";
@@ -26,6 +27,11 @@ export const { listExtensions } = _default;
 export const { fetchProjectSchemas } = _default;
 export const { formatAction } = _default;
 export const { openProject } = _default;
+
+/** Open a URL in the user's default browser (Studio Preview link clicks). */
+export function openExternal({ url }: { url: string }): { ok: boolean } {
+  return { ok: utilsOpenExternal(url) };
+}
 export const { createProject } = _default;
 export const { listDirectory } = _default;
 export const { handleReadFile } = _default;

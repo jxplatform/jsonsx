@@ -32,6 +32,7 @@ import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import type { ExtensionsPayloadEntry } from "@jxsuite/compiler/format-host";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FsEventPayload, FsWatcherHandle, RenameReport } from "@jxsuite/server/refactor";
+import { openExternal } from "./utils.ts";
 import type {
   DataPushRequest,
   DataRowDelete,
@@ -977,6 +978,7 @@ export function createProjectSession(initialRoot: string | null) {
     fetchProjectSchemas,
     formatAction,
     openProject,
+    openExternal,
     createProject,
     pickDirectory,
     listDirectory,

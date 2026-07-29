@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.1-draft
+**Version:** 0.3.2-draft
 **Status:** Pending
-**Updated:** 2026-07-25
+**Updated:** 2026-07-29
 **License:** MIT
 
 ---
@@ -146,6 +146,15 @@ if (!hasPlatform()) {
    - With `openProjectPicker: "repo-list"` (cloud), Studio shows its own repository picker over `listRepos` + `importProject` (write-access repositories only) and opens the choice through the recent-projects path — `openProject()` is never called
    - Otherwise Studio calls `getPlatform().openProject()` and the platform presents its native project opening flow
    - On success, Studio receives `{ config, handle }` and initializes the file tree
+
+### 3.5 Leaving the Webview
+
+The desktop shell registers Studio's preview-navigation override (`@jxsuite/studio/preview-navigate`)
+so a link clicked in Preview mode goes to the **user's default browser** via an `openExternal` RPC onto
+`Utils.openExternal`, not to this webview. Following a link in Preview exists to see the page behave
+like the deployed thing — routing, history, devtools — and a webview with no address bar is not that;
+navigating it would also replace the editor. When the shell is unavailable or the OS refuses, the
+studio's own `window.open` default still applies.
 
 ---
 
@@ -802,6 +811,7 @@ Ensure desktop app matches dev-mode capabilities:
 
 ## Changelog
 
+- **0.3.2-draft** (2026-07-29) — The desktop shell routes Studio preview links to the user's default browser via Utils.openExternal (§3.5).
 - **0.3.1-draft** (2026-07-25) — Repo picker gains a repository-access footer: per-installation manage links, install-on-another-account, and Refresh.
 - **0.3.0-draft** (2026-07-25) — New Project requires a user-chosen destination: StudioPlatform gains the required createDestination declaration, createProject takes a required destination (path parent or repo owner/name/visibility), and §4.5 defines the create flow. No backend picks a location.
 - **0.2.7-draft** (2026-07-24) — Cloud platform registers inside studio.js via a window.__jxCloud signal (single yjs for collab).
@@ -822,4 +832,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.1-draft_
+_Jx Studio Desktop Architecture Specification v0.3.2-draft_

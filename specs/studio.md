@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.3.6-draft
+**Version:** 0.3.7-draft
 **Status:** Partial
-**Updated:** 2026-07-28
+**Updated:** 2026-07-29
 **License:** MIT
 
 ---
@@ -170,6 +170,9 @@ session. So Preview intercepts the click and the shell opens the target in a **r
 resolved against the CANVAS's origin (the project's own), not the editor shell's — which may sit on an
 unrelated deep path. In-page fragments are left to the browser, since scrolling the previewed page is
 what Preview is for.
+
+Only `http`, `https`, `mailto` and `tel` targets are followed. The shell is the opener, so handing a
+`javascript:` or `data:` URL to a new window would execute it in the EDITOR's origin.
 
 That browser tab is also the honest place to verify a project: routing, project JavaScript, server
 functions and live data all behave there exactly as they will on the built site, none of which the
@@ -820,6 +823,19 @@ The build **code-splits**. Everything reached only through a dynamic `import()` 
 
 **Monaco is never on the startup path.** It is roughly two thirds of the editor's code and most sessions never open a code view, so `services/monaco-lazy` loads the editor API and its worker/language registration together, memoized, on first use by source mode, the function editor, or the formula workspace. Nothing in the eager import graph may reference `monaco-editor` — including indirectly, via a module whose own top-level imports pull it in (the reason the model-URI helper lives apart from the Monaco setup module).
 
+**Both build paths share one contract.** The release build (`scripts/build.ts`) and the repo dev
+server's watcher (`server.js` → `@jxsuite/server`'s `builds`) spread the same options from
+`scripts/build-config.ts`. They diverged once, and the failure mode is instructive: the watcher had its
+own inline config with no de-duplication and no splitting, and because it overwrites `dist/` on the
+next keystroke, a developer never saw the built output at all — `bun run dev` served 18.8 MB while
+`bun run build` produced 3.3 MB. A `@jxsuite/server` build entry forwards every unrecognised key to
+`Bun.build`, which is what makes one shared contract possible.
+
+**Nothing may fetch Monaco at startup, including via a dynamic import.** `import()` defers evaluation,
+not payload: an `import()` that RUNS during activation still puts the editor on the critical path.
+Per-project JSON schemas arrive at project activation and used to be applied that way; they are now
+held (`services/monaco-lazy`) and registered when an editor is first created.
+
 ---
 
 ## 12. Pending Features
@@ -840,6 +856,7 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.3.7-draft** (2026-07-29) — Share one bundler contract between the release build and the dev-server watcher; nothing may fetch Monaco at startup; restrict preview navigation to http/https/mailto/tel.
 - **0.3.6-draft** (2026-07-28) — Preview link clicks open the target in a real browser tab instead of navigating the canvas iframe away.
 - **0.3.5-draft** (2026-07-28) — IME composition suspends canvas commits; the editable region gets textbox/aria-multiline/label (§8.2.8).
 - **0.3.4-draft** (2026-07-28) — Document the two-entry code-split bundle layout and the on-demand Monaco load (§11.1).
@@ -881,4 +898,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.3.6-draft_
+_`@jxsuite/studio` Specification v0.3.7-draft_

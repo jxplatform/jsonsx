@@ -15,6 +15,7 @@ import type {
 import type { ImportProgressEvent, ImportSiteOptions, StudioPlatform } from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload } from "@jxsuite/server/refactor";
+import { setPreviewNavigateHandler } from "@jxsuite/studio/preview-navigate";
 
 export function createDesktopPlatform(): StudioPlatform {
   // The studio sidebar's live-sync subscriber, if any. Set via subscribeFileEvents below.
@@ -35,6 +36,20 @@ export function createDesktopPlatform(): StudioPlatform {
       requests: {},
     },
     maxRequestTime: 300_000,
+  });
+
+  /*
+   * Preview link clicks go to the user's REAL browser, not this webview.
+   *
+   * Following a link in Preview exists to see the page behave like the deployed thing — routing,
+   * history, devtools. A webview with no address bar is not that, and navigating THIS one would
+   * replace the editor. The Bun side hands the URL to the OS (`Utils.openExternal`); on failure the
+   * studio's own `window.open` default still applies.
+   */
+  setPreviewNavigateHandler((url) => {
+    void rpc.request.openExternal({ url }).catch(() => {
+      window.open(url, "_blank", "noopener,noreferrer");
+    });
   });
 
   const electroview = new Electroview({ rpc });
