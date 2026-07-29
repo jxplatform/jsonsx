@@ -72,6 +72,7 @@ void mock.module("../src/canvas/canvas-live-render", () => ({
 
 const {
   adoptDragSession,
+  allowAutoRequestsOnNextRender,
   beginDragSession,
   clearDropIndicator,
   commitActiveEditSession,
@@ -134,6 +135,79 @@ describe("mountIframeCanvas", () => {
     channels[0]!.deliver({ kind: "ready" });
     expect(channels[0]!.posts).toHaveLength(1);
     expect(channels[0]!.posts[0]).toMatchObject({ gen: 1, kind: "render", mode: "design" });
+  });
+
+  test("a preview link opens externally instead of navigating the canvas", async () => {
+    const { setPreviewNavigateHandler } = await import("../src/canvas/preview-navigate");
+    resetWorkspaceWithTab();
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    channels[0]!.deliver({ kind: "ready" });
+
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    try {
+      channels[0]!.deliver({ href: "/about", kind: "previewNavigate" });
+      // Resolved against the CANVAS's origin (the project's own), not the editor shell's deep path.
+      expect(opened).toHaveLength(1);
+      expect(opened[0]).toContain("/about");
+      expect(opened[0]!.startsWith("http")).toBe(true);
+    } finally {
+      setPreviewNavigateHandler(null);
+    }
+  });
+
+  test("a javascript: preview href is refused, not opened", async () => {
+    const { setPreviewNavigateHandler } = await import("../src/canvas/preview-navigate");
+    resetWorkspaceWithTab();
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    channels[0]!.deliver({ kind: "ready" });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    try {
+      // The shell is the opener, so a javascript:/data: URL would execute in the EDITOR's origin.
+      // oxlint-disable-next-line no-script-url -- asserting this scheme is REFUSED is the point
+      channels[0]!.deliver({ href: "javascript:alert(1)", kind: "previewNavigate" });
+      channels[0]!.deliver({ href: "data:text/html,<b>x</b>", kind: "previewNavigate" });
+      expect(opened).toHaveLength(0);
+      // Ordinary web and contact schemes still go through.
+      channels[0]!.deliver({ href: "mailto:hi@example.com", kind: "previewNavigate" });
+      expect(opened).toEqual(["mailto:hi@example.com"]);
+    } finally {
+      setPreviewNavigateHandler(null);
+    }
+  });
+
+  test("Data-panel Refresh arms allowAutoRequests for exactly one render", async () => {
+    resetWorkspaceWithTab();
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+
+    // Unarmed: edit/design renders omit the flag, so the runtime keeps auto-requests suppressed.
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    channels[0]!.deliver({ kind: "ready" });
+    const first = channels[0]!.posts.find((p) => p.kind === "render") as Record<string, unknown>;
+    expect(first.allowAutoRequests).toBeUndefined();
+
+    // Armed by Refresh: the NEXT render carries it.
+    allowAutoRequestsOnNextRender();
+    await mountIframeCanvas(2, { tagName: "div" } as never, canvasEl);
+    const renders = channels[0]!.posts.filter((p) => p.kind === "render") as Record<
+      string,
+      unknown
+    >[];
+    expect(renders.at(-1)!.allowAutoRequests).toBe(true);
+
+    // One-shot: a later render (e.g. an escalation) must not inherit it.
+    await mountIframeCanvas(3, { tagName: "div" } as never, canvasEl);
+    const after = channels[0]!.posts.filter((p) => p.kind === "render") as Record<
+      string,
+      unknown
+    >[];
+    expect(after.at(-1)!.allowAutoRequests).toBeUndefined();
   });
 
   test("the render message carries the active tab's forced preview scheme (auto → null)", async () => {

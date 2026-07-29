@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.3.2-draft
+**Version:** 0.3.7-draft
 **Status:** Partial
-**Updated:** 2026-07-28
+**Updated:** 2026-07-29
 **License:** MIT
 
 ---
@@ -137,6 +137,10 @@ When navigating between components, pages, and layouts within a project, the sit
 
 The canvas renders the current document using `@jxsuite/runtime`. It shows exactly what the component looks like at runtime — no simulation or approximation. When a site context is active (§3.6), the canvas applies the site's global styles, CSS custom properties, and media breakpoints so that every file is rendered in its true site context.
 
+**Live data belongs to preview.** Edit and design mode suppress two classes of side effect that a full render would otherwise repeat: `timing: "server"` function resolution, and automatic (non-`manual`) `$prototype: "Request"` state entries. A full render re-resolves every `state` entry, so without the second gate an ordinary authoring action that escalates to a full render issued an HTTP request each time. Gated requests leave their state entry at its pre-fetch value — the same value bindings observe before any fetch resolves. Preview mode lifts both gates.
+
+**Escalation to a full render** is the fallback when an edit cannot be applied surgically, and it is expensive: it re-runs the runtime, rebuilding every binding effect and reloading any embedded iframe. Structural splices (insert / remove / move) therefore escalate only on conditions that can actually break them — a `$switch` case or repeater-template path, an `innerHTML` parent, a missing children array, or an **immediate** parent that is a component instance (whose children may be rendered by the component rather than as light DOM). A component _ancestor_ is not a reason to escalate: these ops locate their target by its stamped path, and the one index-sensitive step reads the immediate parent's own children. This matters for real content, where markdown class-directive pages place every editable block inside a component.
+
 Site style is injected into the canvas as a real stylesheet (custom properties in a `:root` rule, direct properties in a `body` rule, conditional `@--name` blocks resolved and — for scheme queries — dual-emitted per spec.md §9.5), never as inline root properties, so forced-scheme override selectors can win the cascade.
 
 **Color-scheme preview.** When the effective `$media` declares a pure `prefers-color-scheme` query, the tab bar shows an Auto/Light/Dark control (one per tab; available in edit, design, and stylebook modes). Light/Dark force the scheme by setting `data-color-scheme` on the canvas iframe's root element — a patch-free document-level attribute flip that never re-renders; Auto removes the attribute and follows the OS. Scheme queries no longer render as generic feature toggles. The same tri-state also selects which scheme layer style-sidebar edits target (§6.2).
@@ -158,6 +162,22 @@ The mapping is render-only: the tab's source document keeps the authored relativ
 Design and Content are both **editable modes** and behave identically for text: the canvas carries a
 live caret (§8.2). They differ only in what the document is — Content mode opens a format-backed
 document (`.md` via its format class, §8.1), Design mode a native `.json` one.
+
+**Following a link in Preview leaves the canvas.** Editable modes de-link anchors — the runtime stamps
+`href` onto `data-jx-href`, so a click selects the element instead of navigating. Preview keeps them
+live, where a click would navigate the canvas iframe and destroy the render along with the editing
+session. So Preview intercepts the click and the shell opens the target in a **real browser tab**,
+resolved against the CANVAS's origin (the project's own), not the editor shell's — which may sit on an
+unrelated deep path. In-page fragments are left to the browser, since scrolling the previewed page is
+what Preview is for.
+
+Only `http`, `https`, `mailto` and `tel` targets are followed. The shell is the opener, so handing a
+`javascript:` or `data:` URL to a new window would execute it in the EDITOR's origin.
+
+That browser tab is also the honest place to verify a project: routing, project JavaScript, server
+functions and live data all behave there exactly as they will on the built site, none of which the
+canvas promises. The shell exposes an override for this so a host can redirect it (the desktop app
+wants the user's own browser rather than a chrome-less webview); the default is a new tab.
 
 #### 4.2.1 Source-mode schema validation
 
@@ -232,11 +252,11 @@ Vertical tab strip for switching panel views:
 
 ### 5.2 Layers Panel
 
-Flattened tree of all elements in the document with indentation representing nesting depth. Each row shows element tag name, label, and (on hover) move controls and delete button.
+Flattened tree of all elements in the document with indentation representing nesting depth. Each row shows element tag name, label, a grab affordance on hover, and — for the selected row — move controls and a delete button.
 
-**Drag and Drop** — The entire layer row is draggable via Atlassian Pragmatic Drag and Drop. Users can grab any part of the row to drag — no dedicated drag handle required. Drop indicators show reorder (above/below) and reparent (make-child) targets.
+**Drag and Drop** — The entire layer row is draggable via Atlassian Pragmatic Drag and Drop. Users can grab any part of the row to drag; a grip glyph appears on hover to advertise it. Drop indicators show reorder (above/below) and reparent (make-child) targets.
 
-**Move Action Buttons** — On hover, each non-root element row reveals contextual move buttons in place of a drag handle:
+**Move Action Buttons** — The **selected** non-root element row carries contextual move buttons. Selection rather than hover, because the buttons are Spectrum custom elements and building five of them for every visible row made the panel's render cost scale with document size; a click on a row both selects it and reveals its actions. The grab affordance is a plain glyph and therefore stays on every row.
 
 | Button | Icon          | Action                                             | Shown when                                        |
 | ------ | ------------- | -------------------------------------------------- | ------------------------------------------------- |
@@ -247,6 +267,8 @@ Flattened tree of all elements in the document with indentation representing nes
 | Delete | `close`       | Remove element from document                       | Always (non-root elements)                        |
 
 Only applicable buttons render for each row's position in the tree. Clicking a move button updates the document, re-renders the layers panel, and tracks the selection to the node's new position.
+
+**Rendering cost** — The flattened row list is produced by a single pre-order walk that appends into one accumulator, and "is an ancestor collapsed?" is answered by a running depth comparison over that pre-order sequence rather than by re-deriving each row's ancestor keys. Both exist so panel render time scales with the number of rows, not with rows × depth.
 
 **Text Node Rows** — Bare string children appear as display-only rows with a "text" badge and truncated preview (max 40 characters). These rows do not support selection, drag, or action buttons.
 
@@ -572,6 +594,24 @@ the range it would delete — reaching out of the block and into the previous on
 them is how it implements the keystroke. The caret says what the author meant; the target range says
 what the browser would have done about it.
 
+**IME composition suspends every commit.** A composition is a multi-keystroke transaction the browser
+owns: the DOM holds provisional text and the input engine holds a selection tied to it. So between
+`compositionstart` and `compositionend` the idle tick is cancelled and not re-armed, an explicit flush
+is a no-op, and exactly one commit runs when the composition ends. Committing inside one would capture
+half-formed text and — because a commit restores the selection — cancel the composition outright. The
+editing host exposes its composition state so nothing else rewrites the editable subtree mid-input
+either.
+
+#### 8.2.8 Accessibility
+
+The editable region carries `role="textbox"`, `aria-multiline="true"` and a label, added and removed
+with `contenteditable` itself. A bare `contenteditable` div announces as an unlabelled group, and the
+canvas lives in a cross-origin iframe, so a screen reader traversing in has no surrounding context to
+infer the region's purpose from.
+
+This describes the REGION only. Per-block landmarks and a keyboard-reachable block action bar
+(§4.4) are not yet implemented.
+
 #### 8.2.2 Which tags hold a caret
 
 A tag holds a caret when its element vocabulary says it accepts inline children. This is DERIVED,
@@ -765,15 +805,36 @@ An ambiguous component (two or more image props) falls through to an insert rath
 
 ## 11. Dependencies
 
-| Package                             | Purpose                      |
-| ----------------------------------- | ---------------------------- |
-| `@jxsuite/runtime`                  | Canvas rendering             |
-| `@atlaskit/pragmatic-drag-and-drop` | Layer tree drag-and-drop     |
-| `lit-html`                          | Studio UI template rendering |
-| `monaco-editor`                     | Code editor                  |
-| `yaml`                              | YAML frontmatter parsing     |
-| `unified` / `remark-*`              | Markdown conversion pipeline |
-| `@spectrum-web-components/*` (15+)  | Adobe Spectrum UI components |
+| Package                             | Purpose                                |
+| ----------------------------------- | -------------------------------------- |
+| `@jxsuite/runtime`                  | Canvas rendering                       |
+| `@atlaskit/pragmatic-drag-and-drop` | Layer tree drag-and-drop               |
+| `lit-html`                          | Studio UI template rendering           |
+| `monaco-editor`                     | Code editor (loaded on demand — §11.1) |
+| `yaml`                              | YAML frontmatter parsing               |
+| `unified` / `remark-*`              | Markdown conversion pipeline           |
+| `@spectrum-web-components/*` (15+)  | Adobe Spectrum UI components           |
+
+### 11.1 Bundle Layout
+
+The studio ships **two entry bundles** — the editor shell (`dist/studio.js`) and the slim canvas-iframe bundle (`dist/iframe-entry.js`) — built in separate single-entry passes so each lands flat at `dist/<name>.js`. Four consumers address those paths literally (`index.html`, `canvas.html`, the desktop asset staging, and the cloud platform's asset build), so entry names are a contract and are never hashed.
+
+The build **code-splits**. Everything reached only through a dynamic `import()` — Monaco and its language contributions, the Yjs collab stack, the JSON-Schema validator, drag-and-drop adapters — lands in content-hashed files under `dist/chunks/`, addressed by the entry relative to its own URL. That directory therefore ships and is copied wholesale, with its emitted names intact.
+
+**Monaco is never on the startup path.** It is roughly two thirds of the editor's code and most sessions never open a code view, so `services/monaco-lazy` loads the editor API and its worker/language registration together, memoized, on first use by source mode, the function editor, or the formula workspace. Nothing in the eager import graph may reference `monaco-editor` — including indirectly, via a module whose own top-level imports pull it in (the reason the model-URI helper lives apart from the Monaco setup module).
+
+**Both build paths share one contract.** The release build (`scripts/build.ts`) and the repo dev
+server's watcher (`server.js` → `@jxsuite/server`'s `builds`) spread the same options from
+`scripts/build-config.ts`. They diverged once, and the failure mode is instructive: the watcher had its
+own inline config with no de-duplication and no splitting, and because it overwrites `dist/` on the
+next keystroke, a developer never saw the built output at all — `bun run dev` served 18.8 MB while
+`bun run build` produced 3.3 MB. A `@jxsuite/server` build entry forwards every unrecognised key to
+`Bun.build`, which is what makes one shared contract possible.
+
+**Nothing may fetch Monaco at startup, including via a dynamic import.** `import()` defers evaluation,
+not payload: an `import()` that RUNS during activation still puts the editor on the critical path.
+Per-project JSON schemas arrive at project activation and used to be applied that way; they are now
+held (`services/monaco-lazy`) and registered when an editor is first created.
 
 ---
 
@@ -795,6 +856,11 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.3.7-draft** (2026-07-29) — Share one bundler contract between the release build and the dev-server watcher; nothing may fetch Monaco at startup; restrict preview navigation to http/https/mailto/tel.
+- **0.3.6-draft** (2026-07-28) — Preview link clicks open the target in a real browser tab instead of navigating the canvas iframe away.
+- **0.3.5-draft** (2026-07-28) — IME composition suspends canvas commits; the editable region gets textbox/aria-multiline/label (§8.2.8).
+- **0.3.4-draft** (2026-07-28) — Document the two-entry code-split bundle layout and the on-demand Monaco load (§11.1).
+- **0.3.3-draft** (2026-07-28) — Layer-row actions follow selection rather than hover; edit/design gate automatic Request fetches; structural splices escalate on the immediate parent only.
 - **0.3.2-draft** (2026-07-28) — Canvas maps a content entry's entry-relative media onto its asset mount (§4.1) so the preview matches the built site; render-only, source doc untouched.
 - **0.3.1-draft** (2026-07-28) — Media upload across four surfaces (§9.3): image-field Upload button, canvas file drop with replace-vs-insert, Files-tree and Manage destinations; collision-safe naming; binary uploadFile on every platform.
 - **0.3.0-draft** (2026-07-27) — Derive the caret's editable tag set from the document's element vocabulary (§8.2.2): the format class decides per tag and can say no, so a Markdown blockquote holds paragraphs and a link is markup within a block; subsections after it renumber (nothing referenced them).
@@ -832,4 +898,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.3.2-draft_
+_`@jxsuite/studio` Specification v0.3.7-draft_

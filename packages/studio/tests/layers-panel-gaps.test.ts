@@ -205,7 +205,16 @@ describe("renderLayersTemplate — selection and collapse", () => {
 });
 
 describe("renderLayersTemplate — move and delete actions", () => {
-  function buttons(path: JxPath): Record<string, HTMLElement> {
+  /**
+   * Select the row, render, and collect its action buttons by title.
+   *
+   * Row actions are built for the SELECTED row only (five sp-action-buttons per row is ~5 custom
+   * elements with shadow roots per visible row), so selecting first is the real interaction — a
+   * click on the row both selects it and reveals its actions.
+   */
+  async function buttons(path: JxPath): Promise<Record<string, HTMLElement>> {
+    activeTab.value!.session.selection = path;
+    await renderLayers();
     const out: Record<string, HTMLElement> = {};
     for (const btn of rowByKey(path)!.querySelectorAll("sp-action-button")) {
       out[btn.getAttribute("title") ?? ""] = btn as HTMLElement;
@@ -213,33 +222,45 @@ describe("renderLayersTemplate — move and delete actions", () => {
     return out;
   }
 
-  test("first child cannot move up, last cannot move down", async () => {
+  test("actions are built only for the selected row", async () => {
+    activeTab.value!.session.selection = ["children", 1];
     await renderLayers();
-    expect(buttons(["children", 0])["Move up"]).toBeUndefined();
-    expect(buttons(["children", 0])["Move down"]).toBeDefined();
-    expect(buttons(["children", 4])["Move down"]).toBeUndefined();
-    expect(buttons(["children", 4])["Move up"]).toBeDefined();
+    expect(rowByKey(["children", 1])!.querySelectorAll("sp-action-button").length).toBeGreaterThan(
+      0,
+    );
+    // Every other structural row contributes zero custom elements.
+    expect(rowByKey(["children", 0])!.querySelectorAll("sp-action-button").length).toBe(0);
+    expect(rowByKey(["children", 4])!.querySelectorAll("sp-action-button").length).toBe(0);
+  });
+
+  test("first child cannot move up, last cannot move down", async () => {
+    const first = await buttons(["children", 0]);
+    expect(first["Move up"]).toBeUndefined();
+    expect(first["Move down"]).toBeDefined();
+    const last = await buttons(["children", 4]);
+    expect(last["Move down"]).toBeUndefined();
+    expect(last["Move up"]).toBeDefined();
   });
 
   test("move down reorders siblings", async () => {
-    await renderLayers();
-    buttons(["children", 0])["Move down"]!.click();
+    const acts = await buttons(["children", 0]);
+    acts["Move down"]!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children[0]!.tagName).toBe("p");
     expect(children[1]!.tagName).toBe("section");
   });
 
   test("move up reorders siblings", async () => {
-    await renderLayers();
-    buttons(["children", 1])["Move up"]!.click();
+    const acts = await buttons(["children", 1]);
+    acts["Move up"]!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children[0]!.tagName).toBe("p");
     expect(children[1]!.tagName).toBe("section");
   });
 
   test("move into previous sibling appends the node to that sibling's children", async () => {
-    await renderLayers();
-    const btn = buttons(["children", 1])["Move into previous sibling"];
+    const acts = await buttons(["children", 1]);
+    const btn = acts["Move into previous sibling"];
     expect(btn).toBeDefined();
     btn!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
@@ -252,14 +273,14 @@ describe("renderLayersTemplate — move and delete actions", () => {
   });
 
   test("move-in is unavailable when previous sibling is not a container", async () => {
-    await renderLayers();
     // Children[2] (ul with $map children) follows children[1] (p with no children array)
-    expect(buttons(["children", 2])["Move into previous sibling"]).toBeUndefined();
+    const acts = await buttons(["children", 2]);
+    expect(acts["Move into previous sibling"]).toBeUndefined();
   });
 
   test("move out of parent lifts node after its parent", async () => {
-    await renderLayers();
-    const btn = buttons(["children", 0, "children", 0])["Move out of parent"];
+    const acts = await buttons(["children", 0, "children", 0]);
+    const btn = acts["Move out of parent"];
     expect(btn).toBeDefined();
     btn!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
@@ -269,8 +290,8 @@ describe("renderLayersTemplate — move and delete actions", () => {
   });
 
   test("delete removes the node", async () => {
-    await renderLayers();
-    buttons(["children", 1])["Delete"]!.click();
+    const acts = await buttons(["children", 1]);
+    acts["Delete"]!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children.length).toBe(4);
     expect(children.map((c) => c.tagName)).not.toContain("p");

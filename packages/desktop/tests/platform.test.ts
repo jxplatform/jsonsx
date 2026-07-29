@@ -322,7 +322,8 @@ describe("platform methods", () => {
 
   test("openProject delegates with no arguments", async () => {
     const result = await platform.openProject();
-    expect(result).toEqual({ method: "openProject", ok: true });
+    // The stub RPC echoes the call rather than returning a real OpenProjectResult.
+    expect(result).toEqual({ method: "openProject", ok: true } as never);
     expect(lastCall("openProject")!.args).toEqual([]);
   });
 

@@ -1,6 +1,8 @@
 import { homedir } from "node:os";
 
 interface ElectrobunUtils {
+  /** Hand a URL to the OS — the user's real browser, not a chrome-less webview. */
+  openExternal: (url: string) => boolean;
   openFileDialog: (options: {
     startingFolder?: string;
     allowedFileTypes?: string;
@@ -50,4 +52,23 @@ export async function openDirectoryDialog(): Promise<string | null> {
     return null;
   }
   return paths[0].trim() || null;
+}
+
+/**
+ * Open a URL in the user's default browser.
+ *
+ * Studio's Preview mode routes link clicks through here (see `setPreviewNavigateHandler`):
+ * following a link in Preview exists to see the real page behave like the real thing, and a webview
+ * with no address bar, history or devtools is not that. Returns false when the shell is unavailable
+ * or the OS refused, so the caller can fall back to `window.open`.
+ */
+export function openExternal(url: string): boolean {
+  if (!Utils) {
+    return false;
+  }
+  try {
+    return Utils.openExternal(url);
+  } catch {
+    return false;
+  }
 }

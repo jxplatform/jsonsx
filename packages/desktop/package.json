@@ -19,7 +19,8 @@
     "sign:trust": "powershell -ExecutionPolicy Bypass -File scripts/trust-cert.ps1",
     "upgrade": "bunx npm-check-updates -u && bun install",
     "test": "bun test --isolate",
-    "test:coverage": "bun test --isolate --coverage"
+    "test:coverage": "bun test --isolate --coverage",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@jxsuite/compiler": "workspace:^",

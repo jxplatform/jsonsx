@@ -141,6 +141,10 @@ beforeEach(() => {
   toolbarRender.mockClear();
   leftPanelRender.mockClear();
   setModelMarkers.mockClear();
+  // The function editor now registers completions when it MOUNTS (previously studio.ts did it at
+  // Startup), so both the mock and the once-guard have to reset or the count depends on test order.
+  registerCompletionItemProvider.mockClear();
+  view._completionRegistered = false;
   view.functionEditor = null;
   view.monacoEditor = null;
   installMockPlatform({
@@ -153,7 +157,7 @@ beforeEach(() => {
 });
 
 describe("renderFunctionEditor — def target", () => {
-  test("tears down canvas state and renders the editor", () => {
+  test("tears down canvas state and renders the editor", async () => {
     const dndCleanup = mock(() => {});
     const eventCleanup = mock(() => {});
     view.canvasDndCleanups = [dndCleanup];
@@ -162,6 +166,7 @@ describe("renderFunctionEditor — def target", () => {
     setEditing({ defName: "greet", type: "def" });
 
     renderFunctionEditor();
+    await flush();
 
     expect(dndCleanup).toHaveBeenCalledTimes(1);
     expect(eventCleanup).toHaveBeenCalledTimes(1);
@@ -230,20 +235,23 @@ describe("renderFunctionEditor — def target", () => {
     expect(markers[1]).toMatchObject({ endColumn: 2, severity: 4, startColumn: 1 });
   });
 
-  test("re-render with the same target re-syncs the buffer instead of recreating", () => {
+  test("re-render with the same target re-syncs the buffer instead of recreating", async () => {
     setEditing({ defName: "greet", type: "def" });
     renderFunctionEditor();
+    await flush();
     expect(created).toHaveLength(1);
     const [ed] = created;
 
     // Buffer drifted from the document → re-sync writes the body back with the ignore flag
     ed!.value = "drifted()";
     renderFunctionEditor();
+    await flush();
     expect(created).toHaveLength(1);
     expect(ed!.value).toBe("return 1;");
 
     // Buffer already in sync → nothing happens
     renderFunctionEditor();
+    await flush();
     expect(created).toHaveLength(1);
     expect(ed!.value).toBe("return 1;");
     expect(ed!.disposed).toBe(false);
@@ -252,6 +260,7 @@ describe("renderFunctionEditor — def target", () => {
   test("debounced edits write the body back to the state def and lint the new code", async () => {
     setEditing({ defName: "greet", type: "def" });
     renderFunctionEditor();
+    await flush();
     const [ed] = created;
 
     ed!.type("return 42;");
@@ -267,13 +276,15 @@ describe("renderFunctionEditor — def target", () => {
     expect(lints.at(-1)![1]).toEqual({ args: ["state", "name"], code: "return 42;" });
   });
 
-  test("renders an empty buffer for missing or non-function defs", () => {
+  test("renders an empty buffer for missing or non-function defs", async () => {
     setEditing({ defName: "missing", type: "def" });
     renderFunctionEditor();
+    await flush();
     expect(created.at(-1)!.value).toBe("");
 
     setEditing({ defName: "plain", type: "def" });
     renderFunctionEditor();
+    await flush();
     expect(created.at(-1)!.value).toBe("");
     // Non-function defs fall back to the default arg names
     const formatCall = codeServiceCalls.findLast(([action]) => action === "format")!;
@@ -282,15 +293,17 @@ describe("renderFunctionEditor — def target", () => {
 });
 
 describe("renderFunctionEditor — event target", () => {
-  test("switching targets disposes previous editors and loads the event body", () => {
+  test("switching targets disposes previous editors and loads the event body", async () => {
     setEditing({ defName: "greet", type: "def" });
     renderFunctionEditor();
+    await flush();
     const [first] = created;
     const strayMonaco = { dispose: mock(() => {}) };
     view.monacoEditor = strayMonaco as never;
 
     setEditing({ eventKey: "onclick", path: ["children", 0], type: "event" });
     renderFunctionEditor();
+    await flush();
 
     expect(first!.disposed).toBe(true);
     expect(strayMonaco.dispose).toHaveBeenCalledTimes(1);
@@ -302,6 +315,7 @@ describe("renderFunctionEditor — event target", () => {
   test("debounced edits update the event handler property preserving its shape", async () => {
     setEditing({ eventKey: "onclick", path: ["children", 0], type: "event" });
     renderFunctionEditor();
+    await flush();
     const ed = created.at(-1)!;
 
     ed.type("doIt(state)");
@@ -313,9 +327,10 @@ describe("renderFunctionEditor — event target", () => {
     expect([...node.onclick.parameters]).toEqual(["state", "event"]);
   });
 
-  test("renders an empty buffer for an unrecognized editing type", () => {
+  test("renders an empty buffer for an unrecognized editing type", async () => {
     setEditing({ type: "mystery" });
     renderFunctionEditor();
+    await flush();
     expect(created.at(-1)!.value).toBe("");
   });
 
@@ -331,6 +346,7 @@ describe("renderFunctionEditor — event target", () => {
     });
     setEditing({ defName: "greet", type: "def" });
     renderFunctionEditor();
+    await flush();
     const ed = created.at(-1)!;
     setModelMarkers.mockClear();
 
@@ -361,18 +377,19 @@ describe("renderFunctionEditor — event target", () => {
     expect(setModelMarkers).toHaveBeenCalledTimes(1);
   });
 
-  test("renders an empty buffer when the event path resolves to nothing", () => {
+  test("renders an empty buffer when the event path resolves to nothing", async () => {
     setEditing({ eventKey: "onclick", path: ["children", 99], type: "event" });
     renderFunctionEditor();
+    await flush();
     expect(created.at(-1)!.value).toBe("");
   });
 });
 
 describe("registerFunctionCompletions", () => {
-  test("registers once and suggests state members with kind by def shape", () => {
+  test("registers once and suggests state members with kind by def shape", async () => {
     view._completionRegistered = false;
-    registerFunctionCompletions();
-    registerFunctionCompletions();
+    await registerFunctionCompletions();
+    await registerFunctionCompletions();
     expect(registerCompletionItemProvider).toHaveBeenCalledTimes(1);
 
     const [language, provider] = registerCompletionItemProvider.mock.calls[0] as any[];
@@ -395,9 +412,9 @@ describe("registerFunctionCompletions", () => {
     });
   });
 
-  test("appends blessed-global completions with catalog descriptions", () => {
+  test("appends blessed-global completions with catalog descriptions", async () => {
     view._completionRegistered = false;
-    registerFunctionCompletions();
+    await registerFunctionCompletions();
     const [, provider] = registerCompletionItemProvider.mock.calls.at(-1)! as any[];
     const model = { getWordUntilPosition: () => ({ endColumn: 4, startColumn: 1 }) };
     const { suggestions } = provider.provideCompletionItems(model, { lineNumber: 2 });
@@ -408,7 +425,7 @@ describe("registerFunctionCompletions", () => {
     expect(byLabel["JSON.parse"].insertText).toBe("window.JSON.parse");
   });
 
-  test("named formulas complete as functions with their description as documentation", () => {
+  test("named formulas complete as functions with their description as documentation", async () => {
     const tab = activeTab.value!;
     (tab.doc.document as any).state.lineTotal = {
       $expression: { operator: "*", target: { $ref: "$args/a" }, value: 2 },
@@ -416,7 +433,7 @@ describe("registerFunctionCompletions", () => {
       parameters: ["a"],
     };
     view._completionRegistered = false;
-    registerFunctionCompletions();
+    await registerFunctionCompletions();
     const [, provider] = registerCompletionItemProvider.mock.calls.at(-1)! as any[];
     const model = { getWordUntilPosition: () => ({ endColumn: 4, startColumn: 1 }) };
     const { suggestions } = provider.provideCompletionItems(model, { lineNumber: 2 });
@@ -428,9 +445,11 @@ describe("registerFunctionCompletions", () => {
     expect(byLabel["state.plain"].documentation).toBeUndefined();
   });
 
-  test("returns no suggestions without an active tab", () => {
+  test("returns no suggestions without an active tab", async () => {
+    // Register our own provider rather than borrowing one a previous test happened to leave behind.
+    await registerFunctionCompletions();
     closeAllTabs();
-    const [, provider] = registerCompletionItemProvider.mock.calls[0]! as any[];
+    const [, provider] = registerCompletionItemProvider.mock.calls.at(-1)! as any[];
     const model = { getWordUntilPosition: () => ({ endColumn: 1, startColumn: 1 }) };
     expect(provider.provideCompletionItems(model, { lineNumber: 1 }).suggestions).toEqual([]);
   });

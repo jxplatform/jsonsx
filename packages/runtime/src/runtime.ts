@@ -170,6 +170,25 @@ export function setSkipServerFunctions(v: boolean) {
   _serverFnConfig.skip = v;
 }
 
+/** @type {{ skip: boolean }} */
+const _autoRequestConfig = { skip: false };
+/**
+ * Set to true to suppress AUTOMATIC `$prototype: "Request"` fetches — the sibling of
+ * {@link setSkipServerFunctions}, and used by Studio for the same reason.
+ *
+ * `buildScope` re-resolves every `state` entry on each full canvas render, so an auto-request
+ * re-issued its HTTP call every time the canvas rebuilt. In edit/design mode that meant authoring
+ * actions — a signal edit, or pressing Enter inside component-wrapped content, both of which force
+ * a full render — fired network requests. Live data belongs to preview and to the deployed site.
+ *
+ * Only non-`manual` requests are gated: a `manual` one fires from an event handler, and edit mode
+ * strips handlers before rendering. The returned ref is unchanged either way — it simply stays at
+ * its initial `null`, which is the same state bindings observe before any fetch resolves.
+ */
+export function setSkipAutoRequests(v: boolean) {
+  _autoRequestConfig.skip = v;
+}
+
 // ─── Dev-proxy auth token (Studio cross-origin canvas) ────────────────────────
 // The Studio canvas iframe is served from a token-gated loopback origin (createProjectServer): its
 // POST /__jx_resolve__ + /__jx_server__ routes 403 without ?token=<rpcToken>. The iframe boot reads
@@ -1323,7 +1342,7 @@ export async function resolvePrototype(
       const debounceMs = def.debounce ?? 0;
       let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-      if (!def.manual) {
+      if (!def.manual && !_autoRequestConfig.skip) {
         effect(() => {
           let url: string | undefined;
           if (isTemplateString(def.url)) {

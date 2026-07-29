@@ -8,10 +8,21 @@
  */
 
 import { $ } from "bun";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+import { STUDIO_DIR, STUDIO_ENTRYPOINTS, studioBundleOptions } from "./build-config.ts";
 import pkg from "../package.json" with { type: "json" };
+
+const outdir = join(STUDIO_DIR, "dist");
 
 const { version } = pkg as { version: string };
 const buildDate = new Date().toISOString();
+
+// Dist is generated, never curated: wipe it so a renamed entrypoint or a one-off `bun build` cannot
+// Leave an orphan behind that `package.json`'s `files` then publishes. (This repo shipped a stale
+// 12 MB `dist/studio.ts` and a duplicate `dist/canvas/iframe-entry.js` that way.) Safe to do first —
+// The Monaco workers are rebuilt below.
+await rm(outdir, { force: true, recursive: true });
 
 let gitCommit = "unknown";
 try {
@@ -27,17 +38,16 @@ const define = {
   __JX_GIT_COMMIT__: JSON.stringify(gitCommit),
 };
 
-// Build the editor shell and the slim canvas-iframe bundle in SEPARATE passes. A single multi-entry
-// Build roots its output at the entrypoints' common ancestor (src/), which would nest the iframe
-// Bundle under dist/canvas/ and break canvas.html's flat `./dist/iframe-entry.js` import. Two
-// Single-entry builds each emit flat at dist/<name>.js.
-for (const entry of ["./src/studio.ts", "./src/canvas/iframe-entry.ts"]) {
+// One pass per entrypoint: a single multi-entry build roots its output at the entrypoints' common
+// Ancestor (src/), which would nest the iframe bundle under dist/canvas/ and break canvas.html's flat
+// `./dist/iframe-entry.js` import. The bundler contract itself is shared with the dev-server watcher
+// Via build-config.ts, so the two paths cannot drift.
+for (const entry of STUDIO_ENTRYPOINTS) {
   const result = await Bun.build({
+    ...studioBundleOptions,
+    define,
     entrypoints: [entry],
     outdir: "dist",
-    target: "browser",
-    sourcemap: "linked",
-    define,
   });
   if (!result.success) {
     for (const log of result.logs) {

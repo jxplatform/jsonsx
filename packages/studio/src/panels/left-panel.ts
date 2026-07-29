@@ -42,6 +42,8 @@ interface LeftPanelCtx {
   renderHeadTemplate: typeof renderHeadTemplate;
   renderGitPanel: typeof renderGitPanel;
   renderCanvas: () => void;
+  /** Canvas re-render that also lets automatic `Request` entries fetch (Data panel Refresh). */
+  refreshData: () => void;
   defCategory: (def: unknown) => string;
   defBadgeLabel: (def: unknown) => string;
   navigateToComponent: (path: string) => void;
@@ -239,6 +241,7 @@ function _render() {
     content = ctx.renderDataExplorerTemplate(S.document.state ?? {}, S.canvas?.scope ?? null, {
       defBadgeLabel: ctx.defBadgeLabel,
       defCategory: ctx.defCategory,
+      refreshData: ctx.refreshData,
       renderCanvas: ctx.renderCanvas,
       renderLeftPanel: render,
     });

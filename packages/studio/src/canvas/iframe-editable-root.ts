@@ -151,6 +151,14 @@ export interface EditableRootHandle {
   capture: () => DocRange | null;
   /** Restore a captured selection and re-activate its block. */
   restore: (range: DocRange) => boolean;
+  /**
+   * Whether an IME composition is in flight.
+   *
+   * While it is, the DOM holds provisional text and the input engine owns a selection tied to it,
+   * so nothing may rewrite the editable subtree — a remote patch or a re-render would cancel the
+   * composition and lose whatever the author had half-typed.
+   */
+  isComposing: () => boolean;
 }
 
 /** Wire the editing host on `container`. */
@@ -199,13 +207,39 @@ export function startEditableRoot(
     }
   };
 
+  /**
+   * True between `compositionstart` and `compositionend`.
+   *
+   * An IME composition is a multi-keystroke transaction the browser owns: the DOM holds provisional
+   * text and the engine holds selection state tied to it. Committing mid-composition would read
+   * that half-formed text into the document AND — the part that actually breaks input —
+   * `restoreDocSelection` would reset the selection under the IME, cancelling the composition. So
+   * every commit is suspended for the duration and exactly one runs when it ends.
+   *
+   * This surface had no composition handling at all, which is why the 500 ms idle tick could land
+   * in the middle of typing Japanese, Chinese, Korean or Vietnamese.
+   */
+  let composing = false;
+
   /** (Re)arm the idle tick — every keystroke pushes it further out. */
   const scheduleCommitTick = () => {
-    if (!deps.onCommitTick || !activeEl) {
+    if (!deps.onCommitTick || !activeEl || composing) {
       return;
     }
     cancelCommitTick();
     commitTimer = setTimeout(commitTick, deps.commitDelayMs ?? COMMIT_IDLE_MS) as unknown as number;
+  };
+
+  const onCompositionStart = () => {
+    composing = true;
+    // A tick already armed by the keystrokes that opened the composition must not fire inside it.
+    cancelCommitTick();
+  };
+
+  const onCompositionEnd = () => {
+    composing = false;
+    // One commit for the whole composed run, on the same idle path a normal edit takes.
+    scheduleCommitTick();
   };
 
   /** Release whatever is active, if anything. */
@@ -415,12 +449,23 @@ export function startEditableRoot(
   doc.addEventListener("selectionchange", syncActiveBlock);
   container.addEventListener("beforeinput", onBeforeInput);
   container.addEventListener("input", onInput);
+  container.addEventListener("compositionstart", onCompositionStart);
+  container.addEventListener("compositionend", onCompositionEnd);
   container.addEventListener("dragstart", onDragStart);
   doc.addEventListener("pointerdown", onPointerDownCapture, true);
 
   return {
     capture: () => captureDocSelection(container, deps.isEditableBlock),
+    /** Whether an IME composition is in flight — callers must not rewrite the DOM under it. */
+    isComposing: () => composing,
     flush: () => {
+      // Mid-composition, the DOM holds provisional text and the IME owns the selection: committing
+      // Would both capture a half-formed string and cancel the composition. The composition's own
+      // `compositionend` commits it, and anything that must read the document first (saving) already
+      // Waits on this returning.
+      if (composing) {
+        return;
+      }
       if (commitTimer) {
         cancelCommitTick();
         commitTick();
@@ -444,6 +489,8 @@ export function startEditableRoot(
       doc.removeEventListener("selectionchange", syncActiveBlock);
       container.removeEventListener("beforeinput", onBeforeInput);
       container.removeEventListener("input", onInput);
+      container.removeEventListener("compositionstart", onCompositionStart);
+      container.removeEventListener("compositionend", onCompositionEnd);
       container.removeEventListener("dragstart", onDragStart);
       doc.removeEventListener("pointerdown", onPointerDownCapture, true);
       // Deactivating commits, so the pending tick is cancelled rather than fired.

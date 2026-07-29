@@ -257,9 +257,10 @@ afterEach(() => {
 // ─── Grid mode ────────────────────────────────────────────────────────────────
 
 describe("grid mode", () => {
-  test("renders the grid panel and styles the wrap on first entry", () => {
+  test("renders the grid panel and styles the wrap on first entry", async () => {
     setMode("grid");
     renderCanvas();
+    await flush(); // The source editor mounts behind the lazy Monaco import.
     expect(renderGridMode).toHaveBeenCalledTimes(1);
     const [host, tab] = renderGridMode.mock.calls[0]! as unknown as [HTMLElement, Tab];
     expect(host.id).toBe("canvas-wrap");
@@ -268,13 +269,15 @@ describe("grid mode", () => {
     expect(host.style.padding).toBe("0px");
   });
 
-  test("a same-tab re-render while the panel is mounted takes the fast path", () => {
+  test("a same-tab re-render while the panel is mounted takes the fast path", async () => {
     setMode("grid");
     renderCanvas();
+    await flush(); // The source editor mounts behind the lazy Monaco import.
     expect(renderGridMode).toHaveBeenCalledTimes(1);
     // The panel now owns its own reactivity — a content re-render must not rebuild it.
     gridMounted = true;
     renderCanvas();
+    await flush(); // The source editor mounts behind the lazy Monaco import.
     expect(renderGridMode).toHaveBeenCalledTimes(1);
   });
 });
@@ -286,6 +289,7 @@ describe("source-mode collab binding", () => {
     collabCtx = makeCollabCtx({ readOnly: true });
     setMode("source");
     renderCanvas();
+    await flush(); // The source editor mounts behind the lazy Monaco import.
     await flush();
 
     // The binding was constructed against the ctx text/awareness and the editor's model.
@@ -310,6 +314,7 @@ describe("source-mode collab binding", () => {
     collabCtx = makeCollabCtx();
     setMode("source");
     renderCanvas();
+    await flush(); // The source editor mounts behind the lazy Monaco import.
     await flush();
     expect(bindings).toHaveLength(1);
     expect(createdEditors[0]!.updateOptions).not.toHaveBeenCalled();
@@ -317,6 +322,7 @@ describe("source-mode collab binding", () => {
     const ctx = collabCtx;
     setMode("design");
     renderCanvas();
+    await flush(); // The source editor mounts behind the lazy Monaco import.
     expect(bindings[0]!.destroyed).toBe(true);
     expect(ctx.leave).toHaveBeenCalledTimes(1);
     expect(document.head.querySelector("style[data-jx-collab-cursors]")).toBeNull();
@@ -332,6 +338,7 @@ describe("source-mode collab binding", () => {
     });
     setMode("source");
     renderCanvas();
+    await flush(); // The source editor mounts behind the lazy Monaco import.
     view.monacoEditor = null; // The editor goes away while the session enters.
     release();
     await flush();
@@ -347,6 +354,7 @@ describe("source-mode collab binding", () => {
       });
     setMode("source");
     renderCanvas();
+    await flush(); // The source editor mounts behind the lazy Monaco import.
     const ctx = collabCtx;
     release();
     // Let the enter() continuation reach the dynamic y-monaco import, then yank the editor.

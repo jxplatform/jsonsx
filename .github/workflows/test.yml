@@ -186,6 +186,11 @@ jobs:
       # specs/extensions.md §2 and scripts/check-dep-rules.ts.
       - run: bun scripts/check-dep-rules.ts
       - run: bun run typecheck
+      # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
+      # which the root's two strictest flags reject 165 times) so it needs its own pass — without
+      # this, nothing there is typechecked at all, and an unbound identifier once shipped through.
+      # See packages/desktop/tsconfig.json for what differs and why.
+      - run: bun run --cwd packages/desktop typecheck
       # Type-aware (tsgolint) pass — Flow-soundness rules in .oxlintrc.strict.json.
       # The tsgolint binary ships with the oxlint-tsgolint dev dep (installed above).
       - run: bun run lint:typecheck

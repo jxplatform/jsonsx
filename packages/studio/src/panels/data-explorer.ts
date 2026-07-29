@@ -41,6 +41,7 @@ export function dataTypeLabel(value: unknown) {
  * @param {Record<string, unknown> | null} liveScope - Cached live scope from runtime rendering
  * @param {{
  *   renderCanvas: () => void;
+ *   refreshData: () => void;
  *   renderLeftPanel: () => void;
  *   defCategory: (def: unknown) => string;
  *   defBadgeLabel: (def: unknown) => string;
@@ -52,12 +53,14 @@ export function renderDataExplorerTemplate(
   liveScope: Record<string, unknown> | null,
   callbacks: {
     renderCanvas: () => void;
+    /** Re-render the canvas AND let automatic `Request` entries fetch (the Refresh button). */
+    refreshData: () => void;
     renderLeftPanel: () => void;
     defCategory: (def: unknown) => string;
     defBadgeLabel: (def: unknown) => string;
   },
 ) {
-  const { renderCanvas, renderLeftPanel, defCategory, defBadgeLabel } = callbacks;
+  const { refreshData, renderLeftPanel, defCategory, defBadgeLabel } = callbacks;
 
   const defs = state || {};
   const entries = Object.entries(defs);
@@ -70,7 +73,10 @@ export function renderDataExplorerTemplate(
         size="s"
         class="data-refresh-btn"
         @click=${() => {
-          renderCanvas();
+          // Edit/design suppress automatic `Request` fetches (a full render re-resolves every state
+          // Entry, so authoring would refetch constantly). Re-firing them on demand is exactly what
+          // This button is for, which is why it goes through refreshData rather than renderCanvas.
+          refreshData();
           setTimeout(() => renderLeftPanel(), 200);
         }}
       >

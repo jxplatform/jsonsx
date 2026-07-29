@@ -533,10 +533,11 @@ describe("source mode", () => {
     const tab = openSyncedTab();
     setMode("source");
     renderCanvas();
+    // The container renders synchronously; the editor itself mounts once Monaco has loaded.
     expect(canvasWrap.querySelector(".source-wrap")).not.toBeNull();
     expect(canvasWrap.querySelector(".source-editor")).not.toBeNull();
-    expect(view.monacoEditor).toBe(createdEditors[0] as never);
     await flush();
+    expect(view.monacoEditor).toBe(createdEditors[0] as never);
     expect(createdModels[0]!._value).toBe(JSON.stringify(tab.doc.document, null, 2));
     expect(createdModels[0]!.lang).toBe("json");
     expect(createdEditors[0]!._ignoreNextChange).toBe(true);

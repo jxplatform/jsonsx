@@ -12,11 +12,22 @@ import type {
   DataRowUpdate,
   SecretsSetRequest,
 } from "@jxsuite/protocol";
-import type { ImportProgressEvent, ImportSiteOptions, StudioPlatform } from "@jxsuite/studio/types";
+import type {
+  CreateProjectDestination,
+  ImportProgressEvent,
+  ImportSiteOptions,
+  StudioPlatform,
+} from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload } from "@jxsuite/server/refactor";
+import { setPreviewNavigateHandler } from "@jxsuite/studio/preview-navigate";
 
-export function createDesktopPlatform(): StudioPlatform {
+/* Returns an INFERRED type, not `StudioPlatform`, with `satisfies` doing the conformance check. The
+   desktop adds `updater` and `windowControls`, which the PAL interface deliberately does not declare
+   — the studio reaches them through `globalThis.__jxPlatform` with its own local shapes (see
+   resize-edges.ts, toolbar.ts) so it stays launcher-agnostic. Annotating the return as
+   `StudioPlatform` erased them from every caller, including this package's own tests. */
+export function createDesktopPlatform() {
   // The studio sidebar's live-sync subscriber, if any. Set via subscribeFileEvents below.
   let fileEventHandler: ((events: FsEventPayload[]) => void) | null = null;
   const rpc = Electroview.defineRPC<StudioRPC>({
@@ -35,6 +46,20 @@ export function createDesktopPlatform(): StudioPlatform {
       requests: {},
     },
     maxRequestTime: 300_000,
+  });
+
+  /*
+   * Preview link clicks go to the user's REAL browser, not this webview.
+   *
+   * Following a link in Preview exists to see the page behave like the deployed thing — routing,
+   * history, devtools. A webview with no address bar is not that, and navigating THIS one would
+   * replace the editor. The Bun side hands the URL to the OS (`Utils.openExternal`); on failure the
+   * studio's own `window.open` default still applies.
+   */
+  setPreviewNavigateHandler((url) => {
+    void rpc.request.openExternal({ url }).catch(() => {
+      window.open(url, "_blank", "noopener,noreferrer");
+    });
   });
 
   const electroview = new Electroview({ rpc });
@@ -582,7 +607,10 @@ export function createDesktopPlatform(): StudioPlatform {
       url?: string;
       adapter?: string;
       directory: string;
-      destination: { kind: "path"; parent: string };
+      /* The full PAL union, not just the `path` variant: the parameter is contravariant, so
+         narrowing it here makes the whole platform object unassignable to StudioPlatform. What
+         actually keeps Studio from sending a repo destination is `createDestination: "path"`. */
+      destination: CreateProjectDestination;
       starter?: string;
       template?: string;
       design?: {
@@ -595,7 +623,13 @@ export function createDesktopPlatform(): StudioPlatform {
         logo?: { name: string; base64: string };
       };
     }) {
-      return rpc.request.createProject(opts) as Promise<{
+      const { destination } = opts;
+      if (destination.kind !== "path") {
+        throw new Error(
+          "The desktop app creates projects on disk; repo destinations are cloud-only",
+        );
+      }
+      return rpc.request.createProject({ ...opts, destination }) as Promise<{
         root: string;
         config: ProjectConfig;
       }>;
@@ -649,7 +683,10 @@ export function createDesktopPlatform(): StudioPlatform {
     },
   };
 
-  return platform;
+  /* `satisfies` on the identifier, not on the literal above: a fresh object literal gets excess
+     property checks, which would reject the two launcher-only extras this function exists to expose.
+     A reference is not fresh, so this checks conformance and keeps the inferred type. */
+  return platform satisfies StudioPlatform;
 }
 
 function showUpdateToast(version: string, rpc: { request: { updaterApplyUpdate: () => unknown } }) {

@@ -32,12 +32,15 @@ import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import type { ExtensionsPayloadEntry } from "@jxsuite/compiler/format-host";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FsEventPayload, FsWatcherHandle, RenameReport } from "@jxsuite/server/refactor";
+import { openExternal } from "./utils.ts";
 import type {
+  ComponentSlotMeta,
   DataPushRequest,
   DataRowDelete,
   DataRowInsert,
   DataRowsQuery,
   DataRowUpdate,
+  JsonValue,
   SecretsSetRequest,
 } from "@jxsuite/protocol";
 import type { FormatCapability, FormatRegistry } from "@jxsuite/schema/format-registry";
@@ -49,6 +52,9 @@ import type {
   OpenProjectResult,
   SiteConfig,
 } from "./rpc-schema";
+
+/** One entry of `ComponentMeta.props`, kept in step with the protocol rather than restated. */
+type ComponentProp = NonNullable<ComponentMeta["props"]>[number];
 
 // ─── Internal schema types for class.json parsing ─────────────────────────────
 
@@ -78,10 +84,9 @@ interface ComponentJsonDef {
   state?: Record<string, unknown>;
 }
 
-interface SlotDef {
-  name: string;
-  fallback?: unknown[];
-}
+/* The protocol's shape, not a restatement: a local copy typed `fallback?: unknown[]` drifted from
+   `(JxMutableNode | string)[]` and made every ComponentMeta unassignable — see rpc-schema.ts. */
+type SlotDef = ComponentSlotMeta;
 
 /**
  * Collect slot definitions (name + fallback children) from a parsed component tree. Whitespace-only
@@ -99,7 +104,9 @@ function collectSlotDefs(node: unknown, out: SlotDef[] = []): SlotDef[] {
     const { children } = el;
     out.push({
       name,
-      ...(Array.isArray(children) && children.length > 0 ? { fallback: children } : {}),
+      ...(Array.isArray(children) && children.length > 0
+        ? { fallback: children as SlotDef["fallback"] }
+        : {}),
     });
   }
   if (Array.isArray(el.children)) {
@@ -118,6 +125,10 @@ interface ClassJsonDef {
     parameters?: Record<string, ClassFieldDef>;
     fields?: Record<string, ClassFieldDef>;
     constructor?: { parameters?: CtorParam[] };
+    /* Read below for the format-capability summary. Declared here because it IS read — the omission
+       was silent while this package went untypechecked, and only the `as` cast on the read kept it
+       from being a hard error. */
+    methods?: Record<string, { role?: string; identifier?: string; timing?: string[] }>;
   };
 }
 
@@ -319,10 +330,7 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string): Stu
     result.$studio = def.$studio as Record<string, unknown>;
   }
   const capabilityRoles = new Set(["parse", "serialize", "discover", "load"]);
-  const methods = (classDef.$defs?.methods ?? {}) as Record<
-    string,
-    { role?: string; identifier?: string; timing?: string[] }
-  >;
+  const methods = classDef.$defs?.methods ?? {};
   const capabilities: Record<string, { identifier: string; timing: string[] }> = {};
   for (const [key, method] of Object.entries(methods)) {
     if (method.role && capabilityRoles.has(method.role)) {
@@ -770,18 +778,13 @@ export function createProjectSession(initialRoot: string | null) {
                 const entry = d as Record<string, unknown>;
                 return !entry.$prototype && !entry.$handler && !entry.$compute;
               })
-              .map(([name, d]) => {
+              .map(([name, d]): ComponentProp => {
                 if (typeof d !== "object") {
-                  return { default: d, name, type: typeof d };
+                  return { default: d as JsonValue, name, type: typeof d };
                 }
                 const entry = d as Record<string, unknown>;
-                const propResult: {
-                  name: string;
-                  type?: string;
-                  default?: unknown;
-                  format?: string;
-                } = {
-                  default: entry.default,
+                const propResult: ComponentProp = {
+                  default: entry.default as JsonValue,
                   name,
                 };
                 if (entry.type != null) {
@@ -977,6 +980,7 @@ export function createProjectSession(initialRoot: string | null) {
     fetchProjectSchemas,
     formatAction,
     openProject,
+    openExternal,
     createProject,
     pickDirectory,
     listDirectory,

@@ -6,7 +6,8 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
+import type * as monaco from "monaco-editor";
+import { loadedMonaco, loadMonaco } from "../services/monaco-lazy";
 
 import { canvasPanels, canvasWrap, updateCanvas } from "../store";
 import { activeTab } from "../workspace/workspace";
@@ -17,7 +18,7 @@ import { view } from "../view";
 import { parseSourceForPath, serializeDocument } from "../files/file-ops";
 import { detachGridPanel, gridPanelMounted, renderGridMode } from "../grid/grid-panel";
 import { formatByName, formatForPath } from "../format/format-host";
-import { modelUriFor } from "../services/monaco-setup";
+import { modelUriFor } from "../services/model-uri";
 import { renderWelcome } from "../panels/welcome-screen";
 import { projectState } from "../state";
 import {
@@ -34,7 +35,13 @@ import {
   mountIframeCanvas,
   postStyleUpdateToStylebookHosts,
 } from "./iframe-host";
-import { canvasPerf } from "./canvas-perf";
+import {
+  canvasPerf,
+  SPAN_FULL_RENDER,
+  SPAN_MOUNT_CANVAS,
+  timeSpan,
+  timeSpanAsync,
+} from "./canvas-perf";
 import { renderStylebookMode } from "../panels/stylebook-panel";
 import { transposeStylebookStyle } from "../panels/stylebook-doc";
 import { dismissBlockActionBar, dismissLinkPopover } from "../panels/block-action-bar";
@@ -95,22 +102,24 @@ async function sourceContent(tab: Tab, lang: string) {
   return JSON.stringify(tab.doc.document, null, 2);
 }
 
-// Double-RAF scheduling so the canvas render yields to higher-priority panel paints first.
-// Concurrent schedule requests within the same frame are deduped.
+// Single-RAF scheduling; concurrent schedule requests within the same frame are deduped.
+//
+/* Two nested rAFs used to make the canvas render "yield to higher-priority panel paints first".
+   Panels have since grown their own rAF scheduler (see panel-scheduler.ts), so the second frame
+   bought nothing and put a hard ~32 ms floor under every escalated edit — canvas-patcher's
+   escalateToFullRender routes through here. */
 let _canvasRafId = 0;
 export function scheduleCanvasRender() {
   if (_canvasRafId) {
     return;
   }
   _canvasRafId = requestAnimationFrame(() => {
-    _canvasRafId = requestAnimationFrame(() => {
-      _canvasRafId = 0;
-      try {
-        renderCanvas();
-      } catch (error) {
-        console.error("renderCanvas error:", error);
-      }
-    });
+    _canvasRafId = 0;
+    try {
+      renderCanvas();
+    } catch (error) {
+      console.error("renderCanvas error:", error);
+    }
   });
 }
 
@@ -216,7 +225,133 @@ function resetCanvasView() {
   view.prevCanvasMode = null;
 }
 
+/**
+ * Mount the source-mode Monaco editor into an already-rendered container.
+ *
+ * Async because Monaco is loaded on demand (see services/monaco-lazy). The container is in the DOM
+ * before this runs, and every continuation below re-checks `view.monacoEditor`, so a teardown or a
+ * mode switch while the module loads is handled the same way a teardown mid-y-monaco-load already
+ * was.
+ */
+async function mountSourceEditor(
+  tab: Tab,
+  editorContainer: Element,
+  filePath: string,
+  lang: string,
+): Promise<void> {
+  const monaco = await loadMonaco();
+  const modelUri = monaco.Uri.parse(modelUriFor(filePath));
+  const model = monaco.editor.createModel("", lang, modelUri);
+  // Co-edited tabs bind the buffer to the shared Y.Text instead of a local serialization: the
+  // Canonical lock flips to "source", peers co-type character-level, and the source reconciler
+  // Parses back into the structure tree for everyone's canvas.
+  const collabCtx = collabSourceContext(tab);
+  if (collabCtx) {
+    void collabCtx
+      .enter()
+      .then(async () => {
+        const editor = view.monacoEditor;
+        if (!editor || editor.getModel() !== model) {
+          return;
+        }
+        const cleanup = await createSourceCollabBinding(model, editor, collabCtx);
+        // The editor may have been torn down while y-monaco loaded — unbind immediately.
+        if (view.monacoEditor !== editor || editor.getModel() !== model) {
+          cleanup();
+          return;
+        }
+        sourceCollabCleanup = cleanup;
+        if (collabCtx.readOnly) {
+          editor.updateOptions({ readOnly: true });
+        }
+      })
+      .catch(() => {
+        // Binding failures degrade to a read-only-ish local buffer; the session stays live.
+      });
+  } else {
+    sourceContent(tab, lang)
+      .then((content) => {
+        const editor = view.monacoEditor;
+        if (editor && editor.getModel() === model) {
+          editor._ignoreNextChange = true;
+          model.setValue(content);
+        }
+      })
+      .catch(() => {
+        // Serialization unavailable — leave the buffer empty rather than crash the render
+      });
+  }
+  view.monacoEditor = monaco.editor.create(editorContainer as unknown as HTMLElement, {
+    automaticLayout: true,
+    fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace",
+    fontSize: 12,
+    lineNumbers: "on",
+    minimap: { enabled: false },
+    model,
+    scrollBeyondLastLine: false,
+    tabSize: 2,
+    theme: "vs-dark",
+    wordWrap: "on",
+  });
+
+  // Debounced sync back to state (solo tabs only: co-edited buffers flow through the shared
+  // Y.Text and the source reconciler's parse mirror instead of a whole-doc replace).
+  if (collabCtx) {
+    return;
+  }
+  let debounce: ReturnType<typeof setTimeout> | undefined;
+  view.monacoEditor.onDidChangeModelContent(() => {
+    const editor = view.monacoEditor;
+    if (!editor) {
+      return;
+    }
+    if (editor._ignoreNextChange) {
+      editor._ignoreNextChange = false;
+      return;
+    }
+    clearTimeout(debounce);
+    debounce = setTimeout(async () => {
+      const tabNow = activeTab.value;
+      if (!tabNow) {
+        return;
+      }
+      if (formatByName(tabNow.doc.sourceFormat) && tabNow.documentPath) {
+        try {
+          // Parse the full source back into body + frontmatter (title, $head, etc.).
+          const { document, frontmatter } = await parseSourceForPath(
+            tabNow.documentPath,
+            editor.getValue(),
+          );
+          tabNow.doc.document = document as JxMutableNode;
+          tabNow.doc.content.frontmatter = frontmatter;
+          tabNow.doc.dirty = true;
+        } catch {
+          // Unparseable source — don't update state
+        }
+      } else if (lang === "json") {
+        try {
+          tabNow.doc.document = JSON.parse(editor.getValue()) as JxMutableNode;
+          tabNow.doc.dirty = true;
+        } catch {
+          // Invalid JSON — don't update state
+        }
+      } else {
+        tabNow.doc.dirty = true;
+      }
+    }, 600);
+  });
+}
+
+/**
+ * Render the canvas surface for the active tab. Thin timing wrapper — {@link renderCanvasImpl} has
+ * several early returns, so the span is closed by {@link timeSpan}'s `finally` rather than by
+ * hand.
+ */
 export function renderCanvas() {
+  timeSpan(SPAN_FULL_RENDER, renderCanvasImpl);
+}
+
+function renderCanvasImpl() {
   const tab = activeTab.value;
   if (!tab) {
     // No active tab — reset every piece of canvas view state so reopening a file can never inherit
@@ -285,8 +420,11 @@ export function renderCanvas() {
      folder (`./project.schema.json` → `file:///pages/project.schema.json`, unregistered, back to
      "No schema request service available"). Tear down instead and let the creation path below build
      a model with the right URI. */
-  if (canvasMode === "source" && view.monacoEditor) {
-    const expectedUri = monaco.Uri.parse(modelUriFor(tab.documentPath || "document.json"));
+  const loadedForSourceSwap = canvasMode === "source" && view.monacoEditor ? loadedMonaco() : null;
+  if (loadedForSourceSwap && view.monacoEditor) {
+    const expectedUri = loadedForSourceSwap.Uri.parse(
+      modelUriFor(tab.documentPath || "document.json"),
+    );
     if (view.monacoEditor.getModel()?.uri.toString() !== expectedUri.toString()) {
       disposeSourceCollab();
       view.monacoEditor.getModel()?.dispose();
@@ -450,106 +588,7 @@ export function renderCanvas() {
 
     const filePath = tab.documentPath || "document.json";
     const lang = sourceLang(tab);
-    const modelUri = monaco.Uri.parse(modelUriFor(filePath));
-    const model = monaco.editor.createModel("", lang, modelUri);
-    // Co-edited tabs bind the buffer to the shared Y.Text instead of a local serialization: the
-    // Canonical lock flips to "source", peers co-type character-level, and the source reconciler
-    // Parses back into the structure tree for everyone's canvas.
-    const collabCtx = collabSourceContext(tab);
-    if (collabCtx) {
-      void collabCtx
-        .enter()
-        .then(async () => {
-          const editor = view.monacoEditor;
-          if (!editor || editor.getModel() !== model) {
-            return;
-          }
-          const cleanup = await createSourceCollabBinding(model, editor, collabCtx);
-          // The editor may have been torn down while y-monaco loaded — unbind immediately.
-          if (view.monacoEditor !== editor || editor.getModel() !== model) {
-            cleanup();
-            return;
-          }
-          sourceCollabCleanup = cleanup;
-          if (collabCtx.readOnly) {
-            editor.updateOptions({ readOnly: true });
-          }
-        })
-        .catch(() => {
-          // Binding failures degrade to a read-only-ish local buffer; the session stays live.
-        });
-    } else {
-      sourceContent(tab, lang)
-        .then((content) => {
-          const editor = view.monacoEditor;
-          if (editor && editor.getModel() === model) {
-            editor._ignoreNextChange = true;
-            model.setValue(content);
-          }
-        })
-        .catch(() => {
-          // Serialization unavailable — leave the buffer empty rather than crash the render
-        });
-    }
-    view.monacoEditor = monaco.editor.create(editorContainer as unknown as HTMLElement, {
-      automaticLayout: true,
-      fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace",
-      fontSize: 12,
-      lineNumbers: "on",
-      minimap: { enabled: false },
-      model,
-      scrollBeyondLastLine: false,
-      tabSize: 2,
-      theme: "vs-dark",
-      wordWrap: "on",
-    });
-
-    // Debounced sync back to state (solo tabs only: co-edited buffers flow through the shared
-    // Y.Text and the source reconciler's parse mirror instead of a whole-doc replace).
-    if (collabCtx) {
-      return;
-    }
-    let debounce: ReturnType<typeof setTimeout> | undefined;
-    view.monacoEditor.onDidChangeModelContent(() => {
-      const editor = view.monacoEditor;
-      if (!editor) {
-        return;
-      }
-      if (editor._ignoreNextChange) {
-        editor._ignoreNextChange = false;
-        return;
-      }
-      clearTimeout(debounce);
-      debounce = setTimeout(async () => {
-        const tabNow = activeTab.value;
-        if (!tabNow) {
-          return;
-        }
-        if (formatByName(tabNow.doc.sourceFormat) && tabNow.documentPath) {
-          try {
-            // Parse the full source back into body + frontmatter (title, $head, etc.).
-            const { document, frontmatter } = await parseSourceForPath(
-              tabNow.documentPath,
-              editor.getValue(),
-            );
-            tabNow.doc.document = document as JxMutableNode;
-            tabNow.doc.content.frontmatter = frontmatter;
-            tabNow.doc.dirty = true;
-          } catch {
-            // Unparseable source — don't update state
-          }
-        } else if (lang === "json") {
-          try {
-            tabNow.doc.document = JSON.parse(editor.getValue()) as JxMutableNode;
-            tabNow.doc.dirty = true;
-          } catch {
-            // Invalid JSON — don't update state
-          }
-        } else {
-          tabNow.doc.dirty = true;
-        }
-      }, 600);
-    });
+    void mountSourceEditor(tab, editorContainer as unknown as Element, filePath, lang);
     return;
   }
 
@@ -822,12 +861,14 @@ function renderCanvasIntoPanel(
 
   // Overrides (git-diff docs) mount with a null tab identity: their iframes must never route doc
   // Mutations anywhere. The real doc carries its tab id so edit/drop messages route to THAT tab.
-  void mountIframeCanvas(
-    gen,
-    docToRender,
-    canvas,
-    panel._width,
-    docOverride ? null : (tab?.id ?? null),
+  void timeSpanAsync(SPAN_MOUNT_CANVAS, () =>
+    mountIframeCanvas(
+      gen,
+      docToRender,
+      canvas,
+      panel._width,
+      docOverride ? null : (tab?.id ?? null),
+    ),
   )
     .then(() => {
       if (gen === view.renderGeneration) {

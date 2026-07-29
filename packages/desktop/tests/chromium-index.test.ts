@@ -87,6 +87,7 @@ const handlerMocks = {
   listExtensions: mock(() => Promise.resolve([{ specifier: "@jxsuite/parser" }])),
   listFormats: mock(() => Promise.resolve([{ format: "markdown" }])),
   locateFile: mock(() => Promise.resolve("located/file.json")),
+  openExternal: mock(({ url }: { url: string }) => ({ ok: url.startsWith("http") })),
   openProject: mock(() => Promise.resolve({ config: { name: "P" }, handle: { root: "." } })),
   createProject: mock(() => Promise.resolve({ config: { name: "New" }, root: "/new" })),
   setDirectoryDialog: mock(() => {}),
@@ -425,6 +426,8 @@ describe("chromium launcher RPC dispatch", () => {
     ]);
     expect(await rpc("locateFile", { name: "file.json" })).toBe("located/file.json");
     expect(await rpc("openProject")).toEqual({ config: { name: "P" }, handle: { root: "." } });
+    // Preview links leave the webview: the Bun side hands the URL to the OS.
+    expect(await rpc("openExternal", { url: "https://example.com" })).toEqual({ ok: true });
     expect(await rpc("resolveSiteContext", { filePath: "x.json" })).toEqual({ sitePath: "." });
     expect(await rpc("fetchPluginSchema", { src: "./P.ts" })).toEqual({ type: "object" });
     expect(await rpc("codeService", { action: "lint" })).toEqual({

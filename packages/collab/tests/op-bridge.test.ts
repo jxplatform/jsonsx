@@ -343,6 +343,41 @@ describe("yEventsToDocOps (fast inbound path)", () => {
     expect(yEventsToDocOps([fake])).toBeNull();
   });
 
+  /* A bare-string child is stored as its own Y.Text (that is what makes two people typing in the
+     same loose run merge per character), so a remote keystroke inside it arrives as a YTextEvent at
+     ["children", n] rather than a key change on a parent. The text IS the child, so it round-trips
+     as a whole child replacement. */
+  test("a remote edit inside a bare-string child becomes set-child", () => {
+    const result = captureRemote((a) => {
+      const children = a.getMap("structure").get("children") as Y.Array<unknown>;
+      (children.get(2) as Y.Text).insert(5, "r");
+    });
+    expect(assertFaithful(result)).toEqual([
+      { index: 2, node: "looser", op: "set-child", parentPath: [] },
+    ]);
+  });
+
+  /* The two defensive bails on the granular collapse path. Neither is reachable through the public
+     API — a live container always has a doc and always resolves — but a malformed or stale event
+     must degrade to "reconcile by diffing", never to a wrong op. */
+  test("a granular event whose container has no doc bails to null", () => {
+    const fake = {
+      path: ["children", 0, "style"],
+      target: { doc: null },
+    } as unknown as Y.YEvent<never>;
+    expect(yEventsToDocOps([fake])).toBeNull();
+  });
+
+  test("a granular event addressing a node that no longer exists bails to null", () => {
+    const doc = new Y.Doc();
+    seedStructure(doc, BASE);
+    const fake = {
+      path: ["children", 99, "style"],
+      target: { doc },
+    } as unknown as Y.YEvent<never>;
+    expect(yEventsToDocOps([fake])).toBeNull();
+  });
+
   test("two array events in one transaction bail to null", () => {
     const a = new Y.Doc();
     const b = new Y.Doc();

@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { renderDataExplorerTemplate, renderDataTreeTemplate } from "../src/panels/data-explorer";
 
 const renderCanvas = mock(() => {});
+const refreshData = mock(() => {});
 const renderLeftPanel = mock(() => {});
 const callbacks = {
   defBadgeLabel: () => "Signal",
   defCategory: () => "data",
+  refreshData,
   renderCanvas,
   renderLeftPanel,
 };
@@ -21,6 +23,7 @@ async function renderExplorer(
 
 beforeEach(() => {
   renderCanvas.mockClear();
+  refreshData.mockClear();
   renderLeftPanel.mockClear();
 });
 
@@ -89,10 +92,13 @@ describe("data explorer expansion", () => {
     expect(el.querySelector(".data-tree")).toBeNull();
   });
 
-  test("refresh button re-renders canvas then left panel", async () => {
+  test("refresh button re-fetches through refreshData, then re-renders the left panel", async () => {
     const el = await renderExplorer({ a: {} }, {});
     (el.querySelector(".data-refresh-btn") as HTMLElement).click();
-    expect(renderCanvas).toHaveBeenCalledTimes(1);
+    // RefreshData, not renderCanvas: a plain re-render leaves automatic `Request` entries gated in
+    // Edit/design, and re-firing them is exactly what this button promises.
+    expect(refreshData).toHaveBeenCalledTimes(1);
+    expect(renderCanvas).not.toHaveBeenCalled();
     expect(renderLeftPanel).not.toHaveBeenCalled();
     await new Promise((resolve) => {
       setTimeout(resolve, 220);

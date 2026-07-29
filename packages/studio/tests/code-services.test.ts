@@ -1,5 +1,5 @@
 import "./with-dom.js";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { registerPlatform } from "../src/platform";
 import type { StudioPlatform } from "../src/types";
 
@@ -23,6 +23,14 @@ void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
 }));
 
 // ─── codeService ────────────────────────────────────────────────────────────
+
+// `setLintMarkers` reads the loaded Monaco namespace synchronously — in production it is only
+// Reachable with an editor already mounted, so prime the lazy loader here (the module is mocked
+// Above, so this resolves immediately).
+beforeAll(async () => {
+  const { loadMonaco } = await import("../src/services/monaco-lazy");
+  await loadMonaco();
+});
 
 describe("codeService", () => {
   test("returns null when platform has no codeService", async () => {

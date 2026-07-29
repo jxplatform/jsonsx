@@ -4,7 +4,7 @@ import { getPlatform } from "../platform";
 import { isJsonObject, paramNames } from "@jxsuite/schema/guards";
 import { projectState } from "../state";
 import { getNodeAtPath } from "../store";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
+import { loadedMonaco } from "./monaco-lazy";
 import type { JxPath } from "../state";
 import type { JxFunctionDef, JxMutableNode } from "@jxsuite/schema/types";
 import type { editor } from "monaco-editor";
@@ -110,6 +110,11 @@ export function setLintMarkers(
 ) {
   const model = editor.getModel();
   if (!model) {
+    return;
+  }
+  // Reachable only with a live editor in hand, so Monaco is already loaded.
+  const monaco = loadedMonaco();
+  if (!monaco) {
     return;
   }
   const markers = diagnostics

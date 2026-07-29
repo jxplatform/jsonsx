@@ -6,7 +6,11 @@
  * and save. Phase 2: Tree editing with drag-and-drop reordering.
  */
 
-import "./services/monaco-setup.js";
+/*
+ * Monaco is NOT imported here. It is two thirds of the studio bundle and most sessions never open a
+ * code view, so `services/monaco-lazy` loads it (and `monaco-setup`'s worker + language
+ * registration) on first use by source mode, the function editor, or the formula workspace.
+ */
 import { errorMessage } from "@jxsuite/schema/parse";
 
 import {
@@ -47,6 +51,7 @@ import {
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
 import {
   commitActiveEditSession,
+  allowAutoRequestsOnNextRender,
   getEditSnapshot,
   postColorSchemeToLiveHosts,
   setCanvasContextMenuHandler,
@@ -145,7 +150,6 @@ import { selectStylebookTag } from "./panels/stylebook-panel";
 import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from "./panels/dnd";
 import { registerCanvasDndBridge } from "./panels/canvas-dnd-bridge";
 import { defaultDef } from "./panels/shared";
-import { registerFunctionCompletions } from "./panels/editors";
 import { closeFormulaWorkspace } from "./panels/formula-workspace";
 import {
   initBlockActionBar,
@@ -646,6 +650,13 @@ leftPanelMod.mount({
   registerFileTreeDnD,
   registerLayersDnD,
   renderCanvas: () => renderCanvas(),
+  // The Data panel's Refresh: a canvas re-render that ALSO lets automatic `Request` state entries
+  // Fetch. Edit/design suppress them (a full render re-resolves every entry, so authoring would
+  // Refetch constantly); re-firing them on demand is what that button is for.
+  refreshData: () => {
+    allowAutoRequestsOnNextRender();
+    renderCanvas();
+  },
   renderDataExplorerTemplate,
   renderFilesTemplate,
   renderGitPanel,
@@ -687,8 +698,9 @@ function safeRenderRightPanel() {
   rightPanelMod.render();
 }
 
-// Now that renderers are registered, bootstrap
-registerFunctionCompletions();
+/* Monaco JS completions are registered by the function editor when it mounts (see panels/editors),
+   NOT here. Registering at startup would await the lazy Monaco load and pull 12.6 MB back onto the
+   cold-start path — the exact cost the lazy load exists to avoid. */
 
 // Collab sessions serialize/parse through the format host when mirroring between the structure
 // Tree and the shared source text, and surface freezes via the status bar.

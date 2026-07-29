@@ -19,6 +19,7 @@ import {
   setCanvasDelinkAnchors,
   setCanvasViewportTranspose,
   setRootMedia,
+  setSkipAutoRequests,
   setSkipServerFunctions,
   setStampPropBindings,
   transposeCanvasUnits,
@@ -212,6 +213,9 @@ export function syncEditableRoot(container: HTMLElement, mode: CanvasMode): void
   if (!isEditableMode(mode)) {
     container.removeAttribute("contenteditable");
     container.removeAttribute("spellcheck");
+    container.removeAttribute("role");
+    container.removeAttribute("aria-multiline");
+    container.removeAttribute("aria-label");
     return;
   }
   container.contentEditable = "true";
@@ -220,6 +224,19 @@ export function syncEditableRoot(container: HTMLElement, mode: CanvasMode): void
   container.setAttribute("writingsuggestions", "false");
   // The caret must never look like a drag handle: reordering is the block action bar's handle only.
   container.setAttribute("draggable", "false");
+  /*
+   * A bare `contenteditable` div announces as an unlabelled group in most screen readers, so the one
+   * surface an author types into was the least described thing in the editor. `textbox` +
+   * `aria-multiline` is the role the editable region actually plays, and the label names it — the
+   * canvas is inside a cross-origin iframe, so a reader traversing in has no surrounding context to
+   * infer it from.
+   *
+   * Scoped deliberately: this describes the editing REGION. Per-block landmarks and a
+   * keyboard-reachable block action bar are still missing (see specs/studio.md §4.5).
+   */
+  container.setAttribute("role", "textbox");
+  container.setAttribute("aria-multiline", "true");
+  container.setAttribute("aria-label", "Document content");
 }
 
 /** Id of the injected stylebook-mode chrome stylesheet (section/card scaffolding). */
@@ -499,8 +516,16 @@ export async function renderResolvedDocument(opts: {
   mode: CanvasMode;
   mapperCtx: PathMapCtx;
   siteStyle?: Record<string, unknown> | null;
+  /** This render may fetch automatic `Request` entries even outside preview (Data-panel Refresh). */
+  allowAutoRequests?: boolean;
 }): Promise<RenderHandle> {
   setSkipServerFunctions(opts.mode !== "preview");
+  // Same gate for automatic `$prototype: "Request"` state entries. `buildScope` re-resolves every
+  // State entry on each full render, so without this an escalating authoring action (a signals-panel
+  // Edit, or Enter inside component-wrapped content) issued an HTTP request per render. Edit/design
+  // Render the pre-fetch (null) state; preview fetches, and so does a render the Data activity's
+  // Refresh armed (`allowAutoRequests`) — re-firing fetches on demand is that button's purpose.
+  setSkipAutoRequests(opts.mode !== "preview" && !opts.allowAutoRequests);
   // Transpose viewport units (vh/vw/…) → container units (cqh/cqw/…) so they resolve against the
   // Canvas's fixed-size query container (canvas.html) instead of the iframe element. That decouples
   // Them from the iframe height, letting the host size the iframe to its content without `100vh`

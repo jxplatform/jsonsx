@@ -11,7 +11,11 @@
   "files": [
     "*.js",
     "src",
-    "dist",
+    "dist/studio.js",
+    "dist/studio.css",
+    "dist/iframe-entry.js",
+    "dist/chunks",
+    "dist/workers",
     "index.html",
     "canvas.html",
     "fonts"
@@ -24,7 +28,8 @@
     "./base64": "./src/utils/base64.ts",
     "./directory-picker": "./src/services/directory-picker.ts",
     "./import-client": "./src/services/import-client.ts",
-    "./platforms/cloud": "./src/platforms/cloud.ts"
+    "./platforms/cloud": "./src/platforms/cloud.ts",
+    "./preview-navigate": "./src/canvas/preview-navigate.ts"
   },
   "publishConfig": {
     "provenance": true

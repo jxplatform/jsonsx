@@ -9,6 +9,7 @@
 
 import { postMessageChannel } from "./iframe-channel";
 import { canvasBaseOrigin } from "./canvas-origin";
+import { getPreviewNavigateHandler } from "./preview-navigate";
 import { resolveCanvasDocument } from "./canvas-live-render";
 import {
   applyBlockMerge,
@@ -214,6 +215,60 @@ export function sawIframeDragOver(seq: number): boolean {
 
 /** Monotonic eval request id (shared across hosts; stale replies carry an older/unknown id). */
 let evalReqId = 0;
+
+/**
+ * One-shot: let automatic `$prototype: "Request"` entries fetch on the NEXT page render even in
+ * edit/design mode.
+ *
+ * Those fetches are suppressed outside preview because a full render re-resolves every state entry,
+ * so an escalating authoring action would issue a request per render. But the Data activity's
+ * Refresh exists to re-fire them on demand — its documented purpose — so it arms this flag and the
+ * next render consumes it. Deliberately one-shot: a subsequent escalation must not inherit it.
+ */
+let _allowAutoRequestsOnce = false;
+
+/**
+ * Open a preview link's target for real.
+ *
+ * Resolved against the CANVAS's origin, not the editor's: the canvas iframe is served from the
+ * project's own origin so relative `src`/`href` resolve the way they will in production, and the
+ * editor shell may sit on a different origin entirely (a deep `/edit/:owner/:repo` path in the
+ * cloud). Resolving against `location` would send a root-relative `/about` to the wrong host.
+ */
+function openPreviewHref(href: string, state: HostState): void {
+  let resolved: URL;
+  try {
+    resolved = new URL(href, state.iframe.src || canvasBaseOrigin());
+  } catch {
+    return; // Unparseable even against a base — nothing sensible to open.
+  }
+  /*
+   * Scheme allowlist. A page can carry any href, and handing `javascript:` or `data:` to
+   * `window.open` would execute it — in the EDITOR's origin, since the shell is the opener. Web pages
+   * and the contact affordances real sites use are all that Preview needs to follow.
+   */
+  if (!["http:", "https:", "mailto:", "tel:"].includes(resolved.protocol)) {
+    return;
+  }
+  const url = resolved.href;
+  const override = getPreviewNavigateHandler();
+  if (override) {
+    override(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+/** Arm the next page render to allow automatic request fetches (Data activity Refresh). */
+export function allowAutoRequestsOnNextRender(): void {
+  _allowAutoRequestsOnce = true;
+}
+
+function consumeAllowAutoRequests(): boolean {
+  const armed = _allowAutoRequestsOnce;
+  _allowAutoRequestsOnce = false;
+  return armed;
+}
 
 /** Pending eval resolvers keyed by reqId; a timeout or stale reply resolves null. */
 const pendingEvals = new Map<number, (results: EvalExprResult[] | null) => void>();
@@ -1487,6 +1542,10 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       canvasSlashHandler?.dismiss();
       return;
     }
+    case "previewNavigate": {
+      openPreviewHref(msg.href, state);
+      return;
+    }
     case "contextMenu": {
       if (state.stylebook) {
         return; // The doc context menu's actions are meaningless for specimen paths.
@@ -1681,6 +1740,7 @@ export async function mountIframeCanvas(
     shadowDoc: cloneableShadow,
     siteStyle: resolved.siteStyle,
     ...(editableTags ? { editableTags } : {}),
+    ...(consumeAllowAutoRequests() ? { allowAutoRequests: true } : {}),
   };
   // A mode switch to preview mid-split must not start an edit session in the preview render.
   if (message.mode === "preview") {

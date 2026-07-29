@@ -1294,6 +1294,10 @@ describe("startCanvasIframe — stylebook mode", () => {
     acks.length = 0;
 
     p.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 5, clientY: 5 }));
+    // Hover + insert zones are coalesced into one rAF, so the move's effects land next frame.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
     pair.flush();
     expect(acks.some((m) => m.kind === "hover")).toBe(true);
     expect(acks.some((m) => m.kind === "insertZones")).toBe(false);

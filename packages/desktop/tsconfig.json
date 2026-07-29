@@ -1,0 +1,33 @@
+{
+  /* The desktop package cannot use the root tsconfig, which is why the root EXCLUDES it — and why
+     nothing here was typechecked at all until an unbound identifier shipped through `bun run
+     typecheck` unnoticed.
+
+     The cause is that electrobun's dist ships raw TypeScript (`dist/api/bun/core/*.ts`, not `.d.ts`),
+     so importing it pulls its sources into the program as first-class files. `skipLibCheck` does not
+     apply to those — it only suppresses `.d.ts` — and under the root's two strictest flags they emit
+     165 errors we cannot fix in a dependency. Dropping exactly those two flags brings electrobun to
+     zero and leaves only our own code, which is the point of the exercise:
+
+       exactOptionalPropertyTypes  → 160 of them, every `tooltip?: string` given `string | undefined`
+       noUncheckedIndexedAccess    → the rest, plus one TS7030 in electrobun's Socket.ts
+
+     Everything else stays on `strict`. That still catches unbound identifiers, wrong RPC shapes, and
+     bad handler signatures — the failures this package actually has. Prefer narrowing this file back
+     toward the root config over widening it. */
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "lib": ["ESNext", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ESNext",
+    "types": ["bun-types"]
+  },
+  "include": ["src/**/*", "tests/**/*", "scripts/**/*", "../../types.d.ts"]
+}

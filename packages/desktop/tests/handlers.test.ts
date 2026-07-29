@@ -5,10 +5,12 @@ import { join } from "node:path";
 import type { ComponentMeta, DirEntry } from "../src/rpc-schema";
 import type { StudioSchema } from "../src/handlers";
 
+const mockOpenExternal = mock((url: string) => url.startsWith("https://"));
+
 void mock.module("electrobun/bun", () => ({
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
-  Utils: { openFileDialog: async () => [] },
+  Utils: { openExternal: mockOpenExternal, openFileDialog: async () => [] },
 }));
 
 const {
@@ -30,6 +32,7 @@ const {
   fetchPluginSchema,
   openProject,
   createProject,
+  openExternal,
 } = await import("../src/handlers");
 
 // The folder picker lives on the session object (the legacy handlers shim does not re-export
@@ -1170,4 +1173,23 @@ process.on("exit", () => {
   try {
     cleanup();
   } catch {}
+});
+
+// ─── openExternal ────────────────────────────────────────────────────────────
+
+/* The shim's own function rather than a session method: opening a URL is a shell capability with no
+   project state. Studio's Preview link handler is the only caller (specs/desktop.md §3.5). */
+describe("openExternal", () => {
+  test("forwards the url to the shell and wraps the result", async () => {
+    const { init } = await import("../src/utils");
+    await init();
+    expect(await openExternal({ url: "https://example.com/docs" })).toEqual({ ok: true });
+    expect(mockOpenExternal).toHaveBeenCalledWith("https://example.com/docs");
+  });
+
+  test("reports ok: false when the shell refuses", async () => {
+    const { init } = await import("../src/utils");
+    await init();
+    expect(await openExternal({ url: "ftp://example.com" })).toEqual({ ok: false });
+  });
 });

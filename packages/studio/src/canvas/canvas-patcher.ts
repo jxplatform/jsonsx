@@ -18,7 +18,7 @@ import { isTabActive } from "../workspace/workspace";
 import { view } from "../view";
 import { toRaw } from "../reactivity";
 import { postPatchToHosts } from "./iframe-host";
-import { canvasPerf, recordEscalation } from "./canvas-perf";
+import { canvasPerf, recordEscalation, SPAN_PATCH_BATCH, timeSpan } from "./canvas-perf";
 import { setPatchConsumer } from "../tabs/patch-ops";
 
 import type { JxPatchOp, TransactionRecord } from "../tabs/patch-ops";
@@ -108,16 +108,40 @@ function containerVerdict(tab: Tab, parentPath: JxPath, requireArray = true): st
     return "structure-on-map-path";
   }
   const doc = tab.doc.document;
-  for (let i = 0; i <= parentPath.length; i += 2) {
-    const node = getNodeAtPath(doc, parentPath.slice(0, i));
-    if (!node) {
-      return "node-not-found";
-    }
-    if (typeof node.tagName === "string" && node.tagName.includes("-")) {
-      return "structure-in-custom-element";
-    }
-  }
   const parent = getNodeAtPath(doc, parentPath);
+  if (!parent) {
+    return "node-not-found";
+  }
+  /*
+   * Only the IMMEDIATE parent's tag matters, not every ancestor's.
+   *
+   * These ops locate their target by its stamped `data-jx-path` (iframe-patch's `requireElement`);
+   * the one place DOM child-index correspondence is consulted is `domChildReference`, which indexes
+   * `parentEl.childNodes` to pick the insertion reference. That is a property of the immediate
+   * parent alone — a custom element further up the chain projects its own light-DOM children through
+   * slots, which changes where they RENDER, not the child order of some plain container beneath it.
+   *
+   * Scanning every ancestor rejected the common case instead: markdown class-directive pages put
+   * every editable block inside a component, so pressing Enter there forced a full render (reloading
+   * embedded iframes) on a correspondence that was never actually at risk. This mirrors the
+   * reasoning `replaceVerdict` already documents — and if the element turns out to be un-queryable
+   * after all, the iframe throws `element-not-found` and the parent escalates, reaching the same
+   * outcome without the false positives.
+   *
+   * The immediate parent stays conservative: when it IS a component INSTANCE, its children may be
+   * rendered by the component rather than as light DOM, and an insert would land at the wrong
+   * position rather than fail loudly.
+   *
+   * Except at the document root — the same carve-out `isIslandBoundary` makes for the caret
+   * (iframe-position.ts). A component DEFINITION opened as its own document has a hyphenated tagName,
+   * but its subtree IS the document: the canvas renders the definition's own body, not an instance of
+   * it, so those children are ordinary light DOM. Without this, every structural edit to any component
+   * definition escalated to a full render — in a component-heavy project, the most common authoring
+   * action there is.
+   */
+  if (parentPath.length > 0 && typeof parent.tagName === "string" && parent.tagName.includes("-")) {
+    return "structure-in-custom-element";
+  }
   if (parent.innerHTML) {
     return "structure-with-innerhtml";
   }
@@ -309,8 +333,10 @@ export function applyPatchBatch(tab: Tab, _ops: JxPatchOp[], record?: Transactio
   // Rendering THIS tab's document (a background tab's iframe must never fold a foreign edit into
   // Its shadow doc). Throwing when no host received it escalates to a full render (the suppressed
   // Render then runs), so an edit is never dropped.
-  const forwardOps = (record?.docOps ?? []).map((pair) => pair.forward);
-  if (postPatchToHosts(forwardOps, view.renderGeneration, tab.id) === 0) {
-    throw new Error("no-ready-iframe-host");
-  }
+  timeSpan(SPAN_PATCH_BATCH, () => {
+    const forwardOps = (record?.docOps ?? []).map((pair) => pair.forward);
+    if (postPatchToHosts(forwardOps, view.renderGeneration, tab.id) === 0) {
+      throw new Error("no-ready-iframe-host");
+    }
+  });
 }
