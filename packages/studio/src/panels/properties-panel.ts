@@ -194,19 +194,21 @@ function kvRow(
           currentKey = (e.target as HTMLInputElement).value;
           commit();
         }}
-        @change=${datalistId === "css-props"
-          ? (e: Event) => {
-              const el = (e.target as HTMLInputElement)
-                .closest(".kv-row")
-                ?.querySelector(".kv-val");
-              if (el) {
-                el.setAttribute(
-                  "placeholder",
-                  getCssInitialMap().get((e.target as HTMLInputElement).value) || "",
-                );
+        @change=${
+          datalistId === "css-props"
+            ? (e: Event) => {
+                const el = (e.target as HTMLInputElement)
+                  .closest(".kv-row")
+                  ?.querySelector(".kv-val");
+                if (el) {
+                  el.setAttribute(
+                    "placeholder",
+                    getCssInitialMap().get((e.target as HTMLInputElement).value) || "",
+                  );
+                }
               }
-            }
-          : nothing}
+            : nothing
+        }
       ></sp-textfield>
       <sp-textfield
         size="s"
@@ -244,68 +246,78 @@ function renderRepeaterFieldsTemplate(
       null,
       `prop|${path.join("/")}|items`,
     )}
-    ${node.filter
-      ? bindableFieldRow(
-          "Filter",
-          "text",
-          node.filter,
-          (v: JsonValue) =>
-            transactDoc(activeTab.value, (t) =>
-              mutateUpdateProperty(t, path, "filter", v || undefined),
-            ),
-          null,
-          null,
-          `prop|${path.join("/")}|filter`,
-        )
-      : nothing}
-    ${node.sort
-      ? bindableFieldRow(
-          "Sort",
-          "text",
-          node.sort,
-          (v: JsonValue) =>
-            transactDoc(activeTab.value, (t) =>
-              mutateUpdateProperty(t, path, "sort", v || undefined),
-            ),
-          null,
-          null,
-          `prop|${path.join("/")}|sort`,
-        )
-      : nothing}
+    ${
+      node.filter
+        ? bindableFieldRow(
+            "Filter",
+            "text",
+            node.filter,
+            (v: JsonValue) =>
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, path, "filter", v || undefined),
+              ),
+            null,
+            null,
+            `prop|${path.join("/")}|filter`,
+          )
+        : nothing
+    }
+    ${
+      node.sort
+        ? bindableFieldRow(
+            "Sort",
+            "text",
+            node.sort,
+            (v: JsonValue) =>
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, path, "sort", v || undefined),
+              ),
+            null,
+            null,
+            `prop|${path.join("/")}|sort`,
+          )
+        : nothing
+    }
     <div style="display:flex;gap:8px;margin-top:4px">
-      ${!node.filter
-        ? html`<span
-            class="kv-add"
-            @click=${() =>
-              transactDoc(activeTab.value, (t) =>
-                mutateUpdateProperty(t, path, "filter", { $ref: "#/state/" }),
-              )}
-            >+ Add filter</span
-          >`
-        : nothing}
-      ${!node.sort
-        ? html`<span
-            class="kv-add"
-            @click=${() =>
-              transactDoc(activeTab.value, (t) =>
-                mutateUpdateProperty(t, path, "sort", { $ref: "#/state/" }),
-              )}
-            >+ Add sort</span
-          >`
-        : nothing}
+      ${
+        !node.filter
+          ? html`<span
+              class="kv-add"
+              @click=${() =>
+                transactDoc(activeTab.value, (t) =>
+                  mutateUpdateProperty(t, path, "filter", { $ref: "#/state/" }),
+                )}
+              >+ Add filter</span
+            >`
+          : nothing
+      }
+      ${
+        !node.sort
+          ? html`<span
+              class="kv-add"
+              @click=${() =>
+                transactDoc(activeTab.value, (t) =>
+                  mutateUpdateProperty(t, path, "sort", { $ref: "#/state/" }),
+                )}
+              >+ Add sort</span
+            >`
+          : nothing
+      }
     </div>
-    ${node.map
-      ? html`
-          <sp-action-button
-            size="s"
-            style="margin-top:8px;width:100%"
-            @click=${() => {
-              activeTab.value!.session.selection = [...path, "map"];
-            }}
-            >Edit template →</sp-action-button
-          >
-        `
-      : nothing}
+    ${
+      node.map
+        ? html`
+            <sp-action-button
+              size="s"
+              style="margin-top:8px;width:100%"
+              @click=${() => {
+                activeTab.value!.session.selection = [...path, "map"];
+              }}
+              >Edit template →</sp-action-button
+            >
+          `
+        : nothing
+    }
   `;
 }
 
@@ -511,9 +523,15 @@ function renderComponentPropsFieldsTemplate(
         return html`
           <div class="style-row" data-prop=${prop.name}>
             <div class="style-row-label">
-              ${hasVal
-                ? html`<span class="set-dot" title="Clear ${prop.name}" @click=${clearProp}></span>`
-                : nothing}
+              ${
+                hasVal
+                  ? html`<span
+                      class="set-dot"
+                      title="Clear ${prop.name}"
+                      @click=${clearProp}
+                    ></span>`
+                  : nothing
+              }
               <sp-field-label size="s" title=${prop.description || prop.name}
                 >${camelToLabel(prop.name)}</sp-field-label
               >
@@ -525,11 +543,13 @@ function renderComponentPropsFieldsTemplate(
       },
     )}
     ${comp.props.length === 0 ? html`<div class="empty-state">No props defined</div>` : nothing}
-    ${comp.path
-      ? html`<span class="kv-add" @click=${() => navigateToComponent(comp.path!)}
-          >→ Edit definition</span
-        >`
-      : nothing}
+    ${
+      comp.path
+        ? html`<span class="kv-add" @click=${() => navigateToComponent(comp.path!)}
+            >→ Edit definition</span
+          >`
+        : nothing
+    }
   `;
 }
 
@@ -593,13 +613,15 @@ function renderMediaFieldsTemplate(node: JxMutableNode) {
           }, 400);
         }}
       />
-      ${media["--"]
-        ? html`<span
-            class="kv-del"
-            @click=${() => transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, "--"))}
-            >✕</span
-          >`
-        : nothing}
+      ${
+        media["--"]
+          ? html`<span
+              class="kv-del"
+              @click=${() => transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, "--"))}
+              >✕</span
+            >`
+          : nothing
+      }
     </div>
 
     ${breakpoints.map(([name, query]) => mediaBreakpointRowTemplate(name, query))}
@@ -614,63 +636,69 @@ function renderMediaFieldsTemplate(node: JxMutableNode) {
         }}
         >+ Add breakpoint</span
       >
-      ${view.showAddBreakpointForm
-        ? html`
-            <div style="margin-top:4px">
-              <div style="display:flex;gap:4px;margin-bottom:3px;align-items:center">
-                <input
-                  class="field-input"
-                  placeholder="Name (e.g. Tablet)"
-                  style="flex:1"
-                  @input=${(e: Event) => {
-                    view.addBreakpointPreview =
-                      friendlyNameToMedia((e.target as HTMLInputElement).value) || "";
-                    renderOnly("rightPanel");
-                  }}
-                />
-                <span
-                  style="font-size:10px;color:var(--fg-dim);font-family:var(--font-mono);white-space:nowrap"
-                  >${view.addBreakpointPreview}</span
-                >
-              </div>
-              <div style="display:flex;gap:4px;margin-bottom:3px;align-items:center">
-                <input class="field-input add-bp-query" value="(min-width: 768px)" style="flex:1" />
-              </div>
-              <div style="display:flex;gap:4px">
-                <button
-                  class="kv-add"
-                  style="padding:2px 10px;cursor:pointer"
-                  @click=${(e: Event) => {
-                    const wrap = (e.target as HTMLElement).closest("div")?.parentElement;
-                    const nameVal = wrap?.querySelector("input")?.value;
-                    const queryVal = (
-                      wrap?.querySelector(".add-bp-query") as HTMLInputElement | null
-                    )?.value?.trim();
-                    const key = friendlyNameToMedia(nameVal || "");
-                    if (key && queryVal) {
+      ${
+        view.showAddBreakpointForm
+          ? html`
+              <div style="margin-top:4px">
+                <div style="display:flex;gap:4px;margin-bottom:3px;align-items:center">
+                  <input
+                    class="field-input"
+                    placeholder="Name (e.g. Tablet)"
+                    style="flex:1"
+                    @input=${(e: Event) => {
+                      view.addBreakpointPreview =
+                        friendlyNameToMedia((e.target as HTMLInputElement).value) || "";
+                      renderOnly("rightPanel");
+                    }}
+                  />
+                  <span
+                    style="font-size:10px;color:var(--fg-dim);font-family:var(--font-mono);white-space:nowrap"
+                    >${view.addBreakpointPreview}</span
+                  >
+                </div>
+                <div style="display:flex;gap:4px;margin-bottom:3px;align-items:center">
+                  <input
+                    class="field-input add-bp-query"
+                    value="(min-width: 768px)"
+                    style="flex:1"
+                  />
+                </div>
+                <div style="display:flex;gap:4px">
+                  <button
+                    class="kv-add"
+                    style="padding:2px 10px;cursor:pointer"
+                    @click=${(e: Event) => {
+                      const wrap = (e.target as HTMLElement).closest("div")?.parentElement;
+                      const nameVal = wrap?.querySelector("input")?.value;
+                      const queryVal = (
+                        wrap?.querySelector(".add-bp-query") as HTMLInputElement | null
+                      )?.value?.trim();
+                      const key = friendlyNameToMedia(nameVal || "");
+                      if (key && queryVal) {
+                        view.showAddBreakpointForm = false;
+                        view.addBreakpointPreview = "";
+                        transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, key, queryVal));
+                      }
+                    }}
+                  >
+                    Add
+                  </button>
+                  <button
+                    class="kv-add"
+                    style="padding:2px 10px;cursor:pointer;color:var(--fg-dim)"
+                    @click=${() => {
                       view.showAddBreakpointForm = false;
                       view.addBreakpointPreview = "";
-                      transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, key, queryVal));
-                    }
-                  }}
-                >
-                  Add
-                </button>
-                <button
-                  class="kv-add"
-                  style="padding:2px 10px;cursor:pointer;color:var(--fg-dim)"
-                  @click=${() => {
-                    view.showAddBreakpointForm = false;
-                    view.addBreakpointPreview = "";
-                    renderOnly("rightPanel");
-                  }}
-                >
-                  Cancel
-                </button>
+                      renderOnly("rightPanel");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </div>
-          `
-        : nothing}
+            `
+          : nothing
+      }
     </div>
   `;
 }
@@ -989,16 +1017,18 @@ function renderPageSection(node: JxMutableNode) {
       <div class="style-section-body">
         <div class="style-row" data-prop="$layout">
           <div class="style-row-label">
-            ${currentLayout !== undefined
-              ? html`<span
-                  class="set-dot"
-                  title="Reset to default"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, [], "$layout"));
-                  }}
-                ></span>`
-              : nothing}
+            ${
+              currentLayout !== undefined
+                ? html`<span
+                    class="set-dot"
+                    title="Reset to default"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, [], "$layout"));
+                    }}
+                  ></span>`
+                : nothing
+            }
             <sp-field-label size="s">Layout</sp-field-label>
           </div>
           <sp-picker
@@ -1017,9 +1047,11 @@ function renderPageSection(node: JxMutableNode) {
             }}
           >
             <sp-menu-item value="__default__"
-              >Default${defaultLayout
-                ? ` (${defaultLayout.replace(/^\.\/layouts\//, "").replace(/\.json$/, "")})`
-                : ""}</sp-menu-item
+              >Default${
+                defaultLayout
+                  ? ` (${defaultLayout.replace(/^\.\/layouts\//, "").replace(/\.json$/, "")})`
+                  : ""
+              }</sp-menu-item
             >
             <sp-menu-item value="__none__">None</sp-menu-item>
             <sp-menu-divider></sp-menu-divider>
@@ -1029,11 +1061,13 @@ function renderPageSection(node: JxMutableNode) {
             )}
           </sp-picker>
         </div>
-        ${effectivePath
-          ? html`<div style="font-size:10px;color:var(--fg-dim);padding:2px 0;font-style:italic">
-              Wraps page content via &lt;slot&gt; distribution
-            </div>`
-          : nothing}
+        ${
+          effectivePath
+            ? html`<div style="font-size:10px;color:var(--fg-dim);padding:2px 0;font-style:italic">
+                Wraps page content via &lt;slot&gt; distribution
+              </div>`
+            : nothing
+        }
       </div>
     </sp-accordion-item>
   `;
@@ -1065,17 +1099,19 @@ function renderLayoutSelectionPanel(ctx: { navigateToComponent: (path: string) =
                 >&lt;${tagName}&gt;</code
               >
             </div>
-            ${className
-              ? html`<div class="style-row">
-                  <div class="style-row-label">
-                    <sp-field-label size="s">Class</sp-field-label>
-                  </div>
-                  <span
-                    style="font-size:var(--spectrum-font-size-50, 11px);color:var(--fg-dim);word-break:break-all"
-                    >${className}</span
-                  >
-                </div>`
-              : nothing}
+            ${
+              className
+                ? html`<div class="style-row">
+                    <div class="style-row-label">
+                      <sp-field-label size="s">Class</sp-field-label>
+                    </div>
+                    <span
+                      style="font-size:var(--spectrum-font-size-50, 11px);color:var(--fg-dim);word-break:break-all"
+                      >${className}</span
+                    >
+                  </div>`
+                : nothing
+            }
             <div style="font-size:10px;color:var(--fg-dim);padding:4px 0;font-style:italic">
               This element is part of the page layout. Edit it by opening the layout file.
             </div>
@@ -1326,16 +1362,18 @@ export function renderPropertiesPanelTemplate(ctx: {
         </div>
         <div class="style-row" data-prop="$id">
           <div class="style-row-label">
-            ${node.$id
-              ? html`<span
-                  class="set-dot"
-                  title="Clear $id"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "$id"));
-                  }}
-                ></span>`
-              : nothing}
+            ${
+              node.$id
+                ? html`<span
+                    class="set-dot"
+                    title="Clear $id"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "$id"));
+                    }}
+                  ></span>`
+                : nothing
+            }
             <sp-field-label size="s">ID</sp-field-label>
           </div>
           ${spTextField("prop:$id", String(node.$id || ""), (v: string) =>
@@ -1346,16 +1384,20 @@ export function renderPropertiesPanelTemplate(ctx: {
         </div>
         <div class="style-row" data-prop="className">
           <div class="style-row-label">
-            ${node.className
-              ? html`<span
-                  class="set-dot"
-                  title="Clear class"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "className"));
-                  }}
-                ></span>`
-              : nothing}
+            ${
+              node.className
+                ? html`<span
+                    class="set-dot"
+                    title="Clear class"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      transactDoc(activeTab.value, (t) =>
+                        mutateUpdateProperty(t, path, "className"),
+                      );
+                    }}
+                  ></span>`
+                : nothing
+            }
             <sp-field-label size="s">Class</sp-field-label>
           </div>
           ${spTextField("prop:className", String(node.className || ""), (v: string) =>
@@ -1364,41 +1406,47 @@ export function renderPropertiesPanelTemplate(ctx: {
             ),
           )}
         </div>
-        ${!Array.isArray(node.children) || node.children.length === 0
-          ? html`
-              <div class="style-row" data-prop="textContent">
-                <div class="style-row-label">
-                  ${node.textContent !== undefined
-                    ? html`<span
-                        class="set-dot"
-                        title="Clear text"
-                        @click=${(e: Event) => {
-                          e.stopPropagation();
-                          transactDoc(activeTab.value, (t) =>
-                            mutateUpdateProperty(t, path, "textContent"),
-                          );
-                        }}
-                      ></span>`
-                    : nothing}
-                  <sp-field-label size="s">Text Content</sp-field-label>
-                  ${textSlot.modeButton}
+        ${
+          !Array.isArray(node.children) || node.children.length === 0
+            ? html`
+                <div class="style-row" data-prop="textContent">
+                  <div class="style-row-label">
+                    ${
+                      node.textContent !== undefined
+                        ? html`<span
+                            class="set-dot"
+                            title="Clear text"
+                            @click=${(e: Event) => {
+                              e.stopPropagation();
+                              transactDoc(activeTab.value, (t) =>
+                                mutateUpdateProperty(t, path, "textContent"),
+                              );
+                            }}
+                          ></span>`
+                        : nothing
+                    }
+                    <sp-field-label size="s">Text Content</sp-field-label>
+                    ${textSlot.modeButton}
+                  </div>
+                  ${textSlot.widget}
                 </div>
-                ${textSlot.widget}
-              </div>
-            `
-          : nothing}
+              `
+            : nothing
+        }
         <div class="style-row" data-prop="hidden">
           <div class="style-row-label">
-            ${node.hidden
-              ? html`<span
-                  class="set-dot"
-                  title="Clear hidden"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "hidden"));
-                  }}
-                ></span>`
-              : nothing}
+            ${
+              node.hidden
+                ? html`<span
+                    class="set-dot"
+                    title="Clear hidden"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "hidden"));
+                    }}
+                  ></span>`
+                : nothing
+            }
             <sp-field-label size="s">Hidden</sp-field-label>
           </div>
           <sp-checkbox
@@ -1450,35 +1498,42 @@ export function renderPropertiesPanelTemplate(ctx: {
           return html`
             <sp-accordion-item label="Observed Attributes" ?open=${isSectionOpen("__observed")}>
               <div class="style-section-body">
-                ${entries.length === 0
-                  ? html`<div class="empty-state">
-                      No attributes declared. Set "attribute" on a state entry.
-                    </div>`
-                  : entries.map(([key, d]) => {
-                      const def = d as Record<string, unknown>;
-                      return html`
-                        <div
-                          style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:var(--spectrum-font-size-50, 11px)"
-                        >
-                          <code style="font-family:var(--font-mono);color:var(--accent)"
-                            >${def.attribute}</code
+                ${
+                  entries.length === 0
+                    ? html`<div class="empty-state">
+                        No attributes declared. Set "attribute" on a state entry.
+                      </div>`
+                    : entries.map(([key, d]) => {
+                        const def = d as Record<string, unknown>;
+                        return html`
+                          <div
+                            style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:var(--spectrum-font-size-50, 11px)"
                           >
-                          <span style="color:var(--fg-dim)"> → </span>
-                          <span>${key}</span>
-                          ${def.type
-                            ? html`<span style="margin-left:auto;color:var(--fg-dim);font-size:10px"
-                                >${def.type}</span
-                              >`
-                            : nothing}
-                          ${def.reflects
-                            ? html`<span
-                                style="font-size:9px;background:var(--hover-bg);padding:1px 4px;border-radius:var(--radius)"
-                                >reflects</span
-                              >`
-                            : nothing}
-                        </div>
-                      `;
-                    })}
+                            <code style="font-family:var(--font-mono);color:var(--accent)"
+                              >${def.attribute}</code
+                            >
+                            <span style="color:var(--fg-dim)"> → </span>
+                            <span>${key}</span>
+                            ${
+                              def.type
+                                ? html`<span
+                                    style="margin-left:auto;color:var(--fg-dim);font-size:10px"
+                                    >${def.type}</span
+                                  >`
+                                : nothing
+                            }
+                            ${
+                              def.reflects
+                                ? html`<span
+                                    style="font-size:9px;background:var(--hover-bg);padding:1px 4px;border-radius:var(--radius)"
+                                    >reflects</span
+                                  >`
+                                : nothing
+                            }
+                          </div>
+                        `;
+                      })
+                }
               </div>
             </sp-accordion-item>
           `;
@@ -1508,9 +1563,11 @@ export function renderPropertiesPanelTemplate(ctx: {
           ?open=${isSectionOpen(sec.key)}
           @sp-accordion-item-toggle=${() => toggleSection(sec.key)}
         >
-          ${hasAnySet
-            ? html`<span slot="heading" class="set-dot set-dot--section"></span>`
-            : nothing}
+          ${
+            hasAnySet
+              ? html`<span slot="heading" class="set-dot set-dot--section"></span>`
+              : nothing
+          }
           <div class="style-section-body">
             ${sectionAttrs.map((a: { name: string; entry: HtmlMetaEntry }) =>
               renderAttrRow(a.name, a.entry, attrs[a.name]),
@@ -1528,9 +1585,11 @@ export function renderPropertiesPanelTemplate(ctx: {
             ?open=${isSectionOpen("__custom")}
             @sp-accordion-item-toggle=${() => toggleSection("__custom")}
           >
-            ${customAttrs.length > 0
-              ? html`<span slot="heading" class="set-dot set-dot--section"></span>`
-              : nothing}
+            ${
+              customAttrs.length > 0
+                ? html`<span slot="heading" class="set-dot set-dot--section"></span>`
+                : nothing
+            }
             <div class="style-section-body">
               ${renderCustomAttrsFieldsTemplate(node, path, attrs, knownAttrNames)}
             </div>

@@ -141,9 +141,11 @@ export function renderCssVarsEditor(container: HTMLElement) {
       )}
       ${renderFontSection(groups.font, updateVar, deleteVar, addVar)}
       ${renderSizeSection(groups.size, updateVar, deleteVar, addVar, rootStyle, mediaNames)}
-      ${groups.other.length > 0
-        ? renderOtherSection(groups.other, updateVar, deleteVar, addVar, rootStyle, mediaNames)
-        : nothing}
+      ${
+        groups.other.length > 0
+          ? renderOtherSection(groups.other, updateVar, deleteVar, addVar, rootStyle, mediaNames)
+          : nothing
+      }
     </div>
   `;
 
@@ -196,18 +198,20 @@ function renderColorSection(
         `,
       )}
       ${renderAddRow("--color-", "Primary Blue", "#3b82f6", addVar)}
-      ${schemeEntries.length === 0
-        ? html`
-            <sp-action-button
-              size="s"
-              class="css-vars-enable-dark"
-              title="Add a dark color scheme: declares --dark in $media so every color token can carry a dark value"
-              @click=${enableDarkScheme}
-            >
-              Enable dark scheme
-            </sp-action-button>
-          `
-        : nothing}
+      ${
+        schemeEntries.length === 0
+          ? html`
+              <sp-action-button
+                size="s"
+                class="css-vars-enable-dark"
+                title="Add a dark color scheme: declares --dark in $media so every color token can carry a dark value"
+                @click=${enableDarkScheme}
+              >
+                Enable dark scheme
+              </sp-action-button>
+            `
+          : nothing
+      }
     </div>
   `;
 }
@@ -316,10 +320,12 @@ function renderSizeSection(
         ([name, val]) => html`
           <div class="css-var-row">
             <span class="css-var-name"
-              >${varDisplayName(name, "--size-") ||
-              varDisplayName(name, "--spacing-") ||
-              varDisplayName(name, "--radius-") ||
-              name}</span
+              >${
+                varDisplayName(name, "--size-") ||
+                varDisplayName(name, "--spacing-") ||
+                varDisplayName(name, "--radius-") ||
+                name
+              }</span
             >
             <sp-textfield
               size="s"

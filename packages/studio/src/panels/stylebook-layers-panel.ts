@@ -71,11 +71,13 @@ export function renderStylebookLayersTemplate(ctx: {
             style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"
             >${entry.text || `<${tag}>`}</span
           >
-          ${hasTagStyle(rootStyle, tag)
-            ? html`<span
-                style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0"
-              ></span>`
-            : nothing}
+          ${
+            hasTagStyle(rootStyle, tag)
+              ? html`<span
+                  style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0"
+                ></span>`
+              : nothing
+          }
         </div>
         ${uniqueChildren.map((child: StylebookEntry) => renderEntryRow(child, depth + 1, fullPath))}
       `;

@@ -47,9 +47,11 @@ export function presenceChipsTemplate(tab: Tab | null): TemplateResult | typeof 
             class="jx-presence-chip"
             style="background:${peer.state.user.color}"
             title=${titleOf(peer, tab.documentPath)}
-            >${peer.state.user.avatarUrl
-              ? html`<img src=${peer.state.user.avatarUrl} alt=${initialOf(peer)} />`
-              : initialOf(peer)}</span
+            >${
+              peer.state.user.avatarUrl
+                ? html`<img src=${peer.state.user.avatarUrl} alt=${initialOf(peer)} />`
+                : initialOf(peer)
+            }</span
           >
         `,
       )}

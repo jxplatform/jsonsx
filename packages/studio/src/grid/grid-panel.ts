@@ -81,26 +81,30 @@ function toolbarTpl(controller: GridController, getView: () => GridView | null) 
         Refresh
       </sp-action-button>
       <sp-divider size="s" vertical></sp-divider>
-      ${controller.source.capabilities.insert
-        ? html`<sp-action-button
-            size="s"
-            quiet
-            title="Add a row (saved on Save)"
-            @click=${() => controller.addRow()}
-          >
-            Add Row
-          </sp-action-button>`
-        : nothing}
-      ${controller.source.capabilities.delete
-        ? html`<sp-action-button
-            size="s"
-            quiet
-            title="Mark selected rows for deletion"
-            @click=${() => controller.deleteRows(getView()?.getSelectedRowKeys() ?? [])}
-          >
-            Delete Rows
-          </sp-action-button>`
-        : nothing}
+      ${
+        controller.source.capabilities.insert
+          ? html`<sp-action-button
+              size="s"
+              quiet
+              title="Add a row (saved on Save)"
+              @click=${() => controller.addRow()}
+            >
+              Add Row
+            </sp-action-button>`
+          : nothing
+      }
+      ${
+        controller.source.capabilities.delete
+          ? html`<sp-action-button
+              size="s"
+              quiet
+              title="Mark selected rows for deletion"
+              @click=${() => controller.deleteRows(getView()?.getSelectedRowKeys() ?? [])}
+            >
+              Delete Rows
+            </sp-action-button>`
+          : nothing
+      }
       <sp-action-button
         size="s"
         quiet
@@ -127,11 +131,13 @@ function toolbarTpl(controller: GridController, getView: () => GridView | null) 
       <span class="jx-grid-spacer"></span>
       ${lossyNote} ${controller.source.capabilities.remotePaging ? pagerTpl(controller) : nothing}
       <span class="jx-grid-count">
-        ${state.loading
-          ? "Loading…"
-          : state.error
-            ? html`<span class="jx-grid-error-text">${state.error}</span>`
-            : `${state.total} row${state.total === 1 ? "" : "s"}`}
+        ${
+          state.loading
+            ? "Loading…"
+            : state.error
+              ? html`<span class="jx-grid-error-text">${state.error}</span>`
+              : `${state.total} row${state.total === 1 ? "" : "s"}`
+        }
       </span>
     </div>
   `;

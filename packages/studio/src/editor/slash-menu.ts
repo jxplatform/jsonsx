@@ -177,42 +177,49 @@ function render(showFilter: boolean) {
         ${ref((el) => {
           _popoverEl = (el as HTMLElement | undefined) || null;
         })}
-        style="position:fixed;left:${rect.left}px;top:${rect.bottom +
-        4}px;z-index:9999;max-height:320px;overflow-y:auto"
+        style="position:fixed;left:${rect.left}px;top:${
+          rect.bottom + 4
+        }px;z-index:9999;max-height:320px;overflow-y:auto"
       >
-        ${showFilter
-          ? html`<input
-              class="slash-filter"
-              type="text"
-              placeholder="Filter…"
-              autocomplete="off"
-              style="display:block;width:100%;box-sizing:border-box;padding:6px 10px;border:none;border-bottom:1px solid var(--border, #444);outline:none;font-size:13px;background:transparent;color:inherit"
-              ${ref((el) => {
-                _filterEl = (el as HTMLInputElement | undefined) || null;
-              })}
-              @input=${onFilterInput}
-            />`
-          : nothing}
+        ${
+          showFilter
+            ? html`<input
+                class="slash-filter"
+                type="text"
+                placeholder="Filter…"
+                autocomplete="off"
+                style="display:block;width:100%;box-sizing:border-box;padding:6px 10px;border:none;border-bottom:1px solid var(--border, #444);outline:none;font-size:13px;background:transparent;color:inherit"
+                ${ref((el) => {
+                  _filterEl = (el as HTMLInputElement | undefined) || null;
+                })}
+                @input=${onFilterInput}
+              />`
+            : nothing
+        }
         <sp-menu style="min-width:220px">
-          ${filteredItems.length > 0
-            ? filteredItems.map(
-                (cmd, i) => html`
-                  <sp-menu-item
-                    ?focused=${i === 0}
-                    @click=${(e: Event) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      select(cmd);
-                    }}
-                  >
-                    ${cmd.label}
-                    ${cmd.description
-                      ? html`<span slot="description">${cmd.description}</span>`
-                      : nothing}
-                  </sp-menu-item>
-                `,
-              )
-            : html`<sp-menu-item disabled>No matches</sp-menu-item>`}
+          ${
+            filteredItems.length > 0
+              ? filteredItems.map(
+                  (cmd, i) => html`
+                    <sp-menu-item
+                      ?focused=${i === 0}
+                      @click=${(e: Event) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        select(cmd);
+                      }}
+                    >
+                      ${cmd.label}
+                      ${
+                        cmd.description
+                          ? html`<span slot="description">${cmd.description}</span>`
+                          : nothing
+                      }
+                    </sp-menu-item>
+                  `,
+                )
+              : html`<sp-menu-item disabled>No matches</sp-menu-item>`
+          }
         </sp-menu>
       </sp-popover>
     `,

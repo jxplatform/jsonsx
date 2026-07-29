@@ -147,18 +147,20 @@ export async function openGridSourcePicker(): Promise<void> {
           (conn) =>
             html`<sp-menu-group>
               <span slot="header">Data · ${conn.name}</span>
-              ${conn.tables.length === 0
-                ? html`<sp-menu-item disabled>No tables — push a schema first</sp-menu-item>`
-                : conn.tables.map(
-                    (table) =>
-                      html`<sp-menu-item
-                        @click=${() => {
-                          handle.close();
-                          openConnectorGrid(conn.name, table);
-                        }}
-                        >${table}</sp-menu-item
-                      >`,
-                  )}
+              ${
+                conn.tables.length === 0
+                  ? html`<sp-menu-item disabled>No tables — push a schema first</sp-menu-item>`
+                  : conn.tables.map(
+                      (table) =>
+                        html`<sp-menu-item
+                          @click=${() => {
+                            handle.close();
+                            openConnectorGrid(conn.name, table);
+                          }}
+                          >${table}</sp-menu-item
+                        >`,
+                    )
+              }
             </sp-menu-group>`,
         )}
       </sp-menu>

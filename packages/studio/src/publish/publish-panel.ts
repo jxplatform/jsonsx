@@ -258,22 +258,26 @@ function statusTpl(deploy: DeployConfig) {
   return html`
     <p>
       Connected to Pages project <strong>${deploy.projectName}</strong>
-      ${deploy.productionUrl
-        ? html` —
-            <a href=${deploy.productionUrl} target="_blank" rel="noreferrer">
-              ${deploy.productionUrl}
-            </a>`
-        : ""}
+      ${
+        deploy.productionUrl
+          ? html` —
+              <a href=${deploy.productionUrl} target="_blank" rel="noreferrer">
+                ${deploy.productionUrl}
+              </a>`
+          : ""
+      }
     </p>
-    ${_deployment
-      ? html`
-          <p>
-            Latest deployment: <strong>${_deployment.stage}: ${_deployment.status}</strong>
-            (${_deployment.environment}) —
-            <a href=${_deployment.url} target="_blank" rel="noreferrer">preview</a>
-          </p>
-        `
-      : html`<p>No deployments yet — the first commit after connecting triggers one.</p>`}
+    ${
+      _deployment
+        ? html`
+            <p>
+              Latest deployment: <strong>${_deployment.stage}: ${_deployment.status}</strong>
+              (${_deployment.environment}) —
+              <a href=${_deployment.url} target="_blank" rel="noreferrer">preview</a>
+            </p>
+          `
+        : html`<p>No deployments yet — the first commit after connecting triggers one.</p>`
+    }
     <p class="publish-hint">Publishing happens automatically on every commit.</p>
     <div class="publish-actions">
       <sp-button variant="secondary" ?disabled=${_busy} @click=${() => void loadConnection()}>
@@ -313,11 +317,13 @@ function errorTpl() {
   return html`
     <p class="publish-error">
       ${_error}
-      ${needsPagesApp
-        ? html` — if the Cloudflare Pages GitHub App is not installed on the repository,
-            <a href=${PAGES_APP_INSTALL_URL} target="_blank" rel="noreferrer">install it</a> and
-            retry.`
-        : ""}
+      ${
+        needsPagesApp
+          ? html` — if the Cloudflare Pages GitHub App is not installed on the repository,
+              <a href=${PAGES_APP_INSTALL_URL} target="_blank" rel="noreferrer">install it</a> and
+              retry.`
+          : ""
+      }
     </p>
   `;
 }

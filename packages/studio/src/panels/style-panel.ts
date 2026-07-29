@@ -154,38 +154,42 @@ function renderShorthandRow(
   return html`
     <div class="style-row" data-prop=${shortProp}>
       <div class="style-row-label">
-        ${hasAnyVal
-          ? html`<span
-              class="set-dot"
-              title="Clear ${shortProp}"
-              @click=${(e: Event) => {
-                e.stopPropagation();
-                transactDoc(activeTab.value, (t) => {
-                  if (shortVal !== undefined) {
-                    mutateFn(t, shortProp);
-                  }
-                  for (const l of longhands) {
-                    if (style[l.name] !== undefined) {
-                      mutateFn(t, l.name);
+        ${
+          hasAnyVal
+            ? html`<span
+                class="set-dot"
+                title="Clear ${shortProp}"
+                @click=${(e: Event) => {
+                  e.stopPropagation();
+                  transactDoc(activeTab.value, (t) => {
+                    if (shortVal !== undefined) {
+                      mutateFn(t, shortProp);
                     }
-                  }
-                });
-              }}
-            ></span>`
-          : nothing}
+                    for (const l of longhands) {
+                      if (style[l.name] !== undefined) {
+                        mutateFn(t, l.name);
+                      }
+                    }
+                  });
+                }}
+              ></span>`
+            : nothing
+        }
         <sp-field-label size="s" title=${shortProp}>${propLabel(entry, shortProp)}</sp-field-label>
       </div>
       <div class="style-shorthand-header">
         <sp-textfield
           size="s"
           .value=${live(shortVal || "")}
-          placeholder=${!shortVal && hasLonghands
-            ? longhands.map((l: CssLonghand) => style[l.name] || "0").join(" ")
-            : !shortVal && inherited[shortProp]
-              ? inherited[shortProp]
-              : !shortVal && longhands.some((l: CssLonghand) => inherited[l.name])
-                ? longhands.map((l: CssLonghand) => inherited[l.name] || "0").join(" ")
-                : ""}
+          placeholder=${
+            !shortVal && hasLonghands
+              ? longhands.map((l: CssLonghand) => style[l.name] || "0").join(" ")
+              : !shortVal && inherited[shortProp]
+                ? inherited[shortProp]
+                : !shortVal && longhands.some((l: CssLonghand) => inherited[l.name])
+                  ? longhands.map((l: CssLonghand) => inherited[l.name] || "0").join(" ")
+                  : ""
+          }
           @input=${debouncedStyleCommit(`short:${shortProp}`, 400, (e: Event) => {
             transactDoc(activeTab.value, (t) => {
               for (const l of longhands) {
@@ -208,80 +212,89 @@ function renderShorthandRow(
             };
           }}
         >
-          ${isExpanded
-            ? html`<sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>`
-            : html`<sp-icon-chevron-right slot="icon"></sp-icon-chevron-right>`}
+          ${
+            isExpanded
+              ? html`<sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>`
+              : html`<sp-icon-chevron-right slot="icon"></sp-icon-chevron-right>`
+          }
         </sp-action-button>
       </div>
     </div>
-    ${isExpanded
-      ? (() => {
-          const isBorderSide = (entry as Record<string, unknown>).$shorthandType === "border-side";
-          const expanded = shortVal
-            ? isBorderSide
-              ? expandBorderSide(shortVal as string)
-              : expandShorthand(shortVal as string, longhands.length)
-            : null;
-          const compress = isBorderSide ? compressBorderSide : compressShorthand;
-          const emptyVal = isBorderSide ? "" : "0";
-          return longhands.map(({ name, entry: lEntry }: CssLonghand, idx: number) => {
-            const lVal = style[name] ?? (expanded ? expanded[idx] : "");
-            return html`
-              <div class="style-row style-row--child" data-prop=${name}>
-                <div class="style-row-label">
-                  ${lVal !== undefined && lVal !== ""
-                    ? html`<span
-                        class="set-dot"
-                        title="Clear ${name}"
-                        @click=${(e: Event) => {
-                          e.stopPropagation();
-                          const vals = longhands.map((l: CssLonghand, i: number) =>
-                            i === idx
-                              ? emptyVal
-                              : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
-                          );
-                          transactDoc(activeTab.value, (t) => {
-                            for (const l of longhands) {
-                              if (style[l.name] !== undefined) {
-                                mutateFn(t, l.name);
-                              }
-                            }
-                            mutateFn(t, shortProp, compress(vals as string[]));
-                          });
-                        }}
-                      ></span>`
-                    : nothing}
-                  <sp-field-label size="s" title=${name}>${propLabel(lEntry, name)}</sp-field-label>
-                </div>
-                ${widgetForType(
-                  inferInputType(lEntry),
-                  lEntry,
-                  name,
-                  lVal as string,
-                  (newVal: string) => {
-                    const vals = longhands.map((l: CssLonghand, i: number) =>
-                      i === idx
-                        ? newVal || emptyVal
-                        : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
-                    );
-                    transactDoc(activeTab.value, (t) => {
-                      for (const l of longhands) {
-                        if (style[l.name] !== undefined) {
-                          mutateFn(t, l.name);
+    ${
+      isExpanded
+        ? (() => {
+            const isBorderSide =
+              (entry as Record<string, unknown>).$shorthandType === "border-side";
+            const expanded = shortVal
+              ? isBorderSide
+                ? expandBorderSide(shortVal as string)
+                : expandShorthand(shortVal as string, longhands.length)
+              : null;
+            const compress = isBorderSide ? compressBorderSide : compressShorthand;
+            const emptyVal = isBorderSide ? "" : "0";
+            return longhands.map(({ name, entry: lEntry }: CssLonghand, idx: number) => {
+              const lVal = style[name] ?? (expanded ? expanded[idx] : "");
+              return html`
+                <div class="style-row style-row--child" data-prop=${name}>
+                  <div class="style-row-label">
+                    ${
+                      lVal !== undefined && lVal !== ""
+                        ? html`<span
+                            class="set-dot"
+                            title="Clear ${name}"
+                            @click=${(e: Event) => {
+                              e.stopPropagation();
+                              const vals = longhands.map((l: CssLonghand, i: number) =>
+                                i === idx
+                                  ? emptyVal
+                                  : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
+                              );
+                              transactDoc(activeTab.value, (t) => {
+                                for (const l of longhands) {
+                                  if (style[l.name] !== undefined) {
+                                    mutateFn(t, l.name);
+                                  }
+                                }
+                                mutateFn(t, shortProp, compress(vals as string[]));
+                              });
+                            }}
+                          ></span>`
+                        : nothing
+                    }
+                    <sp-field-label size="s" title=${name}
+                      >${propLabel(lEntry, name)}</sp-field-label
+                    >
+                  </div>
+                  ${widgetForType(
+                    inferInputType(lEntry),
+                    lEntry,
+                    name,
+                    lVal as string,
+                    (newVal: string) => {
+                      const vals = longhands.map((l: CssLonghand, i: number) =>
+                        i === idx
+                          ? newVal || emptyVal
+                          : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
+                      );
+                      transactDoc(activeTab.value, (t) => {
+                        for (const l of longhands) {
+                          if (style[l.name] !== undefined) {
+                            mutateFn(t, l.name);
+                          }
                         }
-                      }
-                      mutateFn(t, shortProp, compress(vals as string[]));
-                    });
-                  },
-                  {
-                    placeholder: !lVal && inherited[name] ? String(inherited[name]) : "",
-                  },
-                )}
-              </div>
-            `;
-          });
-        })()
-      : nothing}
+                        mutateFn(t, shortProp, compress(vals as string[]));
+                      });
+                    },
+                    {
+                      placeholder: !lVal && inherited[name] ? String(inherited[name]) : "",
+                    },
+                  )}
+                </div>
+              `;
+            });
+          })()
+        : nothing
+    }
   `;
 }
 
@@ -419,12 +432,14 @@ function styleSidebarTemplate(
           <sp-menu-item value=${s}>${existingSet.has(s) ? `${s}  \u25CF` : s}</sp-menu-item>
         `,
       )}
-      ${extraSelectors.length > 0
-        ? html`
-            <sp-menu-divider></sp-menu-divider>
-            ${extraSelectors.map((s) => html` <sp-menu-item value=${s}>${s} ●</sp-menu-item> `)}
-          `
-        : nothing}
+      ${
+        extraSelectors.length > 0
+          ? html`
+              <sp-menu-divider></sp-menu-divider>
+              ${extraSelectors.map((s) => html` <sp-menu-item value=${s}>${s} ●</sp-menu-item> `)}
+            `
+          : nothing
+      }
       <sp-menu-divider></sp-menu-divider>
       <sp-menu-item value="__add_custom__">+ Add custom…</sp-menu-item>
     </sp-picker>
@@ -628,35 +643,37 @@ function styleSidebarTemplate(
               };
             }}
           >
-            ${sectionActiveProps.length > 0
-              ? html`
-                  <span slot="heading" style="display:flex;align-items:center;gap:6px">
-                    ${sec.label}
-                    <span
-                      class="set-dot set-dot--section"
-                      title="Clear all ${sec.label.toLowerCase()} properties"
-                      @click=${(e: Event) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        transactDoc(activeTab.value, (t) => {
-                          for (const { prop, entry } of sectionActiveProps) {
-                            if (activeStyle[prop] !== undefined) {
-                              commitMutate(t, prop);
-                            }
-                            if (inferInputType(entry) === "shorthand") {
-                              for (const l of getLonghands(prop) as CssLonghand[]) {
-                                if (activeStyle[l.name] !== undefined) {
-                                  commitMutate(t, l.name);
+            ${
+              sectionActiveProps.length > 0
+                ? html`
+                    <span slot="heading" style="display:flex;align-items:center;gap:6px">
+                      ${sec.label}
+                      <span
+                        class="set-dot set-dot--section"
+                        title="Clear all ${sec.label.toLowerCase()} properties"
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          transactDoc(activeTab.value, (t) => {
+                            for (const { prop, entry } of sectionActiveProps) {
+                              if (activeStyle[prop] !== undefined) {
+                                commitMutate(t, prop);
+                              }
+                              if (inferInputType(entry) === "shorthand") {
+                                for (const l of getLonghands(prop) as CssLonghand[]) {
+                                  if (activeStyle[l.name] !== undefined) {
+                                    commitMutate(t, l.name);
+                                  }
                                 }
                               }
                             }
-                          }
-                        });
-                      }}
-                    ></span>
-                  </span>
-                `
-              : nothing}
+                          });
+                        }}
+                      ></span>
+                    </span>
+                  `
+                : nothing
+            }
           </sp-accordion-item>
         `;
       }
@@ -736,35 +753,37 @@ function styleSidebarTemplate(
             };
           }}
         >
-          ${sectionActiveProps.length > 0
-            ? html`
-                <span slot="heading" style="display:flex;align-items:center;gap:6px">
-                  ${sec.label}
-                  <span
-                    class="set-dot set-dot--section"
-                    title="Clear all ${sec.label.toLowerCase()} properties"
-                    @click=${(e: Event) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      transactDoc(activeTab.value, (t) => {
-                        for (const { prop, entry } of sectionActiveProps) {
-                          if (activeStyle[prop] !== undefined) {
-                            commitMutate(t, prop);
-                          }
-                          if (inferInputType(entry) === "shorthand") {
-                            for (const l of getLonghands(prop) as CssLonghand[]) {
-                              if (activeStyle[l.name] !== undefined) {
-                                commitMutate(t, l.name);
+          ${
+            sectionActiveProps.length > 0
+              ? html`
+                  <span slot="heading" style="display:flex;align-items:center;gap:6px">
+                    ${sec.label}
+                    <span
+                      class="set-dot set-dot--section"
+                      title="Clear all ${sec.label.toLowerCase()} properties"
+                      @click=${(e: Event) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        transactDoc(activeTab.value, (t) => {
+                          for (const { prop, entry } of sectionActiveProps) {
+                            if (activeStyle[prop] !== undefined) {
+                              commitMutate(t, prop);
+                            }
+                            if (inferInputType(entry) === "shorthand") {
+                              for (const l of getLonghands(prop) as CssLonghand[]) {
+                                if (activeStyle[l.name] !== undefined) {
+                                  commitMutate(t, l.name);
+                                }
                               }
                             }
                           }
-                        }
-                      });
-                    }}
-                  ></span>
-                </span>
-              `
-            : nothing}
+                        });
+                      }}
+                    ></span>
+                  </span>
+                `
+              : nothing
+          }
           <div class=${sec.$layout === "grid" ? "style-section-body--grid" : ""}>${rows}</div>
         </sp-accordion-item>
       `;

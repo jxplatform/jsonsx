@@ -317,15 +317,17 @@ export function renderFilesTemplate({
   }
 
   return html`
-    ${projectState.isSiteProject
-      ? html`
-          <div class="project-header">
-            <span class="project-name"
-              >${projectState.projectConfig?.name || projectState.name}</span
-            >
-          </div>
-        `
-      : nothing}
+    ${
+      projectState.isSiteProject
+        ? html`
+            <div class="project-header">
+              <span class="project-name"
+                >${projectState.projectConfig?.name || projectState.name}</span
+              >
+            </div>
+          `
+        : nothing
+    }
     <div class="files-toolbar">
       <sp-action-group size="xs" compact quiet>
         <sp-action-button
@@ -437,15 +439,19 @@ function renderTreeLevelTemplate(
           showFileContextMenu(e, entry, ctx);
         }}
       >
-        ${isDir
-          ? html`<span class="file-tree-toggle">${isExpanded ? "\u25BC" : "\u25B6"}</span>`
-          : html`<span class="file-tree-toggle empty"> </span>`}
+        ${
+          isDir
+            ? html`<span class="file-tree-toggle">${isExpanded ? "\u25BC" : "\u25B6"}</span>`
+            : html`<span class="file-tree-toggle empty"> </span>`
+        }
         <span class="file-tree-icon">${fileTypeIconTpl(entry.path, entry.type)}</span>
         <span class="file-tree-name">${entry.name}</span>
       </div>
-      ${isDir && isExpanded
-        ? html`<div role="group">${renderTreeLevelTemplate(entry.path, depth + 1, ctx)}</div>`
-        : nothing}
+      ${
+        isDir && isExpanded
+          ? html`<div role="group">${renderTreeLevelTemplate(entry.path, depth + 1, ctx)}</div>`
+          : nothing
+      }
     `;
   });
 }

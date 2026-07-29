@@ -56,43 +56,47 @@ export function renderButtonGroup(
               ?selected=${v === value}
               @click=${() => onChange(v === value ? "" : v)}
             >
-              ${iconMap[v] && (icons as Record<string, unknown>)[iconMap[v]]
-                ? (icons as Record<string, unknown>)[iconMap[v]]
-                : abbreviateValue(v)}
+              ${
+                iconMap[v] && (icons as Record<string, unknown>)[iconMap[v]]
+                  ? (icons as Record<string, unknown>)[iconMap[v]]
+                  : abbreviateValue(v)
+              }
             </sp-action-button>
           `,
         )}
       </sp-action-group>
-      ${hasExtra
-        ? html`
-            <sp-picker-button
-              size="s"
-              id=${menuId}
-              class=${classMap({ "has-selection": extraSelected })}
-            ></sp-picker-button>
-            <sp-overlay trigger="${menuId}@click" placement="bottom-end" type="auto">
-              <sp-popover>
-                <sp-menu
-                  @change=${(e: Event) => {
-                    if ((e.target as HTMLInputElement).value) {
-                      onChange((e.target as HTMLInputElement).value);
-                    }
-                  }}
-                >
-                  <sp-menu-item value="__none__">—</sp-menu-item>
-                  ${extra.map((v: string) => {
-                    const label = v.includes("-")
-                      ? kebabToLabel(v)
-                      : v.replace(/^./, (c: string) => c.toUpperCase());
-                    return html`<sp-menu-item value=${v} ?selected=${v === value}
-                      >${label}</sp-menu-item
-                    >`;
-                  })}
-                </sp-menu>
-              </sp-popover>
-            </sp-overlay>
-          `
-        : nothing}
+      ${
+        hasExtra
+          ? html`
+              <sp-picker-button
+                size="s"
+                id=${menuId}
+                class=${classMap({ "has-selection": extraSelected })}
+              ></sp-picker-button>
+              <sp-overlay trigger="${menuId}@click" placement="bottom-end" type="auto">
+                <sp-popover>
+                  <sp-menu
+                    @change=${(e: Event) => {
+                      if ((e.target as HTMLInputElement).value) {
+                        onChange((e.target as HTMLInputElement).value);
+                      }
+                    }}
+                  >
+                    <sp-menu-item value="__none__">—</sp-menu-item>
+                    ${extra.map((v: string) => {
+                      const label = v.includes("-")
+                        ? kebabToLabel(v)
+                        : v.replace(/^./, (c: string) => c.toUpperCase());
+                      return html`<sp-menu-item value=${v} ?selected=${v === value}
+                        >${label}</sp-menu-item
+                      >`;
+                    })}
+                  </sp-menu>
+                </sp-popover>
+              </sp-overlay>
+            `
+          : nothing
+      }
     </div>
   `;
 }

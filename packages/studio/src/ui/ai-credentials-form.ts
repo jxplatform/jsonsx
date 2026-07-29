@@ -123,14 +123,16 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
         style="display:flex;flex-direction:column;gap:10px;max-width:320px;text-align:left"
       >
         <div style="font-weight:600;align-self:center">AI provider key</div>
-        ${opts.intro === undefined
-          ? html`
-              <div style="font-size:11px;color:var(--fg-dim)">
-                Any OpenAI-compatible key works. Stored locally in this browser; sent only to the
-                Studio proxy (never to a third party except your chosen endpoint).
-              </div>
-            `
-          : html`<div style="font-size:11px;color:var(--fg-dim)">${opts.intro}</div>`}
+        ${
+          opts.intro === undefined
+            ? html`
+                <div style="font-size:11px;color:var(--fg-dim)">
+                  Any OpenAI-compatible key works. Stored locally in this browser; sent only to the
+                  Studio proxy (never to a third party except your chosen endpoint).
+                </div>
+              `
+            : html`<div style="font-size:11px;color:var(--fg-dim)">${opts.intro}</div>`
+        }
         <input
           type="password"
           style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
@@ -141,46 +143,52 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
           }}
         />
         <div style="font-weight:500;font-size:11px;margin-top:4px">Model</div>
-        ${availableModels.length > 0
-          ? html`
-              <sp-combobox
-                size="s"
-                allows-custom-value
-                .value=${modelDraft}
-                @change=${(e: Event) => {
-                  modelDraft = (e.target as HTMLInputElement).value;
-                }}
-                @input=${(e: Event) => {
-                  modelDraft = (e.target as HTMLInputElement).value;
-                }}
-              >
-                ${availableModels.map(
-                  (m) => html`<sp-menu-item value=${m.id}>${m.name}</sp-menu-item>`,
-                )}
-              </sp-combobox>
-            `
-          : html`
-              <input
-                type="text"
-                style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
-                placeholder="Model ID (e.g. gpt-4o, claude-sonnet-4-20250514, etc.)"
-                .value=${modelDraft}
-                @input=${(e: Event) => {
-                  modelDraft = (e.target as HTMLInputElement).value;
-                }}
-              />
-            `}
+        ${
+          availableModels.length > 0
+            ? html`
+                <sp-combobox
+                  size="s"
+                  allows-custom-value
+                  .value=${modelDraft}
+                  @change=${(e: Event) => {
+                    modelDraft = (e.target as HTMLInputElement).value;
+                  }}
+                  @input=${(e: Event) => {
+                    modelDraft = (e.target as HTMLInputElement).value;
+                  }}
+                >
+                  ${availableModels.map(
+                    (m) => html`<sp-menu-item value=${m.id}>${m.name}</sp-menu-item>`,
+                  )}
+                </sp-combobox>
+              `
+            : html`
+                <input
+                  type="text"
+                  style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
+                  placeholder="Model ID (e.g. gpt-4o, claude-sonnet-4-20250514, etc.)"
+                  .value=${modelDraft}
+                  @input=${(e: Event) => {
+                    modelDraft = (e.target as HTMLInputElement).value;
+                  }}
+                />
+              `
+        }
         <div style="display:flex;gap:8px;align-items:center">
           <sp-button size="s" variant="secondary" ?disabled=${modelsLoading} @click=${fetchModels}>
-            ${modelsLoading
-              ? "Fetching…"
-              : availableModels.length > 0
-                ? "Refresh models"
-                : "Fetch models"}
+            ${
+              modelsLoading
+                ? "Fetching…"
+                : availableModels.length > 0
+                  ? "Refresh models"
+                  : "Fetch models"
+            }
           </sp-button>
-          ${modelsError
-            ? html`<span style="font-size:10px;color:var(--danger)">${modelsError}</span>`
-            : nothing}
+          ${
+            modelsError
+              ? html`<span style="font-size:10px;color:var(--danger)">${modelsError}</span>`
+              : nothing
+          }
         </div>
         <input
           type="text"
@@ -192,9 +200,11 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
           }}
         />
         <div style="display:flex;gap:8px;align-self:flex-end">
-          ${haveKey
-            ? html`<sp-button size="s" variant="secondary" @click=${cancel}>Cancel</sp-button>`
-            : nothing}
+          ${
+            haveKey
+              ? html`<sp-button size="s" variant="secondary" @click=${cancel}>Cancel</sp-button>`
+              : nothing
+          }
           <sp-button size="s" variant="primary" @click=${save}>Save</sp-button>
         </div>
       </div>

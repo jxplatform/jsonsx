@@ -490,11 +490,13 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
                   <sp-icon-delete slot="icon"></sp-icon-delete>
                 </sp-action-button>
               </div>
-              ${isExpanded
-                ? html`<div class="signal-editor">
-                    ${renderSignalEditorTemplate(S, name, def, ctx)}
-                  </div>`
-                : nothing}
+              ${
+                isExpanded
+                  ? html`<div class="signal-editor">
+                      ${renderSignalEditorTemplate(S, name, def, ctx)}
+                    </div>`
+                  : nothing
+              }
             `;
           })}
         </sp-accordion-item>
@@ -606,16 +608,22 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
           <sp-menu-item value="map">Map</sp-menu-item>
           <sp-menu-item value="formData">FormData</sp-menu-item>
           <sp-menu-item value="external">External Module…</sp-menu-item>
-          ${projectState?.projectConfig?.imports
-            ? html`<sp-menu-divider></sp-menu-divider>${Object.keys(
-                  projectState.projectConfig.imports,
-                ).map((k: string) => html`<sp-menu-item value="import:${k}">${k}</sp-menu-item>`)}`
-            : nothing}
-          ${extensionStateClasses().length > 0
-            ? html`<sp-menu-divider></sp-menu-divider>${extensionStateClasses().map(
-                  (cls) => html`<sp-menu-item value="ext:${cls.name}">${cls.name}</sp-menu-item>`,
-                )}`
-            : nothing}
+          ${
+            projectState?.projectConfig?.imports
+              ? html`<sp-menu-divider></sp-menu-divider>${Object.keys(
+                    projectState.projectConfig.imports,
+                  ).map(
+                    (k: string) => html`<sp-menu-item value="import:${k}">${k}</sp-menu-item>`,
+                  )}`
+              : nothing
+          }
+          ${
+            extensionStateClasses().length > 0
+              ? html`<sp-menu-divider></sp-menu-divider>${extensionStateClasses().map(
+                    (cls) => html`<sp-menu-item value="ext:${cls.name}">${cls.name}</sp-menu-item>`,
+                  )}`
+              : nothing
+          }
           <sp-menu-divider></sp-menu-divider>
           <sp-menu-item value="expression">Expression</sp-menu-item>
           <sp-menu-item value="function">Function</sp-menu-item>
@@ -736,43 +744,47 @@ function renderSignalEditorTemplate(
         def.type || "string",
         (v: string) => transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { type: v })),
       )}
-      ${def.type === "string" || !def.type
-        ? pickerRow("Format", ["", "image", "date", "color"], def.format || "", (v: string) =>
-            transactDoc(activeTab.value, (t) =>
-              mutateUpdateDef(t, name, { format: v || undefined }),
-            ),
-          )
-        : nothing}
-      ${def.format === "image"
-        ? renderFieldRow({
-            hasValue: false,
-            label: "Default",
-            prop: "Default",
-            widget: renderMediaPicker("default", defaultVal, (v: string) => {
+      ${
+        def.type === "string" || !def.type
+          ? pickerRow("Format", ["", "image", "date", "color"], def.format || "", (v: string) =>
               transactDoc(activeTab.value, (t) =>
-                mutateUpdateDef(t, name, { default: v || undefined }),
-              );
-            }),
-          })
-        : signalFieldRow("Default", defaultVal, (v: string) => {
-            let parsed: unknown = v;
-            if (def.type === "integer") {
-              parsed = Math.trunc(Number(v)) || 0;
-            } else if (def.type === "number") {
-              parsed = Number(v) || 0;
-            } else if (def.type === "boolean") {
-              parsed = v === "true";
-            } else if (def.type === "array" || def.type === "object") {
-              try {
-                parsed = JSON.parse(v);
-              } catch {
-                parsed = v;
+                mutateUpdateDef(t, name, { format: v || undefined }),
+              ),
+            )
+          : nothing
+      }
+      ${
+        def.format === "image"
+          ? renderFieldRow({
+              hasValue: false,
+              label: "Default",
+              prop: "Default",
+              widget: renderMediaPicker("default", defaultVal, (v: string) => {
+                transactDoc(activeTab.value, (t) =>
+                  mutateUpdateDef(t, name, { default: v || undefined }),
+                );
+              }),
+            })
+          : signalFieldRow("Default", defaultVal, (v: string) => {
+              let parsed: unknown = v;
+              if (def.type === "integer") {
+                parsed = Math.trunc(Number(v)) || 0;
+              } else if (def.type === "number") {
+                parsed = Number(v) || 0;
+              } else if (def.type === "boolean") {
+                parsed = v === "true";
+              } else if (def.type === "array" || def.type === "object") {
+                try {
+                  parsed = JSON.parse(v);
+                } catch {
+                  parsed = v;
+                }
               }
-            }
-            transactDoc(activeTab.value, (t) =>
-              mutateUpdateDef(t, name, { default: parsed as JsonValue }),
-            );
-          })}
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateDef(t, name, { default: parsed as JsonValue }),
+              );
+            })
+      }
       ${signalFieldRow("Description", def.description || "", (v: string) =>
         transactDoc(activeTab.value, (t) =>
           mutateUpdateDef(t, name, { description: v || undefined }),
@@ -806,18 +818,20 @@ function renderSignalEditorTemplate(
           ></textarea>
         `,
       })}
-      ${def.$deps && def.$deps.length > 0
-        ? renderFieldRow({
-            hasValue: false,
-            label: "Dependencies",
-            prop: "dependencies",
-            widget: html`
-              <span class="signal-hint" style="flex:1;max-width:none"
-                >${def.$deps.map((d: string) => d.replace("#/state/", "")).join(", ")}</span
-              >
-            `,
-          })
-        : nothing}
+      ${
+        def.$deps && def.$deps.length > 0
+          ? renderFieldRow({
+              hasValue: false,
+              label: "Dependencies",
+              prop: "dependencies",
+              widget: html`
+                <span class="signal-hint" style="flex:1;max-width:none"
+                  >${def.$deps.map((d: string) => d.replace("#/state/", "")).join(", ")}</span
+                >
+              `,
+            })
+          : nothing
+      }
     `;
   } else if (cat === "data") {
     fields = renderDataSourceFields(S, name, def, textareaRow, pickerRow, ctx);
@@ -1041,51 +1055,55 @@ function renderFunctionFields(
         <div style="display:flex;align-items:center;gap:4px">
           <span class="field-label" style="flex:1">Body</span>
           ${bodyModeToggle}
-          ${bodyIsStatements
-            ? nothing
-            : html`
-                <sp-action-button
-                  size="xs"
-                  quiet
-                  title="Open in code editor"
-                  @click=${() => {
-                    ctx.updateSession({
-                      ui: { editingFunction: { defName: name, type: "def" } },
-                    });
-                    ctx.renderCanvas();
-                  }}
-                >
-                  <sp-icon-code slot="icon"></sp-icon-code>
-                </sp-action-button>
-              `}
+          ${
+            bodyIsStatements
+              ? nothing
+              : html`
+                  <sp-action-button
+                    size="xs"
+                    quiet
+                    title="Open in code editor"
+                    @click=${() => {
+                      ctx.updateSession({
+                        ui: { editingFunction: { defName: name, type: "def" } },
+                      });
+                      ctx.renderCanvas();
+                    }}
+                  >
+                    <sp-icon-code slot="icon"></sp-icon-code>
+                  </sp-action-button>
+                `
+          }
         </div>
-        ${bodyIsStatements
-          ? renderStatementEditor(
-              def.body as JxStatement[],
-              (next) => {
-                transactDoc(activeTab.value, (t) =>
-                  mutateUpdateDef(t, name, { body: next as unknown as JsonValue }),
-                );
-                ctx.renderLeftPanel();
-              },
-              {
-                allowEventRef: true,
-                emits: def.emits ?? [],
-                stateDefs: Object.keys(S.document.state || {}),
-                stateEntries: S.document.state || {},
-              },
-            )
-          : html`
-              <textarea
-                class="field-input"
-                style="min-height:60px;font-family:var(--font-mono);font-size:var(--spectrum-font-size-50, 11px)"
-                .value=${typeof def.body === "string" ? def.body : ""}
-                @input=${(e: Event) => {
-                  const v = (e.target as HTMLInputElement).value;
-                  transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { body: v }));
-                }}
-              ></textarea>
-            `}
+        ${
+          bodyIsStatements
+            ? renderStatementEditor(
+                def.body as JxStatement[],
+                (next) => {
+                  transactDoc(activeTab.value, (t) =>
+                    mutateUpdateDef(t, name, { body: next as unknown as JsonValue }),
+                  );
+                  ctx.renderLeftPanel();
+                },
+                {
+                  allowEventRef: true,
+                  emits: def.emits ?? [],
+                  stateDefs: Object.keys(S.document.state || {}),
+                  stateEntries: S.document.state || {},
+                },
+              )
+            : html`
+                <textarea
+                  class="field-input"
+                  style="min-height:60px;font-family:var(--font-mono);font-size:var(--spectrum-font-size-50, 11px)"
+                  .value=${typeof def.body === "string" ? def.body : ""}
+                  @input=${(e: Event) => {
+                    const v = (e.target as HTMLInputElement).value;
+                    transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { body: v }));
+                  }}
+                ></textarea>
+              `
+        }
       `;
 
   return html`
@@ -1420,21 +1438,23 @@ function renderBindingControl(opts: {
         <sp-menu-divider></sp-menu-divider>
         <sp-menu-item value="__custom__">Custom…</sp-menu-item>
       </sp-picker>
-      ${isCustom
-        ? html`<sp-textfield
-            size="s"
-            placeholder="#/$params/…"
-            .value=${live(opts.refVal)}
-            @change=${(e: Event) => {
-              const v = (e.target as HTMLInputElement).value.trim();
-              if (!v) {
-                bindingCustomOpen.delete(opts.fieldKey);
-              }
-              opts.commit(v ? { $ref: v } : undefined);
-              opts.rerender?.();
-            }}
-          ></sp-textfield>`
-        : nothing}
+      ${
+        isCustom
+          ? html`<sp-textfield
+              size="s"
+              placeholder="#/$params/…"
+              .value=${live(opts.refVal)}
+              @change=${(e: Event) => {
+                const v = (e.target as HTMLInputElement).value.trim();
+                if (!v) {
+                  bindingCustomOpen.delete(opts.fieldKey);
+                }
+                opts.commit(v ? { $ref: v } : undefined);
+                opts.rerender?.();
+              }}
+            ></sp-textfield>`
+          : nothing
+      }
     </div>
   `;
 }
@@ -1504,9 +1524,11 @@ export function renderExternalPrototypeEditorTemplate(
       const schema = pluginSchemaCache.get(cacheKey);
       if (schema) {
         schemaContent = html`
-          ${schema.description
-            ? html`<div class="signal-hint" style="padding:4px 0 8px">${schema.description}</div>`
-            : nothing}
+          ${
+            schema.description
+              ? html`<div class="signal-hint" style="padding:4px 0 8px">${schema.description}</div>`
+              : nothing
+          }
           ${renderSchemaFieldsTemplate(schema as JsonSchema, def, name, S, ctx)}
         `;
       }
@@ -1528,32 +1550,38 @@ export function renderExternalPrototypeEditorTemplate(
   }
 
   return html`
-    ${importedPath
-      ? html`<div
-          class="signal-hint"
-          style="padding:4px 0 2px;font-size:var(--spectrum-font-size-50, 11px);color:var(--fg-dim)"
-        >
-          ${def.$prototype}
-        </div>`
-      : html`
-          ${signalFieldRow("Source", def.$src || "", (v: string) => {
-            transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $src: v || undefined }));
-            pluginSchemaCache.delete(`${v}::${def.$prototype}`);
-          })}
-          ${signalFieldRow("Prototype", def.$prototype || "", (v: string) => {
+    ${
+      importedPath
+        ? html`<div
+            class="signal-hint"
+            style="padding:4px 0 2px;font-size:var(--spectrum-font-size-50, 11px);color:var(--fg-dim)"
+          >
+            ${def.$prototype}
+          </div>`
+        : html`
+            ${signalFieldRow("Source", def.$src || "", (v: string) => {
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateDef(t, name, { $src: v || undefined }),
+              );
+              pluginSchemaCache.delete(`${v}::${def.$prototype}`);
+            })}
+            ${signalFieldRow("Prototype", def.$prototype || "", (v: string) => {
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateDef(t, name, { $prototype: v || undefined }),
+              );
+              pluginSchemaCache.delete(`${def.$src}::${v}`);
+            })}
+          `
+    }
+    ${
+      def.$export
+        ? signalFieldRow("Export", def.$export || "", (v: string) =>
             transactDoc(activeTab.value, (t) =>
-              mutateUpdateDef(t, name, { $prototype: v || undefined }),
-            );
-            pluginSchemaCache.delete(`${def.$src}::${v}`);
-          })}
-        `}
-    ${def.$export
-      ? signalFieldRow("Export", def.$export || "", (v: string) =>
-          transactDoc(activeTab.value, (t) =>
-            mutateUpdateDef(t, name, { $export: v || undefined }),
-          ),
-        )
-      : nothing}
+              mutateUpdateDef(t, name, { $export: v || undefined }),
+            ),
+          )
+        : nothing
+    }
     ${schemaContent}
   `;
 }

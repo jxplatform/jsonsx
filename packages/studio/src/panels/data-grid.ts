@@ -101,13 +101,17 @@ function pushDialogBody(state: PushDialogState): TemplateResult {
   const errors = shown?.errors ?? [];
   return html`
     <div class="push-dialog-plan">
-      ${state.phase === "done"
-        ? html`<div class="push-dialog-status">
-            ${shown?.applied ? "Schema applied." : "Push failed."}
-          </div>`
-        : steps.length === 0 && errors.length === 0
-          ? html`<div class="push-dialog-status">Nothing to push — the schema is up to date.</div>`
-          : nothing}
+      ${
+        state.phase === "done"
+          ? html`<div class="push-dialog-status">
+              ${shown?.applied ? "Schema applied." : "Push failed."}
+            </div>`
+          : steps.length === 0 && errors.length === 0
+            ? html`<div class="push-dialog-status">
+                Nothing to push — the schema is up to date.
+              </div>`
+            : nothing
+      }
       <ul class="push-dialog-steps">
         ${steps.map(
           (step) => html`<li class="push-step push-step-${step.kind}">${step.summary}</li>`,
@@ -138,15 +142,17 @@ function renderPushDialog(): void {
         <sp-action-button size="s" class="push-cancel" @click=${closePushDialog}>
           ${state.phase === "done" ? "Close" : "Cancel"}
         </sp-action-button>
-        ${confirmable
-          ? html`<sp-action-button
-              size="s"
-              emphasized
-              class="push-apply"
-              @click=${() => void applyPush()}
-              >Apply</sp-action-button
-            >`
-          : nothing}
+        ${
+          confirmable
+            ? html`<sp-action-button
+                size="s"
+                emphasized
+                class="push-apply"
+                @click=${() => void applyPush()}
+                >Apply</sp-action-button
+              >`
+            : nothing
+        }
       </div>
     </div>
   `;
@@ -199,20 +205,22 @@ function renderSectionActions(sectionKey: string, ctx: SectionActionsContext): T
   const pushTarget = sectionKey === "connections" && selected ? selected : undefined;
   return html`
     <div class="data-section-actions">
-      ${sectionKey === "connections"
-        ? html`<sp-action-button
-            size="s"
-            class="data-action-test"
-            ?disabled=${!selected || actionsState.testing !== null}
-            @click=${() => {
-              if (selected) {
-                void runTest(selected, rerender);
-              }
-            }}
-          >
-            ${actionsState.testing ? "Testing…" : "Test Connection"}
-          </sp-action-button>`
-        : nothing}
+      ${
+        sectionKey === "connections"
+          ? html`<sp-action-button
+              size="s"
+              class="data-action-test"
+              ?disabled=${!selected || actionsState.testing !== null}
+              @click=${() => {
+                if (selected) {
+                  void runTest(selected, rerender);
+                }
+              }}
+            >
+              ${actionsState.testing ? "Testing…" : "Test Connection"}
+            </sp-action-button>`
+          : nothing
+      }
       <sp-action-button
         size="s"
         class="data-action-push"
@@ -227,15 +235,17 @@ function renderSectionActions(sectionKey: string, ctx: SectionActionsContext): T
       >
         Open Data Grid
       </sp-action-button>
-      ${testResult
-        ? html`<span
-            class="data-test-result ${testResult.ok ? "ok" : "failed"}"
-            title=${testResult.error ?? ""}
-          >
-            ${testResult.connection}:
-            ${testResult.ok ? "connected" : (testResult.error ?? "failed")}
-          </span>`
-        : nothing}
+      ${
+        testResult
+          ? html`<span
+              class="data-test-result ${testResult.ok ? "ok" : "failed"}"
+              title=${testResult.error ?? ""}
+            >
+              ${testResult.connection}:
+              ${testResult.ok ? "connected" : (testResult.error ?? "failed")}
+            </span>`
+          : nothing
+      }
     </div>
   `;
 }

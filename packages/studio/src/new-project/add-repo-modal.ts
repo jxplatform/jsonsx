@@ -185,9 +185,9 @@ function repoRowTpl(repo: RepoInfo) {
         ${repo.private ? html`<span class="add-repo-badge">private</span>` : nothing}
         <span>${repo.defaultBranch} · ${repo.permission}</span>
       </span>
-      ${_importing === repo.fullName
-        ? html`<span class="add-repo-busy">Importing…</span>`
-        : nothing}
+      ${
+        _importing === repo.fullName ? html`<span class="add-repo-busy">Importing…</span>` : nothing
+      }
     </button>
   `;
 }
@@ -262,17 +262,19 @@ function accessTpl() {
             </a>
           `,
         )}
-        ${links.installUrl
-          ? html`<a
-              class="add-repo-access-link"
-              href=${links.installUrl}
-              target="_blank"
-              rel="noreferrer"
-              title="Install the Jx Suite GitHub App on another account"
-            >
-              Another account…
-            </a>`
-          : nothing}
+        ${
+          links.installUrl
+            ? html`<a
+                class="add-repo-access-link"
+                href=${links.installUrl}
+                target="_blank"
+                rel="noreferrer"
+                title="Install the Jx Suite GitHub App on another account"
+              >
+                Another account…
+              </a>`
+            : nothing
+        }
       </span>
       <button
         class="add-repo-refresh"

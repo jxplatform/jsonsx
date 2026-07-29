@@ -178,20 +178,22 @@ function renderEntryFields(
             style="flex:1"
           ></sp-textfield>
         </div>
-        ${!attrs.src
-          ? html`
-              <div class="head-entry-body">
-                <label class="settings-field-label">Script body</label>
-                <textarea
-                  class="head-code-editor"
-                  .value=${entry.textContent || ""}
-                  @input=${onFieldChange("content")}
-                  rows="6"
-                  spellcheck="false"
-                ></textarea>
-              </div>
-            `
-          : nothing}
+        ${
+          !attrs.src
+            ? html`
+                <div class="head-entry-body">
+                  <label class="settings-field-label">Script body</label>
+                  <textarea
+                    class="head-code-editor"
+                    .value=${entry.textContent || ""}
+                    @input=${onFieldChange("content")}
+                    rows="6"
+                    spellcheck="false"
+                  ></textarea>
+                </div>
+              `
+            : nothing
+        }
       `;
     }
     case "style": {
@@ -254,20 +256,22 @@ function renderGoogleFontsSection(
 
   return html`
     <div class="head-entries" style="margin-bottom:12px">
-      ${fontEntries.length > 0
-        ? fontEntries.map(
-            (entry) => html`
-              <div class="head-entry" style="flex-direction:row;align-items:center;gap:8px">
-                <span style="flex:1"
-                  >${extractFontFamily(String(entry.attributes?.href || ""))}</span
-                >
-                <sp-action-button quiet size="s" @click=${() => removeFont(entry)}>
-                  <sp-icon-delete slot="icon"></sp-icon-delete>
-                </sp-action-button>
-              </div>
-            `,
-          )
-        : html`<p class="settings-field-desc" style="margin:0">No fonts imported.</p>`}
+      ${
+        fontEntries.length > 0
+          ? fontEntries.map(
+              (entry) => html`
+                <div class="head-entry" style="flex-direction:row;align-items:center;gap:8px">
+                  <span style="flex:1"
+                    >${extractFontFamily(String(entry.attributes?.href || ""))}</span
+                  >
+                  <sp-action-button quiet size="s" @click=${() => removeFont(entry)}>
+                    <sp-icon-delete slot="icon"></sp-icon-delete>
+                  </sp-action-button>
+                </div>
+              `,
+            )
+          : html`<p class="settings-field-desc" style="margin:0">No fonts imported.</p>`
+      }
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <sp-textfield

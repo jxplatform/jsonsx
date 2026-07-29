@@ -192,74 +192,78 @@ async function promptRepeaterConfig(defs: Record<string, unknown>) {
               </sp-picker>
             </label>
 
-            ${source === "__new__"
-              ? html`
-                  <label>
-                    <sp-field-label size="s">New definition name</sp-field-label>
-                    <sp-textfield
-                      size="s"
-                      placeholder="myItems"
-                      .value=${newDefName}
-                      ?invalid=${Boolean(error)}
-                      @input=${(e: Event) => {
-                        newDefName = (e.target as HTMLInputElement).value || "";
-                        error = "";
-                        rerender();
-                      }}
-                      @keydown=${(e: KeyboardEvent) => {
-                        if (e.key === "Enter") {
-                          confirm();
-                        }
-                      }}
-                      ${ref((el) => {
-                        if (el && source === "__new__") {
-                          requestAnimationFrame(() => (el as HTMLElement).focus());
-                        }
-                      })}
-                    >
-                      <sp-help-text slot="negative-help-text">${error}</sp-help-text>
-                    </sp-textfield>
-                  </label>
-                `
-              : nothing}
-            ${fnDefs.length > 0
-              ? html`
-                  <label>
-                    <sp-field-label size="s">Filter (optional)</sp-field-label>
-                    <sp-picker
-                      label="Filter"
-                      size="s"
-                      .value=${filterDef}
-                      @change=${(e: Event) => {
-                        filterDef = (e.target as HTMLInputElement).value;
-                        rerender();
-                      }}
-                    >
-                      <sp-menu-item value="">None</sp-menu-item>
-                      ${fnDefs.map(
-                        ([name]) => html`<sp-menu-item value=${name}>${name}</sp-menu-item>`,
-                      )}
-                    </sp-picker>
-                  </label>
-                  <label>
-                    <sp-field-label size="s">Sort (optional)</sp-field-label>
-                    <sp-picker
-                      label="Sort"
-                      size="s"
-                      .value=${sortDef}
-                      @change=${(e: Event) => {
-                        sortDef = (e.target as HTMLInputElement).value;
-                        rerender();
-                      }}
-                    >
-                      <sp-menu-item value="">None</sp-menu-item>
-                      ${fnDefs.map(
-                        ([name]) => html`<sp-menu-item value=${name}>${name}</sp-menu-item>`,
-                      )}
-                    </sp-picker>
-                  </label>
-                `
-              : nothing}
+            ${
+              source === "__new__"
+                ? html`
+                    <label>
+                      <sp-field-label size="s">New definition name</sp-field-label>
+                      <sp-textfield
+                        size="s"
+                        placeholder="myItems"
+                        .value=${newDefName}
+                        ?invalid=${Boolean(error)}
+                        @input=${(e: Event) => {
+                          newDefName = (e.target as HTMLInputElement).value || "";
+                          error = "";
+                          rerender();
+                        }}
+                        @keydown=${(e: KeyboardEvent) => {
+                          if (e.key === "Enter") {
+                            confirm();
+                          }
+                        }}
+                        ${ref((el) => {
+                          if (el && source === "__new__") {
+                            requestAnimationFrame(() => (el as HTMLElement).focus());
+                          }
+                        })}
+                      >
+                        <sp-help-text slot="negative-help-text">${error}</sp-help-text>
+                      </sp-textfield>
+                    </label>
+                  `
+                : nothing
+            }
+            ${
+              fnDefs.length > 0
+                ? html`
+                    <label>
+                      <sp-field-label size="s">Filter (optional)</sp-field-label>
+                      <sp-picker
+                        label="Filter"
+                        size="s"
+                        .value=${filterDef}
+                        @change=${(e: Event) => {
+                          filterDef = (e.target as HTMLInputElement).value;
+                          rerender();
+                        }}
+                      >
+                        <sp-menu-item value="">None</sp-menu-item>
+                        ${fnDefs.map(
+                          ([name]) => html`<sp-menu-item value=${name}>${name}</sp-menu-item>`,
+                        )}
+                      </sp-picker>
+                    </label>
+                    <label>
+                      <sp-field-label size="s">Sort (optional)</sp-field-label>
+                      <sp-picker
+                        label="Sort"
+                        size="s"
+                        .value=${sortDef}
+                        @change=${(e: Event) => {
+                          sortDef = (e.target as HTMLInputElement).value;
+                          rerender();
+                        }}
+                      >
+                        <sp-menu-item value="">None</sp-menu-item>
+                        ${fnDefs.map(
+                          ([name]) => html`<sp-menu-item value=${name}>${name}</sp-menu-item>`,
+                        )}
+                      </sp-picker>
+                    </label>
+                  `
+                : nothing
+            }
           </div>
         </sp-dialog-wrapper>
       `;

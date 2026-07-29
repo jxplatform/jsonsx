@@ -84,44 +84,48 @@ export function renderDataExplorerTemplate(
         Refresh
       </sp-action-button>
     </div>
-    ${entries.length === 0
-      ? html`<div class="empty-state">No state defined</div>`
-      : entries.map(([name, def]) => {
-          const value = scope[name];
-          const unwrapped = unwrapSignal(value);
-          const isExpanded = expandedDataKeys.has(name);
-          return html`
-            <div class="data-row">
-              <div
-                class=${classMap({
-                  "data-row-header": true,
-                  expanded: isExpanded,
-                })}
-                @click=${() => {
-                  if (expandedDataKeys.has(name)) {
-                    expandedDataKeys.delete(name);
-                  } else {
-                    expandedDataKeys.add(name);
-                  }
-                  renderLeftPanel();
-                }}
-              >
-                <span class="signal-badge ${defCategory(def)}">${defBadgeLabel(def)}</span>
-                <span class="data-name">${name}</span>
-                <span
+    ${
+      entries.length === 0
+        ? html`<div class="empty-state">No state defined</div>`
+        : entries.map(([name, def]) => {
+            const value = scope[name];
+            const unwrapped = unwrapSignal(value);
+            const isExpanded = expandedDataKeys.has(name);
+            return html`
+              <div class="data-row">
+                <div
                   class=${classMap({
-                    "data-pending": unwrapped === null,
-                    "data-type": true,
+                    "data-row-header": true,
+                    expanded: isExpanded,
                   })}
-                  >${dataTypeLabel(value)}</span
+                  @click=${() => {
+                    if (expandedDataKeys.has(name)) {
+                      expandedDataKeys.delete(name);
+                    } else {
+                      expandedDataKeys.add(name);
+                    }
+                    renderLeftPanel();
+                  }}
                 >
+                  <span class="signal-badge ${defCategory(def)}">${defBadgeLabel(def)}</span>
+                  <span class="data-name">${name}</span>
+                  <span
+                    class=${classMap({
+                      "data-pending": unwrapped === null,
+                      "data-type": true,
+                    })}
+                    >${dataTypeLabel(value)}</span
+                  >
+                </div>
+                ${
+                  isExpanded
+                    ? html`<div class="data-tree">${renderDataTreeTemplate(unwrapped, 0)}</div>`
+                    : nothing
+                }
               </div>
-              ${isExpanded
-                ? html`<div class="data-tree">${renderDataTreeTemplate(unwrapped, 0)}</div>`
-                : nothing}
-            </div>
-          `;
-        })}
+            `;
+          })
+    }
   `;
 }
 
@@ -181,11 +185,13 @@ export function renderDataTreeTemplate(
         ${renderDataTreeTemplate(item, depth + 1, maxDepth)}
       `;
     });
-    return html`${items}${value.length > cap
-      ? html`<div class="data-leaf data-ellipsis" style="padding-left:${indent}">
-          … ${value.length - cap} more
-        </div>`
-      : nothing}`;
+    return html`${items}${
+      value.length > cap
+        ? html`<div class="data-leaf data-ellipsis" style="padding-left:${indent}">
+            … ${value.length - cap} more
+          </div>`
+        : nothing
+    }`;
   }
 
   // Object
@@ -211,9 +217,11 @@ export function renderDataTreeTemplate(
       ${renderDataTreeTemplate(v, depth + 1, maxDepth)}
     `;
   });
-  return html`${items}${keys.length > cap
-    ? html`<div class="data-leaf data-ellipsis" style="padding-left:${indent}">
-        … ${keys.length - cap} more
-      </div>`
-    : nothing}`;
+  return html`${items}${
+    keys.length > cap
+      ? html`<div class="data-leaf data-ellipsis" style="padding-left:${indent}">
+          … ${keys.length - cap} more
+        </div>`
+      : nothing
+  }`;
 }

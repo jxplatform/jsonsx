@@ -195,24 +195,26 @@ export class JxColorPopover extends LitElement {
           placeholder="#000000"
           @change=${this._handleText}
         ></sp-textfield>
-        ${this.colorVars.length > 0
-          ? html`
-              <sp-divider size="s"></sp-divider>
-              <span class="color-popover-swatches-label">Color Tokens</span>
-              <sp-swatch-group size="xs" border="light" rounding="none">
-                ${this.colorVars.map(
-                  (cv) => html`
-                    <sp-swatch
-                      color=${cv.value}
-                      .value=${cv.name}
-                      title=${cv.name}
-                      @click=${(e: Event) => this._handleSwatch(e, cv.name)}
-                    ></sp-swatch>
-                  `,
-                )}
-              </sp-swatch-group>
-            `
-          : nothing}
+        ${
+          this.colorVars.length > 0
+            ? html`
+                <sp-divider size="s"></sp-divider>
+                <span class="color-popover-swatches-label">Color Tokens</span>
+                <sp-swatch-group size="xs" border="light" rounding="none">
+                  ${this.colorVars.map(
+                    (cv) => html`
+                      <sp-swatch
+                        color=${cv.value}
+                        .value=${cv.name}
+                        title=${cv.name}
+                        @click=${(e: Event) => this._handleSwatch(e, cv.name)}
+                      ></sp-swatch>
+                    `,
+                  )}
+                </sp-swatch-group>
+              `
+            : nothing
+        }
       </div>
     `;
   }

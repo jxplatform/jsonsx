@@ -303,127 +303,147 @@ export function renderLayersTemplate(ctx: {
             activeTab.value!.session.selection = path;
             panToElement(path);
           }}
-          @dblclick=${isStructural
-            ? (e: MouseEvent) => {
-                e.stopPropagation();
-                startLayerTitleEdit(path, ctx.rerender);
-              }
-            : nothing}
-          @contextmenu=${isStructural
-            ? (e: MouseEvent) =>
-                showContextMenu(e, path, {
-                  onEditComponent: ctx.navigateToComponent,
-                  rerender: ctx.rerender,
-                })
-            : nothing}
+          @dblclick=${
+            isStructural
+              ? (e: MouseEvent) => {
+                  e.stopPropagation();
+                  startLayerTitleEdit(path, ctx.rerender);
+                }
+              : nothing
+          }
+          @contextmenu=${
+            isStructural
+              ? (e: MouseEvent) =>
+                  showContextMenu(e, path, {
+                    onEditComponent: ctx.navigateToComponent,
+                    rerender: ctx.rerender,
+                  })
+              : nothing
+          }
         >
           <span class="layer-indent" style="width:${depth * 16}px"></span>
           <span class="layer-toggle"
-            >${isExpandable
-              ? html`
-                  ${collapsed.has(key)
-                    ? html`<sp-icon-chevron-right></sp-icon-chevron-right>`
-                    : html`<sp-icon-chevron-down></sp-icon-chevron-down>`}
-                `
-              : nothing}</span
+            >${
+              isExpandable
+                ? html`
+                    ${
+                      collapsed.has(key)
+                        ? html`<sp-icon-chevron-right></sp-icon-chevron-right>`
+                        : html`<sp-icon-chevron-down></sp-icon-chevron-down>`
+                    }
+                  `
+                : nothing
+            }</span
           >
           <span class=${badgeClass} title=${ifDefined(badgeTitle ?? undefined)}>${badgeText}</span>
           <span class="layer-label" style=${labelItalic ? "font-style:italic" : nothing}
             >${labelText}</span
           >
-          ${isStructural && !isRoot
-            ? html`<span class="layer-drag-handle" title="Drag to reorder">⠿</span>`
-            : nothing}
-          ${isStructural && !isRoot && isSelected
-            ? html`
-                <span class="layer-actions">
-                  ${canMoveUp
-                    ? html`<sp-action-button
-                        quiet
-                        size="xs"
-                        title="Move up"
-                        @click=${(e: MouseEvent) => {
-                          e.stopPropagation();
-                          (e.currentTarget as HTMLElement).blur();
-                          const pp = parentPath as JxPath;
-                          transactDoc(activeTab.value!, (t) =>
-                            mutateMoveNode(t, path, pp, idx - 1),
-                          );
-                        }}
-                      >
-                        <sp-icon-arrow-up slot="icon"></sp-icon-arrow-up>
-                      </sp-action-button>`
-                    : nothing}
-                  ${canMoveDown
-                    ? html`<sp-action-button
-                        quiet
-                        size="xs"
-                        title="Move down"
-                        @click=${(e: MouseEvent) => {
-                          e.stopPropagation();
-                          (e.currentTarget as HTMLElement).blur();
-                          const pp = parentPath as JxPath;
-                          transactDoc(activeTab.value!, (t) =>
-                            mutateMoveNode(t, path, pp, idx + 2),
-                          );
-                        }}
-                      >
-                        <sp-icon-arrow-down slot="icon"></sp-icon-arrow-down>
-                      </sp-action-button>`
-                    : nothing}
-                  ${canMoveIn
-                    ? html`<sp-action-button
-                        quiet
-                        size="xs"
-                        title="Move into previous sibling"
-                        @click=${(e: MouseEvent) => {
-                          e.stopPropagation();
-                          (e.currentTarget as HTMLElement).blur();
-                          const pp = parentPath as JxPath;
-                          const prevPath = [...pp, "children", idx - 1];
-                          const prev = getNodeAtPath(activeTab.value!.doc.document, prevPath);
-                          const len = childList(prev).length;
-                          transactDoc(activeTab.value!, (t) =>
-                            mutateMoveNode(t, path, prevPath, len),
-                          );
-                        }}
-                      >
-                        <sp-icon-arrow-right slot="icon"></sp-icon-arrow-right>
-                      </sp-action-button>`
-                    : nothing}
-                  ${canMoveOut
-                    ? html`<sp-action-button
-                        quiet
-                        size="xs"
-                        title="Move out of parent"
-                        @click=${(e: MouseEvent) => {
-                          e.stopPropagation();
-                          (e.currentTarget as HTMLElement).blur();
-                          const gp = grandparentPath as JxPath;
-                          const parentIdx = childIndex(parentPath!) as number;
-                          transactDoc(activeTab.value!, (t) =>
-                            mutateMoveNode(t, path, gp, parentIdx + 1),
-                          );
-                        }}
-                      >
-                        <sp-icon-arrow-left slot="icon"></sp-icon-arrow-left>
-                      </sp-action-button>`
-                    : nothing}
-                  <sp-action-button
-                    quiet
-                    size="xs"
-                    class="layer-delete"
-                    title="Delete"
-                    @click=${(e: MouseEvent) => {
-                      e.stopPropagation();
-                      transactDoc(activeTab.value!, (t) => mutateRemoveNode(t, path));
-                    }}
-                  >
-                    <sp-icon-close slot="icon"></sp-icon-close>
-                  </sp-action-button>
-                </span>
-              `
-            : nothing}
+          ${
+            isStructural && !isRoot
+              ? html`<span class="layer-drag-handle" title="Drag to reorder">⠿</span>`
+              : nothing
+          }
+          ${
+            isStructural && !isRoot && isSelected
+              ? html`
+                  <span class="layer-actions">
+                    ${
+                      canMoveUp
+                        ? html`<sp-action-button
+                            quiet
+                            size="xs"
+                            title="Move up"
+                            @click=${(e: MouseEvent) => {
+                              e.stopPropagation();
+                              (e.currentTarget as HTMLElement).blur();
+                              const pp = parentPath as JxPath;
+                              transactDoc(activeTab.value!, (t) =>
+                                mutateMoveNode(t, path, pp, idx - 1),
+                              );
+                            }}
+                          >
+                            <sp-icon-arrow-up slot="icon"></sp-icon-arrow-up>
+                          </sp-action-button>`
+                        : nothing
+                    }
+                    ${
+                      canMoveDown
+                        ? html`<sp-action-button
+                            quiet
+                            size="xs"
+                            title="Move down"
+                            @click=${(e: MouseEvent) => {
+                              e.stopPropagation();
+                              (e.currentTarget as HTMLElement).blur();
+                              const pp = parentPath as JxPath;
+                              transactDoc(activeTab.value!, (t) =>
+                                mutateMoveNode(t, path, pp, idx + 2),
+                              );
+                            }}
+                          >
+                            <sp-icon-arrow-down slot="icon"></sp-icon-arrow-down>
+                          </sp-action-button>`
+                        : nothing
+                    }
+                    ${
+                      canMoveIn
+                        ? html`<sp-action-button
+                            quiet
+                            size="xs"
+                            title="Move into previous sibling"
+                            @click=${(e: MouseEvent) => {
+                              e.stopPropagation();
+                              (e.currentTarget as HTMLElement).blur();
+                              const pp = parentPath as JxPath;
+                              const prevPath = [...pp, "children", idx - 1];
+                              const prev = getNodeAtPath(activeTab.value!.doc.document, prevPath);
+                              const len = childList(prev).length;
+                              transactDoc(activeTab.value!, (t) =>
+                                mutateMoveNode(t, path, prevPath, len),
+                              );
+                            }}
+                          >
+                            <sp-icon-arrow-right slot="icon"></sp-icon-arrow-right>
+                          </sp-action-button>`
+                        : nothing
+                    }
+                    ${
+                      canMoveOut
+                        ? html`<sp-action-button
+                            quiet
+                            size="xs"
+                            title="Move out of parent"
+                            @click=${(e: MouseEvent) => {
+                              e.stopPropagation();
+                              (e.currentTarget as HTMLElement).blur();
+                              const gp = grandparentPath as JxPath;
+                              const parentIdx = childIndex(parentPath!) as number;
+                              transactDoc(activeTab.value!, (t) =>
+                                mutateMoveNode(t, path, gp, parentIdx + 1),
+                              );
+                            }}
+                          >
+                            <sp-icon-arrow-left slot="icon"></sp-icon-arrow-left>
+                          </sp-action-button>`
+                        : nothing
+                    }
+                    <sp-action-button
+                      quiet
+                      size="xs"
+                      class="layer-delete"
+                      title="Delete"
+                      @click=${(e: MouseEvent) => {
+                        e.stopPropagation();
+                        transactDoc(activeTab.value!, (t) => mutateRemoveNode(t, path));
+                      }}
+                    >
+                      <sp-icon-close slot="icon"></sp-icon-close>
+                    </sp-action-button>
+                  </span>
+                `
+              : nothing
+          }
         </div>
       `,
     });

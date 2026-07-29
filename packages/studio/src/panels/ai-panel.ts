@@ -212,9 +212,11 @@ function renderManagedConnect() {
       <sp-button size="s" ?disabled=${cfConnectBusy} @click=${() => void connectCloudflareForAi()}>
         ${cfConnectBusy ? "Connecting…" : "Connect Cloudflare"}
       </sp-button>
-      ${cfConnectError
-        ? html`<div class="ai-managed-connect-error">${cfConnectError}</div>`
-        : nothing}
+      ${
+        cfConnectError
+          ? html`<div class="ai-managed-connect-error">${cfConnectError}</div>`
+          : nothing
+      }
       <div class="ai-managed-connect-divider">— or bring your own key —</div>
     </div>
   `;

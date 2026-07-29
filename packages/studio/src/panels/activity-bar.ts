@@ -125,9 +125,11 @@ export function renderActivityBar() {
         (t) => html`
           <sp-tab value=${t.value} title=${t.label} aria-label=${t.label}>
             ${tabIcon(t.icon, "m")}
-            ${t.value === "git" && gitFileCount > 0
-              ? html`<span class="activity-badge">${gitFileCount}</span>`
-              : nothing}
+            ${
+              t.value === "git" && gitFileCount > 0
+                ? html`<span class="activity-badge">${gitFileCount}</span>`
+                : nothing
+            }
           </sp-tab>
         `,
       )}

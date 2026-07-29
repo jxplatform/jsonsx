@@ -51,16 +51,18 @@ export function renderFieldRow({
       style=${span === 2 ? "grid-column: 1 / -1" : ""}
     >
       <div class="style-row-label">
-        ${hasValue && onClear
-          ? html`<span
-              class="set-dot"
-              title="Clear ${prop}"
-              @click=${(e: Event) => {
-                e.stopPropagation();
-                onClear();
-              }}
-            ></span>`
-          : nothing}
+        ${
+          hasValue && onClear
+            ? html`<span
+                class="set-dot"
+                title="Clear ${prop}"
+                @click=${(e: Event) => {
+                  e.stopPropagation();
+                  onClear();
+                }}
+              ></span>`
+            : nothing
+        }
         <sp-field-label size="s" title=${prop}>${label}</sp-field-label>
         ${labelExtra ?? nothing}
       </div>

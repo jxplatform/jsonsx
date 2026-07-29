@@ -141,14 +141,16 @@ function renderRefWidget(refVal: string, opts: DynamicSlotOpts) {
       ${opts.stateDefs.map(
         (name) => html`<sp-menu-item value=${`#/state/${name}`}>${name}</sp-menu-item>`,
       )}
-      ${opts.extraSignals?.length
-        ? html`
-            <sp-menu-divider></sp-menu-divider>
-            ${opts.extraSignals.map(
-              (sig) => html`<sp-menu-item value=${sig.value}>${sig.label}</sp-menu-item>`,
-            )}
-          `
-        : nothing}
+      ${
+        opts.extraSignals?.length
+          ? html`
+              <sp-menu-divider></sp-menu-divider>
+              ${opts.extraSignals.map(
+                (sig) => html`<sp-menu-item value=${sig.value}>${sig.label}</sp-menu-item>`,
+              )}
+            `
+          : nothing
+      }
     </sp-picker>
   `;
 }

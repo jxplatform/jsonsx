@@ -77,18 +77,20 @@ export function canvasPanelTemplate(
         }
       })}
     >
-      ${label
-        ? html`
-            <div
-              class="canvas-panel-header"
-              @click=${() => {
-                updateUi("activeMedia", panelMediaToActiveMedia(mediaName));
-              }}
-            >
-              ${label}
-            </div>
-          `
-        : nothing}
+      ${
+        label
+          ? html`
+              <div
+                class="canvas-panel-header"
+                @click=${() => {
+                  updateUi("activeMedia", panelMediaToActiveMedia(mediaName));
+                }}
+              >
+                ${label}
+              </div>
+            `
+          : nothing
+      }
       <div
         class="canvas-panel-viewport"
         style=${styleMap({ width: width && !fullWidth ? `${width}px` : "" })}

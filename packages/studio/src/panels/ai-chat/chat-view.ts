@@ -108,9 +108,11 @@ export function renderChatHeader(opts: ChatHeaderOptions): TemplateResult {
       </sp-action-button>
       <span class="ai-chat-title">${opts.title ?? "New chat"}</span>
       <span class="ai-header-spacer"></span>
-      ${opts.streaming
-        ? html`<sp-progress-circle size="s" indeterminate></sp-progress-circle>`
-        : nothing}
+      ${
+        opts.streaming
+          ? html`<sp-progress-circle size="s" indeterminate></sp-progress-circle>`
+          : nothing
+      }
       <sp-action-button size="s" quiet title="New chat" @click=${opts.onNewChat}>
         <sp-icon-add slot="icon"></sp-icon-add>
       </sp-action-button>
@@ -125,13 +127,15 @@ function renderUserMessage(msg: Message): TemplateResult {
   return html`
     <div class="ai-msg-user">
       <div class="ai-msg-user-body">${body}</div>
-      ${contextLines.length > 0
-        ? html`
-            <div class="ai-msg-context-chips">
-              ${contextLines.map((line) => html`<span class="ai-context-chip">${line}</span>`)}
-            </div>
-          `
-        : nothing}
+      ${
+        contextLines.length > 0
+          ? html`
+              <div class="ai-msg-context-chips">
+                ${contextLines.map((line) => html`<span class="ai-context-chip">${line}</span>`)}
+              </div>
+            `
+          : nothing
+      }
     </div>
   `;
 }
@@ -212,14 +216,16 @@ export function renderMessageList(opts: MessageListOptions): TemplateResult {
   const lastIdx = messages.length - 1;
   return html`
     <div class="ai-chat-messages" ${ref(opts.listRef)} @scroll=${opts.onScroll}>
-      ${messages.length === 0 && status !== "streaming"
-        ? html`
-            <div class="ai-chat-empty">
-              Ask the assistant to build or edit this page — it can add sections, restyle elements,
-              and wire up components.
-            </div>
-          `
-        : nothing}
+      ${
+        messages.length === 0 && status !== "streaming"
+          ? html`
+              <div class="ai-chat-empty">
+                Ask the assistant to build or edit this page — it can add sections, restyle
+                elements, and wire up components.
+              </div>
+            `
+          : nothing
+      }
       ${messages.map((msg, i) => {
         if (msg.role === "user") {
           return renderUserMessage(msg);
@@ -235,16 +241,20 @@ export function renderMessageList(opts: MessageListOptions): TemplateResult {
         }
         return nothing;
       })}
-      ${status !== "streaming" && opts.error
-        ? html`
-            <div class="ai-msg-error">
-              <div>${opts.error}</div>
-              ${formatErrorAdvice(opts.error)
-                ? html`<div class="ai-msg-error-advice">${formatErrorAdvice(opts.error)}</div>`
-                : nothing}
-            </div>
-          `
-        : nothing}
+      ${
+        status !== "streaming" && opts.error
+          ? html`
+              <div class="ai-msg-error">
+                <div>${opts.error}</div>
+                ${
+                  formatErrorAdvice(opts.error)
+                    ? html`<div class="ai-msg-error-advice">${formatErrorAdvice(opts.error)}</div>`
+                    : nothing
+                }
+              </div>
+            `
+          : nothing
+      }
     </div>
   `;
 }

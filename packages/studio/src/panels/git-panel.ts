@@ -192,12 +192,14 @@ export function renderGitPanel(
     return html`<div class="git-panel git-panel-empty">
       <div class="git-empty-state">
         <p>Open a project to use source control.</p>
-        ${platformSupportsClone()
-          ? html`<sp-action-button size="m" @click=${() => ctx.cloneRepository?.()}>
-              <sp-icon-download slot="icon"></sp-icon-download>
-              Clone Git Repository
-            </sp-action-button>`
-          : nothing}
+        ${
+          platformSupportsClone()
+            ? html`<sp-action-button size="m" @click=${() => ctx.cloneRepository?.()}>
+                <sp-icon-download slot="icon"></sp-icon-download>
+                Clone Git Repository
+              </sp-action-button>`
+            : nothing
+        }
       </div>
     </div>`;
   }
@@ -323,9 +325,11 @@ export function renderGitPanel(
           </sp-action-button>
           <div class="git-sync-text">
             <span class="git-sync-label">${syncLabel}</span>
-            ${lastUpdatedStr
-              ? html`<span class="git-sync-time">Last updated ${lastUpdatedStr}</span>`
-              : nothing}
+            ${
+              lastUpdatedStr
+                ? html`<span class="git-sync-time">Last updated ${lastUpdatedStr}</span>`
+                : nothing
+            }
           </div>
           <sp-action-group size="xs" quiet class="git-sync-actions">
             <sp-action-button
@@ -585,49 +589,51 @@ export function renderGitPanel(
           ${dir ? html`<span class="git-file-dir">${dir}</span>` : nothing}
         </span>
         <span class="git-file-actions">
-          ${file.staged
-            ? html`
-                <sp-action-button
-                  size="xs"
-                  quiet
-                  title="Unstage"
-                  @click=${() => gitAction("gitUnstage", [file.path])}
-                >
-                  <sp-icon-remove slot="icon" size="xs"></sp-icon-remove>
-                </sp-action-button>
-              `
-            : html`
-                <sp-action-button
-                  size="xs"
-                  quiet
-                  title="Discard changes"
-                  @click=${async () => {
-                    if (file.status === "U") {
-                      return;
-                    }
-                    const confirmed = await showConfirmDialog(
-                      "Discard Changes",
-                      `Discard changes to ${file.path}?`,
-                      { confirmLabel: "Discard", destructive: true },
-                    );
-                    if (!confirmed) {
-                      return;
-                    }
-                    await gitAction("gitDiscard", [file.path]);
-                  }}
-                  ?disabled=${file.status === "U"}
-                >
-                  <sp-icon-undo slot="icon" size="xs"></sp-icon-undo>
-                </sp-action-button>
-                <sp-action-button
-                  size="xs"
-                  quiet
-                  title="Stage"
-                  @click=${() => gitAction("gitStage", [file.path])}
-                >
-                  <sp-icon-add slot="icon" size="xs"></sp-icon-add>
-                </sp-action-button>
-              `}
+          ${
+            file.staged
+              ? html`
+                  <sp-action-button
+                    size="xs"
+                    quiet
+                    title="Unstage"
+                    @click=${() => gitAction("gitUnstage", [file.path])}
+                  >
+                    <sp-icon-remove slot="icon" size="xs"></sp-icon-remove>
+                  </sp-action-button>
+                `
+              : html`
+                  <sp-action-button
+                    size="xs"
+                    quiet
+                    title="Discard changes"
+                    @click=${async () => {
+                      if (file.status === "U") {
+                        return;
+                      }
+                      const confirmed = await showConfirmDialog(
+                        "Discard Changes",
+                        `Discard changes to ${file.path}?`,
+                        { confirmLabel: "Discard", destructive: true },
+                      );
+                      if (!confirmed) {
+                        return;
+                      }
+                      await gitAction("gitDiscard", [file.path]);
+                    }}
+                    ?disabled=${file.status === "U"}
+                  >
+                    <sp-icon-undo slot="icon" size="xs"></sp-icon-undo>
+                  </sp-action-button>
+                  <sp-action-button
+                    size="xs"
+                    quiet
+                    title="Stage"
+                    @click=${() => gitAction("gitStage", [file.path])}
+                  >
+                    <sp-icon-add slot="icon" size="xs"></sp-icon-add>
+                  </sp-action-button>
+                `
+          }
         </span>
         <span class="git-file-badge git-status-${file.status}">${file.status}</span>
       </div>
@@ -657,72 +663,78 @@ export function renderGitPanel(
   const componentGroups = groupFilesByComponent(allFiles);
 
   const changesT = html`
-    ${stagedFiles.length > 0
-      ? html`
-          <div class="git-section">
-            <div class="git-section-header">
-              <span>Staged Changes</span>
-              <span class="git-count">${stagedFiles.length}</span>
-              <sp-action-button
-                size="xs"
-                quiet
-                title="Unstage all"
-                @click=${() =>
-                  gitAction(
-                    "gitUnstage",
-                    stagedFiles.map((f: GitFileEntry) => f.path),
-                  )}
-              >
-                <sp-icon-remove slot="icon" size="xs"></sp-icon-remove>
-              </sp-action-button>
+    ${
+      stagedFiles.length > 0
+        ? html`
+            <div class="git-section">
+              <div class="git-section-header">
+                <span>Staged Changes</span>
+                <span class="git-count">${stagedFiles.length}</span>
+                <sp-action-button
+                  size="xs"
+                  quiet
+                  title="Unstage all"
+                  @click=${() =>
+                    gitAction(
+                      "gitUnstage",
+                      stagedFiles.map((f: GitFileEntry) => f.path),
+                    )}
+                >
+                  <sp-icon-remove slot="icon" size="xs"></sp-icon-remove>
+                </sp-action-button>
+              </div>
+              ${repeat(stagedFiles, (f: GitFileEntry) => f.path, fileRowT)}
             </div>
-            ${repeat(stagedFiles, (f: GitFileEntry) => f.path, fileRowT)}
-          </div>
-        `
-      : nothing}
+          `
+        : nothing
+    }
     <div class="git-section">
       <div class="git-section-header">
         <span>Changed Components</span>
         <span class="git-count">${allFiles.length}</span>
-        ${unstagedFiles.length > 0
-          ? html`
-              <sp-action-button
-                size="xs"
-                quiet
-                title="Stage all"
-                @click=${() =>
-                  gitAction(
-                    "gitStage",
-                    unstagedFiles.map((f: GitFileEntry) => f.path),
-                  )}
-              >
-                <sp-icon-add slot="icon" size="xs"></sp-icon-add>
-              </sp-action-button>
-            `
-          : nothing}
+        ${
+          unstagedFiles.length > 0
+            ? html`
+                <sp-action-button
+                  size="xs"
+                  quiet
+                  title="Stage all"
+                  @click=${() =>
+                    gitAction(
+                      "gitStage",
+                      unstagedFiles.map((f: GitFileEntry) => f.path),
+                    )}
+                >
+                  <sp-icon-add slot="icon" size="xs"></sp-icon-add>
+                </sp-action-button>
+              `
+            : nothing
+        }
       </div>
-      ${allFiles.length > 0
-        ? html`
-            ${[...componentGroups.entries()].map(
-              ([comp, files]) => html`
-                <div class="git-component-group">
-                  <div class="git-component-header">
-                    <sp-action-button
-                      size="xs"
-                      quiet
-                      class="git-component-overflow"
-                      title="Actions"
-                    >
-                      <sp-icon-more slot="icon" size="xs"></sp-icon-more>
-                    </sp-action-button>
-                    <span class="git-component-name">${comp}</span>
+      ${
+        allFiles.length > 0
+          ? html`
+              ${[...componentGroups.entries()].map(
+                ([comp, files]) => html`
+                  <div class="git-component-group">
+                    <div class="git-component-header">
+                      <sp-action-button
+                        size="xs"
+                        quiet
+                        class="git-component-overflow"
+                        title="Actions"
+                      >
+                        <sp-icon-more slot="icon" size="xs"></sp-icon-more>
+                      </sp-action-button>
+                      <span class="git-component-name">${comp}</span>
+                    </div>
+                    ${repeat(files, (f: GitFileEntry) => f.path, fileRowT)}
                   </div>
-                  ${repeat(files, (f: GitFileEntry) => f.path, fileRowT)}
-                </div>
-              `,
-            )}
-          `
-        : html`<div class="git-empty">No changes</div>`}
+                `,
+              )}
+            `
+          : html`<div class="git-empty">No changes</div>`
+      }
     </div>
   `;
 
@@ -730,19 +742,23 @@ export function renderGitPanel(
   const logEntries = S.ui.gitLogEntries || [];
   const historyT = html`
     <div class="git-history">
-      ${logEntries.length === 0
-        ? html`<div class="git-empty">No history</div>`
-        : repeat(
-            logEntries,
-            (e: GitLogEntry) => e.hash,
-            (entry: GitLogEntry) => html`
-              <div class="git-history-entry">
-                <span class="git-history-hash">${entry.hash.slice(0, 7)}</span>
-                <span class="git-history-message">${entry.message}</span>
-                <span class="git-history-meta">${entry.author} · ${_relativeDate(entry.date)}</span>
-              </div>
-            `,
-          )}
+      ${
+        logEntries.length === 0
+          ? html`<div class="git-empty">No history</div>`
+          : repeat(
+              logEntries,
+              (e: GitLogEntry) => e.hash,
+              (entry: GitLogEntry) => html`
+                <div class="git-history-entry">
+                  <span class="git-history-hash">${entry.hash.slice(0, 7)}</span>
+                  <span class="git-history-message">${entry.message}</span>
+                  <span class="git-history-meta"
+                    >${entry.author} · ${_relativeDate(entry.date)}</span
+                  >
+                </div>
+              `,
+            )
+      }
     </div>
   `;
 

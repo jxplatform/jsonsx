@@ -90,23 +90,27 @@ export function renderGeneralSettings(container: HTMLElement) {
         <label class="settings-field-label">Favicon</label>
         <p class="settings-field-desc">Upload an image to use as the site favicon.</p>
         <div style="display:flex;align-items:center;gap:12px">
-          ${currentFavicon
-            ? html`<img
-                src=${currentFavicon}
-                alt="Current favicon"
-                style="width:32px;height:32px;object-fit:contain;border:1px solid var(--border);border-radius:var(--radius);padding:2px"
-              />`
-            : html`<div
-                style="width:32px;height:32px;border:1px dashed var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;color:var(--fg-dim);font-size:var(--spectrum-font-size-50, 11px)"
-              >
-                —
-              </div>`}
+          ${
+            currentFavicon
+              ? html`<img
+                  src=${currentFavicon}
+                  alt="Current favicon"
+                  style="width:32px;height:32px;object-fit:contain;border:1px solid var(--border);border-radius:var(--radius);padding:2px"
+                />`
+              : html`<div
+                  style="width:32px;height:32px;border:1px dashed var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;color:var(--fg-dim);font-size:var(--spectrum-font-size-50, 11px)"
+                >
+                  —
+                </div>`
+          }
           <sp-action-button size="s" @click=${onFaviconUpload}> Upload Favicon </sp-action-button>
-          ${currentFavicon
-            ? html`<span style="font-size:var(--spectrum-font-size-50, 11px);color:var(--fg-dim)"
-                >${currentFavicon}</span
-              >`
-            : nothing}
+          ${
+            currentFavicon
+              ? html`<span style="font-size:var(--spectrum-font-size-50, 11px);color:var(--fg-dim)"
+                  >${currentFavicon}</span
+                >`
+              : nothing
+          }
         </div>
       </div>
 
@@ -137,15 +141,17 @@ export function renderGeneralSettings(container: HTMLElement) {
             const isBase = key === "--";
             return html`
               <div class="settings-media-row">
-                ${isBase
-                  ? html`<span class="settings-media-name-fixed">Base</span>`
-                  : html`<sp-textfield
-                      size="s"
-                      class="settings-media-name"
-                      .value=${key.replace(/^--/, "")}
-                      placeholder="name"
-                      @change=${onMediaNameChange(key)}
-                    ></sp-textfield>`}
+                ${
+                  isBase
+                    ? html`<span class="settings-media-name-fixed">Base</span>`
+                    : html`<sp-textfield
+                        size="s"
+                        class="settings-media-name"
+                        .value=${key.replace(/^--/, "")}
+                        placeholder="name"
+                        @change=${onMediaNameChange(key)}
+                      ></sp-textfield>`
+                }
                 <sp-textfield
                   size="s"
                   class="settings-media-value"
@@ -153,16 +159,18 @@ export function renderGeneralSettings(container: HTMLElement) {
                   placeholder=${isBase ? "1280px" : "(max-width: 768px)"}
                   @change=${onMediaValueChange(key)}
                 ></sp-textfield>
-                ${isBase
-                  ? nothing
-                  : html`<sp-action-button
-                      size="s"
-                      quiet
-                      title="Remove breakpoint"
-                      @click=${onRemoveBreakpoint(key)}
-                    >
-                      ×
-                    </sp-action-button>`}
+                ${
+                  isBase
+                    ? nothing
+                    : html`<sp-action-button
+                        size="s"
+                        quiet
+                        title="Remove breakpoint"
+                        @click=${onRemoveBreakpoint(key)}
+                      >
+                        ×
+                      </sp-action-button>`
+                }
               </div>
             `;
           })}

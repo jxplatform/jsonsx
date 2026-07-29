@@ -528,9 +528,11 @@ function renderModal() {
         @input=${onInput("name")}
         style="width: 100%"
       >
-        ${_nameError
-          ? html`<sp-help-text slot="negative-help-text">${_nameError}</sp-help-text>`
-          : ""}
+        ${
+          _nameError
+            ? html`<sp-help-text slot="negative-help-text">${_nameError}</sp-help-text>`
+            : ""
+        }
       </sp-textfield>
     </label>
 
@@ -545,41 +547,43 @@ function renderModal() {
     <div class="new-project-step-context">${sourceLabel()}</div>
     <div class="new-project-step-heading">New Project Parameters</div>
     ${nameDirFieldsTpl()}
-    ${_tab === "import"
-      ? renderImportStatus()
-      : html`
-          <label class="new-project-field">
-            <span class="new-project-label">Description</span>
-            <sp-textfield
-              placeholder="A short description of the site"
-              .value=${_form.description}
-              @input=${onInput("description")}
-              style="width: 100%"
-            ></sp-textfield>
-          </label>
+    ${
+      _tab === "import"
+        ? renderImportStatus()
+        : html`
+            <label class="new-project-field">
+              <span class="new-project-label">Description</span>
+              <sp-textfield
+                placeholder="A short description of the site"
+                .value=${_form.description}
+                @input=${onInput("description")}
+                style="width: 100%"
+              ></sp-textfield>
+            </label>
 
-          <label class="new-project-field">
-            <span class="new-project-label">Production URL</span>
-            <sp-textfield
-              placeholder="https://example.com"
-              .value=${_form.url}
-              @input=${onInput("url")}
-              style="width: 100%"
-            ></sp-textfield>
-          </label>
+            <label class="new-project-field">
+              <span class="new-project-label">Production URL</span>
+              <sp-textfield
+                placeholder="https://example.com"
+                .value=${_form.url}
+                @input=${onInput("url")}
+                style="width: 100%"
+              ></sp-textfield>
+            </label>
 
-          <label class="new-project-field">
-            <span class="new-project-label">Deployment Adapter</span>
-            <sp-picker label="Adapter" .value=${_form.adapter} @change=${onAdapterChange}>
-              <sp-menu-item value="static">Static</sp-menu-item>
-              <sp-menu-item value="cloudflare-pages">Cloudflare Pages</sp-menu-item>
-              <sp-menu-item value="node">Node</sp-menu-item>
-              <sp-menu-item value="bun">Bun</sp-menu-item>
-            </sp-picker>
-          </label>
+            <label class="new-project-field">
+              <span class="new-project-label">Deployment Adapter</span>
+              <sp-picker label="Adapter" .value=${_form.adapter} @change=${onAdapterChange}>
+                <sp-menu-item value="static">Static</sp-menu-item>
+                <sp-menu-item value="cloudflare-pages">Cloudflare Pages</sp-menu-item>
+                <sp-menu-item value="node">Node</sp-menu-item>
+                <sp-menu-item value="bun">Bun</sp-menu-item>
+              </sp-picker>
+            </label>
 
-          ${renderDesignFields({ rerender: renderModal })}
-        `}
+            ${renderDesignFields({ rerender: renderModal })}
+          `
+    }
   `;
 
   // ─── Footer ────────────────────────────────────────────────────────────────
@@ -646,29 +650,35 @@ function renderModal() {
           <sp-icon-close slot="icon"></sp-icon-close>
         </sp-action-button>
       </div>
-      ${_step === "source" && !isImportRunning()
-        ? html`
-            <div class="new-project-tabs">
-              <sp-tabs selected=${_tab} quiet @change=${onTabChange}>
-                <sp-tab value="template" label="Template"></sp-tab>
-                <sp-tab value="starter" label="Starter Site"></sp-tab>
-                ${platform.importSite ? html`<sp-tab value="import" label="Import"></sp-tab>` : ""}
-                <sp-tab value="agent" label="Agent"></sp-tab>
-              </sp-tabs>
-            </div>
-          `
-        : ""}
+      ${
+        _step === "source" && !isImportRunning()
+          ? html`
+              <div class="new-project-tabs">
+                <sp-tabs selected=${_tab} quiet @change=${onTabChange}>
+                  <sp-tab value="template" label="Template"></sp-tab>
+                  <sp-tab value="starter" label="Starter Site"></sp-tab>
+                  ${platform.importSite ? html`<sp-tab value="import" label="Import"></sp-tab>` : ""}
+                  <sp-tab value="agent" label="Agent"></sp-tab>
+                </sp-tabs>
+              </div>
+            `
+          : ""
+      }
       <div class="new-project-modal-body">${bodyTpl()}</div>
-      ${_tab !== "import" && _error
-        ? html`<div class="new-project-error new-project-error--global">
-            ${_error}
-            ${_errorInstallUrl
-              ? html`<a href=${_errorInstallUrl} target="_blank" rel="noreferrer">
-                  Install the Jx Suite GitHub App →
-                </a>`
-              : ""}
-          </div>`
-        : ""}
+      ${
+        _tab !== "import" && _error
+          ? html`<div class="new-project-error new-project-error--global">
+              ${_error}
+              ${
+                _errorInstallUrl
+                  ? html`<a href=${_errorInstallUrl} target="_blank" rel="noreferrer">
+                      Install the Jx Suite GitHub App →
+                    </a>`
+                  : ""
+              }
+            </div>`
+          : ""
+      }
       <div class="new-project-modal-footer">${footerTpl()}</div>
     </div>
   `;

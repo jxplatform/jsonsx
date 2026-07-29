@@ -90,9 +90,11 @@ export function renderSessionsList(opts: SessionsListOptions): TemplateResult {
       </sp-action-button>
     </div>
     <div class="ai-sessions">
-      ${opts.sessions.length === 0
-        ? html`<div class="ai-sessions-empty">No previous chats</div>`
-        : opts.sessions.map((s) => renderRow(s, opts))}
+      ${
+        opts.sessions.length === 0
+          ? html`<div class="ai-sessions-empty">No previous chats</div>`
+          : opts.sessions.map((s) => renderRow(s, opts))
+      }
     </div>
   `;
 }

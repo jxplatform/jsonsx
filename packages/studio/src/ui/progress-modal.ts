@@ -38,11 +38,14 @@ function runningView(title: string, status: string): TemplateResult {
       <sp-progress-circle indeterminate size="m" aria-label=${title}></sp-progress-circle>
       <div style="display:flex;flex-direction:column;gap:2px">
         <strong style="font-size:var(--spectrum-font-size-100, 14px)">${title}</strong>
-        ${status
-          ? html`<span style="font-size:var(--spectrum-font-size-75, 12px);color:var(--fg-dim,#aaa)"
-              >${status}</span
-            >`
-          : ""}
+        ${
+          status
+            ? html`<span
+                style="font-size:var(--spectrum-font-size-75, 12px);color:var(--fg-dim,#aaa)"
+                >${status}</span
+              >`
+            : ""
+        }
       </div>
     </div>
   `);

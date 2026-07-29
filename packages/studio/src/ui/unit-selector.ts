@@ -94,40 +94,44 @@ export function renderUnitSelector(
             commitValue((e.target as HTMLInputElement).value);
           }}
         ></sp-textfield>
-        ${hasUnits
-          ? html`
-              <sp-picker-button id=${btnId} size="s">
-                <span slot="label">${currentUnit || units[0] || ""}</span>
-              </sp-picker-button>
-              <sp-overlay trigger="${btnId}@click" placement="bottom-end" offset="4">
-                <sp-popover style="min-width: var(--spectrum-component-width-900, 64px)">
-                  <sp-menu
-                    label="CSS unit"
-                    @change=${(e: Event) => {
-                      const chosen = (e.target as HTMLInputElement).value;
-                      if (keywords.includes(chosen)) {
-                        onChange(chosen);
-                      } else if (units.includes(chosen)) {
-                        const curMatch = String(value ?? "").match(UNIT_RE);
-                        const numPart = curMatch ? curMatch[1] : "";
-                        if (numPart) {
-                          onChange(numPart + chosen);
+        ${
+          hasUnits
+            ? html`
+                <sp-picker-button id=${btnId} size="s">
+                  <span slot="label">${currentUnit || units[0] || ""}</span>
+                </sp-picker-button>
+                <sp-overlay trigger="${btnId}@click" placement="bottom-end" offset="4">
+                  <sp-popover style="min-width: var(--spectrum-component-width-900, 64px)">
+                    <sp-menu
+                      label="CSS unit"
+                      @change=${(e: Event) => {
+                        const chosen = (e.target as HTMLInputElement).value;
+                        if (keywords.includes(chosen)) {
+                          onChange(chosen);
+                        } else if (units.includes(chosen)) {
+                          const curMatch = String(value ?? "").match(UNIT_RE);
+                          const numPart = curMatch ? curMatch[1] : "";
+                          if (numPart) {
+                            onChange(numPart + chosen);
+                          }
                         }
+                      }}
+                    >
+                      ${units.map((u: string) => html`<sp-menu-item value=${u}>${u}</sp-menu-item>`)}
+                      ${
+                        keywords.length > 0 && units.length > 0
+                          ? html`<sp-menu-divider></sp-menu-divider>`
+                          : nothing
                       }
-                    }}
-                  >
-                    ${units.map((u: string) => html`<sp-menu-item value=${u}>${u}</sp-menu-item>`)}
-                    ${keywords.length > 0 && units.length > 0
-                      ? html`<sp-menu-divider></sp-menu-divider>`
-                      : nothing}
-                    ${keywords.map(
-                      (kw: string) => html`<sp-menu-item value=${kw}>${kw}</sp-menu-item>`,
-                    )}
-                  </sp-menu>
-                </sp-popover>
-              </sp-overlay>
-            `
-          : nothing}
+                      ${keywords.map(
+                        (kw: string) => html`<sp-menu-item value=${kw}>${kw}</sp-menu-item>`,
+                      )}
+                    </sp-menu>
+                  </sp-popover>
+                </sp-overlay>
+              `
+            : nothing
+        }
       </div>
     </div>
   `;

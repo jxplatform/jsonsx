@@ -155,24 +155,26 @@ function row(p: PackageInfo) {
   return html`
     <sp-table-row>
       <sp-table-cell>
-        ${p.name}${p.dev
-          ? html`<span style="color:var(--fg-dim);font-size:10px"> · dev</span>`
-          : ""}
+        ${p.name}${
+          p.dev ? html`<span style="color:var(--fg-dim);font-size:10px"> · dev</span>` : ""
+        }
       </sp-table-cell>
       <sp-table-cell>${p.version}</sp-table-cell>
       <sp-table-cell>${latest ?? "—"}</sp-table-cell>
       <sp-table-cell>
-        ${latest
-          ? html`<sp-action-button
-              size="s"
-              quiet
-              ?disabled=${_busy}
-              title="Update to ${latest}"
-              @click=${() => onUpdate(p, latest)}
-            >
-              <sp-icon-refresh slot="icon"></sp-icon-refresh>
-            </sp-action-button>`
-          : ""}
+        ${
+          latest
+            ? html`<sp-action-button
+                size="s"
+                quiet
+                ?disabled=${_busy}
+                title="Update to ${latest}"
+                @click=${() => onUpdate(p, latest)}
+              >
+                <sp-icon-refresh slot="icon"></sp-icon-refresh>
+              </sp-action-button>`
+            : ""
+        }
         <sp-action-button
           size="s"
           quiet
@@ -214,11 +216,13 @@ function render() {
           Add
         </sp-action-button>
         <span style="flex:1"></span>
-        ${hasUpdates
-          ? html`<sp-action-button size="s" ?disabled=${_busy} @click=${onUpdateAll}>
-              Update all
-            </sp-action-button>`
-          : ""}
+        ${
+          hasUpdates
+            ? html`<sp-action-button size="s" ?disabled=${_busy} @click=${onUpdateAll}>
+                Update all
+              </sp-action-button>`
+            : ""
+        }
         <sp-action-button
           size="s"
           quiet
@@ -231,21 +235,23 @@ function render() {
         </sp-action-button>
       </div>
 
-      ${_packages === null
-        ? html`<p class="about-muted">Loading…</p>`
-        : pkgs.length === 0
-          ? html`<p class="about-muted">No dependencies.</p>`
-          : html`
-              <sp-table size="s">
-                <sp-table-head>
-                  <sp-table-head-cell>Package</sp-table-head-cell>
-                  <sp-table-head-cell>Current</sp-table-head-cell>
-                  <sp-table-head-cell>Latest</sp-table-head-cell>
-                  <sp-table-head-cell></sp-table-head-cell>
-                </sp-table-head>
-                <sp-table-body> ${pkgs.map((p) => row(p))} </sp-table-body>
-              </sp-table>
-            `}
+      ${
+        _packages === null
+          ? html`<p class="about-muted">Loading…</p>`
+          : pkgs.length === 0
+            ? html`<p class="about-muted">No dependencies.</p>`
+            : html`
+                <sp-table size="s">
+                  <sp-table-head>
+                    <sp-table-head-cell>Package</sp-table-head-cell>
+                    <sp-table-head-cell>Current</sp-table-head-cell>
+                    <sp-table-head-cell>Latest</sp-table-head-cell>
+                    <sp-table-head-cell></sp-table-head-cell>
+                  </sp-table-head>
+                  <sp-table-body> ${pkgs.map((p) => row(p))} </sp-table-body>
+                </sp-table>
+              `
+      }
     </div>
   `;
 

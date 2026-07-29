@@ -126,9 +126,9 @@ export function renderElementsTemplate(ctx: {
                   <div
                     class="element-card"
                     data-component-tag=${comp.tagName}
-                    title=${comp.source === "npm"
-                      ? `${comp.package}: <${comp.tagName}>`
-                      : comp.path}
+                    title=${
+                      comp.source === "npm" ? `${comp.package}: <${comp.tagName}>` : comp.path
+                    }
                     @click=${() => {
                       const t = activeTab.value;
                       const parentPath = t?.session.selection || [];

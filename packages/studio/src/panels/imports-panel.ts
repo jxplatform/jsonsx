@@ -127,33 +127,35 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
           <span class="imports-section-title">Class Imports</span>
           <span class="imports-count">${entries.length}</span>
         </div>
-        ${entries.length > 0
-          ? html`
-              <div class="imports-list">
-                ${entries.map(
-                  ([name, path]) => html`
-                    <div class="import-row">
-                      <span class="import-name" title=${path as string}>${name}</span>
-                      <span class="import-path">${path}</span>
-                      <sp-action-button
-                        quiet
-                        size="xs"
-                        title="Remove"
-                        @click=${async () => {
-                          const updated = { ...siteImports };
-                          delete updated[name];
-                          await updateSiteConfig({ imports: updated });
-                          renderLeftPanel();
-                        }}
-                      >
-                        <sp-icon-close slot="icon" size="xs"></sp-icon-close>
-                      </sp-action-button>
-                    </div>
-                  `,
-                )}
-              </div>
-            `
-          : html`<div class="imports-empty">No class imports</div>`}
+        ${
+          entries.length > 0
+            ? html`
+                <div class="imports-list">
+                  ${entries.map(
+                    ([name, path]) => html`
+                      <div class="import-row">
+                        <span class="import-name" title=${path as string}>${name}</span>
+                        <span class="import-path">${path}</span>
+                        <sp-action-button
+                          quiet
+                          size="xs"
+                          title="Remove"
+                          @click=${async () => {
+                            const updated = { ...siteImports };
+                            delete updated[name];
+                            await updateSiteConfig({ imports: updated });
+                            renderLeftPanel();
+                          }}
+                        >
+                          <sp-icon-close slot="icon" size="xs"></sp-icon-close>
+                        </sp-action-button>
+                      </div>
+                    `,
+                  )}
+                </div>
+              `
+            : html`<div class="imports-empty">No class imports</div>`
+        }
         <div class="import-add-form">
           <sp-textfield placeholder="Name" size="s" class="import-add-name"></sp-textfield>
           <sp-textfield placeholder="Path" size="s" class="import-add-path"></sp-textfield>
@@ -363,64 +365,68 @@ function renderDocumentLevelImports({
           <span class="imports-section-title">Components</span>
           <span class="imports-count">${refEntries.length}</span>
         </div>
-        ${refEntries.length > 0
-          ? html`
-              <div class="imports-list">
-                ${refEntries.map(
-                  (entry: ElementsEntry) => html`
-                    <div class="import-row">
-                      <span class="import-path" title=${(entry as { $ref: string }).$ref}
-                        >${(entry as { $ref: string }).$ref}</span
-                      >
-                      <sp-action-button
-                        quiet
-                        size="xs"
-                        title="Remove"
-                        @click=${() => removeRef((entry as { $ref: string }).$ref)}
-                      >
-                        <sp-icon-close slot="icon" size="xs"></sp-icon-close>
-                      </sp-action-button>
-                    </div>
-                  `,
-                )}
-              </div>
-            `
-          : nothing}
-        ${availableComponents.length > 0
-          ? html`
-              <div class="import-add-form">
-                <sp-picker
-                  size="s"
-                  label="Add component…"
-                  class="import-picker"
-                  @change=${(e: Event) => {
-                    const tag = (e.target as HTMLInputElement).value;
-                    if (!tag) {
-                      return;
-                    }
-                    (e.target as HTMLInputElement).value = "";
-                    const comp = componentRegistry.find((c: ComponentEntry) => c.tagName === tag);
-                    if (!comp?.path) {
-                      return;
-                    }
-                    const relPath = computeRelativePath(documentPath, comp.path);
-                    applyMutation((doc: JxMutableNode) => {
-                      if (!doc.$elements) {
-                        doc.$elements = [];
-                      }
-                      doc.$elements.push({ $ref: relPath });
-                    });
-                    renderLeftPanel();
-                  }}
-                >
-                  ${availableComponents.map(
-                    (c: ComponentEntry) =>
-                      html`<sp-menu-item value=${c.tagName}>&lt;${c.tagName}&gt;</sp-menu-item>`,
+        ${
+          refEntries.length > 0
+            ? html`
+                <div class="imports-list">
+                  ${refEntries.map(
+                    (entry: ElementsEntry) => html`
+                      <div class="import-row">
+                        <span class="import-path" title=${(entry as { $ref: string }).$ref}
+                          >${(entry as { $ref: string }).$ref}</span
+                        >
+                        <sp-action-button
+                          quiet
+                          size="xs"
+                          title="Remove"
+                          @click=${() => removeRef((entry as { $ref: string }).$ref)}
+                        >
+                          <sp-icon-close slot="icon" size="xs"></sp-icon-close>
+                        </sp-action-button>
+                      </div>
+                    `,
                   )}
-                </sp-picker>
-              </div>
-            `
-          : nothing}
+                </div>
+              `
+            : nothing
+        }
+        ${
+          availableComponents.length > 0
+            ? html`
+                <div class="import-add-form">
+                  <sp-picker
+                    size="s"
+                    label="Add component…"
+                    class="import-picker"
+                    @change=${(e: Event) => {
+                      const tag = (e.target as HTMLInputElement).value;
+                      if (!tag) {
+                        return;
+                      }
+                      (e.target as HTMLInputElement).value = "";
+                      const comp = componentRegistry.find((c: ComponentEntry) => c.tagName === tag);
+                      if (!comp?.path) {
+                        return;
+                      }
+                      const relPath = computeRelativePath(documentPath, comp.path);
+                      applyMutation((doc: JxMutableNode) => {
+                        if (!doc.$elements) {
+                          doc.$elements = [];
+                        }
+                        doc.$elements.push({ $ref: relPath });
+                      });
+                      renderLeftPanel();
+                    }}
+                  >
+                    ${availableComponents.map(
+                      (c: ComponentEntry) =>
+                        html`<sp-menu-item value=${c.tagName}>&lt;${c.tagName}&gt;</sp-menu-item>`,
+                    )}
+                  </sp-picker>
+                </div>
+              `
+            : nothing
+        }
       </div>
 
       <!-- npm Package Components (cherry-pick toggles) -->

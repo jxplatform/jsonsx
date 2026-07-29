@@ -429,43 +429,45 @@ export function renderDefsEditor(container: HTMLElement) {
           </sp-action-button>
         `,
       )}
-      ${showNewDef
-        ? html`
-            <div class="settings-inline-form">
-              <sp-textfield
+      ${
+        showNewDef
+          ? html`
+              <div class="settings-inline-form">
+                <sp-textfield
+                  size="s"
+                  placeholder="TypeName"
+                  .value=${newDefName}
+                  @input=${(e: Event) => {
+                    newDefName = (e.target as HTMLInputElement).value;
+                  }}
+                  @keydown=${(e: KeyboardEvent) => {
+                    if (e.key === "Enter") {
+                      handleNewDef(rerender);
+                    }
+                    if (e.key === "Escape") {
+                      showNewDef = false;
+                      rerender();
+                    }
+                  }}
+                ></sp-textfield>
+                <sp-action-button size="s" @click=${() => handleNewDef(rerender)}>
+                  Create
+                </sp-action-button>
+              </div>
+            `
+          : html`
+              <sp-action-button
                 size="s"
-                placeholder="TypeName"
-                .value=${newDefName}
-                @input=${(e: Event) => {
-                  newDefName = (e.target as HTMLInputElement).value;
+                quiet
+                @click=${() => {
+                  showNewDef = true;
+                  rerender();
                 }}
-                @keydown=${(e: KeyboardEvent) => {
-                  if (e.key === "Enter") {
-                    handleNewDef(rerender);
-                  }
-                  if (e.key === "Escape") {
-                    showNewDef = false;
-                    rerender();
-                  }
-                }}
-              ></sp-textfield>
-              <sp-action-button size="s" @click=${() => handleNewDef(rerender)}>
-                Create
+              >
+                <sp-icon-add slot="icon"></sp-icon-add> New Definition
               </sp-action-button>
-            </div>
-          `
-        : html`
-            <sp-action-button
-              size="s"
-              quiet
-              @click=${() => {
-                showNewDef = true;
-                rerender();
-              }}
-            >
-              <sp-icon-add slot="icon"></sp-icon-add> New Definition
-            </sp-action-button>
-          `}
+            `
+      }
     </div>
   `;
 
@@ -513,36 +515,38 @@ export function renderDefsEditor(container: HTMLElement) {
           </sp-action-button>
         </div>
         <div class="schema-field-list">${fieldCards}</div>
-        ${showAddField
-          ? addFieldFormTpl(newFieldState, {
-              onCancel: () => {
-                showAddField = false;
-                newFieldState = {
-                  format: "",
-                  name: "",
-                  required: false,
-                  type: "string",
-                };
-                rerender();
-              },
-              onConfirm: () => handleAddField(rerender),
-              onInput: (field, value) => {
-                newFieldState = { ...newFieldState, [field]: value };
-                rerender();
-              },
-            })
-          : html`
-              <sp-action-button
-                size="s"
-                quiet
-                @click=${() => {
-                  showAddField = true;
+        ${
+          showAddField
+            ? addFieldFormTpl(newFieldState, {
+                onCancel: () => {
+                  showAddField = false;
+                  newFieldState = {
+                    format: "",
+                    name: "",
+                    required: false,
+                    type: "string",
+                  };
                   rerender();
-                }}
-              >
-                <sp-icon-add slot="icon"></sp-icon-add> Add Field
-              </sp-action-button>
-            `}
+                },
+                onConfirm: () => handleAddField(rerender),
+                onInput: (field, value) => {
+                  newFieldState = { ...newFieldState, [field]: value };
+                  rerender();
+                },
+              })
+            : html`
+                <sp-action-button
+                  size="s"
+                  quiet
+                  @click=${() => {
+                    showAddField = true;
+                    rerender();
+                  }}
+                >
+                  <sp-icon-add slot="icon"></sp-icon-add> Add Field
+                </sp-action-button>
+              `
+        }
       </div>
     `;
   }

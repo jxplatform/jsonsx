@@ -123,13 +123,15 @@ export function fieldCardTpl(
           }}
         ></sp-textfield>
         ${typePickerTpl(type, (newType) => handlers.onChangeType(fieldName, newType))}
-        ${type === "string" || type === "array"
-          ? formatPickerTpl(format, (f) => {
-              if (handlers.onChangeFormat) {
-                handlers.onChangeFormat(fieldName, f);
-              }
-            })
-          : nothing}
+        ${
+          type === "string" || type === "array"
+            ? formatPickerTpl(format, (f) => {
+                if (handlers.onChangeFormat) {
+                  handlers.onChangeFormat(fieldName, f);
+                }
+              })
+            : nothing
+        }
         <sp-switch
           size="s"
           ?checked=${isRequired}
@@ -146,40 +148,44 @@ export function fieldCardTpl(
           <sp-icon-delete slot="icon"></sp-icon-delete>
         </sp-action-button>
       </div>
-      ${isRef && contentTypeNames.length > 0
-        ? html`
-            <div class="schema-field-ref-target">
-              <sp-picker
-                size="s"
-                label="Target"
-                value=${refTarget}
-                @change=${(e: Event) => {
-                  if (handlers.onChangeRefTarget) {
-                    handlers.onChangeRefTarget(fieldName, (e.target as HTMLInputElement).value);
-                  }
-                }}
-              >
-                ${contentTypeNames.map((n) => html`<sp-menu-item value=${n}>${n}</sp-menu-item>`)}
-              </sp-picker>
-            </div>
-          `
-        : nothing}
-      ${isNested
-        ? html`
-            <div class="schema-field-nested">
-              ${Object.entries(nestedProps).map(([name, sub]) =>
-                nestedFieldCardTpl(
-                  fieldName,
-                  name,
-                  /** @type {SchemaProperty} */ sub,
-                  nestedRequired.includes(name),
-                  handlers,
-                ),
-              )}
-              ${nestedAddFieldTpl(fieldName, handlers)}
-            </div>
-          `
-        : nothing}
+      ${
+        isRef && contentTypeNames.length > 0
+          ? html`
+              <div class="schema-field-ref-target">
+                <sp-picker
+                  size="s"
+                  label="Target"
+                  value=${refTarget}
+                  @change=${(e: Event) => {
+                    if (handlers.onChangeRefTarget) {
+                      handlers.onChangeRefTarget(fieldName, (e.target as HTMLInputElement).value);
+                    }
+                  }}
+                >
+                  ${contentTypeNames.map((n) => html`<sp-menu-item value=${n}>${n}</sp-menu-item>`)}
+                </sp-picker>
+              </div>
+            `
+          : nothing
+      }
+      ${
+        isNested
+          ? html`
+              <div class="schema-field-nested">
+                ${Object.entries(nestedProps).map(([name, sub]) =>
+                  nestedFieldCardTpl(
+                    fieldName,
+                    name,
+                    /** @type {SchemaProperty} */ sub,
+                    nestedRequired.includes(name),
+                    handlers,
+                  ),
+                )}
+                ${nestedAddFieldTpl(fieldName, handlers)}
+              </div>
+            `
+          : nothing
+      }
     </div>
   `;
 }
@@ -238,13 +244,15 @@ function nestedFieldCardTpl(
             handlers.onChangeNestedType(parentName, childName, newType);
           }
         })}
-        ${type === "string" || type === "array"
-          ? formatPickerTpl(format, (f) => {
-              if (handlers.onChangeNestedFormat) {
-                handlers.onChangeNestedFormat(parentName, childName, f);
-              }
-            })
-          : nothing}
+        ${
+          type === "string" || type === "array"
+            ? formatPickerTpl(format, (f) => {
+                if (handlers.onChangeNestedFormat) {
+                  handlers.onChangeNestedFormat(parentName, childName, f);
+                }
+              })
+            : nothing
+        }
         <sp-switch
           size="s"
           ?checked=${isRequired}
@@ -413,9 +421,11 @@ export function addFieldFormTpl(
         }}
       ></sp-textfield>
       ${typePickerTpl(state.type, (t) => handlers.onInput("type", t))}
-      ${state.type === "string" || state.type === "array"
-        ? formatPickerTpl(state.format || "", (f) => handlers.onInput("format", f))
-        : nothing}
+      ${
+        state.type === "string" || state.type === "array"
+          ? formatPickerTpl(state.format || "", (f) => handlers.onInput("format", f))
+          : nothing
+      }
       <sp-switch
         size="s"
         ?checked=${state.required}

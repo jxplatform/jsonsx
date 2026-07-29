@@ -231,15 +231,21 @@ function renderOverlay() {
           })}
         />
         <div class="quick-search-results">
-          ${items.length === 0 && hasQuery
-            ? html`<div class="quick-search-empty">No results</div>`
-            : nothing}
-          ${items.length === 0 && !hasQuery
-            ? html`<div class="quick-search-empty">${emptyHint}</div>`
-            : nothing}
-          ${showingRecent && items.length > 0
-            ? html`<div class="quick-search-section-label">${sectionLabel}</div>`
-            : nothing}
+          ${
+            items.length === 0 && hasQuery
+              ? html`<div class="quick-search-empty">No results</div>`
+              : nothing
+          }
+          ${
+            items.length === 0 && !hasQuery
+              ? html`<div class="quick-search-empty">${emptyHint}</div>`
+              : nothing
+          }
+          ${
+            showingRecent && items.length > 0
+              ? html`<div class="quick-search-section-label">${sectionLabel}</div>`
+              : nothing
+          }
           ${items.map((item, i) => {
             const icon =
               item.kind === "project"

@@ -347,9 +347,11 @@ export function showPromptDialog(
             @keydown=${onKeydown}
             ${ref(onFieldRef)}
           >
-            ${error
-              ? html`<sp-help-text slot="negative-help-text">${error}</sp-help-text>`
-              : nothing}
+            ${
+              error
+                ? html`<sp-help-text slot="negative-help-text">${error}</sp-help-text>`
+                : nothing
+            }
           </sp-textfield>
         </sp-dialog-wrapper>
       `;

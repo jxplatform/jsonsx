@@ -183,33 +183,35 @@ function recentMenuTpl(ctx: ToolbarCtx) {
           }}
         >
           <sp-menu-item value="__new__">New Project…</sp-menu-item>
-          ${recentProjects.length > 0
-            ? html`
-                <sp-menu-divider></sp-menu-divider>
-                ${recentProjects.map(
-                  (p) => html`
-                    <sp-menu-item value=${p.root} title=${p.root}>
-                      ${p.name}
-                      <sp-action-button
-                        slot="end"
-                        quiet
-                        size="s"
-                        title="Remove from recent"
-                        @click=${(e: Event) => {
-                          e.stopPropagation();
-                          removeRecentProject(p.root);
-                          render();
-                        }}
-                      >
-                        <sp-icon-close slot="icon"></sp-icon-close>
-                      </sp-action-button>
-                    </sp-menu-item>
-                  `,
-                )}
-                <sp-menu-divider></sp-menu-divider>
-                <sp-menu-item value="__clear__">Clear recent projects</sp-menu-item>
-              `
-            : nothing}
+          ${
+            recentProjects.length > 0
+              ? html`
+                  <sp-menu-divider></sp-menu-divider>
+                  ${recentProjects.map(
+                    (p) => html`
+                      <sp-menu-item value=${p.root} title=${p.root}>
+                        ${p.name}
+                        <sp-action-button
+                          slot="end"
+                          quiet
+                          size="s"
+                          title="Remove from recent"
+                          @click=${(e: Event) => {
+                            e.stopPropagation();
+                            removeRecentProject(p.root);
+                            render();
+                          }}
+                        >
+                          <sp-icon-close slot="icon"></sp-icon-close>
+                        </sp-action-button>
+                      </sp-menu-item>
+                    `,
+                  )}
+                  <sp-menu-divider></sp-menu-divider>
+                  <sp-menu-item value="__clear__">Clear recent projects</sp-menu-item>
+                `
+              : nothing
+          }
         </sp-menu>
       </sp-popover>
     </overlay-trigger>
@@ -318,9 +320,11 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
         render();
       }}
     >
-      ${view.rightPanelCollapsed
-        ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
-        : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`}
+      ${
+        view.rightPanelCollapsed
+          ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
+          : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`
+      }
     </sp-action-button>
     ${chatToggleTpl()} ${csdTpl}
   `;
@@ -550,19 +554,21 @@ function toolbarTemplate() {
       <sp-icon-search slot="icon"></sp-icon-search>
       <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
     </sp-action-button>
-    ${(activeTab.value?.session.ui.gitStatus?.behind ?? 0) > 0
-      ? html`<sp-action-button
-          size="s"
-          title="Sync Project"
-          @click=${async () => {
-            await getPlatform().gitPull();
-            await refreshGitStatus();
-          }}
-        >
-          <sp-icon-download slot="icon"></sp-icon-download>
-          <span class="tb-label">Sync Project</span>
-        </sp-action-button>`
-      : nothing}
+    ${
+      (activeTab.value?.session.ui.gitStatus?.behind ?? 0) > 0
+        ? html`<sp-action-button
+            size="s"
+            title="Sync Project"
+            @click=${async () => {
+              await getPlatform().gitPull();
+              await refreshGitStatus();
+            }}
+          >
+            <sp-icon-download slot="icon"></sp-icon-download>
+            <span class="tb-label">Sync Project</span>
+          </sp-action-button>`
+        : nothing
+    }
     <div class="tb-spacer"></div>
     ${modeSwitcherTpl}
     <sp-action-button
@@ -575,9 +581,11 @@ function toolbarTemplate() {
         render();
       }}
     >
-      ${view.rightPanelCollapsed
-        ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
-        : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`}
+      ${
+        view.rightPanelCollapsed
+          ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
+          : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`
+      }
     </sp-action-button>
     ${chatToggleTpl()} ${isMac ? nothing : csdTpl}
   `;

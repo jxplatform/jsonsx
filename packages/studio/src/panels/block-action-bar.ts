@@ -505,9 +505,11 @@ function showLinkPopover(anchorBtn: HTMLElement) {
         <sp-action-button size="xs" @click=${onApply}>
           ${existing ? "Update" : "Apply"}
         </sp-action-button>
-        ${existing
-          ? html` <sp-action-button size="xs" @click=${onRemove}>Remove</sp-action-button> `
-          : nothing}
+        ${
+          existing
+            ? html` <sp-action-button size="xs" @click=${onRemove}>Remove</sp-action-button> `
+            : nothing
+        }
       </sp-popover>
     `,
     host,
@@ -653,115 +655,123 @@ export function renderBlockActionBar() {
 
         <span
           class="bar-tag${badgeInteractive ? " bar-tag--interactive" : ""}"
-          @click=${badgeInteractive
-            ? (e: MouseEvent) => onTagBadgeClick(e, convertTargets, selection)
-            : nothing}
-          >${isRepeater ? nodeLabel(node) : node.$id || (node.tagName ?? "div")}${editingProp
-            ? ` · ${editingProp}`
-            : ""}</span
+          @click=${
+            badgeInteractive
+              ? (e: MouseEvent) => onTagBadgeClick(e, convertTargets, selection)
+              : nothing
+          }
+          >${isRepeater ? nodeLabel(node) : node.$id || (node.tagName ?? "div")}${
+            editingProp ? ` · ${editingProp}` : ""
+          }</span
         >
 
-        ${selection.length >= 2
-          ? html`<span
-              class="bar-drag-handle"
-              title="Drag to reorder"
-              ${ref((handleEl) => {
-                if (!handleEl) {
-                  return;
-                }
-                if (view.selDragCleanup) {
-                  view.selDragCleanup();
-                  view.selDragCleanup = null;
-                }
-                view.selDragCleanup = draggable({
-                  element: handleEl as HTMLElement,
-                  getInitialData: () => ({
-                    // Snapshot the selection: the live array is a Vue reactive proxy, which
-                    // Structured clone rejects when the src crosses postMessage (DataCloneError
-                    // Killed the whole handle drag), and a live reference would also mutate the
-                    // Retained srcData if the selection changed mid-drag.
-                    path: [...(activeTab.value?.session.selection ?? [])],
-                    type: "tree-node",
-                  }),
-                  onGenerateDragPreview: ({
-                    nativeSetDragImage,
-                  }: {
-                    nativeSetDragImage: ((image: Element, x: number, y: number) => void) | null;
-                  }) => {
-                    // Suppress the native drag image; the cross-frame ghost is the drag affordance.
-                    disableNativeDragPreview({ nativeSetDragImage });
-                  },
-                });
-              })}
-              >⠿</span
-            >`
-          : nothing}
+        ${
+          selection.length >= 2
+            ? html`<span
+                class="bar-drag-handle"
+                title="Drag to reorder"
+                ${ref((handleEl) => {
+                  if (!handleEl) {
+                    return;
+                  }
+                  if (view.selDragCleanup) {
+                    view.selDragCleanup();
+                    view.selDragCleanup = null;
+                  }
+                  view.selDragCleanup = draggable({
+                    element: handleEl as HTMLElement,
+                    getInitialData: () => ({
+                      // Snapshot the selection: the live array is a Vue reactive proxy, which
+                      // Structured clone rejects when the src crosses postMessage (DataCloneError
+                      // Killed the whole handle drag), and a live reference would also mutate the
+                      // Retained srcData if the selection changed mid-drag.
+                      path: [...(activeTab.value?.session.selection ?? [])],
+                      type: "tree-node",
+                    }),
+                    onGenerateDragPreview: ({
+                      nativeSetDragImage,
+                    }: {
+                      nativeSetDragImage: ((image: Element, x: number, y: number) => void) | null;
+                    }) => {
+                      // Suppress the native drag image; the cross-frame ghost is the drag affordance.
+                      disableNativeDragPreview({ nativeSetDragImage });
+                    },
+                  });
+                })}
+                >⠿</span
+              >`
+            : nothing
+        }
         ${selection.length >= 2 ? renderMoveArrows() : nothing}
-        ${selection.length >= 2 && node.tagName
-          ? (() => {
-              const isComp =
-                node.tagName.includes("-") &&
-                componentRegistry.some(
-                  (/** @type {{ tagName: string }} */ c) => c.tagName === node.tagName,
-                );
-              if (isComp) {
-                const comp = componentRegistry.find(
-                  (/** @type {{ tagName: string; path: string }} */ c) =>
-                    c.tagName === node.tagName,
-                );
+        ${
+          selection.length >= 2 && node.tagName
+            ? (() => {
+                const isComp =
+                  node.tagName.includes("-") &&
+                  componentRegistry.some(
+                    (/** @type {{ tagName: string }} */ c) => c.tagName === node.tagName,
+                  );
+                if (isComp) {
+                  const comp = componentRegistry.find(
+                    (/** @type {{ tagName: string; path: string }} */ c) =>
+                      c.tagName === node.tagName,
+                  );
+                  return html`<sp-action-button
+                    size="xs"
+                    quiet
+                    title="Edit Component"
+                    @click=${() => _ctx?.navigateToComponent(comp?.path as string)}
+                    ><sp-icon-edit slot="icon" size="xs"></sp-icon-edit
+                  ></sp-action-button>`;
+                }
                 return html`<sp-action-button
                   size="xs"
                   quiet
-                  title="Edit Component"
-                  @click=${() => _ctx?.navigateToComponent(comp?.path as string)}
-                  ><sp-icon-edit slot="icon" size="xs"></sp-icon-edit
+                  title="Convert to Component"
+                  @click=${() => convertToComponent()}
+                  ><sp-icon-box slot="icon" size="xs"></sp-icon-box
                 ></sp-action-button>`;
-              }
-              return html`<sp-action-button
-                size="xs"
-                quiet
-                title="Convert to Component"
-                @click=${() => convertToComponent()}
-                ><sp-icon-box slot="icon" size="xs"></sp-icon-box
-              ></sp-action-button>`;
-            })()
-          : nothing}
-        ${showFormat
-          ? html`
-              <sp-divider size="s" vertical></sp-divider>
-              <sp-action-group
-                size="xs"
-                compact
-                emphasized
-                selects="multiple"
-                selected=${activeValues.length > 0 ? JSON.stringify(activeValues) : nothing}
-              >
-                ${actions.map(
-                  (action) => html`
-                    <sp-action-button
-                      size="xs"
-                      value=${action.tag}
-                      title="${action.label}${action.shortcut ? ` (${action.shortcut})` : ""}"
-                      ?disabled=${formatDisabled && action.command !== "link"}
-                      @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                      @click=${(e: MouseEvent) => onFormatClick(e, action)}
-                    >
-                      ${action.icon ? (formatIconMap[action.icon] ?? nothing) : nothing}
-                    </sp-action-button>
-                  `,
-                )}
-              </sp-action-group>
-              <sp-action-button
-                size="xs"
-                quiet
-                title="Insert data"
-                @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                @click=${onMergeTagClick}
-              >
-                <sp-icon-data slot="icon"></sp-icon-data>
-              </sp-action-button>
-            `
-          : nothing}
+              })()
+            : nothing
+        }
+        ${
+          showFormat
+            ? html`
+                <sp-divider size="s" vertical></sp-divider>
+                <sp-action-group
+                  size="xs"
+                  compact
+                  emphasized
+                  selects="multiple"
+                  selected=${activeValues.length > 0 ? JSON.stringify(activeValues) : nothing}
+                >
+                  ${actions.map(
+                    (action) => html`
+                      <sp-action-button
+                        size="xs"
+                        value=${action.tag}
+                        title="${action.label}${action.shortcut ? ` (${action.shortcut})` : ""}"
+                        ?disabled=${formatDisabled && action.command !== "link"}
+                        @mousedown=${(e: MouseEvent) => e.preventDefault()}
+                        @click=${(e: MouseEvent) => onFormatClick(e, action)}
+                      >
+                        ${action.icon ? (formatIconMap[action.icon] ?? nothing) : nothing}
+                      </sp-action-button>
+                    `,
+                  )}
+                </sp-action-group>
+                <sp-action-button
+                  size="xs"
+                  quiet
+                  title="Insert data"
+                  @mousedown=${(e: MouseEvent) => e.preventDefault()}
+                  @click=${onMergeTagClick}
+                >
+                  <sp-icon-data slot="icon"></sp-icon-data>
+                </sp-action-button>
+              `
+            : nothing
+        }
       </div>
     `,
     view.blockActionBarEl,

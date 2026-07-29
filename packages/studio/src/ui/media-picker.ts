@@ -193,26 +193,32 @@ function renderMediaPickerPopover() {
             dismissMediaPickerPopover();
           }}
         >
-          ${options.length > 0
-            ? options.map(
-                (m) => html`
-                  <sp-menu-item value=${m.path}>
-                    ${m.isImage
-                      ? html`<img
-                          slot="icon"
-                          src=${loopbackAssetSrc(m.path)}
-                          alt=""
-                          style="width:24px;height:24px;object-fit:cover;border-radius:var(--spectrum-corner-radius-75, 2px)"
-                        />`
-                      : nothing}
-                    ${m.name}
-                  </sp-menu-item>
-                `,
-              )
-            : html`<sp-menu-item disabled>No matches</sp-menu-item>`}
-          ${filtered.length > 50
-            ? html`<sp-menu-item disabled>…${filtered.length - 50} more</sp-menu-item>`
-            : nothing}
+          ${
+            options.length > 0
+              ? options.map(
+                  (m) => html`
+                    <sp-menu-item value=${m.path}>
+                      ${
+                        m.isImage
+                          ? html`<img
+                              slot="icon"
+                              src=${loopbackAssetSrc(m.path)}
+                              alt=""
+                              style="width:24px;height:24px;object-fit:cover;border-radius:var(--spectrum-corner-radius-75, 2px)"
+                            />`
+                          : nothing
+                      }
+                      ${m.name}
+                    </sp-menu-item>
+                  `,
+                )
+              : html`<sp-menu-item disabled>No matches</sp-menu-item>`
+          }
+          ${
+            filtered.length > 50
+              ? html`<sp-menu-item disabled>…${filtered.length - 50} more</sp-menu-item>`
+              : nothing
+          }
         </sp-menu>
       </sp-popover>
     `,
@@ -329,13 +335,15 @@ export function renderMediaPicker(prop: string, value: string, onCommit: (val: s
 
   return html`
     <div class="media-picker">
-      ${isImage && currentValue
-        ? html`<img
-            class="media-picker-thumb"
-            src=${loopbackAssetSrc(previewAssetSrc(currentValue))}
-            alt=""
-          />`
-        : nothing}
+      ${
+        isImage && currentValue
+          ? html`<img
+              class="media-picker-thumb"
+              src=${loopbackAssetSrc(previewAssetSrc(currentValue))}
+              alt=""
+            />`
+          : nothing
+      }
       <sp-textfield
         size="s"
         placeholder="/image.jpg"

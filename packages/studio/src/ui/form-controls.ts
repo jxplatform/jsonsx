@@ -237,50 +237,52 @@ function schemaBuilderControl({ key, value, onChange, ctx, rerender }: SchemaFor
   return html`
     <div class="schema-builder">
       <div class="schema-field-list">${fieldCards}</div>
-      ${addFieldOpen.has(stateKey)
-        ? addFieldFormTpl(addFieldState, {
-            onCancel: () => {
-              addFieldOpen.delete(stateKey);
-              addFieldStates.delete(stateKey);
-              rerender?.();
-            },
-            onConfirm: () => {
-              const raw = addFieldState.name.trim();
-              const name = toCamelCase(raw);
-              if (!name) {
-                return;
-              }
-              // Close the form before update() rerenders with the committed value
-              addFieldOpen.delete(stateKey);
-              addFieldStates.delete(stateKey);
-              update((draft) => {
-                draft.properties![name] = schemaForType(
-                  addFieldState.type,
-                  addFieldState.format || undefined,
-                );
-                if (addFieldState.required && !draft.required!.includes(name)) {
-                  draft.required!.push(name);
-                }
-              });
-            },
-            onInput: (field, val) => {
-              addFieldStates.set(stateKey, { ...addFieldState, [field]: val });
-              rerender?.();
-            },
-          })
-        : html`
-            <sp-action-button
-              size="s"
-              quiet
-              @click=${() => {
-                addFieldOpen.add(stateKey);
-                addFieldStates.set(stateKey, blankAddFieldState());
+      ${
+        addFieldOpen.has(stateKey)
+          ? addFieldFormTpl(addFieldState, {
+              onCancel: () => {
+                addFieldOpen.delete(stateKey);
+                addFieldStates.delete(stateKey);
                 rerender?.();
-              }}
-            >
-              <sp-icon-add slot="icon"></sp-icon-add> Add Field
-            </sp-action-button>
-          `}
+              },
+              onConfirm: () => {
+                const raw = addFieldState.name.trim();
+                const name = toCamelCase(raw);
+                if (!name) {
+                  return;
+                }
+                // Close the form before update() rerenders with the committed value
+                addFieldOpen.delete(stateKey);
+                addFieldStates.delete(stateKey);
+                update((draft) => {
+                  draft.properties![name] = schemaForType(
+                    addFieldState.type,
+                    addFieldState.format || undefined,
+                  );
+                  if (addFieldState.required && !draft.required!.includes(name)) {
+                    draft.required!.push(name);
+                  }
+                });
+              },
+              onInput: (field, val) => {
+                addFieldStates.set(stateKey, { ...addFieldState, [field]: val });
+                rerender?.();
+              },
+            })
+          : html`
+              <sp-action-button
+                size="s"
+                quiet
+                @click=${() => {
+                  addFieldOpen.add(stateKey);
+                  addFieldStates.set(stateKey, blankAddFieldState());
+                  rerender?.();
+                }}
+              >
+                <sp-icon-add slot="icon"></sp-icon-add> Add Field
+              </sp-action-button>
+            `
+      }
     </div>
   `;
 }

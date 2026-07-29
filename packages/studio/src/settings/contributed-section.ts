@@ -318,41 +318,43 @@ function renderMapLayout(
           </sp-action-button>
         `,
       )}
-      ${newEntryOpen.has(sectionKey)
-        ? html`
-            <div class="settings-inline-form">
-              <sp-textfield
+      ${
+        newEntryOpen.has(sectionKey)
+          ? html`
+              <div class="settings-inline-form">
+                <sp-textfield
+                  size="s"
+                  placeholder="entry-name"
+                  .value=${newEntryNames.get(sectionKey) ?? ""}
+                  @input=${(e: Event) => {
+                    newEntryNames.set(sectionKey, (e.target as HTMLInputElement).value);
+                  }}
+                  @keydown=${(e: KeyboardEvent) => {
+                    if (e.key === "Enter") {
+                      handleCreate();
+                    }
+                    if (e.key === "Escape") {
+                      newEntryOpen.delete(sectionKey);
+                      rerender();
+                    }
+                  }}
+                ></sp-textfield>
+                <sp-action-button size="s" @click=${handleCreate}>Create</sp-action-button>
+              </div>
+            `
+          : html`
+              <sp-action-button
                 size="s"
-                placeholder="entry-name"
-                .value=${newEntryNames.get(sectionKey) ?? ""}
-                @input=${(e: Event) => {
-                  newEntryNames.set(sectionKey, (e.target as HTMLInputElement).value);
+                quiet
+                @click=${() => {
+                  newEntryOpen.add(sectionKey);
+                  rerender();
                 }}
-                @keydown=${(e: KeyboardEvent) => {
-                  if (e.key === "Enter") {
-                    handleCreate();
-                  }
-                  if (e.key === "Escape") {
-                    newEntryOpen.delete(sectionKey);
-                    rerender();
-                  }
-                }}
-              ></sp-textfield>
-              <sp-action-button size="s" @click=${handleCreate}>Create</sp-action-button>
-            </div>
-          `
-        : html`
-            <sp-action-button
-              size="s"
-              quiet
-              @click=${() => {
-                newEntryOpen.add(sectionKey);
-                rerender();
-              }}
-            >
-              <sp-icon-add slot="icon"></sp-icon-add> New Entry
-            </sp-action-button>
-          `}
+              >
+                <sp-icon-add slot="icon"></sp-icon-add> New Entry
+              </sp-action-button>
+            `
+      }
     </div>
   `;
 

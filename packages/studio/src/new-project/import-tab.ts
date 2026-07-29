@@ -233,20 +233,22 @@ export function renderImportStatus(): TemplateResult {
   }
   return html`
     ${_errorMsg ? html`<div class="new-project-error">${_errorMsg}</div>` : ""}
-    ${_log.length > 0
-      ? html`
-          <div class="new-project-import-log">
-            ${_log.map(
-              (evt) => html`
-                <div class="new-project-import-log-line">
-                  <span class="new-project-import-phase">${evt.phase}</span>
-                  ${evt.message}
-                </div>
-              `,
-            )}
-          </div>
-        `
-      : ""}
+    ${
+      _log.length > 0
+        ? html`
+            <div class="new-project-import-log">
+              ${_log.map(
+                (evt) => html`
+                  <div class="new-project-import-log-line">
+                    <span class="new-project-import-phase">${evt.phase}</span>
+                    ${evt.message}
+                  </div>
+                `,
+              )}
+            </div>
+          `
+        : ""
+    }
   `;
 }
 
@@ -307,19 +309,21 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
       AI component naming
     </sp-switch>
     ${_errorMsg ? html`<div class="new-project-error">${_errorMsg}</div>` : ""}
-    ${_status === "error" && _log.length > 0
-      ? html`
-          <div class="new-project-import-log">
-            ${_log.map(
-              (evt) => html`
-                <div class="new-project-import-log-line">
-                  <span class="new-project-import-phase">${evt.phase}</span>
-                  ${evt.message}
-                </div>
-              `,
-            )}
-          </div>
-        `
-      : ""}
+    ${
+      _status === "error" && _log.length > 0
+        ? html`
+            <div class="new-project-import-log">
+              ${_log.map(
+                (evt) => html`
+                  <div class="new-project-import-log-line">
+                    <span class="new-project-import-phase">${evt.phase}</span>
+                    ${evt.message}
+                  </div>
+                `,
+              )}
+            </div>
+          `
+        : ""
+    }
   `;
 }

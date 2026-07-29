@@ -450,41 +450,43 @@ export function renderHeadTemplate({
           <span class="imports-section-title">Custom Tags</span>
           <span class="imports-count">${customEntries.length}</span>
         </div>
-        ${customEntries.length > 0
-          ? html`
-              <div class="imports-list">
-                ${customEntries.map((entry: JxHeadEntry) => {
-                  const label = entryLabel(entry);
-                  const value = entryValue(entry);
-                  return html`
-                    <div class="import-row">
-                      <span class="import-name" title=${value}>${label}</span>
-                      <span class="import-path">${value}</span>
-                      <sp-action-button
-                        quiet
-                        size="xs"
-                        title="Remove"
-                        @click=${() => {
-                          applyMutation((d: JxMutableNode) => {
-                            if (!d.$head) {
-                              return;
-                            }
-                            const idx = d.$head.indexOf(entry);
-                            if (idx !== -1) {
-                              d.$head.splice(idx, 1);
-                            }
-                          });
-                          renderLeftPanel();
-                        }}
-                      >
-                        <sp-icon-close slot="icon" size="xs"></sp-icon-close>
-                      </sp-action-button>
-                    </div>
-                  `;
-                })}
-              </div>
-            `
-          : html`<div class="imports-empty">No custom tags</div>`}
+        ${
+          customEntries.length > 0
+            ? html`
+                <div class="imports-list">
+                  ${customEntries.map((entry: JxHeadEntry) => {
+                    const label = entryLabel(entry);
+                    const value = entryValue(entry);
+                    return html`
+                      <div class="import-row">
+                        <span class="import-name" title=${value}>${label}</span>
+                        <span class="import-path">${value}</span>
+                        <sp-action-button
+                          quiet
+                          size="xs"
+                          title="Remove"
+                          @click=${() => {
+                            applyMutation((d: JxMutableNode) => {
+                              if (!d.$head) {
+                                return;
+                              }
+                              const idx = d.$head.indexOf(entry);
+                              if (idx !== -1) {
+                                d.$head.splice(idx, 1);
+                              }
+                            });
+                            renderLeftPanel();
+                          }}
+                        >
+                          <sp-icon-close slot="icon" size="xs"></sp-icon-close>
+                        </sp-action-button>
+                      </div>
+                    `;
+                  })}
+                </div>
+              `
+            : html`<div class="imports-empty">No custom tags</div>`
+        }
 
         <!-- Add custom tag form -->
         <div class="head-add-form">

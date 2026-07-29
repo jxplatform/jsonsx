@@ -305,11 +305,13 @@ function renderPropertyControl(
     return html`
       <sp-picker
         size="s"
-        value=${currentValue !== undefined
-          ? String(currentValue)
-          : ps.default !== undefined
-            ? String(ps.default)
-            : "__none__"}
+        value=${
+          currentValue !== undefined
+            ? String(currentValue)
+            : ps.default !== undefined
+              ? String(ps.default)
+              : "__none__"
+        }
         @change=${(e: Event) =>
           commit(
             (e.target as HTMLInputElement).value === "__none__"
@@ -359,20 +361,22 @@ function renderPropertyControl(
     let debounce: ReturnType<typeof setTimeout> | undefined;
     return html`
       <div class="schema-param-editor">
-        ${hasValue && !isSchemaRef && cv.properties
-          ? html`
-              <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px">
-                ${Object.entries(cv.properties as Record<string, Record<string, unknown>>).map(
-                  ([k, v]) => html`
-                    <span
-                      style="background:var(--bg);padding:1px 6px;border-radius:var(--radius);font-size:10px;color:var(--fg-dim)"
-                      >${k}: ${v.type ?? "any"}</span
-                    >
-                  `,
-                )}
-              </div>
-            `
-          : nothing}
+        ${
+          hasValue && !isSchemaRef && cv.properties
+            ? html`
+                <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px">
+                  ${Object.entries(cv.properties as Record<string, Record<string, unknown>>).map(
+                    ([k, v]) => html`
+                      <span
+                        style="background:var(--bg);padding:1px 6px;border-radius:var(--radius);font-size:10px;color:var(--fg-dim)"
+                        >${k}: ${v.type ?? "any"}</span
+                      >
+                    `,
+                  )}
+                </div>
+              `
+            : nothing
+        }
         <sp-textfield
           multiline
           size="s"
@@ -476,18 +480,20 @@ function renderPropertyControl(
         debounce = setTimeout(() => commit((e.target as HTMLInputElement).value || undefined), 400);
       }}
     ></sp-textfield>
-    ${params.length > 0
-      ? html`<sp-action-button
-          quiet
-          size="s"
-          title="Bind to route param"
-          @click=${() => {
-            commit({ $ref: `#/$params/${params[0]}` });
-            opts.rerender?.();
-          }}
-          ><sp-icon-link slot="icon"></sp-icon-link
-        ></sp-action-button>`
-      : nothing}
+    ${
+      params.length > 0
+        ? html`<sp-action-button
+            quiet
+            size="s"
+            title="Bind to route param"
+            @click=${() => {
+              commit({ $ref: `#/$params/${params[0]}` });
+              opts.rerender?.();
+            }}
+            ><sp-icon-link slot="icon"></sp-icon-link
+          ></sp-action-button>`
+        : nothing
+    }
   </div>`;
 }
 

@@ -664,22 +664,26 @@ function renderCard(
     >
       <div
         class="element-card-preview"
-        ${needsPreview
-          ? ref((el: Element | undefined) => {
-              if (el) {
-                void loadPreview(el, file);
-              }
-            })
-          : nothing}
+        ${
+          needsPreview
+            ? ref((el: Element | undefined) => {
+                if (el) {
+                  void loadPreview(el, file);
+                }
+              })
+            : nothing
+        }
       >
-        ${isImg
-          ? html`<img
-              src=${loopbackAssetSrc(`/${file.path}`)}
-              style="max-width:100%;max-height:100%;object-fit:contain"
-            />`
-          : needsPreview
-            ? nothing
-            : html`<sp-icon-document size="xl"></sp-icon-document>`}
+        ${
+          isImg
+            ? html`<img
+                src=${loopbackAssetSrc(`/${file.path}`)}
+                style="max-width:100%;max-height:100%;object-fit:contain"
+              />`
+            : needsPreview
+              ? nothing
+              : html`<sp-icon-document size="xl"></sp-icon-document>`
+        }
       </div>
       <div class="element-card-label">${file.name}</div>
     </div>
@@ -747,11 +751,13 @@ export async function renderBrowse(
           ${getEntityTypes().map(
             (t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`,
           )}
-          ${contentTypeTypes.length > 0
-            ? html`<sp-menu-divider></sp-menu-divider> ${contentTypeTypes.map(
-                  (t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`,
-                )}`
-            : ""}
+          ${
+            contentTypeTypes.length > 0
+              ? html`<sp-menu-divider></sp-menu-divider> ${contentTypeTypes.map(
+                    (t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`,
+                  )}`
+              : ""
+          }
         </sp-menu>
       </sp-popover>
     </overlay-trigger>
@@ -815,34 +821,38 @@ export async function renderBrowse(
         <sp-table-head-cell>Path</sp-table-head-cell>
       </sp-table-head>
       <sp-table-body>
-        ${files.length === 0
-          ? html`<sp-table-row
-              ><sp-table-cell
-                >${loading ? "Loading..." : "No files found"}</sp-table-cell
-              ></sp-table-row
-            >`
-          : repeat(
-              files,
-              (f) => f.path,
-              (f) => html`
-                <sp-table-row
-                  value=${f.path}
-                  class="browse-row"
-                  style=${isImage(f.ext) ? "cursor:default" : ""}
-                  @click=${isImage(f.ext) ? nothing : () => ctx.openFile(f.path)}
-                  @contextmenu=${(e: MouseEvent) => showBrowseContextMenu(e, f, container, ctx)}
-                >
-                  <sp-table-cell class="browse-name-cell"
-                    >${isImage(f.ext)
-                      ? html`<img class="browse-thumb" src=${loopbackAssetSrc(`/${f.path}`)} />`
-                      : nothing}${f.name}</sp-table-cell
+        ${
+          files.length === 0
+            ? html`<sp-table-row
+                ><sp-table-cell
+                  >${loading ? "Loading..." : "No files found"}</sp-table-cell
+                ></sp-table-row
+              >`
+            : repeat(
+                files,
+                (f) => f.path,
+                (f) => html`
+                  <sp-table-row
+                    value=${f.path}
+                    class="browse-row"
+                    style=${isImage(f.ext) ? "cursor:default" : ""}
+                    @click=${isImage(f.ext) ? nothing : () => ctx.openFile(f.path)}
+                    @contextmenu=${(e: MouseEvent) => showBrowseContextMenu(e, f, container, ctx)}
                   >
-                  <sp-table-cell>${f.category}</sp-table-cell>
-                  <sp-table-cell>${f.type}</sp-table-cell>
-                  <sp-table-cell class="browse-path-cell">${f.path}</sp-table-cell>
-                </sp-table-row>
-              `,
-            )}
+                    <sp-table-cell class="browse-name-cell"
+                      >${
+                        isImage(f.ext)
+                          ? html`<img class="browse-thumb" src=${loopbackAssetSrc(`/${f.path}`)} />`
+                          : nothing
+                      }${f.name}</sp-table-cell
+                    >
+                    <sp-table-cell>${f.category}</sp-table-cell>
+                    <sp-table-cell>${f.type}</sp-table-cell>
+                    <sp-table-cell class="browse-path-cell">${f.path}</sp-table-cell>
+                  </sp-table-row>
+                `,
+              )
+        }
       </sp-table-body>
     </sp-table>
   `;

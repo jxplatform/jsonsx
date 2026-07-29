@@ -357,17 +357,21 @@ function renderRefPicker(
         onRefChange(val);
       }}
     >
-      ${stateRefs.length > 0
-        ? stateRefs.map(
-            (r) => html`<sp-menu-item value=${r}>${r.replace("#/state/", "")}</sp-menu-item>`,
-          )
-        : html`<sp-menu-item disabled>No state defined</sp-menu-item>`}
-      ${eventRefs.length > 0
-        ? html`
-            <sp-menu-divider></sp-menu-divider>
-            ${eventRefs.map((r) => html`<sp-menu-item value=${r}>${r}</sp-menu-item>`)}
-          `
-        : nothing}
+      ${
+        stateRefs.length > 0
+          ? stateRefs.map(
+              (r) => html`<sp-menu-item value=${r}>${r.replace("#/state/", "")}</sp-menu-item>`,
+            )
+          : html`<sp-menu-item disabled>No state defined</sp-menu-item>`
+      }
+      ${
+        eventRefs.length > 0
+          ? html`
+              <sp-menu-divider></sp-menu-divider>
+              ${eventRefs.map((r) => html`<sp-menu-item value=${r}>${r}</sp-menu-item>`)}
+            `
+          : nothing
+      }
     </sp-picker>
   `;
 }
@@ -397,31 +401,33 @@ function renderLiteralEditor(operand: unknown, onChange: (newVal: JxExpressionOp
         <sp-menu-item value="boolean">bool</sp-menu-item>
         <sp-menu-item value="null">null</sp-menu-item>
       </sp-picker>
-      ${type === "string"
-        ? html`<sp-textfield
-            size="s"
-            style="flex:1"
-            .value=${live(String(operand ?? ""))}
-            @input=${(e: Event) => onChange((e.target as HTMLInputElement).value)}
-          ></sp-textfield>`
-        : type === "number"
-          ? html`<sp-number-field
+      ${
+        type === "string"
+          ? html`<sp-textfield
               size="s"
               style="flex:1"
-              .value=${live(Number(operand ?? 0))}
-              @change=${(e: Event) => onChange(Number((e.target as HTMLInputElement).value))}
-            ></sp-number-field>`
-          : type === "boolean"
-            ? html`<sp-checkbox
+              .value=${live(String(operand ?? ""))}
+              @input=${(e: Event) => onChange((e.target as HTMLInputElement).value)}
+            ></sp-textfield>`
+          : type === "number"
+            ? html`<sp-number-field
                 size="s"
-                ?checked=${Boolean(operand)}
-                @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
-                >true</sp-checkbox
-              >`
-            : html`<span
-                style="font-size:var(--spectrum-font-size-75, 12px);color:var(--spectrum-gray-600, #808080)"
-                >null</span
-              >`}
+                style="flex:1"
+                .value=${live(Number(operand ?? 0))}
+                @change=${(e: Event) => onChange(Number((e.target as HTMLInputElement).value))}
+              ></sp-number-field>`
+            : type === "boolean"
+              ? html`<sp-checkbox
+                  size="s"
+                  ?checked=${Boolean(operand)}
+                  @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
+                  >true</sp-checkbox
+                >`
+              : html`<span
+                  style="font-size:var(--spectrum-font-size-75, 12px);color:var(--spectrum-gray-600, #808080)"
+                  >null</span
+                >`
+      }
     </div>
   `;
 }
@@ -479,18 +485,20 @@ export function renderOperandEditor(
         <sp-menu-item value="ref">$ref</sp-menu-item>
         <sp-menu-item value="expression">expr</sp-menu-item>
       </sp-picker>
-      ${mode === "literal"
-        ? renderLiteralEditor(operand, onChange)
-        : mode === "ref"
-          ? renderRefPicker(
-              ((operand as Record<string, unknown> | null)?.$ref as string) ?? "",
-              (r) => onChange({ $ref: r }),
-              opts,
-            )
-          : renderExpressionEditor(operand, onChange, {
-              ...opts,
-              depth: opts.depth + 1,
-            })}
+      ${
+        mode === "literal"
+          ? renderLiteralEditor(operand, onChange)
+          : mode === "ref"
+            ? renderRefPicker(
+                ((operand as Record<string, unknown> | null)?.$ref as string) ?? "",
+                (r) => onChange({ $ref: r }),
+                opts,
+              )
+            : renderExpressionEditor(operand, onChange, {
+                ...opts,
+                depth: opts.depth + 1,
+              })
+      }
     </div>
   `;
 }
@@ -621,16 +629,20 @@ export function renderExpressionEditor(
 
   return html`
     <div class="expression-editor" style=${nestStyle}>
-      ${depth === 0
-        ? renderFormulaChips(safeNode, opts.onChipSelect ?? (() => {}), { path, preview })
-        : nothing}
-      ${depth === 0 && preview?.error
-        ? html`<div
-            style="font-size:10px;color:var(--spectrum-negative-content-color-default, #f76a63);padding:2px 0"
-          >
-            ${preview.error}
-          </div>`
-        : nothing}
+      ${
+        depth === 0
+          ? renderFormulaChips(safeNode, opts.onChipSelect ?? (() => {}), { path, preview })
+          : nothing
+      }
+      ${
+        depth === 0 && preview?.error
+          ? html`<div
+              style="font-size:10px;color:var(--spectrum-negative-content-color-default, #f76a63);padding:2px 0"
+            >
+              ${preview.error}
+            </div>`
+          : nothing
+      }
       ${renderFieldRow({
         hasValue: false,
         label: "Operator",
@@ -715,101 +727,117 @@ export function renderExpressionEditor(
           sub("target"),
         ),
       })}
-      ${info.needsValue && !info.valueIsNode && !info.spliceArray
-        ? renderFieldRow({
-            hasValue: false,
-            label: op === "?:" ? "Then" : "Value",
-            prop: "value",
-            widget: withBadge(
-              renderOperandEditor(safeNode.value, (v) => onChange({ ...safeNode, value: v }), {
-                ...opts,
-                depth,
-                mustBeRef: false,
-                path: [...path, "value"],
-              }),
-              sub("value"),
-            ),
-          })
-        : nothing}
-      ${info.needsValue && info.valueIsNode
-        ? html`
-            <div style="margin-top:4px">
-              ${renderFieldRow({
-                hasValue: false,
-                label: "Per-item",
-                prop: "value",
-                widget: nothing,
-              })}
-              ${renderExpressionEditor(
-                (safeNode.value as Record<string, unknown> | null)?.operator
-                  ? safeNode.value
-                  : { operator: "!", target: null },
-                (v) => onChange({ ...safeNode, value: v }),
-                { ...opts, depth: depth + 1, path: [...path, "value"] },
-              )}
-            </div>
-          `
-        : nothing}
-      ${info.spliceArray
-        ? html`
-            <div style="margin-top:4px">
-              ${renderFieldRow({
-                hasValue: false,
-                label: "Args",
-                prop: "value",
-                widget: nothing,
-              })}
-              ${renderSpliceArgsEditor(
-                safeNode.value as unknown[],
-                (v) => onChange({ ...safeNode, value: v }),
-                {
+      ${
+        info.needsValue && !info.valueIsNode && !info.spliceArray
+          ? renderFieldRow({
+              hasValue: false,
+              label: op === "?:" ? "Then" : "Value",
+              prop: "value",
+              widget: withBadge(
+                renderOperandEditor(safeNode.value, (v) => onChange({ ...safeNode, value: v }), {
                   ...opts,
                   depth,
-                },
-              )}
-            </div>
-          `
-        : nothing}
-      ${info.callArgs
-        ? html`
-            <div style="margin-top:4px">
-              ${renderFieldRow({
-                hasValue: false,
-                label: "Args",
-                prop: "value",
-                widget: nothing,
-              })}
-              ${renderSpliceArgsEditor(
-                safeNode.value as unknown[],
-                (v) => onChange({ ...safeNode, value: v }),
-                { ...opts, depth },
-                {
-                  fallbackLabel: "arg",
-                  labels: calleeParamLabels(safeNode.target, opts.stateEntries),
-                },
-              )}
-            </div>
-          `
-        : nothing}
-      ${info.switchCases
-        ? renderSwitchCasesEditor(safeNode, onChange, { ...opts, depth, path }, withBadge)
-        : nothing}
-      ${info.needsInitial
-        ? renderFieldRow({
-            hasValue: false,
-            label: op === "?:" ? "Else" : "Initial",
-            prop: "initial",
-            widget: withBadge(
-              renderOperandEditor(safeNode.initial, (v) => onChange({ ...safeNode, initial: v }), {
-                ...opts,
-                depth,
-                mustBeRef: false,
-                path: [...path, "initial"],
-              }),
-              sub("initial"),
-            ),
-          })
-        : nothing}
+                  mustBeRef: false,
+                  path: [...path, "value"],
+                }),
+                sub("value"),
+              ),
+            })
+          : nothing
+      }
+      ${
+        info.needsValue && info.valueIsNode
+          ? html`
+              <div style="margin-top:4px">
+                ${renderFieldRow({
+                  hasValue: false,
+                  label: "Per-item",
+                  prop: "value",
+                  widget: nothing,
+                })}
+                ${renderExpressionEditor(
+                  (safeNode.value as Record<string, unknown> | null)?.operator
+                    ? safeNode.value
+                    : { operator: "!", target: null },
+                  (v) => onChange({ ...safeNode, value: v }),
+                  { ...opts, depth: depth + 1, path: [...path, "value"] },
+                )}
+              </div>
+            `
+          : nothing
+      }
+      ${
+        info.spliceArray
+          ? html`
+              <div style="margin-top:4px">
+                ${renderFieldRow({
+                  hasValue: false,
+                  label: "Args",
+                  prop: "value",
+                  widget: nothing,
+                })}
+                ${renderSpliceArgsEditor(
+                  safeNode.value as unknown[],
+                  (v) => onChange({ ...safeNode, value: v }),
+                  {
+                    ...opts,
+                    depth,
+                  },
+                )}
+              </div>
+            `
+          : nothing
+      }
+      ${
+        info.callArgs
+          ? html`
+              <div style="margin-top:4px">
+                ${renderFieldRow({
+                  hasValue: false,
+                  label: "Args",
+                  prop: "value",
+                  widget: nothing,
+                })}
+                ${renderSpliceArgsEditor(
+                  safeNode.value as unknown[],
+                  (v) => onChange({ ...safeNode, value: v }),
+                  { ...opts, depth },
+                  {
+                    fallbackLabel: "arg",
+                    labels: calleeParamLabels(safeNode.target, opts.stateEntries),
+                  },
+                )}
+              </div>
+            `
+          : nothing
+      }
+      ${
+        info.switchCases
+          ? renderSwitchCasesEditor(safeNode, onChange, { ...opts, depth, path }, withBadge)
+          : nothing
+      }
+      ${
+        info.needsInitial
+          ? renderFieldRow({
+              hasValue: false,
+              label: op === "?:" ? "Else" : "Initial",
+              prop: "initial",
+              widget: withBadge(
+                renderOperandEditor(
+                  safeNode.initial,
+                  (v) => onChange({ ...safeNode, initial: v }),
+                  {
+                    ...opts,
+                    depth,
+                    mustBeRef: false,
+                    path: [...path, "initial"],
+                  },
+                ),
+                sub("initial"),
+              ),
+            })
+          : nothing
+      }
     </div>
   `;
 }

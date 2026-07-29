@@ -117,12 +117,16 @@ export function createComposer(opts: ComposerOptions): Composer {
         @change=${onModelChange}
       >
         ${items.map((m) => html`<sp-menu-item value=${m.id}>${m.name}</sp-menu-item>`)}
-        ${modelsLoading
-          ? html`<sp-menu-item disabled value="__loading__">Loading models…</sp-menu-item>`
-          : nothing}
-        ${modelsError
-          ? html`<sp-menu-item value=${RETRY_MODELS}>Retry loading models</sp-menu-item>`
-          : nothing}
+        ${
+          modelsLoading
+            ? html`<sp-menu-item disabled value="__loading__">Loading models…</sp-menu-item>`
+            : nothing
+        }
+        ${
+          modelsError
+            ? html`<sp-menu-item value=${RETRY_MODELS}>Retry loading models</sp-menu-item>`
+            : nothing
+        }
       </sp-picker>
     `;
   }
@@ -289,23 +293,25 @@ export function createComposer(opts: ComposerOptions): Composer {
           <sp-action-button size="s" quiet title="API key & endpoint" @click=${opts.onOpenSettings}>
             <sp-icon-settings slot="icon"></sp-icon-settings>
           </sp-action-button>
-          ${streaming
-            ? html`
-                <sp-action-button size="s" class="ai-send-btn" title="Stop" @click=${opts.onStop}>
-                  <sp-icon-stop slot="icon"></sp-icon-stop>
-                </sp-action-button>
-              `
-            : html`
-                <sp-action-button
-                  size="s"
-                  class="ai-send-btn"
-                  title="Send"
-                  ?disabled=${!hasText}
-                  @click=${trySend}
-                >
-                  <sp-icon-send slot="icon"></sp-icon-send>
-                </sp-action-button>
-              `}
+          ${
+            streaming
+              ? html`
+                  <sp-action-button size="s" class="ai-send-btn" title="Stop" @click=${opts.onStop}>
+                    <sp-icon-stop slot="icon"></sp-icon-stop>
+                  </sp-action-button>
+                `
+              : html`
+                  <sp-action-button
+                    size="s"
+                    class="ai-send-btn"
+                    title="Send"
+                    ?disabled=${!hasText}
+                    @click=${trySend}
+                  >
+                    <sp-icon-send slot="icon"></sp-icon-send>
+                  </sp-action-button>
+                `
+          }
         </div>
       </div>
     `;

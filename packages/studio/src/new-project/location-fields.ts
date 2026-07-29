@@ -213,9 +213,11 @@ function pathFieldsTpl(ctx: {
       <div class="new-project-location-row">
         <sp-textfield
           class="new-project-location"
-          placeholder=${platform.pickDirectory
-            ? "Choose a folder to create the project in"
-            : "/absolute/path/to/your/projects"}
+          placeholder=${
+            platform.pickDirectory
+              ? "Choose a folder to create the project in"
+              : "/absolute/path/to/your/projects"
+          }
           .value=${_parent}
           @input=${(e: Event) => {
             _parent = (e.target as HTMLInputElement).value;
@@ -224,13 +226,15 @@ function pathFieldsTpl(ctx: {
           }}
           style="width: 100%"
         ></sp-textfield>
-        ${platform.pickDirectory
-          ? html`
-              <sp-button variant="secondary" ?disabled=${_browsing} @click=${() => void browse()}>
-                ${_browsing ? "Choosing…" : "Browse…"}
-              </sp-button>
-            `
-          : nothing}
+        ${
+          platform.pickDirectory
+            ? html`
+                <sp-button variant="secondary" ?disabled=${_browsing} @click=${() => void browse()}>
+                  ${_browsing ? "Choosing…" : "Browse…"}
+                </sp-button>
+              `
+            : nothing
+        }
       </div>
     </label>
     ${slugFieldTpl(ctx.slug, ctx.onSlugInput)}
@@ -278,11 +282,13 @@ function repoFieldsTpl(ctx: {
       ${ownerField}
     </label>
     ${slugFieldTpl(ctx.slug, ctx.onSlugInput)}
-    ${repoExists(ctx.slug)
-      ? html`<div class="new-project-error new-project-error--destination">
-          ${_owner}/${ctx.slug} already exists — choose another name.
-        </div>`
-      : nothing}
+    ${
+      repoExists(ctx.slug)
+        ? html`<div class="new-project-error new-project-error--destination">
+            ${_owner}/${ctx.slug} already exists — choose another name.
+          </div>`
+        : nothing
+    }
     <label class="new-project-field">
       <span class="new-project-label">Visibility</span>
       <sp-picker
@@ -316,8 +322,10 @@ export function renderLocationFields(ctx: {
     <div class="new-project-destination-preview">
       ${isRepo ? "Repository" : "Creates"}: <code>${previewOf(ctx.slug)}</code>
     </div>
-    ${_error
-      ? html`<div class="new-project-error new-project-error--destination">${_error}</div>`
-      : nothing}
+    ${
+      _error
+        ? html`<div class="new-project-error new-project-error--destination">${_error}</div>`
+        : nothing
+    }
   `;
 }

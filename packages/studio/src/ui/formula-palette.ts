@@ -166,11 +166,13 @@ function renderOverlay() {
           })}
         />
         <div class="quick-search-results">
-          ${entries.length === 0
-            ? html`<div class="quick-search-empty">
-                ${hasQuery ? "No results" : "No entries available"}
-              </div>`
-            : nothing}
+          ${
+            entries.length === 0
+              ? html`<div class="quick-search-empty">
+                  ${hasQuery ? "No results" : "No entries available"}
+                </div>`
+              : nothing
+          }
           ${groups.map(
             ([group, groupEntries]) => html`
               <div class="quick-search-section-label">${group}</div>

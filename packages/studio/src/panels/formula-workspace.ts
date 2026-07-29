@@ -312,26 +312,28 @@ function workspaceTemplate(tab: Tab, editing: FormulaEditDef): TemplateResult {
       >
         Data
       </div>
-      ${scopeEntries.length === 0
-        ? html`<div class="empty-state">No canvas data snapshot yet</div>`
-        : scopeEntries.map(([name, value]) => {
-            const unwrapped = unwrapSignal(value);
-            return html`
-              <div class="fw-context-entry" style="margin-bottom:10px">
-                <div style="display:flex;gap:6px;align-items:baseline">
-                  <span
-                    class="fw-context-name"
-                    style="${MONO};font-size:12px;color:var(--spectrum-gray-800, #d0d0d0)"
-                    >${name}</span
-                  >
-                  <span style="font-size:10px;color:var(--spectrum-gray-600, #808080)"
-                    >${dataTypeLabel(value)}</span
-                  >
+      ${
+        scopeEntries.length === 0
+          ? html`<div class="empty-state">No canvas data snapshot yet</div>`
+          : scopeEntries.map(([name, value]) => {
+              const unwrapped = unwrapSignal(value);
+              return html`
+                <div class="fw-context-entry" style="margin-bottom:10px">
+                  <div style="display:flex;gap:6px;align-items:baseline">
+                    <span
+                      class="fw-context-name"
+                      style="${MONO};font-size:12px;color:var(--spectrum-gray-800, #d0d0d0)"
+                      >${name}</span
+                    >
+                    <span style="font-size:10px;color:var(--spectrum-gray-600, #808080)"
+                      >${dataTypeLabel(value)}</span
+                    >
+                  </div>
+                  <div class="data-tree">${renderDataTreeTemplate(unwrapped, 0, 4)}</div>
                 </div>
-                <div class="data-tree">${renderDataTreeTemplate(unwrapped, 0, 4)}</div>
-              </div>
-            `;
-          })}
+              `;
+            })
+      }
     </div>
   `;
 
@@ -352,9 +354,13 @@ function workspaceTemplate(tab: Tab, editing: FormulaEditDef): TemplateResult {
             style="${MONO};font-size:12px;padding:10px 20px;border-top:${PANE_BORDER};color:var(--spectrum-seafoam-900, #35a690)"
           >
             = ${preview.values.get("") ?? "undefined"}
-            ${preview.mutating
-              ? html`<span style="color:var(--spectrum-gray-600, #808080)">(mutates target)</span>`
-              : ""}
+            ${
+              preview.mutating
+                ? html`<span style="color:var(--spectrum-gray-600, #808080)"
+                    >(mutates target)</span
+                  >`
+                : ""
+            }
           </div>
         `
       : html`

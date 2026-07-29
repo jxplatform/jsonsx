@@ -187,35 +187,39 @@ export function renderDesignFields(ctx: { rerender: () => void }): TemplateResul
       <div class="new-project-design-heading">Logo</div>
       <div class="new-project-logo-row">
         <input type="file" accept=".svg,.png,.jpg,.jpeg,.webp,.gif,.ico" @change=${onLogoChange} />
-        ${_logo
-          ? html`
-              <span class="new-project-logo-name">
-                ${_logo.name} → public/${_logo.name}
-                <sp-action-button
-                  quiet
-                  size="s"
-                  title="Remove logo"
-                  @click=${() => {
-                    _logo = null;
-                    rerender();
-                  }}
-                >
-                  ✕
-                </sp-action-button>
-              </span>
-            `
-          : html`<span class="new-project-tab-intro"
-              >Copied into the project's public/ folder.</span
-            >`}
+        ${
+          _logo
+            ? html`
+                <span class="new-project-logo-name">
+                  ${_logo.name} → public/${_logo.name}
+                  <sp-action-button
+                    quiet
+                    size="s"
+                    title="Remove logo"
+                    @click=${() => {
+                      _logo = null;
+                      rerender();
+                    }}
+                  >
+                    ✕
+                  </sp-action-button>
+                </span>
+              `
+            : html`<span class="new-project-tab-intro"
+                >Copied into the project's public/ folder.</span
+              >`
+        }
       </div>
       ${_logoError ? html`<div class="new-project-error">${_logoError}</div>` : ""}
     </div>
 
     <div class="new-project-design-section">
       <div class="new-project-design-heading">Breakpoints</div>
-      ${_mediaRows.length === 0 && _mediaNote
-        ? html`<div class="new-project-tab-intro">${_mediaNote}</div>`
-        : ""}
+      ${
+        _mediaRows.length === 0 && _mediaNote
+          ? html`<div class="new-project-tab-intro">${_mediaNote}</div>`
+          : ""
+      }
       ${_mediaRows.map(
         (row, index) => html`
           <div class="new-project-media-row">

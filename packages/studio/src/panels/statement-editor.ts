@@ -349,19 +349,21 @@ function renderLane(
     <div class="statement-lane" style="margin:4px 0 4px 6px">
       <div class="statement-lane-header" style="display:flex;align-items:center;gap:4px">
         <span style=${laneLabelStyle}>${label}</span>
-        ${extras.onRemove
-          ? html`
-              <sp-action-button
-                quiet
-                size="xs"
-                class="statement-lane-remove"
-                title="Remove branch"
-                @click=${extras.onRemove}
-              >
-                <sp-icon-delete slot="icon"></sp-icon-delete>
-              </sp-action-button>
-            `
-          : nothing}
+        ${
+          extras.onRemove
+            ? html`
+                <sp-action-button
+                  quiet
+                  size="xs"
+                  class="statement-lane-remove"
+                  title="Remove branch"
+                  @click=${extras.onRemove}
+                >
+                  <sp-icon-delete slot="icon"></sp-icon-delete>
+                </sp-action-button>
+              `
+            : nothing
+        }
       </div>
       ${renderStatementList(list, commit, opts, lanePath)}
     </div>
@@ -393,30 +395,32 @@ function renderIfBody(
       index,
       "then",
     ])}
-    ${Array.isArray(stmt.else)
-      ? renderLane(
-          "Else",
-          stmt.else,
-          (next) => commit({ ...stmt, else: next }),
-          opts,
-          [...lanePath, index, "else"],
-          {
-            onRemove: () => {
-              const { else: _else, ...rest } = stmt;
-              commit(rest as JxStatement);
+    ${
+      Array.isArray(stmt.else)
+        ? renderLane(
+            "Else",
+            stmt.else,
+            (next) => commit({ ...stmt, else: next }),
+            opts,
+            [...lanePath, index, "else"],
+            {
+              onRemove: () => {
+                const { else: _else, ...rest } = stmt;
+                commit(rest as JxStatement);
+              },
             },
-          },
-        )
-      : html`
-          <sp-action-button
-            quiet
-            size="s"
-            class="statement-add-else"
-            @click=${() => commit({ ...stmt, else: [] })}
-          >
-            + Add else
-          </sp-action-button>
-        `}
+          )
+        : html`
+            <sp-action-button
+              quiet
+              size="s"
+              class="statement-add-else"
+              @click=${() => commit({ ...stmt, else: [] })}
+            >
+              + Add else
+            </sp-action-button>
+          `
+    }
   `;
 }
 

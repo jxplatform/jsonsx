@@ -72,9 +72,11 @@ export async function openCellValuePopover(args: CellPopoverArgs): Promise<void>
     const targetType = referenceTargetType(column);
     const ids = targetType ? await listCollectionEntryIds(targetType) : [];
     body = html`
-      ${targetType
-        ? html`<div class="jx-grid-cell-popover-hint">Entries of “${targetType}”</div>`
-        : nothing}
+      ${
+        targetType
+          ? html`<div class="jx-grid-cell-popover-hint">Entries of “${targetType}”</div>`
+          : nothing
+      }
       <select
         class="jx-grid-select"
         @change=${(e: Event) => {
