@@ -18,6 +18,13 @@ bun run sign:cert
 
 This creates a self-signed code-signing certificate at `packages/desktop/certs/jx-studio-dev.pfx` with password `dev-cert-password`.
 
+The certificate's **Subject must exactly match** the `<Identity Publisher>` in the generated
+`AppxManifest.xml` — MSIX compares them as raw strings, and any difference fails both
+`signtool sign` and `Add-AppxPackage`. Both values therefore come from a single constant,
+`MSIX_PUBLISHER` in [`scripts/msix-identity.ts`](scripts/msix-identity.ts), currently
+`CN=118A192A-BE3D-4B35-A22B-EA889CD1D0B4` (the Partner Center publisher ID). The manifest cannot use
+a friendlier name without breaking Store submission, so the certificate follows the manifest.
+
 ### 2. Trust the Certificate Locally
 
 ```bash
@@ -69,6 +76,19 @@ Add-AppxPackage -Path ".\artifacts\Jx Studio_0.19.0_x64.msix"
 
 - Delete `packages/desktop/certs/jx-studio-dev.pfx` and regenerate with `bun run sign:cert`
 - Check trusted certs: `certmgr.msc` → Trusted Root Certification Authorities
+
+### Signing fails / MSIX ships unsigned despite a certificate
+
+`build-msix.ts` catches signing failures and continues with an **unsigned** package (it records the
+honest status in `artifacts/msix-signing.json`), so a subject mismatch shows up as a warning rather
+than a hard failure. Confirm the certificate's Subject:
+
+```powershell
+certutil -dump -p dev-cert-password .\certs\jx-studio-dev.pfx
+```
+
+If it is not exactly `CN=118A192A-BE3D-4B35-A22B-EA889CD1D0B4`, the certificate predates the shared
+`MSIX_PUBLISHER` constant — delete it and re-run `bun run sign:cert`, then `bun run sign:trust`.
 
 ### Installation fails with "This app couldn't be installed"
 

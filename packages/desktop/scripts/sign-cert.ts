@@ -1,16 +1,16 @@
 import { $ } from "bun";
 import { join, resolve } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
-import { loadConfig } from "electrobun-builder-for-windows/dist/config.js";
+import { DEV_CERT_FILENAME, DEV_CERT_PASSWORD, MSIX_PUBLISHER } from "./msix-identity.ts";
 
 const desktopDir = resolve(import.meta.dir, "..");
 const certDir = join(desktopDir, "certs");
-const certPath = join(certDir, "jx-studio-dev.pfx");
-const certPassword = "dev-cert-password"; // Change this if needed
+const certPath = join(certDir, DEV_CERT_FILENAME);
+const certPassword = DEV_CERT_PASSWORD;
 
-// Publisher in AppxManifest.xml Identity must exactly match the cert Subject
-const config = await loadConfig(desktopDir);
-const publisher: string = config.windows?.msix?.publisher ?? "CN=Jx Studio Dev";
+// Publisher in AppxManifest.xml Identity must exactly match the cert Subject, so both read the same
+// Constant. See scripts/msix-identity.ts for why this is not derived from electrobun.config.ts.
+const publisher = MSIX_PUBLISHER;
 
 if (!existsSync(certDir)) {
   console.log(`[sign-cert] Creating certs directory…`);
@@ -19,6 +19,8 @@ if (!existsSync(certDir)) {
 
 if (existsSync(certPath)) {
   console.log(`[sign-cert] Certificate already exists at ${certPath}`);
+  console.log(`[sign-cert] Its Subject must be exactly: ${publisher}`);
+  console.log(`[sign-cert]   verify: certutil -dump -p ${certPassword} ${certPath}`);
   console.log(`[sign-cert] To regenerate, delete ${certPath} and run again.`);
 } else {
   console.log(`[sign-cert] Generating self-signed certificate…`);

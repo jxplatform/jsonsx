@@ -2,6 +2,12 @@ import { $ } from "bun";
 import { copyFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { existsSync, readdirSync, unlinkSync } from "node:fs";
+import {
+  DEV_CERT_FILENAME,
+  DEV_CERT_PASSWORD,
+  renderAppxManifest,
+  toQuadVersion,
+} from "./msix-identity.ts";
 
 if (process.platform !== "win32") {
   console.log("[build-msix] Skipping MSIX build (not Windows)");
@@ -9,8 +15,8 @@ if (process.platform !== "win32") {
 }
 
 const desktopDir = resolve(import.meta.dir, "..");
-const certPath = join(desktopDir, "certs", "jx-studio-dev.pfx");
-const certPassword = "dev-cert-password";
+const certPath = join(desktopDir, "certs", DEV_CERT_FILENAME);
+const certPassword = DEV_CERT_PASSWORD;
 
 const distDir = join(desktopDir, "dist");
 const artifactsDir = join(desktopDir, "artifacts");
@@ -139,53 +145,15 @@ for (const file of readdirSync(join(desktopDir, "msix-assets"))) {
 }
 
 // --- Step 6: Generate AppxManifest.xml ---
-const pkg = JSON.parse(await readFile(join(desktopDir, "package.json"), "utf8"));
+const pkg = JSON.parse(await readFile(join(desktopDir, "package.json"), "utf8")) as {
+  version: string;
+};
 const { version } = pkg;
-const quadVersion = version.split(".").length === 3 ? `${version}.0` : version;
+const quadVersion = toQuadVersion(version);
 
-const manifest = `<?xml version="1.0" encoding="utf-8"?>
-<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
-         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
-
-  <Identity Name="AvunuLLC.JxStudio"
-            Publisher="CN=118A192A-BE3D-4B35-A22B-EA889CD1D0B4"
-            Version="${quadVersion}"
-            ProcessorArchitecture="x64" />
-
-  <Properties>
-    <DisplayName>Jx Studio</DisplayName>
-    <PublisherDisplayName>Avunu LLC</PublisherDisplayName>
-    <Logo>Assets\\StoreLogo.png</Logo>
-  </Properties>
-
-  <Dependencies>
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
-  </Dependencies>
-
-  <Resources>
-    <Resource Language="en-US" />
-  </Resources>
-
-  <Applications>
-    <Application Id="App" Executable="bin\\launcher.exe" EntryPoint="Windows.FullTrustApplication">
-      <uap:VisualElements DisplayName="Jx Studio"
-                          Description="Jx Studio"
-                          BackgroundColor="transparent"
-                          Square150x150Logo="Assets\\Square150x150Logo.png"
-                          Square44x44Logo="Assets\\Square44x44Logo.png">
-        <uap:DefaultTile Wide310x150Logo="Assets\\Wide310x150Logo.png" />
-        <uap:SplashScreen Image="Assets\\SplashScreen.png" />
-      </uap:VisualElements>
-    </Application>
-  </Applications>
-
-  <Capabilities>
-    <Capability Name="internetClient" />
-    <rescap:Capability Name="runFullTrust" />
-  </Capabilities>
-</Package>
-`;
+// The manifest's Publisher and the signing cert's Subject must match EXACTLY; both come from
+// Scripts/msix-identity.ts so they cannot drift. See that file's header.
+const manifest = renderAppxManifest(version);
 
 await writeFile(join(msixStageDir, "AppxManifest.xml"), manifest, "utf8");
 console.log("[build-msix] Generated AppxManifest.xml");
