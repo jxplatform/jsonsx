@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.6.0](https://github.com/jxsuite/jx/compare/collab-v0.5.1...collab-v0.6.0) (2026-07-30)
+
+
+### Features
+
+* **collab:** merge prose per character and styles per property ([8ecdd7f](https://github.com/jxsuite/jx/commit/8ecdd7fd681f2036b9eecdb84a3536ddc8f19d26))
+
+
+### Bug Fixes
+
+* **desktop,studio,server,collab:** typecheck the desktop package, and hold the coverage gates ([4a348b1](https://github.com/jxsuite/jx/commit/4a348b131be242ac14fe8097bb5cb431a9c64155))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.5.0
+
 ## [0.5.1](https://github.com/jxsuite/jx/compare/collab-v0.5.0...collab-v0.5.1) (2026-07-24)
 
 

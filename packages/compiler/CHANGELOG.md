@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.5.0](https://github.com/jxsuite/jx/compare/compiler-v1.4.0...compiler-v1.5.0) (2026-07-30)
+
+
+### Features
+
+* better search results ([e62c11c](https://github.com/jxsuite/jx/commit/e62c11c902d8d048038a7d280e6dd3e70392e7a7))
+* **schema:** make per-project schema composition host-agnostic ([4dddfa8](https://github.com/jxsuite/jx/commit/4dddfa8742bb43ddd8264d60b370d49aaa87bab1))
+* **schema:** make per-project schema composition host-agnostic ([df337d8](https://github.com/jxsuite/jx/commit/df337d8b3f0c0da35cad16e76d52635f9f06d7c1))
+
+
+### Bug Fixes
+
+* **compiler:** close eight element-target and prerender conformance gaps ([456666b](https://github.com/jxsuite/jx/commit/456666bb5e962b75502c33573954b61e5d8bb0b0))
+* **compiler:** close five adjacent element-target defects found while fixing [#106](https://github.com/jxsuite/jx/issues/106)-113 ([def35f6](https://github.com/jxsuite/jx/commit/def35f6e41f57524d637ba6331714e0fee6f9043))
+* **compiler:** proper handling of white-space: pre ([4489f44](https://github.com/jxsuite/jx/commit/4489f44f18cd4ee5fbd0f80027645d7b9920f5bb))
+* **schema:** make committed entry documents resolve in editors ([3281908](https://github.com/jxsuite/jx/commit/328190812bb9716de5618da9365b4e4e43cfe7f0))
+* **schema:** validate $paths against the source union instead of any object ([b801a9b](https://github.com/jxsuite/jx/commit/b801a9b503d2b116044b9e1d9b2f9ede9d99d5b7))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.2.2
+    * @jxsuite/runtime bumped to 1.3.2
+    * @jxsuite/schema bumped to 1.5.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.4.2
+    * @jxsuite/parser bumped to 1.4.1
+
 ## [1.4.0](https://github.com/jxsuite/jx/compare/compiler-v1.3.0...compiler-v1.4.0) (2026-07-24)
 
 

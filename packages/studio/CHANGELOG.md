@@ -1,5 +1,70 @@
 # Changelog
 
+## [2.0.0](https://github.com/jxsuite/jx/compare/studio-v1.5.0...studio-v2.0.0) (2026-07-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **studio:** `StudioPlatform` implementations must declare `createDestination` and honor `createProject`'s `destination`. `POST /__studio/create-project` rejects a request without one, and returns an absolute `root` for projects created outside the server root.
+
+### Features
+
+* **schema:** make per-project schema composition host-agnostic ([4dddfa8](https://github.com/jxsuite/jx/commit/4dddfa8742bb43ddd8264d60b370d49aaa87bab1))
+* **schema:** make per-project schema composition host-agnostic ([df337d8](https://github.com/jxsuite/jx/commit/df337d8b3f0c0da35cad16e76d52635f9f06d7c1))
+* **studio:** a preview link opens the real page in a real browser tab ([2d35120](https://github.com/jxsuite/jx/commit/2d35120c5faa11886d2aa06a54df48d0bb802903))
+* **studio:** commit while typing, without moving the caret ([9dead59](https://github.com/jxsuite/jx/commit/9dead59d348d633b897cce9d0cf291caf2b42171))
+* **studio:** derive the caret's editable tags from the document ([4d97c1f](https://github.com/jxsuite/jx/commit/4d97c1fa2dfe6fc1ac909c2112d89ef9f0962975))
+* **studio:** edit across block boundaries ([7c0a8b9](https://github.com/jxsuite/jx/commit/7c0a8b96a7814c12e2a8a94870c0cb9b94681b8a))
+* **studio:** give the canvas a document-wide caret ([6a4b470](https://github.com/jxsuite/jx/commit/6a4b4702fe09d42ffbe8f7735d8f786a136db4fb))
+* **studio:** join blocks at their boundaries ([79e713d](https://github.com/jxsuite/jx/commit/79e713dbf6abf0ee813be2f2bb6594a39c2d15ff))
+* **studio:** let the repo picker widen GitHub App repository access ([83f1f7e](https://github.com/jxsuite/jx/commit/83f1f7ea9e1cdc681e68111a6e40e71fdc0c1dca))
+* **studio:** require a user-chosen destination for new projects ([e08966c](https://github.com/jxsuite/jx/commit/e08966cc2d7a7ba34d4b12f3a6186396539b07da))
+* **studio:** upload and drop media from every editing surface ([ed5999b](https://github.com/jxsuite/jx/commit/ed5999b8522bcae408ac19c60d4758c40c7ff688))
+
+
+### Bug Fixes
+
+* **desktop,studio,server,collab:** typecheck the desktop package, and hold the coverage gates ([4a348b1](https://github.com/jxsuite/jx/commit/4a348b131be242ac14fe8097bb5cb431a9c64155))
+* **schema:** validate $paths against the source union instead of any object ([b801a9b](https://github.com/jxsuite/jx/commit/b801a9b503d2b116044b9e1d9b2f9ede9d99d5b7))
+* **server:** let Studio open a project it does not already contain ([f55a22a](https://github.com/jxsuite/jx/commit/f55a22a4a2d5d30d29e75cff6133f0e20c29f973))
+* **studio,server,desktop:** dev server bypassed the build; Monaco still loaded at startup ([288fb73](https://github.com/jxsuite/jx/commit/288fb73a0aae78318f17a4d1a24a73e0a523104e))
+* **studio:** clickable insertion helper target ([aca01db](https://github.com/jxsuite/jx/commit/aca01dbd3d5cbf3144617383df5994d92add76a2))
+* **studio:** keep an anchor's URL when its block is edited ([ac89d16](https://github.com/jxsuite/jx/commit/ac89d1682c926420572330b44b9f914f4fee3614))
+* **studio:** keep the Data panel's Refresh able to fetch, and stop happy-dom loading canvas iframes ([08b149b](https://github.com/jxsuite/jx/commit/08b149b0273bcea8177b302b33e1a5bfb366779e))
+* **studio:** keep the welcome screen up until a project is opened ([20c549b](https://github.com/jxsuite/jx/commit/20c549b189f08228bec7a88b3b0969be5d26ee1c))
+* **studio:** keep undo and the collab mirror usable at typing cadence ([197443d](https://github.com/jxsuite/jx/commit/197443d5d1e5e46ed6ff7b96d12c4df3f1b56a6c))
+* **studio:** preview content-relative media at its mounted URL ([483eeb9](https://github.com/jxsuite/jx/commit/483eeb9d92d0dde160688278ebf5f465f7ca43f0))
+* **studio:** register cloud platform inside studio.js for single-yjs collab ([11b73f3](https://github.com/jxsuite/jx/commit/11b73f337c508aca29b35e932660ce5255d6cadd))
+* **studio:** register cloud platform inside studio.js for single-yjs collab ([f5d9c82](https://github.com/jxsuite/jx/commit/f5d9c821c70d8d6d5289de8fa4b4956b84f17c8a))
+* **studio:** register cloud platform inside studio.js for single-yjs collab ([5179bd9](https://github.com/jxsuite/jx/commit/5179bd93c97b4123f27226213d629ae9cae347b4))
+* **studio:** replace native prompts with a Spectrum prompt dialog ([4911fed](https://github.com/jxsuite/jx/commit/4911fed514bf1b518b836f8096f67fd0a7106165))
+* **studio:** replace native prompts with a Spectrum prompt dialog ([c0bbc5e](https://github.com/jxsuite/jx/commit/c0bbc5ecd390d7b67d40bed523d6d6bd368cd8f1))
+* **studio:** resolve project schemas offline and ship Monaco's workers everywhere ([bf04699](https://github.com/jxsuite/jx/commit/bf04699944b48e0523dc22890ebcbbbea25f0310))
+* **studio:** stop the idle commit cancelling IME compositions; label the editable region ([0497c48](https://github.com/jxsuite/jx/commit/0497c488a5069db6341ffb9f7b5c190674cfa142))
+* **studio:** undo a typing run that changed the block's shape ([47e438a](https://github.com/jxsuite/jx/commit/47e438a5a721026fb304bf3cda370e7ba8441169))
+
+
+### Performance Improvements
+
+* **studio,runtime:** stop refetching on every canvas render, narrow the splice escalation ([bad5b08](https://github.com/jxsuite/jx/commit/bad5b084884ffae3cff7e4d7a0dba1d43508314a))
+* **studio:** build layer-row actions for the selected row, flatten the tree without spreads ([1c0ecac](https://github.com/jxsuite/jx/commit/1c0ecac1628c736d404713ed377b7f72a884e9b4))
+* **studio:** coalesce canvas pointermove into a frame, drop the double-rAF ([54c9052](https://github.com/jxsuite/jx/commit/54c905270db99781ce5c279c0a3e1c51ce4c77d5))
+* **studio:** code-split the bundle and load Monaco on demand ([78d85ba](https://github.com/jxsuite/jx/commit/78d85ba20569ff63ad279371923218f1ab7cc7b5))
+* **studio:** instrument the render hot path, de-duplicate Monaco, stop shipping stale dist ([c9999b8](https://github.com/jxsuite/jx/commit/c9999b88a5557d7769694cb39c40e5630d42ca59))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.6.0
+    * @jxsuite/create bumped to 1.2.2
+    * @jxsuite/formulas bumped to 0.0.6
+    * @jxsuite/markup bumped to 0.4.2
+    * @jxsuite/protocol bumped to 1.0.0
+    * @jxsuite/runtime bumped to 1.3.2
+    * @jxsuite/schema bumped to 1.5.0
+
 ## [1.5.0](https://github.com/jxsuite/jx/compare/studio-v1.4.0...studio-v1.5.0) (2026-07-24)
 
 

@@ -1,5 +1,47 @@
 # Changelog
 
+## [2.0.0](https://github.com/jxsuite/jx/compare/desktop-v1.2.1...desktop-v2.0.0) (2026-07-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **studio:** `StudioPlatform` implementations must declare `createDestination` and honor `createProject`'s `destination`. `POST /__studio/create-project` rejects a request without one, and returns an absolute `root` for projects created outside the server root.
+
+### Features
+
+* **studio:** require a user-chosen destination for new projects ([e08966c](https://github.com/jxsuite/jx/commit/e08966cc2d7a7ba34d4b12f3a6186396539b07da))
+* **studio:** upload and drop media from every editing surface ([ed5999b](https://github.com/jxsuite/jx/commit/ed5999b8522bcae408ac19c60d4758c40c7ff688))
+
+
+### Bug Fixes
+
+* **desktop,studio,server,collab:** typecheck the desktop package, and hold the coverage gates ([4a348b1](https://github.com/jxsuite/jx/commit/4a348b131be242ac14fe8097bb5cb431a9c64155))
+* **schema:** make committed entry documents resolve in editors ([3281908](https://github.com/jxsuite/jx/commit/328190812bb9716de5618da9365b4e4e43cfe7f0))
+* **studio,server,desktop:** dev server bypassed the build; Monaco still loaded at startup ([288fb73](https://github.com/jxsuite/jx/commit/288fb73a0aae78318f17a4d1a24a73e0a523104e))
+* **studio:** resolve project schemas offline and ship Monaco's workers everywhere ([bf04699](https://github.com/jxsuite/jx/commit/bf04699944b48e0523dc22890ebcbbbea25f0310))
+
+
+### Performance Improvements
+
+* **studio:** code-split the bundle and load Monaco on demand ([78d85ba](https://github.com/jxsuite/jx/commit/78d85ba20569ff63ad279371923218f1ab7cc7b5))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 1.5.0
+    * @jxsuite/create bumped to 1.2.2
+    * @jxsuite/parser bumped to 1.4.1
+    * @jxsuite/protocol bumped to 1.0.0
+    * @jxsuite/schema bumped to 1.5.0
+    * @jxsuite/server bumped to 2.0.0
+    * @jxsuite/starters bumped to 1.2.2
+    * @jxsuite/studio bumped to 2.0.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.4.2
+    * @jxsuite/server bumped to 2.0.0
+
 ## [1.2.1](https://github.com/jxsuite/jx/compare/desktop-v1.2.0...desktop-v1.2.1) (2026-07-24)
 
 
