@@ -26,6 +26,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `compiler.md`
 
+- **0.1.25-draft** (2026-07-30) — Element modules: props.* attribute intake and $props template bindings, one effect registry stopped on disconnect, state.$map published for map handlers; prerender keeps a repeater whose build-time expansion is empty (§4.1, §4.2, §4.4, §4.7, §8.1).
 - **0.1.24-draft** (2026-07-30) — Element modules: $export aliasing, Request auto-fetch on connect with effect teardown, $map bound in map callbacks, tagName-based output naming; prerender leaves runtime-only reads unresolved (§4.1, §4.7, §8.1).
 - **0.1.23-draft** (2026-07-24) — §1 Overview: condition the generated Hono worker on build.adapter (per-page _server.js without one) and scope the static-build failure to active data/auth mounts; §6.3 document compileSiteServer's mounts/connectors parameters and extension mount emission.
 - **0.1.22-draft** (2026-07-23) — Image src resolution consults extension asset mounts before public/ (§7.3).
@@ -212,6 +213,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `spec.md`
 
+- **0.4.27-draft** (2026-07-30) — Clarify that a bare `return;` is an early-exit guard, not a value return, when classifying a Function body as a computed (§5.3 4b).
+- **0.4.26-draft** (2026-07-30) — Define the handler-side iteration context: an event handler bound inside a map reads its row via state.$map (§10.2).
 - **0.4.25-draft** (2026-07-30) — Define parameter binding by name at event call sites, and how a bodyless $src Function is classified as a computed or a callable (§5.3 4d).
 - **0.4.24-draft** (2026-07-24) — §5.3 and §11.4: a timing: "server" route lands in the generated site worker only when build.adapter is set; without an adapter the compiler emits a per-page _server.js handler instead.
 - **0.4.23-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).

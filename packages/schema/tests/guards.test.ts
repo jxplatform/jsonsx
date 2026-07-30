@@ -288,6 +288,30 @@ describe("bodyReturnsValue", () => {
     expect(bodyReturnsValue("const returned = fetchData()")).toBe(false);
     expect(bodyReturnsValue("state.count++")).toBe(false);
   });
+
+  test("a bare return is an early-exit guard, not a value", () => {
+    // Reading a guard clause as a value return classified the whole handler as a computed, so the
+    // Binding that invoked it found a value where it expected a function. This body is
+    // Examples/components/todo-app.json's `toggleItem`.
+    expect(
+      bodyReturnsValue(
+        "const index = state.$map?.index ?? -1; if (index < 0) return; state.items[index].done = !state.items[index].done;",
+      ),
+    ).toBe(false);
+    expect(bodyReturnsValue("if (!x) { return; }\n  doThing();")).toBe(false);
+    expect(bodyReturnsValue("return;")).toBe(false);
+    expect(bodyReturnsValue("return")).toBe(false);
+  });
+
+  test("a value must follow on the same line, since a newline is an ASI bare return", () => {
+    expect(bodyReturnsValue("return\n  x")).toBe(false);
+    expect(bodyReturnsValue("return x")).toBe(true);
+  });
+
+  test("a value return needs no space before it", () => {
+    expect(bodyReturnsValue("return(state.a + 1)")).toBe(true);
+    expect(bodyReturnsValue("return{ a: 1 }")).toBe(true);
+  });
 });
 
 describe("isNestedStyle", () => {

@@ -1176,9 +1176,14 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
   }
   const rawChildren = node.children;
   // Legacy whole-children repeater: expand the items into the node's static children.
+  // Only when the expansion actually produced nodes. `expandMappedArrayStatic` returns `null` when
+  // `items` cannot be resolved at build time and `[]` when it resolves to an empty array — and `[]`
+  // Is truthy, so an empty build-time list used to replace the repeater with nothing, discarding the
+  // Definition the client needed. There is no prerendered output to preserve in that case, so the
+  // Repeater is left in place for the client to bind (a page containing one is never zero-JS).
   if (isMappedArray(rawChildren)) {
     const expanded = expandMappedArrayStatic(rawChildren, scope);
-    if (expanded) {
+    if (expanded && expanded.length > 0) {
       node.children = expanded;
       return;
     }
@@ -1208,10 +1213,11 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
           continue;
         }
       }
-      // Array pseudo-element among siblings: expand its items in place.
+      // Array pseudo-element among siblings: expand its items in place, on the same
+      // Produced-nothing rule as the whole-children branch above.
       if (isMappedArray(child)) {
         const expanded = expandMappedArrayStatic(child, scope);
-        if (expanded) {
+        if (expanded && expanded.length > 0) {
           node.children.splice(i, 1, ...expanded);
           i += expanded.length;
           continue;

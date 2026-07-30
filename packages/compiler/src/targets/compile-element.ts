@@ -20,6 +20,7 @@ import {
   tagNameToClassName,
 } from "../shared.ts";
 import {
+  bodyReturnsValue,
   hasStructuredBody,
   isExpressionDef,
   isFunctionDef,
@@ -365,15 +366,17 @@ export function emitElementModule(
     const d = def as JxMutableNode;
     return Boolean(d) && typeof d === "object" && !Array.isArray(d) && d.$prototype === "Request";
   });
-  const hasRequests = requestEntries.length > 0;
 
   lines.push(
-    `import { reactive, computed, effect${hasRequests ? ", stop" : ""} } from '@vue/reactivity';`,
+    `import { reactive, computed, effect, stop } from '@vue/reactivity';`,
     `import { render, html } from 'lit-html';`,
     "",
     `class ${className} extends HTMLElement {`,
-    "  #dispose = null;",
-    ...(hasRequests ? ["  #requests = [];"] : []),
+    // One registry for every effect the element creates — render, dynamic host styles, Request
+    // Auto-fetches. Calling an @vue/reactivity runner re-runs it, so teardown has to be `stop()`,
+    // And a single list keeps every effect on the same lifecycle instead of leaking the ones nobody
+    // Held a handle to.
+    "  #effects = [];",
     "",
     // Constructor: build reactive state
     "  constructor() {",
@@ -407,7 +410,7 @@ export function emitElementModule(
         } else {
           computedEntries.push([key, d]);
         }
-      } else if (typeof d.body === "string" && d.body.includes("return")) {
+      } else if (typeof d.body === "string" && bodyReturnsValue(d.body)) {
         computedEntries.push([key, d]);
       } else {
         functionEntries.push([key, d]);
@@ -547,6 +550,17 @@ export function emitElementModule(
     "      } catch {}",
     "      this.removeAttribute('data-jx-props');",
     "    }",
+    // Literal `props.*` attributes — the live-render mirror of the build-time lift in site-build.
+    // String values only: HTML lowercases attribute names, so a state key must be lowercase to match.
+    // Names are collected first because removing while iterating the live NamedNodeMap skips entries.
+    "    const _pn = this.getAttributeNames().filter(n => n.startsWith('props.') && n.length > 6);",
+    "    for (const _n of _pn) {",
+    "      const _k = _n.slice(6);",
+    "      if (_k in this.state) {",
+    "        this.state[_k] = this.getAttribute(_n);",
+    "        this.removeAttribute(_n);",
+    "      }",
+    "    }",
     // Merge JS properties set before connection (by parent runtime).
     // Only check own properties to avoid inherited DOM properties like `title`.
     "    for (const key of Object.keys(this.state)) {",
@@ -563,7 +577,7 @@ export function emitElementModule(
   for (const [key, def] of requestEntries) {
     lines.push(
       emitRequestFetch(key, def as unknown as JxPrototypeDef, {
-        collect: "this.#requests",
+        collect: "this.#effects",
         indent: "    ",
         statePrefix: "this.state",
       }),
@@ -590,7 +604,7 @@ export function emitElementModule(
       }
     }
     if (dynamicStyles.length > 0) {
-      lines.push("    effect(() => {");
+      lines.push("    this.#effects.push(effect(() => {");
       for (const [cssProp, value] of dynamicStyles) {
         const expr = value.replaceAll(
           /\$\{([^}]+)\}/g,
@@ -598,7 +612,7 @@ export function emitElementModule(
         );
         lines.push(`      this.style['${cssProp}'] = \`${expr}\`;`);
       }
-      lines.push("    });");
+      lines.push("    }));");
     }
   }
   const hasSlot = treeHasSlot(doc.children);
@@ -613,7 +627,7 @@ export function emitElementModule(
     "      this.removeAttribute('data-jx-prerendered');",
     "    }",
     "    this.innerHTML = '';",
-    "    this.#dispose = effect(() => render(this.template(), this));",
+    "    this.#effects.push(effect(() => render(this.template(), this)));",
   );
   if (hasSlot) {
     // Replace <slot> placeholder with saved slotted content
@@ -634,10 +648,8 @@ export function emitElementModule(
     "",
     // DisconnectedCallback
     "  disconnectedCallback() {",
-    ...(hasRequests
-      ? ["    for (const _r of this.#requests) { stop(_r); }", "    this.#requests.length = 0;"]
-      : []),
-    "    if (this.#dispose) { this.#dispose(); this.#dispose = null; }",
+    "    for (const _e of this.#effects) { stop(_e); }",
+    "    this.#effects.length = 0;",
     "    if (typeof this.state.onUnmount === 'function') { this.state.onUnmount(this.state); }",
     "  }",
     "}",
@@ -663,6 +675,7 @@ function emitLitChildren(
   _parentStyle: JxStyle | null | undefined,
   indent: string,
   preformatted = false,
+  inMap = false,
 ) {
   if (!children) {
     return "";
@@ -682,7 +695,7 @@ function emitLitChildren(
     .map((child: JxMutableNode | string) =>
       isMappedArray(child)
         ? emitMappedArray(child, indent)
-        : emitLitNode(child, preformatted ? "" : indent, preformatted),
+        : emitLitNode(child, preformatted ? "" : indent, preformatted, inMap),
     )
     .join(preformatted ? "" : "\n");
 }
@@ -693,7 +706,12 @@ function emitLitChildren(
  * @param {boolean} [preformatted]
  * @returns {string}
  */
-function emitLitNode(def: JxMutableNode | string, indent: string, preformatted = false) {
+function emitLitNode(
+  def: JxMutableNode | string,
+  indent: string,
+  preformatted = false,
+  inMap = false,
+) {
   // String children are text nodes
   if (typeof def === "string") {
     if (def.includes("${")) {
@@ -764,12 +782,21 @@ function emitLitNode(def: JxMutableNode | string, indent: string, preformatted =
     for (const [key, val] of Object.entries(def.$props)) {
       if (val && typeof val === "object" && (val as JxMutableNode).$ref) {
         parts.push(`.${key}="\${${refToExpr((val as JxMutableNode).$ref as string)}}"`);
+      } else if (typeof val === "string" && val.includes("${")) {
+        // A template value is a binding, not text. JSON-quoting it emitted the template's own source
+        // As the prop value (`.label="${"${state.x}"}"`), so the component received the literal
+        // String `${state.x}` forever.
+        parts.push(`.${key}="${toLitExpr(val)}"`);
       } else {
         parts.push(`.${key}="\${${JSON.stringify(val)}}"`);
       }
     }
   }
 
+  // A handler bound inside a map publishes its iteration to state before running, matching the
+  // Interpreter's child scope and the client target's handler wrapper. Bodies read it as
+  // `state.$map.index` / `state.$map.item`.
+  const mapCtx = inMap ? "s.$map = $map; " : "";
   for (const [key, val] of Object.entries(def)) {
     if (!key.startsWith("on") || key === "observedAttributes") {
       continue;
@@ -777,7 +804,9 @@ function emitLitNode(def: JxMutableNode | string, indent: string, preformatted =
     const eventName = key.slice(2).toLowerCase();
     if (val && typeof val === "object" && (val as JxMutableNode).$ref) {
       parts.push(
-        `@${eventName}="\${(e) => ${refToExpr((val as JxMutableNode).$ref as string)}(s, e)}"`,
+        mapCtx
+          ? `@${eventName}="\${(e) => { ${mapCtx}${refToExpr((val as JxMutableNode).$ref as string)}(s, e); }}"`
+          : `@${eventName}="\${(e) => ${refToExpr((val as JxMutableNode).$ref as string)}(s, e)}"`,
       );
     } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ val) {
       const compiled = compileExpression(
@@ -787,9 +816,9 @@ function emitLitNode(def: JxMutableNode | string, indent: string, preformatted =
           statePrefix: "s",
         },
       );
-      parts.push(`@${eventName}="\${(e) => { ${compiled}; }}"`);
+      parts.push(`@${eventName}="\${(e) => { ${mapCtx}${compiled}; }}"`);
     } else if (isFunctionDef(val)) {
-      parts.push(`@${eventName}="\${(e) => { ${inlineHandlerBody(val)} }}"`);
+      parts.push(`@${eventName}="\${(e) => { ${mapCtx}${inlineHandlerBody(val)} }}"`);
     }
   }
 
@@ -815,7 +844,7 @@ function emitLitNode(def: JxMutableNode | string, indent: string, preformatted =
       if (!caseDef || isRef(caseDef)) {
         continue;
       }
-      const renderedCase = emitLitNode(caseDef, `${indent}  `);
+      const renderedCase = emitLitNode(caseDef, `${indent}  `, false, inMap);
       caseEntries.push(`  ${JSON.stringify(key)}: html\`\n${renderedCase}\n  \``);
     }
     inner = `\${{\n${caseEntries.join(",\n")}\n}[${switchExpr}]}`;
@@ -825,8 +854,8 @@ function emitLitNode(def: JxMutableNode | string, indent: string, preformatted =
     inner = def.innerHTML;
   } else if (def.children) {
     inner = inPre
-      ? emitLitChildren(def.children, def.style, "", true)
-      : `\n${emitLitChildren(def.children, def.style, `${indent}  `)}\n${indent}`;
+      ? emitLitChildren(def.children, def.style, "", true, inMap)
+      : `\n${emitLitChildren(def.children, def.style, `${indent}  `, false, inMap)}\n${indent}`;
   }
 
   // Inside a <pre>, the newline before `>` would land in the element's own text.
@@ -876,6 +905,10 @@ function emitMappedArray(arrayDef: JxMappedArray, indent: string) {
     for (const [key, val] of Object.entries(mapDef.$props)) {
       if (isRef(val)) {
         parts.push(`.${key}="\${${mapRefToExpr(val.$ref)}}"`);
+      } else if (typeof val === "string" && val.includes("${")) {
+        // `$props: { label: "${$map.item.name}" }` is the ordinary way to pass per-item data to a
+        // Component in a list; JSON-quoting it handed over the template source instead.
+        parts.push(`.${key}="${toLitExpr(val)}"`);
       } else {
         parts.push(`.${key}="\${${JSON.stringify(val)}}"`);
       }
@@ -893,13 +926,13 @@ function emitMappedArray(arrayDef: JxMappedArray, indent: string) {
     }
     const eventName = key.slice(2).toLowerCase();
     if (isRef(val)) {
-      parts.push(`@${eventName}="\${(e) => ${refToExpr(val.$ref)}(s, e)}"`);
+      parts.push(`@${eventName}="\${(e) => { s.$map = $map; ${refToExpr(val.$ref)}(s, e); }}"`);
     } else if (isExpressionDef(val)) {
       const compiled = compileExpression(val.$expression as ExpressionNode, {
         eventParam: "e",
         statePrefix: "s",
       });
-      parts.push(`@${eventName}="\${(e) => { ${compiled}; }}"`);
+      parts.push(`@${eventName}="\${(e) => { s.$map = $map; ${compiled}; }}"`);
     }
   }
 
@@ -909,7 +942,7 @@ function emitMappedArray(arrayDef: JxMappedArray, indent: string) {
   if (mapDef.textContent !== undefined) {
     inner = toLitTextContent(mapDef.textContent);
   } else if (mapDef.children) {
-    inner = `\n${emitLitChildren(mapDef.children, null, `${indent}      `)}\n${indent}    `;
+    inner = `\n${emitLitChildren(mapDef.children, null, `${indent}      `, false, true)}\n${indent}    `;
   }
 
   const body = `html\`\n${indent}  <${tag}${attrsStr}\n${indent}  >${inner}</${tag}>\n${indent}\``;

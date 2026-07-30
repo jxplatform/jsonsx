@@ -2,7 +2,7 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.4.25-draft
+**Version:** 0.4.27-draft
 **Status:** Partial
 **Updated:** 2026-07-30
 **License:** MIT
@@ -397,6 +397,8 @@ Functions and data sources are both declared via `$prototype`:
 ```
 
 A function with only `body` (no `arguments`) and no event binding acts as a computed value — the framework automatically wraps it in `computed()` when it detects it is referenced reactively.
+
+A body counts as returning a value only when something follows `return` on the same line. A bare `return;` is an early-exit guard, so a handler that begins `if (!x) return;` stays a handler; a newline after `return` is an ASI bare return and counts the same way.
 
 ##### 4c — Function (External)
 
@@ -966,6 +968,13 @@ container).
 | -------------------------- | ------------------------------------ |
 | `{ "$ref": "$map/item" }`  | The current array item object        |
 | `{ "$ref": "$map/index" }` | The current zero-based integer index |
+
+Template strings inside the map read the same context as `${$map.item…}` and `${$map.index}` (§6.6).
+
+**From a handler.** An event handler bound anywhere inside a map — on the map body or on any of its
+descendants — reads its iteration off state as `state.$map`, carrying `item` and `index`. The
+iteration is published before the handler body runs, so a handler shared by every row can tell which
+row invoked it. A nested map shadows the outer context for handlers within it.
 
 ### 10.3 Filtering and Sorting
 
@@ -2289,6 +2298,8 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.4.27-draft** (2026-07-30) — Clarify that a bare `return;` is an early-exit guard, not a value return, when classifying a Function body as a computed (§5.3 4b).
+- **0.4.26-draft** (2026-07-30) — Define the handler-side iteration context: an event handler bound inside a map reads its row via state.$map (§10.2).
 - **0.4.25-draft** (2026-07-30) — Define parameter binding by name at event call sites, and how a bodyless $src Function is classified as a computed or a callable (§5.3 4d).
 - **0.4.24-draft** (2026-07-24) — §5.3 and §11.4: a timing: "server" route lands in the generated site worker only when build.adapter is set; without an adapter the compiler emits a per-page _server.js handler instead.
 - **0.4.23-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -2334,4 +2345,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.4.25-draft — subject to revision_
+_Jx Specification v0.4.27-draft — subject to revision_

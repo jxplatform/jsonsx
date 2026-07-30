@@ -35,6 +35,7 @@ import {
   srcImportBinding,
 } from "../shared.ts";
 import {
+  bodyReturnsValue,
   hasStructuredBody,
   isExpandedSignal,
   isExpressionDef,
@@ -168,7 +169,7 @@ export function compileClient(
 
         // $src functions always produce computed entries (they return values)
         computedEntries.push([key, `() => { return ${key}(state); }`]);
-      } else if (typeof def.body === "string" && def.body.includes("return")) {
+      } else if (typeof def.body === "string" && bodyReturnsValue(def.body)) {
         // Body contains return → computed
         computedEntries.push([key, `() => { ${def.body} }`]);
       } else {
@@ -599,6 +600,20 @@ function emitLitMapTemplate(def: JxMutableNode | undefined, preformatted = false
     attrs += ` class="${mapRefsToLit(def.className)}"`;
   }
 
+  // $props → lit property bindings. The element target emits these; the client target emitted
+  // Nothing, so a component in a list silently received none of its per-item props.
+  if (def.$props && typeof def.$props === "object") {
+    for (const [k, v] of Object.entries(def.$props)) {
+      if (isRefObject(v)) {
+        attrs += ` .${k}="\${${mapRefToClientExpr((v as { $ref: string }).$ref)}}"`;
+      } else if (typeof v === "string" && isTemplateString(v)) {
+        attrs += ` .${k}="${mapRefsToLit(v)}"`;
+      } else {
+        attrs += ` .${k}="\${${JSON.stringify(v)}}"`;
+      }
+    }
+  }
+
   // Attributes object
   if (def.attributes && typeof def.attributes === "object") {
     for (const [k, v] of Object.entries(def.attributes)) {
@@ -957,6 +972,25 @@ function emitCookieInit(key: string, cookieName: string, defaultVal: unknown) {
  * @param {string} ref
  * @returns {string}
  */
+/**
+ * Lower a `$ref` to the JS expression that reads it inside a map callback — the mirror of the
+ * element target's `refToExpr`/`mapRefToExpr`. Distinct from `refToBindingKey` below, which
+ * flattens `/` to `_` to name a binding and would produce nonsense (`state.$map_item`) as an
+ * expression.
+ *
+ * @param {string} ref
+ * @returns {string}
+ */
+function mapRefToClientExpr(ref: string) {
+  if (ref.startsWith("$map/")) {
+    return ref.slice("$map/".length).replaceAll("/", ".");
+  }
+  if (ref.startsWith("#/state/")) {
+    return `state.${ref.slice("#/state/".length).replaceAll("/", ".")}`;
+  }
+  return `state.${ref.replaceAll("/", ".")}`;
+}
+
 function refToBindingKey(ref: string) {
   if (ref.startsWith("#/state/")) {
     return ref.slice("#/state/".length).replaceAll("/", "_");

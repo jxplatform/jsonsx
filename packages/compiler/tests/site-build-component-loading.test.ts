@@ -199,3 +199,122 @@ describe("buildSite — unreferenced components stay out of the page", () => {
     expect(html).not.toContain("/components/ls-unused.css");
   });
 });
+
+// ── A repeater whose build-time list is empty keeps its client binding ────────
+
+describe("buildSite — a build-time-empty repeater is not collapsed", () => {
+  const TMP = resolve(import.meta.dir, "__test-empty-repeater__");
+
+  /**
+   * `expandMappedArrayStatic` returns `[]` for a list that resolves to empty at build time, and
+   * `[]` is truthy — so the repeater used to be replaced with nothing at all, discarding the
+   * definition the client needed. The list then rendered nothing forever, however much state
+   * changed.
+   *
+   * @param {string} dir
+   * @param {unknown} children
+   */
+  async function build(dir: string, children: unknown) {
+    const root = resolve(TMP, dir);
+    rmSync(root, { force: true, recursive: true });
+    writeJSON(root, "project.json", { build: { outDir: "./dist" }, name: "Empty Repeater" });
+    writeJSON(root, "pages/index.json", {
+      children,
+      state: { rows: { default: [] } },
+      title: "Home",
+    });
+    writeJSON(root, "components/ls-row.json", {
+      children: [{ tagName: "span", textContent: "row" }],
+      tagName: "ls-row",
+    });
+    await buildSite(root, { verbose: false });
+    return {
+      html: readFileSync(resolve(root, "dist/index.html"), "utf8"),
+      island: existsSync(resolve(root, "dist/app.js"))
+        ? readFileSync(resolve(root, "dist/app.js"), "utf8")
+        : "",
+    };
+  }
+
+  afterAll(() => {
+    rmSync(TMP, { force: true, recursive: true });
+  });
+
+  it("keeps the whole-children form bound to the client", async () => {
+    const { html, island } = await build("whole", {
+      $prototype: "Array",
+      items: { $ref: "#/state/rows" },
+      map: { tagName: "ls-row" },
+    });
+
+    expect(html).toContain(':render="_list0"');
+    expect(island).toContain("<ls-row");
+  });
+
+  it("keeps the sibling form bound, and its siblings intact", async () => {
+    const { html, island } = await build("sibling", [
+      { tagName: "h1", textContent: "Rows" },
+      { $prototype: "Array", items: { $ref: "#/state/rows" }, map: { tagName: "ls-row" } },
+      { tagName: "p", textContent: "end" },
+    ]);
+
+    expect(html).toContain(':render="_children0"');
+    expect(island).toContain("<ls-row");
+  });
+
+  it("injects the component loader for the client-rendered rows", async () => {
+    const { html } = await build("loader", {
+      $prototype: "Array",
+      items: { $ref: "#/state/rows" },
+      map: { tagName: "ls-row" },
+    });
+
+    expect(html).toContain('src="/components/ls-row.js"');
+  });
+});
+
+// ── A non-empty build-time list still prerenders with zero JS ────────────────
+
+describe("buildSite — a resolvable non-empty repeater still prerenders", () => {
+  const TMP = resolve(import.meta.dir, "__test-static-repeater__");
+
+  beforeAll(async () => {
+    rmSync(TMP, { force: true, recursive: true });
+    writeJSON(TMP, "project.json", { build: { outDir: "./dist" }, name: "Static Repeater" });
+    writeJSON(TMP, "pages/index.json", {
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/rows" },
+        map: { tagName: "ls-row" },
+      },
+      state: { rows: { default: [{ n: 1 }, { n: 2 }] } },
+      title: "Home",
+    });
+    writeJSON(TMP, "components/ls-row.json", {
+      children: [{ tagName: "span", textContent: "row" }],
+      tagName: "ls-row",
+    });
+    await buildSite(TMP, { verbose: false });
+  });
+
+  afterAll(() => {
+    rmSync(TMP, { force: true, recursive: true });
+  });
+
+  it("expands the items into static markup", () => {
+    const html = readFileSync(resolve(TMP, "dist/index.html"), "utf8");
+    expect(html.match(/<ls-row/g)).toHaveLength(2);
+    expect(html).not.toContain(":render=");
+  });
+
+  it("does not client-render the rows", () => {
+    // The guard must not turn a statically resolvable list into a client-rendered one. (A page with
+    // Any `state` still emits an inert bootstrapper; what matters is that it carries no list.)
+    const island = existsSync(resolve(TMP, "dist/app.js"))
+      ? readFileSync(resolve(TMP, "dist/app.js"), "utf8")
+      : "";
+    expect(island).not.toContain("<ls-row");
+    expect(island).not.toContain("_list0");
+    expect(island).not.toContain("_children0");
+  });
+});

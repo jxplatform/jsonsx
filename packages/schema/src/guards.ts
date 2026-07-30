@@ -179,9 +179,14 @@ export function isTemplateString(value?: unknown): value is string {
  * "Function"` as a computed value vs an event handler. Uses a word boundary so identifiers like
  * `returned` do not match. Shared by the runtime interpreter and the compiler so both agree on the
  * classification.
+ *
+ * A bare `return;` does not count. It is an early-exit guard, which is handler code — reading it as
+ * a value return turned any handler with a guard clause into a `computed()`, so the binding that
+ * invoked it found a value where it expected a function. The value has to follow on the same line,
+ * because a newline after `return` is an ASI bare return.
  */
 export function bodyReturnsValue(body: string): boolean {
-  return /\breturn\b/.test(body);
+  return /\breturn\b[^\S\n]*(?![;}\s]|$)/.test(body);
 }
 
 // ─── Style guards & accessors ───────────────────────────────────────────────────

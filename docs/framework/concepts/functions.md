@@ -59,6 +59,17 @@ A function with only a `body` (no `arguments`) that returns a value acts as a co
 }
 ```
 
+Only a `return` with a value on the same line makes an entry a computed. A bare `return;` is an early exit, so a handler that starts with a guard clause stays a handler:
+
+```json
+{
+  "toggle": {
+    "$prototype": "Function",
+    "body": "if (state.locked) return; state.open = !state.open"
+  }
+}
+```
+
 ## External sidecars
 
 When a function outgrows a string, move it to a `.js` file and point `$src` at it. Each entry resolves to the named export matching its key (override with `$export`); npm specifiers work too:

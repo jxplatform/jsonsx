@@ -3,6 +3,9 @@ title: "Lists and iteration"
 description: "Repeating elements from data in Jx: the Array pseudo-element, its items and map, the $map iteration context, and filtering and sorting."
 spec:
   - spec.md#10
+  - spec.md#10.2 # iteration context, including state.$map from a handler
+code:
+  - packages/compiler/src/targets/compile-element.ts
 ---
 
 # Lists and iteration
@@ -79,6 +82,46 @@ The Array object is a _member_ of `children`, so it can sit among ordinary sibli
       "map": { "tagName": "li", "textContent": { "$ref": "$map/item" } }
     }
   ]
+}
+```
+
+## Reading the row from a handler
+
+One handler serves every row. Which row invoked it is on state as `state.$map`, with `item` and `index`:
+
+```json
+{
+  "state": {
+    "toggle": {
+      "$prototype": "Function",
+      "body": "state.items[state.$map.index].done = !state.items[state.$map.index].done"
+    }
+  },
+  "children": {
+    "$prototype": "Array",
+    "items": { "$ref": "#/state/items" },
+    "map": {
+      "tagName": "li",
+      "children": [{ "tagName": "input", "onclick": { "$ref": "#/state/toggle" } }]
+    }
+  }
+}
+```
+
+This works on the map body and on any descendant of it. A nested list shadows the outer context for handlers inside it.
+
+## Passing a row to a component
+
+`$props` on the map body hands each item's data to a component. Template values are bindings, so they read the current row:
+
+```json
+{
+  "$prototype": "Array",
+  "items": { "$ref": "#/state/posts" },
+  "map": {
+    "tagName": "post-card",
+    "$props": { "title": "${$map.item.title}", "index": { "$ref": "$map/index" } }
+  }
 }
 ```
 

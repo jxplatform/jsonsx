@@ -22,7 +22,9 @@ describe("compileElement", () => {
     expect(file.tagName).toBe("test-basic");
     expect(file.content).toContain("class TestBasic extends HTMLElement");
     expect(file.content).toContain("customElements.define('test-basic'");
-    expect(file.content).toContain("import { reactive, computed, effect } from '@vue/reactivity'");
+    expect(file.content).toContain(
+      "import { reactive, computed, effect, stop } from '@vue/reactivity'",
+    );
     expect(file.content).toContain("import { render, html } from 'lit-html'");
   });
 
@@ -86,7 +88,7 @@ describe("compileElement", () => {
     const { content } = result.files[0]!;
     expect(content).toContain("connectedCallback()");
     expect(content).toContain("this.state[key] = this[key]");
-    expect(content).toContain("this.#dispose = effect(() => render(this.template(), this))");
+    expect(content).toContain("this.#effects.push(effect(() => render(this.template(), this)))");
   });
 
   test("disconnectedCallback disposes effect", async () => {
@@ -98,7 +100,8 @@ describe("compileElement", () => {
 
     const { content } = result.files[0]!;
     expect(content).toContain("disconnectedCallback()");
-    expect(content).toContain("#dispose");
+    expect(content).toContain("for (const _e of this.#effects) { stop(_e); }");
+    expect(content).toContain("this.#effects.length = 0;");
   });
 
   test("throws for non-hyphenated tagName", async () => {
@@ -847,7 +850,8 @@ describe("compileElement — refToExpr edge cases", () => {
     const { content } = result.files[0]!;
     expect(content).toContain("item.title");
     expect(content).toContain("item.handler");
-    expect(content).not.toContain("s.$map");
+    expect(content).not.toContain("s.$map.");
+    expect(content).not.toContain("s.$map/");
   });
 
   test("Request prototype state initializes as null", async () => {
@@ -1253,9 +1257,9 @@ describe("compileElement — Request auto-fetch", () => {
     const { content } = result.files[0]!;
     // Calling an @vue/reactivity runner re-runs it, so teardown has to use stop().
     expect(content).toContain("import { reactive, computed, effect, stop } from '@vue/reactivity'");
-    expect(content).toContain("#requests = [];");
-    expect(content).toContain("this.#requests.push(effect(() => {");
-    expect(content).toContain("for (const _r of this.#requests) { stop(_r); }");
+    expect(content).toContain("#effects = [];");
+    expect(content).toContain("this.#effects.push(effect(() => {");
+    expect(content).toContain("for (const _e of this.#effects) { stop(_e); }");
   });
 
   test("adds no Request machinery to a document without one", async () => {
@@ -1266,9 +1270,8 @@ describe("compileElement — Request auto-fetch", () => {
     });
 
     const { content } = result.files[0]!;
-    expect(content).toContain("import { reactive, computed, effect } from '@vue/reactivity'");
-    expect(content).not.toContain("#requests");
-    expect(content).not.toContain("stop(");
+    expect(content).not.toContain("fetch(url");
+    expect(content).not.toContain("auto-fetch");
   });
 });
 
@@ -1392,5 +1395,217 @@ describe("compileElement — declared handler parameters", () => {
     });
 
     expect(result.files[0]!.content).toContain("this.state.save = (state, e) => save(e);");
+  });
+});
+
+// ─── $map context for handlers bound inside a map ───────────────────────────
+
+describe("compileElement — $map context for map handlers", () => {
+  test("a handler on the map root publishes its iteration to state", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: { onclick: { $ref: "#/state/pick" }, tagName: "li" },
+      },
+      state: { items: [], pick: { $prototype: "Function", body: "state.i = state.$map.index" } },
+      tagName: "test-mapctx-root",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('@click="${(e) => { s.$map = $map; s.pick(s, e); }}"');
+  });
+
+  test("a handler on a map descendant publishes it too", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: {
+          children: [{ onclick: { $ref: "#/state/pick" }, tagName: "button" }],
+          tagName: "li",
+        },
+      },
+      state: { items: [], pick: { $prototype: "Function", body: "state.i = state.$map.index" } },
+      tagName: "test-mapctx-descendant",
+    });
+
+    const { content } = result.files[0]!;
+    // Examples/components/todo-app.json binds its checkbox handler exactly here, and it read
+    // `state.$map?.index` — which was undefined, so the handler early-returned and did nothing.
+    expect(content).toContain('@click="${(e) => { s.$map = $map; s.pick(s, e); }}"');
+    expect(content).toContain("const $map = { item, index };");
+  });
+
+  test("an inline and an $expression handler inside a map publish it as well", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: {
+          children: [
+            { onclick: { $prototype: "Function", body: "state.n++" }, tagName: "b" },
+            {
+              onclick: { $expression: { operator: "increment", target: { $ref: "#/state/n" } } },
+              tagName: "i",
+            },
+          ],
+          tagName: "li",
+        },
+      },
+      state: { items: [], n: 0 },
+      tagName: "test-mapctx-inline",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('@click="${(e) => { s.$map = $map; s.n++ }}"');
+    expect(content).toMatch(/@click="\$\{\(e\) => \{ s\.\$map = \$map; s\.n/);
+  });
+
+  test("a handler outside any map is emitted unchanged", async () => {
+    const result = await compileElement({
+      children: [{ onclick: { $ref: "#/state/pick" }, tagName: "button" }],
+      state: { pick: { $prototype: "Function", body: "state.n++" } },
+      tagName: "test-mapctx-none",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('@click="${(e) => s.pick(s, e)}"');
+    expect(content).not.toContain("s.$map");
+  });
+
+  test("a nested map shadows the outer iteration", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/groups" },
+        map: {
+          children: {
+            $prototype: "Array",
+            items: { $ref: "$map/item/rows" },
+            map: { onclick: { $ref: "#/state/pick" }, tagName: "span" },
+          },
+          tagName: "li",
+        },
+      },
+      state: { groups: [], pick: { $prototype: "Function", body: "state.n++" } },
+      tagName: "test-mapctx-nested",
+    });
+
+    const { content } = result.files[0]!;
+    // Two callbacks, each with its own binding — the inner assignment resolves to the inner one.
+    expect(content.match(/const \$map = \{ item, index \};/g)).toHaveLength(2);
+  });
+});
+
+// ─── Effect disposal ────────────────────────────────────────────────────────
+
+describe("compileElement — effect disposal", () => {
+  test("every effect the element creates lands in one registry", async () => {
+    const result = await compileElement({
+      children: [{ tagName: "p", textContent: "x" }],
+      state: { c: "red", d: { $prototype: "Request", url: "/api/d" } },
+      style: { color: "${state.c}" },
+      tagName: "test-dispose-all",
+    });
+
+    const { content } = result.files[0]!;
+    // Render effect, dynamic host style effect, and Request auto-fetch — three pushes.
+    expect(content.match(/this\.#effects\.push\(effect\(/g)).toHaveLength(3);
+    expect(content).toContain("this.#effects.push(effect(() => render(this.template(), this)))");
+  });
+
+  test("the dynamic host-style effect is closed through the registry push", async () => {
+    const result = await compileElement({
+      children: [],
+      state: { c: "red" },
+      style: { color: "${state.c}" },
+      tagName: "test-dispose-style",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("this.#effects.push(effect(() => {");
+    expect(content).toContain("}));");
+  });
+
+  test("disconnect stops the runners rather than calling them", async () => {
+    const result = await compileElement({
+      children: [],
+      state: {},
+      tagName: "test-dispose-stop",
+    });
+
+    const { content } = result.files[0]!;
+    // Calling an @vue/reactivity runner RE-RUNS the effect — it renders once more into a detached
+    // Element and stays subscribed. `stop()` is the only thing that ends it.
+    expect(content).toContain("for (const _e of this.#effects) { stop(_e); }");
+    expect(content).not.toContain("this.#dispose()");
+  });
+});
+
+// ─── $props delivery ───────────────────────────────────────────────────────
+
+describe("compileElement — $props delivery", () => {
+  test("a template-valued $prop is a binding, not literal text", async () => {
+    const result = await compileElement({
+      children: [{ $props: { label: "${state.who}" }, tagName: "ls-row" }],
+      state: { who: "Ann" },
+      tagName: "test-props-tpl",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('.label="${s.who}"');
+    // Was JSON-quoted, handing the component the template's own source as its value.
+    expect(content).not.toContain('.label="${"${state.who}"}"');
+  });
+
+  test("a template-valued $prop inside a map reads the item", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/rows" },
+        map: { $props: { label: "${$map.item.name}" }, tagName: "ls-row" },
+      },
+      state: { rows: [] },
+      tagName: "test-props-map",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('.label="${$map.item.name}"');
+  });
+
+  test("$ref and static $props are unchanged", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/rows" },
+        map: { $props: { k: "static", n: { $ref: "$map/index" } }, tagName: "ls-row" },
+      },
+      state: { rows: [] },
+      tagName: "test-props-plain",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('.n="${index}"');
+    expect(content).toContain('.k="${"static"}"');
+  });
+
+  test("connectedCallback reads literal props.* attributes", async () => {
+    const result = await compileElement({
+      children: [{ tagName: "h3", textContent: "${state.label}" }],
+      state: { label: { default: "DEFAULT" } },
+      tagName: "test-props-attr",
+    });
+
+    const { content } = result.files[0]!;
+    // Mirrors the interpreted runtime: island-rendered and JSON-authored instances both deliver
+    // Props as `props.*` attributes, and the compiled element used to ignore them entirely.
+    expect(content).toContain(
+      "const _pn = this.getAttributeNames().filter(n => n.startsWith('props.') && n.length > 6);",
+    );
+    expect(content).toContain("const _k = _n.slice(6);");
+    expect(content).toContain("if (_k in this.state) {");
+    expect(content).toContain("this.state[_k] = this.getAttribute(_n);");
+    expect(content).toContain("this.removeAttribute(_n);");
   });
 });
