@@ -993,3 +993,93 @@ describe("compileClient — self-closing element with mapped array", () => {
     expect(html).not.toContain("</input>");
   });
 });
+
+// ─── $props on a mapped component tag ───────────────────────────────────────
+
+describe("compileClient — $props in a map template", () => {
+  test("emits lit property bindings for a template-valued $prop", () => {
+    const result = compileClient(
+      asDoc({
+        children: {
+          $prototype: "Array",
+          items: { $ref: "#/state/rows" },
+          map: { $props: { label: "${$map.item.name}" }, tagName: "ls-row" },
+        },
+        state: { rows: { default: [{ name: "A" }] } },
+        tagName: "div",
+        title: "T",
+      }),
+      {},
+    );
+
+    const js = result.files[0]!.content;
+    // $props was not handled at all here, so a component in a list received none of its per-item
+    // Props — it upgraded and rendered its defaults forever.
+    expect(js).toContain('.label="${item.name}"');
+  });
+
+  test("lowers every $ref form to a real expression", () => {
+    /** @param {string} ref */
+    const propFor = (ref: string) => {
+      const result = compileClient(
+        asDoc({
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/rows" },
+            map: { $props: { p: { $ref: ref } }, tagName: "ls-row" },
+          },
+          state: { a: { b: 2 }, n: 1, rows: { default: [{}] } },
+          tagName: "div",
+          title: "T",
+        }),
+        {},
+      );
+      return result.files[0]!.content.match(/\.p="[^"]*"/)?.[0];
+    };
+
+    // The bind-KEY generator flattens `/` to `_`, which is meaningless as an expression
+    // (`state.$map_item`). These need the map callback's own parameters and real member paths.
+    expect(propFor("$map/item")).toBe('.p="${item}"');
+    expect(propFor("$map/item/name")).toBe('.p="${item.name}"');
+    expect(propFor("$map/index")).toBe('.p="${index}"');
+    expect(propFor("#/state/n")).toBe('.p="${state.n}"');
+    expect(propFor("#/state/a/b")).toBe('.p="${state.a.b}"');
+    expect(propFor("loose")).toBe('.p="${state.loose}"');
+  });
+
+  test("emits a static $prop as a literal", () => {
+    const result = compileClient(
+      asDoc({
+        children: {
+          $prototype: "Array",
+          items: { $ref: "#/state/rows" },
+          map: { $props: { k: "static" }, tagName: "ls-row" },
+        },
+        state: { rows: { default: [{}] } },
+        tagName: "div",
+        title: "T",
+      }),
+      {},
+    );
+
+    expect(result.files[0]!.content).toContain('.k="${"static"}"');
+  });
+
+  test("a map body without $props is unchanged", () => {
+    const result = compileClient(
+      asDoc({
+        children: {
+          $prototype: "Array",
+          items: { $ref: "#/state/rows" },
+          map: { tagName: "ls-row" },
+        },
+        state: { rows: { default: [{}] } },
+        tagName: "div",
+        title: "T",
+      }),
+      {},
+    );
+
+    expect(result.files[0]!.content).toContain("html`<ls-row></ls-row>`");
+  });
+});

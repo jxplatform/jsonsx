@@ -256,20 +256,44 @@ export async function buildSite(
     const componentOutDir = resolve(outDir, "components");
     mkdirSync(componentOutDir, { recursive: true });
 
+    // Emitted modules are named after the component's `tagName` — the name the page's loader
+    // `<script>` and the CSS sidecar both use. So a component whose source basename differs from
+    // Its tag needs its `$elements` imports renamed to match, and those get resolved before the
+    // Dependency itself is compiled. Hence: read every component's tag up front.
+    const componentTagByPath = new Map<string, string>();
+    for (const file of componentFiles) {
+      const componentPath = resolve(componentsDir, file);
+      try {
+        const { tagName: depTag } = await readPageDocument(componentPath, formatRegistry);
+        if (depTag) {
+          componentTagByPath.set(componentPath, depTag);
+        }
+      } catch {
+        // Left to the compile pass below, which reports the parse failure with its file context.
+      }
+    }
+
     for (const file of componentFiles) {
       try {
         const componentPath = resolve(componentsDir, file);
         const result = await compileElement(componentPath, {
           ...(projectConfig.$media ? { $media: projectConfig.$media } : {}),
           formats: formatRegistry,
+          resolveElementPath: (refPath: string, currentDir: string | null) => {
+            const depPath = currentDir ? resolve(currentDir, refPath) : resolve(refPath);
+            const depTag = componentTagByPath.get(depPath);
+            return depTag ? `./${depTag}.js` : refPath.replace(/\.json$/, ".js");
+          },
           rewriteSrc: rewriteSidecarSrc,
         });
         for (const f of result.files) {
-          // Reduce the emitted path (an absolute source path with .json swapped to .js) to a bare
-          // Filename for the dist/components/ output. basename handles both / and \ — a
-          // Forward-slash-only split left the full drive path on Windows, so resolve() then wrote
-          // The sidecar back into the source tree instead of dist.
-          const outName = basename(f.path);
+          // Name the output after the tag. `injectComponentScripts` emits
+          // `<script src="/components/<tag>.js">` and the CSS sidecar is written as `<tag>.css`, so
+          // A source basename here left the loader pointing at a file that was never written.
+          // Basename is the fallback, and handles both / and \ — a forward-slash-only split left
+          // The full drive path on Windows, so resolve() then wrote the sidecar back into the
+          // Source tree instead of dist.
+          const outName = f.tagName ? `${f.tagName}.js` : basename(f.path);
           writeFileSync(resolve(componentOutDir, outName), f.content, "utf8");
           if (f.tagName) {
             compiledComponentTags.push(f.tagName);
@@ -366,6 +390,7 @@ export async function buildSite(
           compiledComponentTags,
           componentCSS,
           staticTags,
+          result.files.map((f: { content: string }) => f.content).join("\n"),
         );
       }
 
@@ -1151,9 +1176,14 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
   }
   const rawChildren = node.children;
   // Legacy whole-children repeater: expand the items into the node's static children.
+  // Only when the expansion actually produced nodes. `expandMappedArrayStatic` returns `null` when
+  // `items` cannot be resolved at build time and `[]` when it resolves to an empty array — and `[]`
+  // Is truthy, so an empty build-time list used to replace the repeater with nothing, discarding the
+  // Definition the client needed. There is no prerendered output to preserve in that case, so the
+  // Repeater is left in place for the client to bind (a page containing one is never zero-JS).
   if (isMappedArray(rawChildren)) {
     const expanded = expandMappedArrayStatic(rawChildren, scope);
-    if (expanded) {
+    if (expanded && expanded.length > 0) {
       node.children = expanded;
       return;
     }
@@ -1183,10 +1213,11 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
           continue;
         }
       }
-      // Array pseudo-element among siblings: expand its items in place.
+      // Array pseudo-element among siblings: expand its items in place, on the same
+      // Produced-nothing rule as the whole-children branch above.
       if (isMappedArray(child)) {
         const expanded = expandMappedArrayStatic(child, scope);
-        if (expanded) {
+        if (expanded && expanded.length > 0) {
           node.children.splice(i, 1, ...expanded);
           i += expanded.length;
           continue;
@@ -1351,6 +1382,7 @@ function expandComponents(
  * @param {string[]} allComponentTags - All compiled component tag names
  * @param {Map<string, string>} [cssMap] - TagName → CSS text (for link injection)
  * @param {Set<string>} [staticTags] - Tags where ALL instances are fully static (skip JS)
+ * @param {string} [islandSource] - Concatenated island modules emitted for this page
  * @returns {string}
  */
 function injectComponentScripts(
@@ -1358,11 +1390,15 @@ function injectComponentScripts(
   allComponentTags: string[],
   cssMap = new Map<string, string>(),
   staticTags = new Set<string>(),
+  islandSource = "",
 ) {
-  // Find which components are actually referenced in this page
-  const usedTags = allComponentTags.filter(
-    (tag: string) => html.includes(`<${tag}`), // Matches <tag> and <tag ...>
-  );
+  // A component reaches a page two ways: as a literal tag in the static HTML, or referenced only
+  // From inside an island's client template — in which case the tag exists solely in the island's
+  // Compiled JS and never in the HTML the page ships. Searching the HTML alone missed the second
+  // Kind entirely, so its module was never loaded and the element sat in the DOM un-upgraded.
+  const inHtml = (tag: string) => html.includes(`<${tag}`); // Matches <tag> and <tag ...>
+  const inIsland = (tag: string) => islandSource.includes(`<${tag}`);
+  const usedTags = allComponentTags.filter((tag: string) => inHtml(tag) || inIsland(tag));
   if (usedTags.length === 0) {
     return html;
   }
@@ -1377,8 +1413,11 @@ function injectComponentScripts(
     result = result.replace("</head>", `  ${cssLinks}\n</head>`);
   }
 
-  // Only inject JS for components that have non-static instances
-  const jsTags = usedTags.filter((tag: string) => !staticTags.has(tag));
+  // Only inject JS for components that have non-static instances. An island-rendered instance is
+  // Never prerendered, so it needs its module even when the component itself is fully static —
+  // That module is what fills the element in client-side. This holds when the tag ALSO appears in
+  // The static HTML: those instances are prerendered, but the ones the island creates are not.
+  const jsTags = usedTags.filter((tag: string) => inIsland(tag) || !staticTags.has(tag));
   if (jsTags.length === 0) {
     return result;
   }

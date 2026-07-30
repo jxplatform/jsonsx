@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.39-draft
+**Version:** 0.1.40-draft
 **Status:** Pending
-**Updated:** 2026-07-28
+**Updated:** 2026-07-30
 **License:** MIT
 
 ---
@@ -1440,7 +1440,7 @@ The build system tracks dependencies between files. When a content entry changes
 Static assets are emitted per component, with page styles inlined:
 
 - **CSS:** Page and layout styles are inlined into each page's `<style>` block; each compiled component ships its own `dist/components/<tag>.css`, linked only by pages that use it
-- **JS:** Each interactive component ships its own module (`dist/components/<tag>.js`), loaded via `<script type="module">` only by pages that use it; fully static components ship no script
+- **JS:** Each interactive component ships its own module (`dist/components/<tag>.js`), loaded via `<script type="module">` only by pages that use it; fully static components ship no script. A page "uses" a component when its tag appears in the prerendered HTML **or** in one of the page's island modules — an island builds its markup in the browser, so a component it renders needs its module even when the component is fully static, because no prerendered markup exists for that instance
 - **Images:** Optimized variants are written to `dist/images/_optimized/` with content-hash-suffixed filenames for caching
 - **Fonts:** Copied verbatim from `public/`
 
@@ -1766,6 +1766,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.1.40-draft** (2026-07-30) — A page uses a component when its tag appears in the prerendered HTML or in one of the page's island modules (§12.4).
 - **0.1.39-draft** (2026-07-28) — §9.3: editors that open a collection entry standalone must apply the mount rewrite to their render representation only, with the browser-side existence-check divergence stated.
 - **0.1.38-draft** (2026-07-28) — Media browser (§9.4) is Partial: upload ships on four Studio surfaces with content-collection destinations and collision-safe naming; metadata and usage tracking still pending.
 - **0.1.37-draft** (2026-07-24) — Document the application tier and correct the static-only framing: §1 vision, §1.1 principles 1/3/5, §1.2 coverage, §14.1/§14.2 adapter output (worker generation is gated on build.adapter alone), and new §15 Application Tier covering server functions, auth, and data mounts.

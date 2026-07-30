@@ -5,6 +5,10 @@ spec:
   - spec.md#4.2
   - spec.md#4.3
   - spec.md#5.5
+  - spec.md#5.3 # Function properties, parameter binding, $src classification
+code:
+  - packages/compiler/src/targets/compile-element.ts
+  - packages/compiler/src/targets/compile-client.ts
 ---
 
 # Functions and sidecars
@@ -40,6 +44,8 @@ A `body` string is a raw function body. `state` is always in scope; `arguments` 
 }
 ```
 
+An event binding always calls the handler with the state and the event, and the names you declare bind **by name, not by position**: a parameter called `state` receives the reactive state, and any other name receives the event. So `["event"]`, `["state", "event"]`, and `["state"]` each bind exactly what they read, and a body may reference `state` whether or not it declared it. The same holds for a handler written inline on an `on*` property.
+
 ## Inline computed values
 
 A function with only a `body` (no `arguments`) that returns a value acts as a computed — the framework wraps it in `computed()` when it detects the entry is referenced reactively:
@@ -49,6 +55,17 @@ A function with only a `body` (no `arguments`) that returns a value acts as a co
   "titleClass": {
     "$prototype": "Function",
     "body": "return state.score >= 90 ? 'gold' : 'silver'"
+  }
+}
+```
+
+Only a `return` with a value on the same line makes an entry a computed. A bare `return;` is an early exit, so a handler that starts with a guard clause stays a handler:
+
+```json
+{
+  "toggle": {
+    "$prototype": "Function",
+    "body": "if (state.locked) return; state.open = !state.open"
   }
 }
 ```
@@ -82,6 +99,30 @@ export function decrement(state) {
 
 When several entries share a `$src`, the module is imported once and its named exports extracted; module caching is automatic.
 
+A sidecar entry has no `body` to read, so its role follows how the document uses it. Bind it to an event, invoke it as `state.helper(state)`, or name it a lifecycle hook, and it stays a function. Read it anywhere else — a list's `items`, a `${}` interpolation, a property binding — and it becomes a computed value: what you get is the export's **return value**, recomputed when its inputs change, not the function itself.
+
+```json
+{
+  "state": {
+    "leads": { "$prototype": "Request", "url": "/api/leads" },
+    "openLeads": { "$prototype": "Function", "$src": "./leads.js" }
+  },
+  "children": {
+    "$prototype": "Array",
+    "items": { "$ref": "#/state/openLeads" },
+    "map": { "tagName": "li", "textContent": "${$map.item.name}" }
+  }
+}
+```
+
+```js
+export function openLeads(state) {
+  return (state.leads ?? []).filter((l) => l.open);
+}
+```
+
+`items` reads `openLeads`, so it resolves to the filtered array and re-filters whenever `leads` arrives.
+
 ## Structured bodies
 
 A `body` may also be a JSON array of statements instead of a source string — multi-step logic that stays inspectable and visually editable. That form has its own page: [Statements](/docs/framework/concepts/statements).
@@ -113,7 +154,7 @@ Optional metadata makes a function legible to tooling:
 
 | Property      | Description                                                          |
 | ------------- | -------------------------------------------------------------------- |
-| `arguments`   | Parameter names as plain strings (after the implicit `state`)        |
+| `arguments`   | Parameter names as plain strings, bound by name                      |
 | `parameters`  | CEM-compatible parameter objects — richer alternative to `arguments` |
 | `returns`     | JSON Schema describing the return value                              |
 | `emits`       | CEM `Event` objects this function dispatches                         |
@@ -128,7 +169,7 @@ Functions marked `timing: "server"` are a separate mechanism — a plain `$src`/
 ## Rules
 
 - `body` and `$src` are mutually exclusive — declaring both is a compile-time error.
-- The first parameter is always `state`; `arguments`/`parameters` name only what follows it.
+- `state` is always reachable from a body. `arguments`/`parameters` bind by name: a parameter named `state` gets the state, any other name gets the event.
 - `this` is never used. All component state goes through the `state` proxy.
 - `$export` defaults to the entry's key name; sidecar exports must be named exports.
 - Function entries use `camelCase` names, like all state entries.

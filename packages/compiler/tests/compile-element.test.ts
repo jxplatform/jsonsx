@@ -22,7 +22,9 @@ describe("compileElement", () => {
     expect(file.tagName).toBe("test-basic");
     expect(file.content).toContain("class TestBasic extends HTMLElement");
     expect(file.content).toContain("customElements.define('test-basic'");
-    expect(file.content).toContain("import { reactive, computed, effect } from '@vue/reactivity'");
+    expect(file.content).toContain(
+      "import { reactive, computed, effect, stop } from '@vue/reactivity'",
+    );
     expect(file.content).toContain("import { render, html } from 'lit-html'");
   });
 
@@ -86,7 +88,7 @@ describe("compileElement", () => {
     const { content } = result.files[0]!;
     expect(content).toContain("connectedCallback()");
     expect(content).toContain("this.state[key] = this[key]");
-    expect(content).toContain("this.#dispose = effect(() => render(this.template(), this))");
+    expect(content).toContain("this.#effects.push(effect(() => render(this.template(), this)))");
   });
 
   test("disconnectedCallback disposes effect", async () => {
@@ -98,7 +100,8 @@ describe("compileElement", () => {
 
     const { content } = result.files[0]!;
     expect(content).toContain("disconnectedCallback()");
-    expect(content).toContain("#dispose");
+    expect(content).toContain("for (const _e of this.#effects) { stop(_e); }");
+    expect(content).toContain("this.#effects.length = 0;");
   });
 
   test("throws for non-hyphenated tagName", async () => {
@@ -847,7 +850,8 @@ describe("compileElement — refToExpr edge cases", () => {
     const { content } = result.files[0]!;
     expect(content).toContain("item.title");
     expect(content).toContain("item.handler");
-    expect(content).not.toContain("s.$map");
+    expect(content).not.toContain("s.$map.");
+    expect(content).not.toContain("s.$map/");
   });
 
   test("Request prototype state initializes as null", async () => {
@@ -966,5 +970,642 @@ describe("compileElement — $media opts", () => {
     const { content } = result.files[0]!;
     expect(content).toContain('popovertarget="my-menu"');
     expect(content).toContain("popover");
+  });
+});
+
+// ─── $src `$export` aliasing (issue #106) ───────────────────────────────────
+
+describe("compileElement — $src $export aliasing", () => {
+  test("aliases the import when $export differs from the state key", async () => {
+    const result = await compileElement({
+      children: [],
+      state: {
+        filtered: { $export: "filterLeads", $prototype: "Function", $src: "./lib.js" },
+      },
+      tagName: "test-alias",
+    });
+
+    const { content } = result.files[0]!;
+    // The local binding stays the state key, because that is what the rest of the module calls.
+    expect(content).toContain("import { filterLeads as filtered } from './lib.js'");
+    expect(content).not.toContain("import { filtered } from './lib.js'");
+  });
+
+  test("imports the bare key when $export is absent or matches the key", async () => {
+    const result = await compileElement({
+      children: [],
+      state: {
+        same: { $export: "same", $prototype: "Function", $src: "./a.js" },
+        unnamed: { $prototype: "Function", $src: "./b.js" },
+      },
+      tagName: "test-noalias",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("import { same } from './a.js'");
+    expect(content).toContain("import { unnamed } from './b.js'");
+    expect(content).not.toContain(" as ");
+  });
+
+  test("two keys may alias the same export from one module", async () => {
+    const result = await compileElement({
+      children: [],
+      state: {
+        a: { $export: "shared", $prototype: "Function", $src: "./m.js" },
+        b: { $export: "shared", $prototype: "Function", $src: "./m.js" },
+      },
+      tagName: "test-dual-alias",
+    });
+
+    expect(result.files[0]!.content).toContain("import { shared as a, shared as b } from './m.js'");
+  });
+});
+
+// ─── Bodyless $src classification (issue #107) ──────────────────────────────
+
+describe("compileElement — bodyless $src classification", () => {
+  /** @param {Record<string, unknown>} extra */
+  const compile = (children: unknown, extraState: Record<string, unknown> = {}) =>
+    compileElement({
+      children,
+      state: {
+        rows: { $export: "getRows", $prototype: "Function", $src: "./lib.js" },
+        ...extraState,
+      },
+      tagName: "test-src-class",
+    } as unknown as JxDocument);
+
+  test("a bodyless $src read as a value becomes a computed", async () => {
+    // `items` reads the entry's return value, so the template needs the array, not the function.
+    const result = await compile({
+      $prototype: "Array",
+      items: { $ref: "#/state/rows" },
+      map: { tagName: "li", textContent: "${$map.item}" },
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("this.state.rows = computed(() => rows(this.state));");
+    expect(content).not.toContain("this.state.rows = (state) => rows(state);");
+  });
+
+  test("a bodyless $src bound to an on* event stays callable", async () => {
+    const result = await compile([{ onclick: { $ref: "#/state/rows" }, tagName: "button" }]);
+
+    expect(result.files[0]!.content).toContain("this.state.rows = (state) => rows(state);");
+  });
+
+  test("a bodyless $src invoked from a template string stays callable", async () => {
+    const result = await compile([{ tagName: "p", textContent: "n=${state.rows(state)}" }]);
+
+    expect(result.files[0]!.content).toContain("this.state.rows = (state) => rows(state);");
+  });
+
+  test("a bodyless $src invoked by an $expression call node stays callable", async () => {
+    const result = await compile([{ tagName: "p", textContent: "x" }], {
+      total: { $expression: { operator: "call", target: { $ref: "#/state/rows" }, value: [] } },
+    });
+
+    expect(result.files[0]!.content).toContain("this.state.rows = (state) => rows(state);");
+  });
+
+  test("a bodyless $src lifecycle hook stays callable", async () => {
+    const result = await compileElement({
+      children: [],
+      state: { onMount: { $prototype: "Function", $src: "./lib.js" } },
+      tagName: "test-src-lifecycle",
+    });
+
+    const { content } = result.files[0]!;
+    // A computed here would be *evaluated* by the `typeof … === 'function'` probe and never called.
+    expect(content).toContain("this.state.onMount = (state) => onMount(state);");
+    expect(content).not.toContain("this.state.onMount = computed(");
+  });
+});
+
+// ─── $map bindings in compiled templates (issue #108) ───────────────────────
+
+describe("compileElement — $map template bindings", () => {
+  test("binds $map in the map callback so ${$map.item} resolves", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: { tagName: "li", textContent: "${$map.item.name}" },
+      },
+      state: { items: [] },
+      tagName: "test-map-bind",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("const $map = { item, index };");
+    expect(content).toContain("${$map.item.name}");
+  });
+
+  test("resolves $map on map descendants, id and className included", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: {
+          children: [
+            {
+              className: "cell ${state.active}",
+              id: "s-${$map.index}",
+              tagName: "span",
+              textContent: "${$map.item.name}",
+            },
+          ],
+          className: "row ${state.active} ${$map.item.kind}",
+          tagName: "li",
+        },
+      },
+      state: { active: 0, items: [] },
+      tagName: "test-map-descendants",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('id="s-${$map.index}"');
+    // `state.` still rewrites to the `s` alias alongside the untouched $map read.
+    expect(content).toContain('class="row ${s.active} ${$map.item.kind}"');
+    // Descendants of the map root took no template rewriting at all before, so a `state.` read in a
+    // Nested id/class reached the module unresolved.
+    expect(content).toContain('class="cell ${s.active}"');
+    expect(content).not.toContain('class="cell ${state.active}"');
+  });
+
+  test("supports the optional-chaining and bracket access forms", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: { tagName: "li", textContent: '${$map?.item?.name}${$map["index"]}' },
+      },
+      state: { items: [] },
+      tagName: "test-map-forms",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("${$map?.item?.name}");
+    expect(content).toContain('${$map["index"]}');
+  });
+
+  test("omits the $map binding when the template never references it", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: { tagName: "li", textContent: "${item.name}" },
+      },
+      state: { items: [] },
+      tagName: "test-map-nobind",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).not.toContain("const $map =");
+    expect(content).toContain(".map((item, index) => html`");
+  });
+
+  test("leaves a literal $map. mention in static text alone", async () => {
+    const result = await compileElement({
+      children: [{ tagName: "p", textContent: "write $map.item to read the item" }],
+      state: {},
+      tagName: "test-map-literal",
+    });
+
+    expect(result.files[0]!.content).toContain("write $map.item to read the item");
+  });
+});
+
+// ─── Request auto-fetch (issue #109) ────────────────────────────────────────
+
+describe("compileElement — Request auto-fetch", () => {
+  test("emits a fetch effect on connect that assigns the response", async () => {
+    const result = await compileElement({
+      children: [],
+      state: { leads: { $prototype: "Request", timing: "client", url: "/api/leads" } },
+      tagName: "test-req-basic",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('const url = "/api/leads";');
+    expect(content).toContain("fetch(url)");
+    expect(content).toContain("this.state.leads = d;");
+    expect(content).toContain("this.state.leads = { error: String(e) };");
+    // Still initialised to null, and the fetch runs after the $props merge.
+    expect(content).toContain("leads: null");
+    expect(content.indexOf("data-jx-props")).toBeLessThan(content.indexOf("fetch(url)"));
+  });
+
+  test("rewrites a templated url through this.state without touching literal text", async () => {
+    const result = await compileElement({
+      children: [],
+      state: {
+        q: "",
+        rows: { $prototype: "Request", url: "/api/state.json?q=${state.q}" },
+      },
+      tagName: "test-req-template",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("const url = `/api/state.json?q=${this.state.q}`;");
+    expect(content).not.toContain("/api/this.state.json");
+    expect(content).toContain(
+      'if (!url || url === "undefined" || url.includes("undefined")) return;',
+    );
+  });
+
+  test("honours manual by emitting no fetch", async () => {
+    const result = await compileElement({
+      children: [],
+      state: { d: { $prototype: "Request", manual: true, url: "/api/d" } },
+      tagName: "test-req-manual",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("manual Request — fetch triggered by user action");
+    expect(content).not.toContain("fetch(url");
+  });
+
+  test("passes method, headers and body through to fetch", async () => {
+    const result = await compileElement({
+      children: [],
+      state: {
+        d: {
+          $prototype: "Request",
+          body: { q: 1 },
+          headers: { "X-Key": "v" },
+          method: "POST",
+          url: "/api/d",
+        },
+      },
+      tagName: "test-req-opts",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('method: "POST"');
+    expect(content).toContain('headers: {"X-Key":"v"}');
+    expect(content).toContain(String.raw`body: "{\"q\":1}"`);
+  });
+
+  test("stops the fetch effects on disconnect", async () => {
+    const result = await compileElement({
+      children: [],
+      state: { d: { $prototype: "Request", url: "/api/d" } },
+      tagName: "test-req-dispose",
+    });
+
+    const { content } = result.files[0]!;
+    // Calling an @vue/reactivity runner re-runs it, so teardown has to use stop().
+    expect(content).toContain("import { reactive, computed, effect, stop } from '@vue/reactivity'");
+    expect(content).toContain("#effects = [];");
+    expect(content).toContain("this.#effects.push(effect(() => {");
+    expect(content).toContain("for (const _e of this.#effects) { stop(_e); }");
+  });
+
+  test("adds no Request machinery to a document without one", async () => {
+    const result = await compileElement({
+      children: [{ tagName: "p", textContent: "hi" }],
+      state: { n: 0 },
+      tagName: "test-req-none",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).not.toContain("fetch(url");
+    expect(content).not.toContain("auto-fetch");
+  });
+});
+
+// ─── Declared handler parameters (issue #113) ──────────────────────────────
+
+describe("compileElement — declared handler parameters", () => {
+  test('maps a declared ["event"] onto the event argument, binding state too', async () => {
+    const result = await compileElement({
+      children: [{ oninput: { $ref: "#/state/onSearch" }, tagName: "input" }],
+      state: {
+        onSearch: {
+          $prototype: "Function",
+          body: "state.term = event.target.value;",
+          parameters: ["event"],
+        },
+        term: "",
+      },
+      tagName: "test-param-event",
+    });
+
+    const { content } = result.files[0]!;
+    // Call sites pass (state, event); the declared name is mapped by name, not by position.
+    expect(content).toContain("this.state.onSearch = (state, e) => {");
+    expect(content).toContain("const _fn = (event) => {");
+    expect(content).toContain("return _fn(e);");
+    expect(content).toContain('@input="${(e) => s.onSearch(s, e)}"');
+  });
+
+  test("binds state even when no parameter is declared at all", async () => {
+    const result = await compileElement({
+      children: [],
+      state: { bump: { $prototype: "Function", arguments: [], body: "state.n++;" }, n: 0 },
+      tagName: "test-param-none",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("this.state.bump = (state, e) => {");
+    expect(content).toContain("return _fn();");
+  });
+
+  test('emits the direct form when the declaration already starts with "state"', async () => {
+    const result = await compileElement({
+      children: [],
+      state: {
+        a: { $prototype: "Function", body: "state.n++;", parameters: ["state"] },
+        b: { $prototype: "Function", body: "state.n = 1;", parameters: ["state", "event"] },
+        n: 0,
+      },
+      tagName: "test-param-aligned",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("this.state.a = (state) => {");
+    expect(content).toContain("this.state.b = (state, event) => {");
+    expect(content).not.toContain("const _fn =");
+  });
+
+  test("binds declared parameters on an inline on* handler too", async () => {
+    // Examples/components/task-manager.json declares `["state", "event"]` inline on an `oninput`.
+    const result = await compileElement({
+      children: [
+        {
+          oninput: {
+            $prototype: "Function",
+            body: "state.text = event.target.value",
+            parameters: ["state", "event"],
+          },
+          tagName: "input",
+        },
+      ],
+      state: { text: "" },
+      tagName: "test-inline-params",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain(
+      '@input="${(e) => { ((state, event) => { state.text = event.target.value })(s, e); }}"',
+    );
+  });
+
+  test("a declared name other than event resolves on an inline handler", async () => {
+    const result = await compileElement({
+      children: [
+        {
+          onclick: {
+            $prototype: "Function",
+            body: "state.text = evt.type",
+            parameters: ["state", "evt"],
+          },
+          tagName: "b",
+        },
+      ],
+      state: { text: "" },
+      tagName: "test-inline-named",
+    });
+
+    // Previously emitted a free `evt`, which threw ReferenceError; `event` only ever "worked" by
+    // Accidentally resolving to the deprecated window.event global.
+    expect(result.files[0]!.content).toContain(
+      "((state, evt) => { state.text = evt.type })(s, e);",
+    );
+  });
+
+  test("leaves an inline handler that declares nothing on the plain rewrite", async () => {
+    const result = await compileElement({
+      children: [{ onclick: { $prototype: "Function", body: "state.text = 1" }, tagName: "i" }],
+      state: { text: "" },
+      tagName: "test-inline-plain",
+    });
+
+    expect(result.files[0]!.content).toContain('@click="${(e) => { s.text = 1 }}"');
+  });
+
+  test("maps a $src handler's declared parameters as well", async () => {
+    const result = await compileElement({
+      children: [{ onclick: { $ref: "#/state/save" }, tagName: "button" }],
+      state: {
+        save: { $export: "saveIt", $prototype: "Function", parameters: ["event"], $src: "./l.js" },
+      },
+      tagName: "test-param-src",
+    });
+
+    expect(result.files[0]!.content).toContain("this.state.save = (state, e) => save(e);");
+  });
+});
+
+// ─── $map context for handlers bound inside a map ───────────────────────────
+
+describe("compileElement — $map context for map handlers", () => {
+  test("a handler on the map root publishes its iteration to state", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: { onclick: { $ref: "#/state/pick" }, tagName: "li" },
+      },
+      state: { items: [], pick: { $prototype: "Function", body: "state.i = state.$map.index" } },
+      tagName: "test-mapctx-root",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('@click="${(e) => { s.$map = $map; s.pick(s, e); }}"');
+  });
+
+  test("a handler on a map descendant publishes it too", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: {
+          children: [{ onclick: { $ref: "#/state/pick" }, tagName: "button" }],
+          tagName: "li",
+        },
+      },
+      state: { items: [], pick: { $prototype: "Function", body: "state.i = state.$map.index" } },
+      tagName: "test-mapctx-descendant",
+    });
+
+    const { content } = result.files[0]!;
+    // Examples/components/todo-app.json binds its checkbox handler exactly here, and it read
+    // `state.$map?.index` — which was undefined, so the handler early-returned and did nothing.
+    expect(content).toContain('@click="${(e) => { s.$map = $map; s.pick(s, e); }}"');
+    expect(content).toContain("const $map = { item, index };");
+  });
+
+  test("an inline and an $expression handler inside a map publish it as well", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: {
+          children: [
+            { onclick: { $prototype: "Function", body: "state.n++" }, tagName: "b" },
+            {
+              onclick: { $expression: { operator: "increment", target: { $ref: "#/state/n" } } },
+              tagName: "i",
+            },
+          ],
+          tagName: "li",
+        },
+      },
+      state: { items: [], n: 0 },
+      tagName: "test-mapctx-inline",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('@click="${(e) => { s.$map = $map; s.n++ }}"');
+    expect(content).toMatch(/@click="\$\{\(e\) => \{ s\.\$map = \$map; s\.n/);
+  });
+
+  test("a handler outside any map is emitted unchanged", async () => {
+    const result = await compileElement({
+      children: [{ onclick: { $ref: "#/state/pick" }, tagName: "button" }],
+      state: { pick: { $prototype: "Function", body: "state.n++" } },
+      tagName: "test-mapctx-none",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('@click="${(e) => s.pick(s, e)}"');
+    expect(content).not.toContain("s.$map");
+  });
+
+  test("a nested map shadows the outer iteration", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/groups" },
+        map: {
+          children: {
+            $prototype: "Array",
+            items: { $ref: "$map/item/rows" },
+            map: { onclick: { $ref: "#/state/pick" }, tagName: "span" },
+          },
+          tagName: "li",
+        },
+      },
+      state: { groups: [], pick: { $prototype: "Function", body: "state.n++" } },
+      tagName: "test-mapctx-nested",
+    });
+
+    const { content } = result.files[0]!;
+    // Two callbacks, each with its own binding — the inner assignment resolves to the inner one.
+    expect(content.match(/const \$map = \{ item, index \};/g)).toHaveLength(2);
+  });
+});
+
+// ─── Effect disposal ────────────────────────────────────────────────────────
+
+describe("compileElement — effect disposal", () => {
+  test("every effect the element creates lands in one registry", async () => {
+    const result = await compileElement({
+      children: [{ tagName: "p", textContent: "x" }],
+      state: { c: "red", d: { $prototype: "Request", url: "/api/d" } },
+      style: { color: "${state.c}" },
+      tagName: "test-dispose-all",
+    });
+
+    const { content } = result.files[0]!;
+    // Render effect, dynamic host style effect, and Request auto-fetch — three pushes.
+    expect(content.match(/this\.#effects\.push\(effect\(/g)).toHaveLength(3);
+    expect(content).toContain("this.#effects.push(effect(() => render(this.template(), this)))");
+  });
+
+  test("the dynamic host-style effect is closed through the registry push", async () => {
+    const result = await compileElement({
+      children: [],
+      state: { c: "red" },
+      style: { color: "${state.c}" },
+      tagName: "test-dispose-style",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("this.#effects.push(effect(() => {");
+    expect(content).toContain("}));");
+  });
+
+  test("disconnect stops the runners rather than calling them", async () => {
+    const result = await compileElement({
+      children: [],
+      state: {},
+      tagName: "test-dispose-stop",
+    });
+
+    const { content } = result.files[0]!;
+    // Calling an @vue/reactivity runner RE-RUNS the effect — it renders once more into a detached
+    // Element and stays subscribed. `stop()` is the only thing that ends it.
+    expect(content).toContain("for (const _e of this.#effects) { stop(_e); }");
+    expect(content).not.toContain("this.#dispose()");
+  });
+});
+
+// ─── $props delivery ───────────────────────────────────────────────────────
+
+describe("compileElement — $props delivery", () => {
+  test("a template-valued $prop is a binding, not literal text", async () => {
+    const result = await compileElement({
+      children: [{ $props: { label: "${state.who}" }, tagName: "ls-row" }],
+      state: { who: "Ann" },
+      tagName: "test-props-tpl",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('.label="${s.who}"');
+    // Was JSON-quoted, handing the component the template's own source as its value.
+    expect(content).not.toContain('.label="${"${state.who}"}"');
+  });
+
+  test("a template-valued $prop inside a map reads the item", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/rows" },
+        map: { $props: { label: "${$map.item.name}" }, tagName: "ls-row" },
+      },
+      state: { rows: [] },
+      tagName: "test-props-map",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('.label="${$map.item.name}"');
+  });
+
+  test("$ref and static $props are unchanged", async () => {
+    const result = await compileElement({
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/rows" },
+        map: { $props: { k: "static", n: { $ref: "$map/index" } }, tagName: "ls-row" },
+      },
+      state: { rows: [] },
+      tagName: "test-props-plain",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain('.n="${index}"');
+    expect(content).toContain('.k="${"static"}"');
+  });
+
+  test("connectedCallback reads literal props.* attributes", async () => {
+    const result = await compileElement({
+      children: [{ tagName: "h3", textContent: "${state.label}" }],
+      state: { label: { default: "DEFAULT" } },
+      tagName: "test-props-attr",
+    });
+
+    const { content } = result.files[0]!;
+    // Mirrors the interpreted runtime: island-rendered and JSON-authored instances both deliver
+    // Props as `props.*` attributes, and the compiled element used to ignore them entirely.
+    expect(content).toContain(
+      "const _pn = this.getAttributeNames().filter(n => n.startsWith('props.') && n.length > 6);",
+    );
+    expect(content).toContain("const _k = _n.slice(6);");
+    expect(content).toContain("if (_k in this.state) {");
+    expect(content).toContain("this.state[_k] = this.getAttribute(_n);");
+    expect(content).toContain("this.removeAttribute(_n);");
   });
 });

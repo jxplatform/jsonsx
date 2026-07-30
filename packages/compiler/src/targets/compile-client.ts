@@ -23,6 +23,7 @@ import {
   compileStyles,
   createCompileContext,
   emitFormulaFn,
+  emitRequestFetch,
   escapeHtml,
   isMutating,
   isRefObject,
@@ -31,8 +32,10 @@ import {
   PREFORMATTED_TAGS,
   pureSchemeOf,
   resolveStaticValue,
+  srcImportBinding,
 } from "../shared.ts";
 import {
+  bodyReturnsValue,
   hasStructuredBody,
   isExpandedSignal,
   isExpressionDef,
@@ -49,7 +52,6 @@ import type {
   JxDocument,
   JxMappedArray,
   JxMutableNode,
-  JxPrototypeDef,
   JxStyle,
 } from "@jxsuite/schema/types";
 
@@ -163,11 +165,11 @@ export function compileClient(
         if (!srcImportMap.has(def.$src)) {
           srcImportMap.set(def.$src, new Set());
         }
-        (srcImportMap.get(def.$src) as Set<string>).add(key);
+        (srcImportMap.get(def.$src) as Set<string>).add(srcImportBinding(key, def));
 
         // $src functions always produce computed entries (they return values)
         computedEntries.push([key, `() => { return ${key}(state); }`]);
-      } else if (typeof def.body === "string" && def.body.includes("return")) {
+      } else if (typeof def.body === "string" && bodyReturnsValue(def.body)) {
         // Body contains return → computed
         computedEntries.push([key, `() => { ${def.body} }`]);
       } else {
@@ -202,7 +204,7 @@ export function compileClient(
       // $prototype: "Request"
       if (def.$prototype === "Request") {
         stateEntries.push([key, null]);
-        initBlocks.push(emitRequestInit(key, def));
+        initBlocks.push(emitRequestFetch(key, def));
         continue;
       }
 
@@ -598,6 +600,20 @@ function emitLitMapTemplate(def: JxMutableNode | undefined, preformatted = false
     attrs += ` class="${mapRefsToLit(def.className)}"`;
   }
 
+  // $props → lit property bindings. The element target emits these; the client target emitted
+  // Nothing, so a component in a list silently received none of its per-item props.
+  if (def.$props && typeof def.$props === "object") {
+    for (const [k, v] of Object.entries(def.$props)) {
+      if (isRefObject(v)) {
+        attrs += ` .${k}="\${${mapRefToClientExpr((v as { $ref: string }).$ref)}}"`;
+      } else if (typeof v === "string" && isTemplateString(v)) {
+        attrs += ` .${k}="${mapRefsToLit(v)}"`;
+      } else {
+        attrs += ` .${k}="\${${JSON.stringify(v)}}"`;
+      }
+    }
+  }
+
   // Attributes object
   if (def.attributes && typeof def.attributes === "object") {
     for (const [k, v] of Object.entries(def.attributes)) {
@@ -902,61 +918,8 @@ function emitClientModule(
 }
 
 // ─── Prototype init emitters ─────────────────────────────────────────────────
-
-/**
- * @param {string} key
- * @param {JxMutableNode} def
- * @returns {string}
- */
-function emitRequestInit(key: string, def: JxPrototypeDef) {
-  const { url } = def;
-  const method = def.method ?? "GET";
-  const isTemplateUrl = isTemplateString(url);
-
-  if (def.manual) {
-    return `// ${key}: manual Request — fetch triggered by user action`;
-  }
-
-  const lines: string[] = [
-    `// ${key}: auto-fetch from ${isTemplateUrl ? "(dynamic URL)" : url}`,
-    "effect(() => {",
-  ];
-
-  if (isTemplateUrl) {
-    lines.push(
-      `  const url = \`${url}\`;`,
-      '  if (!url || url === "undefined" || url.includes("undefined")) return;',
-    );
-  } else {
-    lines.push(`  const url = ${JSON.stringify(url)};`);
-  }
-
-  const fetchOpts: string[] = [];
-  if (method !== "GET") {
-    fetchOpts.push(`method: ${JSON.stringify(method)}`);
-  }
-  if (def.headers) {
-    fetchOpts.push(`headers: ${JSON.stringify(def.headers)}`);
-  }
-  if (def.body) {
-    const bodyStr =
-      typeof def.body === "object"
-        ? JSON.stringify(JSON.stringify(def.body))
-        : JSON.stringify(def.body);
-    fetchOpts.push(`body: ${bodyStr}`);
-  }
-
-  const optsStr = fetchOpts.length > 0 ? `, { ${fetchOpts.join(", ")} }` : "";
-  lines.push(
-    `  fetch(url${optsStr})`,
-    "    .then(r => r.ok ? r.json() : Promise.reject(r.statusText))",
-    `    .then(d => { state.${key} = d; })`,
-    `    .catch(e => { state.${key} = { error: String(e) }; });`,
-    "});",
-  );
-
-  return lines.join("\n");
-}
+// Request auto-fetch lives in shared.ts (`emitRequestFetch`) so the element target emits the same
+// Effect against `this.state`.
 
 /**
  * @param {string} key
@@ -1009,6 +972,25 @@ function emitCookieInit(key: string, cookieName: string, defaultVal: unknown) {
  * @param {string} ref
  * @returns {string}
  */
+/**
+ * Lower a `$ref` to the JS expression that reads it inside a map callback — the mirror of the
+ * element target's `refToExpr`/`mapRefToExpr`. Distinct from `refToBindingKey` below, which
+ * flattens `/` to `_` to name a binding and would produce nonsense (`state.$map_item`) as an
+ * expression.
+ *
+ * @param {string} ref
+ * @returns {string}
+ */
+function mapRefToClientExpr(ref: string) {
+  if (ref.startsWith("$map/")) {
+    return ref.slice("$map/".length).replaceAll("/", ".");
+  }
+  if (ref.startsWith("#/state/")) {
+    return `state.${ref.slice("#/state/".length).replaceAll("/", ".")}`;
+  }
+  return `state.${ref.replaceAll("/", ".")}`;
+}
+
 function refToBindingKey(ref: string) {
   if (ref.startsWith("#/state/")) {
     return ref.slice("#/state/".length).replaceAll("/", "_");

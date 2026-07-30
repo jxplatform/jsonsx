@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.1.23-draft
+**Version:** 0.1.25-draft
 **Status:** Partial
-**Updated:** 2026-07-24
+**Updated:** 2026-07-30
 **License:** MIT
 
 ---
@@ -78,7 +78,9 @@ For each custom element, the compiler emits a self-contained ES module:
 2. Imports for `$elements` dependencies (sub-component registrations)
 3. Imports for Function-def `$src` sidecars — in site builds, bundleable
    specifiers (`npm:…`, `./relative`) are rewritten to their `/assets/`
-   bundle URL (spec.md §5.3 "Compiled-site delivery")
+   bundle URL (spec.md §5.3 "Compiled-site delivery"). The local binding is
+   always the `state` key, so an entry whose `$export` names a different export
+   is imported under an alias (`import { filterLeads as filtered }`)
 4. `class extends HTMLElement` with reactive state and lit-html template
 5. Static CSS extracted to a `<style>` block
 6. `customElements.define()` registration call
@@ -87,6 +89,20 @@ Lifecycle conformance (spec.md §16.4): `connectedCallback` invokes
 `state.onMount(state)` on a microtask after the first render, and
 `disconnectedCallback` invokes `state.onUnmount(state)` — the same contract as
 the runtime's interpreted elements.
+
+`$prototype: "Request"` entries initialize to `null` and fetch from
+`connectedCallback`, after the `$props`/property merge so a templated `url`
+interpolates the values the parent passed in. Each fetch runs inside its own
+`effect()`, so a reactive URL re-fetches when its inputs change; the runner joins the element's
+effect registry and is stopped on `disconnectedCallback` (§4.4). A `manual` entry emits no fetch.
+Handler parameters bind by name per spec.md §5.3 4d, and a bodyless `$src` entry
+is emitted as a computed or a callable according to the same section's
+classification rule.
+
+The emitted module is named after the component's `tagName` — matching the
+loader `<script>` and the CSS sidecar (site-architecture.md §12.4) — and
+`$elements` import specifiers are derived from the dependency's tag for the same
+reason.
 
 ### 4.2 Example
 
@@ -119,11 +135,11 @@ the runtime's interpreted elements.
 **Output** (`user-card.js`):
 
 ```js
-import { reactive, computed, effect } from "@vue/reactivity";
+import { reactive, computed, effect, stop } from "@vue/reactivity";
 import { render, html } from "lit-html";
 
 class UserCard extends HTMLElement {
-  #dispose = null;
+  #effects = [];
 
   constructor() {
     super();
@@ -153,14 +169,14 @@ class UserCard extends HTMLElement {
         this.state[key] = this[key];
       }
     }
-    this.#dispose = effect(() => render(this.template(), this));
+    this.#effects.push(effect(() => render(this.template(), this)));
   }
 
   disconnectedCallback() {
-    if (this.#dispose) {
-      this.#dispose();
-      this.#dispose = null;
+    for (const _e of this.#effects) {
+      stop(_e);
     }
+    this.#effects.length = 0;
   }
 }
 
@@ -182,18 +198,37 @@ The `.property` syntax is the key enabler for the property-first interface.
 
 ### 4.4 Property Bridge
 
-`connectedCallback` merges JS properties set before connection into reactive state:
+`connectedCallback` takes props from three sources, in order — a `data-jx-props` payload, literal
+`props.*` attributes, then JS properties set before connection — and registers the render effect:
 
 ```js
 connectedCallback() {
+  // …data-jx-props payload…
+  const _pn = this.getAttributeNames().filter(n => n.startsWith('props.') && n.length > 6);
+  for (const _n of _pn) {
+    const _k = _n.slice(6);
+    if (_k in this.state) {
+      this.state[_k] = this.getAttribute(_n);
+      this.removeAttribute(_n);
+    }
+  }
   for (const key of Object.keys(this.state)) {
     if (key in this && this[key] !== undefined) {
       this.state[key] = this[key];
     }
   }
-  this.#dispose = effect(() => render(this.template(), this));
+  this.#effects.push(effect(() => render(this.template(), this)));
 }
 ```
+
+The `props.*` attribute form is how a JSON-authored instance and an island-rendered map body both
+deliver props, and it mirrors the interpreted runtime; values are strings, and because HTML
+lowercases attribute names a matching state key must be lowercase. A `$props` entry whose value is a
+template string is emitted as a binding, not as quoted text.
+
+**Effect teardown.** Every effect the element creates — render, dynamic host styles, Request
+auto-fetch — is registered in one list and `stop()`ed in `disconnectedCallback`. Calling an
+`@vue/reactivity` runner re-runs its effect rather than ending it, so teardown must use `stop()`.
 
 ### 4.5 Nested CSS
 
@@ -233,6 +268,16 @@ template() {
   `;
 }
 ```
+
+The callback binds `item` and `index`, and — when the map's templates reference
+it — `$map` as well, so the `${$map.item…}`/`${$map.index}` forms named in
+spec.md §6.6 resolve against the same object the interpreter passes to its
+template evaluator. Template rewriting applies throughout the map body, `id` and
+`className` on descendants included.
+
+A handler bound inside the map assigns that object to `state.$map` before
+invoking, so bodies can read `state.$map.index`/`state.$map.item` per spec.md
+§10.2. Handlers outside a map are emitted unchanged.
 
 ### 4.8 `$switch` Compilation
 
@@ -540,6 +585,24 @@ In `site-build`, the pipeline integrates at step 6 (per-route compilation):
 
 When `isDynamic()` returns false for an entire document, the compiler emits plain HTML/CSS with zero JavaScript.
 
+**An empty expansion is not a collapse.** A repeater is expanded into static markup only when the
+expansion actually produces nodes. When `items` resolves to an empty array at build time there is
+nothing to prerender, so the repeater definition is kept for the client to bind — replacing it with
+the empty expansion would discard the binding and the list could never populate. This holds for a
+repeater in the whole-`children` position and for one among siblings. A repeater whose `items` cannot
+be resolved at build time is likewise left in place, and a non-empty expansion still prerenders with
+no JavaScript for the list.
+
+**Runtime-only reads are left unresolved.** Prerender evaluates `${state.…}`
+templates against the build-time scope, but a state entry whose value only exists
+after hydration — a bodyless `$src` Function, a `$prototype: "Request"`, or a
+template entry reading either — has no build-time value to substitute. Resolving
+one anyway would replace the template in the emitted HTML with the placeholder's
+text, destroying the client-side binding rather than merely getting it wrong, so
+such a template is emitted unresolved for the client to populate. A read that
+_calls_ the entry is unaffected: invoking a build-time callable, such as a named
+formula (spec.md §19.4c), still evaluates during prerender.
+
 ### 8.2 CSS Extraction
 
 All static `style` definitions are extracted into a single `<style>` block in `<head>`.
@@ -668,6 +731,8 @@ The site build bundles Function-def `$src` modules for the browser
 
 ## Changelog
 
+- **0.1.25-draft** (2026-07-30) — Element modules: props.* attribute intake and $props template bindings, one effect registry stopped on disconnect, state.$map published for map handlers; prerender keeps a repeater whose build-time expansion is empty (§4.1, §4.2, §4.4, §4.7, §8.1).
+- **0.1.24-draft** (2026-07-30) — Element modules: $export aliasing, Request auto-fetch on connect with effect teardown, $map bound in map callbacks, tagName-based output naming; prerender leaves runtime-only reads unresolved (§4.1, §4.7, §8.1).
 - **0.1.23-draft** (2026-07-24) — §1 Overview: condition the generated Hono worker on build.adapter (per-page _server.js without one) and scope the static-build failure to active data/auth mounts; §6.3 document compileSiteServer's mounts/connectors parameters and extension mount emission.
 - **0.1.22-draft** (2026-07-23) — Image src resolution consults extension asset mounts before public/ (§7.3).
 - **0.1.21-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -695,4 +760,4 @@ The site build bundles Function-def `$src` modules for the browser
 
 ---
 
-_`@jxsuite/compiler` Specification v0.1.23-draft_
+_`@jxsuite/compiler` Specification v0.1.25-draft_

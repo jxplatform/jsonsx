@@ -77,7 +77,132 @@ export function emitFormulaFn(def: { parameters?: unknown[] }, compiledBody: str
   }
   return `(..._a) => { const _args = { ${entries.join(", ")} }; return ${compiledBody}; }`;
 }
+
+/**
+ * Emit the import-clause binding for one Function-def `$src` entry.
+ *
+ * `$export` names the export inside the module and defaults to the state key (spec.md §5.3 4d).
+ * When the two differ the clause has to alias, because the local name the rest of the generated
+ * module calls is the state key — importing the bare key instead requests an export the module does
+ * not have, and the browser rejects the whole module at link time.
+ *
+ * Aliasing rather than renaming call sites is what makes the awkward cases work: two keys may alias
+ * the same export, a key may collide with another entry's export name, and `$export: "default"` is
+ * only reachable as `default as key`.
+ *
+ * @param {string} key - State key, and the local binding name
+ * @param {unknown} def - The Function definition
+ * @returns {string}
+ */
+export function srcImportBinding(key: string, def: unknown) {
+  const declared = (def as { $export?: unknown } | null | undefined)?.$export;
+  const exportName = typeof declared === "string" && declared !== "" ? declared : key;
+  return exportName === key ? key : `${exportName} as ${key}`;
+}
+
+/**
+ * Emit the auto-fetch `effect()` for a `$prototype: "Request"` state entry.
+ *
+ * Shared by the client and element targets so both honour `manual`, template URLs and
+ * `method`/`headers`/`body` the same way. They diverged once: the element target emitted no fetch
+ * at all, leaving every Request entry permanently `null` with nothing thrown.
+ *
+ * A template `url` is read inside the effect, so the fetch re-runs whenever the interpolated state
+ * changes; an URL that still interpolates to `undefined` is skipped rather than fetched.
+ *
+ * @param {string} key - State key receiving the response
+ * @param {JxPrototypeDef} def - The Request definition
+ * @param {{ statePrefix?: string; indent?: string; collect?: string }} [opts] - `statePrefix` is
+ *   the expression the emitted code assigns through (`state` for the client module scope,
+ *   `this.state` inside a custom element); `indent` prefixes every emitted line; `collect`, when
+ *   given, is an array expression the effect runner is pushed onto so the caller can `stop()` it on
+ *   teardown.
+ * @returns {string}
+ */
+export function emitRequestFetch(
+  key: string,
+  def: JxPrototypeDef,
+  opts: { statePrefix?: string; indent?: string; collect?: string } = {},
+) {
+  const { statePrefix = "state", indent = "", collect } = opts;
+  const { url } = def;
+  const isTemplateUrl = isTemplateString(url);
+  const method = def.method ?? "GET";
+
+  if (def.manual) {
+    return `${indent}// ${key}: manual Request — fetch triggered by user action`;
+  }
+
+  const lines: string[] = [
+    `// ${key}: auto-fetch from ${isTemplateUrl ? "(dynamic URL)" : url}`,
+    collect ? `${collect}.push(effect(() => {` : "effect(() => {",
+  ];
+
+  if (isTemplateUrl) {
+    lines.push(
+      `  const url = \`${withStatePrefix(url as string, statePrefix)}\`;`,
+      '  if (!url || url === "undefined" || url.includes("undefined")) return;',
+    );
+  } else {
+    lines.push(`  const url = ${JSON.stringify(url)};`);
+  }
+
+  const fetchOpts: string[] = [];
+  if (method !== "GET") {
+    fetchOpts.push(`method: ${JSON.stringify(method)}`);
+  }
+  if (def.headers) {
+    fetchOpts.push(`headers: ${JSON.stringify(def.headers)}`);
+  }
+  if (def.body) {
+    const bodyStr =
+      typeof def.body === "object"
+        ? JSON.stringify(JSON.stringify(def.body))
+        : JSON.stringify(def.body);
+    fetchOpts.push(`body: ${bodyStr}`);
+  }
+
+  const optsStr = fetchOpts.length > 0 ? `, { ${fetchOpts.join(", ")} }` : "";
+  lines.push(
+    `  fetch(url${optsStr})`,
+    "    .then(r => r.ok ? r.json() : Promise.reject(r.statusText))",
+    `    .then(d => { ${statePrefix}.${key} = d; })`,
+    `    .catch(e => { ${statePrefix}.${key} = { error: String(e) }; });`,
+    collect ? "}));" : "});",
+  );
+
+  return lines.map((line) => `${indent}${line}`).join("\n");
+}
+
+/**
+ * Rebase the bare `state.` reads in a template string onto `statePrefix`.
+ *
+ * Only the `${…}` interpolation holes are rewritten. A blanket replace would corrupt the literal
+ * text around them — `/api/state.json?q=${state.q}` would request `/api/this.state.json` — and the
+ * `\b` guard keeps an identifier that merely ends in `state` (`substate.z`) intact. Reads already
+ * carrying the prefix are left alone.
+ *
+ * @param {string} str
+ * @param {string} statePrefix
+ * @returns {string}
+ */
+function withStatePrefix(str: string, statePrefix: string) {
+  if (statePrefix === "state") {
+    return str;
+  }
+  return str.replaceAll(
+    /\$\{([^}]*)\}/g,
+    (_match: string, expr: string) =>
+      `\${${expr.replaceAll(/(?<!this\.)\bstate\./g, `${statePrefix}.`)}}`,
+  );
+}
 export type { ExpressionNode } from "@jxsuite/runtime/expression";
+
+/**
+ * Non-enumerable marker on a build-time scope listing the state keys that hold no build-time value.
+ * Non-enumerable so it stays out of `Object.entries(scope)` and out of template evaluation.
+ */
+const RUNTIME_ONLY_KEYS = Symbol("jx.runtimeOnlyStateKeys");
 
 // CDN defaults
 export const DEFAULT_REACTIVITY_SRC = "https://esm.sh/@vue/reactivity@3.5.40";
@@ -301,6 +426,18 @@ export function buildInitialScope(
   parentScope: Record<string, unknown> | null = null,
 ) {
   const scope = Object.create(parentScope ?? null) as Record<string, unknown>;
+  // Keys whose real value only exists after hydration, so prerender must not interpolate them —
+  // See `readsRuntimeOnlyState`. Seeded from the parent so nested scopes inherit the marks.
+  const inherited = (parentScope as Record<PropertyKey, unknown> | null)?.[RUNTIME_ONLY_KEYS];
+  const runtimeOnly = new Set<string>(inherited instanceof Set ? (inherited as Set<string>) : []);
+  // Attached up front, and mutated in place by the passes below, so the template pass at the end can
+  // Consult the marks the earlier passes added.
+  Object.defineProperty(scope, RUNTIME_ONLY_KEYS, {
+    configurable: true,
+    enumerable: false,
+    value: runtimeOnly,
+    writable: true,
+  });
 
   for (const [key, def] of Object.entries(defs)) {
     if (typeof def !== "object" || def === null || Array.isArray(def)) {
@@ -317,9 +454,13 @@ export function buildInitialScope(
     }
   }
 
+  // Template-string entries are deferred to a third pass: whether one is resolvable depends on the
+  // Runtime-only marks the loop below adds, and key order must not decide the answer.
+  const templateDefs: [string, string][] = [];
+
   for (const [key, def] of Object.entries(defs)) {
     if (typeof def === "string" && isTemplateString(def)) {
-      defineLazyScopeValue(scope, key, () => evaluateStaticTemplate(def, scope));
+      templateDefs.push([key, def]);
       continue;
     }
     if (!def || typeof def !== "object") {
@@ -361,18 +502,27 @@ export function buildInitialScope(
           void runStatements(body, s ?? scope, event ?? null);
         });
       } else if (typeof def.body === "string") {
-        const names = def.parameters ? paramNames(def.parameters) : (def.arguments ?? []);
+        const declared = def.parameters ? paramNames(def.parameters) : (def.arguments ?? []);
         const { body } = def;
-        const fn = new Function("state", ...names, body) as (
-          state: Record<string, unknown>,
-        ) => unknown;
+        // Declared names bind by name, not by position (spec.md §5.3 4d): a parameter literally
+        // Named `state` receives the scope, anything else receives the event. `state` is prepended
+        // When undeclared so a body may always reference it. Unconditionally prepending it instead —
+        // The older behaviour here — produced a duplicate parameter for the `["state", "event"]`
+        // Form that examples/components/task-manager.json uses, leaving `state` undefined.
+        const params = declared.includes("state") ? declared : ["state", ...declared];
+        const fn = new Function(...params, body) as (...args: unknown[]) => unknown;
+        const invoke = (state: Record<string, unknown>, event?: unknown) =>
+          fn(...params.map((name) => (name === "state" ? state : event)));
         if (bodyReturnsValue(body)) {
-          defineLazyScopeValue(scope, key, () => fn(scope));
+          defineLazyScopeValue(scope, key, () => invoke(scope));
         } else {
-          setOwnScopeValue(scope, key, fn);
+          setOwnScopeValue(scope, key, invoke);
         }
       } else {
+        // Bodyless `$src` Function — the real implementation is only loaded in the browser, so this
+        // Is a placeholder standing in for its callable shape, never its value.
         setOwnScopeValue(scope, key, () => {});
+        runtimeOnly.add(key);
       }
       continue;
     }
@@ -381,7 +531,22 @@ export function buildInitialScope(
       (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage")
     ) {
       setOwnScopeValue(scope, key, cloneValue(def.default ?? null));
+      continue;
     }
+    if (isPrototypeDef(def) && def.$prototype === "Request") {
+      // A client-timing fetch has no build-time value at all — not even a placeholder.
+      runtimeOnly.add(key);
+    }
+  }
+
+  for (const [key, template] of templateDefs) {
+    // A state entry that interpolates a runtime-only key cannot resolve until hydration either, so
+    // It is runtime-only in turn. Without this, prerender would bake the failed evaluation (`null`)
+    // Into every template that reads *this* entry, one step removed from the original.
+    if (readsRuntimeOnlyState(template, scope)) {
+      runtimeOnly.add(key);
+    }
+    defineLazyScopeValue(scope, key, () => evaluateStaticTemplate(template, scope));
   }
 
   return scope;
@@ -468,11 +633,50 @@ export function resolveRefValue(refValue: unknown, scope: Record<string, unknown
 }
 
 /**
+ * Detect whether a template string interpolates a state value that only exists after hydration.
+ *
+ * Evaluating one of those at build time is worse than leaving it alone. The build-time scope holds
+ * a `() => {}` placeholder for a bodyless `$src` Function and nothing at all for a `Request`, so
+ * the template resolves to text like `() => {}`, `undefined` or `""` — and that text _replaces_ the
+ * template in the emitted HTML, so the client-side binding is destroyed rather than merely wrong.
+ * Returning "unresolvable" instead leaves the template in place for the client to populate.
+ *
+ * A read that _calls_ the value is left alone: invoking a build-time callable is exactly how named
+ * formulas (spec.md §19.4c) are meant to be used during prerender.
+ *
+ * @param {string} str
+ * @param {Record<string, unknown>} scope
+ * @returns {boolean}
+ */
+function readsRuntimeOnlyState(str: string, scope: Record<string, unknown>) {
+  if (!scope) {
+    return false;
+  }
+  const runtimeOnly = (scope as Record<PropertyKey, unknown>)[RUNTIME_ONLY_KEYS];
+  for (const match of str.matchAll(/\bstate\.([A-Za-z_$][\w$]*)\s*(\()?/g)) {
+    if (match[2]) {
+      continue;
+    }
+    const key = match[1] as string;
+    if (runtimeOnly instanceof Set && runtimeOnly.has(key)) {
+      return true;
+    }
+    if (typeof scope[key] === "function") {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * @param {string} str
  * @param {Record<string, unknown>} scope
  * @returns {unknown}
  */
 export function evaluateStaticTemplate(str: string, scope: Record<string, unknown>) {
+  if (readsRuntimeOnlyState(str, scope)) {
+    return null;
+  }
   try {
     const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
     if (singleExprMatch) {
