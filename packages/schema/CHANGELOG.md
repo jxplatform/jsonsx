@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.5.0](https://github.com/jxsuite/jx/compare/schema-v1.4.0...schema-v1.5.0) (2026-07-30)
+
+
+### Features
+
+* **schema:** make per-project schema composition host-agnostic ([4dddfa8](https://github.com/jxsuite/jx/commit/4dddfa8742bb43ddd8264d60b370d49aaa87bab1))
+* **schema:** make per-project schema composition host-agnostic ([df337d8](https://github.com/jxsuite/jx/commit/df337d8b3f0c0da35cad16e76d52635f9f06d7c1))
+
+
+### Bug Fixes
+
+* **compiler:** close five adjacent element-target defects found while fixing [#106](https://github.com/jxsuite/jx/issues/106)-113 ([def35f6](https://github.com/jxsuite/jx/commit/def35f6e41f57524d637ba6331714e0fee6f9043))
+* **schema:** make committed entry documents resolve in editors ([3281908](https://github.com/jxsuite/jx/commit/328190812bb9716de5618da9365b4e4e43cfe7f0))
+* **schema:** validate $paths against the source union instead of any object ([b801a9b](https://github.com/jxsuite/jx/commit/b801a9b503d2b116044b9e1d9b2f9ede9d99d5b7))
+* **studio,server,desktop:** dev server bypassed the build; Monaco still loaded at startup ([288fb73](https://github.com/jxsuite/jx/commit/288fb73a0aae78318f17a4d1a24a73e0a523104e))
+* **studio:** keep the Data panel's Refresh able to fetch, and stop happy-dom loading canvas iframes ([08b149b](https://github.com/jxsuite/jx/commit/08b149b0273bcea8177b302b33e1a5bfb366779e))
+
 ## [1.4.0](https://github.com/jxsuite/jx/compare/schema-v1.3.0...schema-v1.4.0) (2026-07-24)
 
 

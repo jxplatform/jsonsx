@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.2](https://github.com/jxsuite/jx/compare/runtime-v1.3.1...runtime-v1.3.2) (2026-07-30)
+
+
+### Performance Improvements
+
+* **studio,runtime:** stop refetching on every canvas render, narrow the splice escalation ([bad5b08](https://github.com/jxsuite/jx/commit/bad5b084884ffae3cff7e4d7a0dba1d43508314a))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.5.0
+
 ## [1.3.1](https://github.com/jxsuite/jx/compare/runtime-v1.3.0...runtime-v1.3.1) (2026-07-24)
 
 

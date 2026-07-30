@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.2](https://github.com/jxsuite/jx/compare/starters-v1.2.1...starters-v1.2.2) (2026-07-30)
+
+
+### Bug Fixes
+
+* **schema:** make committed entry documents resolve in editors ([3281908](https://github.com/jxsuite/jx/commit/328190812bb9716de5618da9365b4e4e43cfe7f0))
+* **schema:** validate $paths against the source union instead of any object ([b801a9b](https://github.com/jxsuite/jx/commit/b801a9b503d2b116044b9e1d9b2f9ede9d99d5b7))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @jxsuite/schema bumped to 1.5.0
+
 ## [1.2.1](https://github.com/jxsuite/jx/compare/starters-v1.2.0...starters-v1.2.1) (2026-07-24)
 
 

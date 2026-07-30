@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.0](https://github.com/jxsuite/jx/compare/protocol-v0.6.1...protocol-v1.0.0) (2026-07-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **studio:** `StudioPlatform` implementations must declare `createDestination` and honor `createProject`'s `destination`. `POST /__studio/create-project` rejects a request without one, and returns an absolute `root` for projects created outside the server root.
+
+### Features
+
+* **studio:** require a user-chosen destination for new projects ([e08966c](https://github.com/jxsuite/jx/commit/e08966cc2d7a7ba34d4b12f3a6186396539b07da))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.5.0
+
 ## [0.6.1](https://github.com/jxsuite/jx/compare/protocol-v0.6.0...protocol-v0.6.1) (2026-07-24)
 
 

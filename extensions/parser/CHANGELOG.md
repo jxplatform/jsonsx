@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.1](https://github.com/jxsuite/jx/compare/parser-v1.4.0...parser-v1.4.1) (2026-07-30)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.2
+    * @jxsuite/schema bumped to 1.5.0
+  * devDependencies
+    * @jxsuite/runtime bumped to 1.3.2
+
 ## [1.4.0](https://github.com/jxsuite/jx/compare/parser-v1.3.0...parser-v1.4.0) (2026-07-24)
 
 
