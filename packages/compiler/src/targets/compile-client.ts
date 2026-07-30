@@ -23,6 +23,7 @@ import {
   compileStyles,
   createCompileContext,
   emitFormulaFn,
+  emitRequestFetch,
   escapeHtml,
   isMutating,
   isRefObject,
@@ -31,6 +32,7 @@ import {
   PREFORMATTED_TAGS,
   pureSchemeOf,
   resolveStaticValue,
+  srcImportBinding,
 } from "../shared.ts";
 import {
   hasStructuredBody,
@@ -49,7 +51,6 @@ import type {
   JxDocument,
   JxMappedArray,
   JxMutableNode,
-  JxPrototypeDef,
   JxStyle,
 } from "@jxsuite/schema/types";
 
@@ -163,7 +164,7 @@ export function compileClient(
         if (!srcImportMap.has(def.$src)) {
           srcImportMap.set(def.$src, new Set());
         }
-        (srcImportMap.get(def.$src) as Set<string>).add(key);
+        (srcImportMap.get(def.$src) as Set<string>).add(srcImportBinding(key, def));
 
         // $src functions always produce computed entries (they return values)
         computedEntries.push([key, `() => { return ${key}(state); }`]);
@@ -202,7 +203,7 @@ export function compileClient(
       // $prototype: "Request"
       if (def.$prototype === "Request") {
         stateEntries.push([key, null]);
-        initBlocks.push(emitRequestInit(key, def));
+        initBlocks.push(emitRequestFetch(key, def));
         continue;
       }
 
@@ -902,61 +903,8 @@ function emitClientModule(
 }
 
 // ─── Prototype init emitters ─────────────────────────────────────────────────
-
-/**
- * @param {string} key
- * @param {JxMutableNode} def
- * @returns {string}
- */
-function emitRequestInit(key: string, def: JxPrototypeDef) {
-  const { url } = def;
-  const method = def.method ?? "GET";
-  const isTemplateUrl = isTemplateString(url);
-
-  if (def.manual) {
-    return `// ${key}: manual Request — fetch triggered by user action`;
-  }
-
-  const lines: string[] = [
-    `// ${key}: auto-fetch from ${isTemplateUrl ? "(dynamic URL)" : url}`,
-    "effect(() => {",
-  ];
-
-  if (isTemplateUrl) {
-    lines.push(
-      `  const url = \`${url}\`;`,
-      '  if (!url || url === "undefined" || url.includes("undefined")) return;',
-    );
-  } else {
-    lines.push(`  const url = ${JSON.stringify(url)};`);
-  }
-
-  const fetchOpts: string[] = [];
-  if (method !== "GET") {
-    fetchOpts.push(`method: ${JSON.stringify(method)}`);
-  }
-  if (def.headers) {
-    fetchOpts.push(`headers: ${JSON.stringify(def.headers)}`);
-  }
-  if (def.body) {
-    const bodyStr =
-      typeof def.body === "object"
-        ? JSON.stringify(JSON.stringify(def.body))
-        : JSON.stringify(def.body);
-    fetchOpts.push(`body: ${bodyStr}`);
-  }
-
-  const optsStr = fetchOpts.length > 0 ? `, { ${fetchOpts.join(", ")} }` : "";
-  lines.push(
-    `  fetch(url${optsStr})`,
-    "    .then(r => r.ok ? r.json() : Promise.reject(r.statusText))",
-    `    .then(d => { state.${key} = d; })`,
-    `    .catch(e => { state.${key} = { error: String(e) }; });`,
-    "});",
-  );
-
-  return lines.join("\n");
-}
+// Request auto-fetch lives in shared.ts (`emitRequestFetch`) so the element target emits the same
+// Effect against `this.state`.
 
 /**
  * @param {string} key

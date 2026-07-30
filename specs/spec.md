@@ -2,9 +2,9 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.4.24-draft
+**Version:** 0.4.25-draft
 **Status:** Partial
-**Updated:** 2026-07-24
+**Updated:** 2026-07-30
 **License:** MIT
 
 ---
@@ -430,6 +430,10 @@ A function with only `body` (no `arguments`) and no event binding acts as a comp
 `body` and `$src` are mutually exclusive. Declaring both is a compile-time error.
 
 `parameters` entries may be bare string names (`["item"]`, as in §20.1's example), CEM-compatible parameter objects (`{ "name": "id", "type": { "text": "number" }, "default": 1 }`), or a mix — the schema and runtime accept both forms, and the runtime normalizes every entry to its name. Prefer objects when tooling metadata (types, defaults, descriptions) matters; bare names suffice otherwise.
+
+**Parameter binding at event call sites.** An event binding always invokes a handler with `(state, event)`. Declared names bind to those arguments **by name, not by position**: a parameter literally named `state` receives the reactive state, and any other name receives the event. So `["event"]`, `["state", "event"]` and `["state"]` all bind what they read, and a handler body may reference `state` regardless of whether it declared that parameter. This applies to both `state`-entry handlers and handlers defined inline on an `on*` property, in the interpreter and in every compiled target alike.
+
+**Classifying an external Function.** Because `body` and `$src` are mutually exclusive, a `$src` entry has no body for the framework to inspect, so its role follows how the document uses it. An entry referenced as a **callable** — bound to an `on*` event, invoked by an `$expression` `call` node (§19.4c), called as `state.key(…)` from a template or another body, or named as a lifecycle hook (§16.4) — stays a function. Otherwise its return value is read reactively and the entry is a computed value, matching the inline-body rule in 4b. Reading a `$src` entry that resolves to a function (rather than its result) is therefore not a supported way to obtain the imported function itself.
 
 **Compiled-site delivery.** In compiled sites, bundleable `$src` specifiers — `npm:<pkg>[/subpath]` and project-relative `./…` files (TypeScript included) — are bundled per the entry's `timing`. Client-timing functions compile to self-contained ESM bundles under `/assets/` with deterministic, hash-free names (relative specifiers key on their project-relative path); emitted page and element modules import the bundle URL instead of the raw specifier, so external libraries work on purely static hosts with no `node_modules/` at runtime. `timing: "compiler"` functions are never bundled — they execute in the build host. Absolute URL specifiers (`/lib/x.js`, `https://…`) are emitted verbatim and served as-is. Server-timing functions are imported by the generated server output — the site worker when `build.adapter` is set, a per-page `_server.js` handler otherwise (compiler.md §6). The bundler backend is `Bun.build` under Bun and esbuild under Node (see compiler.md).
 
@@ -2285,6 +2289,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.4.25-draft** (2026-07-30) — Define parameter binding by name at event call sites, and how a bodyless $src Function is classified as a computed or a callable (§5.3 4d).
 - **0.4.24-draft** (2026-07-24) — §5.3 and §11.4: a timing: "server" route lands in the generated site worker only when build.adapter is set; without an adapter the compiler emits a per-page _server.js handler instead.
 - **0.4.23-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.4.22-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -2329,4 +2334,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.4.24-draft — subject to revision_
+_Jx Specification v0.4.25-draft — subject to revision_

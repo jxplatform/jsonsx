@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.1.23-draft
+**Version:** 0.1.24-draft
 **Status:** Partial
-**Updated:** 2026-07-24
+**Updated:** 2026-07-30
 **License:** MIT
 
 ---
@@ -78,7 +78,9 @@ For each custom element, the compiler emits a self-contained ES module:
 2. Imports for `$elements` dependencies (sub-component registrations)
 3. Imports for Function-def `$src` sidecars — in site builds, bundleable
    specifiers (`npm:…`, `./relative`) are rewritten to their `/assets/`
-   bundle URL (spec.md §5.3 "Compiled-site delivery")
+   bundle URL (spec.md §5.3 "Compiled-site delivery"). The local binding is
+   always the `state` key, so an entry whose `$export` names a different export
+   is imported under an alias (`import { filterLeads as filtered }`)
 4. `class extends HTMLElement` with reactive state and lit-html template
 5. Static CSS extracted to a `<style>` block
 6. `customElements.define()` registration call
@@ -87,6 +89,20 @@ Lifecycle conformance (spec.md §16.4): `connectedCallback` invokes
 `state.onMount(state)` on a microtask after the first render, and
 `disconnectedCallback` invokes `state.onUnmount(state)` — the same contract as
 the runtime's interpreted elements.
+
+`$prototype: "Request"` entries initialize to `null` and fetch from
+`connectedCallback`, after the `$props`/property merge so a templated `url`
+interpolates the values the parent passed in. Each fetch runs inside its own
+`effect()`, so a reactive URL re-fetches when its inputs change; the runners are
+retained and stopped on `disconnectedCallback`. A `manual` entry emits no fetch.
+Handler parameters bind by name per spec.md §5.3 4d, and a bodyless `$src` entry
+is emitted as a computed or a callable according to the same section's
+classification rule.
+
+The emitted module is named after the component's `tagName` — matching the
+loader `<script>` and the CSS sidecar (site-architecture.md §12.4) — and
+`$elements` import specifiers are derived from the dependency's tag for the same
+reason.
 
 ### 4.2 Example
 
@@ -233,6 +249,12 @@ template() {
   `;
 }
 ```
+
+The callback binds `item` and `index`, and — when the map's templates reference
+it — `$map` as well, so the `${$map.item…}`/`${$map.index}` forms named in
+spec.md §6.6 resolve against the same object the interpreter passes to its
+template evaluator. Template rewriting applies throughout the map body, `id` and
+`className` on descendants included.
 
 ### 4.8 `$switch` Compilation
 
@@ -540,6 +562,16 @@ In `site-build`, the pipeline integrates at step 6 (per-route compilation):
 
 When `isDynamic()` returns false for an entire document, the compiler emits plain HTML/CSS with zero JavaScript.
 
+**Runtime-only reads are left unresolved.** Prerender evaluates `${state.…}`
+templates against the build-time scope, but a state entry whose value only exists
+after hydration — a bodyless `$src` Function, a `$prototype: "Request"`, or a
+template entry reading either — has no build-time value to substitute. Resolving
+one anyway would replace the template in the emitted HTML with the placeholder's
+text, destroying the client-side binding rather than merely getting it wrong, so
+such a template is emitted unresolved for the client to populate. A read that
+_calls_ the entry is unaffected: invoking a build-time callable, such as a named
+formula (spec.md §19.4c), still evaluates during prerender.
+
 ### 8.2 CSS Extraction
 
 All static `style` definitions are extracted into a single `<style>` block in `<head>`.
@@ -668,6 +700,7 @@ The site build bundles Function-def `$src` modules for the browser
 
 ## Changelog
 
+- **0.1.24-draft** (2026-07-30) — Element modules: $export aliasing, Request auto-fetch on connect with effect teardown, $map bound in map callbacks, tagName-based output naming; prerender leaves runtime-only reads unresolved (§4.1, §4.7, §8.1).
 - **0.1.23-draft** (2026-07-24) — §1 Overview: condition the generated Hono worker on build.adapter (per-page _server.js without one) and scope the static-build failure to active data/auth mounts; §6.3 document compileSiteServer's mounts/connectors parameters and extension mount emission.
 - **0.1.22-draft** (2026-07-23) — Image src resolution consults extension asset mounts before public/ (§7.3).
 - **0.1.21-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -695,4 +728,4 @@ The site build bundles Function-def `$src` modules for the browser
 
 ---
 
-_`@jxsuite/compiler` Specification v0.1.23-draft_
+_`@jxsuite/compiler` Specification v0.1.24-draft_

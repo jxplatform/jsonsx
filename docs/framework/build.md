@@ -6,7 +6,9 @@ spec:
   - compiler.md#2.1 # static detection (isDynamic)
   - compiler.md#3 # output tiers
   - compiler.md#8.2 # CSS extraction
+  - compiler.md#8.1 # fully static output, runtime-only reads left unresolved
   - compiler.md#9.1 # pre-rendered HTML + reactive JS
+  - compiler.md#4.1 # element module output structure
 code:
   - packages/compiler/src/site/site-build.ts
   - packages/compiler/src/site/pages-discovery.ts
