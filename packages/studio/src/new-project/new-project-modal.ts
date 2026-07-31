@@ -6,7 +6,10 @@
  * (colors, fonts, logo, breakpoints — a creation-time subset of the settings modal), prefilled from
  * the chosen source and customizable before anything is written.
  *
- * Import and Agent are gated behind the AI credentials form until a key is stored.
+ * Import and Agent need working AI, so both are gated until credentials exist — a key stored in
+ * this browser, or a backend that holds its own (managed cloud platforms, env-keyed dev servers).
+ * While gated they offer the same two paths as the assistant sidebar: connect Cloudflare for
+ * Workers AI, or bring a key.
  */
 
 import { html } from "lit-html";
@@ -14,9 +17,10 @@ import { errorMessage } from "@jxsuite/schema/parse";
 import { openModal } from "../ui/layers";
 import { getPlatform } from "../platform";
 import { installUrlOf } from "../platform-errors";
-import { hasOpenAiKey } from "../services/ai-settings";
+import { hasAiCredentials } from "../services/ai-models";
 import { setPendingAgentPrompt } from "../services/agent-seed";
 import { createAiCredentialsForm } from "../ui/ai-credentials-form";
+import { createManagedConnect } from "../ui/ai-managed-connect";
 import { PROJECT_TEMPLATES } from "./templates";
 import { collectDesign, renderDesignFields, resetDesignFields } from "./design-fields";
 import {
@@ -98,20 +102,42 @@ let _resolve: ((result: { root: string; config: ProjectConfig } | null) => void)
 // Before a platform is registered (the form fetches models through the platform on edit).
 let _credsForm: ReturnType<typeof createAiCredentialsForm> | null = null;
 
+function rerenderIfOpen() {
+  if (_handle) {
+    renderModal();
+  }
+}
+
 function credsForm() {
   _credsForm ??= createAiCredentialsForm({
-    onSaved: () => {
-      if (_handle) {
-        renderModal();
-      }
-    },
-    requestRender: () => {
-      if (_handle) {
-        renderModal();
-      }
-    },
+    onSaved: rerenderIfOpen,
+    requestRender: rerenderIfOpen,
   });
   return _credsForm;
+}
+
+/**
+ * The keyless "Connect Cloudflare" option shown beside the key form on managed platforms — the same
+ * controller the assistant sidebar uses. Lazy for the same reason as the form above.
+ */
+let _managedConnect: ReturnType<typeof createManagedConnect> | null = null;
+
+function managedConnect() {
+  _managedConnect ??= createManagedConnect({ requestRender: rerenderIfOpen });
+  return _managedConnect;
+}
+
+/**
+ * The Import and Agent tabs need working AI, which a managed platform can supply without any local
+ * key. Probe on every gated render so the Cloudflare option appears as soon as the backend
+ * answers.
+ */
+function aiGateOpen(): boolean {
+  if (hasAiCredentials()) {
+    return true;
+  }
+  managedConnect().ensureProbe();
+  return false;
 }
 
 /**
@@ -235,8 +261,10 @@ function sourceLabel(): string {
 function renderModal() {
   const platform = getPlatform();
   const importCtx: ImportTabCtx = {
+    aiGateOpen,
     credsForm: credsForm(),
     form: _form,
+    managedConnect: managedConnect(),
     onDone: finish,
     rerender: renderModal,
     resolveDestination: () => validateParams(),
@@ -469,13 +497,17 @@ function renderModal() {
       : html`<div class="new-project-tab-intro">No starter sites are available.</div>`;
 
   const agentSourceTpl = () => {
-    if (!hasOpenAiKey()) {
+    if (!aiGateOpen()) {
       return html`
         <div class="new-project-tab-intro">
-          The agent uses your AI provider to build the site. Add an OpenAI-compatible API key to
-          continue.
+          The agent uses your AI provider to build the site.
+          ${
+            managedConnect().canOffer()
+              ? "Connect Cloudflare, or add an OpenAI-compatible API key, to continue."
+              : "Add an OpenAI-compatible API key to continue."
+          }
         </div>
-        <div class="new-project-creds">${credsForm().render()}</div>
+        <div class="new-project-creds">${managedConnect().render()} ${credsForm().render()}</div>
       `;
     }
     return html`
@@ -597,7 +629,7 @@ function renderModal() {
       `;
     }
     if (_step === "source") {
-      const gated = (_tab === "import" || _tab === "agent") && !hasOpenAiKey();
+      const gated = (_tab === "import" || _tab === "agent") && !aiGateOpen();
       return html`
         <sp-button variant="secondary" @click=${closeNewProjectModal}>Cancel</sp-button>
         ${gated ? "" : html`<sp-button variant="accent" @click=${goNext}>Next</sp-button>`}

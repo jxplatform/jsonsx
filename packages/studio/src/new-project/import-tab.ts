@@ -1,13 +1,14 @@
 /**
  * The New Project modal's Import source step: an AI-guided clone of an existing site. Gated behind
- * the AI credentials form when no key is stored; otherwise a URL + crawl-options form. The
- * name/directory parameters live on the modal's shared Parameters step; the running pipeline
- * streams its progress into a log here and resolves the modal with the imported project.
+ * the AI credentials gate (key form + the keyless Cloudflare option) until AI is usable — a local
+ * key, or a backend holding its own; otherwise a URL + crawl-options form. The name/directory
+ * parameters live on the modal's shared Parameters step; the running pipeline streams its progress
+ * into a log here and resolves the modal with the imported project.
  */
 
 import { html } from "lit-html";
 import { getPlatform } from "../platform";
-import { getBaseUrl, getModel, getOpenAiKey, hasOpenAiKey } from "../services/ai-settings";
+import { getBaseUrl, getModel, getOpenAiKey } from "../services/ai-settings";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { destinationPath } from "./location-fields";
 import type { TemplateResult } from "lit-html";
@@ -18,6 +19,12 @@ import type { CreateProjectDestination, ImportProgressEvent } from "../types";
 export interface CredsFormLike {
   render: () => TemplateResult;
   startEdit: () => void;
+}
+
+/** Structural view of src/ui/ai-managed-connect's controller (the keyless option beside the form). */
+export interface ManagedConnectLike {
+  canOffer: () => boolean;
+  render: () => unknown;
 }
 
 export interface ImportTabCtx {
@@ -32,8 +39,15 @@ export interface ImportTabCtx {
   rerender: () => void;
   /** Called with the imported project; the modal resolves and closes. */
   onDone: (result: { root: string; config: ProjectConfig }) => void;
-  /** The modal's shared credentials-form instance, rendered while no key is stored. */
+  /** The modal's shared credentials-form instance, rendered while the gate is closed. */
   credsForm: CredsFormLike;
+  /**
+   * Whether AI is usable — a local key OR a backend holding credentials of its own. Also fires the
+   * capability probe while closed, so a managed platform's Cloudflare option can appear.
+   */
+  aiGateOpen: () => boolean;
+  /** The modal's shared keyless "Connect Cloudflare" controller, rendered beside the form. */
+  managedConnect: ManagedConnectLike;
 }
 
 let _url = "";
@@ -253,13 +267,17 @@ export function renderImportStatus(): TemplateResult {
 }
 
 export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
-  if (!hasOpenAiKey()) {
+  if (!ctx.aiGateOpen()) {
     return html`
       <div class="new-project-tab-intro">
-        Importing uses an AI-guided pipeline to clone an existing site. Add an OpenAI-compatible API
-        key to continue.
+        Importing uses an AI-guided pipeline to clone an existing site.
+        ${
+          ctx.managedConnect.canOffer()
+            ? "Connect Cloudflare, or add an OpenAI-compatible API key, to continue."
+            : "Add an OpenAI-compatible API key to continue."
+        }
       </div>
-      <div class="new-project-creds">${ctx.credsForm.render()}</div>
+      <div class="new-project-creds">${ctx.managedConnect.render()} ${ctx.credsForm.render()}</div>
     `;
   }
 

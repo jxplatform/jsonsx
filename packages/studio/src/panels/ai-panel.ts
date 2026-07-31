@@ -16,14 +16,14 @@
  * @license MIT
  */
 
-import { html, render as litRender, nothing } from "lit-html";
+import { html, render as litRender } from "lit-html";
 import type { TemplateResult } from "lit-html";
-import { getPlatform } from "../platform";
 import { effect, effectScope } from "../reactivity";
 import { createDocumentAssistant } from "../services/document-assistant";
-import { hasOpenAiKey, setOpenAiKey } from "../services/ai-settings";
-import { fetchAvailableModels, isManagedProxy, isProxyConfigured } from "../services/ai-models";
+import { setOpenAiKey } from "../services/ai-settings";
+import { hasAiCredentials } from "../services/ai-models";
 import { createAiCredentialsForm } from "../ui/ai-credentials-form";
+import { createManagedConnect } from "../ui/ai-managed-connect";
 import { clearMarkdownCache } from "./ai-chat/chat-markdown";
 import { renderChatHeader, renderMessageList } from "./ai-chat/chat-view";
 import { createComposer } from "./ai-chat/composer";
@@ -37,23 +37,6 @@ let mounted = false;
 
 /** Whether the OpenAI key form is showing (gate when no key, or re-edit via the gear). */
 let keyEditing = false;
-
-/**
- * One-time proxy probe: managed platforms (cloud Workers AI) and env-keyed dev servers report
- * `configured` from /models, unlocking the assistant without a locally stored key. Fired lazily on
- * the first gated render.
- */
-let proxyProbe: Promise<void> | null = null;
-
-function ensureProxyProbe() {
-  proxyProbe ??= fetchAvailableModels({ force: true })
-    .catch(() => {
-      // Unreachable proxy — the key gate stays up.
-    })
-    .then(() => {
-      scheduleAiRender();
-    });
-}
 
 /** Which pane the panel shows once the key gate is passed. */
 let view: "chat" | "sessions" = "chat";
@@ -171,56 +154,8 @@ function startEditApiKey() {
 
 // ─── Managed Cloudflare connect (Workers AI) ─────────────────────────────────
 
-let cfConnectBusy = false;
-let cfConnectError = "";
-
-/**
- * Managed platforms broker Workers AI on the user's own Cloudflare account: offer connecting it as
- * the keyless alternative whenever the proxy says managed-but-unconfigured and the platform can run
- * the hosted OAuth flow (the PAL seam — desktop shells can implement cfConnect later).
- */
-function canOfferManagedConnect(): boolean {
-  return isManagedProxy() && !isProxyConfigured() && Boolean(getPlatform().cfConnect);
-}
-
-async function connectCloudflareForAi() {
-  if (cfConnectBusy) {
-    return;
-  }
-  cfConnectBusy = true;
-  cfConnectError = "";
-  scheduleAiRender();
-  try {
-    const connection = await getPlatform().cfConnect?.();
-    if (connection) {
-      // Re-probe: /models flips to configured once the connection lands, opening the gate.
-      await fetchAvailableModels({ force: true });
-    } else {
-      cfConnectError = "Cloudflare connection was not completed.";
-    }
-  } catch (error) {
-    cfConnectError = error instanceof Error ? error.message : String(error);
-  }
-  cfConnectBusy = false;
-  scheduleAiRender();
-}
-
-function renderManagedConnect() {
-  return html`
-    <div class="ai-managed-connect">
-      <div>Use Workers AI on your own Cloudflare account — no API key needed.</div>
-      <sp-button size="s" ?disabled=${cfConnectBusy} @click=${() => void connectCloudflareForAi()}>
-        ${cfConnectBusy ? "Connecting…" : "Connect Cloudflare"}
-      </sp-button>
-      ${
-        cfConnectError
-          ? html`<div class="ai-managed-connect-error">${cfConnectError}</div>`
-          : nothing
-      }
-      <div class="ai-managed-connect-divider">— or bring your own key —</div>
-    </div>
-  `;
-}
+/** Shared with the New Project modal's gates — see ui/ai-managed-connect.ts. */
+const managedConnect = createManagedConnect({ requestRender: scheduleAiRender });
 
 /**
  * The credentials gate: on managed platforms a keyless "Connect Cloudflare" (Workers AI) option
@@ -229,9 +164,7 @@ function renderManagedConnect() {
 function renderKeyGate() {
   return html`
     <div class="ai-tab-body">
-      <div class="ai-status-center">
-        ${canOfferManagedConnect() ? renderManagedConnect() : nothing} ${credsForm.render()}
-      </div>
+      <div class="ai-status-center">${managedConnect.render()} ${credsForm.render()}</div>
     </div>
   `;
 }
@@ -377,9 +310,9 @@ export function renderAiPanelTemplate(): TemplateResult {
   /* The document assistant authenticates via the AI proxy. Gate the chat
      behind the key form until a key is stored locally OR the proxy reports
      itself configured (managed platforms, env-keyed dev servers). */
-  if ((!hasOpenAiKey() && !isProxyConfigured()) || keyEditing) {
+  if (!hasAiCredentials() || keyEditing) {
     if (!keyEditing) {
-      ensureProxyProbe();
+      managedConnect.ensureProbe();
     }
     return renderKeyGate();
   }

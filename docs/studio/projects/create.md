@@ -25,8 +25,14 @@ The first screen — **Start new project from:** — has up to four tabs:
   - **Mobile First** — the same, with min-width breakpoints: design the phone layout first and adapt up.
   - **Mobile App** — an app shell with bottom navigation.
 - **Starter Site** — a complete, themed website (restaurant, shop, portfolio, blog, and more) that Studio copies in as plain files you own. Browse the full gallery in **[Starter templates](/docs/studio/projects/starters)**.
-- **Import** — recreate an existing website as a Jx project. Give Studio the site's URL and how many pages to crawl; the import is AI-assisted, so this tab asks for an AI provider key before it unlocks. Not every Studio platform offers this tab.
-- **Agent** — describe the site you want in a sentence or two and the AI assistant builds it in the editor while you watch. Like Import, it needs an AI provider key first.
+- **Import** — recreate an existing website as a Jx project. Give Studio the site's URL and how many pages to crawl; the import is AI-assisted, so this tab asks you to connect AI before it unlocks. Not every Studio platform offers this tab.
+- **Agent** — describe the site you want in a sentence or two and the AI assistant builds it in the editor while you watch. Like Import, it needs AI connected first.
+
+Both tabs unlock the moment AI is available, by whichever route your Studio offers — the same options the [AI assistant](/docs/studio/ai) sidebar gives you:
+
+- **Connect Cloudflare** — on Jx Cloud, run Workers AI on your own Cloudflare account with no API key at all. Click the button, approve the Cloudflare authorization, and the tab unlocks when you land back in Studio.
+- **An AI provider key** — paste any OpenAI-compatible key into the form. This is the only route on desktop and the dev server.
+- **Nothing to do** — if the Studio backend already holds a provider key (a dev server started with `OPENAI_API_KEY`, or a Cloudflare account you connected earlier), both tabs are unlocked from the start.
 
 Pick a source and click **Next**.
 

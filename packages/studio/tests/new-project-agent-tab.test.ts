@@ -8,6 +8,7 @@
  */
 import { flush, installMockPlatform, npFillLocation, npName, npPreview, npType } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { invalidateModelCache } from "../src/services/ai-models";
 
 const { closeNewProjectModal, openNewProjectModal } =
   await import("../src/new-project/new-project-modal");
@@ -49,8 +50,16 @@ function switchTab(value: string) {
   tabs.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+/* The credentials gate probes the AI proxy for backend-held credentials. Stub it: the default is an
+   unmanaged, unconfigured backend (BYOK-only), and managed tests override `proxyState`. */
+let proxyState: { configured: boolean; managed: boolean } = { configured: false, managed: false };
+(globalThis as Record<string, unknown>).fetch = async () =>
+  Response.json({ models: [], ...proxyState }, { status: 200 });
+
 beforeEach(() => {
   localStorage.clear();
+  proxyState = { configured: false, managed: false };
+  invalidateModelCache(); // Re-arms the one-shot probe between tests.
 });
 
 afterEach(() => {
@@ -64,6 +73,41 @@ describe("Agent flow", () => {
     switchTab("agent");
     expect(document.querySelector("#layer-modal .new-project-creds")).toBeTruthy();
     expect(footerButtons()).toHaveLength(1); // Cancel only
+  });
+
+  test("offers Connect Cloudflare beside the key form on a managed platform", async () => {
+    /* Regression: the cloud SaaS brokers Workers AI on the user's own account, so a gate that
+       renders only the BYOK form leaves them with no key and no way to get one. */
+    proxyState = { configured: false, managed: true };
+    const { platform } = installMockPlatform();
+    platform.cfConnect = async () => ({ connected: true });
+    void openNewProjectModal();
+    switchTab("agent");
+    await flush();
+
+    const gate = document.querySelector("#layer-modal .new-project-creds");
+    expect(gate?.querySelector(".ai-managed-connect")).toBeTruthy();
+    expect(gate!.textContent).toContain("Connect Cloudflare");
+    // The BYOK form stays — both are real paths.
+    expect(gate!.querySelector(".ai-creds-form")).toBeTruthy();
+    expect(document.querySelector("#layer-modal .new-project-tab-intro")?.textContent).toContain(
+      "Connect Cloudflare, or add an OpenAI-compatible API key",
+    );
+  });
+
+  test("lets a managed platform with AI already connected past the gate without a key", async () => {
+    /* Regression: gating on hasOpenAiKey() alone suppressed the Next button for users whose
+       Cloudflare account was already brokering working AI. */
+    proxyState = { configured: true, managed: true };
+    installMockPlatform();
+    void openNewProjectModal();
+    switchTab("agent");
+    await flush();
+
+    expect(localStorage.getItem("jx.ai.openaiKey")).toBeNull();
+    expect(document.querySelector("#layer-modal .new-project-creds")).toBeNull();
+    expect(promptField()).toBeTruthy();
+    expect(footerButtons().map((b) => b.textContent?.trim())).toContain("Next");
   });
 
   test("shows the prompt once a key is stored and requires it before Next", () => {

@@ -13,7 +13,7 @@
 
 import type { AiModelsResponse } from "@jxsuite/protocol";
 import { getPlatform } from "../platform";
-import { getBaseUrl, getOpenAiKey } from "./ai-settings";
+import { getBaseUrl, getOpenAiKey, hasOpenAiKey } from "./ai-settings";
 
 export interface AiModel {
   id: string;
@@ -25,12 +25,56 @@ let proxyConfigured = false;
 let proxyManaged = false;
 let proxyDefaultModel = "";
 
+/**
+ * One-shot capability probe shared by every credentials gate, plus the hosts to repaint when it
+ * settles. Managed platforms (cloud Workers AI) and env-keyed dev servers report their state from
+ * /models, so the gate cannot know which paths to offer until this has run once.
+ */
+let proxyProbe: Promise<void> | null = null;
+const probeListeners = new Set<() => void>();
+
 /** Drop the cached model list (call after credentials/endpoint changes). */
 export function invalidateModelCache() {
   cache = null;
   proxyConfigured = false;
   proxyManaged = false;
   proxyDefaultModel = "";
+  /* The probe's result IS the three flags above. Clearing them while keeping the settled promise
+     would strand every gate on a permanent "unconfigured, unmanaged" reading — ensureProxyProbe
+     would no-op forever and the managed option would vanish until a full reload. */
+  proxyProbe = null;
+}
+
+/**
+ * Run the capability probe once, repainting `onSettled` when it lands. Idempotent: concurrent and
+ * repeated callers share the single in-flight fetch, and every registered host is notified. Probe
+ * failure is not surfaced — an unreachable proxy simply leaves the gate showing the key form.
+ *
+ * @param {() => void} [onSettled] - Host re-render scheduler, registered for this and later probes.
+ */
+export function ensureProxyProbe(onSettled?: () => void) {
+  if (onSettled) {
+    probeListeners.add(onSettled);
+  }
+  proxyProbe ??= fetchAvailableModels({ force: true })
+    .catch(() => {
+      // Unreachable proxy — the key gate stays up.
+    })
+    .then(() => {
+      for (const notify of probeListeners) {
+        notify();
+      }
+    });
+}
+
+/**
+ * Whether the assistant can run at all: a key stored in this browser, or a backend that holds
+ * credentials itself (managed cloud platforms, env-keyed dev servers). Every credentials gate must
+ * use this rather than `hasOpenAiKey()` alone — gating on the local key locks managed-platform
+ * users out of features their own Cloudflare account is already paying for.
+ */
+export function hasAiCredentials(): boolean {
+  return hasOpenAiKey() || isProxyConfigured();
 }
 
 /**
