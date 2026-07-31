@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1](https://github.com/jxsuite/jx/compare/studio-v2.0.0...studio-v2.0.1) (2026-07-31)
+
+
+### Bug Fixes
+
+* **studio:** offer Cloudflare AI enablement wherever credentials are gated ([afbd35c](https://github.com/jxsuite/jx/commit/afbd35c2ce5da020532ca58b6bcec834e3f1ed1d))
+* **studio:** offer Cloudflare AI enablement wherever credentials are gated ([79e9d05](https://github.com/jxsuite/jx/commit/79e9d05820599342401e8b1fd09d338bb1ad823b))
+
 ## [2.0.0](https://github.com/jxsuite/jx/compare/studio-v1.5.0...studio-v2.0.0) (2026-07-30)
 
 
