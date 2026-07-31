@@ -14,6 +14,7 @@ import {
   npType,
 } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { invalidateModelCache } from "../src/services/ai-models";
 import type { ImportTabCtx } from "../src/new-project/import-tab";
 import type { ImportProgressEvent } from "../src/types";
 
@@ -59,8 +60,10 @@ function inlineError(): string {
 function directCtx(resolveDestination: ImportTabCtx["resolveDestination"]) {
   const counter = { rerenders: 0 };
   const ctx: ImportTabCtx = {
+    aiGateOpen: () => true,
     credsForm: { render: () => "" as never, startEdit: () => {} },
     form: { directory: "site", name: "Site" },
+    managedConnect: { canOffer: () => false, render: () => "" },
     onDone: () => {},
     rerender: () => {
       counter.rerenders += 1;
@@ -130,9 +133,17 @@ function reachParams(url = "https://clone.example/") {
   return promise;
 }
 
+/* The credentials gate probes the AI proxy for backend-held credentials; default it to a plain
+   BYOK-only backend, and let managed/env-keyed tests override. */
+let proxyState: { configured: boolean; managed: boolean } = { configured: false, managed: false };
+(globalThis as Record<string, unknown>).fetch = async () =>
+  Response.json({ models: [], ...proxyState }, { status: 200 });
+
 beforeEach(() => {
   captured = null;
   localStorage.clear();
+  proxyState = { configured: false, managed: false };
+  invalidateModelCache(); // Re-arms the one-shot probe between tests.
 });
 
 afterEach(async () => {
@@ -154,6 +165,20 @@ describe("Import source step", () => {
     expect(document.querySelector("#layer-modal .new-project-creds")).toBeTruthy();
     // Only Cancel in the footer while gated.
     expect(footerButtons()).toHaveLength(1);
+  });
+
+  test("opens the gate for a backend holding its own credentials, with no key stored", async () => {
+    /* Regression: gating on hasOpenAiKey() alone blocked env-keyed dev servers and managed cloud
+       platforms, whose AI already works without anything stored in this browser. */
+    proxyState = { configured: true, managed: false };
+    importPlatform();
+    void openNewProjectModal();
+    switchTab("import");
+    await flush();
+
+    expect(localStorage.getItem("jx.ai.openaiKey")).toBeNull();
+    expect(document.querySelector("#layer-modal .new-project-creds")).toBeNull();
+    expect(footerButtons().map((b) => b.textContent?.trim())).toEqual(["Cancel", "Next"]);
   });
 
   test("shows the URL + crawl options once a key is stored", () => {

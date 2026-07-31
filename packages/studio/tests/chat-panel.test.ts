@@ -34,10 +34,13 @@ void mock.module("../src/services/document-assistant", () => ({
   }),
 }));
 
-// Keep the credentials gate deterministic: no managed proxy, no configured proxy, no probe fetch.
+/* Keep the credentials gate deterministic: no managed proxy, no configured proxy, no probe fetch.
+   hasAiCredentials still tracks the stored key, since these tests drive the gate through it. */
 void mock.module("../src/services/ai-models", () => ({
+  ensureProxyProbe: () => {},
   fetchAvailableModels: async () => {},
   getProxyDefaultModel: () => "",
+  hasAiCredentials: () => Boolean(globalThis.localStorage.getItem("jx.ai.openaiKey")),
   invalidateModelCache: () => {},
   isManagedProxy: () => false,
   isProxyConfigured: () => false,

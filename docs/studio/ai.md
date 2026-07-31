@@ -7,6 +7,8 @@ code:
   - packages/studio/src/services/ai-settings.ts
   - packages/studio/src/services/tool-executor.ts
   - packages/studio/src/ui/ai-credentials-form.ts
+  - packages/studio/src/ui/ai-managed-connect.ts
+  - packages/studio/src/services/ai-models.ts
 ---
 
 # AI assistant
@@ -31,7 +33,17 @@ Each request gets five working rounds — five turns of thinking and calling too
 
 ## Connect a provider
 
-The first time you open the sidebar (and any time no key is stored), the chat is replaced by the **AI provider key** form:
+The first time you open the sidebar (and any time AI isn't connected yet), the chat is replaced by a short setup screen. It offers whichever routes your Studio supports.
+
+### Connect Cloudflare (Jx Cloud)
+
+On Jx Cloud the screen leads with **Connect Cloudflare**: Studio brokers **Workers AI** on your own Cloudflare account, so you need no API key and no third-party provider account. Click **Connect Cloudflare**, approve the authorization in the Cloudflare window that opens, and you land back in Studio with the assistant unlocked. Inference runs on — and bills to — your own Cloudflare account; Jx only brokers the request.
+
+This option appears only where a platform can run that hosted flow. The desktop app and the dev server show the key form alone.
+
+### Bring your own key
+
+Below the Cloudflare option (or on its own, everywhere else) is the **AI provider key** form:
 
 1. Paste an API key. Any OpenAI-compatible key works — OpenAI itself, a compatible hosted provider, or a local model server.
 2. Pick a **Model**. Click **Fetch models** to list what your key can use, or type a model ID directly.
@@ -41,8 +53,10 @@ The first time you open the sidebar (and any time no key is stored), the chat is
 To change any of this later, click the gear button (**API key & endpoint**) at the bottom of the sidebar. You can also switch models per conversation with the model picker next to the message box.
 
 :::doc-note
-The key, endpoint, and model choice are stored locally on your machine, per browser or app install. If the Studio backend you're running already has a provider key configured (for example a dev server started with an `OPENAI_API_KEY` environment variable), the assistant unlocks without asking for one.
+The key, endpoint, and model choice are stored locally on your machine, per browser or app install. If the Studio backend you're running already holds credentials — a dev server started with an `OPENAI_API_KEY` environment variable, or a Cloudflare account you connected earlier — the assistant unlocks without asking for anything.
 :::
+
+Whichever route you take unlocks the AI features everywhere in Studio, including the [New Project](/docs/studio/projects/create) dialog's **Import** and **Agent** tabs.
 
 ## What leaves your machine
 
