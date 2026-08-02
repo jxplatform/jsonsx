@@ -258,10 +258,18 @@ export function createCommandRegistry(options: CommandRegistryOptions): CommandR
       // A chord bound to a command whose `when` is false is not a hit: the key falls through to
       // The browser rather than being swallowed by an action that is not there.
       const hit = match && registry.isVisible(match.commandId) ? match : undefined;
-      if (hit) {
-        void registry.run(hit.commandId);
+      if (!hit) {
+        return;
       }
-      return hit?.commandId;
+      // Visible but disabled — ⌘Z with no history, Delete on the root. The chord IS claimed (the
+      // Action exists here, it just cannot act right now, and letting the browser have it would be
+      // Worse), but running it would throw CommandUnavailableError straight out of the keydown
+      // Listener. Claim it silently instead of making every caller wrap dispatch in a try/catch.
+      if (!registry.isEnabled(hit.commandId)) {
+        return hit.commandId;
+      }
+      void registry.run(hit.commandId);
+      return hit.commandId;
     },
     context: options.getContext,
   };

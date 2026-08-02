@@ -32,10 +32,12 @@ import {
   activeTab,
   closeAllTabs,
   openTab,
+  registerTabCommands,
   setWorkspaceProject,
   workspace,
 } from "./workspace/workspace";
 import { mutateUpdateDef, mutateUpdateProperty, transactDoc } from "./tabs/transact";
+import { popSubDocument, popToSubDocument } from "./tabs/tab";
 import { effect } from "./reactivity";
 
 import { view } from "./view";
@@ -54,6 +56,7 @@ import {
   commitActiveEditSession,
   allowAutoRequestsOnNextRender,
   getEditSnapshot,
+  isCaretActive,
   postColorSchemeToLiveHosts,
   setCanvasContextMenuHandler,
   setCanvasSlashHandler,
@@ -135,8 +138,11 @@ import { components as _swc } from "./ui/spectrum";
 import "./ui/panel-resize.js";
 // Built-in schema-form controls (schema-builder, secret) register on import
 import "./ui/form-controls.js";
-import { initLayers, showSaveDiscardDialog } from "./ui/layers";
-import { initShortcuts } from "./editor/shortcuts";
+import { initLayers, isModalOpen, showSaveDiscardDialog } from "./ui/layers";
+import { initShortcuts, registerStudioCommands } from "./editor/shortcuts";
+import { createCommandRegistry } from "./commands/registry";
+import { createLiveContext } from "./commands/live-context";
+import { hasAiCredentials } from "./services/ai-models";
 import { mount as mountActivityBar } from "./panels/activity-bar";
 import * as toolbarPanel from "./panels/toolbar";
 import * as overlaysPanel from "./panels/overlays";
@@ -171,7 +177,7 @@ import {
   platformUsesRepoPicker,
 } from "./new-project/add-repo-modal";
 import { openNewProjectModal } from "./new-project/new-project-modal";
-import type { DocumentStackEntry, GitDiffState } from "./types";
+import type { GitDiffState } from "./types";
 import type { Tab } from "./tabs/tab";
 import type { JxPath } from "./state";
 import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
@@ -205,51 +211,30 @@ function setCanvasMode(mode: string) {
 
 // ─── Component registry ───────────────────────────────────────────────────────
 
-/** @param {string} componentPath */
+/**
+ * Drill into a component (or a layout) — as a REAL TAB, not a document swapped in under the current
+ * tab's id.
+ *
+ * The old implementation rewrote `tab.documentPath` and left `tab.id` alone, and everything
+ * downstream believed the id: `openFileInTab`'s dedupe stopped matching, so re-opening the page
+ * from the tree called `openTab` with an id that was already in the map — overwriting the entry
+ * without disposing the old tab's effect scope and pushing a SECOND copy of the id into `tabOrder`,
+ * which is a duplicate lit `repeat` key and a lost document stack.
+ *
+ * What the drill-in keeps is the RELATIONSHIP: the new tab records the document it was opened from
+ * and the strip prints it. The parent stays open, right where it was.
+ *
+ * @param {string} componentPath
+ */
 async function navigateToComponent(componentPath: string) {
-  try {
-    const platform = getPlatform();
-    const content = await platform.readFile(componentPath);
-    if (!content) {
-      return;
-    }
-    const parsed = JSON.parse(content) as JxMutableNode;
-    const tab = activeTab.value;
-    if (!tab) {
-      return;
-    }
-
-    // Push current state onto the document stack
-    const frame = {
-      dirty: tab.doc.dirty,
-      document: tab.doc.document,
-      documentPath: tab.documentPath,
-      mode: tab.doc.mode,
-      selection: tab.session.selection,
-      sourceFormat: tab.doc.sourceFormat,
-    };
-    if (!tab.session.documentStack) {
-      tab.session.documentStack = [];
-    }
-    tab.session.documentStack.push(frame);
-
-    // Load the component
-    tab.doc.document = parsed;
-    tab.doc.dirty = false;
-    tab.doc.mode = null as unknown as string;
-    tab.doc.sourceFormat = null;
-    tab.documentPath = componentPath;
-    tab.session.selection = null;
-    setActivityTab("layers");
-    tab.session.ui.activeMedia = null;
-    tab.session.ui.activeSelector = null;
-
-    render();
-    statusMessage(`Editing component: ${parsed.tagName || componentPath}`);
-  } catch (error) {
-    const err = error as Error;
-    statusMessage(`Error: ${err.message}`);
+  const from = activeTab.value;
+  const alreadyOpen = [...workspace.tabs.values()].some((t) => t.documentPath === componentPath);
+  await openFileInTab(componentPath);
+  const opened = activeTab.value;
+  if (!alreadyOpen && from && opened && opened.documentPath === componentPath) {
+    opened.session.openedFrom = { documentPath: from.documentPath, tabId: from.id };
   }
+  setActivityTab("layers");
 }
 
 /**
@@ -280,26 +265,16 @@ async function confirmLeaveDirtyChild(tab: Tab): Promise<boolean> {
   return true;
 }
 
+/** Leave the innermost sub-document ($map template, function body) and restore the frame beneath. */
 async function navigateBack() {
   const tab = activeTab.value;
-  if (!tab?.session.documentStack || tab.session.documentStack.length === 0) {
+  if (!tab || tab.session.documentStack.length === 0) {
     return;
   }
   if (!(await confirmLeaveDirtyChild(tab))) {
     return;
   }
-
-  // Pop the stack
-  const frame = tab.session.documentStack.pop() as Record<string, unknown> | undefined;
-  if (!frame) {
-    return;
-  }
-  tab.doc.document = frame.document as JxMutableNode;
-  tab.doc.dirty = frame.dirty as boolean;
-  tab.doc.mode = frame.mode as string;
-  tab.doc.sourceFormat = frame.sourceFormat as string | null;
-  tab.documentPath = frame.documentPath as string | null;
-  tab.session.selection = frame.selection as JxPath | null;
+  popSubDocument(tab);
   setActivityTab("layers");
 
   render();
@@ -310,21 +285,13 @@ async function navigateBack() {
 async function navigateToLevel(targetIndex: number) {
   const tab = activeTab.value;
   const stack = tab?.session.documentStack;
-  if (!stack || targetIndex < 0 || targetIndex >= stack.length) {
+  if (!tab || !stack || targetIndex < 0 || targetIndex >= stack.length) {
     return;
   }
   if (!(await confirmLeaveDirtyChild(tab))) {
     return;
   }
-
-  const frame = stack[targetIndex] as DocumentStackEntry;
-  tab.session.documentStack = stack.slice(0, targetIndex);
-  tab.doc.document = frame.document as JxMutableNode;
-  tab.doc.dirty = frame.dirty as boolean;
-  tab.doc.mode = frame.mode as string;
-  tab.doc.sourceFormat = frame.sourceFormat as string | null;
-  tab.documentPath = frame.documentPath as string | null;
-  tab.session.selection = frame.selection as JxPath | null;
+  popToSubDocument(tab, targetIndex);
   setActivityTab("layers");
 
   render();
@@ -1032,17 +999,55 @@ function openFileFromTree(path: string) {
   return openFileInTab(path);
 }
 
-// ─── Keyboard shortcuts ───────────────────────────────────────────────────────
-initShortcuts(() => ({
+// ─── Commands and the keyboard ────────────────────────────────────────────────
+
+/** Pointer/pan state, read fresh on every gesture. */
+const pointerContext = () => ({
   applyTransform,
   canvasMode: getCanvasMode(),
-  openProject,
   panX: view.panX,
   panY: view.panY,
-  saveFile,
-  setPan: (x, y) => {
+  setPan: (x: number, y: number) => {
     view.panX = x;
     view.panY = y;
     view.needsCenter = false;
   },
-}));
+});
+
+/**
+ * The registry the keyboard dispatches through.
+ *
+ * Built here, in the bootstrap, because `createCommandRegistry` deliberately has no module-level
+ * singleton: the context it closes over is this window's, and a second window gets its own.
+ */
+const commandRegistry = createCommandRegistry({
+  getContext: createLiveContext({
+    aiConfigured: hasAiCredentials,
+    canvasMode: getCanvasMode,
+    isCaretActive,
+    isModalOpen,
+    platform: () => (hasPlatform() ? getPlatform() : null),
+  }),
+});
+
+registerStudioCommands(
+  commandRegistry,
+  {
+    openInBrowser: () => {
+      const target = toolbarPanel.openInBrowserTarget(activeTab.value ?? null);
+      if ("url" in target) {
+        window.open(target.url, "_blank", "noopener,noreferrer");
+        return;
+      }
+      statusMessage(target.reason);
+    },
+    openProject,
+    saveDocument: saveFile,
+  },
+  pointerContext,
+);
+
+// Tab navigation (⌃Tab MRU cycling, ⌘⇧T reopen-closed) is defined beside the tab model it drives.
+registerTabCommands(commandRegistry, { openFile: openFileInTab });
+
+initShortcuts(commandRegistry, pointerContext);

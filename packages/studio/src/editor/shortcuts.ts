@@ -1,9 +1,33 @@
 /// <reference lib="dom" />
 /**
- * Shortcuts.js — Keyboard shortcuts for Jx Studio
+ * Shortcuts.ts — the pointer surface of the canvas, and the keyboard's one dispatcher.
  *
- * Extracted from studio.js. Registers wheel-zoom, middle-mouse pan, resize listener, and keydown
- * shortcuts on the canvas / document.
+ * Two unrelated jobs share this file because they share the canvas element:
+ *
+ * 1. **Wheel, middle-mouse pan and resize.** Unchanged: these are gestures over `canvasWrap`, not
+ *    commands, and there is no chord to register them under.
+ * 2. **Keyboard.** Formerly a 403-line `keydown` switch — twelve modifier chords and seven bare keys
+ *    hand-matched against the canvas mode, with three blanket guards in front. It is now a
+ *    dispatcher of about thirty lines: build the scope stack from the command context, hand the
+ *    event to the registry, and `preventDefault()` iff a command claimed it.
+ *
+ * The three guards did not move, they were replaced by mechanisms that generalise:
+ *
+ * | Old guard                                              | Now                                     |
+ * | ------------------------------------------------------ | --------------------------------------- |
+ * | `if (isModalOpen()) return`                            | `modal.open` → the `palette`-only stack |
+ * | `canvasMode === "grid" && !["o","p","s","w","z","Z"]…` | the `grid` stack (see `keyScopeStack`)  |
+ * | the caret / text-input early return                    | the `caret` stack, which drops `canvas` |
+ *
+ * A chord whose command's `when` is false is deliberately NOT swallowed: `handleKeyEvent` returns
+ * `undefined`, nothing calls `preventDefault`, and the key falls through to the browser. That is
+ * how ↑/↓ still scroll a surface with no selection, and how ⌘Z reaches a text field's native undo
+ * when no document is open.
+ *
+ * This file is also the definition site for the commands it implements — the clipboard trio, the
+ * three zoom verbs and the four selection-navigation verbs — plus the implementations behind the
+ * document- and selection-level records declared in `commands/defaults.ts`. Registration lives next
+ * to the code that runs, so a chord and its behaviour cannot drift apart again.
  */
 
 import { canvasWrap, childIndex, childList, getNodeAtPath, parentElementPath } from "../store";
@@ -22,53 +46,544 @@ import {
   requestEditZoom,
   setEditZoom,
 } from "../canvas/canvas-utils";
-import { isCaretActive } from "../canvas/iframe-host";
-import { copyNode, cutNode, pasteNode } from "./context-menu";
 import { openQuickSearch } from "../panels/quick-search";
-import { shouldWarnOnClose } from "../panels/tab-strip";
-import { isModalOpen, showConfirmDialog } from "../ui/layers";
+import { shouldWarnOnClose, tabLabel } from "../panels/tab-strip";
+import { showConfirmDialog } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
+import { DOCK_IDS, setDockCollapsed, shell } from "../shell";
+import { copyNode, cutNode, pasteNode } from "./context-menu";
 
+import { keyScopeStack } from "../commands/context";
+import { defaultCommands } from "../commands/defaults";
+import { CommandUnavailableError } from "../commands/registry";
+import type { CommandContext } from "../commands/context";
+import type { DockId as CommandDockId } from "../commands/defaults";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
+import type { DockId } from "../shell";
 import type { JxPath } from "../state";
 
-/**
- * Modifier chords Preview refuses. Duplicate / cut / paste mutate the document, which Preview does
- * not do; the zoom chords drive an artboard transform Preview does not have. Save, undo/redo,
- * close, open and the palette are app-level and still work.
- */
-const PREVIEW_REFUSED_CHORDS: ReadonlySet<string> = new Set(["d", "x", "v", "0", "=", "+", "-"]);
+/** What the pointer handlers need from `studio.ts` on every gesture. */
+export interface ShortcutPointerContext {
+  canvasMode: string;
+  panX: number;
+  panY: number;
+  setPan: (x: number, y: number) => void;
+  applyTransform: () => void;
+}
+
+/** The verbs the default command set needs that are not implemented in this file. */
+export interface StudioCommandHooks {
+  saveDocument: () => void | Promise<void>;
+  openProject: () => void | Promise<void>;
+  openInBrowser: () => void | Promise<void>;
+}
+
+// ─── Shared predicates ────────────────────────────────────────────────────────
+
+/** A document is open. */
+const inDocument = (ctx: CommandContext) => ctx.document.open;
+
+/** Something is selected — including the document root, which is a selection of one. */
+const hasSelection = (ctx: CommandContext) => ctx.selection.count > 0;
+
+/** A selection that is not the document element, i.e. a node with a parent to act relative to. */
+const hasElementSelection = (ctx: CommandContext) =>
+  ctx.selection.count > 0 && !ctx.selection.isRoot;
+
+// ─── Selection verbs ──────────────────────────────────────────────────────────
 
 /**
- * Bare keys Preview refuses: every one of them mutates the selected node. A selection carried in
- * from Design is invisible here (Preview draws no overlays and posts no hits), so acting on it
- * would be a blind edit.
- */
-const PREVIEW_REFUSED_KEYS: ReadonlySet<string> = new Set(["Delete", "Backspace", "Enter"]);
-
-/**
- * Initialise all keyboard (and wheel/pointer) shortcuts.
+ * Move the selection to the previous (`-1`) or next (`+1`) sibling.
  *
- * @param {() => {
- *   canvasMode: string;
- *   panX: number;
- *   panY: number;
- *   setPan: (x: number, y: number) => void;
- *   applyTransform: () => void;
- *   saveFile: () => void;
- *   openProject: () => void;
- * }} getContext
+ * With nothing selected, either direction selects the document element: the first arrow press from
+ * a cold canvas has to put the cursor somewhere, and the root is the only node guaranteed to
+ * exist.
+ */
+function navigateSelection(direction: -1 | 1): void {
+  const tab = activeTab.value;
+  if (!tab) {
+    return;
+  }
+  if (!tab.session.selection) {
+    tab.session.selection = [];
+    return;
+  }
+  if (tab.session.selection.length < 2) {
+    return;
+  }
+  const parentPath = parentElementPath(tab.session.selection) as JxPath;
+  const parent = getNodeAtPath(tab.doc.document, parentPath);
+  const newIndex = (childIndex(tab.session.selection) as number) + direction;
+  if (newIndex >= 0 && newIndex < childList(parent).length) {
+    tab.session.selection = [...parentPath, "children", newIndex];
+  }
+}
+
+/** Descend into the first child of the selected node. */
+function selectFirstChild(): void {
+  const tab = activeTab.value;
+  if (!tab?.session.selection) {
+    return;
+  }
+  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
+  if (childList(node).length > 0) {
+    tab.session.selection = [...tab.session.selection, "children", 0];
+  }
+}
+
+/**
+ * Walk out of the selection by one rung.
+ *
+ * This is the Escape ladder (plan §5.3), and it is one rung short of complete: the block action bar
+ * is not on the registry yet, so "Escape returns to the bar's selection" has nowhere to read focus
+ * from. What ships is the rest of it — a nested selection selects its parent, the document element
+ * clears — which replaces an Escape that always cleared regardless of depth and so threw away the
+ * whole path to get out of one node.
+ */
+function selectParent(): void {
+  const tab = activeTab.value;
+  if (!tab?.session.selection) {
+    return;
+  }
+  if (tab.session.selection.length >= 2) {
+    tab.session.selection = parentElementPath(tab.session.selection);
+    return;
+  }
+  tab.session.selection = null;
+}
+
+/** Insert an empty paragraph after the selection and select it. */
+function insertSiblingParagraph(): void {
+  const tab = activeTab.value;
+  if (!tab?.session.selection || tab.session.selection.length < 2) {
+    return;
+  }
+  const parentPath = parentElementPath(tab.session.selection) as JxPath;
+  const index = childIndex(tab.session.selection) as number;
+  const newPath = [...parentPath, "children", index + 1];
+  transactDoc(tab, (t) => {
+    mutateInsertNode(t, parentPath, index + 1, { tagName: "p", textContent: "" });
+    t.session.selection = newPath;
+  });
+  // The iframe canvas re-enters inline edit for the freshly-selected node via its own posted
+  // EnterEdit flow, so no parent-side enterEditOnPath is needed here.
+}
+
+function duplicateSelection(): void {
+  const tab = activeTab.value;
+  const selection = tab?.session.selection;
+  if (tab && selection) {
+    transactDoc(tab, (t) => mutateDuplicateNode(t, selection));
+  }
+}
+
+function deleteSelection(): void {
+  const tab = activeTab.value;
+  const selection = tab?.session.selection;
+  if (tab && selection && selection.length >= 2) {
+    transactDoc(tab, (t) => mutateRemoveNode(t, selection));
+  }
+}
+
+// ─── Document verbs ───────────────────────────────────────────────────────────
+
+/**
+ * Close the focused document — the ⌘W half of the bug this registry exists to prevent.
+ *
+ * The old chord refused to close the last tab (`shortcuts.ts:192`) while the tab strip's × closed
+ * it happily (`tab-strip.ts:182`): two implementations of one action, disagreeing for a release
+ * cycle. This is the ×'s behaviour, and it is now the only one — including its `tabLabel` wording,
+ * so the confirm dialog reads identically whichever way the document is closed.
+ *
+ * The tab id is captured BEFORE the dialog opens. The old code re-read `workspace.activeTabId` in
+ * the `.then`, so confirming after switching tabs closed whichever document happened to be focused
+ * by then.
+ */
+function closeDocument(): void {
+  const id = workspace.activeTabId;
+  const tab = id ? workspace.tabs.get(id) : undefined;
+  if (!id || !tab) {
+    return;
+  }
+  if (!shouldWarnOnClose(tab)) {
+    closeTab(id);
+    return;
+  }
+  void showConfirmDialog(
+    "Unsaved Changes",
+    `"${tabLabel(tab)}" has unsaved changes. Close without saving?`,
+    { confirmLabel: "Close", destructive: true },
+  ).then((confirmed) => {
+    if (confirmed) {
+      closeTab(id);
+    }
+  });
+}
+
+function undoDocument(): void {
+  const tab = activeTab.value;
+  if (tab) {
+    tabUndo(tab);
+  }
+}
+
+function redoDocument(): void {
+  const tab = activeTab.value;
+  if (tab) {
+    tabRedo(tab);
+  }
+}
+
+// ─── Canvas zoom ──────────────────────────────────────────────────────────────
+
+/** Design-mode zoom bounds. Edit mode clamps inside `canvas-utils`. */
+const ZOOM_MIN = 0.05;
+const ZOOM_MAX = 5;
+const ZOOM_STEP = 1.2;
+
+/** Whether the zoom verbs address the reflowing content zoom rather than the artboard transform. */
+function isContentZoom(ctx: CommandContext): boolean {
+  return ctx.canvas.view === "edit";
+}
+
+function zoomReset(ctx: CommandContext, resetPan: () => void): void {
+  if (isContentZoom(ctx)) {
+    setEditZoom(1);
+    return;
+  }
+  const tab = activeTab.value;
+  if (!tab) {
+    return;
+  }
+  tab.session.ui.zoom = 1;
+  resetPan();
+}
+
+function zoomBy(ctx: CommandContext, factor: number, redraw: () => void): void {
+  const tab = activeTab.value;
+  if (!tab) {
+    return;
+  }
+  if (isContentZoom(ctx)) {
+    setEditZoom((tab.session.ui.editZoom ?? 1) * factor);
+    return;
+  }
+  const next = (tab.session.ui.zoom ?? 1) * factor;
+  tab.session.ui.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+  redraw();
+}
+
+// ─── Shell verbs ──────────────────────────────────────────────────────────────
+
+/**
+ * The Command Bar's three dock toggles, mapped onto the three docks that exist.
+ *
+ * `"bottom"` is the plan's Problems/Terminal dock (§3.1) and has no shell column yet, so ⌘J
+ * addresses the assistant — the only third dock there is. When the bottom dock lands this row moves
+ * and `"chat"` gets its own record.
+ */
+const DOCK_FOR_COMMAND: Readonly<Record<CommandDockId, DockId>> = {
+  bottom: "chat",
+  inspector: "right",
+  navigator: "left",
+};
+
+/** The dock state Zen collapsed, or null when Zen is off. */
+let zenRestore: Partial<Record<DockId, boolean>> | null = null;
+
+/**
+ * Collapse every dock; the same chord puts them back exactly as they were.
+ *
+ * "Reversible by the same key" (plan §5.3) is the whole requirement, and it is why the previous
+ * state is snapshotted rather than assumed: an author who had the assistant closed does not want
+ * leaving Zen to open it.
+ */
+function toggleZen(): void {
+  if (zenRestore) {
+    const restore = zenRestore;
+    zenRestore = null;
+    for (const id of DOCK_IDS) {
+      setDockCollapsed(id, restore[id] ?? false);
+    }
+    return;
+  }
+  const snapshot: Partial<Record<DockId, boolean>> = {};
+  for (const id of DOCK_IDS) {
+    snapshot[id] = shell.docks[id].collapsed;
+    setDockCollapsed(id, true);
+  }
+  zenRestore = snapshot;
+}
+
+// ─── Command records owned by this file ───────────────────────────────────────
+
+/**
+ * The nine verbs the old switch implemented inline and no other surface had a name for.
+ *
+ * All nine are `keyScope: "canvas"`: they act on a node in the artboard, so they must not fire
+ * while a caret owns the keyboard, while the grid engine does, or while Preview is showing a page
+ * with no overlays to aim at. That is one field per record instead of two ad-hoc refusal sets.
+ */
+function canvasCommands(pointer: () => ShortcutPointerContext): AnyCommand[] {
+  const resetPan = () => {
+    pointer().setPan(16, 16);
+    pointer().applyTransform();
+  };
+  const redraw = () => pointer().applyTransform();
+  return [
+    {
+      category: "Edit",
+      group: "1_clipboard",
+      id: "edit.copy",
+      keybinding: "mod+c",
+      keyScope: "canvas",
+      level: "selection",
+      requires: "an element selection",
+      run: () => {
+        void copyNode();
+      },
+      title: "Copy",
+      undo: "none",
+      when: hasSelection,
+    },
+    {
+      category: "Edit",
+      destructive: true,
+      group: "1_clipboard",
+      id: "edit.cut",
+      keybinding: "mod+x",
+      keyScope: "canvas",
+      level: "selection",
+      requires: "an element selection that is not the document root",
+      run: () => {
+        void cutNode();
+      },
+      title: "Cut",
+      undo: "document",
+      when: hasElementSelection,
+    },
+    {
+      category: "Edit",
+      group: "1_clipboard",
+      id: "edit.paste",
+      keybinding: "mod+v",
+      keyScope: "canvas",
+      level: "document",
+      requires: "an open document",
+      run: () => {
+        void pasteNode();
+      },
+      title: "Paste",
+      undo: "document",
+      when: inDocument,
+    },
+    {
+      category: "Selection",
+      group: "3_structure",
+      id: "selection.insertSibling",
+      keybinding: "enter",
+      keyScope: "canvas",
+      level: "selection",
+      requires: "an element selection that is not the document root",
+      run: () => insertSiblingParagraph(),
+      title: "Insert Paragraph After",
+      undo: "document",
+      when: hasElementSelection,
+    },
+    {
+      category: "Selection",
+      group: "2_navigate",
+      id: "selection.selectPrevious",
+      keybinding: "arrowup",
+      keyScope: "canvas",
+      level: "selection",
+      requires: "an open document",
+      run: () => navigateSelection(-1),
+      title: "Select Previous Sibling",
+      undo: "none",
+      when: inDocument,
+    },
+    {
+      category: "Selection",
+      group: "2_navigate",
+      id: "selection.selectNext",
+      keybinding: "arrowdown",
+      keyScope: "canvas",
+      level: "selection",
+      requires: "an open document",
+      run: () => navigateSelection(1),
+      title: "Select Next Sibling",
+      undo: "none",
+      when: inDocument,
+    },
+    {
+      category: "Selection",
+      group: "2_navigate",
+      id: "selection.selectFirstChild",
+      keybinding: "arrowright",
+      keyScope: "canvas",
+      level: "selection",
+      requires: "an element selection with children",
+      run: () => selectFirstChild(),
+      title: "Select First Child",
+      undo: "none",
+      when: hasSelection,
+    },
+    {
+      category: "View",
+      group: "6_zoom",
+      id: "canvas.zoomReset",
+      keybinding: "mod+0",
+      keyScope: "canvas",
+      level: "document",
+      requires: "an open document",
+      run: (ctx) => zoomReset(ctx, resetPan),
+      title: "Reset Zoom",
+      undo: "none",
+      when: inDocument,
+    },
+    {
+      category: "View",
+      group: "6_zoom",
+      id: "canvas.zoomIn",
+      // ⌘+ needs Shift on most layouts, and `KeyboardEvent.key` is then "+" with `shiftKey` set —
+      // Three spellings of one gesture, which is why the old switch had `case "=": case "+":`.
+      keybinding: ["mod+=", "mod++", "mod+shift++"],
+      keyScope: "canvas",
+      level: "document",
+      requires: "an open document",
+      run: (ctx) => zoomBy(ctx, ZOOM_STEP, redraw),
+      title: "Zoom In",
+      undo: "none",
+      when: inDocument,
+    },
+    {
+      category: "View",
+      group: "6_zoom",
+      id: "canvas.zoomOut",
+      keybinding: "mod+-",
+      keyScope: "canvas",
+      level: "document",
+      requires: "an open document",
+      run: (ctx) => zoomBy(ctx, 1 / ZOOM_STEP, redraw),
+      title: "Zoom Out",
+      undo: "none",
+      when: inDocument,
+    },
+  ];
+}
+
+/**
+ * Register every command the keyboard dispatches, with its real implementation.
+ *
+ * The default set's `CommandDeps` are wired here rather than in the bootstrap because nine of the
+ * twelve verbs are implemented in this file; the three that reach outside it arrive as
+ * {@link StudioCommandHooks}.
+ *
+ * **This is the KEYBOARD's registry, not yet the app's.** Three other contribution points landed in
+ * the same wave and each built its own registry over its own context — `editor/context-menu.ts`
+ * (the element menu, over the node the open MENU addresses), `panels/block-action-bar.ts` and
+ * `workspace/workspace.ts`. Composing all four into one app-wide registry is the follow-up PR, and
+ * these four records are what it has to reconcile:
+ *
+ * | Here                      | There                                       | Keep                                                                                                                                             |
+ * | ------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+ * | `edit.copy` / `edit.cut`  | same ids in `context-menu.ts`               | THEIRS — the implementation lives there; it needs a selection-derived `target()`                                                                 |
+ * | `edit.paste`              | `edit.pasteAfter` / `edit.pasteInside`      | theirs, once one of them covers "paste into the root with nothing selected", which ⌘V does today                                                 |
+ * | `selection.insertSibling` | `selection.insertAfter` (unbound, no chord) | theirs, once it SELECTS the inserted node — the canvas re-enters inline edit off that selection, and Enter-to-add-a-paragraph is dead without it |
+ *
+ * Until then the two registries are separate objects, so the duplicate ids are not a runtime
+ * conflict; they are a debt with a name.
+ */
+export function registerStudioCommands(
+  registry: CommandRegistry,
+  hooks: StudioCommandHooks,
+  pointer: () => ShortcutPointerContext,
+): void {
+  registry.registerAll(
+    defaultCommands({
+      closeDocument,
+      deleteSelection,
+      duplicateSelection,
+      openInBrowser: () => hooks.openInBrowser(),
+      openPalette: () => {
+        openQuickSearch();
+      },
+      openProject: () => hooks.openProject(),
+      redo: redoDocument,
+      saveDocument: () => hooks.saveDocument(),
+      selectParent,
+      toggleDock: (dock) => {
+        const target = DOCK_FOR_COMMAND[dock];
+        setDockCollapsed(target, !shell.docks[target].collapsed);
+      },
+      toggleZen,
+      undo: undoDocument,
+    }),
+  );
+  registry.registerAll(canvasCommands(pointer));
+  /*
+   * ← is the second chord for Select Parent, alongside Escape.
+   *
+   * HANDOFF: it belongs in the record itself as `keybinding: ["escape", "arrowleft"]`. That record
+   * lives in `commands/defaults.ts`, which another workstream owns this wave, so the chord is added
+   * through the same keymap the record's own chord went into — one ACTION, one definition site, two
+   * spellings. Fold it into the record and delete this call.
+   */
+  registry.keymap.add({
+    id: "selection.selectParent",
+    keybinding: ["escape", "arrowleft"],
+    keyScope: "canvas",
+  });
+}
+
+// ─── The dispatcher ───────────────────────────────────────────────────────────
+
+/**
+ * Resolve one keydown through the registry.
+ *
+ * `preventDefault()` iff a command claimed the chord. A command that is VISIBLE but disabled — ⌘Z
+ * with nothing to undo, Delete on the document element — still counts as claiming it: the registry
+ * throws {@link CommandUnavailableError} from `run`, and swallowing the key is the honest outcome,
+ * because the chord is spoken for and letting the browser act on it instead would be a surprise.
+ *
+ * HANDOFF: `registry.handleKeyEvent` reports the hit and runs it in one step, so a refusal can only
+ * be observed by catching. It would be better for it to consult `isEnabled` itself and return the
+ * id without running; `commands/registry.ts` is another workstream's file this wave.
+ */
+function dispatchKey(registry: CommandRegistry, event: KeyboardEvent): string | undefined {
+  const commandId = claimChord(registry, event);
+  if (commandId) {
+    event.preventDefault();
+  }
+  return commandId;
+}
+
+/** The id of the command that claimed the chord, whether it ran or refused. */
+function claimChord(registry: CommandRegistry, event: KeyboardEvent): string | undefined {
+  const stack = keyScopeStack(registry.context());
+  try {
+    return registry.handleKeyEvent(event, stack);
+  } catch (error) {
+    if (error instanceof CommandUnavailableError) {
+      return error.commandId;
+    }
+    throw error;
+  }
+}
+
+// ─── Pointer and wheel gestures ───────────────────────────────────────────────
+
+/**
+ * Install the canvas gestures and the keyboard dispatcher.
+ *
+ * @param registry The app's command registry, already populated.
+ * @param getContext Live pointer/pan state, read fresh on every gesture.
  */
 export function initShortcuts(
-  getContext: () => {
-    canvasMode: string;
-    panX: number;
-    panY: number;
-    setPan: (x: number, y: number) => void;
-    applyTransform: () => void;
-    saveFile: () => void;
-    openProject: () => void;
-  },
-) {
+  registry: CommandRegistry,
+  getContext: () => ShortcutPointerContext,
+): void {
   // Wheel handler: Ctrl+Scroll = zoom (cursor-centered), plain scroll = pan
   canvasWrap.addEventListener(
     "wheel",
@@ -94,8 +609,10 @@ export function initShortcuts(
         }
         return;
       }
-      // Manage mode: browse table handles its own scrolling
-      if (canvasMode === "manage") {
+      /* Surfaces that scroll themselves. The grid is a Tabulator viewport with its own virtual
+         scroller and the browse table is an ordinary overflow container — panning a transform over
+         either is why neither could be scrolled with the wheel at all. */
+      if (canvasMode === "grid" || canvasMode === "manage") {
         return;
       }
       /* Preview scrolls for real. Its frame is a normally-sized viewport over its own document, so
@@ -113,7 +630,7 @@ export function initShortcuts(
         const cursorY = e.clientY - rect.top;
         const oldZoom = activeTab.value?.session.ui.zoom ?? 1;
         const delta = -e.deltaY * 0.005;
-        const newZoom = Math.min(5, Math.max(0.05, oldZoom * (1 + delta)));
+        const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, oldZoom * (1 + delta)));
         const ratio = newZoom / oldZoom;
         // Adjust pan so the point under cursor stays stationary
         setPan(cursorX - (cursorX - panX) * ratio, cursorY - (cursorY - panY) * ratio);
@@ -170,244 +687,7 @@ export function initShortcuts(
   });
 
   document.addEventListener("keydown", (e) => {
-    // A modal surface owns the keyboard while it is up. Its underlay already swallows every click,
-    // So leaving these live let Delete/Enter mutate the document — and ⌘S/⌘W/⌘Z drive the app —
-    // Behind a dialog the author cannot reach (the dialog's own keys are handled inside its layer).
-    if (isModalOpen()) {
-      return;
-    }
-    const { canvasMode, setPan, applyTransform, saveFile, openProject } = getContext();
-    const tab = activeTab.value;
-    const mod = e.ctrlKey || e.metaKey;
-
-    // Don't intercept when typing in inputs or contenteditable
-    if (
-      e.target instanceof HTMLElement &&
-      e.target.matches(
-        "input, textarea, select, sp-textfield, sp-search, sp-number-field, sp-picker",
-      )
-    ) {
-      if (mod && e.key === "s") {
-        e.preventDefault();
-        saveFile();
-      }
-      if (mod && e.key === "w") {
-        e.preventDefault();
-      }
-      return;
-    }
-    /* A live text caret owns the keyboard. The caret is in the canvas IFRAME, so the parent bundle's
-       own `isEditing()` is permanently false here — reading it (as this did) meant ⌘C copied the
-       whole <p> instead of the selected phrase and ⌘X deleted the paragraph out from under the
-       writer. {@link isCaretActive} derives the answer from the bridge's editStart /
-       selectionChanged / editEnd messages, so the element-level clipboard and structural handlers
-       below stay away while the author is typing. Save is the one exception: it flushes the canvas
-       frames itself, so ending the session here would be a second, racing commit path. */
-    if (isCaretActive()) {
-      if (mod && e.key === "s") {
-        e.preventDefault();
-        saveFile();
-      }
-      if (mod && e.key === "w") {
-        e.preventDefault();
-      }
-      return;
-    }
-    if (mod) {
-      // Grid mode: copy/paste/duplicate/zoom belong to the grid engine (Tabulator clipboard
-      // Needs the native events); only tab/app-level chords pass through.
-      if (canvasMode === "grid" && !["o", "p", "s", "w", "z", "Z"].includes(e.key)) {
-        return;
-      }
-      /* Preview edits nothing and zooms nothing. The structural chords are refused (preview posts
-         no hits, so a selection carried in from Design is not something the author can see, let
-         alone aim at), and so are the zoom chords — there is no artboard, and a phantom `ui.zoom`
-         written here would be waiting for them back in Design. */
-      if (canvasMode === "preview" && PREVIEW_REFUSED_CHORDS.has(e.key)) {
-        return;
-      }
-      switch (e.key) {
-        case "w": {
-          e.preventDefault();
-          if (workspace.activeTabId && workspace.tabOrder.length > 1) {
-            const tabToClose = workspace.tabs.get(workspace.activeTabId);
-            if (tabToClose && shouldWarnOnClose(tabToClose)) {
-              const name = tabToClose.documentPath?.split("/").pop() || "Untitled";
-              void showConfirmDialog(
-                "Unsaved Changes",
-                `"${name}" has unsaved changes. Close without saving?`,
-                { confirmLabel: "Close", destructive: true },
-              ).then((confirmed) => {
-                if (confirmed && workspace.activeTabId) {
-                  closeTab(workspace.activeTabId);
-                }
-              });
-            } else {
-              closeTab(workspace.activeTabId);
-            }
-          }
-          break;
-        }
-        case "o": {
-          e.preventDefault();
-          openProject();
-          break;
-        }
-        case "p": {
-          e.preventDefault();
-          openQuickSearch();
-          break;
-        }
-        case "s": {
-          e.preventDefault();
-          saveFile();
-          break;
-        }
-        // With Shift held e.key is "Z", so redo needs the uppercase case too.
-        case "z":
-        case "Z": {
-          e.preventDefault();
-          if (e.shiftKey) {
-            tabRedo(activeTab.value!);
-          } else {
-            tabUndo(activeTab.value!);
-          }
-          break;
-        }
-        case "d": {
-          e.preventDefault();
-          if (tab?.session.selection) {
-            const sel = tab.session.selection;
-            transactDoc(tab, (t) => mutateDuplicateNode(t, sel));
-          }
-          break;
-        }
-        case "c": {
-          e.preventDefault();
-          void copyNode();
-          break;
-        }
-        case "x": {
-          e.preventDefault();
-          void cutNode();
-          break;
-        }
-        case "v": {
-          e.preventDefault();
-          void pasteNode();
-          break;
-        }
-        case "0": {
-          e.preventDefault();
-          if (canvasMode === "edit") {
-            setEditZoom(1);
-            break;
-          }
-          activeTab.value!.session.ui.zoom = 1;
-          setPan(16, 16);
-          applyTransform();
-          break;
-        }
-        case "=":
-        case "+": {
-          e.preventDefault();
-          if (canvasMode === "edit") {
-            setEditZoom((tab?.session.ui.editZoom ?? 1) * 1.2);
-            break;
-          }
-          activeTab.value!.session.ui.zoom = Math.min(5, (tab?.session.ui.zoom ?? 1) * 1.2);
-          applyTransform();
-          break;
-        }
-        case "-": {
-          e.preventDefault();
-          if (canvasMode === "edit") {
-            setEditZoom((tab?.session.ui.editZoom ?? 1) / 1.2);
-            break;
-          }
-          activeTab.value!.session.ui.zoom = Math.max(0.05, (tab?.session.ui.zoom ?? 1) / 1.2);
-          applyTransform();
-          break;
-        }
-        default: {
-          break;
-        }
-      }
-      return;
-    }
-
-    // Grid mode: Delete/Escape/Enter/arrows drive the grid's own range clearing and cell
-    // Navigation — never the canvas document.
-    if (canvasMode === "grid") {
-      return;
-    }
-
-    // Preview refuses the destructive bare keys; Escape and the arrows stay (they only move or
-    // Clear the selection, which is how the author leaves Preview with a clean slate).
-    if (canvasMode === "preview" && PREVIEW_REFUSED_KEYS.has(e.key)) {
-      return;
-    }
-
-    switch (e.key) {
-      case "Delete":
-      case "Backspace": {
-        if (tab?.session.selection && tab.session.selection.length >= 2) {
-          e.preventDefault();
-          const sel = tab.session.selection;
-          transactDoc(tab, (t) => mutateRemoveNode(t, sel));
-        }
-        break;
-      }
-      case "Escape": {
-        activeTab.value!.session.selection = null;
-        break;
-      }
-      case "Enter": {
-        if (tab?.session.selection && tab.session.selection.length >= 2) {
-          e.preventDefault();
-          const pp = parentElementPath(tab.session.selection) as JxPath;
-          const idx = childIndex(tab.session.selection) as number;
-          const newPath = [...pp, "children", idx + 1];
-          transactDoc(tab, (t) => {
-            mutateInsertNode(t, pp, idx + 1, { tagName: "p", textContent: "" });
-            t.session.selection = newPath;
-          });
-          // The iframe canvas re-enters inline edit for the freshly-selected node via its own
-          // Posted enterEdit flow, so no parent-side enterEditOnPath is needed here.
-        }
-        break;
-      }
-      case "ArrowUp": {
-        e.preventDefault();
-        navigateSelection(-1);
-        break;
-      }
-      case "ArrowDown": {
-        e.preventDefault();
-        navigateSelection(1);
-        break;
-      }
-      case "ArrowLeft": {
-        e.preventDefault();
-        if (tab?.session.selection && tab.session.selection.length >= 2) {
-          activeTab.value!.session.selection = parentElementPath(tab.session.selection);
-        }
-        break;
-      }
-      case "ArrowRight": {
-        e.preventDefault();
-        if (tab?.session.selection) {
-          const node = getNodeAtPath(tab.doc.document, tab.session.selection);
-          if (childList(node).length > 0) {
-            activeTab.value!.session.selection = [...tab.session.selection, "children", 0];
-          }
-        }
-        break;
-      }
-      default: {
-        break;
-      }
-    }
+    dispatchKey(registry, e);
   });
 
   // Block ctrl+scroll (browser zoom) on all non-canvas areas
@@ -420,30 +700,4 @@ export function initShortcuts(
     },
     { passive: false },
   );
-}
-
-/** @param {number} [direction] */
-function navigateSelection(direction = -1) {
-  const tab = activeTab.value;
-  if (!tab?.session.selection) {
-    activeTab.value!.session.selection = [];
-    return;
-  }
-  if (tab.session.selection.length < 2) {
-    return;
-  }
-
-  const parent = getNodeAtPath(
-    tab.doc.document,
-    parentElementPath(tab.session.selection) as JxPath,
-  );
-  const idx = childIndex(tab.session.selection) as number;
-  const newIdx = idx + direction;
-  if (newIdx >= 0 && newIdx < childList(parent).length) {
-    activeTab.value!.session.selection = [
-      ...(parentElementPath(tab.session.selection) as JxPath),
-      "children",
-      newIdx,
-    ];
-  }
 }

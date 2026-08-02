@@ -9,7 +9,14 @@
  */
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { activeTab, closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
+import {
+  activateTab,
+  activeTab,
+  closeAllTabs,
+  openTab,
+  workspace,
+} from "../src/workspace/workspace";
+import { captureTabUi, createTab } from "../src/tabs/tab";
 import { view } from "../src/view";
 import { shell } from "../src/shell";
 import { resetZoom } from "../src/canvas/canvas-utils";
@@ -68,6 +75,7 @@ let blockBarCtx: any = null;
 let canvasRenderCtx: any = null;
 let canvasPatcherCtx: any = null;
 let shortcutsGet: (() => any) | null = null;
+let shortcutHooks: Record<string, unknown> | null = null;
 
 const statusMessages: string[] = [];
 const scheduleCanvasRenderMock = mock(() => {});
@@ -108,10 +116,14 @@ void mock.module("../src/panels/statusbar.ts", () => ({
   unmountStatusbar: mock(() => {}),
 }));
 
+/** What the toolbar's `openInBrowserTarget` resolves to for the `view.openInBrowser` hook. */
+let browserTarget: { url: string } | { reason: string } = { url: "https://example.test/page" };
+
 void mock.module("../src/panels/toolbar.ts", () => ({
   mount: (_el: HTMLElement, ctx: unknown) => {
     toolbarCtx = ctx;
   },
+  openInBrowserTarget: () => browserTarget,
   render: mock(() => {}),
   unmount: mock(() => {}),
 }));
@@ -132,8 +144,12 @@ void mock.module("../src/panels/welcome-screen.ts", () => ({
 }));
 
 void mock.module("../src/editor/shortcuts.ts", () => ({
-  initShortcuts: (get: () => unknown) => {
+  // The registry is the first argument now; the pointer/pan thunk is the second.
+  initShortcuts: (_registry: unknown, get: () => unknown) => {
     shortcutsGet = get as () => any;
+  },
+  registerStudioCommands: (_registry: unknown, hooks: unknown) => {
+    shortcutHooks = hooks as Record<string, unknown>;
   },
 }));
 
@@ -362,32 +378,51 @@ describe("canvas-wrap background click", () => {
 });
 
 describe("navigateToComponent", () => {
-  test("pushes the current document onto the stack and loads the component", async () => {
-    const tab = openShellTab();
-    tab.session.selection = ["children", 0];
+  test("opens the component in its own tab and leaves the parent tab intact", async () => {
+    const parent = openShellTab();
+    parent.session.selection = ["children", 0];
     await blockBarCtx.navigateToComponent("components/card.json");
-    expect(tab.documentPath).toBe("components/card.json");
-    expect((tab.doc.document as any).tagName).toBe("my-card");
-    expect(tab.session.documentStack).toHaveLength(1);
-    expect((tab.session.documentStack![0] as any).documentPath).toBe("pages/current.json");
-    expect(tab.session.selection).toBeNull();
+
+    // The parent is still open, still on its own document, still holding its selection.
+    expect(parent.documentPath).toBe("pages/current.json");
+    expect(parent.session.selection).toEqual(["children", 0]);
+    expect(parent.session.documentStack).toHaveLength(0);
+
+    // The component is a real, separately-keyed tab.
+    expect(workspace.tabOrder).toEqual(["shell-tab", "components/card.json"]);
+    const child = workspace.tabs.get("components/card.json")!;
+    expect(workspace.activeTabId).toBe("components/card.json");
+    expect(child.documentPath).toBe("components/card.json");
+    expect((child.doc.document as any).tagName).toBe("my-card");
     expect(shell.leftTab).toBe("layers");
-    expect(statusMessages.at(-1)).toBe("Editing component: my-card");
   });
 
-  test("creates the document stack when the session has none", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = undefined as any;
+  test("records the document it was drilled in from", async () => {
+    openShellTab();
     await blockBarCtx.navigateToComponent("components/card.json");
-    expect(tab.session.documentStack).toHaveLength(1);
-    expect(tab.documentPath).toBe("components/card.json");
+    const child = workspace.tabs.get("components/card.json")!;
+    expect(child.session.openedFrom).toEqual({
+      documentPath: "pages/current.json",
+      tabId: "shell-tab",
+    });
+  });
+
+  test("drilling into an already-open component activates it without re-parenting it", async () => {
+    openShellTab();
+    await blockBarCtx.navigateToComponent("components/card.json");
+    const child = workspace.tabs.get("components/card.json")!;
+    activateTab("shell-tab");
+    await blockBarCtx.navigateToComponent("components/card.json");
+    expect(workspace.activeTabId).toBe("components/card.json");
+    expect(workspace.tabs.get("components/card.json")).toBe(child);
+    expect(workspace.tabOrder.filter((id) => id === "components/card.json")).toHaveLength(1);
   });
 
   test("returns silently when the file is empty", async () => {
     const tab = openShellTab();
     await blockBarCtx.navigateToComponent("components/empty.json");
     expect(tab.documentPath).toBe("pages/current.json");
-    expect(statusMessages).toHaveLength(0);
+    expect(workspace.tabs.has("components/empty.json")).toBe(false);
   });
 
   test("reports read errors via the statusbar", async () => {
@@ -396,10 +431,12 @@ describe("navigateToComponent", () => {
     expect(statusMessages.at(-1)).toStartWith("Error:");
   });
 
-  test("returns silently when no tab is open", async () => {
+  test("still opens the component when no tab was open to drill from", async () => {
     closeAllTabs();
     await blockBarCtx.navigateToComponent("components/card.json");
-    expect(statusMessages).toHaveLength(0);
+    const child = workspace.tabs.get("components/card.json")!;
+    expect(child).toBeDefined();
+    expect(child.session.openedFrom).toBeNull();
   });
 });
 
@@ -410,7 +447,7 @@ function answerDrillPrompt(event: "confirm" | "secondary" | "cancel"): void {
 }
 
 describe("navigateBack", () => {
-  function frameFor(tagName: string) {
+  function frameFor(tagName: string, ui: Record<string, unknown> = {}) {
     return {
       dirty: false,
       document: { children: [], tagName },
@@ -418,6 +455,7 @@ describe("navigateBack", () => {
       mode: null,
       selection: null,
       sourceFormat: null,
+      ui: { ...captureTabUi(createTab({ document: {}, id: "frame" }).session.ui), ...ui },
     };
   }
 
@@ -513,14 +551,26 @@ describe("navigateBack", () => {
     expect(tab.session.documentStack).toHaveLength(1);
   });
 
-  test("a stack holding an undefined frame is popped without applying it", async () => {
+  test("popping restores the parent's UI context, not just its document", async () => {
     const tab = openShellTab();
-    tab.session.documentStack = [undefined] as any;
-    tab.doc.dirty = false;
-    const before = tab.doc.document;
+    tab.session.documentStack = [
+      frameFor("section", {
+        activeMedia: "@md",
+        activeSelector: ":hover",
+        rightTab: "style",
+        zoom: 0.5,
+      }),
+    ] as any;
+    tab.documentPath = "components/card-ui.json";
+    tab.session.ui.activeMedia = "@sm";
+    tab.session.ui.activeSelector = "::before";
+    tab.session.ui.rightTab = "properties";
+    tab.session.ui.zoom = 2;
     await tabBarCtx.navigateBack();
-    expect(tab.doc.document).toBe(before);
-    expect(statusMessages).toHaveLength(0);
+    expect(tab.session.ui.activeMedia).toBe("@md");
+    expect(tab.session.ui.activeSelector).toBe(":hover");
+    expect(tab.session.ui.rightTab).toBe("style");
+    expect(tab.session.ui.zoom).toBe(0.5);
   });
 });
 
@@ -533,6 +583,7 @@ describe("navigateToLevel", () => {
       mode: null,
       selection: null,
       sourceFormat: null,
+      ui: captureTabUi(createTab({ document: {}, id: "frame" }).session.ui),
     };
   }
 
@@ -924,12 +975,42 @@ describe("shortcuts context", () => {
     const ctx = shortcutsGet!();
     expect(ctx.canvasMode).toBe("design");
     expect(typeof ctx.applyTransform).toBe("function");
-    expect(typeof ctx.saveFile).toBe("function");
-    expect(typeof ctx.openProject).toBe("function");
     ctx.setPan(12, 34);
     expect(view.panX).toBe(12);
     expect(view.panY).toBe(34);
     expect(view.needsCenter).toBe(false);
+  });
+
+  /* Save / Open Project / Open in Browser are no longer read off the gesture context: they are the
+     three command implementations the bootstrap has to reach outside `editor/shortcuts.ts` for, so
+     they arrive once at registration instead of on every wheel event. */
+  test("hands the command set the three verbs the bootstrap owns", () => {
+    expect(shortcutHooks).not.toBeNull();
+    expect(typeof shortcutHooks!.saveDocument).toBe("function");
+    expect(typeof shortcutHooks!.openProject).toBe("function");
+    expect(typeof shortcutHooks!.openInBrowser).toBe("function");
+  });
+
+  test("Open in Browser opens the resolved page, or states why it cannot", () => {
+    const opened: string[] = [];
+    const realOpen = window.open;
+    (window as unknown as { open: unknown }).open = (url: string) => {
+      opened.push(url);
+      return null;
+    };
+    try {
+      browserTarget = { url: "https://example.test/page" };
+      (shortcutHooks!.openInBrowser as () => void)();
+      expect(opened).toEqual(["https://example.test/page"]);
+
+      // Never silently absent: with no page resolvable the reason is reported (toolbar.ts:173).
+      browserTarget = { reason: "this document is not a page" };
+      (shortcutHooks!.openInBrowser as () => void)();
+      expect(opened).toHaveLength(1);
+      expect(statusMessages.at(-1)).toBe("this document is not a page");
+    } finally {
+      (window as unknown as { open: unknown }).open = realOpen;
+    }
   });
 });
 

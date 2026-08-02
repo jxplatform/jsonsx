@@ -167,7 +167,12 @@ export function defaultCommands(deps: CommandDeps): AnyCommand[] {
       group: "3_structure",
       undo: "document",
       when: hasSelection,
-      requires: "an element selection",
+      // Same gate as `selection.delete`: duplicating needs a sibling position to insert into. The
+      // Document root and a repeater template have none, and `mutateDuplicateNode` splices at a
+      // Non-numeric index there — a live button that silently corrupts the document. Both surfaces
+      // That render this record had to hand-guard it before the record said so.
+      enablement: (ctx) => !ctx.selection.isRoot,
+      requires: "an element that has a sibling position",
       aiTool: {
         name: "duplicate_node",
         description: "Duplicate the currently selected element, inserting the copy after it.",

@@ -15,7 +15,13 @@
  * `capability.*` mirrors the Platform Abstraction Layer so cloud / desktop / dev-server differences
  * stop being `if (platform.x)` scattered across templates and become one `when` clause per
  * command.
+ *
+ * {@link keyScopeStack} lives here for the same reason: it is a pure function of this record, so
+ * the keyboard's "where am I" question is answered by the same facts every `when` predicate reads,
+ * rather than by a second set of `if (canvasMode === …)` branches in the listener.
  */
+
+import type { KeyScope } from "./levels";
 
 /** PAL-derived capability keys. One `when` clause replaces a scattered `if (platform.x)`. */
 export const CAPABILITIES = [
@@ -167,4 +173,73 @@ export function makeContext(patch: CommandContextPatch = {}): CommandContext {
     }
   }
   return base;
+}
+
+/**
+ * An overlay owns the keyboard outright.
+ *
+ * This is what replaces `shortcuts.ts`'s blanket `if (isModalOpen()) return`. Expressing it as a
+ * stack rather than a `!ctx.modal.open` term repeated in fourteen `when` predicates keeps the rule
+ * in ONE place — and a dialog that swallows every click has to swallow every chord too, including
+ * ones registered next week by a surface that never heard of dialogs. `palette` is the scope
+ * overlay-owned bindings register in; nothing outside it resolves while one is up.
+ */
+const MODAL_STACK: readonly KeyScope[] = ["palette"];
+
+/** A live caret shadows the canvas: app-level chords still fire, element-level ones do not. */
+const CARET_STACK: readonly KeyScope[] = ["caret", "global"];
+
+/** Focus outside the pane grid. Dock-scoped bindings, then the app's. */
+const DOCK_STACK: readonly KeyScope[] = ["dock", "global"];
+
+const CANVAS_STACK: readonly KeyScope[] = ["canvas", "global"];
+const GRID_STACK: readonly KeyScope[] = ["grid", "global"];
+const CODE_STACK: readonly KeyScope[] = ["code", "global"];
+
+/** No engine owns the keyboard — only app-level chords are live. */
+const GLOBAL_STACK: readonly KeyScope[] = ["global"];
+
+/**
+ * The scope stack for the current context, narrowest scope first.
+ *
+ * The ladder is `caret > grid/code engine > focused dock > global` (plan §5.3), and the whole point
+ * is that a scope which is not on the stack cannot fire AT ALL. Three hand-written guards collapse
+ * into it:
+ *
+ * - The blanket modal return → the `palette`-only stack;
+ * - The `canvasMode === "grid" && !["o","p","s","w","z","Z"].includes(key)` allow-list → the `grid`
+ *   stack, whose six survivors are precisely the `global`-scoped commands;
+ * - The caret guard → the `caret` stack, which drops `canvas` so ⌘C/⌘X/⌘V/Delete stay off a sentence
+ *   being typed while ⌘S still saves.
+ *
+ * Preview and the non-editing surfaces (the diff view, the media library, the stylebook) get the
+ * bare `global` stack. Preview draws no overlays and posts no hits, so a selection carried in from
+ * Design is invisible: every element-level chord there — destructive or not — acts on something the
+ * author cannot see. That is one rule where `shortcuts.ts` had two ad-hoc refusal sets which
+ * disagreed with each other (⌘X was refused, ⌘C was not).
+ */
+export function keyScopeStack(ctx: CommandContext): readonly KeyScope[] {
+  if (ctx.modal.open) {
+    return MODAL_STACK;
+  }
+  if (ctx.caret.active) {
+    return CARET_STACK;
+  }
+  if (ctx.focus.region !== "pane") {
+    return DOCK_STACK;
+  }
+  switch (ctx.editor.kind) {
+    case "grid": {
+      return GRID_STACK;
+    }
+    case "code": {
+      return CODE_STACK;
+    }
+    case "canvas": {
+      return ctx.canvas.view === "preview" ? GLOBAL_STACK : CANVAS_STACK;
+    }
+    default: {
+      return GLOBAL_STACK;
+    }
+  }
 }

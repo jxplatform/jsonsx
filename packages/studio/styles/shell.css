@@ -684,6 +684,44 @@
 }
 
 /* ─── Tab strip ───────────────────────────────── */
+/* The chevron sits OUTSIDE the scrolling strip, so it stays reachable at any scroll offset —
+   which is the whole point of it: the scrollbar is hidden and the wheel is a mouse affordance. */
+.tab-strip-row {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+.tab-strip-row .tab-strip {
+  flex: 1 1 auto;
+  border-bottom: none;
+}
+.tab-strip-overflow {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: none;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-100, 14px);
+  line-height: 1;
+  cursor: pointer;
+}
+.tab-strip-overflow:hover {
+  background: var(--hover-bg);
+  color: var(--fg);
+}
+/* Drill-in marker: this document was opened FROM another one. */
+.tab-strip-origin {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1;
+}
 .tab-strip {
   display: flex;
   align-items: stretch;

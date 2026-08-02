@@ -222,8 +222,12 @@ describe("block action bar gaps", () => {
     );
     renderBlockActionBar();
     await flush();
-    const up = bar()!.querySelector('sp-action-button[title="Move up"]') as HTMLElement;
-    const down = bar()!.querySelector('sp-action-button[title="Move down"]') as HTMLElement;
+    const up = bar()!.querySelector(
+      'sp-action-button[data-command="selection.moveUp"]',
+    ) as HTMLElement;
+    const down = bar()!.querySelector(
+      'sp-action-button[data-command="selection.moveDown"]',
+    ) as HTMLElement;
     const before = JSON.stringify(tab.doc.document);
     tab.session.selection = null;
     up.click();

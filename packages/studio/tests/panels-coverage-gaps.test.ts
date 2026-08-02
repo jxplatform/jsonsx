@@ -269,15 +269,21 @@ describe("layers-panel gaps", () => {
   }
 
   /**
-   * Select the row, re-render, and find its move-in button. Row actions are built for the SELECTED
-   * row only, so selecting first is the real interaction (clicking a row does both).
+   * Select the row, re-render, and report whether "Move Into Previous" can act on it.
+   *
+   * Row actions exist for the selected row (and the hovered one) only, so selecting first is the
+   * real interaction — clicking a row does both. The button itself is always rendered: ONE shape,
+   * so an unavailable verb is disabled rather than removed, and "can this node move in" is read off
+   * `disabled` rather than off the button's presence.
    */
-  async function moveInButton(path: JxPath): Promise<HTMLElement | undefined> {
+  async function canMoveIn(path: JxPath): Promise<boolean> {
     activeTab.value!.session.selection = path;
     await renderLayers();
-    return [...(rowByKey(path)?.querySelectorAll("sp-action-button") ?? [])].find(
-      (b) => b.getAttribute("title") === "Move into previous sibling",
-    ) as HTMLElement | undefined;
+    const btn = rowByKey(path)?.querySelector('sp-action-button[data-command="selection.moveIn"]');
+    if (!btn) {
+      throw new Error(`no Move Into Previous button on row ${path.join("/")}`);
+    }
+    return !btn.hasAttribute("disabled");
   }
 
   beforeEach(() => {
@@ -310,8 +316,7 @@ describe("layers-panel gaps", () => {
 
   test("move-in is unavailable after a void sibling", async () => {
     await renderLayers();
-    const btn1 = await moveInButton(["children", 1]);
-    expect(btn1).toBeUndefined();
+    expect(await canMoveIn(["children", 1])).toBe(false);
   });
 
   test("a legacy array-object children sibling still counts as a container", async () => {
@@ -322,16 +327,14 @@ describe("layers-panel gaps", () => {
       map: { tagName: "li", textContent: "item" },
     };
     await renderLayers();
-    const btn3 = await moveInButton(["children", 3]);
-    expect(btn3).toBeDefined();
+    expect(await canMoveIn(["children", 3])).toBe(true);
   });
 
   test("non-array object children (a $ref) do not count as a container", async () => {
     const doc = activeTab.value!.doc.document as AnyRec;
     doc.children[4].children = { $ref: "#/state/body" };
     await renderLayers();
-    const btn5 = await moveInButton(["children", 5]);
-    expect(btn5).toBeUndefined();
+    expect(await canMoveIn(["children", 5])).toBe(false);
   });
 
   test("clicking a stray toggle outside any row is a no-op", async () => {

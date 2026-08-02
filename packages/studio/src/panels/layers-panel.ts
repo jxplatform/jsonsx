@@ -1,17 +1,40 @@
 /// <reference lib="dom" />
 /**
- * Layers panel — document tree view showing element hierarchy with collapse, selection, move
- * actions, and drag-and-drop reordering.
+ * Layers panel — the Outline: the document tree, with collapse, selection, drag-and-drop
+ * reordering, and per-row actions that are RENDERINGS of the command registry.
+ *
+ * Three things this file is deliberate about.
+ *
+ * **Rows are `registry.forPlacement("outline/row")`.** Every row used to carry five hand-built
+ * action buttons, always visible, on every row — five custom elements with shadow roots per visible
+ * row. They now collapse to the selected row plus the hovered one, which is Gutenberg's rule and
+ * the one plan §3.2 ⑩ codifies: the floating bar owns selection-scoped verbs, the inspector owns
+ * values. The verbs, their names, their chords and their disabled reasons all come from the records
+ * in `block-action-bar.ts` — the surface renders, it does not decide.
+ *
+ * The hovered row's cluster is mounted imperatively ({@link mountHoverActions}) rather than by a
+ * `display: none` CSS rule, because a hidden `sp-action-button` is still an upgraded custom element
+ * with a shadow root: CSS reveal would have kept the whole cost the collapse exists to remove. At
+ * most two clusters exist at any moment — the selected row's, and the one under the pointer.
+ *
+ * **A row says something.** On a real page the tree was a wall of rows all reading "div": only
+ * text-bearing nodes got a preview and containers got the tag they already wear as a coloured
+ * badge. {@link outlineLabel} derives an identity instead — a title, an `$id`, a class, a landmark
+ * name, the first text inside — and returns "" rather than repeat the badge.
+ *
+ * **It is a tree, and it is reachable.** `role="tree"` / `role="treeitem"` with a roving tabindex
+ * and the arrow-key model ARIA specifies: ↑↓ walk the visible rows, → expands then descends, ←
+ * collapses then ascends, Enter/F2 renames.
  */
 
-import { html, nothing } from "lit-html";
+import { html, render as litRender, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
+import { ref } from "lit-html/directives/ref.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import {
   VOID_ELEMENTS,
   childIndex,
-  childList,
   flattenTree,
   getNodeAtPath,
   nodeLabel,
@@ -22,19 +45,404 @@ import {
 import { activeTab } from "../workspace/workspace";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
-import {
-  mutateMoveNode,
-  mutateRemoveNode,
-  mutateUpdateProperty,
-  transactDoc,
-} from "../tabs/transact";
+import { mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { view } from "../view";
 import { setActivityTab } from "../shell";
 import { renderEmptyState } from "./empty-state";
 import { isInlineElement } from "../editor/inline-edit";
 import { showContextMenu } from "../editor/context-menu";
 import { panToElement } from "../canvas/canvas-utils";
+import {
+  commandIcon,
+  commandTooltip,
+  runCommand,
+  selectionCommandRegistry,
+  showCommandOverflow,
+  withCommandTarget,
+} from "./block-action-bar";
+import type { CommandRegistry } from "../commands/registry";
 import type { TemplateResult } from "lit-html";
+
+// ─── What a row says ─────────────────────────────────────────────────────────
+
+/** How much of a text preview a 240px column can carry before it is just noise. */
+const LABEL_MAX = 32;
+
+/**
+ * Tags whose human name is worth more than the tag itself.
+ *
+ * Deliberately short. `section`, `ul` and `table` are omitted: "Section" next to a `section` badge
+ * is the repetition this function exists to remove.
+ */
+const LANDMARK_NAMES: Readonly<Record<string, string>> = {
+  article: "Article",
+  aside: "Sidebar",
+  dialog: "Dialog",
+  figure: "Figure",
+  footer: "Footer",
+  form: "Form",
+  header: "Header",
+  main: "Main",
+  nav: "Navigation",
+};
+
+/** Trim and ellipsize to {@link LABEL_MAX}. */
+function truncate(text: string): string {
+  const clean = text.replaceAll(/\s+/gu, " ").trim();
+  return clean.length > LABEL_MAX ? `${clean.slice(0, LABEL_MAX)}…` : clean;
+}
+
+/**
+ * The first text anywhere under `node`, or "".
+ *
+ * Bounded at three levels and short-circuited on the first hit: a container's identity is usually
+ * its heading or its first line, and walking a whole subtree per row would cost the render what the
+ * five-buttons-per-row build already cost it.
+ */
+function firstText(node: JxMutableNode, depth = 0): string {
+  if (typeof node.textContent === "string" && node.textContent.trim()) {
+    return node.textContent.trim();
+  }
+  if (depth >= 3 || !Array.isArray(node.children)) {
+    return "";
+  }
+  for (const child of node.children) {
+    if (typeof child === "string" && child.trim()) {
+      return child.trim();
+    }
+    if (child && typeof child === "object") {
+      const found = firstText(child, depth + 1);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return "";
+}
+
+/** The node's first class name, when it has a plain (unbound) `class` attribute. */
+function firstClass(node: JxMutableNode): string {
+  const value = node.attributes?.class;
+  return typeof value === "string" ? (value.trim().split(/\s+/u)[0] ?? "") : "";
+}
+
+/**
+ * What an Outline row says about `node`, beyond the tag its badge already shows.
+ *
+ * Returns "" when the node has no identity of its own — the badge is then the whole answer, which
+ * is honest, and quieter than a column of "div".
+ *
+ * This is NOT `nodeLabel()`. `nodeLabel` answers "name this node anywhere" and prefixes the tag (`p
+ * — Hello`), which is right for the canvas overlay and the status bar and wrong here, where the tag
+ * is already a coloured badge two pixels to the left. Those surfaces are unchanged.
+ */
+export function outlineLabel(node: JxMutableNode): string {
+  if (node.$title) {
+    return truncate(node.$title);
+  }
+  // Repeaters and slots have a real name of their own; nodeLabel already composes it.
+  if (node.$prototype === "Array" || node.tagName === "slot") {
+    return nodeLabel(node);
+  }
+  if (node.$id) {
+    return `#${truncate(node.$id)}`;
+  }
+  if (typeof node.textContent === "string" && node.textContent.trim()) {
+    return truncate(node.textContent);
+  }
+  const cls = firstClass(node);
+  if (cls) {
+    return `.${truncate(cls)}`;
+  }
+  const landmark = LANDMARK_NAMES[(node.tagName ?? "").toLowerCase()];
+  if (landmark) {
+    return landmark;
+  }
+  const inner = firstText(node);
+  if (inner) {
+    return `“${truncate(inner)}”`;
+  }
+  const count = Array.isArray(node.children) ? node.children.length : 0;
+  return count > 0 ? `${count} item${count === 1 ? "" : "s"}` : "";
+}
+
+// ─── Row actions, from the registry ──────────────────────────────────────────
+
+/**
+ * Verbs shown inline on a row before the rest fold into `⋮`. A 240px column is the budget.
+ *
+ * Four is what the Outline's own verbs cost: the moves (up, down, into previous, out of parent),
+ * which are the reason a document tree has rows you can grab at all. Duplicate and Delete sort
+ * after them (`3_structure`, `9_danger`) and so ride in the `⋮` menu with their names and chords
+ * intact — they are also on the block action bar, in the row's context menu, and on ⌘D / Delete.
+ * The four moves are on none of those.
+ */
+export const OUTLINE_ROW_MAX_ITEMS = 4;
+
+/**
+ * The row's action cluster.
+ *
+ * Wrapped in {@link withCommandTarget} so every record is evaluated against THIS ROW'S node rather
+ * than the selection — `PLACEMENT_MATRIX["outline/row"]` says row actions act on the row's node,
+ * and the hovered row is not the selected one.
+ */
+export function renderRowCommands(registry: CommandRegistry, path: JxPath) {
+  return withCommandTarget(path, () => {
+    const placed = registry.forPlacement("outline/row");
+    const shown = placed.slice(0, OUTLINE_ROW_MAX_ITEMS);
+    const overflow = placed.slice(OUTLINE_ROW_MAX_ITEMS);
+    return html`${shown.map(
+      (command) => html`<sp-action-button
+        quiet
+        size="xs"
+        class=${command.destructive ? "layer-action layer-delete" : "layer-action"}
+        data-command=${command.id}
+        aria-label=${command.title}
+        title=${commandTooltip(registry, command)}
+        ?disabled=${registry.disabledReason(command.id) !== undefined}
+        @click=${(e: MouseEvent) => {
+          e.stopPropagation();
+          (e.currentTarget as HTMLElement).blur();
+          runCommand(registry, command.id, path);
+        }}
+        >${commandIcon(command)}</sp-action-button
+      >`,
+    )}
+    ${
+      overflow.length === 0
+        ? nothing
+        : html`<sp-action-button
+            quiet
+            size="xs"
+            class="layer-action layer-overflow"
+            aria-label="More actions"
+            aria-haspopup="menu"
+            title="More actions"
+            @click=${(e: MouseEvent) => {
+              e.stopPropagation();
+              showCommandOverflow(e.currentTarget as HTMLElement, registry, overflow, path);
+            }}
+          >
+            <sp-icon-more slot="icon"></sp-icon-more>
+          </sp-action-button>`
+    }`;
+  });
+}
+
+// ─── The hovered row's cluster ───────────────────────────────────────────────
+
+/**
+ * The row whose cluster this module mounted on hover, so it can be taken down again.
+ *
+ * One at a time: the pointer is in one place. The SELECTED row's cluster is lit's (it is in the row
+ * template), and is never touched from here.
+ */
+let _hoverActionsRow: HTMLElement | null = null;
+
+/** The empty span a non-selected row keeps for {@link mountHoverActions} to render into. */
+function actionSlot(row: HTMLElement): HTMLElement | null {
+  return row.classList.contains("selected")
+    ? null
+    : row.querySelector<HTMLElement>(".layer-actions");
+}
+
+/** Take down the hover cluster, if one is up. */
+export function clearHoverActions(): void {
+  const slot = _hoverActionsRow ? actionSlot(_hoverActionsRow) : null;
+  if (slot) {
+    litRender(nothing, slot);
+  }
+  _hoverActionsRow = null;
+}
+
+/** Build `row`'s cluster into its slot, replacing whatever was there. */
+function mountHoverActions(row: HTMLElement): void {
+  const slot = actionSlot(row);
+  const key = row.dataset.path;
+  if (!slot || key === undefined) {
+    return;
+  }
+  _hoverActionsRow = row;
+  litRender(renderRowCommands(selectionCommandRegistry(), pathFromKey(key)), slot);
+}
+
+/**
+ * Delegated `mouseover` (which bubbles; `mouseenter` does not): reveal the cluster on the row under
+ * the pointer, and only that row.
+ */
+export function onTreeHover(e: Event): void {
+  const row = (e.target as HTMLElement | null)?.closest<HTMLElement>('.layer-row[role="treeitem"]');
+  if (!row || row === _hoverActionsRow) {
+    return;
+  }
+  clearHoverActions();
+  mountHoverActions(row);
+}
+
+/**
+ * The two things that can only be decided once the rows are in the document.
+ *
+ * Deferred by a microtask on purpose. A `ref` on the tree element commits BEFORE the child part
+ * holding the rows, so on a first render the callback sees an empty tree; and the template this
+ * module returns is rendered by its caller, so a microtask is the first tick at which the new DOM
+ * exists either way.
+ *
+ * - The roving tabindex needs to know which rows survived their collapsed ancestors.
+ * - The hover cluster needs re-mounting: rows are keyed by path, so a document edit can leave the
+ *   pointer on a DOM row that now stands for a different node, with different disabled reasons.
+ */
+export function afterTreeRender(tree: HTMLElement): void {
+  const row = _hoverActionsRow;
+  queueMicrotask(() => {
+    applyTreeRovingTabindex(tree);
+    if (!row || _hoverActionsRow !== row) {
+      return;
+    }
+    if (row.isConnected && !row.classList.contains("selected")) {
+      mountHoverActions(row);
+    } else {
+      _hoverActionsRow = null;
+    }
+  });
+}
+
+// ─── The tree, as a keyboard surface ─────────────────────────────────────────
+
+/** Pixels of indent per level, and the depth past which the column stops paying for more. */
+const INDENT_STEP = 16;
+const INDENT_MAX_DEPTH = 6;
+
+/**
+ * The indent for `depth`, capped.
+ *
+ * Uncapped, a depth-12 row pushed 192px of empty space in front of a badge and a label inside a
+ * 240px column, which is what made the panel scroll sideways instead of reading as a tree.
+ */
+export function indentWidth(depth: number): number {
+  return Math.min(depth, INDENT_MAX_DEPTH) * INDENT_STEP;
+}
+
+/** The inverse of {@link pathKey}: numeric segments come back as numbers, as the doc stores them. */
+function pathFromKey(key: string): JxPath {
+  return key ? (key.split("/").map((s) => (/^\d+$/u.test(s) ? Number(s) : s)) as JxPath) : [];
+}
+
+/** Every row currently on screen, in visual order. */
+function treeRows(tree: HTMLElement): HTMLElement[] {
+  return [...tree.querySelectorAll<HTMLElement>('.layer-row[role="treeitem"]')];
+}
+
+/**
+ * Roving tabindex over the rows: the selected row is the tab stop, else the first.
+ *
+ * Applied after every render ({@link afterTreeRender}) rather than baked into each row's template,
+ * because "is the selected row actually on screen" is only known once the collapsed ancestors have
+ * been skipped — a selection inside a collapsed branch would otherwise leave the tree with no tab
+ * stop at all.
+ */
+export function applyTreeRovingTabindex(tree: HTMLElement): void {
+  const rows = treeRows(tree);
+  if (rows.length === 0) {
+    return;
+  }
+  const selected = rows.find((row) => row.getAttribute("aria-selected") === "true");
+  const stop = selected ?? rows[0]!;
+  for (const row of rows) {
+    row.tabIndex = row === stop ? 0 : -1;
+  }
+}
+
+/** Focus `row`, and make it the tree's single tab stop. */
+function focusRow(tree: HTMLElement, row: HTMLElement | undefined): void {
+  if (!row) {
+    return;
+  }
+  for (const other of treeRows(tree)) {
+    other.tabIndex = other === row ? 0 : -1;
+  }
+  row.focus();
+}
+
+/** Select the node a row stands for, so the canvas and the inspector follow the keyboard. */
+function selectRow(row: HTMLElement): void {
+  const key = row.dataset.path;
+  const tab = activeTab.value;
+  if (key === undefined || !tab) {
+    return;
+  }
+  tab.session.selection = pathFromKey(key);
+}
+
+/**
+ * The ARIA tree keyboard model.
+ *
+ * ↑ / ↓ walk the visible rows and take the selection with them — in an outline, "focus follows
+ * selection" is what an author means by pressing Down. → expands a collapsed row and otherwise
+ * descends into it; ← collapses an expanded one and otherwise climbs to its parent. Enter and F2
+ * rename. Delete is deliberately absent: it is `selection.delete`'s chord, and the registry owns
+ * it.
+ */
+export function onTreeKeydown(
+  e: KeyboardEvent,
+  collapsed: Set<string>,
+  rerender: () => void,
+): void {
+  const tree = e.currentTarget as HTMLElement;
+  const row = (e.target as HTMLElement).closest<HTMLElement>('.layer-row[role="treeitem"]');
+  if (!row) {
+    return;
+  }
+  const rows = treeRows(tree);
+  const index = rows.indexOf(row);
+  const key = row.dataset.path ?? "";
+  const expanded = row.getAttribute("aria-expanded");
+
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    const next = rows[index + (e.key === "ArrowDown" ? 1 : -1)];
+    if (next) {
+      selectRow(next);
+      focusRow(tree, next);
+    }
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    if (expanded === "false") {
+      collapsed.delete(key);
+      rerender();
+    } else if (expanded === "true") {
+      focusRow(tree, rows[index + 1]);
+    }
+  } else if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    if (expanded === "true") {
+      collapsed.add(key);
+      rerender();
+    } else {
+      const level = Number(row.getAttribute("aria-level") ?? "1");
+      const parent = rows
+        .slice(0, index)
+        .toReversed()
+        .find((candidate) => Number(candidate.getAttribute("aria-level") ?? "1") < level);
+      if (parent) {
+        selectRow(parent);
+        focusRow(tree, parent);
+      }
+    }
+  } else if (e.key === "Home" || e.key === "End") {
+    e.preventDefault();
+    const target = e.key === "Home" ? rows[0] : rows.at(-1);
+    if (target) {
+      selectRow(target);
+      focusRow(tree, target);
+    }
+  } else if (e.key === "Enter" || e.key === "F2") {
+    e.preventDefault();
+    selectRow(row);
+    if (row.dataset.path !== undefined) {
+      startLayerTitleEdit(pathFromKey(row.dataset.path), rerender);
+    }
+  }
+}
 
 /**
  * Start inline title editing on a layer row.
@@ -67,7 +475,7 @@ export function startLayerTitleEdit(path: JxPath, rerender: () => void) {
   input.className = "layer-title-input";
   input.value = node.$title || "";
   const { $title: _, ...nodeWithoutTitle } = node;
-  input.placeholder = nodeLabel(nodeWithoutTitle);
+  input.placeholder = outlineLabel(nodeWithoutTitle) || (node.tagName ?? "div");
   label.after(input);
   input.focus();
   input.select();
@@ -125,6 +533,7 @@ export function renderLayersTemplate(ctx: {
 
   const rows = flattenTree(tab!.doc.document);
   const collapsed = (view._layersCollapsed ||= new Set());
+  const registry = selectionCommandRegistry();
 
   const layerRows: { key: string; tpl: TemplateResult }[] = [];
   // Rows arrive in pre-order, so "is any ancestor collapsed?" is a running depth comparison rather
@@ -153,7 +562,7 @@ export function renderLayersTemplate(ctx: {
         tpl: html`
           <div
             class="layer-row"
-            style="padding-left:${depth * 16 + 8}px; opacity: 0.6; font-style: italic;"
+            style="padding-left:${indentWidth(depth) + 8}px; opacity: 0.6; font-style: italic;"
           >
             <span
               class="layer-tag"
@@ -240,7 +649,7 @@ export function renderLayersTemplate(ctx: {
       labelText = jxNode.$ref || "external";
       labelItalic = true;
     } else {
-      labelText = nodeLabel(jxNode);
+      labelText = outlineLabel(jxNode);
       labelItalic = false;
     }
 
@@ -250,52 +659,17 @@ export function renderLayersTemplate(ctx: {
     const isStructural =
       (nodeType === "element" || nodeType === "map") && typeof childIndex(path) === "number";
     const isRoot = tab?.doc.mode === "content" ? path.length === 0 : path.length < 2;
-    const idx = isStructural ? (childIndex(path) as number) : 0;
-    const parentPath = isStructural && !isRoot ? (parentElementPath(path) as JxPath) : null;
-    const parentNode = parentPath ? getNodeAtPath(tab!.doc.document, parentPath) : null;
-    const siblingCount = childList(parentNode).length;
-    const canMoveUp = isStructural && !isRoot && idx > 0;
-    const canMoveDown = isStructural && !isRoot && idx < siblingCount - 1;
-    const prevSibling = canMoveUp && parentNode ? childList(parentNode)[idx - 1] : null;
-    const prevIsContainer = (() => {
-      if (!prevSibling || typeof prevSibling !== "object") {
-        return false;
-      }
-      if (VOID_ELEMENTS.has((prevSibling.tagName || "div").toLowerCase())) {
-        return false;
-      }
-      const ch = prevSibling.children;
-      if (!ch) {
-        return false;
-      }
-      if (
-        typeof ch === "object" &&
-        (ch as unknown as Record<string, unknown>).$prototype === "Array"
-      ) {
-        return true;
-      }
-      if (!Array.isArray(ch)) {
-        return false;
-      }
-      if (ch.length === 0) {
-        return true;
-      }
-      return ch.some(
-        (c) => typeof c === "object" && c !== null && !isInlineElement(c, prevSibling),
-      );
-    })();
-    const canMoveIn = isStructural && !isRoot && prevIsContainer;
-    const grandparentPath =
-      isStructural && parentPath && parentPath.length >= 2
-        ? (parentElementPath(parentPath) as JxPath)
-        : null;
-    const canMoveOut = isStructural && !isRoot && Boolean(grandparentPath);
 
     layerRows.push({
       key,
       tpl: html`
         <div
           class=${classMap({ "layer-row": true, selected: isSelected })}
+          role="treeitem"
+          aria-level=${depth + 1}
+          aria-selected=${isSelected ? "true" : "false"}
+          aria-expanded=${isExpandable ? (collapsed.has(key) ? "false" : "true") : nothing}
+          tabindex=${isSelected ? "0" : "-1"}
           data-path=${key}
           data-dnd-row=${isStructural ? key : nothing}
           data-dnd-depth=${isStructural ? depth : nothing}
@@ -323,7 +697,7 @@ export function renderLayersTemplate(ctx: {
               : nothing
           }
         >
-          <span class="layer-indent" style="width:${depth * 16}px"></span>
+          <span class="layer-indent" style="width:${indentWidth(depth)}px"></span>
           <span class="layer-toggle"
             >${
               isExpandable
@@ -347,103 +721,14 @@ export function renderLayersTemplate(ctx: {
               : nothing
           }
           ${
-            isStructural && !isRoot && isSelected
-              ? html`
-                  <span class="layer-actions">
-                    ${
-                      canMoveUp
-                        ? html`<sp-action-button
-                            quiet
-                            size="xs"
-                            title="Move up"
-                            @click=${(e: MouseEvent) => {
-                              e.stopPropagation();
-                              (e.currentTarget as HTMLElement).blur();
-                              const pp = parentPath as JxPath;
-                              transactDoc(activeTab.value!, (t) =>
-                                mutateMoveNode(t, path, pp, idx - 1),
-                              );
-                            }}
-                          >
-                            <sp-icon-arrow-up slot="icon"></sp-icon-arrow-up>
-                          </sp-action-button>`
-                        : nothing
-                    }
-                    ${
-                      canMoveDown
-                        ? html`<sp-action-button
-                            quiet
-                            size="xs"
-                            title="Move down"
-                            @click=${(e: MouseEvent) => {
-                              e.stopPropagation();
-                              (e.currentTarget as HTMLElement).blur();
-                              const pp = parentPath as JxPath;
-                              transactDoc(activeTab.value!, (t) =>
-                                mutateMoveNode(t, path, pp, idx + 2),
-                              );
-                            }}
-                          >
-                            <sp-icon-arrow-down slot="icon"></sp-icon-arrow-down>
-                          </sp-action-button>`
-                        : nothing
-                    }
-                    ${
-                      canMoveIn
-                        ? html`<sp-action-button
-                            quiet
-                            size="xs"
-                            title="Move into previous sibling"
-                            @click=${(e: MouseEvent) => {
-                              e.stopPropagation();
-                              (e.currentTarget as HTMLElement).blur();
-                              const pp = parentPath as JxPath;
-                              const prevPath = [...pp, "children", idx - 1];
-                              const prev = getNodeAtPath(activeTab.value!.doc.document, prevPath);
-                              const len = childList(prev).length;
-                              transactDoc(activeTab.value!, (t) =>
-                                mutateMoveNode(t, path, prevPath, len),
-                              );
-                            }}
-                          >
-                            <sp-icon-arrow-right slot="icon"></sp-icon-arrow-right>
-                          </sp-action-button>`
-                        : nothing
-                    }
-                    ${
-                      canMoveOut
-                        ? html`<sp-action-button
-                            quiet
-                            size="xs"
-                            title="Move out of parent"
-                            @click=${(e: MouseEvent) => {
-                              e.stopPropagation();
-                              (e.currentTarget as HTMLElement).blur();
-                              const gp = grandparentPath as JxPath;
-                              const parentIdx = childIndex(parentPath!) as number;
-                              transactDoc(activeTab.value!, (t) =>
-                                mutateMoveNode(t, path, gp, parentIdx + 1),
-                              );
-                            }}
-                          >
-                            <sp-icon-arrow-left slot="icon"></sp-icon-arrow-left>
-                          </sp-action-button>`
-                        : nothing
-                    }
-                    <sp-action-button
-                      quiet
-                      size="xs"
-                      class="layer-delete"
-                      title="Delete"
-                      @click=${(e: MouseEvent) => {
-                        e.stopPropagation();
-                        transactDoc(activeTab.value!, (t) => mutateRemoveNode(t, path));
-                      }}
-                    >
-                      <sp-icon-close slot="icon"></sp-icon-close>
-                    </sp-action-button>
-                  </span>
-                `
+            // The selected row's cluster is declared here so it survives every re-render; every
+            // Other structural row keeps an EMPTY slot, which the pointer fills (mountHoverActions)
+            // And empties again. The two branches are different templates, so lit swaps the DOM
+            // Between them and a hover cluster can never outlive the row becoming selected.
+            isStructural && !isRoot
+              ? isSelected
+                ? html`<span class="layer-actions">${renderRowCommands(registry, path)}</span>`
+                : html`<span class="layer-actions"></span>`
               : nothing
           }
         </div>
@@ -455,6 +740,16 @@ export function renderLayersTemplate(ctx: {
     <div class="layers-container" style="position:relative">
       <div
         class="layers-tree"
+        role="tree"
+        aria-label="Document outline"
+        ${ref((el) => {
+          if (el) {
+            afterTreeRender(el as HTMLElement);
+          }
+        })}
+        @keydown=${(e: KeyboardEvent) => onTreeKeydown(e, collapsed, ctx.rerender)}
+        @mouseover=${onTreeHover}
+        @mouseleave=${clearHoverActions}
         @click=${(e: MouseEvent) => {
           const toggle = (e.target as HTMLElement).closest(".layer-toggle");
           if (!toggle) {

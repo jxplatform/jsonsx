@@ -63,6 +63,7 @@ void mock.module("../src/canvas/iframe-host", () => ({
 }));
 
 const {
+  BLOCKBAR_MAX_ITEMS,
   dismissBlockActionBar,
   dismissLinkPopover,
   handleParentFormatShortcut,
@@ -123,6 +124,21 @@ function barButton(title: string): HTMLElement {
   const btn = bar()?.querySelector(`sp-action-button[title^="${title}"]`) as HTMLElement | null;
   if (!btn) {
     throw new Error(`bar button not found: ${title}`);
+  }
+  return btn;
+}
+
+/**
+ * A registry verb by command id.
+ *
+ * The verb cluster is `registry.forPlacement("blockbar")`, so its buttons are addressed by the
+ * record that produced them — their `title` is the record's tooltip (chord when it can act, the
+ * `requires` sentence when it cannot) and belongs to the record, not to this surface.
+ */
+function cmdButton(id: string): HTMLElement {
+  const btn = bar()?.querySelector(`sp-action-button[data-command="${id}"]`) as HTMLElement | null;
+  if (!btn) {
+    throw new Error(`bar command not rendered: ${id}`);
   }
   return btn;
 }
@@ -235,9 +251,9 @@ describe("block action bar", () => {
     expect(barEl.querySelector(".bar-tag")!.classList.contains("bar-tag--interactive")).toBe(true);
     expect(barEl.querySelector("sp-icon-back")).not.toBeNull(); // Parent selector
     expect(barEl.querySelector(".bar-drag-handle")!.textContent).toContain("⠿");
-    expect(barButton("Move up").hasAttribute("disabled")).toBe(true); // Idx 0
-    expect(barButton("Move down").hasAttribute("disabled")).toBe(false);
-    expect(barButton("Convert to Component")).not.toBeNull();
+    expect(cmdButton("selection.moveUp").hasAttribute("disabled")).toBe(true); // Idx 0
+    expect(cmdButton("selection.moveDown").hasAttribute("disabled")).toBe(false);
+    expect(cmdButton("selection.convertToComponent")).not.toBeNull();
     // ONE bar: the format group is part of it whenever the block can carry inline markup, whether
     // Or not a caret is in the block yet.
     expect(barEl.querySelector("sp-action-group")).not.toBeNull();
@@ -261,15 +277,89 @@ describe("block action bar", () => {
     expect(style).toContain("top:34px"); // 10 + 20 + 4
   });
 
-  test("root selection renders only the tag badge", () => {
+  test("the root selection keeps the bar's shape and disables what cannot act", () => {
+    // §8.6 is normative: ONE shape. The bar used to drop the parent selector, the drag handle and
+    // Every verb at the root, so selecting the document rearranged the toolbar under the cursor.
     setup({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" }, []);
     renderBlockActionBar();
     const barEl = bar()!;
     expect(barEl.querySelector(".bar-tag")!.textContent!.trim()).toBe("div");
-    expect(barEl.querySelector("sp-icon-back")).toBeNull();
-    expect(barEl.querySelector(".bar-drag-handle")).toBeNull();
-    expect(barEl.querySelector('sp-action-button[title^="Move"]')).toBeNull();
-    expect(barEl.querySelector('sp-action-button[title="Convert to Component"]')).toBeNull();
+
+    const parentBtn = barEl.querySelector("sp-icon-back")!.parentElement!;
+    expect(parentBtn.hasAttribute("disabled")).toBe(true);
+    const handle = barEl.querySelector(".bar-drag-handle")!;
+    expect(handle.classList.contains("bar-drag-handle--disabled")).toBe(true);
+    expect(handle.getAttribute("aria-disabled")).toBe("true");
+
+    for (const id of ["selection.moveUp", "selection.moveDown"]) {
+      expect(cmdButton(id).hasAttribute("disabled")).toBe(true);
+    }
+    // `selection.duplicate` now declares the same gate `selection.delete` has, so the root
+    // Disables it here instead of offering a button whose only effect is nothing.
+    const dup = cmdButton("selection.duplicate");
+    expect(dup.hasAttribute("disabled")).toBe(true);
+    expect(dup.getAttribute("title")).toBe(
+      "Duplicate — requires an element that has a sibling position",
+    );
+    // Delete arrives from the registry with the one sentence that refuses the document root.
+    const del = cmdButton("selection.delete");
+    expect(del.hasAttribute("disabled")).toBe(true);
+    expect(del.getAttribute("title")).toBe(
+      "Delete — requires an element selection that is not the document root",
+    );
+    expect(del.getAttribute("aria-label")).toBe("Delete"); // The name stays the bare name.
+    expect(cmdButton("selection.convertToComponent").hasAttribute("disabled")).toBe(true);
+  });
+
+  test("the verb cluster is the blockbar placement, in group order, with Delete last", () => {
+    setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+        ],
+        tagName: "div",
+      },
+      ["children", 1],
+    );
+    renderBlockActionBar();
+    const ids = [...bar()!.querySelectorAll<HTMLElement>("sp-action-button[data-command]")].map(
+      (b) => b.dataset.command,
+    );
+    expect(ids).toEqual([
+      "selection.moveUp",
+      "selection.moveDown",
+      "selection.duplicate",
+      "selection.convertToComponent",
+      "selection.delete",
+    ]);
+    // Exactly the cap, so nothing folds away: no ⋮ on a default selection.
+    expect(ids.length).toBe(BLOCKBAR_MAX_ITEMS);
+    expect(bar()!.querySelector(".bar-overflow")).toBeNull();
+  });
+
+  test("Delete removes the selected element and leaves its parent selected", () => {
+    setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+        ],
+        tagName: "div",
+      },
+      ["children", 1],
+    );
+    renderBlockActionBar();
+    cmdButton("selection.delete").click();
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A"]);
+    expect(activeTab.value!.session.selection).toEqual([]);
+  });
+
+  test("Duplicate inserts a copy after the selection", () => {
+    setup({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" }, ["children", 0]);
+    renderBlockActionBar();
+    cmdButton("selection.duplicate").click();
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "A"]);
   });
 
   test("badge prefers the node $id over the tag name", () => {
@@ -325,13 +415,13 @@ describe("block action bar", () => {
     );
     renderBlockActionBar();
 
-    barButton("Move down").click();
+    cmdButton("selection.moveDown").click();
     let children = doc().children as JxMutableNode[];
     expect(children.map((c) => c.textContent)).toEqual(["B", "A"]);
     expect(activeTab.value!.session.selection).toEqual(["children", 1]);
 
     renderBlockActionBar(); // Selection now at idx 1
-    barButton("Move up").click();
+    cmdButton("selection.moveUp").click();
     children = doc().children as JxMutableNode[];
     expect(children.map((c) => c.textContent)).toEqual(["A", "B"]);
     expect(activeTab.value!.session.selection).toEqual(["children", 0]);
@@ -349,13 +439,13 @@ describe("block action bar", () => {
       ["children", 0],
     );
     renderBlockActionBar();
-    barButton("Move up").click(); // Disabled guard
+    cmdButton("selection.moveUp").click(); // Disabled guard
     expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "B"]);
 
     activeTab.value!.session.selection = ["children", 1] as never;
     renderBlockActionBar();
-    expect(barButton("Move down").hasAttribute("disabled")).toBe(true);
-    barButton("Move down").click();
+    expect(cmdButton("selection.moveDown").hasAttribute("disabled")).toBe(true);
+    cmdButton("selection.moveDown").click();
     expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "B"]);
   });
 
@@ -404,9 +494,11 @@ describe("block action bar", () => {
     const badge = bar()!.querySelector(".bar-tag")!;
     expect(badge.textContent!.trim()).toBe("x-card");
     expect(badge.classList.contains("bar-tag--interactive")).toBe(false);
-    expect(bar()!.querySelector('sp-action-button[title="Convert to Component"]')).toBeNull();
+    expect(
+      bar()!.querySelector('sp-action-button[data-command="selection.convertToComponent"]'),
+    ).toBeNull();
 
-    barButton("Edit Component").click();
+    cmdButton("selection.editComponent").click();
     expect(navigated).toEqual(["components/card.json"]);
   });
 

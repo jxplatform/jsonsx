@@ -287,9 +287,39 @@
 .block-action-bar .bar-drag-handle:active {
   cursor: grabbing;
 }
+/* ONE shape (studio-ui-guidelines §8.6): the handle is greyed on the document root, never removed —
+   a toolbar whose controls move under the cursor is worse than one with a dead affordance. */
+.block-action-bar .bar-drag-handle--disabled {
+  cursor: default;
+  opacity: 0.3;
+}
 .block-action-bar sp-divider {
   height: 20px;
   margin: 0 2px;
+}
+/* One rule for every registry-rendered verb; `--danger` is the `destructive: true` half. */
+.block-action-bar .bar-cmd,
+.block-action-bar .bar-overflow {
+  flex-shrink: 0;
+}
+.block-action-bar .bar-cmd--danger {
+  color: var(--danger);
+}
+/* A record with no `icon` draws its title instead of a blank button. */
+.block-action-bar .cmd-label {
+  font-size: var(--spectrum-font-size-50, 11px);
+  padding: 0 2px;
+}
+.block-action-bar [data-toolbar-item]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* The `⋮` menu: shared by the bar and the Outline rows, so it lives with the bar that owns it. */
+.bar-overflow-menu .cmd-chord {
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  padding-left: 12px;
 }
 
 .link-popover {

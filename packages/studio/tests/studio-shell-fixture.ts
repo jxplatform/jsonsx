@@ -8,6 +8,7 @@
  */
 import { flush, installMockPlatform } from "./harness";
 import { mock } from "bun:test";
+import { nothing } from "lit-html";
 import type { MockPlatformState } from "./harness";
 import type { StudioPlatform } from "../src/types";
 
@@ -133,12 +134,20 @@ export async function bootStudio(opts: {
   }));
 
   void mock.module("../src/editor/shortcuts.ts", () => ({
-    initShortcuts: (get: () => unknown) => {
+    // The registry is the first argument now; the pointer/pan thunk is the second.
+    initShortcuts: (_registry: unknown, get: () => unknown) => {
       captured.shortcutsGet = get as () => any;
     },
+    registerStudioCommands: mock(() => {}),
   }));
 
   void mock.module("../src/panels/block-action-bar.ts", () => ({
+    // The bar owns the selection command records, so `panels/layers-panel.ts` imports its verb
+    // Rendering from here too: a mock that stops at the bar's own five exports fails the boot at
+    // Import time ("Export named 'commandIcon' not found"). The registry stub places nothing, so
+    // The row-rendering helpers below are never reached — they exist to satisfy the import.
+    commandIcon: mock(() => nothing),
+    commandTooltip: mock(() => ""),
     dismissBlockActionBar: mock(() => {}),
     dismissLinkPopover: mock(() => {}),
     initBlockActionBar: (ctx: unknown) => {
@@ -146,6 +155,14 @@ export async function bootStudio(opts: {
     },
     isEditChromeTarget: mock(() => false),
     renderBlockActionBar: mock(() => {}),
+    runCommand: mock(() => {}),
+    selectionCommandRegistry: () => ({
+      disabledReason: () => {},
+      forPlacement: () => [],
+      keymap: { formatBinding: () => {} },
+    }),
+    showCommandOverflow: mock(() => {}),
+    withCommandTarget: <T>(_path: unknown, fn: () => T) => fn(),
   }));
 
   void mock.module("../src/canvas/canvas-render.ts", () => ({

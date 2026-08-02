@@ -7,6 +7,7 @@
  */
 import { flush, installMockPlatform } from "./harness";
 import { expect, mock, test } from "bun:test";
+import { nothing } from "lit-html";
 import { hasPlatform, getPlatform } from "../src/platform";
 import { renderOnly, setProjectState } from "../src/store";
 import { shell } from "../src/shell";
@@ -96,14 +97,27 @@ void mock.module("../src/panels/welcome-screen.ts", () => ({
 
 void mock.module("../src/editor/shortcuts.ts", () => ({
   initShortcuts: mock(() => {}),
+  registerStudioCommands: mock(() => {}),
 }));
 
+// `panels/layers-panel.ts` renders its row verbs from the bar's command records, so this mock has
+// To carry them too or the boot fails at import time.
 void mock.module("../src/panels/block-action-bar.ts", () => ({
+  commandIcon: mock(() => nothing),
+  commandTooltip: mock(() => ""),
   dismissBlockActionBar: mock(() => {}),
   dismissLinkPopover: mock(() => {}),
   initBlockActionBar: mock(() => {}),
   isEditChromeTarget: mock(() => false),
   renderBlockActionBar: mock(() => {}),
+  runCommand: mock(() => {}),
+  selectionCommandRegistry: () => ({
+    disabledReason: () => {},
+    forPlacement: () => [],
+    keymap: { formatBinding: () => {} },
+  }),
+  showCommandOverflow: mock(() => {}),
+  withCommandTarget: <T>(_path: unknown, fn: () => T) => fn(),
 }));
 
 interface TabBarCtx {

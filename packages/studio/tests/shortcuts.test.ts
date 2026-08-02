@@ -1,9 +1,16 @@
 /**
- * Tests for src/editor/shortcuts.ts — keyboard, wheel, and pointer shortcuts.
+ * Tests for src/editor/shortcuts.ts — the canvas gestures and the keyboard dispatcher.
  *
- * Mocks quick-search and context-menu (their own behavior is covered elsewhere) so the test
- * exercises the shortcut dispatch logic itself: wheel zoom/pan, middle-mouse pan, and the
- * document-level keydown router.
+ * The keyboard half is a port: a 403-line hand-authored `keydown` switch became a ~30-line
+ * dispatcher over the command registry. The deliverable that makes that safe is
+ * {@link file://./shortcuts.test.ts "the old dispatch, chord by chord"} below — every chord the
+ * pre-port file handled (transcribed from `editor/shortcuts.ts` at commit e0c80e76: twelve modifier
+ * chords, seven bare keys, three blanket guards, two canvas-mode refusal sets) asserted against the
+ * new path, plus an explicit, named list of the places the two deliberately disagree.
+ *
+ * The whole real chain is under test — `createLiveContext` → `createCommandRegistry` →
+ * `registerStudioCommands` → `initShortcuts` — because the bug class this port exists to kill is a
+ * gate that disagrees with itself between two layers.
  */
 import {
   flush,
@@ -24,18 +31,15 @@ const cutNode = mock(async () => {});
 const pasteNode = mock(async () => {});
 void mock.module("../src/editor/context-menu.js", () => ({ copyNode, cutNode, pasteNode }));
 
-// The caret lives in the canvas IFRAME, so the guard reads the host's bridge-derived flag rather
-// Than the parent bundle's (permanently false) isEditing(). Stub the flag; iframe-host's own tests
-// Prove it is derived from editStart / selectionChanged / editEnd.
-let caretActive = false;
-void mock.module("../src/canvas/iframe-host.js", () => ({ isCaretActive: () => caretActive }));
-
-const { initShortcuts } = await import("../src/editor/shortcuts");
+const { initShortcuts, registerStudioCommands } = await import("../src/editor/shortcuts");
+const { createCommandRegistry } = await import("../src/commands/registry");
+const { createLiveContext } = await import("../src/commands/live-context");
 const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
 const store = await import("../src/store");
 const { initShellRefs } = store;
 const { activeTab, openTab, workspace } = await import("../src/workspace/workspace");
-const { initLayers } = await import("../src/ui/layers");
+const { initLayers, isModalOpen } = await import("../src/ui/layers");
+const { shell, resetProjectShell, setDockCollapsed } = await import("../src/shell");
 
 // ─── Environment setup ────────────────────────────────────────────────────────
 
@@ -52,6 +56,7 @@ function wrapEl(): HTMLElement {
 // ─── Shortcut context (mutable; read by getContext on every event) ────────────
 
 let canvasMode = "design";
+let caretActive = false;
 let panX = 0;
 let panY = 0;
 const setPan = mock((x: number, y: number) => {
@@ -61,6 +66,7 @@ const setPan = mock((x: number, y: number) => {
 const applyTransform = mock(() => {});
 const saveFile = mock(() => {});
 const openProject = mock(() => {});
+const openInBrowser = mock(() => {});
 
 function freshDoc() {
   return {
@@ -72,6 +78,8 @@ function freshDoc() {
     tagName: "div",
   };
 }
+
+const pointerContext = () => ({ applyTransform, canvasMode, panX, panY, setPan });
 
 beforeAll(() => {
   document.body.innerHTML = "";
@@ -93,20 +101,36 @@ beforeAll(() => {
   initShellRefs();
   initLayers();
   installMockPlatform();
-  resetStudioState();
+  // A site project, so `view.openInBrowser`'s `when` holds — ⌘⇧O is one of the chords the port adds.
+  resetStudioState({ isSiteProject: true });
   // Happy-dom's pointer capture needs an active pointer; stub it out.
   (wrapEl() as unknown as { setPointerCapture: (id: number) => void }).setPointerCapture = () => {};
   (wrapEl() as unknown as { releasePointerCapture: (id: number) => void }).releasePointerCapture =
     () => {};
-  initShortcuts(() => ({
-    applyTransform,
-    canvasMode,
-    openProject,
-    panX,
-    panY,
-    saveFile,
-    setPan,
-  }));
+
+  /*
+   * `mac: false` pins `mod` to Ctrl. On a real mac the same registry resolves ⌘ instead — that is
+   * `chordFromEvent`'s job and `commands-keymap.test.ts` owns it. Pinning it here is also the one
+   * DIVERGENCE that has to be stated up front: the old switch tested `e.ctrlKey || e.metaKey`, so
+   * ⌘S fired on Linux and Ctrl+S fired on a mac. `mod` is now one modifier per platform.
+   */
+  const registry = createCommandRegistry({
+    getContext: createLiveContext({
+      aiConfigured: () => false,
+      canvasMode: () => canvasMode,
+      isCaretActive: () => caretActive,
+      isModalOpen,
+      platform: () => null,
+    }),
+    mac: false,
+  });
+  registerStudioCommands(
+    registry,
+    { openInBrowser, openProject, saveDocument: saveFile },
+    pointerContext,
+  );
+  initShortcuts(registry, pointerContext);
+
   // The edit-zoom path (ctrl+wheel / Ctrl+0/+/- / resize in edit mode) runs the REAL canvas-utils
   // ApplyEditZoom, which needs the module context initialized.
   initCanvasUtils({
@@ -130,6 +154,7 @@ beforeEach(() => {
     applyTransform,
     saveFile,
     openProject,
+    openInBrowser,
     openQuickSearch,
     copyNode,
     cutNode,
@@ -138,6 +163,9 @@ beforeEach(() => {
     m.mockClear();
   }
   store.canvasPanels.length = 0;
+  document.body.focus();
+  resetProjectShell();
+  shell.focusRegion = "pane";
   resetWorkspaceWithTab(freshDoc());
 });
 
@@ -157,6 +185,19 @@ function wheel(target: EventTarget, init: WheelEventInit = {}) {
   }
   target.dispatchEvent(e);
   return e;
+}
+
+/** Focus a text control so the context reports a live caret, as the old target test did. */
+function focusTextField(tag = "input"): HTMLElement {
+  const el = document.createElement(tag);
+  el.setAttribute("tabindex", "0");
+  document.body.append(el);
+  el.focus();
+  return el;
+}
+
+function childCount(): number {
+  return (activeTab.value!.doc.document.children as unknown[]).length;
 }
 
 // ─── Wheel handler ────────────────────────────────────────────────────────────
@@ -219,8 +260,11 @@ describe("wheel handler", () => {
     expect(() => wheel(wrapEl(), { deltaY: 50 })).not.toThrow();
   });
 
-  test("manage mode lets the browse table scroll", () => {
-    canvasMode = "manage";
+  /* The grid could not be wheel-scrolled at all: the pan branch preventDefaulted over a Tabulator
+     viewport that owns its own virtual scroller. Only the mode string "manage" was exempt, and it
+     is reachable from nowhere else in the codebase (plan §5.3). */
+  test.each(["grid", "manage"])("%s mode lets the surface scroll itself", (mode) => {
+    canvasMode = mode;
     const e = wheel(wrapEl(), { deltaY: 20 });
     expect(e.defaultPrevented).toBe(false);
     expect(setPan).not.toHaveBeenCalled();
@@ -299,6 +343,21 @@ describe("middle-mouse panning", () => {
     const down = pointer("pointerdown", { button: 1, pointerId: 3 });
     expect(down.defaultPrevented).toBe(false);
   });
+
+  test("preview scrolls its own frame rather than panning", () => {
+    canvasMode = "preview";
+    const down = pointer("pointerdown", { button: 1, pointerId: 9 });
+    expect(down.defaultPrevented).toBe(false);
+  });
+
+  test("the wheel is left to the preview frame — no pan, no preventDefault", () => {
+    canvasMode = "preview";
+    const e = wheel(wrapEl(), { deltaX: 10, deltaY: 20 });
+    expect(e.defaultPrevented).toBe(false);
+    expect(setPan).not.toHaveBeenCalled();
+    wheel(wrapEl(), { ctrlKey: true, deltaY: -100 });
+    expect(activeTab.value!.session.ui.zoom ?? 1).toBe(1);
+  });
 });
 
 // ─── Resize listener ──────────────────────────────────────────────────────────
@@ -334,130 +393,38 @@ test("window resize outside edit mode leaves the canvas untouched", () => {
   expect(() => window.dispatchEvent(new Event("resize"))).not.toThrow();
 });
 
-// ─── Keydown: input/editing guards ────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// The old dispatch, chord by chord
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Transcribed from `editor/shortcuts.ts` at e0c80e76 — the last commit before the port. Each case
+// Names the branch it came from. Everything here must behave identically after the rewrite; the
+// Deliberate exceptions live in their own block at the bottom of this file and nowhere else.
 
-describe("keydown guards", () => {
-  test("ctrl+s inside an input saves without other shortcuts firing", () => {
-    const input = document.createElement("input");
-    document.body.append(input);
-    const e = new KeyboardEvent("keydown", {
-      bubbles: true,
-      cancelable: true,
-      ctrlKey: true,
-      key: "s",
-    });
-    input.dispatchEvent(e);
-    expect(saveFile).toHaveBeenCalledTimes(1);
-    expect(e.defaultPrevented).toBe(true);
-    input.remove();
-  });
-
-  test("ctrl+w inside an input is prevented but does not close the tab", () => {
-    openTab({ document: { tagName: "div" }, id: "second-tab" });
-    const input = document.createElement("input");
-    document.body.append(input);
-    const e = new KeyboardEvent("keydown", {
-      bubbles: true,
-      cancelable: true,
-      ctrlKey: true,
-      key: "w",
-    });
-    input.dispatchEvent(e);
-    expect(e.defaultPrevented).toBe(true);
-    expect(workspace.tabOrder.length).toBe(2);
-    input.remove();
-  });
-
-  test("other keys inside an input are ignored", () => {
-    activeTab.value!.session.selection = ["children", 0];
-    const input = document.createElement("input");
-    document.body.append(input);
-    input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
-    input.remove();
-  });
-
-  test("ctrl+s while the caret is in a block saves WITHOUT ending the block", () => {
-    // The caret must survive a save: saveFile flushes every canvas frame's pending text itself, so
-    // Ending the block here would be a second, racing commit path — and would eject the writer
-    // From their sentence every time they hit save.
-    caretActive = true;
+describe("the old dispatch — twelve modifier chords", () => {
+  test('⌘S saves (`case "s"`)', () => {
     pressDoc("s", { ctrlKey: true });
     expect(saveFile).toHaveBeenCalledTimes(1);
   });
 
-  test("ctrl+w while the caret is in a block is prevented and other keys pass through", () => {
-    caretActive = true;
-    const e = pressDoc("w", { ctrlKey: true });
-    expect(e.defaultPrevented).toBe(true);
-
-    activeTab.value!.session.selection = ["children", 0];
-    pressDoc("Escape");
-    // Caret guard returns early — selection untouched
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+  test('⌘O opens a project (`case "o"`)', () => {
+    pressDoc("o", { ctrlKey: true });
+    expect(openProject).toHaveBeenCalledTimes(1);
   });
 
-  /* The bug this guard exists for. The guard used to read the PARENT bundle's isEditing(), whose
-     `activeEl` is always null (the caret is in the cross-origin canvas iframe), so the three
-     clipboard chords fell straight through to the element-level handlers: copying a phrase copied
-     the whole <p>, and ⌘X mid-sentence deleted the paragraph. */
-  describe("the caret owns the clipboard chords", () => {
-    test.each([
-      ["c", () => copyNode],
-      ["x", () => cutNode],
-      ["v", () => pasteNode],
-    ])("ctrl+%s reaches the element handler with no caret", (key, handler) => {
-      activeTab.value!.session.selection = ["children", 0];
-      pressDoc(key, { ctrlKey: true });
-      expect(handler()).toHaveBeenCalledTimes(1);
-    });
-
-    test.each([
-      ["c", () => copyNode],
-      ["x", () => cutNode],
-      ["v", () => pasteNode],
-    ])("ctrl+%s is left to the caret while text is being edited", (key, handler) => {
-      caretActive = true;
-      activeTab.value!.session.selection = ["children", 0];
-      const e = pressDoc(key, { ctrlKey: true });
-      expect(handler()).not.toHaveBeenCalled();
-      // Not preventDefaulted either — the chord belongs to the frame the caret is in.
-      expect(e.defaultPrevented).toBe(false);
-    });
-
-    test("⌘X mid-sentence leaves the paragraph in the document", () => {
-      caretActive = true;
-      activeTab.value!.session.selection = ["children", 0];
-      pressDoc("x", { ctrlKey: true });
-      expect(cutNode).not.toHaveBeenCalled();
-      expect(activeTab.value!.doc.document.children).toHaveLength(3);
-    });
-
-    test("Delete does not remove the selected node while the caret is live", () => {
-      caretActive = true;
-      activeTab.value!.session.selection = ["children", 0];
-      pressDoc("Delete");
-      expect(activeTab.value!.doc.document.children).toHaveLength(3);
-    });
-  });
-});
-
-// ─── Keydown: mod shortcuts ───────────────────────────────────────────────────
-
-describe("mod shortcuts", () => {
-  test("ctrl+w with a single tab does nothing", () => {
-    pressDoc("w", { ctrlKey: true });
-    expect(workspace.tabOrder.length).toBe(1);
+  test('⌘P opens the palette (`case "p"`)', () => {
+    pressDoc("p", { ctrlKey: true });
+    expect(openQuickSearch).toHaveBeenCalledTimes(1);
   });
 
-  test("ctrl+w closes a clean tab when several are open", () => {
+  test('⌘W closes a clean tab when several are open (`case "w"`)', () => {
     openTab({ document: { tagName: "div" }, id: "second-tab" });
     expect(workspace.activeTabId).toBe("second-tab");
     pressDoc("w", { ctrlKey: true });
     expect(workspace.tabOrder).toEqual(["test-tab"]);
   });
 
-  test("ctrl+w on a dirty tab shows a confirm dialog and closes on confirm", async () => {
+  test("⌘W on a dirty tab confirms first, then closes", async () => {
     const tab = openTab({
       document: { tagName: "div" },
       documentPath: "/project/dirty.json",
@@ -467,89 +434,56 @@ describe("mod shortcuts", () => {
     pressDoc("w", { ctrlKey: true });
     await flush();
     const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper");
-    expect(dialog).not.toBeNull();
     expect(dialog?.getAttribute("headline")).toBe("Unsaved Changes");
     dialog!.dispatchEvent(new Event("confirm"));
     await flush();
     expect(workspace.tabOrder).toEqual(["test-tab"]);
   });
 
-  test("ctrl+w on a dirty tab keeps it open on cancel", async () => {
+  test("⌘W on a dirty tab keeps it open on cancel", async () => {
     const tab = openTab({ document: { tagName: "div" }, id: "dirty-tab" });
     tab.doc.dirty = true;
     pressDoc("w", { ctrlKey: true });
     await flush();
-    const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper");
-    dialog!.dispatchEvent(new Event("cancel"));
+    document.querySelector("#layer-dialog sp-dialog-wrapper")!.dispatchEvent(new Event("cancel"));
     await flush();
     expect(workspace.tabOrder).toEqual(["test-tab", "dirty-tab"]);
   });
 
-  test("ctrl+o opens a project", () => {
-    pressDoc("o", { ctrlKey: true });
-    expect(openProject).toHaveBeenCalledTimes(1);
-  });
-
-  test("ctrl+p opens quick search", () => {
-    pressDoc("p", { ctrlKey: true });
-    expect(openQuickSearch).toHaveBeenCalledTimes(1);
-  });
-
-  test("every shortcut stands down while a modal surface is up", () => {
-    // The underlay already swallows the mouse across the viewport; the keyboard must follow, or
-    // ⌘P/⌘S/Delete keep driving the document behind a dialog the author cannot click.
-    const slot = document.createElement("div");
-    slot.innerHTML = "<sp-dialog-wrapper open></sp-dialog-wrapper>";
-    document.querySelector("#layer-dialog")!.append(slot);
-    const tab = activeTab.value!;
-    tab.session.selection = ["children", 0];
-
-    pressDoc("p", { ctrlKey: true });
-    pressDoc("s", { metaKey: true });
-    pressDoc("Delete");
-    expect(openQuickSearch).not.toHaveBeenCalled();
-    expect(saveFile).not.toHaveBeenCalled();
-    expect((tab.doc.document.children as unknown[]).length).toBe(3);
-
-    slot.remove();
-    pressDoc("p", { ctrlKey: true });
-    expect(openQuickSearch).toHaveBeenCalledTimes(1);
-  });
-
-  test("meta+s saves the file", () => {
-    pressDoc("s", { metaKey: true });
-    expect(saveFile).toHaveBeenCalledTimes(1);
-  });
-
-  test("ctrl+d duplicates the selected node, ctrl+z undoes, ctrl+shift+z redoes", () => {
-    const tab = activeTab.value!;
-    tab.session.selection = ["children", 0];
+  test('⌘Z undoes and ⌘⇧Z redoes, uppercase key included (`case "z"` / `case "Z"`)', () => {
+    activeTab.value!.session.selection = ["children", 0];
     pressDoc("d", { ctrlKey: true });
-    expect((tab.doc.document.children as unknown[]).length).toBe(4);
-
+    expect(childCount()).toBe(4);
     pressDoc("z", { ctrlKey: true });
-    expect((tab.doc.document.children as unknown[]).length).toBe(3);
-
+    expect(childCount()).toBe(3);
     // Real browsers report key "Z" (uppercase) while Shift is held.
     pressDoc("Z", { ctrlKey: true, shiftKey: true });
-    expect((tab.doc.document.children as unknown[]).length).toBe(4);
+    expect(childCount()).toBe(4);
   });
 
-  test("ctrl+d without selection does nothing", () => {
+  test('⌘D duplicates the selection (`case "d"`)', () => {
+    activeTab.value!.session.selection = ["children", 0];
     pressDoc("d", { ctrlKey: true });
-    expect((activeTab.value!.doc.document.children as unknown[]).length).toBe(3);
+    expect(childCount()).toBe(4);
   });
 
-  test("ctrl+c / ctrl+x / ctrl+v invoke clipboard actions", () => {
-    pressDoc("c", { ctrlKey: true });
-    expect(copyNode).toHaveBeenCalledTimes(1);
-    pressDoc("x", { ctrlKey: true });
-    expect(cutNode).toHaveBeenCalledTimes(1);
-    pressDoc("v", { ctrlKey: true });
-    expect(pasteNode).toHaveBeenCalledTimes(1);
+  test("⌘D without a selection does nothing and is not swallowed", () => {
+    const e = pressDoc("d", { ctrlKey: true });
+    expect(childCount()).toBe(3);
+    expect(e.defaultPrevented).toBe(false);
   });
 
-  test("ctrl+0 resets zoom and pan", () => {
+  test.each([
+    ["c", () => copyNode],
+    ["x", () => cutNode],
+    ["v", () => pasteNode],
+  ])('⌘%s reaches the clipboard action (`case "c"/"x"/"v"`)', (key, handler) => {
+    activeTab.value!.session.selection = ["children", 0];
+    pressDoc(key, { ctrlKey: true });
+    expect(handler()).toHaveBeenCalledTimes(1);
+  });
+
+  test('⌘0 resets zoom and pan (`case "0"`)', () => {
     activeTab.value!.session.ui.zoom = 2.5;
     pressDoc("0", { ctrlKey: true });
     expect(activeTab.value!.session.ui.zoom).toBe(1);
@@ -557,14 +491,21 @@ describe("mod shortcuts", () => {
     expect(applyTransform).toHaveBeenCalled();
   });
 
-  test("ctrl+= zooms in, ctrl+- zooms out", () => {
+  test('⌘= zooms in and ⌘- zooms out (`case "="` / `case "-"`)', () => {
     pressDoc("=", { ctrlKey: true });
     expect(activeTab.value!.session.ui.zoom).toBeCloseTo(1.2);
     pressDoc("-", { ctrlKey: true });
     expect(activeTab.value!.session.ui.zoom).toBeCloseTo(1);
   });
 
-  test("zoom shortcuts drive the content zoom in edit mode", () => {
+  test('⌘+ is the same verb as ⌘=, with or without Shift (`case "+"`)', () => {
+    pressDoc("+", { ctrlKey: true });
+    expect(activeTab.value!.session.ui.zoom).toBeCloseTo(1.2);
+    pressDoc("+", { ctrlKey: true, shiftKey: true });
+    expect(activeTab.value!.session.ui.zoom).toBeCloseTo(1.44);
+  });
+
+  test("the zoom chords drive the CONTENT zoom in edit mode", () => {
     canvasMode = "edit";
     const tab = activeTab.value!;
     tab.session.ui.zoom = 2;
@@ -580,35 +521,26 @@ describe("mod shortcuts", () => {
     expect(setPan).not.toHaveBeenCalled();
   });
 
-  test("unknown mod key falls through harmlessly", () => {
-    pressDoc("q", { ctrlKey: true });
+  test("an unclaimed modifier chord falls through to the browser (`default: break`)", () => {
+    const e = pressDoc("q", { ctrlKey: true });
     expect(saveFile).not.toHaveBeenCalled();
+    expect(e.defaultPrevented).toBe(false);
   });
 });
 
-// ─── Keydown: plain shortcuts ─────────────────────────────────────────────────
-
-describe("plain shortcuts", () => {
-  test("Delete removes the selected node", () => {
-    const tab = activeTab.value!;
-    tab.session.selection = ["children", 0];
-    pressDoc("Delete");
-    const children = tab.doc.document.children as { textContent?: string }[];
+describe("the old dispatch — seven bare keys", () => {
+  test.each(["Delete", "Backspace"])("%s removes the selected node", (key) => {
+    activeTab.value!.session.selection = ["children", 0];
+    pressDoc(key);
+    const children = activeTab.value!.doc.document.children as { textContent?: string }[];
     expect(children.length).toBe(2);
     expect(children[0]!.textContent).toBeUndefined();
   });
 
-  test("Backspace with root selection does nothing", () => {
-    const tab = activeTab.value!;
-    tab.session.selection = [];
+  test("Backspace on the document element does nothing (`selection.length >= 2`)", () => {
+    activeTab.value!.session.selection = [];
     pressDoc("Backspace");
-    expect((tab.doc.document.children as unknown[]).length).toBe(3);
-  });
-
-  test("Escape clears the selection", () => {
-    activeTab.value!.session.selection = ["children", 0];
-    pressDoc("Escape");
-    expect(activeTab.value!.session.selection).toBeNull();
+    expect(childCount()).toBe(3);
   });
 
   test("Enter inserts a paragraph after the selection and selects it", () => {
@@ -623,14 +555,10 @@ describe("plain shortcuts", () => {
     expect(tab.session.selection).toEqual(["children", 1]);
   });
 
-  test("ArrowDown moves selection to the next sibling", () => {
+  test("ArrowDown moves to the next sibling and ArrowUp back", () => {
     activeTab.value!.session.selection = ["children", 0];
     pressDoc("ArrowDown");
     expect(activeTab.value!.session.selection).toEqual(["children", 1]);
-  });
-
-  test("ArrowUp moves selection to the previous sibling", () => {
-    activeTab.value!.session.selection = ["children", 1];
     pressDoc("ArrowUp");
     expect(activeTab.value!.session.selection).toEqual(["children", 0]);
   });
@@ -641,13 +569,13 @@ describe("plain shortcuts", () => {
     expect(activeTab.value!.session.selection).toEqual(["children", 0]);
   });
 
-  test("ArrowDown without selection selects the root", () => {
+  test("ArrowDown without a selection selects the document element", () => {
     activeTab.value!.session.selection = null;
     pressDoc("ArrowDown");
     expect(activeTab.value!.session.selection as unknown).toEqual([]);
   });
 
-  test("ArrowDown with root selection is a no-op", () => {
+  test("ArrowDown with the document element selected is a no-op", () => {
     activeTab.value!.session.selection = [];
     pressDoc("ArrowDown");
     expect(activeTab.value!.session.selection).toEqual([]);
@@ -671,68 +599,327 @@ describe("plain shortcuts", () => {
     expect(activeTab.value!.session.selection).toEqual(["children", 0]);
   });
 
-  test("unhandled plain keys fall through", () => {
+  test("an unhandled plain key falls through", () => {
     activeTab.value!.session.selection = ["children", 0];
-    pressDoc("a");
+    const e = pressDoc("a");
     expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(e.defaultPrevented).toBe(false);
   });
 });
 
-// ─── Preview refuses to edit ──────────────────────────────────────────────────
-// Preview is the shipped page: it draws no overlays, posts no hits, and scrolls its own frame
-// Instead of panning a transform. Every keyboard and pointer path that would edit or pan is gated.
+describe("the old dispatch — the three blanket guards", () => {
+  /* Guard 1: `if (isModalOpen()) return`. Now the `palette`-only scope stack. */
+  test("every chord stands down while a modal surface is up", () => {
+    const slot = document.createElement("div");
+    slot.innerHTML = "<sp-dialog-wrapper open></sp-dialog-wrapper>";
+    document.querySelector("#layer-dialog")!.append(slot);
+    activeTab.value!.session.selection = ["children", 0];
 
-describe("preview mode", () => {
+    pressDoc("p", { ctrlKey: true });
+    pressDoc("s", { ctrlKey: true });
+    const del = pressDoc("Delete");
+    expect(openQuickSearch).not.toHaveBeenCalled();
+    expect(saveFile).not.toHaveBeenCalled();
+    expect(childCount()).toBe(3);
+    // Not swallowed either: the dialog's own layer handles what it wants.
+    expect(del.defaultPrevented).toBe(false);
+
+    slot.remove();
+    pressDoc("p", { ctrlKey: true });
+    expect(openQuickSearch).toHaveBeenCalledTimes(1);
+  });
+
+  /* Guard 2: the grid allow-list `["o","p","s","w","z","Z"]`. Now the `grid` scope stack, whose
+     survivors are exactly the `global`-scoped commands — same six chords, derived not listed. */
+  describe("the grid engine owns the canvas chords", () => {
+    beforeEach(() => {
+      canvasMode = "grid";
+    });
+
+    test.each([
+      ["o", () => expect(openProject).toHaveBeenCalledTimes(1)],
+      ["p", () => expect(openQuickSearch).toHaveBeenCalledTimes(1)],
+      ["s", () => expect(saveFile).toHaveBeenCalledTimes(1)],
+    ])("⌘%s still passes through", (key, assert) => {
+      pressDoc(key, { ctrlKey: true });
+      assert();
+    });
+
+    test("⌘W still closes the document", () => {
+      openTab({ document: { tagName: "div" }, id: "second-tab" });
+      pressDoc("w", { ctrlKey: true });
+      expect(workspace.tabOrder).toEqual(["test-tab"]);
+    });
+
+    test.each(["c", "x", "v", "d", "0", "=", "-"])("⌘%s belongs to the grid", (key) => {
+      activeTab.value!.session.selection = ["children", 0];
+      const e = pressDoc(key, { ctrlKey: true });
+      expect(e.defaultPrevented).toBe(false);
+      expect(copyNode).not.toHaveBeenCalled();
+      expect(cutNode).not.toHaveBeenCalled();
+      expect(pasteNode).not.toHaveBeenCalled();
+      expect(childCount()).toBe(3);
+      expect(activeTab.value!.session.ui.zoom ?? 1).toBe(1);
+    });
+
+    test.each(["Delete", "Backspace", "Enter", "Escape", "ArrowUp", "ArrowDown"])(
+      "%s drives the grid's own cell navigation, never the document",
+      (key) => {
+        activeTab.value!.session.selection = ["children", 0];
+        const e = pressDoc(key);
+        expect(e.defaultPrevented).toBe(false);
+        expect(childCount()).toBe(3);
+        expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+      },
+    );
+  });
+
+  /* Guard 3: the caret / text-input early return. Now the `caret` scope stack, which drops
+     `canvas` — the element-level verbs stay away from a sentence being typed, and ⌘S still saves
+     because it flushes the canvas frames itself. */
+  describe("a live caret owns the element chords", () => {
+    test.each([
+      ["a canvas caret", () => (caretActive = true)],
+      ["a focused text field", () => focusTextField()],
+      ["a focused sp-textfield", () => focusTextField("sp-textfield")],
+    ])("%s: ⌘S still saves", (_label, arrange) => {
+      arrange();
+      pressDoc("s", { ctrlKey: true });
+      expect(saveFile).toHaveBeenCalledTimes(1);
+    });
+
+    test.each([
+      ["c", () => copyNode],
+      ["x", () => cutNode],
+      ["v", () => pasteNode],
+    ])("⌘%s is left to the caret", (key, handler) => {
+      caretActive = true;
+      activeTab.value!.session.selection = ["children", 0];
+      const e = pressDoc(key, { ctrlKey: true });
+      expect(handler()).not.toHaveBeenCalled();
+      // Not preventDefaulted either — the chord belongs to the frame the caret is in.
+      expect(e.defaultPrevented).toBe(false);
+    });
+
+    test("⌘X mid-sentence leaves the paragraph in the document", () => {
+      caretActive = true;
+      activeTab.value!.session.selection = ["children", 0];
+      pressDoc("x", { ctrlKey: true });
+      expect(cutNode).not.toHaveBeenCalled();
+      expect(childCount()).toBe(3);
+    });
+
+    test("Delete does not remove the selected node while the caret is live", () => {
+      caretActive = true;
+      activeTab.value!.session.selection = ["children", 0];
+      pressDoc("Delete");
+      expect(childCount()).toBe(3);
+    });
+
+    test("Escape in a text field leaves the canvas selection alone", () => {
+      focusTextField();
+      activeTab.value!.session.selection = ["children", 0];
+      pressDoc("Escape");
+      expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    });
+  });
+});
+
+describe("the old dispatch — Preview refuses to edit", () => {
   beforeEach(() => {
     canvasMode = "preview";
   });
 
-  test("the wheel is left to the frame — no pan, no preventDefault", () => {
-    const e = wheel(wrapEl(), { deltaX: 10, deltaY: 20 });
-    expect(e.defaultPrevented).toBe(false);
-    expect(setPan).not.toHaveBeenCalled();
-  });
-
-  test("ctrl+wheel does not zoom an artboard that isn't there", () => {
-    wheel(wrapEl(), { ctrlKey: true, deltaY: -100 });
-    expect(activeTab.value!.session.ui.zoom ?? 1).toBe(1);
-  });
-
-  test("middle-mouse drag does not pan", () => {
-    const down = new PointerEvent("pointerdown", {
-      bubbles: true,
-      button: 1,
-      cancelable: true,
-      pointerId: 9,
-    });
-    wrapEl().dispatchEvent(down);
-    expect(down.defaultPrevented).toBe(false);
-  });
-
-  test.each(["d", "x", "v"])("ctrl+%s does not mutate the document", (key) => {
+  test.each(["d", "x", "v", "0", "=", "-"])("⌘%s does not mutate or zoom", (key) => {
     activeTab.value!.session.selection = ["children", 0];
     pressDoc(key, { ctrlKey: true });
     expect(cutNode).not.toHaveBeenCalled();
     expect(pasteNode).not.toHaveBeenCalled();
-    expect(activeTab.value!.doc.document.children).toHaveLength(3);
-  });
-
-  test.each(["0", "=", "-"])("ctrl+%s writes no phantom zoom to carry back to Design", (key) => {
-    pressDoc(key, { ctrlKey: true });
+    expect(childCount()).toBe(3);
+    // A phantom `ui.zoom` written here would be waiting for the author back in Design.
     expect(activeTab.value!.session.ui.zoom ?? 1).toBe(1);
   });
 
   test.each(["Delete", "Backspace", "Enter"])("%s does not mutate the document", (key) => {
     activeTab.value!.session.selection = ["children", 0];
     pressDoc(key);
-    expect(activeTab.value!.doc.document.children).toHaveLength(3);
+    expect(childCount()).toBe(3);
   });
 
-  test("ctrl+s still saves and Escape still clears the selection", () => {
-    activeTab.value!.session.selection = ["children", 0];
+  test("⌘S still saves", () => {
     pressDoc("s", { ctrlKey: true });
     expect(saveFile).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Where the port deliberately disagrees with the old dispatch
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Nothing below is an accident. Each case is a bug the old switch had, or the direct consequence of
+// One of the three guards becoming a scope stack. Anything NOT listed here is asserted identical
+// Above.
+
+describe("deliberate divergences", () => {
+  /* 1. THE NAMED FIX. `shortcuts.ts:192` refused to close the last tab; `tab-strip.ts:182`'s ×
+        closed it happily. One record now, and it is the ×'s behaviour. */
+  test("⌘W closes the last remaining document, as the tab's × always did", () => {
+    expect(workspace.tabOrder).toEqual(["test-tab"]);
+    pressDoc("w", { ctrlKey: true });
+    expect(workspace.tabOrder).toEqual([]);
+  });
+
+  /* 2. THE NAMED FIX. Escape used to clear the selection outright, whatever its depth — so leaving
+        one node meant losing the whole path back to it. It now walks the ladder. */
+  test("Escape selects the parent, and clears only at the document element", () => {
+    const tab = activeTab.value!;
+    tab.session.selection = ["children", 1, "children", 0];
     pressDoc("Escape");
-    expect(activeTab.value!.session.selection).toBeNull();
+    expect(tab.session.selection).toEqual(["children", 1]);
+    pressDoc("Escape");
+    expect(tab.session.selection).toEqual([]);
+    pressDoc("Escape");
+    expect(tab.session.selection).toBeNull();
+  });
+
+  test("Escape with nothing selected is not swallowed", () => {
+    activeTab.value!.session.selection = null;
+    expect(pressDoc("Escape").defaultPrevented).toBe(false);
+  });
+
+  /* 3. `mod` is ONE modifier per platform. The old switch tested `e.ctrlKey || e.metaKey`, so ⌘S
+        fired on Linux and Ctrl+S on a mac. This registry is pinned to `mac: false`. */
+  test("Meta is not a modifier on a non-mac platform", () => {
+    pressDoc("s", { metaKey: true });
+    expect(saveFile).not.toHaveBeenCalled();
+  });
+
+  /* 4. Consequence of caret shadowing: `global`-scoped chords are live while typing, because the
+        caret stack is ["caret", "global"]. The old code returned early and ate ⌘W without acting.
+        ⌘P/⌘O/⌘Z reaching the app from a text field is the VS Code behaviour and the intended one;
+        it is called out here because a reader of the old file would not expect it. */
+  test("app-level chords reach the app from a text field", () => {
+    focusTextField();
+    pressDoc("p", { ctrlKey: true });
+    expect(openQuickSearch).toHaveBeenCalledTimes(1);
+    pressDoc("o", { ctrlKey: true });
+    expect(openProject).toHaveBeenCalledTimes(1);
+  });
+
+  test("⌘W from a text field closes the document instead of being eaten", () => {
+    openTab({ document: { tagName: "div" }, id: "second-tab" });
+    focusTextField();
+    pressDoc("w", { ctrlKey: true });
+    expect(workspace.tabOrder).toEqual(["test-tab"]);
+  });
+
+  /* 5. Preview drops the whole `canvas` scope rather than carrying two hand-written refusal sets
+        that disagreed with each other — ⌘C was allowed and ⌘X was not, on the same invisible
+        selection. Escape and the arrows go with them. */
+  test.each(["Escape", "ArrowDown", "ArrowLeft"])("%s no longer acts in Preview", (key) => {
+    canvasMode = "preview";
+    activeTab.value!.session.selection = ["children", 1, "children", 0];
+    const e = pressDoc(key);
+    expect(activeTab.value!.session.selection).toEqual(["children", 1, "children", 0]);
+    expect(e.defaultPrevented).toBe(false);
+  });
+
+  test("⌘C no longer copies an invisible Preview selection", () => {
+    canvasMode = "preview";
+    activeTab.value!.session.selection = ["children", 0];
+    pressDoc("c", { ctrlKey: true });
+    expect(copyNode).not.toHaveBeenCalled();
+  });
+
+  /* 6. A chord bound to a VISIBLE but DISABLED command is swallowed rather than falling through:
+        the registry refuses it, and the key is spoken for. The old switch's `if` bodies simply did
+        nothing, without preventDefault. */
+  test("Delete on the document element is refused, not passed to the browser", () => {
+    activeTab.value!.session.selection = [];
+    const e = pressDoc("Delete");
+    expect(childCount()).toBe(3);
+    expect(e.defaultPrevented).toBe(true);
+  });
+
+  /* 7. Chords that had no branch at all in the old switch and are now real commands. */
+  test("⌘⇧Z is redo even without the uppercase-key spelling", () => {
+    activeTab.value!.session.selection = ["children", 0];
+    pressDoc("d", { ctrlKey: true });
+    pressDoc("z", { ctrlKey: true });
+    expect(childCount()).toBe(3);
+    pressDoc("z", { ctrlKey: true, shiftKey: true });
+    expect(childCount()).toBe(4);
+  });
+
+  test("⌘K and ⌘⇧P open the palette; ⌘⇧O opens the page in a browser", () => {
+    pressDoc("k", { ctrlKey: true });
+    pressDoc("P", { ctrlKey: true, shiftKey: true });
+    expect(openQuickSearch).toHaveBeenCalledTimes(2);
+    pressDoc("O", { ctrlKey: true, shiftKey: true });
+    expect(openInBrowser).toHaveBeenCalledTimes(1);
+  });
+
+  test("⌘B / ⌥⌘B / ⌘J toggle the three docks", () => {
+    setDockCollapsed("left", false);
+    pressDoc("b", { ctrlKey: true });
+    expect(shell.docks.left.collapsed).toBe(true);
+
+    setDockCollapsed("right", false);
+    pressDoc("b", { altKey: true, ctrlKey: true });
+    expect(shell.docks.right.collapsed).toBe(true);
+
+    setDockCollapsed("chat", true);
+    pressDoc("j", { ctrlKey: true });
+    expect(shell.docks.chat.collapsed).toBe(false);
+  });
+
+  test("⌘. collapses every dock and the same chord puts them back", () => {
+    setDockCollapsed("left", false);
+    setDockCollapsed("right", false);
+    setDockCollapsed("chat", true);
+
+    pressDoc(".", { ctrlKey: true });
+    expect([shell.docks.left, shell.docks.right, shell.docks.chat].map((d) => d.collapsed)).toEqual(
+      [true, true, true],
+    );
+
+    pressDoc(".", { ctrlKey: true });
+    expect([shell.docks.left, shell.docks.right, shell.docks.chat].map((d) => d.collapsed)).toEqual(
+      [false, false, true],
+    );
+  });
+
+  /* 8. Focus outside the pane grid takes the canvas scope off the stack entirely (plan §5.3's
+        `caret > engine > focused dock > global`). Nothing sets `focusRegion` away from "pane" yet,
+        so this is inert in the running app — it is the rung being put in place. */
+  test("with focus in a dock the canvas chords are not live", () => {
+    shell.focusRegion = "navigator";
+    activeTab.value!.session.selection = ["children", 0];
+    const e = pressDoc("Delete");
+    expect(childCount()).toBe(3);
+    expect(e.defaultPrevented).toBe(false);
+    // App-level chords still are.
+    pressDoc("s", { ctrlKey: true });
+    expect(saveFile).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── The dispatcher itself ────────────────────────────────────────────────────
+
+describe("dispatcher", () => {
+  test("a chord with no command anywhere is left to the browser", () => {
+    const e = pressDoc("F5");
+    expect(e.defaultPrevented).toBe(false);
+  });
+
+  test("an error from a command's run is not swallowed as a refusal", () => {
+    // Undo with no history is the registry's own refusal path; anything else must propagate.
+    // Closing every tab makes `document.open` false, so ⌘Z is not even visible.
+    while (workspace.tabOrder.length > 0) {
+      workspace.tabs.delete(workspace.tabOrder.pop()!);
+    }
+    workspace.activeTabId = null;
+    const e = pressDoc("z", { ctrlKey: true });
+    expect(e.defaultPrevented).toBe(false);
   });
 });

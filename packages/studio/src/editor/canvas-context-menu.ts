@@ -2,9 +2,13 @@
 /**
  * Parent-realm adapter for canvas right-clicks: the iframe suppresses the browser menu and posts
  * `contextMenu` with the nearest element path + iframe-viewport coords; the host converts to
- * parent-viewport coords and calls this handler, which shows the Jx element context menu (copy /
- * paste / insert before/after / convert / delete…). Replaces the legacy panel-events canvas
- * contextmenu handler that died with the in-parent <div> canvas.
+ * parent-viewport coords and calls this handler, which shows the Jx element context menu. Replaces
+ * the legacy panel-events canvas contextmenu handler that died with the in-parent <div> canvas.
+ *
+ * The canvas menu IS the `context/element` placement — this adapter contributes coordinates and the
+ * component-navigation hook, and never a list of verbs. Which rows appear, what they are called,
+ * whether they are enabled and what chord they teach all come from the registry
+ * (`context-menu.ts`).
  */
 
 import { dismissContextMenu, showContextMenu } from "./context-menu";

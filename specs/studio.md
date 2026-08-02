@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.3.8-draft
+**Version:** 0.4.0-draft
 **Status:** Partial
 **Updated:** 2026-08-02
 **License:** MIT
@@ -921,8 +921,215 @@ held (`services/monaco-lazy`) and registered when an editor is first created.
 
 See the [Site Architecture Specification](site-architecture.md) for full design details on content management UI.
 
+---
+
+## 13. Command Registry and Context Keys
+
+**Status:** Partial — the registry, the keymap and the CI checks ship; the surfaces are being ported onto them.
+
+Every capability Studio has is one **command record**. The Command Bar, the palette, the Navigator
+rail, the context menus, the block action bar, the keymap, `__jxAutomation` and the assistant's tool
+surface are **renderings** of those records. A rendering may choose _whether_ to show a command; it
+may never decide what it is called, when it is available, or what it does. A second hand-maintained
+list of actions is a defect.
+
+Rendering rules — which surfaces admit which levels, the chrome budget, and what every invoking
+surface must print — live in [studio-ui-guidelines.md §12](studio-ui-guidelines.md).
+
+### 13.1 The record
+
+`packages/studio/src/commands/registry.ts`:
+
+| Field         | Type                                | Meaning                                                                                                                             |
+| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `string`                            | `<namespace>.<verb>` — `selection.duplicate`, `document.reopenClosed`. The address automation and the palette use.                  |
+| `title`       | `string`                            | Imperative human name. The **only** place the action is named.                                                                      |
+| `category`    | `Category`                          | Groups palette rows: File, Edit, Selection, Insert, View, Document, Project, Source Control, Publish, Assistant, Collaborate, Help. |
+| `level`       | `Level`                             | **Required.** What the command acts on (§13.2). Checked against every declared placement.                                           |
+| `keyScope`    | `KeyScope`                          | Where the chord is live (§13.3). Defaults to `global`. Deliberately **not** the same field as `level`.                              |
+| `icon`        | `string`                            | Icon key, resolved through the shared icon map.                                                                                     |
+| `when`        | `(ctx) => boolean`                  | Hide entirely. Default: always visible.                                                                                             |
+| `enablement`  | `(ctx) => boolean`                  | Show but disable. Defaults to always-enabled once `when` holds.                                                                     |
+| `requires`    | `string`                            | ONE sentence — "an element selection". The disabled tooltip, the palette subtitle and the agent's refusal are all this string.      |
+| `keybinding`  | `string \| string[]`                | Canonical chords (§13.3). User overrides layer on top.                                                                              |
+| `args`        | JSON Schema                         | The palette's argument prompt AND the AI tool's parameters — one schema, two consumers.                                             |
+| `menus`       | `Placement[]`                       | Surfaces the command renders in. Defaults to `["palette"]`.                                                                         |
+| `group`       | `string`                            | Menu ordering key: `"1_clipboard"`, `"3_structure"`, `"9_danger"`.                                                                  |
+| `undo`        | `"document" \| "project" \| "none"` | How the effect is undone — shown to the user before an agent runs it.                                                               |
+| `destructive` | `boolean`                           | Derives the danger styling wherever the command renders.                                                                            |
+| `aiTool`      | `{ name, description }`             | Opt-in projection to the assistant. The human's gate and the agent's gate stay ONE predicate.                                       |
+| `run`         | `(ctx, args) => void \| Promise`    | The implementation.                                                                                                                 |
+
+**`when` and `enablement` are plain predicates, not a string expression language.** They are closures
+over the reactive context record (§13.4) — the same shape the AI tool gate already ships — so they
+recompute for free and need no tokenizer, parser or evaluator. A serialisable grammar would buy
+serialisability that nothing in Studio consumes.
+
+Three things fail **at registration**, loudly, rather than degrading into a surface disagreement:
+
+1. A duplicate `id` — the second definition site the design exists to prevent.
+2. A chord already claimed in the same `keyScope` (§13.3).
+3. A `menus` placement the level × placement matrix does not admit.
+
+The registry has no module-level singleton: the bootstrap creates one and passes it down, so tests,
+the CI checks and a second window each get their own, and the context arrives by injection.
+
+**A command defines itself beside its implementation.** The record, the chord and the `run` are one
+thing; a shared "all the commands" module would recreate the second definition site by another name.
+
+### 13.2 Level — the containment vocabulary
+
+`level` answers **what the command acts on**, and it governs placement.
+
+| Level         | Acts on                                      | Examples                                 |
+| ------------- | -------------------------------------------- | ---------------------------------------- |
+| `application` | The editor itself, with or without a project | Toggle a dock, Zen, open the palette     |
+| `project`     | The open project's files and settings        | Open Project…, Commit, a file-row action |
+| `document`    | One open document                            | Save, Undo, Close Document, Next Tab     |
+| `selection`   | The current node selection or its content    | Duplicate, Delete, Bold, Select Parent   |
+
+The rule that settles contested cases: **file a command by the level of the state it _writes_, not
+the state it _reads_.** Insert reads the project's component registry and writes the document tree,
+so it is `document`. A Library action reads documents and writes project files, so it is `project`.
+
+There is deliberately **no `range` level.** Bold, Italic, Code and Link act on a text range inside
+the selected node, so their level is `selection` — what they act on is the selection's content —
+while their `keyScope` is `caret`. A fifth level would demand a fifth region, and there is none.
+
+### 13.3 KeyScope and chords
+
+`keyScope` answers **where the chord is live**, and it is orthogonal to `level`:
+
+`global` · `canvas` · `caret` · `grid` · `code` · `dock` · `palette`
+
+Resolution walks a **scope stack**, narrowest first — `caret > grid/code engine > focused dock >
+global`. A chord bound in a narrower scope shadows the same chord in a wider one; that shadowing is
+the mechanism, not an accident, and it is why the two fields are separate. A chord whose command's
+`when` is false is **not a hit**: the key falls through to the browser rather than being swallowed by
+an action that is not there.
+
+Chords normalise to one canonical string — modifiers in the fixed order `mod+ctrl+alt+shift`, key
+lowercased — so `"Cmd+Shift+P"`, `"meta+shift+p"` and `"mod+shift+P"` are the same chord. `mod` is ⌘
+on macOS and Ctrl elsewhere. **One function formats a chord for display** (`⌘⇧P` on macOS,
+`Ctrl+Shift+P` elsewhere); no template may hardcode a glyph, or Windows and Linux users are shown
+shortcuts they do not have.
+
+Because `mod` absorbs the platform's primary modifier, a physical **Ctrl+Tab** normalises to
+`ctrl+tab` on macOS and `mod+tab` elsewhere. A command that wants that one gesture on every platform
+declares both spellings; each is unreachable on the other platform, so it binds one gesture, not two.
+
+### 13.4 Context keys
+
+One reactive record (`commands/context.ts`), derived from the reactive `shell` record, `workspace`
+and `activeTab`. Predicates read it; nothing writes to it from a predicate.
+
+| Group        | Keys                                                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `project`    | `open`, `isSite`, `isRepo`                                                                                                     |
+| `git`        | `ahead`, `behind`, `dirtyCount`                                                                                                |
+| `document`   | `open`, `dirty`, `mode`, `canUndo`, `canRedo`                                                                                  |
+| `editor`     | `kind` — `canvas` \| `grid` \| `code` \| `diff` \| `library` \| `config` \| `none`                                             |
+| `canvas`     | `view` — `edit` \| `design` \| `preview`                                                                                       |
+| `pane`       | `count`, `derived`                                                                                                             |
+| `selection`  | `count`, `kind`, `isRoot`, `isComponentInstance`, `isLayoutNode`                                                               |
+| `caret`      | `active` (§10)                                                                                                                 |
+| `focus`      | `region` — `rail` \| `navigator` \| `pane` \| `inspector` \| `dock` \| `status` \| `palette`                                   |
+| `modal`      | `open`                                                                                                                         |
+| `collab`     | `attached`, `readOnly`, `sourceCanonical`                                                                                      |
+| `ai`         | `configured`, `streaming`                                                                                                      |
+| `capability` | One boolean per PAL member: `gitClone`, `importSite`, `openProjectInNewWindow`, `dataRows`, `windowControls`, `findReferences` |
+
+**`capability.*` replaces scattered platform branching.** A cloud/desktop/dev-server difference
+becomes one `when` clause on one record instead of an `if (platform.x)` in every template that
+touches the feature.
+
+**Project-level keys are never sourced from the focused document.** Git status is a property of the
+project, so it lives on the `shell` record (§3): sourcing it from `activeTab` made the rail's Source
+Control badge vanish when the last tab closed, and let two tabs disagree about the branch.
+
+### 13.5 Enforcement
+
+| Check                             | What it fails on                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| `scripts/check-command-levels.ts` | A `menus` placement the level × placement matrix does not admit                |
+| `scripts/check-chrome-budget.ts`  | More than five `commandbar/primary` commands, or more than four tabs in a dock |
+
+Both run in CI, and `createCommandRegistry` applies the placement check again at registration so a
+violation cannot reach a running app either.
+
+---
+
+## 14. Tabs and Document Identity
+
+**Status:** Partial — the identity model and the strip ship; per-pane tab strips and preview tabs are pending.
+
+### 14.1 A tab's id IS its document
+
+A file-backed tab is keyed by its path. Everything downstream believes that key: opening a file
+looks for a tab with a matching path and activates it rather than opening a second one; the strip
+uses the id as its list key; the collaboration session is keyed off it.
+
+Consequently **a tab's document may never be swapped out from under its id.** Drilling into a
+component opens a **real tab** of its own. It used to rewrite `documentPath` in place and leave `id`
+alone, which broke the dedupe — re-opening the original page then called through with an id already
+in the map, overwriting the entry without disposing the old tab's effect scope and pushing a second
+copy of the id into the tab order: duplicate list keys, a leaked scope, and a lost document stack.
+
+Opening an id that is already open **replaces** the tab in place — the previous one is disposed and
+its position in the strip is reused. The id can never appear twice.
+
+### 14.2 The drill-in relationship
+
+The new tab records `openedFrom` — the id and path of the document the author drilled in from. It is
+a **relationship, not a navigation stack**: nothing pops it, nothing restores from it, and closing
+the parent leaves the child perfectly usable. The strip renders it as a `↳` marker and names the
+origin in the tab's tooltip.
+
+### 14.3 Sub-documents
+
+The per-tab document stack survives only for documents that have no file of their own — `$map`
+templates and function bodies. Anything with a file opens a tab instead.
+
+Each frame snapshots the parent's document coordinates (document, path, mode, source format, dirty
+flag, selection) **and its whole UI context** — the previewed breakpoint, the active pseudo-selector,
+the inspector tab, the zoom. Popping restores _where you were_, not merely what you were looking at.
+The frame's nested records are copied, so editing inside the sub-document cannot rewrite the
+snapshot it will be restored from.
+
+### 14.4 The tab strip
+
+| Behaviour        | Rule                                                                                                                                                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Label            | The shortest **unique** path suffix among the open tabs. A page labels by its **route** (`/blog/[slug]`), because a realistic session has four files named `index.md`. A tab with no path uses its own name (a grid tab's table, otherwise "Untitled"). |
+| Widening         | Only the tabs that actually collide grow a segment; one collision does not put a directory on every tab.                                                                                                                                                |
+| Overflow         | A chevron at the strip's fixed right edge lists the tabs currently out of view and activates the chosen one. The scrollbar is hidden by design and the wheel is a mouse-only affordance, so the chevron is the pointer-independent route.               |
+| Activation       | Activating a tab points the **file tree** at its document — the tree and the strip never disagree about where you are — and promotes it in the MRU order.                                                                                               |
+| Dirty            | A dot; closing a dirty tab confirms first, unless a collaborator is still holding the document.                                                                                                                                                         |
+| `⌃Tab` / `⌃⇧Tab` | Cycle the **MRU** order, not the strip order (§14.5).                                                                                                                                                                                                   |
+| `⌘⇧T`            | Reopen the most recently closed document (§14.6).                                                                                                                                                                                                       |
+
+### 14.5 MRU cycling
+
+Tabs carry a most-recently-used order alongside their left-to-right order, because "the tab I was
+just in" is rarely the one to the left. Closing the active tab lands on the most recently used
+survivor, not the rightmost.
+
+`⌃Tab` freezes a snapshot of the MRU order for the duration of a cycle and walks it **without
+reordering**. Without the snapshot the first press would promote the tab it landed on and the second
+would come straight back — the shortcut would only ever toggle between two tabs. The cycle ends when
+the modifier is released (the tab the author settled on becomes the most recent) or at the next
+ordinary activation.
+
+### 14.6 Reopen closed
+
+Closing a **file-backed** tab records its path on a bounded, newest-first stack; `⌘⇧T` pops the stack
+and re-reads the file. A virtual tab with no path is not recorded — there is nothing to re-read, and
+offering to reopen it would be a lie. The command renders disabled, with its reason, until something
+has been closed.
+
 ## Changelog
 
+- **0.4.0-draft** (2026-08-02) — Command Registry and Context Keys (§13); Tabs and Document Identity (§14) — drill-in opens a real tab, labels disambiguate by route.
 - **0.3.8-draft** (2026-08-02) — Layout chrome is selectable and inert to the caret; Preview gates editing and scrolls for real; Design opens fitted; caret.active is a bridge fact; Open in Browser (Cmd+Shift+O); assistant column defaults closed.
 - **0.3.7-draft** (2026-07-29) — Share one bundler contract between the release build and the dev-server watcher; nothing may fetch Monaco at startup; restrict preview navigation to http/https/mailto/tel.
 - **0.3.6-draft** (2026-07-28) — Preview link clicks open the target in a real browser tab instead of navigating the canvas iframe away.
@@ -966,4 +1173,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.3.8-draft_
+_`@jxsuite/studio` Specification v0.4.0-draft_

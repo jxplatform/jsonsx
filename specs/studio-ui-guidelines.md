@@ -1,6 +1,6 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.2.3
+**Version:** 0.3.0
 **Status:** Implemented
 **Updated:** 2026-08-02
 **Applies to:** `packages/studio/`
@@ -556,9 +556,171 @@ When building new UI in Studio, verify:
 - [ ] A control that cannot act renders **disabled with the reason in its tooltip**, never absent
 - [ ] `outline: none` is scoped to `:focus:not(:focus-visible)` and paired with a `:focus-visible`
       ring — suppressing the ring on plain `:focus` makes the control untraversable by keyboard
+- [ ] An empty region renders through `renderEmptyState()` (§11) — never a bare container, never a
+      hand-written block, never a noun phrase like "No state defined"
+- [ ] A control that invokes an action renders it from its command record (§12): the record's title
+      as the accessible name, its chord formatted by the one formatter, its `requires` as the
+      disabled tooltip — never a hand-maintained `{ label, action }` list
+
+---
+
+## 11. Empty States and Copy
+
+**Status:** Implemented
+
+Every region of the shell that can be empty renders through **one** pattern —
+`renderEmptyState()` in `src/panels/empty-state.ts`. A region with no object to show never paints a
+bare container, and it never hand-writes its own block: the copy rules below are inherited, not
+re-decided per panel.
+
+### 11.1 The three copy rules
+
+1. **One sentence saying what the region is _for_** — never what is absent. "No state defined" is a
+   dead end; "Data this page can read, compute or fetch lives here" tells the reader what the region
+   would contain and why they might want one. The sentence is `spec.message`; an optional second
+   sentence (`spec.detail`) says where the content comes from.
+
+2. **The action that fills it, as a real button that does the thing.** `spec.actions` are
+   `{ label, run }` records rendered as `sp-action-button`s. The label is imperative and names the
+   outcome — "Add a value", not "Go to the Data panel". The single exception is a `compact:true`
+   state sitting directly above its own add form: there, the form _is_ the action, and a button
+   duplicating it would be a second definition site for one capability.
+
+3. **One shared verb across equivalent surfaces.** Everything that needs a canvas selection says
+   `clickAnythingTo(outcome)` — "Click anything on the canvas to ⟨style it / edit its content / wire
+   it up⟩". Everything that needs an open document offers `openPageAction()`. Three panels that all
+   want the same thing must not read as three different requirements.
+
+`staleSelectionMessage()` is the fourth case, and it is the shape every "it's gone" message takes:
+name what disappeared, then hand back the shared verb — "That element is no longer on the page.
+Click anything on the canvas to pick another one."
+
+### 11.2 Structure and styling
+
+| Element                | Class                   | Notes                                                       |
+| ---------------------- | ----------------------- | ----------------------------------------------------------- |
+| Container              | `.empty-state`          | plus `.empty-state--teach`                                  |
+| Inline (in-panel) form | `.empty-state--compact` | tighter, left-aligned; sits inside an otherwise full panel  |
+| Sentence               | `.empty-state-message`  | required                                                    |
+| Second sentence        | `.empty-state-detail`   | optional                                                    |
+| Action row             | `.empty-state-actions`  | omitted entirely when there are no actions                  |
+| Action                 | `.empty-state-action`   | `sp-action-button size="s"`; `?disabled` carries its reason |
+
+Layout lives in `styles/panels.css`; no empty state carries a `style=` attribute.
+
+### 11.3 Jargon
+
+The empty state is where a new author meets the vocabulary, so it uses the plain word, with the
+Jx term in apposition at most once: "Data this page can read (its **state**)". A panel title may be
+a term of art; the sentence beneath it may not be a second one.
+
+---
+
+## 12. Command and Menu Rendering Rules
+
+**Status:** Partial — the registry and the CI checks ship; the surfaces are being ported onto them.
+
+Every capability Studio has is a **command record** (`specs/studio.md` §13). This section governs
+how those records are _rendered_: where a record may appear, how many may appear at once, and what
+every appearance must print.
+
+### 12.1 The level × placement matrix
+
+`level` states what a command acts on; a **placement** is a surface it declares itself into via
+`menus`. Each placement admits a fixed set of levels. This table is the normative copy;
+`packages/studio/src/commands/levels.ts` (`PLACEMENT_MATRIX`) mirrors it, and
+`scripts/check-command-levels.ts` validates every registered command's `menus` against it in CI.
+
+| Placement             | Admits levels                             | Why                                                                            |
+| --------------------- | ----------------------------------------- | ------------------------------------------------------------------------------ |
+| `commandbar/primary`  | application, document                     | document only for Save / Undo / Redo / Open in Browser, by frequency; ≤5 total |
+| `commandbar/overflow` | application, project, document            | never selection — the Command Bar is not a selection surface                   |
+| `statusbar/project`   | project                                   | the status bar's left field                                                    |
+| `statusbar/document`  | document                                  | the status bar's centre field                                                  |
+| `statusbar/selection` | selection                                 | the status bar's right field                                                   |
+| `context/element`     | selection                                 | the canvas element menu acts on a selection                                    |
+| `context/file`        | project                                   | a file row addresses the project's file set                                    |
+| `context/layer`       | selection                                 | an outline row IS a selection                                                  |
+| `context/tab`         | document                                  | a tab addresses one document                                                   |
+| `context/pane`        | document                                  | a pane hosts one document                                                      |
+| `blockbar`            | selection                                 | the floating bar owns selection-scoped verbs                                   |
+| `outline/row`         | selection                                 | row actions act on the row's node                                              |
+| `palette`             | application, project, document, selection | the level-agnostic surface; it groups its rows by level                        |
+| `never`               | application, project, document, selection | keyboard- and API-only; there is no rendered surface to be misplaced in        |
+
+Panel placements — the two Navigator rail groups (project above, document below), the Navigator dock
+body, the Bottom dock (project and document, with the panel header stating which) and the Inspector
+dock (selection) — belong to the same matrix. They admit **Panel** records rather than commands, and
+they join `levels.ts` when `registerPanel()` ships.
+
+Three rules follow from the table and are not negotiable in review:
+
+- **A record with no `menus` defaults to `["palette"]`**, which admits every level. A command has to
+  opt _in_ to a region before it can be misplaced.
+- **Mixed regions are mixed in the table, never by prose exemption.** The status bar is three
+  separate single-level placements, not one "mixed" region.
+- **A region that genuinely needs a second level gets a new row**, with its reason in the `note`
+  field — not a comment excusing one command.
+
+The check validates placement only. Whether a panel _reads_ state above its level is a separate
+defect with a separate rule: a record declared `level:"project"` may not source its state from
+`activeTab`, or its badge disappears when the last tab closes.
+
+### 12.2 The chrome budget
+
+Chrome is earned by frequency and capped by a build check
+(`scripts/check-chrome-budget.ts`, thresholds in `src/commands/budget.ts`):
+
+| Cap                                                | Limit |
+| -------------------------------------------------- | ----- |
+| Commands declaring `menus: ["commandbar/primary"]` | 5     |
+| Tabs in any one dock or rail group                 | 4     |
+
+Raising a cap is a design decision and happens in `budget.ts`, in one place, deliberately.
+
+**Retiring a control costs three things**: (a) a discoverable command name, (b) a bindable chord, and
+usually (c) a status-bar or context-menu residue. Retiring without all three is deletion, not
+consolidation. Moving a command to `commandbar/overflow` satisfies (a) and (c) for free — it keeps
+its name, its chord and its palette row.
+
+Stripping labels is **not** a way to stay under the cap. A container query that hides every button's
+text below a breakpoint converts a crowding problem into an anonymity problem: an unlabelled icon is
+a control the reader must hover to identify.
+
+### 12.3 Every invoking surface prints the name and the chord
+
+Wherever a command is rendered — Command Bar button, palette row, context-menu item, block-action
+button, rail entry — the surface prints:
+
+| What                | From                     | Rule                                                                      |
+| ------------------- | ------------------------ | ------------------------------------------------------------------------- |
+| The name            | `Command.title`          | the accessible name, even when the control shows only an icon             |
+| The chord           | `keymap.formatBinding()` | platform-formatted by ONE function — never a hardcoded `⌘P` in a template |
+| The disabled reason | `Command.requires`       | the tooltip on a disabled control, the grey subtitle on a palette row     |
+
+Consequences:
+
+- **No unlabelled icon** without its command title as accessible name and its binding in the tooltip.
+- **No context-menu row without its chord** when the command has one.
+- **No surface renames a command.** A placement chooses _whether_ to show a record; it never chooses
+  what it is called, when it is available, or what it does.
+- **A control that cannot act renders disabled with `requires` in its tooltip**, never absent (§10)
+  — and the palette shows unavailable commands greyed with the same sentence rather than hiding
+  them, because "why can't I" is the question a palette is uniquely good at answering.
+- **`destructive: true` derives the danger styling**, and `group` derives menu ordering
+  (`"1_clipboard"`, `"3_structure"`, `"9_danger"`); neither is re-decided per menu.
+
+### 12.4 A second list of actions is a defect
+
+If a surface maintains its own array of `{ label, action }` records for capabilities that already
+exist, that array is the bug — not a shortcut around one. The symptom is always the same: two
+surfaces disagree about one capability. `Cmd+W` refusing to close the last tab while the tab strip's
+`×` closed it happily is the canonical example, and it is exactly what one record with one chord and
+one `run` makes impossible.
 
 ## Changelog
 
+- **0.3.0** (2026-08-02) — Empty States and Copy (§11); Command and Menu Rendering Rules incl. the level × placement matrix (§12).
 - **0.2.3** (2026-08-02) — One teaching empty-state pattern (new §11); focus-visible rings replace bare outline:none; settings writes surface failure at the control.
 - **0.2.2** (2026-08-02) — openModal shares showDialog's focus machinery: role/label at the wrapper, focus trap, focus restore, centralised Escape (§8.7).
 - **0.2.1** (2026-07-28) — Drag-and-drop conventions for external OS file drags (§8.2): copy dropEffect, the Files-type guard, tree highlights, and the canvas replace-vs-insert affordance.

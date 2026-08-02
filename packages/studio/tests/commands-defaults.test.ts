@@ -96,8 +96,22 @@ describe("the records that settle an existing argument", () => {
   test("duplicate is defined once and projected to the assistant from the same record", () => {
     const duplicate = defaultCommandSet().find((c) => c.id === "selection.duplicate");
     expect(duplicate?.aiTool?.name).toBe("duplicate_node");
-    expect(duplicate?.requires).toBe("an element selection");
+    expect(duplicate?.requires).toBe("an element that has a sibling position");
     expect(duplicate?.undo).toBe("document");
+  });
+
+  test("duplicate refuses the document root, like delete", () => {
+    // Duplicating needs a sibling position to insert into; the root and a repeater template have
+    // None, and mutateDuplicateNode would splice at a non-numeric index. Both rendering surfaces
+    // Hand-guarded this before the record declared it.
+    const registry = createCommandRegistry({
+      getContext: () => makeContext({ selection: { count: 1, isRoot: true } }),
+      mac: true,
+    });
+    registry.registerAll(defaultCommandSet());
+    expect(registry.isVisible("selection.duplicate")).toBe(true);
+    expect(registry.isEnabled("selection.duplicate")).toBe(false);
+    expect(registry.disabledReason("selection.duplicate")).toContain("sibling position");
   });
 
   test("delete is destructive, undoable, and refuses the document root", () => {

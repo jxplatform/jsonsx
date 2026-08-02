@@ -207,20 +207,32 @@ describe("renderLayersTemplate — selection and collapse", () => {
 
 describe("renderLayersTemplate — move and delete actions", () => {
   /**
-   * Select the row, render, and collect its action buttons by title.
+   * Select the row, render, and collect its action buttons by COMMAND ID.
    *
-   * Row actions are built for the SELECTED row only (five sp-action-buttons per row is ~5 custom
-   * elements with shadow roots per visible row), so selecting first is the real interaction — a
-   * click on the row both selects it and reveals its actions.
+   * Two things this helper encodes. Row actions exist for the selected row (and the hovered one)
+   * only — five sp-action-buttons per row is ~5 custom elements with shadow roots per visible row —
+   * so selecting first is the real interaction; a click on the row both selects it and reveals its
+   * verbs. And the buttons are keyed by `data-command` rather than by their title, because the
+   * title is now the record's own tooltip (its chord when it can act, its `requires` sentence when
+   * it cannot) and the surface is not allowed to know either string.
    */
   async function buttons(path: JxPath): Promise<Record<string, HTMLElement>> {
     activeTab.value!.session.selection = path;
     await renderLayers();
     const out: Record<string, HTMLElement> = {};
-    for (const btn of rowByKey(path)!.querySelectorAll("sp-action-button")) {
-      out[btn.getAttribute("title") ?? ""] = btn as HTMLElement;
+    for (const btn of rowByKey(path)!.querySelectorAll("sp-action-button[data-command]")) {
+      out[(btn as HTMLElement).dataset.command ?? ""] = btn as HTMLElement;
     }
     return out;
+  }
+
+  /** Whether the row's button for `id` is present but refusing (ONE shape: disabled, not removed). */
+  function isDisabled(acts: Record<string, HTMLElement>, id: string): boolean {
+    const btn = acts[id];
+    if (!btn) {
+      throw new Error(`row action not rendered: ${id}`);
+    }
+    return btn.hasAttribute("disabled");
   }
 
   test("actions are built only for the selected row", async () => {
@@ -234,18 +246,22 @@ describe("renderLayersTemplate — move and delete actions", () => {
     expect(rowByKey(["children", 4])!.querySelectorAll("sp-action-button").length).toBe(0);
   });
 
-  test("first child cannot move up, last cannot move down", async () => {
+  test("first child cannot move up, last cannot move down — disabled, not removed", async () => {
     const first = await buttons(["children", 0]);
-    expect(first["Move up"]).toBeUndefined();
-    expect(first["Move down"]).toBeDefined();
+    expect(isDisabled(first, "selection.moveUp")).toBe(true);
+    expect(isDisabled(first, "selection.moveDown")).toBe(false);
+    // The refusal is the record's own sentence, printed once.
+    expect(first["selection.moveUp"]!.getAttribute("title")).toBe(
+      "Move Up — requires an element with a sibling above it",
+    );
     const last = await buttons(["children", 4]);
-    expect(last["Move down"]).toBeUndefined();
-    expect(last["Move up"]).toBeDefined();
+    expect(isDisabled(last, "selection.moveDown")).toBe(true);
+    expect(isDisabled(last, "selection.moveUp")).toBe(false);
   });
 
   test("move down reorders siblings", async () => {
     const acts = await buttons(["children", 0]);
-    acts["Move down"]!.click();
+    acts["selection.moveDown"]!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children[0]!.tagName).toBe("p");
     expect(children[1]!.tagName).toBe("section");
@@ -253,7 +269,7 @@ describe("renderLayersTemplate — move and delete actions", () => {
 
   test("move up reorders siblings", async () => {
     const acts = await buttons(["children", 1]);
-    acts["Move up"]!.click();
+    acts["selection.moveUp"]!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children[0]!.tagName).toBe("p");
     expect(children[1]!.tagName).toBe("section");
@@ -261,8 +277,8 @@ describe("renderLayersTemplate — move and delete actions", () => {
 
   test("move into previous sibling appends the node to that sibling's children", async () => {
     const acts = await buttons(["children", 1]);
-    const btn = acts["Move into previous sibling"];
-    expect(btn).toBeDefined();
+    const btn = acts["selection.moveIn"];
+    expect(isDisabled(acts, "selection.moveIn")).toBe(false);
     btn!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children.length).toBe(4);
@@ -276,13 +292,13 @@ describe("renderLayersTemplate — move and delete actions", () => {
   test("move-in is unavailable when previous sibling is not a container", async () => {
     // Children[2] (ul with $map children) follows children[1] (p with no children array)
     const acts = await buttons(["children", 2]);
-    expect(acts["Move into previous sibling"]).toBeUndefined();
+    expect(isDisabled(acts, "selection.moveIn")).toBe(true);
   });
 
   test("move out of parent lifts node after its parent", async () => {
     const acts = await buttons(["children", 0, "children", 0]);
-    const btn = acts["Move out of parent"];
-    expect(btn).toBeDefined();
+    const btn = acts["selection.moveOut"];
+    expect(isDisabled(acts, "selection.moveOut")).toBe(false);
     btn!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children[1]!.tagName).toBe("h2");
@@ -290,12 +306,32 @@ describe("renderLayersTemplate — move and delete actions", () => {
     expect((section.children as JxMutableNode[]).length).toBe(1);
   });
 
-  test("delete removes the node", async () => {
+  test("the row's inline cluster is the four moves; Duplicate and Delete ride in ⋮", async () => {
     const acts = await buttons(["children", 1]);
-    acts["Delete"]!.click();
+    expect(Object.keys(acts)).toEqual([
+      "selection.moveUp",
+      "selection.moveDown",
+      "selection.moveIn",
+      "selection.moveOut",
+    ]);
+    expect(rowByKey(["children", 1])!.querySelector(".layer-overflow")).not.toBeNull();
+  });
+
+  test("delete removes the node, from the ⋮ menu", async () => {
+    await buttons(["children", 1]);
+    (rowByKey(["children", 1])!.querySelector(".layer-overflow") as HTMLElement).click();
+    const menu = [...document.querySelectorAll("#layer-popover sp-menu-item")];
+    expect(menu.map((el) => (el as HTMLElement).dataset.command)).toEqual([
+      "selection.duplicate",
+      "selection.delete",
+    ]);
+    (menu[1] as HTMLElement).click();
+
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children.length).toBe(4);
     expect(children.map((c) => c.tagName)).not.toContain("p");
+    // The menu closes behind the verb it ran.
+    expect(document.querySelectorAll("#layer-popover sp-menu-item")).toHaveLength(0);
   });
 
   test("dnd cleanups run and reset on each render", async () => {
