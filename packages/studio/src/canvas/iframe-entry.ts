@@ -176,6 +176,27 @@ export function patchDisturbsActiveEdit(forwardOps: JxDocOp[]): boolean {
   return false;
 }
 
+/** Consecutive quiet animation frames before the frame declares itself settled (§13.4). */
+export const IDLE_QUIET_FRAMES = 2;
+
+/**
+ * How long the idle watcher keeps sampling before it stops.
+ *
+ * A page with an endless animation never reaches two quiet frames, and a rAF loop that runs for the
+ * life of the tab to prove it is not free. Giving up is safe because the last posted sample already
+ * names the animation — the parent stays honestly "not idle" rather than being told a comfortable
+ * lie.
+ */
+export const IDLE_WATCH_MAX_MS = 5000;
+
+/**
+ * How long after a failed image load a retry may still be in flight.
+ *
+ * `installCanvasImageRetry` re-fires at 150/300/450 ms; each further failure re-arms the window, so
+ * a per-error grace comfortably covers the whole chain without encoding its schedule twice.
+ */
+export const IMAGE_RETRY_WINDOW_MS = 500;
+
 /**
  * Drive a channel: render each `render` message into `container`, dropping stale generations, and
  * acknowledge with `renderComplete`/`renderError`. Exposed (rather than inlined in {@link boot}) so
@@ -362,10 +383,106 @@ export function startCanvasIframe(opts: {
       const root = container.firstElementChild;
       const fragment = root instanceof HTMLElement && root.dataset.jxDefinitionRoot !== undefined;
       channel.post({ fragment, height: measured, kind: "contentHeight" });
+      // The content box moved, so fonts/animations/images may not be where they were.
+      armIdleWatch();
     }
   }
   const ResizeObs = win?.ResizeObserver;
   const heightObserver = ResizeObs ? new ResizeObs(() => postContentHeight()) : null;
+
+  // ─── Cross-realm quiescence ─────────────────────────────────────────────────
+  // The frame answers "have I settled?" instead of being polled (§13.4 condition 5). Nothing in the
+  // Parent realm can look inside a cross-origin frame, so the alternative was `wait: {ms}` — and 115
+  // Of those were 115 places a slow subsystem got answered with +500 ms and the wrong picture was
+  // Accepted. Sampling lives HERE, next to the render that changes the answer.
+  const frameDoc = container.ownerDocument;
+  let idleFrame = 0;
+  let quietFrames = 0;
+  let idleDeadline = 0;
+  let lastIdleKey = "";
+  /** Images whose load failed, and the moment `installCanvasImageRetry` can no longer be waiting. */
+  const retryingImages = new Map<HTMLImageElement, number>();
+
+  /**
+   * Images with a retry still outstanding.
+   *
+   * `installCanvasImageRetry` re-fires at 150/300/450 ms and bounds itself at three attempts, so an
+   * error puts the image back in flight for at most that long; each further error extends the
+   * window. Only the app knows this is pending — a `<img>` mid-retry looks exactly like one that
+   * settled broken.
+   */
+  function pendingImageRetries(): number {
+    const now = Date.now();
+    for (const [img, deadline] of retryingImages) {
+      if (deadline <= now) {
+        retryingImages.delete(img);
+      }
+    }
+    return retryingImages.size;
+  }
+
+  function sampleIdle(): Extract<IframeToParent, { kind: "idle" }> {
+    const running =
+      typeof frameDoc.getAnimations === "function"
+        ? frameDoc.getAnimations().filter((a) => a.playState === "running").length
+        : 0;
+    return {
+      animations: running,
+      fonts: frameDoc.fonts ? frameDoc.fonts.status === "loaded" : true,
+      gen: renderedGen,
+      images: pendingImageRetries(),
+      kind: "idle",
+    };
+  }
+
+  function idleTick(): void {
+    idleFrame = 0;
+    const sample = sampleIdle();
+    const key = `${sample.gen}|${sample.fonts}|${sample.animations}|${sample.images}`;
+    const changed = key !== lastIdleKey;
+    if (changed) {
+      lastIdleKey = key;
+      channel.post(sample);
+    }
+    const quiet = sample.fonts && sample.animations === 0 && sample.images === 0;
+    quietFrames = quiet ? (changed ? 1 : quietFrames + 1) : 0;
+    // Two consecutive quiet frames, then stop — the state is stable and any change re-arms us.
+    if (quietFrames >= IDLE_QUIET_FRAMES) {
+      return;
+    }
+    // A page with a genuinely endless animation never goes quiet. Give up rather than burn a rAF
+    // Loop forever: the last posted sample already NAMES the animation, which is the honest answer.
+    if (Date.now() >= idleDeadline) {
+      return;
+    }
+    idleFrame = win ? win.requestAnimationFrame(idleTick) : 0;
+  }
+
+  /** Something changed the frame's DOM or assets — re-sample until it is quiet again. */
+  function armIdleWatch(): void {
+    quietFrames = 0;
+    idleDeadline = Date.now() + IDLE_WATCH_MAX_MS;
+    if (!idleFrame && win) {
+      idleFrame = win.requestAnimationFrame(idleTick);
+    }
+  }
+
+  const onImageError = (event: Event): void => {
+    if (event.target instanceof HTMLImageElement) {
+      retryingImages.set(event.target, Date.now() + IMAGE_RETRY_WINDOW_MS);
+      armIdleWatch();
+    }
+  };
+  const onImageLoad = (event: Event): void => {
+    if (event.target instanceof HTMLImageElement && retryingImages.delete(event.target)) {
+      armIdleWatch();
+    }
+  };
+  // Capture: neither `error` nor `load` bubbles from an <img>.
+  container.addEventListener("error", onImageError, true);
+  container.addEventListener("load", onImageLoad, true);
+  armIdleWatch();
+  // Observed only once the quiescence state above exists: a reflow arms the watcher.
   heightObserver?.observe(container);
 
   // ─── Wheel forwarding (canvas zoom/pan) ─────────────────────────────────────
@@ -570,6 +687,7 @@ export function startCanvasIframe(opts: {
           restoreDocSelection(container, caret);
         }
         channel.post({ gen, kind: "patchComplete" });
+        armIdleWatch();
       } catch (error) {
         channel.post({
           gen,
@@ -702,6 +820,7 @@ export function startCanvasIframe(opts: {
           renderedGen = gen;
           currentMode = msg.mode;
           channel.post({ gen, kind: "renderComplete" });
+          armIdleWatch();
           // Thread a serializable snapshot of the resolved $defs to the parent so the data-explorer
           // Panel shows live data (the iframe, not the parent, now resolves the scope). Inside a
           // Reactive effect: dev-proxy data sources ($prototype/$src) return a ref that fills AFTER
@@ -737,6 +856,12 @@ export function startCanvasIframe(opts: {
     stopInlineEdit();
     stopSlashBridge();
     stopImageRetry();
+    if (idleFrame && win) {
+      win.cancelAnimationFrame(idleFrame);
+    }
+    idleFrame = 0;
+    container.removeEventListener("error", onImageError, true);
+    container.removeEventListener("load", onImageLoad, true);
     stopAutoScroll();
     heightObserver?.disconnect();
     container.ownerDocument.removeEventListener("click", onLayoutClick, true);

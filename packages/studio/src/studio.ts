@@ -21,6 +21,7 @@ import {
   projectState,
   registerRenderer,
   render,
+  renderOnly,
   requireProjectState,
   setProjectState,
   toolbarEl,
@@ -41,12 +42,19 @@ import { popSubDocument, popToSubDocument } from "./tabs/tab";
 import { effect } from "./reactivity";
 
 import { view } from "./view";
-import { mountShell, resetProjectShell, setActivityTab, shell } from "./shell";
+import {
+  mountShell,
+  registerShellViewCommands,
+  resetProjectShell,
+  setActivityTab,
+  shell,
+} from "./shell";
 
 import { isEditing } from "./editor/inline-edit";
-import { applyTransform, initCanvasUtils } from "./canvas/canvas-utils";
+import { applyTransform, initCanvasUtils, registerCanvasViewCommands } from "./canvas/canvas-utils";
 import {
   initCanvasRender,
+  registerSelectionSetCommand,
   renderCanvas,
   renderOverlays,
   scheduleCanvasRender,
@@ -105,21 +113,24 @@ import { renderImportsTemplate } from "./panels/imports-panel";
 import { renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
 import { installAutomationHook } from "./services/automation";
-import { openBrowseModal } from "./browse/browse-modal";
 import { invalidateBrowseCache } from "./browse/browse";
 import { invalidateMediaCache } from "./ui/media-picker";
 import { setMediaChangedHandler } from "./files/media-upload";
 import { applyFileDrop } from "./editor/file-drop-action";
 import { seedAssistantMessages } from "./panels/ai-panel";
 import { seedPublishConnected } from "./publish/publish-panel";
-import { openConnectorGrid } from "./grid/grid-open";
 
 import { getPlatform, hasPlatform, registerPlatform } from "./platform";
 import { parseMediaEntries } from "./utils/canvas-media";
 import { resolveDefaultPlatform } from "./platforms/default-platform";
 import { mountResizeEdges } from "./resize-edges";
 import { codeService } from "./services/code-services";
-import { defBadgeLabel, defCategory, renderSignalsTemplate } from "./panels/signals-panel";
+import {
+  defBadgeLabel,
+  defCategory,
+  registerSignalsCommands,
+  renderSignalsTemplate,
+} from "./panels/signals-panel";
 import { loadComponentRegistry } from "./files/components";
 import { ensureDependenciesInstalled } from "./packages/ensure-deps";
 import { maybePromptJxsuiteUpdate } from "./packages/jxsuite-update";
@@ -128,7 +139,7 @@ import { autoSyncProjectOnOpen } from "./packages/pull-package-sync";
 import { html, render as litRender } from "lit-html";
 
 import webdata from "../data/webdata.json";
-import { renderDataExplorerTemplate } from "./panels/data-explorer";
+import { registerDataExplorerCommands, renderDataExplorerTemplate } from "./panels/data-explorer";
 import { cleanupGitPanel, cloneRepository, renderGitPanel } from "./panels/git-panel";
 
 // ─── Spectrum Web Components ──────────────────────────────────────────────────
@@ -157,15 +168,15 @@ import { selectStylebookTag } from "./panels/stylebook-panel";
 import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from "./panels/dnd";
 import { registerCanvasDndBridge } from "./panels/canvas-dnd-bridge";
 import { defaultDef } from "./panels/shared";
-import { closeFormulaWorkspace } from "./panels/formula-workspace";
+import { closeFormulaWorkspace, registerFormulaEditorCommands } from "./panels/formula-workspace";
 import {
   initBlockActionBar,
   isEditChromeTarget,
+  registerSelectionCommands,
   renderBlockActionBar,
 } from "./panels/block-action-bar";
 import { initCssData } from "./panels/style-utils";
-import { initQuickSearch, openQuickSearch } from "./panels/quick-search";
-import { openSettingsModal } from "./settings/settings-modal";
+import { initQuickSearch } from "./panels/quick-search";
 import { hydrateAccountStatus } from "./account-status";
 import { hydrateProjectList } from "./project-list";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
@@ -176,7 +187,13 @@ import {
   openProjectPickerModal,
   platformUsesRepoPicker,
 } from "./new-project/add-repo-modal";
-import { openNewProjectModal } from "./new-project/new-project-modal";
+import { openNewProjectModal, registerNewProjectCommands } from "./new-project/new-project-modal";
+import { registerInspectorCommands } from "./panels/properties-panel";
+import { registerStyleCommands } from "./panels/style-panel";
+import { registerGridCommands } from "./grid/grid-open";
+import { registerSettingsCommands } from "./settings/settings-modal";
+import { registerBrowseCommands } from "./browse/browse-modal";
+import { convertToComponent } from "./editor/convert-to-component";
 import type { GitDiffState } from "./types";
 import type { Tab } from "./tabs/tab";
 import type { JxPath } from "./state";
@@ -370,22 +387,6 @@ initCssData(webdata);
 if (!hasPlatform()) {
   registerPlatform(resolveDefaultPlatform());
 }
-
-// Screenshot/automation runners (scripts/screenshots/) await window.__jxAutomation right after
-// Navigation, so the gated hook must install before the async deep-link project load below.
-installAutomationHook({
-  getCanvasMode,
-  openBrowseModal,
-  openConnectorGrid,
-  openNewProjectModal,
-  openQuickSearchPalette: openQuickSearch,
-  openSettingsModal,
-  render,
-  seedAssistantMessages,
-  seedPublishConnected,
-  setCanvasMode,
-  statusMessage,
-});
 
 mountResizeEdges();
 
@@ -1050,4 +1051,48 @@ registerStudioCommands(
 // Tab navigation (⌃Tab MRU cycling, ⌘⇧T reopen-closed) is defined beside the tab model it drives.
 registerTabCommands(commandRegistry, { openFile: openFileInTab });
 
+/*
+ * The rest of the app's contribution points, each defined beside the state it writes.
+ *
+ * This block is the bootstrap's whole share of plan §13's registry work: every record below lives
+ * in the module that implements it, and this is the ONE place that composes them into the registry
+ * `__jxAutomation.run` projects. Nothing here decides what a command is called, when it is
+ * available or what it does — that would be the second definition site the design exists to
+ * prevent (plan §2, principle 1).
+ */
+registerShellViewCommands(commandRegistry, {
+  setInspectorTab: (tab) => {
+    updateUi("rightTab", tab);
+    renderOnly("rightPanel");
+  },
+});
+registerCanvasViewCommands(commandRegistry, { getCanvasMode, setCanvasMode });
+registerSelectionSetCommand(commandRegistry);
+registerInspectorCommands(commandRegistry);
+registerDataExplorerCommands(commandRegistry, { renderLeftPanel });
+registerSignalsCommands(commandRegistry, {
+  renderCanvas: () => renderCanvas(),
+  renderLeftPanel,
+});
+registerFormulaEditorCommands(commandRegistry, { renderCanvas: () => renderCanvas() });
+registerGridCommands(commandRegistry);
+registerSettingsCommands(commandRegistry);
+registerBrowseCommands(commandRegistry);
+registerNewProjectCommands(commandRegistry);
+registerStyleCommands(commandRegistry);
+/*
+ * The structural selection verbs — Move Up/Down/In/Out, Convert to Component, Edit Component.
+ *
+ * They were already defined in `panels/block-action-bar.ts` beside the mutations they perform, but
+ * only ever registered into that panel's OWN registry, so the palette, the keyboard and
+ * `__jxAutomation` could not see them. `commandTargetPath()` falls back to the current selection
+ * when no menu is open, which is precisely the app-wide meaning of these verbs.
+ */
+registerSelectionCommands(commandRegistry, { convertToComponent, navigateToComponent });
+
 initShortcuts(commandRegistry, pointerContext);
+
+// The gated scripting surface (`?automation=1` only) is a PROJECTION of the registry above, so it
+// Installs after it — still inside this module's synchronous body, which is what the screenshot
+// Runner's `waitForFunction(() => window.__jxAutomation)` and every deferred project load depend on.
+installAutomationHook({ registry: commandRegistry, seedAssistantMessages, seedPublishConnected });

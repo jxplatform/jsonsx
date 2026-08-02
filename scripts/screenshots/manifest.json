@@ -1,208 +1,210 @@
 {
+  "contract": 1,
   "outDir": "docs/images",
   "server": {
-    "url": "http://localhost:3000",
-    "studioPath": "/packages/studio/index.html"
+    "studioPath": "/packages/studio/index.html",
+    "url": "http://127.0.0.1:3000"
   },
   "defaults": {
-    "project": "packages/starters/sites/real-estate",
     "viewport": {
       "width": 1920,
       "height": 1000
     },
     "deviceScaleFactor": 2,
     "theme": "dark",
-    "clip": {
-      "selector": "#app"
-    },
-    "waitFor": [
-      {
-        "type": "canvasReady"
-      },
-      {
-        "type": "fonts"
-      },
-      {
-        "type": "settle",
-        "frames": 2
-      }
-    ]
+    "profile": "fresh",
+    "clock": "2026-01-15T09:30:00Z"
   },
   "shots": [
     {
       "name": "hero",
       "docs": [],
-      "file": "pages/index.md",
-      "viewport": {
-        "width": 1920,
-        "height": 1200
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "pages/index.md",
+        "view": "preview",
+        "viewport": {
+          "width": 1920,
+          "height": 1200
+        }
       },
-      "canvasMode": "preview",
-      "actions": [
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "select",
-          "path": ["children", 0]
+          "args": {
+            "path": ["children", 0]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "setRightTab",
-          "value": "properties"
-        },
+          "args": {
+            "tab": "properties"
+          },
+          "cmd": "view.setRightTab"
+        }
+      ],
+      "expect": [
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "state": {
+            "selection": {
+              "count": 1
+            }
+          }
+        }
+      ],
+      "capture": [
+        {
+          "image": "hero"
         }
       ]
     },
     {
       "name": "mode-manage",
       "docs": ["studio/projects/browse"],
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "pages/index.md",
+        "view": "preview"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "files"
+          "args": {
+            "tab": "files"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "openBrowse"
+          "cmd": "project.browse"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".browse-modal"
-        },
+          "region": "overlay.dialog:library"
+        }
+      ],
+      "capture": [
         {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "image": "mode-manage"
         }
       ]
     },
     {
       "name": "mode-edit",
       "docs": ["studio/editing"],
-      "file": "pages/index.md",
-      "project": "packages/starters/sites/restaurant",
-      "canvasMode": "edit",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/restaurant",
+        "file": "pages/index.md",
+        "view": "edit"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "files"
-        },
+          "args": {
+            "tab": "files"
+          },
+          "cmd": "view.setActivity"
+        }
+      ],
+      "capture": [
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "image": "mode-edit"
         }
       ]
     },
     {
       "name": "mode-design",
       "docs": ["studio/design"],
-      "project": "packages/starters/sites/event",
-      "file": "components/ev-savedate.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/event",
+        "file": "components/ev-savedate.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setZoom",
-          "value": 0.6
+          "args": {
+            "zoom": 0.6
+          },
+          "cmd": "canvas.setZoom"
         },
         {
-          "do": "select",
-          "path": ["children", 0]
+          "args": {
+            "path": ["children", 0]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "setRightTab",
-          "value": "style"
-        },
+          "args": {
+            "tab": "style"
+          },
+          "cmd": "view.setRightTab"
+        }
+      ],
+      "capture": [
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "image": "mode-design"
         }
       ]
     },
     {
       "name": "mode-script",
       "docs": ["studio/logic"],
-      "file": "components/re-listings-filter.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "components/re-listings-filter.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "state"
+          "args": {
+            "tab": "state"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "editDef",
-          "defName": "visibleCount"
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "defName": "visibleCount"
+          },
+          "cmd": "formula.editDef"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "selector",
-          "selector": ".monaco-editor .view-lines"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 2
+          "image": "mode-script"
         }
       ]
     },
     {
       "name": "new-project",
       "docs": ["start/first-project"],
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "pages/index.md",
+        "view": "preview"
+      },
+      "steps": [
         {
-          "do": "openNewProject"
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "cmd": "project.new"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".new-project-modal"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "timeout",
-          "ms": 400
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "overlay.dialog:new-project"
         }
       ],
-      "regions": [
+      "capture": [
         {
-          "name": "new-project-modal",
-          "selector": ".new-project-modal",
+          "image": "new-project-modal",
+          "of": "overlay.dialog:new-project",
           "padding": 24
         }
       ]
@@ -210,45 +212,34 @@
     {
       "name": "git-panel",
       "docs": ["studio/publish"],
-      "file": "components/re-listings-filter.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "file": "pages/index.md",
+        "project": "scripts/screenshots/fixtures/repos/showcase"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "git"
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "git"
+          },
+          "cmd": "view.setActivity"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".git-panel"
+          "region": "navigator/panel:git"
         },
         {
-          "type": "fonts"
-        },
-        {
-          "type": "timeout",
-          "ms": 1500
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "navigator/panel:git/commit"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "git-panel",
-          "selector": "#left-panel",
-          "padding": 0
+          "image": "git-panel",
+          "of": "navigator"
         },
         {
-          "name": "git-commit",
-          "selector": ".git-commit-area",
+          "image": "git-commit",
+          "of": "navigator/panel:git/commit",
           "padding": 16
         }
       ]
@@ -256,447 +247,414 @@
     {
       "name": "state-panel",
       "docs": ["studio/logic"],
-      "file": "components/re-listings-filter.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "components/re-listings-filter.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "state"
-        },
+          "args": {
+            "tab": "state"
+          },
+          "cmd": "view.setActivity"
+        }
+      ],
+      "capture": [
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "image": "state-panel"
         }
       ]
     },
     {
       "name": "design-inspector",
       "docs": ["studio/design"],
-      "file": "components/re-listing-card.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "components/re-listing-card.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "select",
-          "path": ["children", 0]
+          "args": {
+            "path": ["children", 0]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "setRightTab",
-          "value": "style"
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "style"
+          },
+          "cmd": "view.setRightTab"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "selector",
-          "selector": "#right-panel"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "inspector/tab:style"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "design-inspector",
-          "selector": "#right-panel",
-          "padding": 0
+          "image": "design-inspector",
+          "of": "inspector"
         }
       ]
     },
     {
       "name": "stylebook",
       "docs": ["studio/design"],
-      "file": "components/re-listing-card.json",
-      "canvasMode": "stylebook",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "components/re-listing-card.json",
+        "view": "stylebook"
+      },
+      "steps": [
         {
-          "do": "setZoom",
-          "value": 0.6
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "zoom": 0.6
+          },
+          "cmd": "canvas.setZoom"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "timeout",
-          "ms": 5000
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "image": "stylebook"
         }
       ]
     },
     {
       "name": "welcome-screen",
       "docs": ["studio/interface/welcome-screen"],
-      "noProject": true,
-      "waitFor": [
+      "steps": [
         {
-          "type": "selector",
-          "selector": ".welcome-screen"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "args": {
+            "projects": [
+              {
+                "name": "Bistro & Café",
+                "root": "~/Sites/bistro",
+                "description": "~/Sites/bistro"
+              },
+              {
+                "name": "Northshore Realty",
+                "root": "~/Sites/northshore",
+                "description": "~/Sites/northshore"
+              },
+              {
+                "name": "The Long Field",
+                "root": "~/Sites/long-field",
+                "description": "~/Sites/long-field"
+              },
+              {
+                "name": "Horizon Conf 2026",
+                "root": "~/Sites/horizon-conf",
+                "description": "~/Sites/horizon-conf"
+              }
+            ]
+          },
+          "seed": "seed.projectList"
         }
       ],
-      "actions": [
+      "expect": [
         {
-          "do": "showWelcome",
-          "projects": [
-            {
-              "name": "Bistro & Caf\u00e9",
-              "root": "~/Sites/bistro",
-              "description": "~/Sites/bistro"
+          "state": {
+            "document": {
+              "open": false
             },
-            {
-              "name": "Northshore Realty",
-              "root": "~/Sites/northshore",
-              "description": "~/Sites/northshore"
-            },
-            {
-              "name": "The Long Field",
-              "root": "~/Sites/long-field",
-              "description": "~/Sites/long-field"
-            },
-            {
-              "name": "Horizon Conf 2026",
-              "root": "~/Sites/horizon-conf",
-              "description": "~/Sites/horizon-conf"
+            "pane": {
+              "count": 0
             }
-          ]
+          }
+        }
+      ],
+      "capture": [
+        {
+          "image": "welcome-screen"
         }
       ]
     },
     {
       "name": "settings-modal",
       "docs": ["studio/projects/settings"],
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "pages/index.md",
+        "view": "preview"
+      },
+      "steps": [
         {
-          "do": "openSettings"
+          "cmd": "settings.open"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".settings-modal"
-        },
+          "region": "overlay.dialog:settings"
+        }
+      ],
+      "capture": [
         {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "settings-modal"
         }
       ]
     },
     {
       "name": "css-variables-shot",
       "docs": ["studio/design/tokens"],
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "clip": "none",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "pages/index.md",
+        "view": "preview"
+      },
+      "steps": [
         {
-          "do": "openSettings",
-          "section": "css-variables"
+          "args": {
+            "section": "cssVars"
+          },
+          "cmd": "settings.open"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".settings-modal"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "overlay.dialog:settings"
         }
       ],
-      "regions": [
+      "capture": [
         {
-          "name": "css-variables",
-          "selector": ".settings-modal",
-          "padding": 0
+          "image": "css-variables",
+          "of": "overlay.dialog:settings"
         }
       ]
     },
     {
       "name": "quick-access",
       "docs": ["studio/interface/quick-access"],
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "pages/index.md",
+        "view": "preview"
+      },
+      "steps": [
         {
-          "do": "openQuickSearch"
+          "cmd": "palette.open"
         },
         {
-          "do": "type",
-          "selector": ".quick-search-input",
+          "input": "type",
           "text": "list"
-        },
-        {
-          "do": "wait",
-          "ms": 400
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "quick-access"
         }
       ]
     },
     {
       "name": "elements-panel-shot",
       "docs": ["studio/design/elements"],
-      "file": "pages/index.md",
-      "canvasMode": "design",
-      "clip": "none",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "pages/index.md",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "blocks"
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "blocks"
+          },
+          "cmd": "view.setActivity"
         }
       ],
-      "regions": [
+      "expect": [
         {
-          "name": "elements-panel",
-          "selector": "#left-panel",
-          "padding": 0
+          "region": "navigator/panel:blocks"
+        }
+      ],
+      "capture": [
+        {
+          "image": "elements-panel",
+          "of": "navigator"
         }
       ]
     },
     {
       "name": "layers-panel-shot",
       "docs": ["studio/design/layers"],
-      "project": "packages/starters/sites/event",
-      "file": "components/ev-savedate.json",
-      "canvasMode": "design",
-      "clip": "none",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/event",
+        "file": "components/ev-savedate.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "select",
-          "path": ["children", 0]
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "path": ["children", 0]
+          },
+          "cmd": "selection.set"
         }
       ],
-      "regions": [
+      "expect": [
         {
-          "name": "layers-panel",
-          "selector": "#left-panel",
-          "padding": 0
+          "region": "navigator/panel:layers"
+        }
+      ],
+      "capture": [
+        {
+          "image": "layers-panel",
+          "of": "navigator"
         }
       ]
     },
     {
       "name": "imports-panel-shot",
       "docs": ["studio/projects/dependencies"],
-      "project": "packages/starters/sites/shop",
-      "file": "project.json",
-      "clip": "none",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/shop",
+        "file": "project.json"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "imports"
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "imports"
+          },
+          "cmd": "view.setActivity"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "region": "navigator/panel:imports"
         }
       ],
-      "regions": [
+      "capture": [
         {
-          "name": "imports-panel",
-          "selector": "#left-panel",
-          "padding": 0
+          "image": "imports-panel",
+          "of": "navigator"
         }
       ]
     },
     {
       "name": "document-panel-shot",
       "docs": ["studio/editing/frontmatter"],
-      "project": "packages/starters/sites/blog",
-      "file": "content/posts/designing-for-slowness.md",
-      "canvasMode": "edit",
-      "clip": "none",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/blog",
+        "file": "content/posts/designing-for-slowness.md",
+        "view": "edit"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "head"
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "head"
+          },
+          "cmd": "view.setActivity"
         }
       ],
-      "regions": [
+      "expect": [
         {
-          "name": "document-panel",
-          "selector": "#left-panel",
-          "padding": 0
+          "region": "navigator/panel:head"
+        }
+      ],
+      "capture": [
+        {
+          "image": "document-panel",
+          "of": "navigator"
         }
       ]
     },
     {
       "name": "data-explorer-shot",
       "docs": ["studio/logic/data-explorer"],
-      "file": "components/re-listings-filter.json",
-      "canvasMode": "design",
-      "clip": "none",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "components/re-listings-filter.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "data"
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "wait",
-          "ms": 800
+          "args": {
+            "tab": "data"
+          },
+          "cmd": "view.setActivity"
         }
       ],
-      "regions": [
+      "expect": [
         {
-          "name": "data-explorer",
-          "selector": "#left-panel",
-          "padding": 0
+          "region": "navigator/panel:data"
+        }
+      ],
+      "capture": [
+        {
+          "image": "data-explorer",
+          "of": "navigator"
         }
       ]
     },
     {
       "name": "grid-mode",
       "docs": ["studio/editing/grid"],
-      "file": "content/listings.csv",
-      "waitFor": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "content/listings.csv"
+      },
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".tabulator"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "state": {
+            "editor": {
+              "kind": "grid"
+            }
+          }
         }
       ],
-      "actions": [
+      "capture": [
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "image": "grid-mode"
         }
-      ],
-      "noCanvas": true
+      ]
     },
     {
       "name": "block-action-bar-shot",
       "docs": ["studio/interface/canvas"],
-      "project": "packages/starters/sites/restaurant",
-      "file": "pages/index.md",
-      "canvasMode": "edit",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/restaurant",
+        "file": "pages/index.md",
+        "view": "edit"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "run",
-          "id": "view.toggleActivity",
           "args": {
             "tab": "layers"
-          }
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "wait",
-          "ms": 400
+          "args": {
+            "open": false
+          },
+          "cmd": "view.setNavigator"
         },
         {
-          "do": "canvasClick",
-          "selector": "xpath/(//h3)[3]"
-        },
-        {
-          "do": "wait",
-          "ms": 600
+          "input": "caret",
+          "path": ["children", 1]
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".block-action-bar"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "overlay.menu:block-action-bar"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "block-action-bar",
-          "selector": ".block-action-bar",
+          "image": "block-action-bar",
+          "of": "overlay.menu:block-action-bar",
           "padding": 260
         }
       ]
@@ -704,172 +662,93 @@
     {
       "name": "slash-menu-shot",
       "docs": ["studio/editing/slash-commands"],
-      "project": "packages/starters/sites/restaurant",
-      "file": "pages/index.md",
-      "canvasMode": "edit",
-      "viewport": {
-        "width": 1920,
-        "height": 1200
+      "status": {
+        "reason": "the inline editor's slash controller does not respond to a synthetic \"/\" keydown: the caret session is live and the character lands in the document, but no overlay.menu:slash-menu slot is ever created. Red on main before the conversion, for the same reason.",
+        "since": "d4e63504",
+        "state": "quarantined"
       },
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/restaurant",
+        "file": "pages/index.md",
+        "view": "edit",
+        "viewport": {
+          "width": 1920,
+          "height": 1200
+        }
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "input": "caret",
+          "path": ["children", 1]
         },
         {
-          "do": "wait",
-          "ms": 2400
+          "input": "type",
+          "text": " "
         },
         {
-          "do": "canvasClick",
-          "selector": "xpath/(//p[contains(., 'Come for the coffee')])[1]"
-        },
-        {
-          "do": "wait",
-          "ms": 800
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasKey",
-          "key": "Enter"
-        },
-        {
-          "do": "wait",
-          "ms": 800
-        },
-        {
-          "do": "canvasType",
+          "input": "type",
           "text": "/"
-        },
-        {
-          "do": "wait",
-          "ms": 800
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": "sp-popover[open] sp-menu-item"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "overlay.menu:slash-menu"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "slash-menu",
-          "selector": "sp-popover[open]",
+          "image": "slash-menu",
+          "of": "overlay.menu:slash-menu",
           "padding": 130
-        }
-      ],
-      "variants": [
-        {
-          "suffix": ".cleanup",
-          "actions": [
-            {
-              "do": "canvasKey",
-              "key": "Escape"
-            },
-            {
-              "do": "wait",
-              "ms": 400
-            },
-            {
-              "do": "canvasKey",
-              "key": "Escape"
-            },
-            {
-              "do": "wait",
-              "ms": 400
-            },
-            {
-              "do": "canvasKey",
-              "key": "Delete"
-            },
-            {
-              "do": "wait",
-              "ms": 600
-            }
-          ],
-          "waitFor": [
-            {
-              "type": "settle",
-              "frames": 2
-            }
-          ]
         }
       ]
     },
     {
       "name": "inline-editing-shot",
       "docs": ["studio/editing/writing"],
-      "project": "packages/starters/sites/restaurant",
-      "file": "pages/index.md",
-      "canvasMode": "edit",
-      "viewport": {
-        "width": 1920,
-        "height": 1200
+      "open": {
+        "project": "packages/starters/sites/restaurant",
+        "file": "pages/index.md",
+        "view": "edit",
+        "viewport": {
+          "width": 1920,
+          "height": 1200
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "run",
-          "id": "view.setRightPanel",
           "args": {
             "open": false
-          }
+          },
+          "cmd": "view.setRightPanel"
         },
         {
-          "do": "wait",
-          "ms": 2400
-        },
-        {
-          "do": "canvasClick",
-          "selector": "xpath/(//p[contains(., 'Come for the coffee')])[1]",
+          "input": "caret",
+          "path": ["children", 1],
           "clickCount": 3
-        },
-        {
-          "do": "wait",
-          "ms": 800
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".block-action-bar"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "overlay.menu:block-action-bar"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "inline-editing",
-          "selector": ".block-action-bar",
+          "image": "inline-editing",
+          "of": "overlay.menu:block-action-bar",
           "padding": 230
         }
       ]
@@ -877,71 +756,55 @@
     {
       "name": "properties-panel-shot",
       "docs": ["studio/design/properties", "studio/logic/formulas"],
-      "file": "components/re-listing-card.json",
-      "canvasMode": "design",
-      "viewport": {
-        "width": 1920,
-        "height": 800
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "components/re-listing-card.json",
+        "view": "design",
+        "viewport": {
+          "width": 1920,
+          "height": 800
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "select",
-          "path": ["children", 0]
-        },
-        {
-          "do": "setRightTab",
-          "value": "properties"
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "run",
-          "id": "inspector.toggleSection",
           "args": {
-            "section": "Element"
-          }
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "wait",
-          "ms": 400
+          "args": {
+            "path": ["children", 0]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "properties"
+          },
+          "cmd": "view.setRightTab"
+        },
+        {
+          "args": {
+            "open": true,
+            "section": "__element"
+          },
+          "cmd": "inspector.setSection"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "selector",
-          "selector": "#right-panel"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "inspector/field:href"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "properties-panel",
-          "selector": "#right-panel",
-          "padding": 0
+          "image": "properties-panel",
+          "of": "inspector"
         },
         {
-          "name": "field-mode-button",
-          "selector": "#right-panel [data-prop='href']",
+          "image": "field-mode-button",
+          "of": "inspector/field:href",
           "padding": 6
         }
       ]
@@ -949,852 +812,353 @@
     {
       "name": "events-panel-shot",
       "docs": ["studio/logic/events"],
-      "project": "packages/starters/sites/event",
-      "file": "components/ev-agenda-tabs.json",
-      "canvasMode": "design",
-      "viewport": {
-        "width": 1920,
-        "height": 640
+      "open": {
+        "project": "packages/starters/sites/event",
+        "file": "components/ev-agenda-tabs.json",
+        "view": "design",
+        "viewport": {
+          "width": 1920,
+          "height": 640
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "select",
-          "path": ["children", 0, "children", 0]
+          "args": {
+            "path": ["children", 0, "children", 0]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "setRightTab",
-          "value": "events"
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "events"
+          },
+          "cmd": "view.setRightTab"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "selector",
-          "selector": "#right-panel"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "inspector/tab:events"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "events-panel",
-          "selector": "#right-panel",
-          "padding": 0
-        }
-      ]
-    },
-    {
-      "name": "formula-palette-shot",
-      "docs": ["studio/logic/formulas"],
-      "project": "packages/starters/sites/event",
-      "file": "components/ev-agenda-tabs.json",
-      "canvasMode": "design",
-      "actions": [
-        {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "select",
-          "path": ["children", 0, "children", 0]
-        },
-        {
-          "do": "setRightTab",
-          "value": "events"
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "run",
-          "id": "formula.browseCatalog"
-        },
-        {
-          "do": "wait",
-          "ms": 500
-        },
-        {
-          "do": "type",
-          "selector": ".formula-palette-input",
-          "text": "char"
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        }
-      ],
-      "waitFor": [
-        {
-          "type": "selector",
-          "selector": ".formula-palette"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
-        }
-      ],
-      "clip": "none",
-      "regions": [
-        {
-          "name": "formula-palette",
-          "selector": ".formula-palette",
-          "padding": 10
+          "image": "events-panel",
+          "of": "inspector"
         }
       ]
     },
     {
       "name": "formula-workspace",
       "docs": ["studio/logic/formula-workspace"],
-      "project": "packages/starters/sites/course",
-      "file": "components/co-curriculum-accordion.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/course",
+        "file": "components/co-curriculum-accordion.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "state"
+          "args": {
+            "tab": "state"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "run",
-          "id": "view.setRightPanel",
           "args": {
             "open": false
-          }
+          },
+          "cmd": "view.setRightPanel"
         },
         {
-          "do": "run",
-          "id": "view.setAssistant",
-          "args": {
-            "open": false
-          }
-        },
-        {
-          "do": "wait",
-          "ms": 600
-        },
-        {
-          "do": "run",
-          "id": "state.selectSignal",
           "args": {
             "name": "toggle0"
-          }
+          },
+          "cmd": "state.selectSignal"
         },
         {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "run",
-          "id": "formula.openWorkspace"
-        },
-        {
-          "do": "wait",
-          "ms": 800
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "cmd": "formula.openWorkspace"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "selector",
-          "selector": ".formula-workspace"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "formula-workspace"
         }
       ]
     },
     {
       "name": "statement-editor-shot",
       "docs": ["studio/logic/statements"],
-      "project": "scripts/screenshots/fixtures/statements",
-      "file": "components/rsvp-card.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/statements",
+        "file": "components/rsvp-card.json",
+        "view": "design",
+        "viewport": {
+          "width": 1920,
+          "height": 1600
+        }
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "state"
+          "args": {
+            "tab": "state"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "wait",
-          "ms": 600
-        },
-        {
-          "do": "run",
-          "id": "state.selectSignal",
           "args": {
             "name": "submitRsvp"
-          }
-        },
-        {
-          "do": "wait",
-          "ms": 500
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          },
+          "cmd": "state.selectSignal"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".statement-kind-label"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "navigator/statements"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "statement-editor",
-          "selector": "#left-panel div:has(> .statement-card)",
+          "image": "statement-editor",
+          "of": "navigator/statements",
           "padding": 30
         }
-      ],
-      "viewport": {
-        "width": 1920,
-        "height": 1600
-      }
+      ]
     },
     {
       "name": "selector-menu-shot",
       "docs": ["studio/design/states-and-selectors"],
-      "file": "components/re-listing-card.json",
-      "canvasMode": "design",
-      "viewport": {
-        "width": 1920,
-        "height": 800
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "components/re-listing-card.json",
+        "view": "design",
+        "viewport": {
+          "width": 1920,
+          "height": 800
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "select",
-          "path": []
+          "args": {
+            "path": []
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "setRightTab",
-          "value": "style"
+          "args": {
+            "tab": "style"
+          },
+          "cmd": "view.setRightTab"
         },
         {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "run",
-          "id": "style.openSelectorMenu"
-        },
-        {
-          "do": "wait",
-          "ms": 500
+          "cmd": "style.openSelectorMenu"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": "#right-panel"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "inspector/tab:style"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "selector-menu",
-          "selector": "#right-panel",
-          "padding": 0
+          "image": "selector-menu",
+          "of": "inspector"
         }
       ]
     },
     {
       "name": "convert-to-component",
       "docs": ["studio/design/components"],
-      "file": "components/re-listing-card.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "components/re-listing-card.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "path": ["children", 1]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "wait",
-          "ms": 800
+          "cmd": "selection.convertToComponent"
         },
         {
-          "do": "canvasClick",
-          "selector": "xpath/(//h3)[1]"
-        },
-        {
-          "do": "wait",
-          "ms": 600
-        },
-        {
-          "do": "run",
-          "id": "element.convertToComponent"
-        },
-        {
-          "do": "wait",
-          "ms": 500
-        },
-        {
-          "do": "canvasType",
-          "text": "r"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "e"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "-"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "c"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "a"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "r"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "d"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "-"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "t"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "i"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "t"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "l"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
-          "text": "e"
-        },
-        {
-          "do": "wait",
-          "ms": 90
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "wait",
-          "ms": 200
+          "input": "type",
+          "text": "re-card-title"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": "sp-dialog-wrapper"
-        },
+          "state": {
+            "modal": {
+              "open": true
+            }
+          }
+        }
+      ],
+      "capture": [
         {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "convert-to-component"
         }
       ]
     },
     {
       "name": "repeat-dialog",
       "docs": ["studio/design/repeaters"],
-      "file": "components/rsvp-card.json",
-      "canvasMode": "design",
-      "actions": [
+      "status": {
+        "reason": "the Repeat dialog is reachable only through the element context menu, whose \"selection.repeat\" record lives in editor/context-menu.ts's own registry rather than the app's; the contract has no right-click input kind. P5 moves the record into the app registry.",
+        "since": "d4e63504",
+        "state": "quarantined"
+      },
+      "open": {
+        "project": "scripts/screenshots/fixtures/statements",
+        "file": "components/rsvp-card.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "path": ["children", 0]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "wait",
-          "ms": 800
-        },
-        {
-          "do": "canvasClick",
-          "selector": "xpath/(//p)[1]"
-        },
-        {
-          "do": "wait",
-          "ms": 500
-        },
-        {
-          "do": "canvasClick",
-          "selector": "xpath/(//p)[1]",
-          "button": "right"
-        },
-        {
-          "do": "wait",
-          "ms": 500
-        },
-        {
-          "do": "run",
-          "id": "element.repeat"
-        },
-        {
-          "do": "wait",
-          "ms": 600
+          "cmd": "selection.repeat"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "selector",
-          "selector": "sp-dialog-wrapper"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "repeat-dialog"
         }
-      ],
-      "project": "scripts/screenshots/fixtures/statements"
+      ]
     },
     {
       "name": "tab-strip-shot",
       "docs": ["studio/interface/tabs"],
-      "project": "packages/starters/sites/restaurant",
-      "file": "pages/index.md",
-      "canvasMode": "edit",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/restaurant",
+        "file": "pages/index.md",
+        "view": "edit",
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        }
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "input": "caret",
+          "path": ["children", 1]
         },
         {
-          "do": "wait",
-          "ms": 1000
-        },
-        {
-          "do": "canvasClick",
-          "selector": "xpath/(//p[contains(., 'Come for the coffee')])[1]"
-        },
-        {
-          "do": "wait",
-          "ms": 700
-        },
-        {
-          "do": "canvasKey",
-          "key": "End"
-        },
-        {
-          "do": "canvasType",
+          "input": "type",
           "text": " Come hungry."
         },
         {
-          "do": "wait",
-          "ms": 400
+          "cmd": "palette.openFiles"
         },
         {
-          "do": "canvasKey",
-          "key": "Backspace"
+          "input": "type",
+          "text": "menu\n"
         },
         {
-          "do": "canvasKey",
-          "key": "Backspace"
+          "cmd": "palette.openFiles"
         },
         {
-          "do": "canvasKey",
-          "key": "Backspace"
+          "input": "type",
+          "text": "bit-hero\n"
         },
         {
-          "do": "canvasKey",
-          "key": "Backspace"
+          "cmd": "palette.openFiles"
         },
         {
-          "do": "canvasKey",
-          "key": "Backspace"
-        },
-        {
-          "do": "canvasKey",
-          "key": "Backspace"
-        },
-        {
-          "do": "canvasKey",
-          "key": "Backspace"
-        },
-        {
-          "do": "canvasKey",
-          "key": "Backspace"
-        },
-        {
-          "do": "canvasKey",
-          "key": "Backspace"
-        },
-        {
-          "do": "canvasKey",
-          "key": "Backspace"
-        },
-        {
-          "do": "canvasKey",
-          "key": "Backspace"
-        },
-        {
-          "do": "canvasKey",
-          "key": "Backspace"
-        },
-        {
-          "do": "canvasKey",
-          "key": "Backspace"
-        },
-        {
-          "do": "canvasKey",
-          "key": "Escape"
-        },
-        {
-          "do": "wait",
-          "ms": 500
-        },
-        {
-          "do": "openQuickSearch"
-        },
-        {
-          "do": "type",
-          "selector": ".quick-search-input",
-          "text": "menu"
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "canvasKey",
-          "key": "Enter"
-        },
-        {
-          "do": "wait",
-          "ms": 1200
-        },
-        {
-          "do": "openQuickSearch"
-        },
-        {
-          "do": "type",
-          "selector": ".quick-search-input",
-          "text": "bit-hero"
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "canvasKey",
-          "key": "Enter"
-        },
-        {
-          "do": "wait",
-          "ms": 1200
-        },
-        {
-          "do": "openQuickSearch"
-        },
-        {
-          "do": "type",
-          "selector": ".quick-search-input",
-          "text": "about"
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "canvasKey",
-          "key": "Enter"
-        },
-        {
-          "do": "wait",
-          "ms": 1500
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "input": "type",
+          "text": "about\n"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "selector",
-          "selector": ".tab-strip-dirty"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
-        }
-      ],
-      "clip": "none",
-      "regions": [
-        {
-          "name": "tab-strip",
-          "selector": "#tab-strip",
+          "image": "tab-strip",
+          "of": "pane.primary/tabs",
           "padding": 3
         }
-      ],
-      "viewport": {
-        "width": 1280,
-        "height": 900
-      }
+      ]
     },
     {
       "name": "media-picker-shot",
       "docs": ["studio/projects/media"],
-      "project": "packages/starters/sites/restaurant",
-      "file": "pages/about.md",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/restaurant",
+        "file": "pages/about.md",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
+        },
+        {
+          "args": {
+            "path": ["children", 1]
+          },
+          "cmd": "selection.set"
+        },
+        {
+          "args": {
+            "tab": "properties"
+          },
+          "cmd": "view.setRightTab"
+        },
+        {
+          "input": "type",
+          "region": "inspector/field:image/browse",
+          "text": "",
+          "unstable": {
+            "reason": "\"media.browse\" has no command record; P7.5 lands it as a registry verb",
+            "until": "P7.5"
           }
-        },
-        {
-          "do": "select",
-          "path": ["children", 1]
-        },
-        {
-          "do": "setRightTab",
-          "value": "properties"
-        },
-        {
-          "do": "wait",
-          "ms": 600
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "run",
-          "id": "media.browse"
-        },
-        {
-          "do": "wait",
-          "ms": 900
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": "sp-popover[open] .media-picker-filter"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "region": "overlay.menu:media-picker"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "media-picker",
-          "selector": "sp-popover[open]",
+          "image": "media-picker",
+          "of": "overlay.menu:media-picker",
           "padding": 130
         }
       ]
@@ -1802,1496 +1166,1057 @@
     {
       "name": "counter-elements",
       "docs": ["start/first-component"],
-      "project": "scripts/screenshots/fixtures/counter-elements",
-      "file": "components/counter-card.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/counter-elements",
+        "file": "components/counter-card.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "blocks"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "blocks"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setZoom",
-          "value": 0.6
-        },
-        {
-          "do": "select",
-          "path": ["children", 0]
-        },
-        {
-          "do": "setRightTab",
-          "value": "properties"
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "run",
-          "id": "inspector.toggleSection",
           "args": {
-            "section": "Element"
-          }
+            "zoom": 0.6
+          },
+          "cmd": "canvas.setZoom"
         },
         {
-          "do": "wait",
-          "ms": 400
+          "args": {
+            "path": ["children", 0]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "properties"
+          },
+          "cmd": "view.setRightTab"
+        },
+        {
+          "args": {
+            "open": true,
+            "section": "__element"
+          },
+          "cmd": "inspector.setSection"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "selector",
-          "selector": "#right-panel"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "counter-elements"
         }
       ]
     },
     {
       "name": "counter-text-binding",
       "docs": ["start/first-component"],
-      "project": "scripts/screenshots/fixtures/counter",
-      "file": "components/counter-card.json",
-      "canvasMode": "design",
-      "viewport": {
-        "width": 1920,
-        "height": 560
+      "open": {
+        "project": "scripts/screenshots/fixtures/counter",
+        "file": "components/counter-card.json",
+        "view": "design",
+        "viewport": {
+          "width": 1920,
+          "height": 560
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "select",
-          "path": ["children", 1]
-        },
-        {
-          "do": "setRightTab",
-          "value": "properties"
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "run",
-          "id": "inspector.toggleSection",
           "args": {
-            "section": "Element"
-          }
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "wait",
-          "ms": 400
+          "args": {
+            "path": ["children", 1]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "properties"
+          },
+          "cmd": "view.setRightTab"
+        },
+        {
+          "args": {
+            "open": true,
+            "section": "__element"
+          },
+          "cmd": "inspector.setSection"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "selector",
-          "selector": "#right-panel"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "inspector/tab:properties"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "counter-text-binding",
-          "selector": "#right-panel",
-          "padding": 0
+          "image": "counter-text-binding",
+          "of": "inspector"
         }
       ]
     },
     {
       "name": "counter-onclick",
       "docs": ["start/first-component"],
-      "project": "scripts/screenshots/fixtures/counter",
-      "file": "components/counter-card.json",
-      "canvasMode": "design",
-      "viewport": {
-        "width": 1920,
-        "height": 640
+      "open": {
+        "project": "scripts/screenshots/fixtures/counter",
+        "file": "components/counter-card.json",
+        "view": "design",
+        "viewport": {
+          "width": 1920,
+          "height": 640
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "select",
-          "path": ["children", 0]
+          "args": {
+            "path": ["children", 0]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "setRightTab",
-          "value": "events"
-        },
-        {
-          "do": "wait",
-          "ms": 600
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "events"
+          },
+          "cmd": "view.setRightTab"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "selector",
-          "selector": ".events-panel"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "inspector/tab:events"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "counter-onclick",
-          "selector": "#right-panel",
-          "padding": 0
+          "image": "counter-onclick",
+          "of": "inspector"
         }
       ]
     },
     {
       "name": "counter-preview",
       "docs": ["start/first-component"],
-      "project": "scripts/screenshots/fixtures/counter-preview",
-      "file": "components/counter-card.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/counter-preview",
+        "file": "components/counter-card.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "state"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "state"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setZoom",
-          "value": 0.8
+          "args": {
+            "zoom": 0.8
+          },
+          "cmd": "canvas.setZoom"
         },
         {
-          "do": "run",
-          "id": "canvas.togglePreview"
-        },
-        {
-          "do": "wait",
-          "ms": 800
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "mode": "preview"
+          },
+          "cmd": "canvas.setMode"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "counter-preview"
         }
       ]
     },
     {
       "name": "counter-finished",
       "docs": ["start/first-component"],
-      "project": "scripts/screenshots/fixtures/counter-preview",
-      "file": "components/counter-card.json",
-      "canvasMode": "design",
-      "viewport": {
-        "width": 1920,
-        "height": 1200
+      "open": {
+        "project": "scripts/screenshots/fixtures/counter-preview",
+        "file": "components/counter-card.json",
+        "view": "design",
+        "viewport": {
+          "width": 1920,
+          "height": 1200
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setZoom",
-          "value": 0.8
+          "args": {
+            "zoom": 0.8
+          },
+          "cmd": "canvas.setZoom"
         },
         {
-          "do": "run",
-          "id": "canvas.togglePreview"
-        },
-        {
-          "do": "wait",
-          "ms": 800
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "mode": "preview"
+          },
+          "cmd": "canvas.setMode"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "counter-finished"
         }
       ]
     },
     {
       "name": "counter-data-explorer",
       "docs": ["start/first-component"],
-      "project": "scripts/screenshots/fixtures/counter-preview",
-      "file": "components/counter-card.json",
-      "canvasMode": "design",
-      "viewport": {
-        "width": 1920,
-        "height": 480
+      "open": {
+        "project": "scripts/screenshots/fixtures/counter-preview",
+        "file": "components/counter-card.json",
+        "view": "design",
+        "viewport": {
+          "width": 1920,
+          "height": 480
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "run",
-          "id": "canvas.togglePreview"
+          "args": {
+            "mode": "preview"
+          },
+          "cmd": "canvas.setMode"
         },
         {
-          "do": "wait",
-          "ms": 600
+          "args": {
+            "tab": "data"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setActivity",
-          "value": "data"
-        },
-        {
-          "do": "wait",
-          "ms": 1000
-        },
-        {
-          "do": "run",
-          "id": "data.expandRow",
           "args": {
             "name": "count"
-          }
-        },
-        {
-          "do": "wait",
-          "ms": 500
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          },
+          "cmd": "data.expandRow"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "selector",
-          "selector": ".data-tree"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "navigator/panel:data"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "counter-data-explorer",
-          "selector": "#left-panel",
-          "padding": 0
+          "image": "counter-data-explorer",
+          "of": "navigator"
         }
       ]
     },
     {
       "name": "counter-test-prop",
       "docs": ["start/first-component"],
-      "project": "scripts/screenshots/fixtures/counter",
-      "file": "components/counter-card.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/counter",
+        "file": "components/counter-card.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setZoom",
-          "value": 0.8
+          "args": {
+            "zoom": 0.8
+          },
+          "cmd": "canvas.setZoom"
         },
         {
-          "do": "run",
-          "id": "canvas.togglePreview"
+          "args": {
+            "mode": "preview"
+          },
+          "cmd": "canvas.setMode"
         },
         {
-          "do": "wait",
-          "ms": 600
-        },
-        {
-          "do": "type",
-          "selector": ".tab-bar-prop",
-          "text": "100"
-        },
-        {
-          "do": "canvasKey",
-          "key": "Enter"
-        },
-        {
-          "do": "wait",
-          "ms": 1000
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "input": "type",
+          "region": "pane.primary/prop:count",
+          "text": "100\n"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "counter-test-prop"
         }
       ]
     },
     {
       "name": "blog-content-type",
       "docs": ["start/first-collection"],
-      "project": "scripts/screenshots/fixtures/first-collection-start",
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/first-collection-start",
+        "file": "pages/index.md",
+        "view": "preview",
+        "viewport": {
+          "width": 1920,
+          "height": 720
+        }
+      },
+      "steps": [
         {
-          "do": "openSettings"
-        },
-        {
-          "do": "wait",
-          "ms": 1200
-        },
-        {
-          "do": "run",
-          "id": "settings.setSection",
           "args": {
             "section": "content"
+          },
+          "cmd": "settings.open"
+        },
+        {
+          "input": "type",
+          "region": "overlay.dialog:settings/entry:posts",
+          "text": "",
+          "unstable": {
+            "reason": "\"settings.selectEntry\" has no command record; P6.2 opens settings entries as tabs",
+            "until": "P6.2"
           }
-        },
-        {
-          "do": "wait",
-          "ms": 700
-        },
-        {
-          "do": "run",
-          "id": "settings.selectEntry",
-          "args": {
-            "name": "posts"
-          }
-        },
-        {
-          "do": "wait",
-          "ms": 700
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".settings-modal"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "region": "overlay.dialog:settings/entry:posts"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "blog-content-type",
-          "selector": ".settings-modal",
-          "padding": 0
+          "image": "blog-content-type",
+          "of": "overlay.dialog:settings"
         }
-      ],
-      "viewport": {
-        "width": 1920,
-        "height": 720
-      }
+      ]
     },
     {
       "name": "blog-schema-fields",
       "docs": ["start/first-collection"],
-      "project": "scripts/screenshots/fixtures/first-collection",
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/first-collection",
+        "file": "pages/index.md",
+        "view": "preview",
+        "viewport": {
+          "width": 1920,
+          "height": 720
+        }
+      },
+      "steps": [
         {
-          "do": "openSettings"
-        },
-        {
-          "do": "wait",
-          "ms": 1200
-        },
-        {
-          "do": "run",
-          "id": "settings.setSection",
           "args": {
             "section": "content"
+          },
+          "cmd": "settings.open"
+        },
+        {
+          "input": "type",
+          "region": "overlay.dialog:settings/entry:posts",
+          "text": "",
+          "unstable": {
+            "reason": "\"settings.selectEntry\" has no command record; P6.2 opens settings entries as tabs",
+            "until": "P6.2"
           }
-        },
-        {
-          "do": "wait",
-          "ms": 700
-        },
-        {
-          "do": "run",
-          "id": "settings.selectEntry",
-          "args": {
-            "name": "posts"
-          }
-        },
-        {
-          "do": "wait",
-          "ms": 700
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".settings-modal"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "region": "overlay.dialog:settings/entry:posts"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "blog-schema-fields",
-          "selector": ".settings-modal",
-          "padding": 0
+          "image": "blog-schema-fields",
+          "of": "overlay.dialog:settings"
         }
-      ],
-      "viewport": {
-        "width": 1920,
-        "height": 720
-      }
+      ]
     },
     {
       "name": "blog-grid",
       "docs": ["start/first-collection"],
-      "project": "scripts/screenshots/fixtures/first-collection",
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/first-collection",
+        "file": "pages/index.md",
+        "view": "preview"
+      },
+      "steps": [
         {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "files"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setActivity",
-          "value": "files"
-        },
-        {
-          "do": "wait",
-          "ms": 800
-        },
-        {
-          "do": "run",
-          "id": "file.contextMenu",
           "args": {
-            "path": "content/posts"
-          }
-        },
-        {
-          "do": "wait",
-          "ms": 500
-        },
-        {
-          "do": "run",
-          "id": "collection.editInGrid"
-        },
-        {
-          "do": "wait",
-          "ms": 1500
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+            "name": "posts"
+          },
+          "cmd": "collection.editInGrid"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".tabulator"
-        },
+          "state": {
+            "editor": {
+              "kind": "grid"
+            }
+          }
+        }
+      ],
+      "capture": [
         {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "image": "blog-grid"
         }
       ]
     },
     {
       "name": "blog-card",
       "docs": ["start/first-collection"],
-      "project": "scripts/screenshots/fixtures/first-collection-card",
-      "file": "pages/blog.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/first-collection-card",
+        "file": "pages/blog.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setZoom",
-          "value": 0.6
+          "args": {
+            "zoom": 0.6
+          },
+          "cmd": "canvas.setZoom"
         },
         {
-          "do": "select",
-          "path": ["children", 0]
+          "args": {
+            "path": ["children", 0]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "setRightTab",
-          "value": "properties"
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "properties"
+          },
+          "cmd": "view.setRightTab"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "blog-card"
         }
       ]
     },
     {
       "name": "blog-collection-state",
       "docs": ["start/first-collection"],
-      "project": "scripts/screenshots/fixtures/first-collection-state",
-      "file": "pages/blog.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/first-collection-state",
+        "file": "pages/blog.json",
+        "view": "design",
+        "viewport": {
+          "width": 1920,
+          "height": 680
+        }
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "state"
+          "args": {
+            "tab": "state"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "wait",
-          "ms": 600
-        },
-        {
-          "do": "run",
-          "id": "state.selectSignal",
           "args": {
             "name": "posts"
-          }
-        },
-        {
-          "do": "wait",
-          "ms": 800
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          },
+          "cmd": "state.selectSignal"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "navigator/panel:state"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "blog-collection-state",
-          "selector": "#left-panel",
-          "padding": 0
+          "image": "blog-collection-state",
+          "of": "navigator"
         }
-      ],
-      "viewport": {
-        "width": 1920,
-        "height": 680
-      }
+      ]
     },
     {
       "name": "blog-repeat-dialog",
       "docs": ["start/first-collection"],
-      "project": "scripts/screenshots/fixtures/first-collection-state",
-      "file": "pages/blog.json",
-      "canvasMode": "design",
-      "actions": [
+      "status": {
+        "reason": "the Repeat dialog is reachable only through the element context menu, whose \"selection.repeat\" record lives in editor/context-menu.ts's own registry rather than the app's; the contract has no right-click input kind. P5 moves the record into the app registry.",
+        "since": "d4e63504",
+        "state": "quarantined"
+      },
+      "open": {
+        "project": "scripts/screenshots/fixtures/first-collection-state",
+        "file": "pages/blog.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "wait",
-          "ms": 800
-        },
-        {
-          "do": "select",
-          "path": ["children", 0]
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "run",
-          "id": "layers.contextMenu",
           "args": {
-            "label": "article"
-          }
+            "path": ["children", 0]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "wait",
-          "ms": 500
-        },
-        {
-          "do": "run",
-          "id": "element.repeat"
-        },
-        {
-          "do": "wait",
-          "ms": 800
+          "cmd": "selection.repeat"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "selector",
-          "selector": "sp-dialog-wrapper"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "blog-repeat-dialog"
         }
       ]
     },
     {
       "name": "blog-insert-data",
       "docs": ["start/first-collection"],
-      "project": "scripts/screenshots/fixtures/first-collection-bind",
-      "file": "pages/blog.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/first-collection-bind",
+        "file": "pages/blog.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
+        },
+        {
+          "input": "caret",
+          "path": ["children", 0, "map", "children", 0]
+        },
+        {
+          "input": "type",
+          "region": "overlay.menu:block-action-bar/insertData",
+          "text": "",
+          "unstable": {
+            "reason": "\"element.insertData\" has no command record; P5 lands it as insert.data",
+            "until": "P5"
           }
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "wait",
-          "ms": 1000
-        },
-        {
-          "do": "canvasClick",
-          "selector": "xpath/(//h3)[1]"
-        },
-        {
-          "do": "wait",
-          "ms": 800
-        },
-        {
-          "do": "run",
-          "id": "element.insertData"
-        },
-        {
-          "do": "wait",
-          "ms": 700
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "selector",
-          "selector": "sp-popover[open] sp-menu-item"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "blog-insert-data"
         }
       ]
     },
     {
       "name": "blog-preview",
       "docs": ["start/first-collection"],
-      "project": "scripts/screenshots/fixtures/first-collection",
-      "file": "pages/blog.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/first-collection",
+        "file": "pages/blog.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "state"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "state"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setZoom",
-          "value": 0.8
+          "args": {
+            "zoom": 0.8
+          },
+          "cmd": "canvas.setZoom"
         },
         {
-          "do": "run",
-          "id": "canvas.togglePreview"
-        },
-        {
-          "do": "wait",
-          "ms": 1500
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "mode": "preview"
+          },
+          "cmd": "canvas.setMode"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "blog-preview"
         }
       ]
     },
     {
       "name": "blog-finished",
       "docs": ["start/first-collection"],
-      "project": "scripts/screenshots/fixtures/first-collection",
-      "file": "pages/blog.json",
-      "canvasMode": "design",
-      "viewport": {
-        "width": 1920,
-        "height": 1200
+      "open": {
+        "project": "scripts/screenshots/fixtures/first-collection",
+        "file": "pages/blog.json",
+        "view": "design",
+        "viewport": {
+          "width": 1920,
+          "height": 1200
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setZoom",
-          "value": 0.8
+          "args": {
+            "zoom": 0.8
+          },
+          "cmd": "canvas.setZoom"
         },
         {
-          "do": "run",
-          "id": "canvas.togglePreview"
-        },
-        {
-          "do": "wait",
-          "ms": 1500
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "mode": "preview"
+          },
+          "cmd": "canvas.setMode"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "blog-finished"
         }
       ]
     },
     {
       "name": "content-type-builder-shot",
       "docs": ["studio/projects/content-types"],
-      "project": "packages/starters/sites/blog",
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/blog",
+        "file": "pages/index.md",
+        "view": "preview"
+      },
+      "steps": [
         {
-          "do": "openSettings"
-        },
-        {
-          "do": "wait",
-          "ms": 1200
-        },
-        {
-          "do": "run",
-          "id": "settings.setSection",
           "args": {
             "section": "content"
+          },
+          "cmd": "settings.open"
+        },
+        {
+          "input": "type",
+          "region": "overlay.dialog:settings/entry:posts",
+          "text": "",
+          "unstable": {
+            "reason": "\"settings.selectEntry\" has no command record; P6.2 opens settings entries as tabs",
+            "until": "P6.2"
           }
-        },
-        {
-          "do": "wait",
-          "ms": 700
-        },
-        {
-          "do": "run",
-          "id": "settings.selectEntry",
-          "args": {
-            "name": "posts"
-          }
-        },
-        {
-          "do": "wait",
-          "ms": 700
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".settings-modal"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "region": "overlay.dialog:settings/entry:posts"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "content-type-builder",
-          "selector": ".settings-modal",
-          "padding": 0
+          "image": "content-type-builder",
+          "of": "overlay.dialog:settings"
         }
       ]
     },
     {
       "name": "ai-sidebar",
       "docs": ["studio/ai"],
-      "file": "pages/index.md",
-      "canvasMode": "edit",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "pages/index.md",
+        "view": "edit"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "run",
-          "id": "view.setRightPanel",
           "args": {
             "open": false
-          }
+          },
+          "cmd": "view.setRightPanel"
         },
         {
-          "do": "setRightTab",
-          "value": "assistant"
+          "args": {
+            "open": true
+          },
+          "cmd": "view.setAssistant"
         },
         {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "seedAssistant",
-          "messages": [
-            {
-              "role": "user",
-              "content": "Can you make the hero headline feel more welcoming?"
-            },
-            {
-              "role": "assistant",
-              "content": "Done \u2014 I rewrote the hero headline to \"Find the home that fits your life on the north shore.\" and softened the subheading to match. Want me to warm up the call-to-action button too?"
-            }
-          ]
-        },
-        {
-          "do": "wait",
-          "ms": 500
+          "args": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Can you make the hero headline feel more welcoming?"
+              },
+              {
+                "role": "assistant",
+                "content": "Done — I rewrote the hero headline to \"Find the home that fits your life on the north shore.\" and softened the subheading to match. Want me to warm up the call-to-action button too?"
+              }
+            ]
+          },
+          "seed": "seed.assistant"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "canvasReady"
-        },
+          "region": "inspector.assistant"
+        }
+      ],
+      "capture": [
         {
-          "type": "selector",
-          "selector": "#chat-panel .ai-msg-assistant"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "ai-sidebar"
         }
       ]
     },
     {
       "name": "ai-sidebar-chat",
       "docs": ["studio/ai/chat"],
-      "file": "pages/index.md",
-      "canvasMode": "edit",
-      "viewport": {
-        "width": 1920,
-        "height": 680
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "pages/index.md",
+        "view": "edit",
+        "viewport": {
+          "width": 1920,
+          "height": 680
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "open": true
+          },
+          "cmd": "view.setAssistant"
         },
         {
-          "do": "setRightTab",
-          "value": "assistant"
-        },
-        {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "seedAssistant",
-          "messages": [
-            {
-              "role": "user",
-              "content": "What does this page show above the fold?"
-            },
-            {
-              "role": "assistant",
-              "content": "The hero pairs the headline with a search card \u2014 visitors can filter by price, beds, and baths before they scroll. Below it, a stats band builds trust with the agency's track record."
-            },
-            {
-              "role": "user",
-              "content": "Make this headline a little shorter.\n\n---- attached context ----\nPage: pages/index.md\nSelected element at [\"children\",0]: <re-hero> \"Find the home that fits your life\u2026\""
-            },
-            {
-              "role": "assistant",
-              "content": "Trimmed it to \"Find the home that fits your life.\" \u2014 still warm, but it now sits on two lines above the search card.",
-              "toolCalls": [
-                {
-                  "name": "set_property",
-                  "arguments": "{\"path\":[\"children\",0],\"name\":\"heading\",\"value\":\"Find the home that fits your life.\"}"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "do": "wait",
-          "ms": 500
+          "args": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "What does this page show above the fold?"
+              },
+              {
+                "role": "assistant",
+                "content": "The hero pairs the headline with a search card — visitors can filter by price, beds, and baths before they scroll. Below it, a stats band builds trust with the agency's track record."
+              },
+              {
+                "role": "user",
+                "content": "Make this headline a little shorter.\n\n---- attached context ----\nPage: pages/index.md\nSelected element at [\"children\",0]: <re-hero> \"Find the home that fits your life…\""
+              },
+              {
+                "role": "assistant",
+                "content": "Trimmed it to \"Find the home that fits your life.\" — still warm, but it now sits on two lines above the search card.",
+                "toolCalls": [
+                  {
+                    "name": "set_property",
+                    "arguments": "{\"path\":[\"children\",0],\"name\":\"heading\",\"value\":\"Find the home that fits your life.\"}"
+                  }
+                ]
+              }
+            ]
+          },
+          "seed": "seed.assistant"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "selector",
-          "selector": "#chat-panel .ai-tool-chip"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "inspector.assistant"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "ai-sidebar-chat",
-          "selector": "#chat-panel",
-          "padding": 0
+          "image": "ai-sidebar-chat",
+          "of": "inspector.assistant"
         }
       ]
     },
     {
       "name": "ai-document-assistant",
       "docs": ["studio/ai/document-assistant"],
-      "file": "pages/index.md",
-      "canvasMode": "edit",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "pages/index.md",
+        "view": "edit"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
+          "args": {
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "run",
-          "id": "view.setRightPanel",
           "args": {
             "open": false
-          }
+          },
+          "cmd": "view.setRightPanel"
         },
         {
-          "do": "setRightTab",
-          "value": "assistant"
+          "args": {
+            "open": true
+          },
+          "cmd": "view.setAssistant"
         },
         {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "seedAssistant",
-          "messages": [
-            {
-              "role": "user",
-              "content": "Add a short welcome line under the stats band and make the eyebrow text easier to read.\n\n---- attached context ----\nPage: pages/index.md"
-            },
-            {
-              "role": "assistant",
-              "content": "Done \u2014 I added a one-line welcome under the stats band and bumped the eyebrow's contrast. Both edits are on the canvas now; undo works as usual if you want to step back.",
-              "toolCalls": [
-                {
-                  "name": "add_child",
-                  "arguments": "{\"parentPath\":[\"children\",1],\"tagName\":\"p\"}"
-                },
-                {
-                  "name": "set_text",
-                  "arguments": "{\"path\":[\"children\",1,\"children\",2],\"text\":\"Welcome home \u2014 let's find yours.\"}"
-                },
-                {
-                  "name": "set_style",
-                  "arguments": "{\"path\":[\"children\",0],\"property\":\"opacity\",\"value\":\"0.95\"}"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "do": "wait",
-          "ms": 500
+          "args": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "Add a short welcome line under the stats band and make the eyebrow text easier to read.\n\n---- attached context ----\nPage: pages/index.md"
+              },
+              {
+                "role": "assistant",
+                "content": "Done — I added a one-line welcome under the stats band and bumped the eyebrow's contrast. Both edits are on the canvas now; undo works as usual if you want to step back.",
+                "toolCalls": [
+                  {
+                    "name": "add_child",
+                    "arguments": "{\"parentPath\":[\"children\",1],\"tagName\":\"p\"}"
+                  },
+                  {
+                    "name": "set_text",
+                    "arguments": "{\"path\":[\"children\",1,\"children\",2],\"text\":\"Welcome home — let's find yours.\"}"
+                  },
+                  {
+                    "name": "set_style",
+                    "arguments": "{\"path\":[\"children\",0],\"property\":\"opacity\",\"value\":\"0.95\"}"
+                  }
+                ]
+              }
+            ]
+          },
+          "seed": "seed.assistant"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "canvasReady"
-        },
+          "region": "inspector.assistant"
+        }
+      ],
+      "capture": [
         {
-          "type": "selector",
-          "selector": "#chat-panel .ai-tool-chip"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "ai-document-assistant"
         }
       ]
     },
     {
       "name": "data-tables-shot",
       "docs": ["studio/data", "studio/data/tables"],
-      "project": "scripts/screenshots/fixtures/data",
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "viewport": {
-        "width": 1920,
-        "height": 900
+      "open": {
+        "project": "scripts/screenshots/fixtures/data",
+        "file": "pages/index.md",
+        "view": "preview",
+        "viewport": {
+          "width": 1920,
+          "height": 900
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "openSettings",
-          "section": "data"
-        },
-        {
-          "do": "wait",
-          "ms": 1200
-        },
-        {
-          "do": "run",
-          "id": "settings.selectEntry",
           "args": {
-            "name": "comments"
+            "section": "data"
+          },
+          "cmd": "settings.open"
+        },
+        {
+          "input": "type",
+          "region": "overlay.dialog:settings/entry:comments",
+          "text": "",
+          "unstable": {
+            "reason": "\"settings.selectEntry\" has no command record; P6.2 opens settings entries as tabs",
+            "until": "P6.2"
           }
-        },
-        {
-          "do": "wait",
-          "ms": 700
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".settings-editor-panel"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "region": "overlay.dialog:settings/entry:comments"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "data-tables-section",
-          "selector": ".settings-modal",
-          "padding": 0
+          "image": "data-tables-section",
+          "of": "overlay.dialog:settings"
         },
         {
-          "name": "data-table-editor",
-          "selector": ".settings-editor-panel",
-          "padding": 0
+          "image": "data-table-editor",
+          "of": "overlay.dialog:settings/editor"
         }
       ]
     },
     {
       "name": "connections-section",
       "docs": ["studio/data/connections"],
-      "project": "scripts/screenshots/fixtures/data",
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "viewport": {
-        "width": 1920,
-        "height": 720
+      "open": {
+        "project": "scripts/screenshots/fixtures/data",
+        "file": "pages/index.md",
+        "view": "preview",
+        "viewport": {
+          "width": 1920,
+          "height": 720
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "openSettings",
-          "section": "connections"
-        },
-        {
-          "do": "wait",
-          "ms": 1200
-        },
-        {
-          "do": "run",
-          "id": "settings.selectEntry",
           "args": {
-            "name": "main"
+            "section": "connections"
+          },
+          "cmd": "settings.open"
+        },
+        {
+          "input": "type",
+          "region": "overlay.dialog:settings/entry:main",
+          "text": "",
+          "unstable": {
+            "reason": "\"settings.selectEntry\" has no command record; P6.2 opens settings entries as tabs",
+            "until": "P6.2"
           }
-        },
-        {
-          "do": "wait",
-          "ms": 700
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".settings-editor-panel"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "region": "overlay.dialog:settings/entry:main"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "connections-section",
-          "selector": ".settings-modal",
-          "padding": 0
+          "image": "connections-section",
+          "of": "overlay.dialog:settings"
         }
       ]
     },
     {
       "name": "data-grid",
       "docs": ["studio/data/grid"],
-      "project": "scripts/screenshots/fixtures/data",
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/data",
+        "file": "pages/index.md",
+        "view": "preview"
+      },
+      "steps": [
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "args": {
+            "tab": "files"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "setActivity",
-          "value": "files"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
             "open": false
-          }
+          },
+          "cmd": "view.setRightPanel"
         },
         {
-          "do": "run",
-          "id": "view.setRightPanel",
           "args": {
-            "open": false
-          }
-        },
-        {
-          "do": "openDataGrid",
-          "connection": "main",
-          "table": "comments"
-        },
-        {
-          "do": "wait",
-          "ms": 1500
+            "connection": "main",
+            "table": "comments"
+          },
+          "cmd": "data.openGrid"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".tabulator"
-        },
+          "state": {
+            "editor": {
+              "kind": "grid"
+            }
+          }
+        }
+      ],
+      "capture": [
         {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 4
+          "image": "data-grid"
         }
       ]
     },
     {
       "name": "data-source-request",
       "docs": ["studio/logic/data-sources"],
-      "project": "examples",
-      "file": "components/fetch-demo.json",
-      "canvasMode": "design",
-      "actions": [
+      "open": {
+        "project": "examples",
+        "file": "components/fetch-demo.json",
+        "view": "design"
+      },
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "state"
+          "args": {
+            "tab": "state"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "wait",
-          "ms": 600
-        },
-        {
-          "do": "run",
-          "id": "state.selectSignal",
           "args": {
             "name": "allPosts"
-          }
-        },
-        {
-          "do": "wait",
-          "ms": 500
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
+          },
+          "cmd": "state.selectSignal"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "selector",
-          "selector": ".signal-editor"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
-        }
-      ],
-      "clip": "none",
-      "regions": [
-        {
-          "name": "data-source-request",
-          "selector": "#left-panel",
-          "padding": 0
+          "image": "data-source-request",
+          "of": "navigator"
         }
       ]
     },
     {
       "name": "publish-panel",
       "docs": ["studio/publish/cloudflare"],
-      "project": "scripts/screenshots/fixtures/data",
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "actions": [
+      "open": {
+        "project": "scripts/screenshots/fixtures/data",
+        "file": "pages/index.md",
+        "view": "preview"
+      },
+      "steps": [
         {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
-        },
-        {
-          "do": "seedPublish",
-          "deployment": {
-            "id": "3f2a9c1d-8f47-4a10-9d55-6b8f2f6f2b31",
-            "url": "https://main.bistro-cafe.pages.dev",
-            "environment": "production",
-            "stage": "deploy",
-            "status": "success",
-            "createdOn": "2026-07-17T14:02:00Z"
-          }
-        },
-        {
-          "do": "wait",
-          "ms": 500
+            "deployment": {
+              "id": "3f2a9c1d-8f47-4a10-9d55-6b8f2f6f2b31",
+              "url": "https://main.bistro-cafe.pages.dev",
+              "environment": "production",
+              "stage": "deploy",
+              "status": "success",
+              "createdOn": "2026-07-17T14:02:00Z"
+            }
+          },
+          "seed": "seed.publish"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".publish-modal"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "overlay.dialog:publish"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "publish-panel",
-          "selector": ".publish-modal",
+          "image": "publish-panel",
+          "of": "overlay.dialog:publish",
           "padding": 24
         }
       ]
@@ -3299,185 +2224,113 @@
     {
       "name": "collab-presence",
       "docs": ["studio/publish/collaboration"],
-      "file": "pages/index.md",
-      "canvasMode": "edit",
-      "viewport": {
-        "width": 1920,
-        "height": 1200
+      "open": {
+        "project": "packages/starters/sites/real-estate",
+        "file": "pages/index.md",
+        "view": "edit",
+        "viewport": {
+          "width": 1920,
+          "height": 1200
+        }
       },
-      "actions": [
+      "steps": [
         {
-          "do": "setActivity",
-          "value": "layers"
-        },
-        {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "run",
-          "id": "view.setAssistant",
           "args": {
-            "open": false
-          }
+            "tab": "layers"
+          },
+          "cmd": "view.setActivity"
         },
         {
-          "do": "select",
-          "path": ["children", 0]
+          "args": {
+            "path": ["children", 0]
+          },
+          "cmd": "selection.set"
         },
         {
-          "do": "wait",
-          "ms": 400
-        },
-        {
-          "do": "seedCollab",
-          "peers": [
-            {
-              "clientId": 101,
-              "state": {
-                "user": {
-                  "login": "maya",
-                  "name": "Maya",
-                  "color": "#30a46c"
-                },
-                "structuralSelection": ["children", 1, "children", 0]
-              }
-            },
-            {
-              "clientId": 102,
-              "state": {
-                "user": {
-                  "login": "jon",
-                  "name": "Jon",
-                  "color": "#f5a524"
+          "args": {
+            "peers": [
+              {
+                "clientId": 101,
+                "state": {
+                  "user": {
+                    "login": "maya",
+                    "name": "Maya",
+                    "color": "#30a46c"
+                  },
+                  "structuralSelection": ["children", 1, "children", 0]
+                }
+              },
+              {
+                "clientId": 102,
+                "state": {
+                  "user": {
+                    "login": "jon",
+                    "name": "Jon",
+                    "color": "#f5a524"
+                  }
                 }
               }
-            }
-          ]
-        },
-        {
-          "do": "wait",
-          "ms": 800
+            ]
+          },
+          "seed": "seed.collab"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "selector",
-          "selector": ".jx-presence-chip"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "image": "collab-presence"
         }
       ]
     },
     {
       "name": "media-upload",
       "docs": ["studio/projects/media"],
-      "project": "packages/starters/sites/restaurant",
-      "file": "pages/index.md",
-      "canvasMode": "preview",
-      "actions": [
+      "open": {
+        "project": "packages/starters/sites/restaurant",
+        "file": "pages/index.md",
+        "view": "preview"
+      },
+      "steps": [
         {
-          "do": "setStatus",
-          "value": "Ready"
+          "cmd": "project.browse"
         },
         {
-          "do": "openBrowse"
-        },
-        {
-          "do": "wait",
-          "ms": 800
-        },
-        {
-          "do": "run",
-          "id": "project.setBrowseCategory",
-          "args": {
-            "category": "media"
-          }
-        },
-        {
-          "do": "wait",
-          "ms": 700
-        },
-        {
-          "do": "dispatchDragOver",
-          "selector": ".browse-view"
-        },
-        {
-          "do": "wait",
-          "ms": 200
+          "input": "dragOver",
+          "region": "overlay.dialog:library/view"
         }
       ],
-      "waitFor": [
+      "expect": [
         {
-          "type": "selector",
-          "selector": ".browse-view.browse-drop-active"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
+          "region": "overlay.dialog:library/view"
         }
       ],
-      "clip": "none",
-      "regions": [
+      "capture": [
         {
-          "name": "media-upload",
-          "selector": ".browse-view",
-          "padding": 0
+          "image": "media-upload",
+          "of": "overlay.dialog:library/view"
         }
       ]
     },
     {
       "name": "properties-bar",
       "docs": ["studio/editing/frontmatter"],
-      "project": "packages/starters/sites/blog",
-      "file": "content/posts/designing-for-slowness.md",
-      "canvasMode": "edit",
-      "viewport": {
-        "width": 1920,
-        "height": 1400
+      "open": {
+        "project": "packages/starters/sites/blog",
+        "file": "content/posts/designing-for-slowness.md",
+        "view": "edit",
+        "viewport": {
+          "width": 1920,
+          "height": 1400
+        }
       },
-      "actions": [
+      "expect": [
         {
-          "do": "setStatus",
-          "value": "Ready"
-        },
-        {
-          "do": "wait",
-          "ms": 400
+          "region": "pane.primary/frontmatter"
         }
       ],
-      "waitFor": [
+      "capture": [
         {
-          "type": "canvasReady"
-        },
-        {
-          "type": "selector",
-          "selector": "#frontmatter-panel sp-accordion-item"
-        },
-        {
-          "type": "fonts"
-        },
-        {
-          "type": "settle",
-          "frames": 3
-        }
-      ],
-      "clip": "none",
-      "regions": [
-        {
-          "name": "properties-bar",
-          "selector": "#frontmatter-panel",
+          "image": "properties-bar",
+          "of": "pane.primary/frontmatter",
           "padding": 8
         }
       ]

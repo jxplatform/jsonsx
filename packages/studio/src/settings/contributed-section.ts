@@ -308,6 +308,7 @@ function renderMapLayout(
         (name) => html`
           <sp-action-button
             size="s"
+            data-jx-region=${`overlay.dialog:settings/entry:${name}`}
             ?selected=${selected === name}
             @click=${() => {
               selectedEntries.set(sectionKey, name);
@@ -363,7 +364,7 @@ function renderMapLayout(
   const editorTpl: TemplateResult =
     selected && selectedEntry && typeof selectedEntry === "object"
       ? html`
-          <div class="settings-editor-panel">
+          <div class="settings-editor-panel" data-jx-region="overlay.dialog:settings/editor">
             <div class="settings-editor-header">
               <sp-textfield
                 size="s"

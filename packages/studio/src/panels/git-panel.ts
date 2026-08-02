@@ -11,6 +11,7 @@ import type { GitDiffState, GitFileStatus, StudioPlatform } from "../types";
 import { live } from "lit-html/directives/live.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform";
+import { now } from "../services/clock";
 import { formatForPath } from "../format/format-host";
 import { projectState } from "../store";
 import { shell } from "../shell";
@@ -55,7 +56,7 @@ export async function refreshGitStatus() {
     if (failure) {
       git.error = errorMessage(failure);
     }
-    git.lastUpdated = Date.now();
+    git.lastUpdated = now();
   } catch (error) {
     git.error = errorMessage(error);
   } finally {
@@ -447,8 +448,11 @@ export function renderGitPanel(ctx: {
   `;
 
   // ─── 4. Commit form ──────────────────────────────────────────────────────
+  // `navigator/panel:git/commit` is a HAND-STAMPED leaf: the panel host derives
+  // `navigator/panel:git`, but nothing derives the parts inside a panel body. Leaves are the one
+  // Category of region id that is authored, and they are counted for exactly that reason.
   const commitT = html`
-    <div class="git-commit-area">
+    <div class="git-commit-area" data-jx-region="navigator/panel:git/commit">
       <label class="git-commit-label">Please write a commit message</label>
       <sp-textfield
         size="s"
@@ -738,7 +742,7 @@ export function renderGitPanel(ctx: {
                   <span class="git-history-hash">${entry.hash.slice(0, 7)}</span>
                   <span class="git-history-message">${entry.message}</span>
                   <span class="git-history-meta"
-                    >${entry.author} · ${_relativeDate(entry.date)}</span
+                    >${entry.author} · ${relativeDate(entry.date)}</span
                   >
                 </div>
               `,
@@ -757,11 +761,18 @@ export function renderGitPanel(ctx: {
   `;
 }
 
-/** @param {string} iso */
-function _relativeDate(iso: string) {
+/**
+ * A commit age, relative to {@link now}.
+ *
+ * Exported so it is testable at all: reading the wall clock inline meant "yesterday" and the
+ * locale-date fallback could only be asserted against an offset from the real present, and two
+ * captures minutes apart legitimately disagreed.
+ *
+ * @param {string} iso
+ */
+export function relativeDate(iso: string) {
   const d = new Date(iso);
-  const now = Date.now();
-  const diff = now - d.getTime();
+  const diff = now() - d.getTime();
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) {
     return "just now";

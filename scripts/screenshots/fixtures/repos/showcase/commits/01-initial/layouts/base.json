@@ -1,0 +1,14 @@
+{
+  "tagName": "div",
+  "$elements": [{ "$ref": "../components/sc-nav.json" }],
+  "style": {
+    "minHeight": "100vh",
+    "display": "flex",
+    "flexDirection": "column",
+    "backgroundColor": "var(--color-bg)"
+  },
+  "children": [
+    { "tagName": "sc-nav" },
+    { "tagName": "main", "style": { "flex": "1" }, "children": [{ "tagName": "slot" }] }
+  ]
+}

@@ -327,6 +327,32 @@ function pathFromKey(key: string): JxPath {
   return key ? (key.split("/").map((s) => (/^\d+$/u.test(s) ? Number(s) : s)) as JxPath) : [];
 }
 
+/**
+ * The node an Outline row stands for, read back off the row.
+ *
+ * Rows carry their `JxPath` verbatim, as JSON, in `data-jx-path` — node IDENTITY in the DOM. That
+ * is a different thing from the neighbouring `data-path`, which is `pathKey`'s lossy `join("/")`
+ * string and exists as the drag-and-drop and roving-tabindex Map key; `["children", "0"]` and
+ * `["children", 0]` share a key and are different nodes, and a segment containing a slash has no
+ * key at all.
+ *
+ * Everything that has to point at a node from outside the render — shift-range multi-select,
+ * drag-reorder, canvas to Outline sync, a collaborator's cursor, a jump from Problems — needs the
+ * unambiguous one.
+ */
+export function outlineRowPath(el: Element | null): JxPath | null {
+  const row = el?.closest<HTMLElement>("[data-jx-path]");
+  if (!row?.dataset.jxPath) {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(row.dataset.jxPath);
+    return Array.isArray(parsed) ? (parsed as JxPath) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Every row currently on screen, in visual order. */
 function treeRows(tree: HTMLElement): HTMLElement[] {
   return [...tree.querySelectorAll<HTMLElement>('.layer-row[role="treeitem"]')];
@@ -562,6 +588,7 @@ export function renderLayersTemplate(ctx: {
         tpl: html`
           <div
             class="layer-row"
+            data-jx-path=${JSON.stringify(path)}
             style="padding-left:${indentWidth(depth) + 8}px; opacity: 0.6; font-style: italic;"
           >
             <span
@@ -670,6 +697,7 @@ export function renderLayersTemplate(ctx: {
           aria-selected=${isSelected ? "true" : "false"}
           aria-expanded=${isExpandable ? (collapsed.has(key) ? "false" : "true") : nothing}
           tabindex=${isSelected ? "0" : "-1"}
+          data-jx-path=${JSON.stringify(path)}
           data-path=${key}
           data-dnd-row=${isStructural ? key : nothing}
           data-dnd-depth=${isStructural ? depth : nothing}

@@ -758,6 +758,9 @@ describe("startCanvasIframe — cross-frame drag (Phase 4c)", () => {
 
     try {
       const { acks, pair } = await bootRendered(7);
+      // Discard the frame the idle watcher armed at boot, so `rafCbs` holds only the
+      // Auto-scroll loop's own tick (the quiescence watcher is a separate rAF client).
+      rafCbs.length = 0;
       pair.parent.post({ dragSeq: 8, gen: 7, kind: "dragStart", src: { type: "block" } });
       // A bottom-band cursor (y near innerHeight) arms the loop and queues the first rAF.
       pair.parent.post({ cursor: { x: 5, y: 790 }, dragSeq: 8, kind: "dragMove" });

@@ -160,6 +160,7 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
     blockBarCtx = ctx;
   },
   isEditChromeTarget: mock(() => false),
+  registerSelectionCommands: mock(() => {}),
   renderBlockActionBar: mock(() => {}),
 }));
 
@@ -167,6 +168,7 @@ void mock.module("../src/canvas/canvas-render.ts", () => ({
   initCanvasRender: (ctx: unknown) => {
     canvasRenderCtx = ctx;
   },
+  registerSelectionSetCommand: mock(() => {}),
   renderCanvas: renderCanvasMock,
   renderOverlays: mock(() => {}),
   scheduleCanvasRender: scheduleCanvasRenderMock,
@@ -185,6 +187,7 @@ void mock.module("../src/canvas/canvas-patcher.ts", () => ({
 void mock.module("../src/new-project/new-project-modal.ts", () => ({
   closeNewProjectModal: mock(() => {}),
   openNewProjectModal: mock(async () => newProjectResult),
+  registerNewProjectCommands: mock(() => {}),
 }));
 
 void mock.module("../src/new-project/add-repo-modal.ts", () => ({

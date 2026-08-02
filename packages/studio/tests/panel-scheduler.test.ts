@@ -1,6 +1,11 @@
 import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
-import { createPanelScheduler, isTextInput } from "../src/panels/panel-scheduler";
+import {
+  createPanelScheduler,
+  isTextInput,
+  pendingSchedulers,
+  schedulersQuiet,
+} from "../src/panels/panel-scheduler";
 
 describe("isTextInput", () => {
   test("detects native inputs and Spectrum text controls", () => {
@@ -61,5 +66,58 @@ describe("panel scheduler", () => {
     blocked = false;
     s.flushNow();
     expect(renders).toBe(1);
+  });
+});
+
+// ─── Quiescence (probe.idle() condition 2) ──────────────────────────────────
+
+describe("pendingSchedulers", () => {
+  test("a queued frame and a withheld render are reported differently", async () => {
+    // They end differently: a queued frame lands on its own, a withheld one waits for a focusout
+    // That may never come. A predicate conflating them would either hang or lie.
+    const root = document.createElement("div");
+    root.id = "frontmatter-panel";
+    const input = document.createElement("input");
+    root.append(input);
+    document.body.append(root);
+    const scheduler = createPanelScheduler({ render: () => {}, root });
+    scheduler.bindFocus();
+
+    expect(schedulersQuiet()).toBe(true);
+
+    scheduler.schedule();
+    expect(pendingSchedulers()).toEqual(["#frontmatter-panel has a frame queued"]);
+
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    expect(schedulersQuiet()).toBe(true);
+
+    input.dispatchEvent(new Event("focusin", { bubbles: true }));
+    scheduler.flushNow();
+    expect(pendingSchedulers()).toEqual([
+      "#frontmatter-panel is withholding a render (a field has focus)",
+    ]);
+
+    scheduler.unbind();
+    expect(pendingSchedulers()).toEqual([]);
+    root.remove();
+  });
+
+  test("a root with no id is named by its first class, then by its tag", () => {
+    const classed = document.createElement("div");
+    classed.className = "browse-view wide";
+    const bare = document.createElement("section");
+    const a = createPanelScheduler({ render: () => {}, root: classed });
+    const b = createPanelScheduler({ render: () => {}, root: bare });
+    a.schedule();
+    b.schedule();
+    expect(pendingSchedulers().toSorted()).toEqual([
+      ".browse-view has a frame queued",
+      "section has a frame queued",
+    ]);
+    a.unbind();
+    b.unbind();
+    expect(schedulersQuiet()).toBe(true);
   });
 });

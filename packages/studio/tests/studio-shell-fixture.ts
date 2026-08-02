@@ -154,6 +154,9 @@ export async function bootStudio(opts: {
       captured.blockBarCtx = ctx;
     },
     isEditChromeTarget: mock(() => false),
+    // The bootstrap composes the bar's structural selection verbs into the app-wide registry so
+    // The palette, the keyboard and `__jxAutomation` can reach them (plan §13.3).
+    registerSelectionCommands: mock(() => {}),
     renderBlockActionBar: mock(() => {}),
     runCommand: mock(() => {}),
     selectionCommandRegistry: () => ({
@@ -169,6 +172,7 @@ export async function bootStudio(opts: {
     initCanvasRender: (ctx: unknown) => {
       captured.canvasRenderCtx = ctx;
     },
+    registerSelectionSetCommand: mock(() => {}),
     renderCanvas: mock(() => {}),
     renderOverlays: mock(() => {}),
     scheduleCanvasRender: scheduleCanvasRenderMock,

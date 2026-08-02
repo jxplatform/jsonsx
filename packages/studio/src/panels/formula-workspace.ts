@@ -27,7 +27,16 @@ import { openFormulaPalette } from "../ui/formula-palette";
 import { livePreviewExpression } from "../services/live-preview";
 import { dataTypeLabel, renderDataTreeTemplate, unwrapSignal } from "./data-explorer";
 
+import {
+  argsSchema,
+  pathArg,
+  pathProperty,
+  stringArg,
+  stringProperty,
+} from "../commands/command-args";
+
 import type { JxNodeValue } from "../tabs/transact";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import type { FormulaEditDef, JsonValue } from "../types";
 import type { Tab } from "../tabs/tab";
 import type { JxStateDefinition } from "@jxsuite/schema/types";
@@ -382,4 +391,107 @@ function workspaceTemplate(tab: Tab, editing: FormulaEditDef): TemplateResult {
       ${footer}
     </div>
   `;
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/** What the formula-editing verbs need that this module does not own. */
+export interface FormulaCommandDeps {
+  /** Repaint the canvas, which is what the code editor takes over. */
+  renderCanvas: () => void;
+}
+
+/**
+ * The formula/function EDITOR verbs — open Monaco over a state entry's body or an event binding.
+ *
+ * They live here rather than beside `panels/editors.ts`'s renderer because this module already owns
+ * the other half of the same idea: `editingFormula` (the structured workspace) and
+ * `editingFunction` (the code editor) are two takeovers of the same canvas area, addressing the
+ * same two document positions — a state entry by `defName`, or an element event binding by `path` +
+ * `eventKey`.
+ *
+ * Both REFUSE a target the document does not hold. The predecessors wrote `ui.editingFunction`
+ * straight from the automation hook with no check at all, so a renamed def opened an editor over
+ * nothing and the shot photographed an empty takeover.
+ *
+ * @param {FormulaCommandDeps} deps
+ * @returns {AnyCommand[]}
+ */
+export function formulaEditorCommands(deps: FormulaCommandDeps): AnyCommand[] {
+  return [
+    {
+      args: argsSchema({
+        defName: stringProperty("The state entry whose body to open in the code editor."),
+      }),
+      category: "Document",
+      id: "formula.editDef",
+      level: "document",
+      menus: ["palette"],
+      group: "5_data",
+      requires: "an open document that defines state",
+      when: (ctx) => ctx.document.open,
+      run: (_commandCtx, args) => {
+        const defName = stringArg("formula.editDef", args, "defName");
+        const tab = activeTab.value;
+        if (!tab) {
+          throw new RangeError(`command "formula.editDef" needs an open document`);
+        }
+        const defs = tab.doc.document?.state ?? {};
+        if (!(defName in defs)) {
+          const defined = Object.keys(defs);
+          throw new RangeError(
+            `command "formula.editDef" argument "defName": "${defName}" is not a state entry ` +
+              `this document defines — it defines: ` +
+              `${defined.length > 0 ? defined.join(", ") : "nothing"}`,
+          );
+        }
+        updateUi("editingFunction", { defName, type: "def" });
+        deps.renderCanvas();
+      },
+      title: "Edit Function",
+    },
+    {
+      args: argsSchema({
+        eventKey: stringProperty('The event binding, e.g. "onclick".'),
+        path: pathProperty("The document path of the element that carries the binding."),
+      }),
+      category: "Document",
+      id: "formula.editEvent",
+      level: "document",
+      menus: ["palette"],
+      group: "5_data",
+      requires: "an open document",
+      when: (ctx) => ctx.document.open,
+      run: (_commandCtx, args) => {
+        const eventKey = stringArg("formula.editEvent", args, "eventKey");
+        const path = pathArg("formula.editEvent", args, "path");
+        const tab = activeTab.value;
+        if (!tab) {
+          throw new RangeError(`command "formula.editEvent" needs an open document`);
+        }
+        if (!getNodeAtPath(tab.doc.document, path)) {
+          throw new RangeError(
+            `command "formula.editEvent" argument "path": [${path.join(", ")}] addresses no ` +
+              `node in ${tab.documentPath ?? "the open document"}`,
+          );
+        }
+        updateUi("editingFunction", { eventKey, path, type: "event" });
+        deps.renderCanvas();
+      },
+      title: "Edit Event Handler",
+    },
+  ];
+}
+
+/**
+ * Register the formula/function editor verbs.
+ *
+ * @param {CommandRegistry} registry
+ * @param {FormulaCommandDeps} deps
+ */
+export function registerFormulaEditorCommands(
+  registry: CommandRegistry,
+  deps: FormulaCommandDeps,
+): void {
+  registry.registerAll(formulaEditorCommands(deps));
 }

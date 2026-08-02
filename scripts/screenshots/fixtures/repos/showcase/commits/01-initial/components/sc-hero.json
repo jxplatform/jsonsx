@@ -1,0 +1,42 @@
+{
+  "tagName": "sc-hero",
+  "state": {
+    "eyebrow": "A fixed, boring, dependable repository",
+    "heading": "Showcase",
+    "text": "This project exists so the Source Control shot photographs a stated working tree instead of whoever ran the pipeline."
+  },
+  "style": {
+    "display": "block",
+    "padding": "clamp(3rem, 8vw, 5rem) 1.5rem",
+    "borderBottom": "1px solid var(--color-border)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
+      "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0 0 0.75rem",
+            "color": "var(--color-accent)",
+            "fontSize": "0.85rem",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.08em"
+          },
+          "children": ["${eyebrow}"]
+        },
+        {
+          "tagName": "h1",
+          "style": { "margin": "0 0 1rem", "fontSize": "clamp(2rem, 5vw, 3rem)" },
+          "children": ["${heading}"]
+        },
+        {
+          "tagName": "p",
+          "style": { "margin": "0", "maxWidth": "48ch", "color": "var(--color-muted)" },
+          "children": ["${text}"]
+        }
+      ]
+    }
+  ]
+}

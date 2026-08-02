@@ -873,6 +873,7 @@ export async function renderBrowse(
   const tpl = html`
     <div
       class="browse-view"
+      data-jx-region="overlay.dialog:library/view"
       @dragover=${(e: DragEvent) => {
         e.preventDefault();
         (e.currentTarget as HTMLElement).classList.add("browse-drop-active");

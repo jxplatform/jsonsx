@@ -23,6 +23,8 @@
 import { html } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { openModal } from "../ui/layers";
+import { enumArg, enumProperty } from "../commands/command-args";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import { getPlatform } from "../platform";
 import { installUrlOf } from "../platform-errors";
 import { hasAiCredentials } from "../services/ai-models";
@@ -51,7 +53,7 @@ import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { CreateProjectDestination, StarterInfo } from "../types";
 import type { ImportTabCtx } from "./import-tab";
 
-type NewProjectTab = "starter" | "import" | "agent";
+type NewProjectTab = (typeof NEW_PROJECT_TABS)[number];
 type WizardStep = "source" | "params";
 
 let _handle: ReturnType<typeof openModal> | null = null;
@@ -587,7 +589,7 @@ function renderModal() {
 
   const tpl = html`
     <sp-underlay open @close=${closeNewProjectModal}></sp-underlay>
-    <div class="new-project-modal">
+    <div class="new-project-modal" data-jx-region="overlay.dialog:new-project">
       <div class="new-project-modal-header">
         <h2 class="new-project-modal-title">
           ${_step === "source" ? "Choose a starting point" : "Name your project"}
@@ -636,3 +638,61 @@ function renderModal() {
 }
 
 let _dirDerived = true;
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/** The wizard's source tabs, in strip order — the declared values of `project.new`'s `tab`. */
+export const NEW_PROJECT_TABS = ["starter", "import", "agent"] as const;
+
+/**
+ * Open the New Project wizard.
+ *
+ * `tab` is declared as an enum rather than passed through, because the two non-default tabs are AI
+ * gated: naming one that does not exist would open the wizard on Starters and a shot would record
+ * that as "the Import tab". The wizard resolves the returned promise when the project is created or
+ * dismissed; the command deliberately does not await it — opening a modal is the action, and
+ * blocking `run` until a human finishes a wizard would hold the palette open behind it.
+ *
+ * @returns {AnyCommand[]}
+ */
+export function newProjectCommands(): AnyCommand[] {
+  return [
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          tab: enumProperty(NEW_PROJECT_TABS, "Which source tab to open on. Defaults to Starters."),
+        },
+        required: [],
+        type: "object",
+      },
+      category: "Project",
+      id: "project.new",
+      level: "application",
+      menus: ["commandbar/overflow", "palette"],
+      group: "1_file",
+      aiTool: {
+        description:
+          "Open the New Project wizard, optionally on the Starters, Import or Agent tab.",
+        name: "open_new_project",
+      },
+      run: (_commandCtx, args) => {
+        const tab =
+          (args as { tab?: unknown }).tab === undefined
+            ? undefined
+            : enumArg("project.new", args, "tab", NEW_PROJECT_TABS);
+        void openNewProjectModal(tab === undefined ? {} : { tab });
+      },
+      title: "New Project…",
+    },
+  ];
+}
+
+/**
+ * Register the New Project verb.
+ *
+ * @param {CommandRegistry} registry
+ */
+export function registerNewProjectCommands(registry: CommandRegistry): void {
+  registry.registerAll(newProjectCommands());
+}

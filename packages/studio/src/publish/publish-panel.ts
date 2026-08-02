@@ -330,7 +330,7 @@ function errorTpl() {
 
 function render(): void {
   const tpl = html`
-    <div class="new-project-modal publish-modal">
+    <div class="new-project-modal publish-modal" data-jx-region="overlay.dialog:publish">
       <div class="new-project-modal-header">
         <h2 class="new-project-modal-title">Publish</h2>
         <sp-action-button size="s" quiet @click=${close}>✕</sp-action-button>

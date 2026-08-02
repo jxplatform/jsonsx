@@ -20,23 +20,29 @@
  *
  * Rules, in the order they fire:
  *
- * 1. Every command step names a declared, scriptable command — `run` (contract 1), `cmd` (contract 2),
- *    and the contract-1 bespoke verbs read through {@link LEGACY_ACTIONS}, which is what takes
- *    coverage from the 58 `run` steps to 218 of the manifest's 400 actions.
+ * 1. Every command step names a declared, scriptable command, and every seed step names a declared
+ *    seed. The projection is the app's registry ∪
+ *    {@link import("../packages/studio/src/services/automation").seedIds} ∪ the shrinking
+ *    `AUTOMATION_COMMANDS` gap list.
  * 2. No command id matches `/\.toggle[A-Z]/` — §13.3 clause 3. A toggle is a delta against unstated
- *    state, which is what silently inverted 18 steps when the assistant's default flipped. The
- *    three ids that carry that debt today are named in {@link TOGGLE_DEBT}, which may only shrink;
- *    a toggle id NOT named there is a hard error from day one.
+ *    state, which is what silently inverted 18 steps when the assistant's default flipped.
+ *    {@link TOGGLE_DEBT} is **empty**, so any toggle id is a hard error the first time it appears.
  * 3. `args` validate against the command's own `args` JSON Schema, where one is declared.
- * 4. No CSS or XPath selector anywhere in the manifest, and no hand-stamped (non-derived) region id —
- *    both landed as committed budgets at today's counts, the `ALLOWED_ORPHANS` idiom from
- *    `packages/studio/scripts/check-styles.ts`. S2 ratchets them to zero.
+ * 4. No CSS or XPath selector anywhere in the manifest, and no hand-stamped (non-derived) region id
+ *    beyond the committed count — the `ALLOWED_ORPHANS` idiom from
+ *    `packages/studio/scripts/check-styles.ts`. The selector counters are all at **zero**.
  * 5. The `input`-step and `unstable` counts §13.3 caps, same shape.
  * 6. `manifest.contract` matches {@link CONTRACT_VERSION}.
  *
- * The manifest is read in BOTH shapes: contract 1 (`actions`/`waitFor`/`regions`/`variants`, what
- * is committed today) and contract 2 (`steps`/`expect`/`capture`, what §13.2 specifies). S2's
- * conversion therefore does not have to rewrite this file — the budgets simply start falling.
+ * **Quarantined shots are read past.** A shot carrying `status: {state: "quarantined"}` is one the
+ * repo admits is broken; the runner skips it too, `docs:check` fails if a page still illustrates
+ * itself with it, and its ids are checked again the moment the quarantine is lifted — which is the
+ * moment someone is looking. Holding a disabled shot to the contract only means fixing it twice.
+ *
+ * The manifest is read in BOTH shapes: contract 0 (`actions`/`waitFor`/`regions`/`variants`, which
+ * only the fixtures under `scripts/screenshots/fixtures/contract/` still use) and contract 1
+ * (`steps`/`expect`/`capture`), so the fixtures that prove each rule need not be rewritten with
+ * it.
  *
  * Run in the CI `checks` job: `bun scripts/check-shot-contract.ts` Against fixtures: `bun
  * scripts/check-shot-contract.ts --manifest <m.json> --commands <mod.ts>`
@@ -78,7 +84,7 @@ export interface CommandRecord {
 export type CommandTable = ReadonlyMap<string, CommandRecord>;
 
 export const DEFAULT_COMMAND_SOURCES = [
-  "packages/studio/src/commands/defaults.ts",
+  "packages/studio/src/commands/app-commands.ts",
   "packages/studio/src/services/automation.ts",
 ] as const;
 
@@ -90,56 +96,59 @@ export const CONTRACT_VERSION = 1;
 // ─── Committed budgets ────────────────────────────────────────────────────────
 
 /**
- * The counts §13.3 caps, committed at what the manifest holds TODAY.
+ * The counts §13.3 caps, committed at what the CONVERTED manifest holds.
  *
- * Every one of these is debt with a named owner: S2 converts the manifest and drives them down. The
- * check fails when a count goes UP — that is the whole contract. When a count goes down the run
+ * The check fails when a count goes UP — that is the whole contract. When a count goes down the run
  * prints a ratchet line naming the new value; lowering the committed number is then a one-line
  * edit, and raising one needs the same written justification as lowering a coverage threshold
  * (CLAUDE.md).
  *
- * - `selectorActions` `click`/`hover`/`type`/`canvasClick`/`dispatchDragOver` with a selector.
- * - `waitForSelectors` `waitFor: {type: "selector"}` steps. All 43 become `expect` in S2.
- * - `regionSelectors` region captures addressed by CSS instead of a region id.
- * - `clipSelectors` `clip: {selector}`, shot-level or in `defaults`.
- * - `argSelectors` a puppeteer handler prefix (`xpath/`, `pierce/`) inside a step's `args`. Already
+ * - `selectorActions` `click`/`hover`/`type`/`canvasClick`/`dispatchDragOver` with a selector. **0**
+ *   — the contract has no verb that takes one.
+ * - `waitForSelectors` `waitFor: {type: "selector"}` steps. **0** — all 43 became `expect`.
+ * - `regionSelectors` region captures addressed by CSS instead of a region id. **0**.
+ * - `clipSelectors` `clip: {selector}`. **0** — `of: "viewport"` names the camera's own frame.
+ * - `argSelectors` a puppeteer handler prefix (`xpath/`, `pierce/`) inside a step's `args`. Always
  *   zero, and landing it at zero is what keeps it zero.
- * - `inputSteps` raw input: keystrokes, typing, clicks, synthetic drags. §13.3 lands this at ≤6
- *   (slash menu, inline editing, media-upload's dragOver, one field keystroke); target 3.
- * - `nonDerivedRegions` DISTINCT region addresses that no registry stamps for free — today the 16
- *   region-capture selectors plus the default `clip: {selector: "#app"}`. §13.2 says roughly 6 of
- *   the 16 fall out of `registerPanel()`/`getLayerSlot()` once those exist; ~10 are authored to be
- *   photographed.
- * - `unstable` `{reason, until}` escape hatches. Zero today, so it can only be opened deliberately,
- *   in a PR that argues for it.
+ * - `inputSteps` raw input: keystrokes, typing, caret placement, synthetic drags. §13.6 wanted ≤6. It
+ *   lands at **19**, and the gap is almost entirely the three ids that have no command record yet
+ *   (`settings.selectEntry` ×5, `element.insertData`, `media.browse`) plus `tab-strip-shot`, which
+ *   types into a real editor because the dirty flag is EARNED, not asserted. Each falls out as its
+ *   record lands.
+ * - `nonDerivedRegions` DISTINCT region ids no registry stamps for free — the hand-stamped leaves
+ *   §13.3 budgets for (`navigator/panel:git/commit`, `navigator/statements`, the settings entry
+ *   rows, the media-picker's browse button…). Contract 0 counted 17 CSS selectors here.
+ * - `unstable` `{reason, until}` escape hatches. **7**, and every one is a step that would otherwise
+ *   be a `cmd` naming an id no registry declares. See {@link REMEDY}.
  */
 export const CONTRACT_BUDGET = {
-  selectorActions: 15,
-  waitForSelectors: 43,
-  regionSelectors: 36,
-  clipSelectors: 1,
+  selectorActions: 0,
+  waitForSelectors: 0,
+  regionSelectors: 0,
+  clipSelectors: 0,
   argSelectors: 0,
-  inputSteps: 67,
-  nonDerivedRegions: 17,
-  unstable: 0,
+  inputSteps: 19,
+  nonDerivedRegions: 12,
+  unstable: 7,
 } as const;
 
 export type BudgetKey = keyof typeof CONTRACT_BUDGET;
 export type ContractCounts = Record<BudgetKey, number>;
 
 /**
- * The toggle ids the manifest still names, and how many steps name each.
+ * The toggle ids the manifest still names, and how many steps name each. **Empty, and staying so.**
  *
- * A NAMED, SHRINKING debt list — not a knob. §13.3 clause 3 requires zero: `canvas.togglePreview`
- * cannot say which state it ends in, so a shot using it photographs whatever the default happens to
- * be that week. Any toggle id absent from this list is a hard error the first time it appears, and
- * an entry's count may only fall. S2 replaces all three with `set*` commands and empties it.
+ * §13.3 clause 3 requires zero: `canvas.togglePreview` cannot say which state it ends in, so six
+ * screenshots taken through it photographed whichever way the default happened to point that week.
+ * S2 replaced all ten steps with the state each was reaching for — `canvas.setMode {mode:
+ * "preview"}` ×6, `inspector.setSection {section: "__element", open: true}` ×3, and the one
+ * `view.toggleActivity {tab: "layers"}` in `block-action-bar-shot`, which was not switching panel
+ * at all: it was COLLAPSING the dock, and now says `view.setNavigator {open: false}`.
+ *
+ * With the list empty, any toggle id is a hard error the first time it appears. Re-opening it is a
+ * deliberate act in a PR that argues for it, the same bar as raising a budget.
  */
-export const TOGGLE_DEBT: Readonly<Record<string, number>> = {
-  "canvas.togglePreview": 6,
-  "inspector.toggleSection": 3,
-  "view.toggleActivity": 1,
-};
+export const TOGGLE_DEBT: Readonly<Record<string, number>> = {};
 
 /**
  * Region ids the app stamps for free, per the §13.2 grammar `<surface>[.<instance>][/<part>]`.
@@ -414,6 +423,8 @@ interface Sighting {
 
 interface ManifestFacts {
   shots: number;
+  /** Shots carrying `status: {state: "quarantined"}` — read past, and reported rather than hidden. */
+  quarantined: string[];
   commandSteps: CommandStep[];
   seedSteps: CommandStep[];
   regionIds: Sighting[];
@@ -460,6 +471,7 @@ export function readManifest(raw: unknown): ManifestFacts {
   };
   const facts: ManifestFacts = {
     shots: 0,
+    quarantined: [],
     commandSteps: [],
     seedSteps: [],
     regionIds: [],
@@ -519,6 +531,11 @@ export function readManifest(raw: unknown): ManifestFacts {
       }
       if (INPUT_ACTIONS.has(kind) || step.input !== undefined) {
         counts.inputSteps += 1;
+        // An `input` step addresses its target by region id, so it is exactly as much of a
+        // Hand-stamped-region commitment as a capture is — and the three ids that only ever appear
+        // On a gesture (`pane.primary/prop:count`, `…/insertData`, `inspector/field:src/browse`)
+        // Would otherwise be invisible to the budget that exists to hold that number down.
+        takeRegion(at, step.region);
       }
       const commandId = kind === "run" ? step.id : step.cmd;
       const legacy = LEGACY_ACTIONS[kind];
@@ -540,6 +557,14 @@ export function readManifest(raw: unknown): ManifestFacts {
     facts.shots += 1;
     const name = typeof shot.name === "string" ? shot.name : `#${index + 1}`;
     const label = `manifest shot "${name}"`;
+    // A quarantined shot is one the repo ADMITS is broken (§13.5). The runner skips it, `docs:check`
+    // Fails if a page still illustrates itself with it, and holding a disabled shot to the contract
+    // Would only mean the fix has to be made twice. Its ids are checked again the moment the
+    // Quarantine is lifted, which is the point at which someone is looking.
+    if (isRecord(shot.status) && shot.status.state === "quarantined") {
+      facts.quarantined.push(name);
+      continue;
+    }
     countUnstable(shot);
     takeSteps(label, shot.actions);
     takeSteps(label, shot.steps);
@@ -572,6 +597,8 @@ export function readManifest(raw: unknown): ManifestFacts {
 
 export interface ContractResult {
   violations: string[];
+  /** Names of the shots read past because they are quarantined. */
+  quarantined: string[];
   /** `budget` lines for counters now BELOW their committed value — the ratchet, spelled out. */
   ratchets: string[];
   counts: ContractCounts;
@@ -679,6 +706,7 @@ export function checkShotContract(input: ContractInput): ContractResult {
     commandIds: seenIds.size,
     commandSteps: facts.commandSteps.length,
     counts: facts.counts,
+    quarantined: facts.quarantined,
     ratchets,
     shots: facts.shots,
     toggleSteps,
@@ -702,6 +730,9 @@ export function formatSummary(result: ContractResult): string {
       `${result.commandIds} id(s).`,
     `  budget: ${budgetLine}`,
   ];
+  if (result.quarantined.length > 0) {
+    lines.push(`  quarantined (not checked, not captured): ${result.quarantined.join(", ")}`);
+  }
   if (result.toggleSteps > 0) {
     lines.push(
       `  toggle debt: ${result.toggleSteps} step(s) over ${Object.keys(TOGGLE_DEBT).length} id(s) ` +
@@ -715,14 +746,20 @@ export function formatSummary(result: ContractResult): string {
 
 interface CommandModule {
   defaultCommandSet?: () => { id: string; args?: object; isScriptable?: boolean }[];
+  seedIds?: () => string[];
   AUTOMATION_COMMANDS?: Record<string, unknown>;
 }
 
 /**
  * Import each module and fold its declarations into one table, first declaration winning.
  *
- * A module may export `defaultCommandSet()` (the registry), `AUTOMATION_COMMANDS` (the shim table
- * S3 deletes), or both. Neither is a usage error, not a silent empty projection.
+ * A module may export `defaultCommandSet()` (the registry), `seedIds()` (the seed registry),
+ * `AUTOMATION_COMMANDS` (the shim table S3 deletes), or any combination. Exporting NONE of them is
+ * a usage error, not a silent empty projection.
+ *
+ * `seedIds()` is read rather than the shim's three `disposition: "seed"` entries because those
+ * three were a hand-kept list, and `seed.git` and `seed.projectList` were both shipping while
+ * absent from it — a manifest naming either failed against a check that was simply out of date.
  */
 export async function loadCommandTable(modulePaths: readonly string[]): Promise<CommandTable> {
   const table = new Map<string, CommandRecord>();
@@ -740,6 +777,12 @@ export async function loadCommandTable(modulePaths: readonly string[]): Promise<
         add(command.id, path, command.args, command.isScriptable !== false);
       }
     }
+    if (typeof module_.seedIds === "function") {
+      declared = true;
+      for (const id of module_.seedIds()) {
+        add(id, path);
+      }
+    }
     if (module_.AUTOMATION_COMMANDS && typeof module_.AUTOMATION_COMMANDS === "object") {
       declared = true;
       for (const id of Object.keys(module_.AUTOMATION_COMMANDS)) {
@@ -747,7 +790,9 @@ export async function loadCommandTable(modulePaths: readonly string[]): Promise<
       }
     }
     if (!declared) {
-      throw new Error(`${path} exports neither defaultCommandSet() nor AUTOMATION_COMMANDS`);
+      throw new Error(
+        `${path} exports none of defaultCommandSet(), seedIds() or AUTOMATION_COMMANDS`,
+      );
     }
   }
   return table;

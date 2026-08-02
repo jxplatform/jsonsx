@@ -1049,13 +1049,64 @@ Control badge vanish when the last tab closed, and let two tabs disagree about t
 
 ### 13.5 Enforcement
 
-| Check                             | What it fails on                                                               |
-| --------------------------------- | ------------------------------------------------------------------------------ |
-| `scripts/check-command-levels.ts` | A `menus` placement the level × placement matrix does not admit                |
-| `scripts/check-chrome-budget.ts`  | More than five `commandbar/primary` commands, or more than four tabs in a dock |
+| Check                             | What it fails on                                                                          |
+| --------------------------------- | ----------------------------------------------------------------------------------------- |
+| `scripts/check-command-levels.ts` | A `menus` placement the level × placement matrix does not admit                           |
+| `scripts/check-chrome-budget.ts`  | More than five `commandbar/primary` commands, or more than four tabs in a dock            |
+| `scripts/check-shot-contract.ts`  | A script naming an id nothing declares, a `toggle*` id, or a selector where an id belongs |
 
-Both run in CI, and `createCommandRegistry` applies the placement check again at registration so a
-violation cannot reach a running app either.
+All three run in CI, and `createCommandRegistry` applies the placement check again at registration so
+a violation cannot reach a running app either.
+
+**The scripting surface is a rendering, and these three rules are what make that true.**
+`window.__jxAutomation` (installed only under `?automation=1`) exposes `run(id, args)`, `seed(id,
+args)` and a read-only `probe`, and nothing else.
+
+**1. The projection rule.** `__jxAutomation.run` **is** `registry.run`, behind an `isScriptable`
+filter derived from the records themselves. There is no second action table: a hand-maintained
+parallel list of what the app can do is a second definition site, which this section already calls a
+defect. `probe.state()` returns the whole context record of §13.4 rather than a bespoke subset, and
+`probe.commands()` is the same records with their gates already evaluated. An id the registry does
+not declare **throws** — a silently skipped step leaves the app in a state its caller did not ask
+for, and every consumer of that state then believes a lie.
+
+**2. The idempotence rule.** A scriptable id names a STATE, never a delta. `run()` refuses
+`/\.toggle[A-Z]/` at runtime and names the setter the id should have been. This is a correctness
+property of the registry, not a convenience: `view.toggleAssistant` cannot say which state it ends
+in, so a caller that cannot observe the current one is guessing — which is exactly how flipping the
+assistant's default silently inverted 23 scripted steps, and exactly the bug an agent hits when it
+calls the same id. `enablement` refusing is a failure, not a no-op: `run()` throws
+`CommandUnavailableError` carrying the record's own `requires` sentence.
+
+**3. The Remote Rule.** _A seed may only write state whose real writer is a network or IPC boundary.
+It stands in for a remote, never for a user._ `seed.assistant` (the model stream), `seed.collab` (the
+awareness socket), `seed.publish` (the Pages API), `seed.git` (the platform's git routes) and
+`seed.projectList` (the recent-projects store) qualify; each declares the boundary it replaces.
+Refused outright, and named in the refusal: `setStatus`, `setActivity`, `setRightTab`, `setZoom`,
+`select` and `openSettings` — a user does all six, so a **command** does all six. Staging the status
+bar in particular is not a fixture but a false report; a surface that needs a calm shell needs the
+app to BE calm.
+
+Three further refusals follow from the same three rules. **No method that accepts a selector** — if
+a caller cannot say it in command ids, region ids and `JxPath`s, it cannot say it. **No write that
+bypasses the transaction log** — automation mutates documents by running the commands a user runs.
+**No compatibility shim**: a branch that exists to keep an external caller's verb working is that
+caller's coupling living inside the product.
+
+**"Settled" is a predicate, not a sleep** (`packages/studio/src/services/idle.ts`). `probe.idle()`
+resolves once four subsystems have been quiet for two consecutive animation frames — no renderer
+mid-paint (`store.ts`), no panel scheduler holding a frame or withholding a render
+(`panel-scheduler.ts`), no unacked canvas generation or patch **per host** and no outstanding
+font/animation/image-retry reported by the frame itself (`iframe-host.ts`, folding the
+`{kind: "idle"}` message the canvas posts at its own rAF-quiet), and no in-flight platform call
+(counted once, at `getPlatform()`, so every PAL method and every adapter is covered). **It rejects
+with a `blockedBy` array naming each outstanding item**, and that rejection is the point: a sleep
+cannot fail, so a subsystem that is slow answers "+500 ms" and the caller proceeds against state that
+is still moving.
+
+`probe.pointAt({ path })` and `probe.revealPath(path)` answer in **top-document coordinates**: the
+app composes the iframe offset, the panzoom transform and the edit-zoom scale itself, because those
+are its own arithmetic and a caller outside the app can only guess at them.
 
 ---
 

@@ -11,8 +11,6 @@ code:
 
 The slash menu inserts blocks without leaving the keyboard: while editing text, type `/` and a menu of everything you can insert opens under your cursor. It's the fastest way to build a page up from a blank paragraph.
 
-![The slash menu open under an empty paragraph, showing the block list](../../images/slash-menu.png)
-
 ## Insert a block
 
 1. While editing text, type :kbd[/] on an empty line or after a space.

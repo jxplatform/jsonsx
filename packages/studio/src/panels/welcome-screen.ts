@@ -18,6 +18,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { getAccountStatus, needsAppInstall } from "../account-status";
 import { platformSupportsAddRepo } from "../new-project/add-repo-modal";
 import { getProjectList } from "../project-list";
+import { now } from "../services/clock";
 import { clearRecentProjects, getRecentProjects, removeRecentProject } from "../recent-projects";
 import { renderOnly } from "../store";
 import { platformSupportsClone } from "./git-panel";
@@ -119,10 +120,11 @@ const DAY = 24 * HOUR;
  * a week — the exact timestamp is in the row's tooltip.
  *
  * @param timestamp Epoch milliseconds.
- * @param now Epoch milliseconds to measure against (injectable for tests).
+ * @param at Epoch milliseconds to measure against. Defaults to the {@link now} seam, so a pinned
+ *   clock makes "last opened" answer the same on every read.
  */
-export function lastOpenedLabel(timestamp: number, now: number = Date.now()): string {
-  const elapsed = Math.max(0, now - timestamp);
+export function lastOpenedLabel(timestamp: number, at: number = now()): string {
+  const elapsed = Math.max(0, at - timestamp);
   if (elapsed < MINUTE) {
     return "just now";
   }

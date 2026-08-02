@@ -331,6 +331,23 @@ export type IframeToParent =
   // Not the parent, now resolves the scope). `gen` lets the parent drop a snapshot from a superseded
   // Render. Posted right after `renderComplete`; values are JSON-safe deep clones (see serialize-scope).
   | { kind: "dataScope"; gen: number; scope: Record<string, unknown> }
+  // The frame's own quiescence, ANSWERED rather than polled (spec §13.5, plan §13.4 condition 5).
+  // Nothing in the parent realm can see inside a cross-origin frame, so a parent that wanted to
+  // Know whether the canvas had settled could only sleep. The frame samples itself at its own rAF
+  // And posts whenever the tuple changes, ending with the quiet one; the host holds the latest.
+  //
+  // `fonts` is `document.fonts.status === "loaded"` and is NOT sufficient alone — in a blank canvas
+  // Frame it reports "loaded" against an EMPTY font set (measured in S0: `hero` drifted 0.150 RMSE
+  // Because the first capture measured fallback metrics while Plus Jakarta Sans was still in
+  // Flight). It is honest only together with `gen` (a frame that has not acked a render has not
+  // Loaded its fonts either) and the runner's per-frame network count.
+  //
+  // `images` counts images whose load FAILED and whose retry (`installCanvasImageRetry`, re-firing
+  // At 150/300/450 ms) has not resolved. Deliberately NOT "images not yet complete": blocking on
+  // `img.complete` failed 8 of 61 shots — the design canvas renders unresolved bindings as literal
+  // Srcs, several starters ship a 404 favicon, and lazy images below the fold never complete. A
+  // Pending retry is the one image fact only the app knows.
+  | { kind: "idle"; gen: number; fonts: boolean; animations: number; images: number }
   | { kind: "hit"; hit: NodeHit }
   // A click on layout chrome (see {@link LayoutHit}). Distinct from `hit` because the target is not
   // In the page document at all: the parent adopts it as `view.layoutSelection` (which shows the

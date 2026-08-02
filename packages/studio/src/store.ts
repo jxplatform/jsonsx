@@ -139,6 +139,47 @@ export { stripEventHandlers } from "./utils/strip-events";
 const _renderers = new Map<string, () => void>();
 
 /**
+ * How many registered renderers are mid-paint right now.
+ *
+ * Condition 1 of the `probe.idle()` predicate (`services/idle.ts`, spec §13.5). A renderer is
+ * declared `() => void`, but TypeScript happily assigns an `async` function to that type, so a
+ * renderer that awaits keeps repainting long after `render()` returned. Counting the returned
+ * thenable is what makes "no queued lit render" an answerable question instead of an assumption —
+ * the alternative is a sleep, and a sleep cannot name what it is waiting for.
+ */
+let _rendersInFlight = 0;
+
+/** Renderers currently mid-paint — zero when the shell's DOM has caught up with its state. */
+export function rendersInFlight(): number {
+  return _rendersInFlight;
+}
+
+/** Run one renderer, counting it as in-flight until it returns (or its promise settles). */
+function runRenderer(name: string, fn: () => void) {
+  _rendersInFlight += 1;
+  const done = () => {
+    _rendersInFlight -= 1;
+  };
+  let pending: PromiseLike<unknown> | null = null;
+  try {
+    const result = fn() as unknown;
+    if (typeof (result as PromiseLike<unknown> | null)?.then === "function") {
+      pending = result as PromiseLike<unknown>;
+    }
+  } catch (error) {
+    console.error(`Renderer "${name}" failed:`, error);
+  }
+  if (!pending) {
+    done();
+    return;
+  }
+  pending.then(done, (error: unknown) => {
+    console.error(`Renderer "${name}" failed:`, error);
+    done();
+  });
+}
+
+/**
  * Register a named renderer. Called at module import time by each module.
  *
  * @param {string} name
@@ -151,11 +192,7 @@ export function registerRenderer(name: string, fn: () => void) {
 /** Call all registered renderers (full repaint). */
 export function render() {
   for (const [name, fn] of _renderers.entries()) {
-    try {
-      fn();
-    } catch (error) {
-      console.error(`Renderer "${name}" failed:`, error);
-    }
+    runRenderer(name, fn);
   }
 }
 
@@ -170,11 +207,7 @@ export function renderOnly(...names: string[]) {
     if (!fn) {
       continue;
     }
-    try {
-      fn();
-    } catch (error) {
-      console.error(`Renderer "${name}" failed:`, error);
-    }
+    runRenderer(name, fn);
   }
 }
 

@@ -109,6 +109,7 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
   dismissLinkPopover: mock(() => {}),
   initBlockActionBar: mock(() => {}),
   isEditChromeTarget: mock(() => false),
+  registerSelectionCommands: mock(() => {}),
   renderBlockActionBar: mock(() => {}),
   runCommand: mock(() => {}),
   selectionCommandRegistry: () => ({
@@ -137,6 +138,7 @@ void mock.module("../src/panels/tab-bar.ts", () => ({
 
 void mock.module("../src/canvas/canvas-render.ts", () => ({
   initCanvasRender: mock(() => {}),
+  registerSelectionSetCommand: mock(() => {}),
   renderCanvas: mock(() => {}),
   renderOverlays: mock(() => {}),
   scheduleCanvasRender: mock(() => {}),

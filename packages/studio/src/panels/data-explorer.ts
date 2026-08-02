@@ -5,10 +5,13 @@ import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import type { TemplateResult } from "lit-html";
 import { setActivityTab } from "../shell";
+import { activeTab } from "../workspace/workspace";
+import { booleanArg, stringArg, stringProperty } from "../commands/command-args";
 import { renderEmptyState } from "./empty-state";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
 /** Expanded data entries set — persists across renders. */
-const expandedDataKeys = new Set();
+const expandedDataKeys = new Set<string>();
 
 /** Unwrap a Vue ref (has .value and .__v_isRef) to get the underlying value. */
 export function unwrapSignal(value: unknown) {
@@ -112,11 +115,8 @@ export function renderDataExplorerTemplate(
                     expanded: isExpanded,
                   })}
                   @click=${() => {
-                    if (expandedDataKeys.has(name)) {
-                      expandedDataKeys.delete(name);
-                    } else {
-                      expandedDataKeys.add(name);
-                    }
+                    // One writer: the row's click and `data.expandRow` land in the same function.
+                    setDataRowExpanded(name, !isExpanded);
                     renderLeftPanel();
                   }}
                 >
@@ -237,4 +237,111 @@ export function renderDataTreeTemplate(
         </div>`
       : nothing
   }`;
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/** Expand (or collapse) one data row's value tree. Idempotent — expanding twice is expanding once. */
+export function setDataRowExpanded(name: string, expanded: boolean): void {
+  if (expanded) {
+    expandedDataKeys.add(name);
+  } else {
+    expandedDataKeys.delete(name);
+  }
+}
+
+/** Whether a data row is currently expanded. Exported for the tests and the command's idempotence. */
+export function isDataRowExpanded(name: string): boolean {
+  return expandedDataKeys.has(name);
+}
+
+/** Drop every expansion — a fresh document, and the tests. */
+export function resetDataRowExpansion(): void {
+  expandedDataKeys.clear();
+}
+
+/** The state entry names the open document defines — what a row can be named by. */
+function definedDataNames(): string[] {
+  return Object.keys(activeTab.value?.doc.document?.state ?? {});
+}
+
+/** What the data verb needs that this module does not own. */
+export interface DataExplorerCommandDeps {
+  /** Repaint the Navigator so the expanded row's tree appears — `left-panel.ts`'s `render`. */
+  renderLeftPanel: () => void;
+}
+
+/**
+ * The Data panel's row verb.
+ *
+ * `expandRow` reads as a delta but is not one: it names the state it ends in, which is why it
+ * survives `__jxAutomation`'s `/\.toggle[A-Z]/` refusal and why running it twice photographs the
+ * same picture. The collapse direction is `{ expanded: false }` on the same record rather than a
+ * second id.
+ *
+ * REFUSES a name the open document does not define. The predecessor matched the row by its rendered
+ * label through an XPath, so a document without that entry silently pressed nothing and the shot
+ * recorded a collapsed panel as if it were the feature.
+ *
+ * @param {DataExplorerCommandDeps} deps
+ * @returns {AnyCommand[]}
+ */
+export function dataExplorerCommands(deps: DataExplorerCommandDeps): AnyCommand[] {
+  return [
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          expanded: {
+            default: true,
+            description: "True to expand the row's value tree, false to collapse it.",
+            type: "boolean",
+          },
+          name: stringProperty("The state entry's name, as the document defines it."),
+        },
+        required: ["name"],
+        type: "object",
+      },
+      category: "Document",
+      id: "data.expandRow",
+      level: "document",
+      menus: ["palette"],
+      group: "5_data",
+      requires: "an open document that defines data",
+      when: (ctx) => ctx.document.open,
+      run: (_commandCtx, args) => {
+        const name = stringArg("data.expandRow", args, "name");
+        const defined = definedDataNames();
+        if (!defined.includes(name)) {
+          throw new RangeError(
+            `command "data.expandRow" argument "name": "${name}" is not defined by this ` +
+              `document — it defines: ${defined.length > 0 ? defined.join(", ") : "nothing"}`,
+          );
+        }
+        const { expanded } = args as { expanded?: unknown };
+        // `expanded` defaults to true but is never COERCED: `{ expanded: "no" }` would otherwise
+        // Read as a collapse, which is the class of silent wrong answer this whole record exists
+        // To stop.
+        setDataRowExpanded(
+          name,
+          expanded === undefined || booleanArg("data.expandRow", args, "expanded"),
+        );
+        deps.renderLeftPanel();
+      },
+      title: "Expand Data Row",
+    },
+  ];
+}
+
+/**
+ * Register the Data panel's row verb.
+ *
+ * @param {CommandRegistry} registry
+ * @param {DataExplorerCommandDeps} deps
+ */
+export function registerDataExplorerCommands(
+  registry: CommandRegistry,
+  deps: DataExplorerCommandDeps,
+): void {
+  registry.registerAll(dataExplorerCommands(deps));
 }

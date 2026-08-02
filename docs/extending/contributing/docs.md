@@ -87,12 +87,12 @@ Write them as root-absolute slugs — `/docs/framework/site/routing` — with no
 
 All screenshots come from the automated pipeline — none are hand-taken, so every image can be regenerated when the UI changes:
 
-1. Declare the shot in `scripts/screenshots/manifest.json` (project, file, actions, regions). Give it a `docs` field listing the page slugs it illustrates.
-2. Run `bun run screenshots` — output lands in `docs/images/` and is committed.
+1. Declare the shot in `scripts/screenshots/manifest.json` — the shot contract is `open` (the world the app wakes up in), `steps`, `expect`, `capture` and `then`, and the full grammar is [`scripts/screenshots/README.md`](https://github.com/jxsuite/jx/blob/main/scripts/screenshots/README.md). Give it a `docs` field listing the page slugs it illustrates.
+2. Run `bun run screenshots` — output lands in `docs/images/` and is committed alongside `scripts/screenshots/capture.lock.json`, which records the bytes and the shot definition each image came from.
 3. Reference it **relative to your page**, e.g. `![descriptive alt text](../images/<name>.png)` from `docs/start/`, `../../images/<name>.png` one level deeper.
 
-A shot's actions must state the state they want, never flip it: `view.setAssistant` with `{ "open": false }` rather than a toggle. A toggle depends on what the panel happened to be doing when the run reached it, so changing a default silently inverts every shot that used one; a setter cannot.
+A step names a **command id** and a capture names a **region id** — never a CSS selector, and never a sleep. `probe.idle()` decides when the app has settled, and a step must state the state it wants rather than flip it: `view.setAssistant` with `{ "open": false }`, never a toggle. A toggle depends on what the panel happened to be doing when the run reached it, so changing a default silently inverts every shot that used one; a setter cannot.
 
 Relative paths are what make `/docs` readable in any markdown editor — the images travel with the pages. The site build republishes them under `/content/docs/images/` (the `docs` collection's [asset mount](/docs/framework/site/content-collections)), which is also how a site page outside `/docs` references one.
 
-Alt text is mandatory and describes the state shown ("Style inspector with the Typography section expanded"), not the filename. Shots drive the starter sites (real-estate by default, dark theme) so docs show real projects, not Jx internals. CI verifies every referenced image resolves into `docs/images/`, is produced by the manifest, and exists on disk.
+Alt text is mandatory and describes the state shown ("Style inspector with the Typography section expanded"), not the filename. Shots drive the starter sites (real-estate by default, dark theme) so docs show real projects, not Jx internals. CI verifies every referenced image resolves into `docs/images/`, is produced by the manifest, exists on disk, and is one the capture lock names — a PNG the pipeline did not produce fails the build.

@@ -21,7 +21,7 @@
 import { checkPlacements, PLACEMENT_MATRIX } from "../packages/studio/src/commands/levels";
 import type { PlaceableRecord } from "../packages/studio/src/commands/levels";
 
-const DEFAULT_SOURCE = "../packages/studio/src/commands/defaults.ts";
+const DEFAULT_SOURCE = "../packages/studio/src/commands/app-commands.ts";
 
 interface CommandSource {
   defaultCommandSet?: () => PlaceableRecord[];

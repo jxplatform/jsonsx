@@ -166,6 +166,7 @@ function renderMediaPickerPopover() {
     html`
       <sp-popover
         open
+        data-jx-region="overlay.menu:media-picker"
         ${ref((el) => {
           _popoverEl = (el as HTMLElement | undefined) || null;
         })}
@@ -364,6 +365,7 @@ export function renderMediaPicker(prop: string, value: string, onCommit: (val: s
       </sp-action-button>
       <sp-action-button
         class="media-picker-browse"
+        data-jx-region=${`inspector/field:${prop}/browse`}
         size="xs"
         quiet
         title="Browse media"

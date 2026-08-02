@@ -1,0 +1,17 @@
+{
+  "branch": "main",
+  "author": { "name": "Rae Okonjo", "email": "rae@showcase.example" },
+  "commits": [
+    {
+      "message": "Add the Showcase site skeleton",
+      "at": "2026-01-12T09:14:00Z",
+      "from": "commits/01-initial"
+    },
+    {
+      "message": "Add the listings page and its card",
+      "at": "2026-01-14T16:42:00Z",
+      "from": "commits/02-listings"
+    }
+  ],
+  "dirty": { "from": "dirty", "deleted": ["pages/about.md"] }
+}

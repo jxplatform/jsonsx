@@ -154,6 +154,29 @@ describe("the selection command records", () => {
     ]);
   });
 
+  test("Convert to Component STARTS the flow — it does not await the name dialog", async () => {
+    // `convertToComponent()` resolves when a human answers the prompt. Returning that promise from
+    // `run()` made the command uncallable by anything automated: `__jxAutomation.run` awaits it, so
+    // The screenshot step that opens this dialog hung until the CDP protocol timeout fired.
+    let started = 0;
+    let settled = false;
+    const registry = createCommandRegistry({ getContext: selectionCommandContext });
+    registerSelectionCommands(registry, {
+      convertToComponent: async () => {
+        started += 1;
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 20);
+        });
+        settled = true;
+      },
+      navigateToComponent: () => {},
+    });
+    setup();
+    await registry.run("selection.convertToComponent");
+    expect(started).toBe(1);
+    expect(settled).toBe(false);
+  });
+
   test("Convert and Edit Component are one slot with two states, never both", () => {
     setup();
     const registry = selectionCommandRegistry();

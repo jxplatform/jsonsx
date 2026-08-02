@@ -564,7 +564,12 @@ export function registerSelectionCommands(
       level: "selection",
       menus: ["blockbar"],
       requires: "an element that is not the document root",
-      run: () => deps.convertToComponent(),
+      // Deliberately NOT awaited: `convertToComponent()` resolves when the human answers the name
+      // Dialog, and a command whose promise waits on a person is a command nothing automated can
+      // Call. `run()` means "start this flow", the same as `settings.open` and `project.new`.
+      run: () => {
+        void deps.convertToComponent();
+      },
       title: "Convert to Component",
       undo: "project",
       when: (ctx) => ctx.selection.count > 0 && !ctx.selection.isComponentInstance,
@@ -1298,6 +1303,7 @@ export function renderBlockActionBar() {
     html`
       <div
         class="block-action-bar"
+        data-jx-region="overlay.menu:block-action-bar"
         role="toolbar"
         aria-label="Block actions"
         aria-orientation="horizontal"
@@ -1396,6 +1402,7 @@ export function renderBlockActionBar() {
                   size="xs"
                   quiet
                   data-toolbar-item
+                  data-jx-region="overlay.menu:block-action-bar/insertData"
                   tabindex="-1"
                   aria-label="Insert data"
                   title="Insert data"

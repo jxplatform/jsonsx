@@ -19,7 +19,15 @@ import {
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { setLayoutSelection, shell } from "../shell";
+import {
+  argsSchema,
+  booleanArg,
+  booleanProperty,
+  stringArg,
+  stringProperty,
+} from "../commands/command-args";
 import type { LayoutSelection } from "../shell";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import { componentRegistry } from "../files/components";
 import { widgetForType } from "./style-inputs";
 import { renderFieldRow } from "../ui/field-row";
@@ -1350,11 +1358,9 @@ export function renderPropertiesPanelTemplate(ctx: {
   }
 
   function toggleSection(key: string) {
-    const current = isSectionOpen(key);
-    activeTab.value!.session.ui.inspectorSections = {
-      ...activeTab.value!.session.ui.inspectorSections,
-      [key]: !current,
-    };
+    // One writer: the accordion's own click and `inspector.setSection` land in the same function,
+    // So the command and the control cannot disagree about what "open" means.
+    setInspectorSection(key, !isSectionOpen(key));
   }
 
   // ── Build section templates ─────────────────────────────────────────
@@ -1736,4 +1742,96 @@ export function renderPropertiesPanelTemplate(ctx: {
   `;
 
   return tpl;
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/**
+ * The Inspector's fixed section keys — the accordion rows this panel always draws.
+ *
+ * Attribute-schema sections add their own keys at render time (a class's `$section`), so this is a
+ * floor, not a closed set: {@link inspectorSectionKeys} unions it with whatever the OPEN DOCUMENT
+ * declares, and that union is what `inspector.setSection` validates against. A fixed enum would
+ * refuse a section the user is looking at; no validation at all would accept the label the old
+ * `inspector.toggleSection` step passed ("Element", not `__element`) and silently do nothing.
+ */
+export const INSPECTOR_SECTION_KEYS = [
+  "__element",
+  "__observed",
+  "__custom",
+  "__media",
+  "__cssprops",
+  "__cssparts",
+] as const;
+
+export type InspectorSectionKey = (typeof INSPECTOR_SECTION_KEYS)[number];
+
+/** Section keys addressable right now: the fixed rows plus any already recorded for this tab. */
+export function inspectorSectionKeys(): string[] {
+  const recorded = Object.keys(activeTab.value?.session.ui.inspectorSections ?? {});
+  return [...new Set<string>([...INSPECTOR_SECTION_KEYS, ...recorded])];
+}
+
+/**
+ * Open or close one Inspector section, per tab.
+ *
+ * The pair `{ section, open }` is the whole point: `inspector.toggleSection` named a DELTA against
+ * a section whose state depended on the selected node's own attributes (`autoOpen`), so the same
+ * three manifest steps opened a section on one document and closed it on the next. Writing a new
+ * object rather than mutating in place is what the reactive read in `isSectionOpen` depends on.
+ */
+export function setInspectorSection(section: string, open: boolean): void {
+  const tab = activeTab.value;
+  if (!tab) {
+    return;
+  }
+  tab.session.ui.inspectorSections = { ...tab.session.ui.inspectorSections, [section]: open };
+}
+
+/**
+ * The Inspector's section verb. **This is the setter that retires `inspector.toggleSection`.**
+ *
+ * @returns {AnyCommand[]}
+ */
+export function inspectorCommands(): AnyCommand[] {
+  return [
+    {
+      args: argsSchema({
+        open: booleanProperty("True to expand the section, false to collapse it."),
+        section: stringProperty(
+          "The section key — one of the fixed rows (__element, __observed, __custom, " +
+            "__media, __cssprops, __cssparts) or an attribute schema's own $section.",
+        ),
+      }),
+      category: "View",
+      id: "inspector.setSection",
+      level: "document",
+      menus: ["palette"],
+      group: "4_docks",
+      requires: "an open document",
+      when: (ctx) => ctx.document.open,
+      run: (_commandCtx, args) => {
+        const open = booleanArg("inspector.setSection", args, "open");
+        const section = stringArg("inspector.setSection", args, "section");
+        const known = inspectorSectionKeys();
+        if (!known.includes(section)) {
+          throw new RangeError(
+            `command "inspector.setSection" argument "section": "${section}" is not a section ` +
+              `this document declares — declared: ${known.join(", ")}`,
+          );
+        }
+        setInspectorSection(section, open);
+      },
+      title: "Show Inspector Section",
+    },
+  ];
+}
+
+/**
+ * Register the Inspector's section verb.
+ *
+ * @param {CommandRegistry} registry
+ */
+export function registerInspectorCommands(registry: CommandRegistry): void {
+  registry.registerAll(inspectorCommands());
 }

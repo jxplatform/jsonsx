@@ -138,6 +138,9 @@ describe("auto-scroll tick stop conditions", () => {
     const { rafCbs, restore } = hijackScroll();
     try {
       const { acks, pair } = await bootRendered(7);
+      // Discard the frame the idle watcher armed at boot, so `rafCbs` holds only the
+      // Auto-scroll loop's own tick (the quiescence watcher is a separate rAF client).
+      rafCbs.length = 0;
       pair.parent.post({ dragSeq: 4, gen: 7, kind: "dragStart", src: { type: "block" } });
       pair.parent.post({ cursor: { x: 5, y: 790 }, dragSeq: 4, kind: "dragMove" });
       pair.flush();
@@ -160,6 +163,9 @@ describe("auto-scroll tick stop conditions", () => {
     const { rafCbs, restore, win } = hijackScroll();
     try {
       const { acks, pair } = await bootRendered(7);
+      // Discard the frame the idle watcher armed at boot, so `rafCbs` holds only the
+      // Auto-scroll loop's own tick (the quiescence watcher is a separate rAF client).
+      rafCbs.length = 0;
       pair.parent.post({ dragSeq: 5, gen: 7, kind: "dragStart", src: { type: "block" } });
       pair.parent.post({ cursor: { x: 5, y: 790 }, dragSeq: 5, kind: "dragMove" });
       pair.flush();
@@ -186,6 +192,9 @@ describe("auto-scroll tick stop conditions", () => {
     win.scrollBy = () => {};
     try {
       const { acks, pair } = await bootRendered(7);
+      // Discard the frame the idle watcher armed at boot, so `rafCbs` holds only the
+      // Auto-scroll loop's own tick (the quiescence watcher is a separate rAF client).
+      rafCbs.length = 0;
       pair.parent.post({ dragSeq: 6, gen: 7, kind: "dragStart", src: { type: "block" } });
       pair.parent.post({ cursor: { x: 5, y: 790 }, dragSeq: 6, kind: "dragMove" });
       pair.flush();

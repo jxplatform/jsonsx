@@ -54,6 +54,7 @@ import type {
   NodeHit,
   ParentToIframe,
   SelectionSnapshot,
+  SerializableRect,
   SerializedKey,
   WireDocOp,
 } from "./iframe-protocol";
@@ -156,6 +157,28 @@ interface HostState {
   tabId: string | null;
   /** Tab id keyed by render gen for posted-but-unacked renders; adopted on `renderComplete`. */
   pendingTabIds: Map<number, string | null>;
+  /**
+   * Surgical patches posted to this iframe that have not acked (`patchComplete`/`patchError`).
+   *
+   * `pendingTabIds` covers full renders because it has to (identity adoption depends on it); a
+   * patch carries no identity, so nothing counted it. Both are "the DOM in that frame does not yet
+   * reflect what this host has told it", which is the question {@link canvasIdleBlockers} answers.
+   */
+  pendingPatches: number;
+  /**
+   * The frame's own last quiescence report (`{kind: "idle"}`), or null before the first one.
+   *
+   * Held PER HOST from the start. `shot.ts`'s "Studio's only child frame" is a coin flip the moment
+   * P8 adds a second pane, and a global would have to be unpicked exactly then.
+   */
+  idle: Omit<Extract<IframeToParent, { kind: "idle" }>, "kind"> | null;
+  /**
+   * Resolvers for {@link measureCanvasPath} requests, keyed by the `measure` reqId.
+   *
+   * Allocated from the same `selReqId` counter as the selection and presence measures, so the three
+   * can never collide and the `geometry` handler can dispatch on the id alone.
+   */
+  pendingMeasures: Map<number, (hits: NodeHit[]) => void>;
   /**
    * A split/insert re-entry deferred until this host's DOM contains the new element: a surgical
    * patch acks (`patchComplete`) at the SAME gen the host already reflects, an escalated full
@@ -493,6 +516,214 @@ export function hostDragGeometry(host: HostState): {
   const rect = rectOf(host.iframe);
   const scale = host.iframe.clientWidth > 0 ? rect.width / host.iframe.clientWidth : 1;
   return { rect, scale };
+}
+
+// ─── Quiescence and point resolution ────────────────────────────────────────────
+// Two questions the parent realm could not previously answer about a cross-origin canvas: "has it
+// Settled?" and "where on screen is this node?". Both were answered by the CALLER instead — a sleep
+// And a `Math.abs(scale - 1) < 0.001` guess at whether a fit transform was in play. Both are the
+// Host's own arithmetic; it already does them for the selection overlay and the block action bar.
+
+/** A short, stable handle for a host inside a blocker string. */
+function hostLabel(host: HostState): string {
+  if (host.stylebook) {
+    return "stylebook";
+  }
+  return host.tabId ?? "unbound";
+}
+
+/**
+ * Everything the canvas is still owed, one human-readable line per outstanding item, PER HOST.
+ *
+ * Empty means every live frame's DOM reflects what this host told it, its fonts have loaded, no
+ * animation is running and no image retry is in flight. Naming the blockers is the whole point:
+ * `probe.idle()` rejects with this list, so a slow subsystem identifies itself instead of being
+ * answered with `+500 ms` and a wrong capture (plan §13.4).
+ */
+export function canvasIdleBlockers(): string[] {
+  const blockers: string[] = [];
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    const at = `canvas[${hostLabel(host)}]`;
+    if (!host.ready) {
+      blockers.push(`${at}: frame has not handshaked`);
+      continue;
+    }
+    const unacked = [...host.pendingTabIds.keys()];
+    if (unacked.length > 0) {
+      blockers.push(`${at}: gen ${unacked.join(", ")} unacked`);
+    }
+    if (host.pendingPatches > 0) {
+      blockers.push(`${at}: ${host.pendingPatches} unacked patch(es)`);
+    }
+    if (host.pendingMeasures.size > 0) {
+      blockers.push(`${at}: ${host.pendingMeasures.size} measure(s) in flight`);
+    }
+    const { idle } = host;
+    if (!idle) {
+      blockers.push(`${at}: no quiescence report yet`);
+      continue;
+    }
+    if (idle.gen !== host.lastRenderedGen) {
+      blockers.push(`${at}: quiescence is for gen ${idle.gen}, DOM is gen ${host.lastRenderedGen}`);
+    }
+    if (!idle.fonts) {
+      blockers.push(`${at}: fonts still loading`);
+    }
+    if (idle.animations > 0) {
+      blockers.push(`${at}: ${idle.animations} running animation(s)`);
+    }
+    if (idle.images > 0) {
+      blockers.push(`${at}: ${idle.images} pending image retry(ies)`);
+    }
+  }
+  if (pendingEvals.size > 0) {
+    blockers.push(`canvas: ${pendingEvals.size} expression eval(s) in flight`);
+  }
+  return blockers;
+}
+
+/**
+ * A node's box in TOP-DOCUMENT coordinates, with `x`/`y` at its centre.
+ *
+ * The caller gets a point it can act on directly — click it, scroll to it, anchor a popover to it —
+ * without knowing that a canvas iframe, a panzoom transform and an edit-zoom scale sit between the
+ * document and the screen. P4.6's find-references jump, P8.4's jump bar and collab follow-peer all
+ * want exactly this, and so does anything driving Studio from outside.
+ */
+export interface CanvasPoint {
+  x: number;
+  y: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** How long a point request waits for its `geometry` reply before answering null. */
+export const MEASURE_TIMEOUT_MS = 500;
+
+/** Frames of an unchanged iframe offset that end a pan animation. */
+const PAN_SETTLE_FRAMES = 2;
+
+/** Give up on a pan that never settles rather than await it forever. */
+const PAN_SETTLE_MAX_FRAMES = 40;
+
+/**
+ * The live host a document path is addressed in: the one rendering the focused tab, else any ready
+ * page host. A stylebook host is never it — its paths decode to TAGS, not document paths.
+ */
+function hostForPath(): HostState | null {
+  const tabId = activeTab.value?.id ?? null;
+  let fallback: HostState | null = null;
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    if (!host.ready || host.stylebook) {
+      continue;
+    }
+    if (host.tabId === tabId) {
+      return host;
+    }
+    fallback ??= host;
+  }
+  return fallback;
+}
+
+/**
+ * Compose the host's own transforms onto an iframe-viewport rect.
+ *
+ * `scale` is the EMPIRICAL ratio {@link hostDragGeometry} reads fresh from the DOM, so it covers the
+ * design-mode panzoom transform and edit-mode content zoom together — which is precisely the
+ * distinction a caller cannot make from outside and used to guess at.
+ */
+function pointForRect(host: HostState, rect: SerializableRect): CanvasPoint {
+  const { rect: frame, scale } = hostDragGeometry(host);
+  const left = frame.left + rect.x * scale;
+  const top = frame.top + rect.y * scale;
+  const width = rect.width * scale;
+  const height = rect.height * scale;
+  return { height, left, top, width, x: left + width / 2, y: top + height / 2 };
+}
+
+/** Ask one host to measure one path and resolve the reply as a top-document point. */
+function measureIn(
+  host: HostState,
+  path: readonly (string | number)[],
+): Promise<CanvasPoint | null> {
+  return new Promise((resolve) => {
+    host.selReqId += 1;
+    const reqId = host.selReqId;
+    const timer = setTimeout(() => {
+      host.pendingMeasures.delete(reqId);
+      resolve(null);
+    }, MEASURE_TIMEOUT_MS);
+    host.pendingMeasures.set(reqId, (hits) => {
+      clearTimeout(timer);
+      const [hit] = hits;
+      resolve(hit ? pointForRect(host, hit.rect) : null);
+    });
+    // A plain copy: `session.selection` is a reactive proxy and only serializable values cross.
+    host.channel.post({ kind: "measure", paths: [[...path]], reqId });
+  });
+}
+
+/**
+ * Where the node at `path` is on screen right now, or null when no canvas can answer.
+ *
+ * Read-only: it measures, it does not move anything. {@link revealCanvasPath} is the half that does.
+ */
+export function canvasPointAt(path: readonly (string | number)[]): Promise<CanvasPoint | null> {
+  const host = hostForPath();
+  return host ? measureIn(host, path) : Promise.resolve(null);
+}
+
+/** Resolve once the iframe's offset has stopped moving — the pan animation is a rAF tween. */
+function panSettled(host: HostState): Promise<void> {
+  return new Promise((resolve) => {
+    let last = Number.NaN;
+    let stable = 0;
+    let frames = 0;
+    const tick = () => {
+      const { top } = rectOf(host.iframe);
+      stable = top === last ? stable + 1 : 0;
+      last = top;
+      frames += 1;
+      if (stable >= PAN_SETTLE_FRAMES || frames >= PAN_SETTLE_MAX_FRAMES) {
+        resolve();
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+/**
+ * Bring the node at `path` into view and answer where it landed.
+ *
+ * The pan is the same {@link panToParentRect} the stylebook's pan-to-card uses, and the second
+ * measure is not belt-and-braces: the point BEFORE the pan is not the point a caller can act on.
+ */
+export async function revealCanvasPath(
+  path: readonly (string | number)[],
+): Promise<CanvasPoint | null> {
+  const host = hostForPath();
+  if (!host) {
+    return null;
+  }
+  const before = await measureIn(host, path);
+  if (!before) {
+    return null;
+  }
+  panToParentRect({ height: before.height, top: before.top });
+  await panSettled(host);
+  return measureIn(host, path);
 }
 
 /**
@@ -867,6 +1098,7 @@ export function postPatchToHosts(
           ? { echoPaths, forwardOps, gen, kind: "patch" }
           : { forwardOps, gen, kind: "patch" },
       );
+      host.pendingPatches += 1;
       posted += 1;
     }
   }
@@ -1130,7 +1362,10 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     overlay,
     panReqId: -1,
     pending: null,
+    idle: null,
     pendingEnterEdit: null,
+    pendingMeasures: new Map(),
+    pendingPatches: 0,
     pendingTabIds: new Map(),
     presenceMeta: new Map(),
     presenceReqId: -1,
@@ -1379,6 +1614,15 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "geometry": {
+      // A `measureCanvasPath` caller is waiting on this exact id — answer it and stop. Checked
+      // FIRST because these ids come from the same counter as the two overlay measures below, so
+      // Falling through would let a point request repaint the selection box.
+      const awaiting = state.pendingMeasures.get(msg.reqId);
+      if (awaiting) {
+        state.pendingMeasures.delete(msg.reqId);
+        awaiting(msg.hits);
+        return;
+      }
       // Remote-presence reply: draw one colored box per measured peer selection.
       if (msg.reqId === state.presenceReqId) {
         state.presenceReqId = -1;
@@ -1443,7 +1687,19 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
     }
     case "patchComplete": {
       // A patch never re-targets the host (tabId untouched) — only the DOM/geometry changed.
+      state.pendingPatches = Math.max(0, state.pendingPatches - 1);
       onDomUpdated(state, msg.gen);
+      return;
+    }
+    case "idle": {
+      // The frame's own quiescence report. Held, not acted on: it is read by
+      // {@link canvasIdleBlockers} when something asks whether Studio has settled.
+      state.idle = {
+        animations: msg.animations,
+        fonts: msg.fonts,
+        gen: msg.gen,
+        images: msg.images,
+      };
       return;
     }
     case "renderError": {
@@ -1563,6 +1819,9 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
     }
     case "patchError": {
       // The iframe couldn't apply the edit surgically — fall back to a full render of the live doc.
+      // The patch is no longer outstanding either way; a counter that only went up would wedge
+      // Every later idle() behind a message the host already handled.
+      state.pendingPatches = Math.max(0, state.pendingPatches - 1);
       patchEscalation?.();
       return;
     }

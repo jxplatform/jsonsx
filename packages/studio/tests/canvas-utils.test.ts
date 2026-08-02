@@ -9,9 +9,12 @@ import {
   clampPanZoom,
   EDIT_ZOOM_MAX,
   EDIT_ZOOM_MIN,
+  applyFit,
+  DEFAULT_FIT,
   fitOnCanvasEntry,
   fitToScreen,
-  hasExplicitZoom,
+  getFit,
+  hasDeclaredFit,
   initCanvasUtils,
   markExplicitZoom,
   observeCenterUntilStable,
@@ -20,8 +23,9 @@ import {
   panToElement,
   panToParentRect,
   requestEditZoom,
-  resetExplicitZoom,
+  resetFits,
   resetZoom,
+  setFit,
   setEditZoom,
   setUserZoom,
   updateActivePanelHeaders,
@@ -260,43 +264,82 @@ describe("pan zoom clamping", () => {
   });
 });
 
-describe("explicit author zoom", () => {
+describe("declared fit", () => {
   beforeEach(() => {
-    resetExplicitZoom();
+    resetFits();
   });
 
-  test("setUserZoom clamps, records the document, and applies the transform", () => {
+  test("an undeclared document reports the default fit", () => {
+    resetWorkspaceWithTab();
+    expect(hasDeclaredFit()).toBe(false);
+    expect(getFit()).toBe(DEFAULT_FIT);
+  });
+
+  test("setUserZoom clamps, declares the number as the fit, and applies the transform", () => {
     const tab = resetWorkspaceWithTab();
     const wrap = makePanzoomWrap();
-    expect(hasExplicitZoom()).toBe(false);
+    expect(hasDeclaredFit()).toBe(false);
 
     setUserZoom(99);
 
     expect(tab.session.ui.zoom).toBe(PAN_ZOOM_MAX);
-    expect(hasExplicitZoom()).toBe(true);
+    expect(getFit()).toBe(PAN_ZOOM_MAX);
     expect(wrap.style.transform).toContain("scale(");
+  });
+
+  test("markExplicitZoom declares whatever the zoom currently is", () => {
+    resetWorkspaceWithTab();
+    makePanzoomWrap();
+    zoom = 0.75;
+    markExplicitZoom();
+    expect(getFit()).toBe(0.75);
   });
 
   test("setUserZoom and markExplicitZoom are no-ops with no tab open", () => {
     closeAllTabs();
     setUserZoom(2);
     markExplicitZoom();
-    expect(hasExplicitZoom()).toBe(false);
+    expect(hasDeclaredFit()).toBe(false);
+    expect(getFit()).toBe(DEFAULT_FIT);
   });
 
-  test("the record is per document, so another document still auto-fits", () => {
+  test("the fit is per document, so another document still gets the default", () => {
     const tab = resetWorkspaceWithTab();
     tab.documentPath = "pages/index.md";
-    markExplicitZoom();
-    expect(hasExplicitZoom()).toBe(true);
+    setFit("width");
+    expect(getFit()).toBe("width");
     tab.documentPath = "pages/about.md";
-    expect(hasExplicitZoom()).toBe(false);
+    expect(hasDeclaredFit()).toBe(false);
+    expect(getFit()).toBe(DEFAULT_FIT);
+  });
+
+  test('applyFit("none") frames nothing', () => {
+    resetWorkspaceWithTab();
+    const wrap = makePanzoomWrap();
+    zoom = 0.4;
+    applyFit("none");
+    expect(setZoomDirect).not.toHaveBeenCalled();
+    expect(wrap.style.transform).toContain("scale(0.4)");
+  });
+
+  test('a declared "width" fit ignores the height axis', () => {
+    resetWorkspaceWithTab();
+    const wrap = makePanzoomWrap();
+    defineMetric(canvasWrap, "clientWidth", 700);
+    // A viewport far too short for the artboard: "page" would fit to this, "width" must not.
+    defineMetric(canvasWrap, "clientHeight", 100);
+    stubRect(wrap, { height: 600, width: 1312 });
+    canvasPanels.push({ _width: 1280 } as never);
+
+    setFit("width");
+
+    expect(setZoomDirect).toHaveBeenCalledWith(700 / 1312);
   });
 });
 
 describe("fitOnCanvasEntry", () => {
   beforeEach(() => {
-    resetExplicitZoom();
+    resetFits();
     resetWorkspaceWithTab();
   });
 
@@ -337,7 +380,7 @@ describe("fitOnCanvasEntry", () => {
     expect(setZoomDirect).toHaveBeenCalledWith(2000 / 432);
   });
 
-  test("preserves a zoom the author set for this document", () => {
+  test("honours a numeric fit the author declared for this document", () => {
     const wrap = makePanzoomWrap();
     defineMetric(canvasWrap, "clientWidth", 700);
     canvasPanels.push({ _width: 1280 } as never);
@@ -346,7 +389,7 @@ describe("fitOnCanvasEntry", () => {
 
     fitOnCanvasEntry();
 
-    expect(setZoomDirect).not.toHaveBeenCalled();
+    expect(setZoomDirect).toHaveBeenCalledWith(0.5);
     expect(wrap.style.transform).toContain("scale(0.5)");
   });
 
@@ -368,12 +411,14 @@ describe("resetZoom", () => {
     expect(setZoomDirect).not.toHaveBeenCalled();
   });
 
-  test("resets zoom to 1 and re-centers", () => {
+  test("resets zoom to 1, re-centers, and declares 1 as the fit", () => {
     const wrap = makePanzoomWrap();
     defineMetric(canvasWrap, "clientWidth", 1000);
     defineMetric(wrap, "scrollWidth", 500);
     zoom = 3;
+    resetWorkspaceWithTab();
     resetZoom();
+    expect(getFit()).toBe(1);
     expect(setZoomDirect).toHaveBeenCalledWith(1);
     expect(view.panX).toBe(250);
     expect(wrap.style.transform).toBe("translate(250px, 0px) scale(1)");

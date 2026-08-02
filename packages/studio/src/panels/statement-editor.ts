@@ -702,6 +702,7 @@ export function renderStatementEditor(
   return html`
     <div
       class="statement-editor"
+      data-jx-region="navigator/statements"
       ${ref((el) => {
         if (el) {
           registerStatementsDnD(el as HTMLElement, safe, onChange);

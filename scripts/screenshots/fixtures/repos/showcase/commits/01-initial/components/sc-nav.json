@@ -1,0 +1,28 @@
+{
+  "tagName": "sc-nav",
+  "state": { "brand": "Showcase" },
+  "style": {
+    "display": "flex",
+    "alignItems": "center",
+    "justifyContent": "space-between",
+    "gap": "1rem",
+    "padding": "1rem 1.5rem",
+    "borderBottom": "1px solid var(--color-border)",
+    "backgroundColor": "var(--color-surface)"
+  },
+  "children": [
+    {
+      "tagName": "strong",
+      "style": { "fontSize": "1.05rem", "letterSpacing": "-0.01em" },
+      "children": ["${brand}"]
+    },
+    {
+      "tagName": "nav",
+      "style": { "display": "flex", "gap": "1.25rem", "color": "var(--color-muted)" },
+      "children": [
+        { "tagName": "a", "attributes": { "href": "/listings/" }, "children": ["Listings"] },
+        { "tagName": "a", "attributes": { "href": "/about/" }, "children": ["About"] }
+      ]
+    }
+  ]
+}

@@ -16,6 +16,7 @@ import { openPageAction, renderEmptyState } from "./empty-state";
 import { eventsSidebarTemplate } from "./events-panel";
 import { isCustomElementDoc } from "./signals-panel";
 
+import { inspectorTabRegion, REGION_ATTR } from "../ui/regions";
 import { isColorPopoverOpen } from "../ui/color-selector";
 import { renderStylePanelTemplate } from "./style-panel";
 import { renderPropertiesPanelTemplate } from "./properties-panel";
@@ -76,9 +77,7 @@ export function unmount() {
   _ctx = null;
   _scheduler?.unbind();
   _scheduler = null;
-  _propsContainer = null;
-  _eventsContainer = null;
-  _styleContainer = null;
+  _containers = null;
 }
 
 /**
@@ -89,20 +88,36 @@ export function render() {
   _scheduler?.schedule();
 }
 
-let _propsContainer: HTMLElement | null = null;
-let _eventsContainer: HTMLElement | null = null;
-let _styleContainer: HTMLElement | null = null;
+/**
+ * The Inspector's tabs, in order — one record per tab.
+ *
+ * The `value` is the single source of the tab: it is what `ui.rightTab` stores, what the tab strip
+ * selects by, which container is shown, AND the region `inspector/tab:<value>` that addresses that
+ * container. Three parallel arrays used to encode that (`panelTabs`, `containers`, `tabKeys`), and
+ * a fourth thing — the region — would have been a fourth place to keep in step.
+ */
+const INSPECTOR_TABS = [
+  { icon: "sp-icon-properties", label: "Properties", value: "properties" },
+  { icon: "sp-icon-event", label: "Events", value: "events" },
+  { icon: "sp-icon-brush", label: "Style", value: "style" },
+] as const;
 
-function _ensureContainers() {
-  if (_propsContainer) {
-    return;
+/** Tab value → its body container, built once and reused across renders. */
+let _containers: Map<string, HTMLElement> | null = null;
+
+function _ensureContainers(): Map<string, HTMLElement> {
+  if (_containers) {
+    return _containers;
   }
-  _propsContainer = document.createElement("div");
-  _propsContainer.className = "panel-body";
-  _eventsContainer = document.createElement("div");
-  _eventsContainer.className = "panel-body";
-  _styleContainer = document.createElement("div");
-  _styleContainer.className = "panel-body";
+  _containers = new Map(
+    INSPECTOR_TABS.map((t) => {
+      const el = document.createElement("div");
+      el.className = "panel-body";
+      el.setAttribute(REGION_ATTR, inspectorTabRegion(t.value));
+      return [t.value, el] as const;
+    }),
+  );
+  return _containers;
 }
 
 /**
@@ -111,9 +126,7 @@ function _ensureContainers() {
  * emptied root can be rendered into again.
  */
 function _renderNoDocument() {
-  _propsContainer = null;
-  _eventsContainer = null;
-  _styleContainer = null;
+  _containers = null;
   rightPanel.textContent = "";
   // @ts-expect-error — clear Lit's internal state so the cleared root re-renders cleanly
   delete rightPanel["_$litPart$"];
@@ -147,16 +160,11 @@ function _doRender() {
     };
     // Coerce stale values ("assistant" moved to the persistent chat sidebar; automation or a
     // Restored session may still carry it).
-    const tab = ["properties", "events", "style"].includes(S.ui.rightTab)
+    const tab = INSPECTOR_TABS.some((t) => t.value === S.ui.rightTab)
       ? S.ui.rightTab
-      : "properties";
+      : INSPECTOR_TABS[0].value;
 
     // Render tabs header
-    const panelTabs = [
-      { icon: "sp-icon-properties", label: "Properties", value: "properties" },
-      { icon: "sp-icon-event", label: "Events", value: "events" },
-      { icon: "sp-icon-brush", label: "Style", value: "style" },
-    ];
     const tabsT = html`
       <div class="panel-tabs">
         <sp-tabs
@@ -170,7 +178,7 @@ function _doRender() {
             }
           }}
         >
-          ${panelTabs.map(
+          ${INSPECTOR_TABS.map(
             (t) => html`
               <sp-tab value=${t.value} title=${t.label} aria-label=${t.label}>
                 ${tabIcon(t.icon, "xs")}
@@ -181,41 +189,36 @@ function _doRender() {
       </div>
     `;
 
-    _ensureContainers();
-    const containers = [_propsContainer, _eventsContainer, _styleContainer] as HTMLElement[];
-    const tabKeys = ["properties", "events", "style"];
+    const containers = _ensureContainers();
 
-    // Show/hide containers
-    for (let i = 0; i < containers.length; i++) {
-      containers[i]!.style.display = tabKeys[i] === tab ? "" : "none";
-    }
-
-    // Render tabs into the right panel, append containers
+    // Show/hide containers, and attach any that a fresh build has not mounted yet.
     litRender(tabsT, rightPanel);
-    for (const c of containers) {
-      if (!c.parentNode) {
-        rightPanel.append(c);
+    for (const [key, el] of containers) {
+      el.style.display = key === tab ? "" : "none";
+      if (!el.parentNode) {
+        rightPanel.append(el);
       }
     }
 
     // Only render the active panel's content
+    const body = containers.get(tab)!;
     if (tab === "properties") {
       litRender(
         renderPropertiesPanelTemplate({
           navigateToComponent: ctx.navigateToComponent,
         }),
-        _propsContainer!,
+        body,
       );
     } else if (tab === "events") {
       litRender(
         eventsSidebarTemplate({
           isCustomElementDoc: () => isCustomElementDoc(S),
         }),
-        _eventsContainer!,
+        body,
       );
     } else if (tab === "style") {
       try {
-        litRender(renderStylePanelTemplate({ getCanvasMode: ctx.getCanvasMode }), _styleContainer!);
+        litRender(renderStylePanelTemplate({ getCanvasMode: ctx.getCanvasMode }), body);
       } catch (error) {
         console.error("[renderStylePanelTemplate]", error);
       }

@@ -67,10 +67,17 @@ export function renderStatusbar() {
   if (tab?.doc.mode === "content") {
     parts.push("Content Mode");
   }
+  // The bar's SELECTION field, kept apart from the rest of the line.
+  //
+  // `statusbar/selection` is one of the three placements the level x placement matrix already
+  // Declares for this bar, and it is the only one this bar renders today. Emitting it as its own
+  // Element makes the placement addressable — for a focus move, for the F6 walk, for a crop —
+  // Without inventing the project and document fields the bar does not have yet.
+  const selectionParts: string[] = [];
   if (tab?.session.selection?.length) {
     const sel = tab.session.selection as JxPath;
     const node = getNodeAtPath(tab.doc.document, sel);
-    parts.push(`Selected: ${esc(nodeLabel(node))}`);
+    selectionParts.push(`Selected: ${esc(nodeLabel(node))}`);
 
     // Walk the path one structural step at a time. Most steps are `["children", index]` or
     // `["cases", name]` pairs, but a repeater template is reached by a lone `"map"` segment — so the
@@ -95,10 +102,13 @@ export function renderStatusbar() {
       );
       i += step;
     }
-    parts.push(`Path: ${pathSegments.join(' <span class="sb-path-sep">&gt;</span> ')}`);
+    selectionParts.push(`Path: ${pathSegments.join(' <span class="sb-path-sep">&gt;</span> ')}`);
   } else if (shell.stylebook.selection) {
     const sel = shell.stylebook.selection;
-    parts.push(`Style: ${esc(sel.replaceAll(" ", " > "))}`);
+    selectionParts.push(`Style: ${esc(sel.replaceAll(" ", " > "))}`);
+  }
+  if (selectionParts.length > 0) {
+    parts.push(`<span data-jx-region="statusbar/selection">${selectionParts.join("  |  ")}</span>`);
   }
   if (statusMsg) {
     parts.push(esc(statusMsg));

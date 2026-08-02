@@ -1,0 +1,24 @@
+{
+  "tagName": "sc-listing-card",
+  "state": { "title": "Cedar House", "meta": "3 bed · 2 bath", "price": "$540,000" },
+  "style": {
+    "display": "block",
+    "padding": "1.25rem",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "0.75rem",
+    "backgroundColor": "var(--color-surface)"
+  },
+  "children": [
+    { "tagName": "h3", "style": { "margin": "0 0 0.35rem" }, "children": ["${title}"] },
+    {
+      "tagName": "p",
+      "style": { "margin": "0 0 0.75rem", "color": "var(--color-muted)" },
+      "children": ["${meta}"]
+    },
+    {
+      "tagName": "strong",
+      "style": { "color": "var(--color-accent)" },
+      "children": ["${price}"]
+    }
+  ]
+}

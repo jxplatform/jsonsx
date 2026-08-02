@@ -1,8 +1,29 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, mkdir, rm, utimes, writeFile } from "node:fs/promises";
+import { lstat, mkdtemp, mkdir, rm, utimes, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { assertBundleFresh, ensureDevServer } from "./server";
+import { dirname, join, resolve } from "node:path";
+import {
+  assertBundleFresh,
+  ensureDevServer,
+  forgetOverlays,
+  materialiseGitFixture,
+  normalizeServerUrl,
+  overlayProject,
+  WORK_DIR,
+} from "./server";
+
+const REPO_ROOT = resolve(import.meta.dir, "../../..");
+
+/** Run git in `cwd` and return stdout. The fixture tests assert on real repository state. */
+async function run(cwd: string, args: string[]): Promise<string> {
+  const proc = Bun.spawn(["git", ...args], { cwd, stderr: "pipe", stdout: "pipe" });
+  const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  if (code !== 0) {
+    throw new Error(`git ${args.join(" ")}: ${await new Response(proc.stderr).text()}`);
+  }
+  return out;
+}
 
 const roots: string[] = [];
 
@@ -98,5 +119,142 @@ describe("ensureDevServer", () => {
     } finally {
       await served.stop(true);
     }
+  });
+});
+
+describe("normalizeServerUrl", () => {
+  test("localhost becomes 127.0.0.1 — the dev server binds IPv4 only", () => {
+    expect(normalizeServerUrl("http://localhost:3000")).toBe("http://127.0.0.1:3000");
+    expect(normalizeServerUrl("http://127.0.0.1:3000")).toBe("http://127.0.0.1:3000");
+  });
+});
+
+/** A throwaway repo with one committed "starter" project inside it. */
+async function repoWithProject(files: Record<string, string>): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "jx-shot-overlay-"));
+  roots.push(root);
+  for (const [rel, body] of Object.entries(files)) {
+    const full = join(root, "starter", rel);
+    await mkdir(dirname(full), { recursive: true });
+    await writeFile(full, body);
+  }
+  return root;
+}
+
+describe("overlayProject", () => {
+  test("a shot opens a copy, and writing through it cannot reach the committed file", async () => {
+    const root = await repoWithProject({
+      "pages/index.md": "# Come for the coffee\n",
+      "project.json": '{ "name": "Starter" }\n',
+    });
+    forgetOverlays();
+    const overlay = await overlayProject(root, "starter");
+
+    expect(overlay.root).toContain(WORK_DIR);
+    expect(overlay.root).not.toBe(join(root, "starter"));
+    expect(await Bun.file(join(overlay.root, "pages/index.md")).text()).toBe(
+      "# Come for the coffee\n",
+    );
+
+    // What `slash-menu-shot` used to do to a committed starter, and then undo by hand.
+    await writeFile(join(overlay.root, "pages/index.md"), "# Come hungry\n");
+    expect(await Bun.file(join(root, "starter/pages/index.md")).text()).toBe(
+      "# Come for the coffee\n",
+    );
+  });
+
+  test("reset undoes a modification, a creation and a deletion", async () => {
+    const root = await repoWithProject({
+      "pages/index.md": "original\n",
+      "pages/menu.md": "menu\n",
+      "project.json": "{}\n",
+    });
+    forgetOverlays();
+    const overlay = await overlayProject(root, "starter");
+
+    await writeFile(join(overlay.root, "pages/index.md"), "edited by a step\n");
+    await writeFile(join(overlay.root, "pages/new.md"), "created by a step\n");
+    await rm(join(overlay.root, "pages/menu.md"));
+
+    await overlay.reset();
+
+    expect(await Bun.file(join(overlay.root, "pages/index.md")).text()).toBe("original\n");
+    expect(await Bun.file(join(overlay.root, "pages/menu.md")).text()).toBe("menu\n");
+    expect(existsSync(join(overlay.root, "pages/new.md"))).toBe(false);
+  });
+
+  test("the copy is memoised per project, so twenty shots share one materialisation", async () => {
+    const root = await repoWithProject({ "project.json": "{}\n" });
+    forgetOverlays();
+    const first = await overlayProject(root, "starter");
+    const second = await overlayProject(root, "starter");
+    expect(second).toBe(first);
+  });
+
+  test("node_modules is symlinked, never copied — the shop starter's is 69 MB", async () => {
+    const root = await repoWithProject({
+      "node_modules/dep/index.js": "export const x = 1;\n",
+      "project.json": "{}\n",
+    });
+    forgetOverlays();
+    const overlay = await overlayProject(root, "starter");
+    const linked = await lstat(join(overlay.root, "node_modules"));
+    expect(linked.isSymbolicLink()).toBe(true);
+  });
+
+  test("a project that does not exist fails naming the path, not the symptom", async () => {
+    const root = await repoWithProject({ "project.json": "{}\n" });
+    forgetOverlays();
+    await expect(overlayProject(root, "packages/starters/sites/ghost")).rejects.toThrow(
+      "does not exist",
+    );
+  });
+});
+
+describe("materialiseGitFixture", () => {
+  test("builds a repository whose history and dirty set are the same on every machine", async () => {
+    const root = await mkdtemp(join(tmpdir(), "jx-shot-fixture-"));
+    roots.push(root);
+    const source = join(REPO_ROOT, "scripts/screenshots/fixtures/repos/showcase");
+    const dest = join(root, "showcase");
+    await materialiseGitFixture(source, dest);
+
+    const log = await run(dest, ["log", "--format=%s|%ad|%an", "--date=iso-strict"]);
+    expect(log.trim().split("\n")).toEqual([
+      "Add the listings page and its card|2026-01-14T16:42:00Z|Rae Okonjo",
+      "Add the Showcase site skeleton|2026-01-12T09:14:00Z|Rae Okonjo",
+    ]);
+
+    const status = await run(dest, ["status", "--porcelain"]);
+    expect(status.trimEnd().split("\n").toSorted()).toEqual([
+      " D pages/about.md",
+      " M pages/index.md",
+      "?? components/sc-cta.json",
+    ]);
+  });
+
+  test("rebuilding is the reset, so a shot may stage and commit inside the fixture", async () => {
+    const root = await mkdtemp(join(tmpdir(), "jx-shot-fixture-reset-"));
+    roots.push(root);
+    const source = join(REPO_ROOT, "scripts/screenshots/fixtures/repos/showcase");
+    const dest = join(root, "showcase");
+    await materialiseGitFixture(source, dest);
+    await run(dest, ["add", "-A"]);
+    await run(dest, [
+      "-c",
+      "user.name=x",
+      "-c",
+      "user.email=x@y.z",
+      "commit",
+      "-m",
+      "a shot did this",
+    ]);
+    const clean = await run(dest, ["status", "--porcelain"]);
+    expect(clean.trim()).toBe("");
+
+    await materialiseGitFixture(source, dest);
+    const dirty = await run(dest, ["status", "--porcelain"]);
+    expect(dirty.trim()).not.toBe("");
+    expect(await run(dest, ["log", "--oneline"])).not.toContain("a shot did this");
   });
 });

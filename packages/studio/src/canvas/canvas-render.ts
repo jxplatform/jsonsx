@@ -9,8 +9,9 @@ import { ref } from "lit-html/directives/ref.js";
 import type * as monaco from "monaco-editor";
 import { loadedMonaco, loadMonaco } from "../services/monaco-lazy";
 
-import { canvasPanels, canvasWrap, updateCanvas } from "../store";
+import { canvasPanels, canvasWrap, getNodeAtPath, updateCanvas } from "../store";
 import { activeTab } from "../workspace/workspace";
+import { argsSchema, nullablePathArg, pathProperty } from "../commands/command-args";
 import { collabSourceContext } from "../collab/collab-session";
 import { attachCursorStyles } from "../collab/monaco-cursors";
 import type { AwarenessLike } from "../collab/monaco-cursors";
@@ -57,6 +58,7 @@ import { statusMessage } from "../panels/statusbar";
 import * as overlaysPanel from "../panels/overlays";
 
 import type { CanvasPanel, GitDiffState } from "../types";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../tabs/tab.js";
 
@@ -924,4 +926,70 @@ function renderCanvasIntoPanel(
 
 export function renderOverlays() {
   overlaysPanel.render();
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/**
+ * Set (or clear) the active document's element selection.
+ *
+ * Defined beside the surface that DRAWS a selection rather than beside the field that stores it:
+ * every consumer of `session.selection` — the overlay boxes, the Outline's selected row, the
+ * Inspector, the block action bar — is downstream of this module's render, and the one thing this
+ * verb must guarantee is that the path it accepts is one those surfaces can actually draw.
+ *
+ * `path: []` is the document ROOT and is a legal selection (`selector-menu-shot` uses it). `null`
+ * clears the selection. Anything else is resolved against the open document and REFUSED when it
+ * addresses nothing — a stale path used to select a hole, and every panel downstream then rendered
+ * its empty state while the shot recorded that as the truth.
+ */
+export function selectionCommands(): AnyCommand[] {
+  return [
+    {
+      args: argsSchema({
+        path: pathProperty(
+          "The document path to select — an array of keys and indexes. [] is the document " +
+            "root; null clears the selection.",
+          true,
+        ),
+      }),
+      category: "Selection",
+      id: "selection.set",
+      level: "document",
+      menus: ["palette"],
+      group: "2_navigate",
+      requires: "an open document",
+      when: (ctx) => ctx.document.open,
+      aiTool: {
+        description:
+          "Select the element at a document path so the Inspector, the Outline and the canvas " +
+          "overlay all address it. Pass null to clear the selection.",
+        name: "select_node",
+      },
+      run: (_commandCtx, args) => {
+        const path = nullablePathArg("selection.set", args, "path");
+        const tab = activeTab.value;
+        if (!tab) {
+          throw new RangeError(`command "selection.set" needs an open document; no tab is active`);
+        }
+        if (path !== null && path.length > 0 && !getNodeAtPath(tab.doc.document, path)) {
+          throw new RangeError(
+            `command "selection.set" argument "path": [${path.join(", ")}] addresses no node in ` +
+              `${tab.documentPath ?? "the open document"}`,
+          );
+        }
+        tab.session.selection = path;
+      },
+      title: "Select Element",
+    },
+  ];
+}
+
+/**
+ * Register the selection verb. Called from the bootstrap.
+ *
+ * @param {CommandRegistry} registry
+ */
+export function registerSelectionSetCommand(registry: CommandRegistry): void {
+  registry.registerAll(selectionCommands());
 }

@@ -1,526 +1,462 @@
 /// <reference lib="dom" />
 /**
- * Automation hook — a small, gated scripting surface for driving Studio from a browser-automation
- * runner (see scripts/screenshots/ at the repo root). Installed as `window.__jxAutomation` only
- * when the page URL carries `?automation=1`; without the flag production behavior is untouched.
+ * Automation.ts — the scripting surface, as a PROJECTION of the app.
  *
- * The API mutates the same reactive state the real UI mutates (canvas mode, activity tab,
- * selection, inspector tab, function editor) instead of clicking through Spectrum shadow DOM, so
- * shot definitions stay stable across chrome refactors.
+ * Installed as `window.__jxAutomation` only when the page URL carries `?automation=1`. It exposes
+ * exactly three members (spec studio.md §13.5):
+ *
+ * - `run(id, args)` — **is** `registry.run(id, args)`, behind {@link isScriptable}. There is no
+ *   second action table. A hand-maintained parallel list of what the app can do is what plan §2
+ *   principle 1 defines as a defect, and this module used to be 39 entries of exactly that, 16 of
+ *   them holding raw XPath into the shell and three of them matching RENDERED TEXT.
+ * - `seed(id, args)` — the {@link SEEDS} registry, under the **Remote Rule**: a seed may only write
+ *   state whose real writer is a network or IPC boundary. It stands in for a remote, never for a
+ *   user. {@link REFUSED_SEEDS} names what that excludes and why.
+ * - `probe` — read-only. {@link AutomationProbe.idle} (the predicate that replaced 115 sleeps),
+ *   `state()` (the full `CommandContext`), `commands()`, `seeds()`, and `pointAt`/`revealPath`,
+ *   which compose the app's own transforms and answer in top-document coordinates.
+ *
+ * **What is deliberately absent**, each a normative refusal in spec §13.5:
+ *
+ * 1. No method that takes a selector. If a script cannot say it in command ids and `JxPath`s, it
+ *    cannot say it here.
+ * 2. No `setStatus`. Staging the word "Ready" over the status bar is lying to the reader; if a capture
+ *    needs a calm status bar, the app has to BE calm.
+ * 3. No `toggle*`. A delta against unstated state is what silently inverted 23 manifest steps when the
+ *    assistant's default flipped, and an agent calling `view.toggleAssistant` is guessing at state
+ *    it cannot observe. {@link TOGGLE_ID} refuses them at runtime.
+ * 4. No compatibility shim. The predecessor carried `setRightTab`'s `if (tab === "assistant")`
+ *    redirect, whose own comment said it existed "to keep the Screenshot-manifest verb working" — a
+ *    pipeline artefact living in production code.
+ * 5. No presentation-state pokes. Automation mutates documents by running the commands a user runs, so
+ *    every write goes through the transaction log.
  */
 
-import { renderOnly, updateUi } from "../store";
-import { setProjectState } from "../state";
+import { render } from "../store";
 import { seedProjectList } from "../project-list";
-import { activeTab, closeAllTabs, workspace } from "../workspace/workspace";
-import type { ProjectListEntry } from "../types";
-import { setActivityTab, setDockCollapsed, shell, toggleActivityTab } from "../shell";
-import { setEditZoom as applyEditZoomLevel } from "../canvas/canvas-utils";
+import { activeTab } from "../workspace/workspace";
+import { shell } from "../shell";
 import { collabState } from "../collab/collab-state";
+import { canvasPointAt, revealCanvasPath } from "../canvas/iframe-host";
+import { probeIdle } from "./idle";
+import type { CanvasPoint } from "../canvas/iframe-host";
+import type { IdleOptions } from "./idle";
+import type { CommandContext } from "../commands/context";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import type { PeerPresence } from "../collab/collab-state";
 import type { SeededAssistantMessage } from "../panels/ai-panel";
 import type { PagesDeploymentInfo } from "../publish/pages-service";
+import type { GitBranchesResult, GitStatusResult, ProjectListEntry } from "../types";
+import type { GitLogEntry } from "../shell";
 import type { JxPath } from "../state";
 
-/** Callbacks injected from studio.ts (module-local helpers or imports kept out of this module). */
-export interface AutomationDeps {
-  getCanvasMode: () => string;
-  openBrowseModal: () => void;
-  openConnectorGrid: (connection: string | undefined, table: string) => void;
-  openNewProjectModal: () => void;
-  openQuickSearchPalette: () => void;
-  openSettingsModal: (section?: string) => void;
-  render: () => void;
-  seedAssistantMessages: (messages: SeededAssistantMessage[]) => void;
-  seedPublishConnected: (options: { accountId?: string; deployment: PagesDeploymentInfo }) => void;
-  setCanvasMode: (mode: string) => void;
-  statusMessage: (text: string) => void;
-}
-
-/**
- * What a command handler tells the runner to do next.
- *
- * INTERIM: a handful of Studio actions are still reachable only by pressing a chrome control — a
- * context-menu item, a Spectrum picker that opens on a real pointer press, a sub-navigation button
- * inside the settings modal. Those handlers resolve the control and hand its selector back so the
- * runner performs a genuine mouse press on it. Every such entry disappears the moment the action
- * exists in the command registry: the handler starts executing in-page and stops returning `click`,
- * and no manifest step changes.
- */
-export interface AutomationRunResult {
-  click?: { button?: "left" | "right"; selector: string };
-}
-
-/** Loosely-typed command arguments, as they arrive from a manifest step's `args` object. */
+/** Loosely-typed arguments, as they arrive from a manifest step, a palette prompt or a tool call. */
 export type AutomationArgs = Record<string, unknown>;
 
 /**
- * One entry of the id→handler table behind `run(id, args)`.
+ * What the hook needs that it cannot import.
  *
- * `run` is the real thing: it mutates the same reactive state the UI mutates. `press` is the
- * interim escape hatch described on {@link AutomationRunResult} — an entry carries one or the other,
- * and Phase 2 converts every `press` into a `run` against the command registry.
+ * Three entries, and the shape is the point: everything the predecessor took by injection —
+ * `getCanvasMode`, `openBrowseModal`, `openSettingsModal`, `render`, `setCanvasMode`,
+ * `statusMessage` — was a capability being re-implemented here instead of being a command.
  */
-export interface AutomationCommand {
-  run?: (api: AutomationApi, args: AutomationArgs) => void;
-  press?: (args: AutomationArgs) => { button?: "left" | "right"; selector: string };
+export interface AutomationDeps {
+  /** The registry `run()` projects. One per window, exactly as the bootstrap builds it. */
+  registry: CommandRegistry;
+  /** The assistant's transcript sink — stands in for the model stream. */
+  seedAssistantMessages: (messages: SeededAssistantMessage[]) => void;
+  /** The publish panel's connected state — stands in for the Cloudflare Pages API. */
+  seedPublishConnected: (options: { accountId?: string; deployment: PagesDeploymentInfo }) => void;
 }
 
-export interface AutomationApi {
-  /**
-   * Command-addressed entry point: the only thing a screenshot manifest ever names. Resolves `id`
-   * against {@link AUTOMATION_COMMANDS} and runs it. Unknown ids throw rather than no-op — a
-   * silently-skipped step would capture the wrong state and the docs build would accept it.
-   */
-  run: (id: string, args?: AutomationArgs) => AutomationRunResult;
-  editDef: (defName: string) => void;
-  editFunction: (path: JxPath, eventKey: string) => void;
-  openBrowse: () => void;
-  openDataGrid: (options: { connection?: string; table: string }) => void;
-  openNewProject: () => void;
-  openQuickSearch: () => void;
-  openSettings: (section?: string) => void;
-  seedAssistant: (options: { messages: SeededAssistantMessage[] }) => void;
-  seedCollab: (options: { peers: PeerPresence[] }) => void;
-  seedPublish: (options: { accountId?: string; deployment: PagesDeploymentInfo }) => void;
-  showWelcome: (options?: { projects?: ProjectListEntry[] }) => void;
-  getState: () => {
-    activeTabId: string | null;
-    canvasMode: string;
-    canvasStatus: string | null;
-    leftTab: string;
-  };
-  select: (path: JxPath | null) => void;
-  setActivity: (tab: string) => void;
-  setCanvasMode: (mode: string) => void;
-  setRightTab: (tab: string) => void;
-  setStatus: (text: string) => void;
-  setTheme: (color: string) => void;
-  setZoom: (zoom: number) => void;
-  setEditZoom: (zoom: number) => void;
-  toggleActivity: (tab: string) => void;
-  togglePreview: () => void;
-  setAssistant: (open: boolean) => void;
-  setRightPanel: (open: boolean) => void;
-  waitForCanvasReady: (timeoutMs?: number) => Promise<void>;
+// ─── The idempotence rule ─────────────────────────────────────────────────────
+
+/** `view.toggleAssistant` names a delta; `view.setAssistant` names a state. Only one is runnable. */
+export const TOGGLE_ID = /\.toggle[A-Z]/;
+
+/** The idempotent id a toggle should have become — printed so the fix is inside the refusal. */
+export function setterFor(id: string): string {
+  return id.replace(/\.toggle([A-Z])/, (_match, initial: string) => `.set${initial}`);
 }
 
-// ─── Argument coercion ────────────────────────────────────────────────────────
-// A manifest step's `args` is plain JSON. Coerce loudly: a mistyped argument must fail the shot,
-// Never silently capture `undefined` state.
+/**
+ * Whether a command projects into `run()`.
+ *
+ * Derived, not declared: everything the registry holds is a capability with an id, a gate and a
+ * `run`, which is exactly what a script needs. The one exclusion is the idempotence rule, so the
+ * projection cannot drift from the registry the way a hand-kept allow-list would.
+ */
+export function isScriptable(command: AnyCommand): boolean {
+  return !TOGGLE_ID.test(command.id);
+}
 
-function str(args: AutomationArgs, key: string): string {
+// ─── The registry-gap declaration ─────────────────────────────────────────────
+
+/**
+ * How a manifest id the registry does not declare is going to stop existing.
+ *
+ * - `command` — a thing a user does, so it becomes a registry record. The value names who lands it.
+ * - `seed` — a remote's state, addressed through {@link AutomationApi.seed}.
+ * - `refused` — §13.3 says the app will never provide it; the manifest step is deleted.
+ */
+export type GapDisposition = "command" | "seed" | "refused";
+
+export interface ManifestId {
+  disposition: GapDisposition;
+  /** The phase that lands the record, or the sentence that refuses it. One line, for the error. */
+  note: string;
+}
+
+/**
+ * Ids the screenshot manifest still depends on and no registry declares. **No handlers, no
+ * behaviour.**
+ *
+ * The export name is the contract `scripts/check-shot-contract.ts` reads (`loadCommandTable` looks
+ * for `defaultCommandSet()`, `seedIds()` or `AUTOMATION_COMMANDS`), and it is all that is left of
+ * the 39-entry action table this module used to be: every `press`, every XPath, every rendered-text
+ * matcher and both label mirrors are gone, and `run()` never consults this map to decide what to DO
+ * — only to explain, when the registry refuses an id, which of the three fates that id has.
+ *
+ * This is a countdown, in the idiom of the checker's own `TOGGLE_DEBT`: it may only shrink. It went
+ * 39 → 8 when the manifest converted (S2). What left: every `seed` entry, now read off
+ * {@link seedIds} and answered from the live registry rather than from a hand-kept list; every
+ * `toggle*` entry, which {@link TOGGLE_ID} refuses before this map is ever consulted; and every
+ * `command` entry whose record has since landed.
+ *
+ * What is left is two kinds. Three `command` entries are the manifest's real registry gaps — each
+ * reached today by an `input` step clicking a hand-stamped region, and each of those steps carries
+ * an `unstable` hatch naming the phase that lands the record, so this map and that hatch count are
+ * the same debt. Five `refused` entries are NOT a countdown: they are §13.3's normative refusals,
+ * and they stay so that a caller reaching for one gets the reason instead of "unknown command".
+ */
+export const AUTOMATION_COMMANDS: Readonly<Record<string, ManifestId>> = {
+  "element.insertData": { disposition: "command", note: "P5 — insert.data" },
+  "file.contextMenu": {
+    disposition: "refused",
+    note: "opening a menu to press an item names a control; the ITEM is the command",
+  },
+  "layers.contextMenu": {
+    disposition: "refused",
+    note: "matched RENDERED TEXT, which §13's R1 forbids; P5.5 stamps data-jx-path on rows",
+  },
+  "media.browse": { disposition: "command", note: "P7.5 — media.browse" },
+  "project.showWelcome": {
+    disposition: "refused",
+    note: "cold start is a startup profile (?profile=fresh), not an action",
+  },
+  "settings.selectEntry": { disposition: "command", note: "P6.2 — settings.selectEntry" },
+  "settings.setSection": {
+    disposition: "refused",
+    note: 'mirrored the section registry\'s LABELS; say settings.open { section: "cssVars" }',
+  },
+  "view.setStatus": {
+    disposition: "refused",
+    note: "the status bar is not staged — if a capture needs a calm shell, the app must BE calm",
+  },
+};
+
+// ─── The seed registry, under the Remote Rule ─────────────────────────────────
+
+/** One staged fixture, and the boundary whose job it is doing. */
+export interface SeedDefinition {
+  id: string;
+  /** The network or IPC boundary this seed stands in for. The Remote Rule, written down per seed. */
+  boundary: string;
+  run: (args: AutomationArgs) => void | Promise<void>;
+}
+
+/**
+ * Writes a seed will not do, and the reason, quoted back at the caller.
+ *
+ * Every one of these was a method on the old surface. Each writes state a USER writes, so each is a
+ * COMMAND — and a fixture that stages it photographs a state no session could have reached.
+ */
+export const REFUSED_SEEDS: Readonly<Record<string, string>> = {
+  openSettings: 'a user opens Settings — run("settings.open")',
+  select: 'a user selects a node — run("selection.set", { path })',
+  setActivity: 'a user picks a Navigator panel — run("navigator.showPanel", { panel })',
+  setRightTab: 'a user picks an Inspector tab — run("inspector.setTab", { tab })',
+  setStatus:
+    "the status bar reports what the app just did; staging it is the one lie §13.3 names outright",
+  setZoom: 'a user zooms — run("canvas.setZoom", { zoom })',
+};
+
+function arrayArg<T>(args: AutomationArgs, key: string): T[] {
   const value = args[key];
-  if (typeof value !== "string") {
-    throw new TypeError(`automation command argument "${key}" must be a string`);
+  if (value === undefined) {
+    return [];
   }
-  return value;
+  if (!Array.isArray(value)) {
+    throw new TypeError(`seed argument "${key}" must be an array`);
+  }
+  return value as T[];
 }
 
-function num(args: AutomationArgs, key: string): number {
+function requiredArg<T>(args: AutomationArgs, key: string): T {
   const value = args[key];
-  if (typeof value !== "number") {
-    throw new TypeError(`automation command argument "${key}" must be a number`);
+  if (value === null || typeof value !== "object") {
+    throw new TypeError(`seed argument "${key}" must be an object`);
   }
-  return value;
+  return value as T;
 }
 
-function bool(args: AutomationArgs, key: string): boolean {
-  const value = args[key];
-  if (typeof value !== "boolean") {
-    throw new TypeError(`automation command argument "${key}" must be a boolean`);
-  }
-  return value;
-}
-
-function optionalStr(args: AutomationArgs, key: string): string | undefined {
+function optionalString(args: AutomationArgs, key: string): string | undefined {
   const value = args[key];
   if (value === undefined) {
     return undefined;
   }
   if (typeof value !== "string") {
-    throw new TypeError(`automation command argument "${key}" must be a string`);
+    throw new TypeError(`seed argument "${key}" must be a string`);
   }
   return value;
 }
 
-// ─── INTERIM selector shims ───────────────────────────────────────────────────
-// Everything below this banner is scaffolding, not architecture. These commands have no
-// Programmatic seam yet — the only way to fire them is to press the chrome control that owns them.
-// Keeping the selectors HERE (rather than in 58 manifest steps) means a chrome refactor is a
-// One-file fix, and Phase 2 deletes the whole banner by swapping each `press` for a `run`.
-
-/** An `sp-menu-item` in whatever menu/context menu is currently open, matched by its label. */
-const menuItem = (label: string) => `xpath///sp-menu-item[normalize-space()="${label}"]`;
-
-/** A panel row (signals, data explorer, layers) matched by the text of its name/label span. */
-const namedRow = (rowClass: string, nameClass: string, name: string) =>
-  `xpath///div[contains(@class,"${rowClass}")][.//span[contains(@class,"${nameClass}")]` +
-  `[normalize-space()="${name}"]]`;
-
 /**
- * An Outline row, matched by its label OR its tag badge, case-insensitively.
+ * The declared seeds.
  *
- * Outline labels are derived from the node, so they are deliberately not stable strings; the tag
- * badge is. Accepting either keeps a shot working when a row's label changes shape.
+ * Each one writes exactly what its named boundary would have written, and nothing else — the git
+ * seed does not also open the Source Control panel, because a user does that.
  */
-const layerRow = (name: string) => {
-  const lower = name.toLowerCase();
-  const fold = `translate(normalize-space(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")`;
-  return (
-    `xpath///div[contains(@class,"layer-row")]` +
-    `[.//span[contains(@class,"layer-label")][${fold}="${lower}"]` +
-    ` or .//span[contains(@class,"layer-tag")][${fold}="${lower}"]]`
-  );
-};
-
-/** An `sp-action-button` inside `container`, matched by its label. */
-const buttonIn = (container: string, label: string) =>
-  `xpath///div[contains(@class,"${container}")]//sp-action-button[normalize-space()="${label}"]`;
-
-/** Settings-section key → nav label. Mirrors the labels the section registry renders. */
-const SETTINGS_SECTION_LABELS: Record<string, string> = { content: "Content Types" };
-
-/** Browse category key → filter-bar label. Mirrors CATEGORIES in browse/browse.ts. */
-const BROWSE_CATEGORY_LABELS: Record<string, string> = {
-  all: "All",
-  components: "Components",
-  content: "Content",
-  layouts: "Layouts",
-  media: "Media",
-  pages: "Pages",
-};
-
-function labelFor(map: Record<string, string>, key: string, what: string): string {
-  const label = map[key];
-  if (!label) {
-    throw new Error(`unknown ${what} "${key}"`);
-  }
-  return label;
+export function createSeeds(deps: AutomationDeps): SeedDefinition[] {
+  return [
+    {
+      boundary: "the assistant's model stream",
+      id: "seed.assistant",
+      run: (args) => {
+        deps.seedAssistantMessages(arrayArg<SeededAssistantMessage>(args, "messages"));
+      },
+    },
+    {
+      boundary: "the collaboration websocket (awareness + sync)",
+      id: "seed.collab",
+      run: (args) => {
+        const tab = activeTab.value;
+        if (!tab) {
+          return;
+        }
+        const state = collabState(tab);
+        state.status = "synced";
+        state.active = true;
+        const peers: PeerPresence[] = [];
+        for (const peer of arrayArg<PeerPresence>(args, "peers")) {
+          const peerState = { ...peer.state };
+          // A peer with no focused document is focused on THIS one — the presence overlay keys on it.
+          peerState.focusedPath ??= tab.documentPath;
+          peers.push({ ...peer, state: peerState });
+        }
+        state.peers = peers;
+        render();
+      },
+    },
+    {
+      boundary: "the Cloudflare Pages API",
+      id: "seed.publish",
+      run: (args) => {
+        const accountId = optionalString(args, "accountId");
+        deps.seedPublishConnected({
+          deployment: requiredArg<PagesDeploymentInfo>(args, "deployment"),
+          ...(accountId ? { accountId } : {}),
+        });
+      },
+    },
+    {
+      boundary: "the platform's git routes (`gitStatus` / `gitBranches` / `gitLog`)",
+      id: "seed.git",
+      run: (args) => {
+        // The working tree really is a remote here: the git-panel shot photographs whatever the
+        // Author happened to have dirty, because its project lives inside this repository.
+        shell.git.status = (args.status as GitStatusResult | undefined) ?? null;
+        shell.git.branches = (args.branches as GitBranchesResult | undefined) ?? null;
+        shell.git.logEntries = (args.log as GitLogEntry[] | undefined) ?? null;
+        shell.git.loading = false;
+        shell.git.error = null;
+        render();
+      },
+    },
+    {
+      boundary: "the platform's recent-projects store (desktop IPC / cloud API)",
+      id: "seed.projectList",
+      run: (args) => {
+        seedProjectList(arrayArg<ProjectListEntry>(args, "projects"));
+        render();
+      },
+    },
+  ];
 }
 
 /**
- * The id→handler table behind `run(id, args)`.
+ * Every declared seed id, read off {@link createSeeds} itself.
  *
- * Ids are `<category>.<verb>`, the shape the Studio command registry is heading for, so Phase 2 can
- * replace this table's body with a registry lookup without touching a single manifest step.
+ * `scripts/check-shot-contract.ts` needs to answer "is `seed.projectList` a real seed?" in a bare
+ * Bun process with no app. It could have read a hand-kept list — and a hand-kept list is precisely
+ * how `seed.git` and `seed.projectList` came to be missing from {@link AUTOMATION_COMMANDS} while
+ * both were shipping. Constructing the definitions is free: every seed's dependency is used inside
+ * its `run`, never while building it, so the no-op deps below can never be called.
  */
-export const AUTOMATION_COMMANDS: Record<string, AutomationCommand> = {
-  // ── Canvas ──
-  "canvas.setEditZoom": { run: (api, args) => api.setEditZoom(num(args, "zoom")) },
-  "canvas.setMode": { run: (api, args) => api.setCanvasMode(str(args, "mode")) },
-  "canvas.setZoom": { run: (api, args) => api.setZoom(num(args, "zoom")) },
-  "canvas.togglePreview": { run: (api) => api.togglePreview() },
+export function seedIds(): string[] {
+  const inert = {
+    registry: undefined as unknown as CommandRegistry,
+    seedAssistantMessages: () => {},
+    seedPublishConnected: () => {},
+  } satisfies AutomationDeps;
+  return createSeeds(inert).map((seed) => seed.id);
+}
 
-  // ── Content collections ──
-  "collection.editInGrid": { press: () => ({ selector: menuItem("Edit Collection in Grid") }) },
+// ─── The API ──────────────────────────────────────────────────────────────────
 
-  // ── Data ──
-  "data.expandRow": {
-    press: (args) => ({
-      selector: namedRow("data-row-header", "data-name", str(args, "name")),
-    }),
-  },
-  "data.openGrid": {
-    run: (api, args) => {
-      const connection = optionalStr(args, "connection");
-      api.openDataGrid({ table: str(args, "table"), ...(connection ? { connection } : {}) });
+/** One command as a script sees it — the projection, not a second declaration. */
+export interface ScriptableCommand {
+  id: string;
+  title: string;
+  /** Whether its own `enablement` predicate would let it run right now. */
+  enabled: boolean;
+  /** The `requires` sentence when it would not. */
+  requires?: string;
+  /** The command's own JSON Schema — the palette's prompt and the AI tool's parameters. */
+  args?: object;
+}
+
+/** What `pointAt` can address. Region ids join `path` when P3.8's region registry lands. */
+export interface AutomationTarget {
+  path: JxPath;
+}
+
+/** Read-only questions. Nothing here writes document or presentation state. */
+export interface AutomationProbe {
+  /**
+   * Resolve when Studio has settled; reject with `NotIdleError.blockedBy` naming what it is waiting
+   * on. See `services/idle.ts` — the rejection is the reason this exists.
+   */
+  idle: (options?: Pick<IdleOptions, "frames" | "timeoutMs">) => Promise<void>;
+  /** The full `CommandContext` — the same record every `when` predicate and AI tool gate reads. */
+  state: () => CommandContext;
+  /** Every command a script may run right now, with its gate already evaluated. */
+  commands: () => ScriptableCommand[];
+  /** The declared seed ids, with the boundary each stands in for. */
+  seeds: () => { id: string; boundary: string }[];
+  /** Where a node is on screen, in TOP-DOCUMENT coordinates. Measures; moves nothing. */
+  pointAt: (target: AutomationTarget) => Promise<CanvasPoint | null>;
+  /** Bring a node into view and answer where it landed — the app's own jump-to-node. */
+  revealPath: (path: JxPath) => Promise<CanvasPoint | null>;
+}
+
+export interface AutomationApi {
+  run: (id: string, args?: AutomationArgs) => Promise<void>;
+  seed: (id: string, args?: AutomationArgs) => Promise<void>;
+  probe: AutomationProbe;
+}
+
+/** Thrown when the surface refuses an id on principle rather than because it is unknown. */
+export class AutomationRefusedError extends Error {
+  readonly id: string;
+
+  constructor(id: string, reason: string) {
+    super(`automation refuses "${id}" — ${reason}`);
+    this.name = "AutomationRefusedError";
+    this.id = id;
+  }
+}
+
+/** The projection: every visible, scriptable command with its gate already evaluated. */
+export function scriptableCommands(registry: CommandRegistry): ScriptableCommand[] {
+  const projected: ScriptableCommand[] = [];
+  for (const command of registry.visible()) {
+    if (!isScriptable(command)) {
+      continue;
+    }
+    const requires = registry.disabledReason(command.id);
+    const entry: ScriptableCommand = {
+      enabled: requires === undefined,
+      id: command.id,
+      title: command.title,
+    };
+    if (command.args) {
+      entry.args = command.args;
+    }
+    if (requires !== undefined) {
+      entry.requires = requires;
+    }
+    projected.push(entry);
+  }
+  return projected;
+}
+
+/** Why an id the registry does not declare is not runnable — the countdown, said out loud. */
+function unknownCommandMessage(
+  id: string,
+  registry: CommandRegistry,
+  seeds: ReadonlySet<string>,
+): string {
+  // Derived from the live seed registry, not from a hand-kept `disposition: "seed"` list: a seed
+  // Added next week answers this question without anyone remembering to write it down twice.
+  if (seeds.has(id)) {
+    return `"${id}" is a seed, not a command — call seed("${id}", …)`;
+  }
+  const gap = AUTOMATION_COMMANDS[id];
+  if (gap?.disposition === "refused") {
+    return `"${id}" is refused by spec §13.5: ${gap.note}`;
+  }
+  if (gap) {
+    return `"${id}" has no command record yet (${gap.note}) — __jxAutomation.run projects the registry and nothing else`;
+  }
+  const known = registry
+    .list()
+    .filter((command) => isScriptable(command))
+    .map((command) => command.id);
+  return `unknown command "${id}" — the registry declares ${known.length} scriptable id(s)`;
+}
+
+export function createAutomationApi(deps: AutomationDeps): AutomationApi {
+  const seeds = new Map(createSeeds(deps).map((seed) => [seed.id, seed]));
+  const seedIdSet = new Set(seeds.keys());
+
+  return {
+    probe: {
+      commands: () => scriptableCommands(deps.registry),
+      idle: (options = {}) => probeIdle(options),
+      pointAt: (target) => canvasPointAt(target.path),
+      revealPath: (path) => revealCanvasPath(path),
+      seeds: () => [...seeds.values()].map((seed) => ({ boundary: seed.boundary, id: seed.id })),
+      state: () => deps.registry.context(),
     },
-  },
-
-  // ── Element actions (block action bar / context menu) ──
-  "element.convertToComponent": {
-    press: () => ({ selector: "sp-action-button[title='Convert to Component']" }),
-  },
-  "element.insertData": { press: () => ({ selector: "sp-action-button[title='Insert data']" }) },
-  "element.repeat": { press: () => ({ selector: menuItem("Repeat...") }) },
-
-  // ── Files ──
-  "file.contextMenu": {
-    press: (args) => ({ button: "right", selector: `[data-path='${str(args, "path")}']` }),
-  },
-
-  // ── Formulas ──
-  "formula.browseCatalog": { press: () => ({ selector: ".expr-browse-catalog" }) },
-  "formula.editDef": { run: (api, args) => api.editDef(str(args, "defName")) },
-  "formula.editEvent": {
-    run: (api, args) => {
-      const { path } = args;
-      if (!Array.isArray(path)) {
-        throw new TypeError('automation command argument "path" must be an array');
+    async run(id, args = {}) {
+      if (TOGGLE_ID.test(id)) {
+        throw new AutomationRefusedError(
+          id,
+          `it names a delta against state the caller cannot observe; call "${setterFor(id)}"`,
+        );
       }
-      api.editFunction(path as JxPath, str(args, "eventKey"));
-    },
-  },
-  "formula.openWorkspace": {
-    press: () => ({ selector: "sp-action-button[title='Open in formula workspace']" }),
-  },
-
-  // ── Inspector ──
-  "inspector.toggleSection": {
-    press: (args) => ({ selector: `sp-accordion-item[label='${str(args, "section")}']` }),
-  },
-
-  // ── Layers ──
-  "layers.contextMenu": {
-    // Matches the row's TAG BADGE as well as its label, and case-insensitively. Outline labels are
-    // Derived from the node ($title → #id → own text → .class → landmark → first text → "n items"),
-    // So they are deliberately not stable strings — a shot that names "article" must keep working
-    // When the row starts rendering "Article". The badge is the durable half of the pair.
-    press: (args) => ({ button: "right", selector: layerRow(str(args, "label")) }),
-  },
-
-  // ── Media ──
-  "media.browse": { press: () => ({ selector: "sp-action-button[title='Browse media']" }) },
-
-  // ── Project ──
-  "project.browse": { run: (api) => api.openBrowse() },
-  "project.new": { run: (api) => api.openNewProject() },
-  "project.setBrowseCategory": {
-    press: (args) => ({
-      selector: buttonIn(
-        "browse-filter-bar",
-        labelFor(BROWSE_CATEGORY_LABELS, str(args, "category"), "browse category"),
-      ),
-    }),
-  },
-  "project.showWelcome": {
-    run: (api, args) => {
-      const { projects } = args;
-      api.showWelcome(Array.isArray(projects) ? { projects: projects as ProjectListEntry[] } : {});
-    },
-  },
-
-  // ── Search ──
-  "search.openPalette": { run: (api) => api.openQuickSearch() },
-
-  // ── Seeded fixtures (staged state a real session would have earned) ──
-  "seed.assistant": {
-    run: (api, args) =>
-      api.seedAssistant({ messages: (args.messages ?? []) as SeededAssistantMessage[] }),
-  },
-  "seed.collab": {
-    run: (api, args) => api.seedCollab({ peers: (args.peers ?? []) as PeerPresence[] }),
-  },
-  "seed.publish": {
-    run: (api, args) => {
-      const accountId = optionalStr(args, "accountId");
-      api.seedPublish({
-        deployment: args.deployment as PagesDeploymentInfo,
-        ...(accountId ? { accountId } : {}),
-      });
-    },
-  },
-
-  // ── Selection ──
-  "selection.set": {
-    run: (api, args) => {
-      const { path } = args;
-      if (path !== null && !Array.isArray(path)) {
-        throw new TypeError('automation command argument "path" must be an array or null');
+      const { registry } = deps;
+      if (!registry.get(id)) {
+        throw new Error(unknownCommandMessage(id, registry, seedIdSet));
       }
-      api.select(path as JxPath | null);
+      // Refusal propagates as `CommandUnavailableError`: a step asking for a state the app refuses
+      // Must FAIL, because that step is lying about what the app can be.
+      await registry.run(id, args);
     },
-  },
-
-  // ── Settings ──
-  "settings.open": { run: (api, args) => api.openSettings(optionalStr(args, "section")) },
-  "settings.selectEntry": {
-    press: (args) => ({ selector: buttonIn("settings-list-panel", str(args, "name")) }),
-  },
-  "settings.setSection": {
-    press: (args) => ({
-      selector:
-        `xpath///button[contains(@class,"settings-nav-item")][normalize-space()=` +
-        `"${labelFor(SETTINGS_SECTION_LABELS, str(args, "section"), "settings section")}"]`,
-    }),
-  },
-
-  // ── State ──
-  "state.selectSignal": {
-    press: (args) => ({ selector: namedRow("signal-row", "signal-name", str(args, "name")) }),
-  },
-
-  // ── Style ──
-  "style.openSelectorMenu": { press: () => ({ selector: "sp-picker.selector-select" }) },
-
-  // ── View ──
-  "view.setActivity": { run: (api, args) => api.setActivity(str(args, "tab")) },
-  "view.setRightTab": { run: (api, args) => api.setRightTab(str(args, "tab")) },
-  "view.setStatus": { run: (api, args) => api.setStatus(str(args, "text")) },
-  "view.setTheme": { run: (api, args) => api.setTheme(str(args, "color")) },
-  "view.toggleActivity": { run: (api, args) => api.toggleActivity(str(args, "tab")) },
-  // Idempotent by design, unlike the rail's toggleActivity. A manifest step that says "close the
-  // Assistant" must mean it whichever way the default currently points — these two used to be
-  // Blind toggles driven by pressing the button, so flipping the assistant to default-closed
-  // Silently inverted 18 shots. The dock lives on the reactive shell record, so the chrome
-  // Repaints without pressing anything.
-  "view.setAssistant": { run: (api, args) => api.setAssistant(bool(args, "open")) },
-  "view.setRightPanel": { run: (api, args) => api.setRightPanel(bool(args, "open")) },
-};
+    async seed(id, args = {}) {
+      const bare = id.startsWith("seed.") ? id.slice(5) : id;
+      const refusal = REFUSED_SEEDS[bare];
+      if (refusal) {
+        throw new AutomationRefusedError(
+          id,
+          `a seed stands in for a remote, never for a user: ${refusal}`,
+        );
+      }
+      const seed = seeds.get(id.startsWith("seed.") ? id : `seed.${id}`);
+      if (!seed) {
+        throw new Error(
+          `unknown seed "${id}" — declared seeds are ${[...seeds.keys()].join(", ")}`,
+        );
+      }
+      await seed.run(args);
+    },
+  };
+}
 
 /** The hook is opt-in per page load: only `?automation=1` installs it. */
 export function shouldInstallAutomation(search: string): boolean {
   return new URLSearchParams(search).get("automation") === "1";
-}
-
-export function createAutomationApi(deps: AutomationDeps): AutomationApi {
-  const api: AutomationApi = {
-    run(id: string, args: AutomationArgs = {}) {
-      const command = AUTOMATION_COMMANDS[id];
-      if (!command) {
-        throw new Error(`unknown automation command "${id}"`);
-      }
-      command.run?.(api, args);
-      const press = command.press?.(args);
-      return press ? { click: press } : {};
-    },
-    editDef(defName: string) {
-      updateUi("editingFunction", { defName, type: "def" });
-      deps.render();
-    },
-    editFunction(path: JxPath, eventKey: string) {
-      updateUi("editingFunction", { eventKey, path, type: "event" });
-      deps.render();
-    },
-    openBrowse() {
-      deps.openBrowseModal();
-    },
-    openDataGrid(options: { connection?: string; table: string }) {
-      deps.openConnectorGrid(options.connection, options.table);
-    },
-    openNewProject() {
-      deps.openNewProjectModal();
-    },
-    openQuickSearch() {
-      deps.openQuickSearchPalette();
-    },
-    openSettings(section?: string) {
-      deps.openSettingsModal(section);
-    },
-    seedAssistant(options: { messages: SeededAssistantMessage[] }) {
-      deps.seedAssistantMessages(options.messages);
-    },
-    seedCollab(options: { peers: PeerPresence[] }) {
-      // Stage a live co-editing session on the active tab: the toolbar's presence chips and the
-      // Canvas peer-selection boxes both read this same reactive store.
-      const tab = activeTab.value;
-      if (!tab) {
-        return;
-      }
-      const state = collabState(tab);
-      state.status = "synced";
-      state.active = true;
-      state.peers = options.peers.map((peer) => ({
-        ...peer,
-        state: {
-          ...peer.state,
-          focusedPath: peer.state.focusedPath ?? tab.documentPath,
-        },
-      }));
-      deps.render();
-    },
-    seedPublish(options: { accountId?: string; deployment: PagesDeploymentInfo }) {
-      deps.seedPublishConnected(options);
-    },
-    showWelcome(options?: { projects?: ProjectListEntry[] }) {
-      // The devserver platform auto-opens the repo-root project on boot; the welcome
-      // Screen only renders with no project and no tabs, so stage that state directly.
-      // A staged catalogue replaces the real one (screenshots must not leak local paths).
-      closeAllTabs();
-      setProjectState(null);
-      if (options?.projects) {
-        seedProjectList(options.projects);
-      }
-      setDockCollapsed("chat", true);
-      deps.render();
-    },
-    getState() {
-      return {
-        activeTabId: workspace.activeTabId,
-        canvasMode: deps.getCanvasMode(),
-        canvasStatus: activeTab.value?.session.canvas.status ?? null,
-        leftTab: shell.leftTab,
-      };
-    },
-    select(path: JxPath | null) {
-      const tab = activeTab.value;
-      if (tab) {
-        tab.session.selection = path;
-      }
-      deps.render();
-    },
-    setActivity(tab: string) {
-      setActivityTab(tab);
-    },
-    setCanvasMode(mode: string) {
-      deps.setCanvasMode(mode);
-      deps.render();
-    },
-    setRightTab(tab: string) {
-      // "assistant" now lives in the persistent chat sidebar, not the right panel — keep the
-      // Screenshot-manifest verb working by opening that sidebar instead.
-      if (tab === "assistant") {
-        setDockCollapsed("chat", false);
-        renderOnly("chatPanel");
-        deps.render();
-        return;
-      }
-      updateUi("rightTab", tab);
-      deps.render();
-    },
-    setStatus(text: string) {
-      deps.statusMessage(text);
-    },
-    setTheme(color: string) {
-      document.querySelector("sp-theme")?.setAttribute("color", color);
-    },
-    setZoom(zoom: number) {
-      updateUi("zoom", zoom);
-      deps.render();
-    },
-    setEditZoom(zoom: number) {
-      // Deliberately NOT deps.render(): live edit zoom must never re-render the canvas (it would
-      // Rebuild the iframe DOM) — setEditZoom applies bare style writes, matching production paths.
-      applyEditZoomLevel(zoom);
-    },
-    setAssistant(open: boolean) {
-      setDockCollapsed("chat", !open);
-      renderOnly("chatPanel");
-      deps.render();
-    },
-    setRightPanel(open: boolean) {
-      setDockCollapsed("right", !open);
-      deps.render();
-    },
-    toggleActivity(tab: string) {
-      // Mirrors the activity bar's own sp-tabs @change handler: re-picking the open tab collapses
-      // The left panel rather than reselecting it.
-      toggleActivityTab(tab);
-    },
-    togglePreview() {
-      // Matches the tab bar's Preview button, which relies on reactivity alone to repaint.
-      updateUi("preview", !activeTab.value?.session.ui.preview);
-    },
-    waitForCanvasReady(timeoutMs = 30_000) {
-      return new Promise((resolve, reject) => {
-        const started = Date.now();
-        const tick = () => {
-          if (activeTab.value?.session.canvas.status === "ready") {
-            resolve();
-            return;
-          }
-          if (Date.now() - started > timeoutMs) {
-            reject(new Error(`canvas not ready after ${timeoutMs}ms`));
-            return;
-          }
-          setTimeout(tick, 50);
-        };
-        tick();
-      });
-    },
-  };
-  return api;
 }
 
 /**

@@ -19,6 +19,7 @@ import { mutateUpdateFrontmatter, transact } from "../tabs/transact";
 import type { GitDiffState, JsonValue } from "../types";
 import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
 
+import { navigatorPanelRegion } from "../ui/regions";
 import { openPageAction, renderEmptyState } from "./empty-state";
 import { renderLayersTemplate } from "./layers-panel";
 import { renderStylebookLayersTemplate } from "./stylebook-layers-panel";
@@ -154,6 +155,20 @@ const NO_DOCUMENT_COPY: Record<string, string> = {
   state: "Open a page to give it data — values it can read, compute or fetch.",
 };
 
+/**
+ * The Navigator's one panel host.
+ *
+ * Every branch below renders through this, which is what makes `navigator/panel:<id>` **derived**:
+ * the region is stamped once, from the same id the rail routes by, so all eight panels are
+ * addressable without anyone authoring eight ids — and renaming a panel renames its region in the
+ * same edit, instead of leaving a stale selector that photographs the wrong box.
+ */
+function panelBody(panelId: string, content: unknown): TemplateResult {
+  return html`<div class="panel-body" data-jx-region=${navigatorPanelRegion(panelId)}>
+    ${content}
+  </div>`;
+}
+
 /** Overlay content-mode frontmatter title/$head onto the document for the head panel. */
 function buildHeadDoc(doc: JxMutableNode, fm: Record<string, unknown>): JxMutableNode {
   const title = fm.title as string | undefined;
@@ -172,7 +187,7 @@ function _render() {
   // ── Project-level panels: render based on projectState, independent of active tab ──
 
   if (tab === "files") {
-    litRender(html`<div class="panel-body">${ctx.renderFilesTemplate()}</div>`, leftPanel);
+    litRender(panelBody(tab, ctx.renderFilesTemplate()), leftPanel);
     const tree = leftPanel.querySelector(".file-tree") as HTMLElement | null;
     if (tree) {
       ctx.setupTreeKeyboard(tree);
@@ -182,7 +197,7 @@ function _render() {
   }
 
   if (tab === "git") {
-    litRender(html`<div class="panel-body">${ctx.renderGitPanel(ctx)}</div>`, leftPanel);
+    litRender(panelBody(tab, ctx.renderGitPanel(ctx)), leftPanel);
     return;
   }
 
@@ -192,7 +207,7 @@ function _render() {
       rerender: render,
       webdata: ctx.webdata,
     } as Parameters<typeof renderElementsTemplate>[0]);
-    litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
+    litRender(panelBody(tab, content), leftPanel);
     ctx.registerElementsDnD();
     ctx.registerComponentsDnD();
     return;
@@ -203,12 +218,8 @@ function _render() {
   const aTab = activeTab.value;
   if (!aTab) {
     const message = NO_DOCUMENT_COPY[tab];
-    litRender(
-      html`<div class="panel-body">
-        ${message ? renderEmptyState({ actions: [openPageAction()], message }) : nothing}
-      </div>`,
-      leftPanel,
-    );
+    const empty = message ? renderEmptyState({ actions: [openPageAction()], message }) : nothing;
+    litRender(panelBody(tab, empty), leftPanel);
     return;
   }
 
@@ -301,7 +312,7 @@ function _render() {
     content = nothing;
   }
 
-  litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
+  litRender(panelBody(tab, content), leftPanel);
 
   // Post-render side effects
   if (tab === "layers" && ctx.getCanvasMode() !== "stylebook") {

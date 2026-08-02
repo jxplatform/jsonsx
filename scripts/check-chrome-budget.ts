@@ -24,7 +24,7 @@ import {
 } from "../packages/studio/src/commands/budget";
 import type { BudgetableRecord, DockDeclaration } from "../packages/studio/src/commands/budget";
 
-const DEFAULT_SOURCE = "../packages/studio/src/commands/defaults.ts";
+const DEFAULT_SOURCE = "../packages/studio/src/commands/app-commands.ts";
 
 interface CommandSource {
   defaultCommandSet?: () => BudgetableRecord[];

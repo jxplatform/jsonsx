@@ -539,6 +539,7 @@ function propFieldsTpl(tab: Tab): TemplateResult | typeof nothing {
           size="s"
           quiet
           class="tab-bar-prop"
+          data-jx-region=${`pane.primary/prop:${name}`}
           placeholder=${name}
           title=${`Test value for ${name}`}
           .value=${display(previewProps?.[name])}

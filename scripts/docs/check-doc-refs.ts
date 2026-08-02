@@ -12,7 +12,8 @@
 //   - `code:` entries must be repo paths that exist
 //   - Body image refs must be page-relative paths into docs/images/ (so the page
 //     Renders in any markdown editor), be produced by the screenshots manifest,
-//     AND exist on disk
+//     Exist on disk, be NAMED BY scripts/screenshots/capture.lock.json, and never
+//     Belong to a quarantined shot (UX-REDESIGN-PLAN §13.5)
 //   - `generated: true` pages must carry the generator banner
 //   - Nav bijection: every docs page appears exactly once in docs/nav.json and
 //     Every nav path has a page
@@ -22,6 +23,16 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
+
+import {
+  DEFAULT_LOCK,
+  collectDocImageRefs,
+  imageTargets,
+  lockedImagePaths,
+  quarantineRefFindings,
+  readLock,
+  readShots,
+} from "../check-image-lock";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const DOCS_DIR = join(ROOT, "docs");
@@ -91,32 +102,26 @@ function sectionsOf(specFile: string): Set<string> | null {
 
 // ─── Screenshot manifest names ───────────────────────────────────────────────
 
-interface ManifestShot {
-  name: string;
-  docs?: string[];
-  regions?: { name: string }[];
-  variants?: { suffix: string }[];
-}
+// Shot reading, image-name derivation and the capture lock all live in
+// `scripts/check-image-lock.ts` — one implementation, because a second reading of "what images can
+// This shot produce" is a check that agrees with itself and with nothing else.
+const manifest: unknown = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
+const shots = readShots(manifest);
 
-const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8")) as { shots: ManifestShot[] };
-
-/** Image basenames one shot can produce (primary + regions + variants). */
-function shotImageNames(shot: ManifestShot): Set<string> {
-  const names = new Set<string>([shot.name]);
-  for (const region of shot.regions ?? []) {
-    names.add(region.name);
-  }
-  for (const variant of shot.variants ?? []) {
-    names.add(`${shot.name}${variant.suffix}`);
-  }
-  return names;
-}
+/**
+ * The capture lock, or null before the first capture.
+ *
+ * Null is reported ONCE rather than 65 times: a missing lock is one fact about the repo, not a
+ * defect in every page that references a picture.
+ */
+const lock = readLock();
+const lockedImages = lockedImagePaths(lock);
 
 /** Every image basename the screenshots pipeline can produce. */
 function manifestImageNames(): Set<string> {
   const names = new Set<string>();
-  for (const shot of manifest.shots) {
-    for (const name of shotImageNames(shot)) {
+  for (const shot of shots) {
+    for (const name of shot.images) {
       names.add(name);
     }
   }
@@ -144,14 +149,6 @@ function docPageExists(slug: string): boolean {
 
 const screenshotNames = manifestImageNames();
 const referencedScreenshots = new Set<string>();
-// Markdown image targets: any page-relative path, so a ref pointing somewhere other than
-// Docs/images/ is caught below rather than skipped silently.
-const IMAGE_RE = /!\[[^\]]*]\(<?([^)>\s]+\.(?:png|webp|jpg|jpeg))>?\s*(?:"[^"]*")?\)/g;
-
-/** Drop fenced blocks and inline code spans — image syntax quoted as an example is prose. */
-function withoutCode(source: string): string {
-  return source.replaceAll(/```[\s\S]*?```/g, "").replaceAll(/`[^`\n]*`/g, "");
-}
 
 const docFiles = [...new Bun.Glob("**/*.md").scanSync({ cwd: DOCS_DIR })]
   .map((f) => join(DOCS_DIR, f))
@@ -206,8 +203,7 @@ for (const file of docFiles) {
     }
   }
 
-  for (const m of withoutCode(source).matchAll(IMAGE_RE)) {
-    const target = m[1]!;
+  for (const target of imageTargets(source)) {
     // Images are addressed relative to the page so /docs reads correctly in a markdown editor;
     // The compiler republishes them under /content/docs/ when the site builds.
     if (target.startsWith("/") || /^[a-z][\w+.-]*:/i.test(target)) {
@@ -226,6 +222,16 @@ for (const file of docFiles) {
     }
     if (!existsSync(resolved)) {
       fail(file, `screenshot file missing on disk: docs/images/${basename(resolved)}`);
+    }
+    // A page may only reference an image the capture lock names. `existsSync` says a file is
+    // There; the lock says the pipeline PRODUCED it — which is the difference between a
+    // Screenshot and a picture somebody dropped in the directory (UX-REDESIGN-PLAN §13.5).
+    if (lock && !lockedImages.has(relative(ROOT, resolved).replaceAll("\\", "/"))) {
+      fail(
+        file,
+        `screenshot "${name}" is not named by ${DEFAULT_LOCK} — docs may only reference an ` +
+          `image the capture lock records; run "bun run screenshots"`,
+      );
     }
   }
 
@@ -296,8 +302,8 @@ for (const pattern of CODE_GLOBS) {
 // Slugs it will illustrate, or [] to mark it as serving the README/marketing.
 
 const warnings: string[] = [];
-for (const shot of manifest.shots) {
-  const referenced = [...shotImageNames(shot)].some((name) => referencedScreenshots.has(name));
+for (const shot of shots) {
+  const referenced = [...shot.images].some((name) => referencedScreenshots.has(name));
   if (!referenced && shot.docs === undefined) {
     warnings.push(
       `manifest shot "${shot.name}" is referenced by no docs page and has no "docs" field`,
@@ -314,6 +320,25 @@ if (warnings.length > 0) {
   for (const w of warnings) {
     console.warn(`  ${w}`);
   }
+}
+
+// ─── The capture lock ────────────────────────────────────────────────────────
+// Two page-context assertions §13.5 puts here rather than in `docs:images:check`, because
+// "docs/studio/publish.md illustrates itself with a quarantined shot" is only actionable if it
+// Names the page. The byte-level half — every PNG in docs/images/ is one the pipeline produced,
+// And every shot definition is current — is `bun run docs:images:check`.
+
+if (!lock) {
+  fail(
+    join(ROOT, DEFAULT_LOCK),
+    "does not exist: docs images cannot be verified against a capture. " +
+      'Run "bun run screenshots", or let the screenshots CI lane capture and push it.',
+  );
+}
+
+// A quarantined shot is a shot we admit is wrong. It must not be silently illustrating a page.
+for (const finding of quarantineRefFindings(manifest, collectDocImageRefs(), lock)) {
+  fail(join(ROOT, finding.page), finding.message);
 }
 
 // ─── Report ──────────────────────────────────────────────────────────────────

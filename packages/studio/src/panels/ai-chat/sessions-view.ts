@@ -10,6 +10,7 @@
  */
 
 import { html } from "lit-html";
+import { now } from "../../services/clock";
 import type { TemplateResult } from "lit-html";
 import type { SessionMeta } from "../../services/ai-session-store";
 
@@ -22,11 +23,11 @@ const DAY = 24 * HOUR;
  * date.
  *
  * @param {number} ts
- * @param {number} [now]
+ * @param {number} [at] Epoch milliseconds to measure against; defaults to the {@link now} seam.
  * @returns {string}
  */
-export function relativeTime(ts: number, now: number = Date.now()): string {
-  const delta = Math.max(0, now - ts);
+export function relativeTime(ts: number, at: number = now()): string {
+  const delta = Math.max(0, at - ts);
   if (delta < MINUTE) {
     return "just now";
   }

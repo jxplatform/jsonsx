@@ -16,7 +16,15 @@ import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { findCanvasElement, getActivePanel, panelMediaToActiveMedia } from "./canvas-helpers";
 import { rectOf } from "../utils/geometry";
+import {
+  argsSchema,
+  boundedNumberArg,
+  enumArg,
+  enumProperty,
+  numberProperty,
+} from "../commands/command-args";
 import type { TemplateResult } from "lit-html";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
 let _ctx: {
   getCanvasMode: () => string;
@@ -283,13 +291,13 @@ export function requestEditZoom(zoom: number) {
 }
 
 /**
- * Calculate zoom + pan to fit all panels within the viewport.
+ * Compute and apply a geometric fit. Pure arithmetic — it declares nothing.
  *
- * `maxZoom` caps the result. The Fit control passes the full {@link PAN_ZOOM_MAX} (asking to fit is
- * asking to magnify a small artboard too); the automatic fit on entering a panzoom mode passes 1,
- * because arriving at a document should never blow it up past life size.
+ * `axis` is the fit's own meaning: `"page"` fits both axes (the whole artboard, in view), `"width"`
+ * fits the horizontal axis and lets the page run off the bottom, which is what you want on a long
+ * document you are about to scroll. `maxZoom` caps the result.
  */
-export function fitToScreen({ maxZoom = PAN_ZOOM_MAX }: { maxZoom?: number } = {}) {
+function applyGeometricFit(axis: "width" | "page", maxZoom: number): void {
   if (!view.panzoomWrap) {
     return;
   }
@@ -310,7 +318,8 @@ export function fitToScreen({ maxZoom = PAN_ZOOM_MAX }: { maxZoom?: number } = {
 
   const fitZoomW = wrapWidth / totalPanelWidth;
   const fitZoomH = wrapHeight / maxPanelHeight;
-  const fitZoom = Math.min(maxZoom, Math.max(PAN_ZOOM_MIN, Math.min(fitZoomW, fitZoomH)));
+  const wanted = axis === "width" ? fitZoomW : Math.min(fitZoomW, fitZoomH);
+  const fitZoom = Math.min(maxZoom, Math.max(PAN_ZOOM_MIN, wanted));
 
   _ctx.setZoomDirect(fitZoom);
 
@@ -319,6 +328,20 @@ export function fitToScreen({ maxZoom = PAN_ZOOM_MAX }: { maxZoom?: number } = {
   view.panX = Math.max(0, (wrapWidth - scaledWidth) / 2);
   view.panY = Math.max(0, (wrapHeight - scaledHeight) / 2);
   applyTransform();
+}
+
+/**
+ * Fit all panels within the viewport, and declare that as the document's fit.
+ *
+ * `maxZoom` caps the result. The Fit control passes the full {@link PAN_ZOOM_MAX} (asking to fit is
+ * asking to magnify a small artboard too); the automatic fit on entering a panzoom mode passes 1,
+ * because arriving at a document should never blow it up past life size.
+ */
+export function fitToScreen({ maxZoom = PAN_ZOOM_MAX }: { maxZoom?: number } = {}) {
+  // Declared before the guard: "frame the whole page" is a preference the author expressed, and it
+  // Stays true whether or not there is a laid-out artboard to apply it to this instant.
+  declareFit("page");
+  applyGeometricFit("page", maxZoom);
 }
 
 // ─── Pan-zoom (design / stylebook / git-diff artboards) ──────────────────────
@@ -333,43 +356,125 @@ export function clampPanZoom(zoom: number): number {
 }
 
 /**
- * Documents whose pan-zoom the author has set by hand this session, keyed per tab + document.
+ * How a document is framed when you arrive at it — **declared state**, per tab + document.
  *
- * Entering a panzoom mode fits the artboard automatically ({@link fitOnCanvasEntry}) — a 1280px
- * artboard used to land clipped mid-word in a ~700px viewport. That default must not overwrite a
- * zoom the author chose, so every author-driven zoom path records its document here. Session-scoped
- * on purpose: the fit is about arriving at a document, so a reload starts fresh.
+ * - `"page"` — the whole artboard in view (the default: arriving at a document should show it).
+ * - `"width"` — fit the horizontal axis; the page runs off the bottom, which is what a long document
+ *   you are about to scroll actually wants.
+ * - `"none"` — frame nothing; whatever the zoom is, is the zoom.
+ * - A number — that exact pan-zoom.
+ *
+ * This replaces an IMPLICIT fit-on-entry plus a `Set` of "documents the author has zoomed by hand",
+ * which had three problems. It could not be read, so the zoom control could not show it. It could
+ * not be written, so a preference users expect to persist silently reset. And because entering a
+ * mode applied a transform nobody had asked for, anything measuring the canvas from outside had to
+ * guess whether a fit had happened — which is precisely how a screen coordinate ends up wrong.
+ *
+ * "The author chose 84%" is not a special case here: it is the fit `0.84`.
  */
-const explicitZoomDocs = new Set<string>();
+export type FitMode = "width" | "page" | "none" | number;
+
+/**
+ * The fit a document gets when it has not declared one.
+ *
+ * `"page"` because a 1280px artboard used to land clipped mid-word in a ~700px viewport, and
+ * arriving at a document should never require a zoom-out before you can read it.
+ */
+export const DEFAULT_FIT: FitMode = "page";
+
+/** The three named fits, as the `canvas.setFit` schema and its coercion both read them. */
+export const FIT_WORDS: readonly string[] = ["width", "page", "none"];
+
+/**
+ * Coerce a `canvas.setFit` argument, refusing anything that is neither a named fit nor a scale.
+ *
+ * Written here rather than in `commands/command-args.ts` because the value space is this module's:
+ * {@link FitMode} is declared three lines up, and a second copy of "which words are fits" in the
+ * shared helpers is exactly the drift the registry projection exists to prevent.
+ */
+function fitArg(commandId: string, args: Record<string, unknown>, key: string): FitMode {
+  const value = args[key];
+  if (typeof value === "string" && FIT_WORDS.includes(value)) {
+    return value as FitMode;
+  }
+  if (typeof value === "number" && value >= PAN_ZOOM_MIN && value <= PAN_ZOOM_MAX) {
+    return value;
+  }
+  throw new RangeError(
+    `command "${commandId}" argument "${key}": expected ${FIT_WORDS.map((w) => `"${w}"`).join(" | ")} ` +
+      `or a number in [${PAN_ZOOM_MIN}, ${PAN_ZOOM_MAX}], got ${JSON.stringify(value)}`,
+  );
+}
+
+/** Declared fits, keyed per tab + document. */
+const _fits = new Map<string, FitMode>();
 
 /** The registry key for the active tab's document (null when no tab is open). */
-function zoomKey(): string | null {
+function fitKey(): string | null {
   const tab = activeTab.value;
   return tab ? `${tab.id}::${tab.documentPath ?? ""}` : null;
 }
 
-/** Record that the author chose the active document's current pan-zoom. */
-export function markExplicitZoom(): void {
-  const key = zoomKey();
+/** Write the active document's fit without applying it — the internal half of {@link setFit}. */
+function declareFit(fit: FitMode): void {
+  const key = fitKey();
   if (key) {
-    explicitZoomDocs.add(key);
+    _fits.set(key, fit);
   }
 }
 
-/** Whether the author has set an explicit pan-zoom for the active document this session. */
-export function hasExplicitZoom(): boolean {
-  const key = zoomKey();
-  return key !== null && explicitZoomDocs.has(key);
+/** The active document's declared fit, or {@link DEFAULT_FIT}. Readable by the zoom control. */
+export function getFit(): FitMode {
+  const key = fitKey();
+  return (key === null ? undefined : _fits.get(key)) ?? DEFAULT_FIT;
 }
 
-/** Drop every recorded author zoom — for tests and a fresh session. */
-export function resetExplicitZoom(): void {
-  explicitZoomDocs.clear();
+/** Whether the active document has declared a fit of its own. */
+export function hasDeclaredFit(): boolean {
+  const key = fitKey();
+  return key !== null && _fits.has(key);
+}
+
+/** Drop every declared fit — a fresh session, and the tests. */
+export function resetFits(): void {
+  _fits.clear();
+}
+
+/** Honour a fit right now. Defaults to the active document's declared one. */
+export function applyFit(fit: FitMode = getFit()): void {
+  if (fit === "none") {
+    applyTransform();
+    return;
+  }
+  if (typeof fit === "number") {
+    _ctx.setZoomDirect(clampPanZoom(fit));
+    applyTransform();
+    return;
+  }
+  // Capped at life size: arriving at a document should never blow it up past 100%.
+  applyGeometricFit(fit, 1);
+}
+
+/** Declare the active document's fit AND honour it. The one writer every control routes through. */
+export function setFit(fit: FitMode): void {
+  declareFit(fit);
+  applyFit(fit);
 }
 
 /**
- * Set the active tab's pan-zoom on the author's behalf: clamped, recorded as explicit (so entering
- * the mode again keeps it) and applied. Every author-facing pan-zoom control routes through here.
+ * Record the active document's CURRENT pan-zoom as its declared fit.
+ *
+ * For the gesture paths that move the zoom themselves and then have to say so — ctrl+scroll writes
+ * `ui.zoom` directly, pinch will too. An author-chosen zoom is a numeric fit, so re-entering the
+ * mode restores it instead of re-framing over the top of it.
+ */
+export function markExplicitZoom(): void {
+  declareFit(clampPanZoom(_ctx.getZoom()));
+}
+
+/**
+ * Set the active tab's pan-zoom on the author's behalf: clamped, declared as this document's fit,
+ * and applied. Every author-facing pan-zoom control routes through here.
  */
 export function setUserZoom(zoom: number): void {
   const tab = activeTab.value;
@@ -377,30 +482,30 @@ export function setUserZoom(zoom: number): void {
     return;
   }
   tab.session.ui.zoom = clampPanZoom(zoom);
-  markExplicitZoom();
+  declareFit(tab.session.ui.zoom);
   applyTransform();
 }
 
 /**
- * Fit the artboard when a pane enters a panzoom mode (Design, Stylebook), unless the author already
- * chose a zoom for this document — then that zoom is restored instead.
+ * Honour the declared fit when a pane enters a panzoom mode (Design, Stylebook).
  *
  * Called on the mode transition only. At that point the panels exist with their declared widths but
- * the iframes have not painted, so the fit is driven by width, which is the axis that was broken:
- * Design opened at 100% and cut a 1280px artboard off mid-word.
+ * the iframes have not painted, which is why the geometry is driven by the panel widths rather than
+ * by anything measured from content.
  */
 export function fitOnCanvasEntry(): void {
   // An unmeasurable viewport (the pane is hidden, or layout has not run yet) would fit to the 5%
   // Floor, which is worse than the clipping this replaces. Leave the zoom alone.
-  if (hasExplicitZoom() || canvasWrap.clientWidth <= 0) {
+  if (canvasWrap.clientWidth <= 0) {
     applyTransform();
     return;
   }
-  fitToScreen({ maxZoom: 1 });
+  applyFit();
 }
 
-/** Reset zoom to 100% and re-center horizontally. */
+/** Reset zoom to 100% and re-center horizontally, declaring 100% as this document's fit. */
 export function resetZoom() {
+  declareFit(1);
   if (!view.panzoomWrap) {
     return;
   }
@@ -476,6 +581,199 @@ export function panToElement(path: (string | number)[]) {
     return;
   }
   _panToEl(el, panel);
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/**
+ * Every canvas mode a pane can render, in the order the mode switcher lists them.
+ *
+ * `"preview"` is in the set even though it is not a base mode: `getCanvasMode()` composes the
+ * per-tab `ui.preview` flag with an `edit`/`design` base and presents "preview" to every downstream
+ * gate, and `tab.capabilities.modes` lists it exactly the same way. A caller naming a mode is
+ * naming the mode it will observe, so the enum is the observable set, not the storage set.
+ */
+export const CANVAS_MODES = [
+  "edit",
+  "design",
+  "preview",
+  "source",
+  "stylebook",
+  "grid",
+  "git-diff",
+] as const;
+
+export type CanvasMode = (typeof CANVAS_MODES)[number];
+
+/** The base modes the preview flag composes with — the two the tab bar shows it beside. */
+const PREVIEWABLE_BASE_MODES = new Set(["edit", "design"]);
+
+/** What the canvas view verbs need that this module does not own. */
+export interface CanvasCommandDeps {
+  /** The effective mode, `ui.preview` already composed in — `studio.ts`'s `getCanvasMode`. */
+  getCanvasMode: () => string;
+  /** Write the BASE mode (`ui.canvasMode`) — `studio.ts`'s `setCanvasMode`. */
+  setCanvasMode: (mode: string) => void;
+}
+
+/** A document is open in a pane — every verb here writes that pane's own view state. */
+const documentOpen = (ctx: { document: { open: boolean } }) => ctx.document.open;
+
+/**
+ * The canvas view verbs — `setMode`, `setZoom`, `setEditZoom`.
+ *
+ * **These are the setters that retire `canvas.togglePreview`** (plan §13.3 clause 3). A toggle
+ * cannot say which state it ends in, so six screenshots taken through it photographed whichever way
+ * the default happened to point that week; `canvas.setMode { mode: "preview" }` means the same
+ * thing twice in a row and from any starting state.
+ *
+ * Three refusals, each a wrong picture that used to be accepted silently:
+ *
+ * - A mode the open document cannot render (`tab.capabilities.modes`) — a `.csv` has no `design`.
+ * - `"preview"` over a base mode it does not compose with — `ui.preview` is ignored in `source`, so
+ *   setting it there would report a state the app is not in.
+ * - A zoom outside the supported range, which the interactive controls clamp and a caller may not.
+ *
+ * @param {CanvasCommandDeps} deps
+ * @returns {AnyCommand[]}
+ */
+export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
+  /** The open tab, or a refusal naming why there is nothing to act on. */
+  function requireTab(commandId: string) {
+    const tab = activeTab.value;
+    if (!tab) {
+      throw new RangeError(`command "${commandId}" needs an open document; no tab is active`);
+    }
+    return tab;
+  }
+
+  return [
+    {
+      args: argsSchema({
+        mode: enumProperty(CANVAS_MODES, "The canvas mode to switch the active pane to."),
+      }),
+      category: "View",
+      id: "canvas.setMode",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "an open document",
+      when: documentOpen,
+      aiTool: {
+        description:
+          "Switch the active pane's canvas to a mode: edit, design, preview, source, stylebook, " +
+          "grid or git-diff. Fails when the open document does not support that mode.",
+        name: "set_canvas_mode",
+      },
+      run: (_commandCtx, args) => {
+        const mode = enumArg("canvas.setMode", args, "mode", CANVAS_MODES);
+        const tab = requireTab("canvas.setMode");
+        const { modes } = tab.capabilities;
+        if (!modes.includes(mode)) {
+          throw new RangeError(
+            `command "canvas.setMode" argument "mode": "${mode}" is not a mode this document ` +
+              `supports — it declares: ${modes.join(", ")}`,
+          );
+        }
+        if (mode === "preview") {
+          const base = tab.session.ui.canvasMode;
+          if (!PREVIEWABLE_BASE_MODES.has(base)) {
+            throw new RangeError(
+              `command "canvas.setMode" argument "mode": "preview" composes with the edit and ` +
+                `design base modes; this pane is in "${base}"`,
+            );
+          }
+          tab.session.ui.preview = true;
+          return;
+        }
+        // Idempotent in both directions: leaving preview is part of arriving anywhere else, so a
+        // Shot that says "design" gets design whether or not the previous step turned preview on.
+        tab.session.ui.preview = false;
+        deps.setCanvasMode(mode);
+      },
+      title: "Set Canvas Mode",
+    },
+    {
+      args: argsSchema({
+        zoom: numberProperty("Pan-zoom scale, 1 = 100%.", {
+          maximum: PAN_ZOOM_MAX,
+          minimum: PAN_ZOOM_MIN,
+        }),
+      }),
+      category: "View",
+      id: "canvas.setZoom",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "a document on the pan-zoom surface",
+      when: documentOpen,
+      run: (_commandCtx, args) => {
+        requireTab("canvas.setZoom");
+        setUserZoom(boundedNumberArg("canvas.setZoom", args, "zoom", PAN_ZOOM_MIN, PAN_ZOOM_MAX));
+      },
+      title: "Set Zoom",
+    },
+    {
+      args: argsSchema({
+        fit: {
+          description:
+            'How the document is framed: "width" | "page" | "none", or a numeric pan-zoom scale.',
+          oneOf: [
+            { enum: [...FIT_WORDS], type: "string" },
+            { maximum: PAN_ZOOM_MAX, minimum: PAN_ZOOM_MIN, type: "number" },
+          ],
+        },
+      }),
+      category: "View",
+      id: "canvas.setFit",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "an open document",
+      when: documentOpen,
+      run: (_commandCtx, args) => {
+        requireTab("canvas.setFit");
+        setFit(fitArg("canvas.setFit", args, "fit"));
+      },
+      title: "Set Fit",
+    },
+    {
+      args: argsSchema({
+        zoom: numberProperty("Edit-mode content zoom, 1 = 100%.", {
+          maximum: EDIT_ZOOM_MAX,
+          minimum: EDIT_ZOOM_MIN,
+        }),
+      }),
+      category: "View",
+      id: "canvas.setEditZoom",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "a document in edit mode",
+      when: documentOpen,
+      enablement: () => deps.getCanvasMode() === "edit",
+      run: (_commandCtx, args) => {
+        requireTab("canvas.setEditZoom");
+        setEditZoom(
+          boundedNumberArg("canvas.setEditZoom", args, "zoom", EDIT_ZOOM_MIN, EDIT_ZOOM_MAX),
+        );
+      },
+      title: "Set Edit Zoom",
+    },
+  ];
+}
+
+/**
+ * Register the canvas view verbs. Called from the bootstrap, beside the transforms they drive.
+ *
+ * @param {CommandRegistry} registry
+ * @param {CanvasCommandDeps} deps
+ */
+export function registerCanvasViewCommands(
+  registry: CommandRegistry,
+  deps: CanvasCommandDeps,
+): void {
+  registry.registerAll(canvasViewCommands(deps));
 }
 
 /** Toggle "active" class on canvas panel headers based on activeMedia. */

@@ -542,15 +542,22 @@ describe("loadCommandTable", () => {
     expect(loaded.get("seed.git")?.source).toBe(`${FIXTURES}/commands.ts`);
   });
 
-  test("the shipped projection is the registry union the AUTOMATION_COMMANDS shim", async () => {
+  test("the shipped projection is the registry, the seeds and the AUTOMATION_COMMANDS shim", async () => {
     const loaded = await loadCommandTable(DEFAULT_COMMAND_SOURCES);
-    // From commands/defaults.ts …
+    // The registry composes every module's records, so `view.setActivity` comes from the FIRST
+    // Source with its `args` schema — the shim's bare id no longer shadows a schema-carrying record.
     expect(loaded.get("file.save")?.source).toBe(DEFAULT_COMMAND_SOURCES[0]);
-    // … and from the shim table S3 deletes.
-    expect(loaded.get("view.setActivity")?.source).toBe(DEFAULT_COMMAND_SOURCES[1]);
+    expect(loaded.get("view.setActivity")?.source).toBe(DEFAULT_COMMAND_SOURCES[0]);
+    expect(loaded.get("view.setActivity")?.args).toBeDefined();
+    // Seeds are read off `createSeeds()` itself, which is how `seed.git` and `seed.projectList`
+    // Resolve at all: neither was ever listed in the hand-kept shim table.
+    expect(loaded.get("seed.projectList")?.source).toBe(DEFAULT_COMMAND_SOURCES[1]);
+    expect(loaded.get("seed.git")?.source).toBe(DEFAULT_COMMAND_SOURCES[1]);
+    // … and the shim still contributes the ids no registry declares yet.
+    expect(loaded.get("element.insertData")?.source).toBe(DEFAULT_COMMAND_SOURCES[1]);
   });
 
-  test("a module declaring neither export is an error, not an empty projection", async () => {
+  test("a module declaring none of the three exports is an error, not an empty projection", async () => {
     let thrown: unknown;
     try {
       await loadCommandTable(["packages/studio/src/commands/budget.ts"]);
@@ -558,7 +565,7 @@ describe("loadCommandTable", () => {
       thrown = error;
     }
     expect((thrown as Error | undefined)?.message).toBe(
-      "packages/studio/src/commands/budget.ts exports neither defaultCommandSet() nor " +
+      "packages/studio/src/commands/budget.ts exports none of defaultCommandSet(), seedIds() or " +
         "AUTOMATION_COMMANDS",
     );
   });
@@ -575,10 +582,12 @@ describe("the CLI", () => {
     }
   });
 
-  test("the shipped manifest's toggle debt is exactly what TOGGLE_DEBT commits", async () => {
-    const total = Object.values(TOGGLE_DEBT).reduce((sum, n) => sum + n, 0);
+  test("the shipped manifest names no toggle at all, and TOGGLE_DEBT is empty", async () => {
+    expect(Object.keys(TOGGLE_DEBT)).toEqual([]);
     const result = await runCheck([]);
-    expect(result.stdout).toContain(`toggle debt: ${total} step(s)`);
+    // The debt line is printed only when a toggle survives. Its ABSENCE is the assertion: with the
+    // List empty, the next `canvas.togglePreview` to appear is a hard failure rather than a tally.
+    expect(result.stdout).not.toContain("toggle debt:");
   });
 
   test("passes on a clean fixture, and does not print ratchets for a fixture run", async () => {
@@ -654,7 +663,7 @@ describe("the CLI", () => {
     expect(missing.stderr).toContain("Cannot read");
     const bad = await runCheck(["--commands", "packages/studio/src/commands/budget.ts"]);
     expect(bad.exitCode).toBe(2);
-    expect(bad.stderr).toContain("exports neither defaultCommandSet() nor AUTOMATION_COMMANDS");
+    expect(bad.stderr).toContain("exports none of defaultCommandSet(), seedIds() or");
   });
 
   test("an unknown flag, or a flag with no value, is a usage error", async () => {

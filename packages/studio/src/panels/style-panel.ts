@@ -7,6 +7,7 @@
 import { html, nothing } from "lit-html";
 import { getNestedStyle } from "@jxsuite/schema/guards";
 import { live } from "lit-html/directives/live.js";
+import { ref } from "lit-html/directives/ref.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { COMMON_SELECTORS, debouncedStyleCommit, getNodeAtPath, isNestedSelector } from "../store";
 import { activeTab } from "../workspace/workspace";
@@ -22,6 +23,8 @@ import {
   transactDoc,
 } from "../tabs/transact";
 import { inferInputType, propLabel } from "../utils/studio-utils";
+import { stringArg } from "../commands/command-args";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import { renderFieldRow } from "../ui/field-row";
 import { showPromptDialog } from "../ui/layers";
 import { renderDynamicSlot } from "../ui/dynamic-slot";
@@ -305,6 +308,27 @@ function renderShorthandRow(
   `;
 }
 
+// ─── Selector control ────────────────────────────────────────────────────────
+
+/** The `sp-picker` surface this module drives — `open` is the overlay's own declared state. */
+interface SelectorPicker extends HTMLElement {
+  open: boolean;
+  value: string;
+}
+
+/**
+ * The live selector picker, captured by the template's own `ref`.
+ *
+ * A module-local element handle rather than a `querySelector` at call time: the picker is rebuilt
+ * on every Inspector render, so anything that resolved it once would hold a detached node.
+ */
+let _selectorPicker: SelectorPicker | null = null;
+
+/** Forget the picker — the Inspector unmounted, or a test is starting clean. */
+export function resetSelectorPicker(): void {
+  _selectorPicker = null;
+}
+
 // ─── Main template ──────────────────────────────────────────────────────────
 
 /**
@@ -389,6 +413,12 @@ function styleSidebarTemplate(
       size="s"
       class="selector-select"
       quiet
+      ${ref((el) => {
+        // The command that opens this menu belongs to the module that RENDERS it, so it holds the
+        // Element rather than querying for one. That is the difference between a selector inside a
+        // Screenshot manifest (which §13 forbids) and a module knowing its own DOM.
+        _selectorPicker = (el as SelectorPicker | undefined) ?? null;
+      })}
       .value=${live(_selectorVal)}
       @change=${(e: Event) => {
         const val = (e.target as HTMLElement & { value: string }).value;
@@ -1012,4 +1042,126 @@ export function _fieldRow(
       ${inputTpl}
     </div>
   `;
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/**
+ * The style-context selectors addressable right now: the common set plus whatever the selected
+ * element already declares, plus the active one. Mirrors the picker's own menu, from the same
+ * data.
+ */
+export function availableSelectors(): string[] {
+  const tab = activeTab.value;
+  const declared: string[] = [];
+  if (tab?.session.selection) {
+    const node = getNodeAtPath(tab.doc.document, tab.session.selection);
+    for (const key of Object.keys(node?.style ?? {})) {
+      if (isNestedSelector(key)) {
+        declared.push(key);
+      }
+    }
+  }
+  const active = tab?.session.ui.activeSelector;
+  return [...new Set([...COMMON_SELECTORS, ...declared, ...(active ? [active] : [])])];
+}
+
+/**
+ * The Style tab's selector verbs.
+ *
+ * `style.openSelectorMenu` is the one command here that addresses a CONTROL rather than a state,
+ * and it earns that on purpose: the shot it serves photographs the open menu, so the menu is the
+ * subject. What it does not do is what its predecessor did — hand a CSS selector
+ * (`sp-picker.selector-select`) back to the runner for a synthetic mouse press. The element comes
+ * from the template's own `ref`, so a refactor of this panel's markup moves the handle with it.
+ *
+ * `style.setSelector` is the state half of the same idea, and it is what a caller that wants a
+ * RESULT rather than a picture should use: the menu exists to choose a selector, and choosing one
+ * is expressible.
+ *
+ * @returns {AnyCommand[]}
+ */
+export function styleCommands(): AnyCommand[] {
+  const styleTabOpen = (ctx: { document: { open: boolean }; selection: { count: number } }) =>
+    ctx.document.open && ctx.selection.count > 0;
+
+  return [
+    {
+      category: "View",
+      id: "style.openSelectorMenu",
+      level: "selection",
+      menus: ["palette"],
+      group: "8_style",
+      requires: "the Style tab showing a selected element",
+      when: styleTabOpen,
+      run: () => {
+        if (!_selectorPicker?.isConnected) {
+          throw new RangeError(
+            `command "style.openSelectorMenu" needs the Inspector's Style tab rendered; its ` +
+              `selector picker is not in the document`,
+          );
+        }
+        _selectorPicker.open = true;
+      },
+      title: "Open Selector Menu",
+    },
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          selector: pathlessSelectorProperty(),
+        },
+        required: ["selector"],
+        type: "object",
+      },
+      category: "View",
+      id: "style.setSelector",
+      level: "selection",
+      menus: ["palette"],
+      group: "8_style",
+      requires: "an element selection",
+      when: styleTabOpen,
+      run: (_commandCtx, args) => {
+        const { selector } = args as { selector?: unknown };
+        if (selector === null) {
+          const tab = activeTab.value;
+          if (tab) {
+            tab.session.ui.activeSelector = null;
+          }
+          return;
+        }
+        const value = stringArg("style.setSelector", args, "selector");
+        if (!isNestedSelector(value)) {
+          throw new RangeError(
+            `command "style.setSelector" argument "selector": "${value}" is not a nested ` +
+              `selector — it must start with ":", ".", "&" or "["`,
+          );
+        }
+        const tab = activeTab.value;
+        if (!tab) {
+          throw new RangeError(`command "style.setSelector" needs an open document`);
+        }
+        tab.session.ui.activeSelector = value;
+      },
+      title: "Set Style Selector",
+    },
+  ];
+}
+
+/** The `selector` property's schema: a nested selector, or `null` for the base context. */
+function pathlessSelectorProperty(): object {
+  return {
+    description:
+      'A nested selector such as ":hover", ".child" or "[open]". null edits the base context.',
+    oneOf: [{ type: "string" }, { type: "null" }],
+  };
+}
+
+/**
+ * Register the Style tab's selector verbs.
+ *
+ * @param {CommandRegistry} registry
+ */
+export function registerStyleCommands(registry: CommandRegistry): void {
+  registry.registerAll(styleCommands());
 }

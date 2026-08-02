@@ -49,9 +49,7 @@ In the compact inline editor the chips are a summary; clicking them to navigate 
 
 ## The formula palette
 
-You don't have to assemble everything operator by operator. The brackets button beside the operator picker opens the **formula palette** — a search box over the whole catalog:
-
-![The formula palette open with search results grouped into formulas, operators, and globals](../../images/formula-palette.png)
+You don't have to assemble everything operator by operator. The brackets button beside the operator picker opens the **formula palette** — a search box over the whole catalog, grouped into formulas, operators and globals:
 
 - Type to filter by name, group, or description; :kbd[↓] and :kbd[↑] move through results and :kbd[Enter] inserts the highlighted entry.
 - **Formulas** lists the named formulas already defined in this file.

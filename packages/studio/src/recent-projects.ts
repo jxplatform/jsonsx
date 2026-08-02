@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
 import { getPlatform, hasPlatform } from "./platform";
+import { now } from "./services/clock";
 import type { RecentProjectEntry } from "./types";
 
 interface RecentFile {
@@ -103,7 +104,7 @@ export function getRecentProjects(): RecentProjectEntry[] {
  */
 export function addRecentProject(name: string, root: string) {
   const projects = currentList().filter((p) => p.root !== root);
-  projects.unshift({ name, root, timestamp: Date.now() });
+  projects.unshift({ name, root, timestamp: now() });
   if (projects.length > MAX_RECENT) {
     projects.length = MAX_RECENT;
   }
@@ -153,7 +154,7 @@ export function getRecentFiles(root?: string) {
 /** @param {{ path: string; name: string; root: string }} file */
 export function trackRecentFile(file: { path: string; name: string; root: string }) {
   const all = loadRecentFiles().filter((f) => !(f.root === file.root && f.path === file.path));
-  all.unshift({ name: file.name, path: file.path, root: file.root, timestamp: Date.now() });
+  all.unshift({ name: file.name, path: file.path, root: file.root, timestamp: now() });
   // Cap per project so a busy project can't evict another project's history.
   const perRoot = new Map<string, number>();
   const kept: RecentFile[] = [];

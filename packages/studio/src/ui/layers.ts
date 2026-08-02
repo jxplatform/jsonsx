@@ -9,11 +9,21 @@
  */
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
+import { overlayRegion, REGION_ATTR } from "./regions";
 import type { TemplateResult } from "lit-html";
+
+/** The three fixed layer hosts, by name. Also the `kind` half of every overlay region id. */
+export type LayerKind = "popover" | "modal" | "dialog";
 
 let _popoverLayer: HTMLElement;
 let _modalLayer: HTMLElement;
 let _dialogLayer: HTMLElement;
+
+/** The host a layer kind renders into, falling back to `<body>` before `initLayers()` has run. */
+function layerHost(kind: LayerKind): HTMLElement {
+  const host = kind === "popover" ? _popoverLayer : kind === "modal" ? _modalLayer : _dialogLayer;
+  return host || document.body;
+}
 
 export function initLayers() {
   _popoverLayer = document.querySelector("#layer-popover") as HTMLElement;
@@ -99,6 +109,13 @@ function trapTab(slot: HTMLElement, e: KeyboardEvent): void {
 interface OverlaySlotOptions {
   /** Layer host the slot is appended to. */
   layer: HTMLElement;
+  /** Which layer this is, for the slot's region id. */
+  kind: LayerKind;
+  /**
+   * Optional instance name, making the slot `overlay.<instance>:<id>` instead of the bare
+   * `overlay.<instance>`. A surface that can be open alongside another one of its kind wants this.
+   */
+  regionId?: string | undefined;
   /** Handle <kbd>Escape</kbd> pressed inside the slot; the callback owns `preventDefault`. */
   onEscape?: (e: KeyboardEvent, slot: HTMLElement) => void;
   /** Cycle <kbd>Tab</kbd> within the slot instead of letting it walk into the app behind. */
@@ -115,6 +132,7 @@ interface OverlaySlotOptions {
 function openOverlaySlot(opts: OverlaySlotOptions): { slot: HTMLElement; release: () => void } {
   const slot = document.createElement("div");
   slot.style.pointerEvents = "auto";
+  slot.setAttribute(REGION_ATTR, overlayRegion(opts.kind, opts.regionId));
   // Focusable as a last resort, so a body with no controls still owns the keyboard (focusOverlay).
   slot.tabIndex = -1;
   // The slot is a zero-height wrapper around fixed-position bodies, so its own focus ring would
@@ -161,10 +179,13 @@ function openOverlaySlot(opts: OverlaySlotOptions): { slot: HTMLElement; release
  */
 export function showDialog<T>(
   templateFn: (done: (value: T) => void) => TemplateResult,
+  opts: { region?: string } = {},
 ): Promise<T> {
   return new Promise((resolve) => {
     const { release, slot } = openOverlaySlot({
+      kind: "dialog",
       layer: _dialogLayer,
+      regionId: opts.region,
       onEscape(e, host) {
         const wrapper = host.querySelector("sp-dialog-wrapper");
         if (!wrapper) {
@@ -444,6 +465,14 @@ export interface ModalOptions {
    * function when it keeps bookkeeping of its own (a module-level handle to clear).
    */
   onDismiss?: () => void;
+  /**
+   * Instance name for this modal's region — `overlay.dialog:settings`.
+   *
+   * Optional because one modal at a time is the norm and `overlay.dialog` addresses it. A modal
+   * that can be open beside another, or that a command needs to move focus back into by name,
+   * declares one.
+   */
+  region?: string;
 }
 
 /**
@@ -459,6 +488,7 @@ export interface ModalOptions {
  */
 export function openModal(template: TemplateResult, opts: ModalOptions) {
   const { release, slot } = openOverlaySlot({
+    kind: "modal",
     layer: _modalLayer,
     onEscape(e) {
       if (opts.dismissible === false) {
@@ -469,6 +499,7 @@ export function openModal(template: TemplateResult, opts: ModalOptions) {
       e.stopPropagation();
       (opts.onDismiss ?? handle.close)();
     },
+    regionId: opts.region,
     trapFocus: true,
   });
   slot.setAttribute("role", "dialog");
@@ -497,7 +528,8 @@ export function openModal(template: TemplateResult, opts: ModalOptions) {
  * @param {{
  *   dismissOnOutsideClick?: boolean;
  *   onDismiss?: () => void;
- *   layer?: "popover" | "modal" | "dialog";
+ *   layer?: LayerKind;
+ *   region?: string;
  * }} [opts]
  */
 export function renderPopover(
@@ -505,14 +537,16 @@ export function renderPopover(
   opts: {
     dismissOnOutsideClick?: boolean;
     onDismiss?: () => void;
-    layer?: "popover" | "modal" | "dialog";
+    layer?: LayerKind;
+    /** Instance name for this popover's region — `overlay.menu:blockbar`. */
+    region?: string;
   } = {},
 ) {
+  const kind = opts.layer ?? "popover";
   const slot = document.createElement("div");
   slot.style.pointerEvents = "auto";
-  const target =
-    opts.layer === "modal" ? _modalLayer : opts.layer === "dialog" ? _dialogLayer : _popoverLayer;
-  target.append(slot);
+  slot.setAttribute(REGION_ATTR, overlayRegion(kind, opts.region));
+  layerHost(kind).append(slot);
   litRender(template, slot);
 
   let outsideClickHandler: ((e: MouseEvent) => void) | null = null;
@@ -550,13 +584,19 @@ export function renderPopover(
 const _namedSlots = new Map<string, HTMLElement>();
 
 /**
- * Get or create a named slot in a layer. Useful for persistent popovers like zoom indicator.
+ * Get or create a named slot in a layer. Useful for persistent popovers like the zoom indicator.
  *
- * @param {"popover" | "modal" | "dialog"} layer
+ * The `${layer}:${id}` key this already builds IS the slot's region: it is stamped as
+ * `overlay.<instance>:<id>`, so naming a slot names its region and every persistent overlay becomes
+ * addressable for free. That also settles a latent ambiguity — two open popovers used to be
+ * indistinguishable to anything matching on `sp-popover[open]`, and each now answers to its own
+ * id.
+ *
+ * @param {LayerKind} layer
  * @param {string} id
  * @returns {HTMLElement}
  */
-export function getLayerSlot(layer: "popover" | "modal" | "dialog", id: string) {
+export function getLayerSlot(layer: LayerKind, id: string) {
   const key = `${layer}:${id}`;
   let slot = _namedSlots.get(key);
   if (slot && slot.parentElement) {
@@ -565,10 +605,8 @@ export function getLayerSlot(layer: "popover" | "modal" | "dialog", id: string) 
 
   slot = document.createElement("div");
   slot.style.pointerEvents = "auto";
-  const target =
-    (layer === "popover" ? _popoverLayer : layer === "modal" ? _modalLayer : _dialogLayer) ||
-    document.body;
-  target.append(slot);
+  slot.setAttribute(REGION_ATTR, overlayRegion(layer, id));
+  layerHost(layer).append(slot);
   _namedSlots.set(key, slot);
   return slot;
 }
@@ -576,10 +614,10 @@ export function getLayerSlot(layer: "popover" | "modal" | "dialog", id: string) 
 /**
  * Clear a named layer slot (remove from DOM and map).
  *
- * @param {"popover" | "modal" | "dialog"} layer
+ * @param {LayerKind} layer
  * @param {string} id
  */
-export function clearLayerSlot(layer: "popover" | "modal" | "dialog", id: string) {
+export function clearLayerSlot(layer: LayerKind, id: string) {
   const key = `${layer}:${id}`;
   const slot = _namedSlots.get(key);
   if (slot) {

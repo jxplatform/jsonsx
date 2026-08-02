@@ -22,9 +22,19 @@
  */
 
 import { effect, effectScope, reactive } from "./reactivity";
+import { applyStartupProfile } from "./services/profile";
+import { stampShellRegions } from "./ui/regions";
+import {
+  argsSchema,
+  booleanArg,
+  booleanProperty,
+  enumArg,
+  enumProperty,
+} from "./commands/command-args";
 import type { EffectScope } from "@vue/reactivity";
 import type { LayoutHit } from "./canvas/iframe-protocol";
 import type { GitBranchesResult, GitDiffState, GitStatusResult } from "./types";
+import type { AnyCommand, CommandRegistry } from "./commands/registry";
 
 /**
  * The canvas selection when the author clicked LAYOUT chrome rather than page content — a header, a
@@ -36,6 +46,49 @@ export type LayoutSelection = LayoutHit;
 
 /** The three resizable docks flanking the pane grid. */
 export type DockId = "left" | "right" | "chat";
+
+/**
+ * The Navigator's panel ids, in rail order.
+ *
+ * This is the DECLARATION `view.setActivity`'s `args` enum is built from, and it is the reason a
+ * panel rename fails `scripts/check-shot-contract.ts` in the renaming PR naming both ids instead of
+ * silently photographing the wrong panel (plan §13.5). `shell.leftTab` stays a `string` because it
+ * is also read from persisted state written by an older build — the COMMAND is what refuses an
+ * undeclared id, at the one door a caller comes through.
+ *
+ * HANDOFF: `panels/activity-bar.ts` renders the same eight `value`s from its own array, and
+ * `panels/left-panel.ts` branches on them. Neither file is this workstream's; `tests/registry-gap-
+ * commands.test.ts` asserts the three lists agree so the duplicate cannot drift while it lasts.
+ */
+export const NAVIGATOR_PANEL_IDS = [
+  "files",
+  "layers",
+  "imports",
+  "blocks",
+  "state",
+  "data",
+  "head",
+  "git",
+] as const;
+
+export type NavigatorPanelId = (typeof NAVIGATOR_PANEL_IDS)[number];
+
+/**
+ * The Inspector's tab ids, in strip order — the `value`s `panels/right-panel.ts` renders.
+ *
+ * `"assistant"` is deliberately NOT here. It used to be, and `automation.ts` carried an `if (tab
+ * === "assistant")` redirect to keep a screenshot verb working after the chat sidebar moved out of
+ * this dock. The redirect is deleted; a caller that wants the assistant runs `view.setAssistant`,
+ * which is a different dock and therefore a different command.
+ */
+export const INSPECTOR_TAB_IDS = ["properties", "events", "style"] as const;
+
+export type InspectorTabId = (typeof INSPECTOR_TAB_IDS)[number];
+
+/** The Studio chrome's Spectrum theme — the `color` attribute on `<sp-theme>`. */
+export const CHROME_THEMES = ["light", "dark"] as const;
+
+export type ChromeTheme = (typeof CHROME_THEMES)[number];
 
 /** Which shell region currently owns keyboard focus (`focus.region` in the command context). */
 export type FocusRegion = "rail" | "navigator" | "pane" | "inspector" | "dock" | "status";
@@ -79,8 +132,10 @@ export interface ShellStylebook {
 }
 
 export interface ShellState {
-  /** Which panel the Navigator dock shows. */
+  /** Which panel the Navigator dock shows. One of {@link NAVIGATOR_PANEL_IDS}. */
   leftTab: string;
+  /** The Studio chrome's Spectrum theme. One of {@link CHROME_THEMES}. */
+  theme: ChromeTheme;
   docks: Record<DockId, DockState>;
   focusRegion: FocusRegion;
   /** Named layout preset (Write · Design · Build · Ship). */
@@ -93,6 +148,31 @@ export interface ShellState {
 }
 
 const DOCK_STORAGE_KEY = "jx-studio-panel-widths";
+
+const THEME_STORAGE_KEY = "jx-studio-theme";
+
+/**
+ * The chrome theme Studio wakes up in.
+ *
+ * `index.html` hard-codes `color="dark"` on `<sp-theme>` so the first paint has a theme before this
+ * module evaluates; the default here has to agree with it or the shell flashes.
+ */
+const DEFAULT_THEME: ChromeTheme = "dark";
+
+/** Whether a string is one of the declared {@link CHROME_THEMES}. */
+function isChromeTheme(value: unknown): value is ChromeTheme {
+  return typeof value === "string" && (CHROME_THEMES as readonly string[]).includes(value);
+}
+
+/** Read the persisted theme, falling back to {@link DEFAULT_THEME} on absent/corrupt storage. */
+function readPersistedTheme(): ChromeTheme {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    return isChromeTheme(stored) ? stored : DEFAULT_THEME;
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
 
 export const DOCK_IDS: DockId[] = ["left", "right", "chat"];
 
@@ -192,8 +272,19 @@ function createShellState(): ShellState {
     leftTab: "layers",
     settingsTab: "stylebook",
     stylebook: freshStylebook(),
+    theme: readPersistedTheme(),
   };
 }
+
+/*
+ * The startup profile is applied HERE, above the first read of persisted state.
+ *
+ * `?profile=fresh` has to mean "the app woke up with nothing", and this module's `createShellState()`
+ * is the earliest `localStorage.getItem` in the import graph — every other read is inside a function
+ * and therefore runs after module evaluation. Clearing storage a statement later would restore the
+ * dock widths from a profile that claims not to have any.
+ */
+applyStartupProfile();
 
 /*
  * The input is widened before `reactive()` sees it: `UnwrapNestedRefs<ShellState>` recurses through
@@ -230,6 +321,17 @@ export function persistDocks(): void {
   }
 }
 
+/**
+ * Project the theme record onto `<sp-theme>`.
+ *
+ * The predecessor was a raw `document.querySelector("sp-theme")?.setAttribute(...)` inside the
+ * automation hook — a presentation poke no user could make and no surface could read back. It is a
+ * shell input like the docks, so it lives on the record and is applied by the same effect.
+ */
+export function applyChromeTheme(): void {
+  document.querySelector("sp-theme")?.setAttribute("color", shell.theme);
+}
+
 /** Project the dock record onto the shell grid: collapse classes on #app, widths as CSS vars. */
 export function applyDockLayout(): void {
   const root = document.documentElement;
@@ -257,10 +359,16 @@ export function mountShell(): void {
   if (_scope) {
     return;
   }
+  // The six shell hosts are bare `<div id>`s in index.html, so they cannot stamp their own region
+  // The way a panel or an overlay slot does. One table, applied once the tree exists.
+  stampShellRegions();
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
       applyDockLayout();
+    });
+    effect(() => {
+      applyChromeTheme();
     });
   });
 }
@@ -293,6 +401,19 @@ export function setDockWidth(dock: DockId, width: number): void {
 export function setActivityTab(tab: string): void {
   shell.leftTab = tab;
   setDockCollapsed("left", false);
+}
+
+/** Set the chrome theme, apply it, and remember it. */
+export function setChromeTheme(theme: ChromeTheme): void {
+  if (shell.theme === theme) {
+    return;
+  }
+  shell.theme = theme;
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // Storage full or unavailable — the theme is still applied, just not remembered.
+  }
 }
 
 /**
@@ -333,4 +454,148 @@ export function resetProjectShell(): void {
   Object.assign(shell.stylebook, freshStylebook());
   shell.settingsTab = "stylebook";
   shell.layoutSelection = null;
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/** What the shell's view verbs need that this module does not own. */
+export interface ShellCommandDeps {
+  /**
+   * Show an Inspector tab. Writes the ACTIVE TAB's `session.ui.rightTab`, which is per-document
+   * session state this module deliberately does not reach into (`shell` is workspace state, and the
+   * split is the whole point of the file).
+   */
+  setInspectorTab: (tab: InspectorTabId) => void;
+}
+
+/** The Navigator dock hosts a panel — the precondition its own verbs share. */
+const projectOpen = (ctx: { project: { open: boolean } }) => ctx.project.open;
+
+/**
+ * The shell's view verbs: idempotent SETTERS, never toggles.
+ *
+ * Plan §13.3 clause 3 is the whole shape of this list. `view.toggleAssistant` names a _delta_
+ * against state the caller cannot observe, so flipping the assistant's default silently inverted 18
+ * screenshots and an agent calling it is guessing; `view.setAssistant { open: false }` means the
+ * same thing whichever way the default points. The rail's own click handler keeps its
+ * toggle-to-collapse behaviour ({@link toggleActivityTab}) because a human CAN see which panel is
+ * open — that is a gesture, not an API.
+ *
+ * The `args` enums are the highest-value declaration here: `view.setActivity`'s `tab` is exactly
+ * {@link NAVIGATOR_PANEL_IDS}, so renaming a panel turns every stale manifest step red naming both
+ * ids, in the PR that renamed it (plan §13.5).
+ *
+ * @param {ShellCommandDeps} deps
+ * @returns {AnyCommand[]}
+ */
+export function shellViewCommands(deps: ShellCommandDeps): AnyCommand[] {
+  return [
+    {
+      args: argsSchema({
+        tab: enumProperty(NAVIGATOR_PANEL_IDS, "Which Navigator panel to show."),
+      }),
+      category: "View",
+      id: "view.setActivity",
+      level: "application",
+      menus: ["commandbar/overflow", "palette"],
+      group: "4_docks",
+      requires: "an open project",
+      when: projectOpen,
+      aiTool: {
+        description:
+          "Show one of the Navigator panels (Files, Layers, Imports, Elements, State, Data, " +
+          "Document, Source Control) and open the Navigator dock if it is closed.",
+        name: "show_navigator_panel",
+      },
+      run: (_ctx, args) => {
+        setActivityTab(enumArg("view.setActivity", args, "tab", NAVIGATOR_PANEL_IDS));
+      },
+      title: "Show Navigator Panel",
+    },
+    {
+      args: argsSchema({
+        tab: enumProperty(INSPECTOR_TAB_IDS, "Which Inspector tab to show."),
+      }),
+      category: "View",
+      id: "view.setRightTab",
+      level: "document",
+      menus: ["palette"],
+      group: "4_docks",
+      requires: "an open document",
+      when: (ctx) => ctx.document.open,
+      run: (_ctx, args) => {
+        deps.setInspectorTab(enumArg("view.setRightTab", args, "tab", INSPECTOR_TAB_IDS));
+      },
+      title: "Show Inspector Tab",
+    },
+    {
+      args: argsSchema({
+        open: booleanProperty("True to show the Navigator dock, false to collapse it."),
+      }),
+      category: "View",
+      // The idempotent half of `toggleActivityTab`. A shot that wants the Navigator CLOSED used to
+      // Say `view.toggleActivity { tab: "layers" }` — re-pick the open panel and the dock
+      // Collapses — which only means "closed" if you already know it was open.
+      id: "view.setNavigator",
+      level: "application",
+      menus: ["palette"],
+      group: "4_docks",
+      run: (_ctx, args) => {
+        setDockCollapsed("left", !booleanArg("view.setNavigator", args, "open"));
+      },
+      title: "Show Navigator Dock",
+    },
+    {
+      args: argsSchema({
+        open: booleanProperty("True to show the Inspector dock, false to collapse it."),
+      }),
+      category: "View",
+      id: "view.setRightPanel",
+      level: "application",
+      menus: ["palette"],
+      group: "4_docks",
+      run: (_ctx, args) => {
+        setDockCollapsed("right", !booleanArg("view.setRightPanel", args, "open"));
+      },
+      title: "Show Inspector Dock",
+    },
+    {
+      args: argsSchema({
+        open: booleanProperty("True to show the assistant sidebar, false to collapse it."),
+      }),
+      category: "View",
+      id: "view.setAssistant",
+      level: "application",
+      menus: ["palette"],
+      group: "4_docks",
+      run: (_ctx, args) => {
+        setDockCollapsed("chat", !booleanArg("view.setAssistant", args, "open"));
+      },
+      title: "Show Assistant",
+    },
+    {
+      args: argsSchema({
+        color: enumProperty(CHROME_THEMES, "The Studio chrome's theme."),
+      }),
+      category: "View",
+      id: "view.setTheme",
+      level: "application",
+      menus: ["palette"],
+      group: "6_appearance",
+      run: (_ctx, args) => {
+        setChromeTheme(enumArg("view.setTheme", args, "color", CHROME_THEMES));
+      },
+      title: "Set Theme",
+    },
+  ];
+}
+
+/**
+ * Register the shell's view verbs. Called from the bootstrap, beside the state they write.
+ *
+ * @param {CommandRegistry} registry
+ * @param {ShellCommandDeps} deps
+ */
+export function registerShellViewCommands(registry: CommandRegistry, deps: ShellCommandDeps): void {
+  registry.registerAll(shellViewCommands(deps));
 }

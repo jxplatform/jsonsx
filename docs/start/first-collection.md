@@ -129,8 +129,6 @@ Open the **Data** activity and you should see `posts` worth `Array(3)` — your 
 2. In the dialog, set **Items source** to `posts`.
 3. Click **Create Repeater**.
 
-![The Repeat dialog with posts selected as the items source](../images/blog-repeat-dialog.png)
-
 Your card is now the repeater's _template_, marked **↻** in Layers. On the design canvas it still renders once — that's the template view. Everything about repeaters lives in **[Repeaters](/docs/studio/design/repeaters)**.
 
 ## 12. Bind the card to each post's fields

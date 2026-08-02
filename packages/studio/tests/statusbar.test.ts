@@ -150,12 +150,16 @@ describe("renderStatusbar", () => {
     expect(statusbarEl.innerHTML).not.toContain("Style: h1");
   });
 
-  test("parts are joined with separators", () => {
+  test("parts are joined with separators, with the selection field in its own region", () => {
     const tab = resetWorkspaceWithTab();
     tab.doc.mode = "content";
     shell.stylebook.selection = "h1";
     renderStatusbar();
-    expect(statusbarEl.innerHTML).toContain("Content Mode  |  Style: h1");
+    expect(statusbarEl.textContent).toContain("Content Mode  |  Style: h1");
+    // `statusbar/selection` is one of the bar's three declared placements — the only one it renders
+    // Today — so it is emitted as its own element rather than as a run of text in a joined string.
+    const field = statusbarEl.querySelector('[data-jx-region="statusbar/selection"]');
+    expect(field?.textContent).toBe("Style: h1");
   });
 });
 

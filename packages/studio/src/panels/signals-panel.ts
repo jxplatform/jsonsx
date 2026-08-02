@@ -41,7 +41,9 @@ import type {
 } from "@jxsuite/schema/types";
 import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services";
 import { getExtensions, loadExtensions } from "../format/format-host";
+import { argsSchema, optionalStringArg, stringArg, stringProperty } from "../commands/command-args";
 import type { TemplateResult } from "lit-html";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
 interface SignalsPanelState {
   document: JxMutableNode;
@@ -435,7 +437,7 @@ function addTemplateDef(type: string, S: SignalsPanelState, ctx: SignalsPanelCtx
   transactDoc(activeTab.value, (t) =>
     mutateAddDef(t, n, structuredClone(template) as Record<string, JsonValue>),
   );
-  expandedSignal = n;
+  selectSignal(n);
   ctx.renderLeftPanel();
 }
 
@@ -495,7 +497,7 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
               <div
                 class=${classMap({ expanded: isExpanded, "signal-row": true })}
                 @click=${() => {
-                  expandedSignal = isExpanded ? null : name;
+                  selectSignal(isExpanded ? null : name);
                   ctx.renderLeftPanel();
                 }}
               >
@@ -569,7 +571,7 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
                   ...cls?.stateDefaults,
                 } as Record<string, JsonValue>),
               );
-              expandedSignal = n;
+              selectSignal(n);
               ctx.renderLeftPanel();
               return;
             }
@@ -594,7 +596,7 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
                   },
                 ),
               );
-              expandedSignal = n;
+              selectSignal(n);
               if (src) {
                 void fetchPluginSchema(
                   { $prototype: protoName, $src: src },
@@ -704,7 +706,7 @@ function renderSignalEditorTemplate(
   // Name field (common to all)
   const nameField = signalFieldRow("Name", name, (v: string) => {
     if (v && v !== name && !(S.document.state && S.document.state[v])) {
-      expandedSignal = v;
+      selectSignal(v);
       transactDoc(activeTab.value, (t) => mutateRenameDef(t, name, v));
     }
   });
@@ -1601,4 +1603,141 @@ export function renderExternalPrototypeEditorTemplate(
     }
     ${schemaContent}
   `;
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/** Which signal's editor is expanded, or `null`. Exported for the command's idempotence and tests. */
+export function selectedSignal(): string | null {
+  return expandedSignal;
+}
+
+/**
+ * Expand one signal's editor (or collapse all with `null`).
+ *
+ * One writer for a field seven call sites used to assign directly, which is what makes
+ * `state.selectSignal` and the row's own click the same action rather than two that agree by
+ * coincidence.
+ */
+export function selectSignal(name: string | null): void {
+  expandedSignal = name;
+}
+
+/** The state entries the open document defines. */
+function definedSignalNames(): string[] {
+  return Object.keys(activeTab.value?.doc.document?.state ?? {});
+}
+
+/** What the State panel's verbs need that this module does not own. */
+export interface SignalsCommandDeps {
+  /** Repaint the Navigator — `left-panel.ts`'s `render`. */
+  renderLeftPanel: () => void;
+  /** Repaint the canvas, which is what the formula workspace takes over. */
+  renderCanvas: () => void;
+}
+
+/**
+ * The State panel's verbs — select a signal, and open its formula full-screen.
+ *
+ * Both used to be XPath presses matching the row's RENDERED NAME, which plan §13's R1 forbids
+ * outright: a panel that starts eliding long names, or grouping differently, breaks a shot by
+ * improving the app. The document defines these names, so the document is what validates them.
+ *
+ * `formula.openWorkspace` defaults its target to the selected signal — the button it replaces is
+ * rendered inside that signal's own editor, so "the one that is open" is what a reader means. It
+ * REFUSES a signal with no `$expression`: the workspace edits an expression tree, and opening it
+ * over a plain state entry used to paint an empty canvas takeover.
+ *
+ * @param {SignalsCommandDeps} deps
+ * @returns {AnyCommand[]}
+ */
+export function signalsCommands(deps: SignalsCommandDeps): AnyCommand[] {
+  /** The named entry, or a refusal listing what the document does define. */
+  function requireDef(commandId: string, name: string): SignalDef {
+    const defs = (activeTab.value?.doc.document?.state ?? {}) as Record<string, SignalDef>;
+    const def = defs[name];
+    if (!def) {
+      const defined = definedSignalNames();
+      throw new RangeError(
+        `command "${commandId}" argument "name": "${name}" is not a state entry this document ` +
+          `defines — it defines: ${defined.length > 0 ? defined.join(", ") : "nothing"}`,
+      );
+    }
+    return def;
+  }
+
+  return [
+    {
+      args: argsSchema({
+        name: stringProperty("The state entry's name, as the document defines it."),
+      }),
+      category: "Document",
+      id: "state.selectSignal",
+      level: "document",
+      menus: ["palette"],
+      group: "5_data",
+      requires: "an open document that defines state",
+      when: (ctx) => ctx.document.open,
+      run: (_commandCtx, args) => {
+        const name = stringArg("state.selectSignal", args, "name");
+        requireDef("state.selectSignal", name);
+        selectSignal(name);
+        deps.renderLeftPanel();
+      },
+      title: "Select State Entry",
+    },
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          defName: stringProperty(
+            "The state entry whose $expression to edit. Defaults to the selected one.",
+          ),
+        },
+        required: [],
+        type: "object",
+      },
+      category: "Document",
+      id: "formula.openWorkspace",
+      level: "document",
+      menus: ["palette"],
+      group: "5_data",
+      requires: "a selected state entry that holds a formula",
+      when: (ctx) => ctx.document.open,
+      run: (_commandCtx, args) => {
+        const named = optionalStringArg("formula.openWorkspace", args, "defName");
+        const defName = named ?? expandedSignal;
+        if (defName === null) {
+          throw new RangeError(
+            `command "formula.openWorkspace" needs a target: pass "defName", or select a state ` +
+              `entry first with state.selectSignal`,
+          );
+        }
+        const def = requireDef("formula.openWorkspace", defName);
+        if (!def.$expression) {
+          throw new RangeError(
+            `command "formula.openWorkspace" argument "defName": "${defName}" holds no ` +
+              `$expression — the workspace edits formulas, and this entry is not one`,
+          );
+        }
+        // The workspace reads its target off the tab; `renderCanvas` is what performs the takeover.
+        const tab = activeTab.value;
+        if (tab) {
+          tab.session.ui.editingFormula = { defName, type: "def" };
+        }
+        deps.renderCanvas();
+      },
+      title: "Open Formula Workspace",
+    },
+  ];
+}
+
+/**
+ * Register the State panel's verbs.
+ *
+ * @param {CommandRegistry} registry
+ * @param {SignalsCommandDeps} deps
+ */
+export function registerSignalsCommands(registry: CommandRegistry, deps: SignalsCommandDeps): void {
+  registry.registerAll(signalsCommands(deps));
 }
