@@ -18,7 +18,7 @@ Shipping a Jx site is part of the Studio flow — no terminal, no separate deplo
 2. The push wakes your host (or CI), which builds the project into plain HTML, CSS, and a little JavaScript.
 3. The host serves that output from a CDN. Your site is live.
 
-The **deployment adapter** you picked when [creating the project](/docs/studio/projects/create) — Static, Cloudflare Pages, Node, or Bun, with Cloudflare Workers also on offer in [Project settings](/docs/studio/projects/settings) — tells the build how to package the output for your target. Switching hosts means switching the adapter; your pages, components, and content stay the same.
+The **deployment adapter** — Static, Bun, Node, Cloudflare Workers, or Cloudflare Pages — tells the build how to package the output for your target. It isn't a creation-time decision: set it in [Project settings](/docs/studio/projects/settings) whenever you know where the site is going. Switching hosts means switching the adapter; your pages, components, and content stay the same.
 
 Every page is built ahead of time, so what the CDN serves is finished HTML however the site is put together. Pick one of the non-Static adapters and the same build writes a small worker beside those files for your host to run — that is what answers the `/_jx/*` routes behind a database, sign-ins, or server functions. A database or sign-ins make an adapter mandatory: the build stops with an error on **Static**. Server functions still build there, but nothing serves them without an adapter. **[Build output and adapters](/docs/framework/site/deployment)** lists what each adapter emits.
 

@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.3.7-draft
+**Version:** 0.3.8-draft
 **Status:** Partial
-**Updated:** 2026-07-29
+**Updated:** 2026-08-02
 **License:** MIT
 
 ---
@@ -923,6 +923,7 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## Changelog
 
+- **0.3.8-draft** (2026-08-02) — Layout chrome is selectable and inert to the caret; Preview gates editing and scrolls for real; Design opens fitted; caret.active is a bridge fact; Open in Browser (Cmd+Shift+O); assistant column defaults closed.
 - **0.3.7-draft** (2026-07-29) — Share one bundler contract between the release build and the dev-server watcher; nothing may fetch Monaco at startup; restrict preview navigation to http/https/mailto/tel.
 - **0.3.6-draft** (2026-07-28) — Preview link clicks open the target in a real browser tab instead of navigating the canvas iframe away.
 - **0.3.5-draft** (2026-07-28) — IME composition suspends canvas commits; the editable region gets textbox/aria-multiline/label (§8.2.8).
@@ -965,4 +966,4 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ---
 
-_`@jxsuite/studio` Specification v0.3.7-draft_
+_`@jxsuite/studio` Specification v0.3.8-draft_

@@ -18,7 +18,7 @@ Elements is the palette of things you can add to the page — the standard HTML 
 - **Components** — at the top, your project's own components, plus components from installed packages once they're enabled for the project (see **[Dependencies](/docs/studio/projects/dependencies)**). Project components render a live preview on their card, so you see the real thing before you place it.
 - **Element categories** — below, the HTML elements grouped by category in accordion sections. Each card shows a small preview of the element and its tag name.
 
-Type in the **Filter elements…** box to narrow the palette by name; categories with no matches disappear. Click a category header to collapse or expand it.
+Type in the **Filter elements…** box to narrow the palette by name; categories with no matches disappear. Click a category header to collapse or expand it. When a filter matches nothing at all, the panel says so and offers **Clear the filter** rather than leaving you with a blank column.
 
 ## Insert by click
 

@@ -25,9 +25,9 @@ Together they cover the whole range: most interactions never need code, and the 
 
 Here is the shape of the workflow, end to end:
 
-1. Open a component and click **State** in the activity bar. Choose _+ Add… > State Signal_, name it `$count`, set its **Type** to `integer` and its **Default** to `0`. The component now knows a number.
+1. Open a component and click **State** in the activity bar. Choose _+ Add… > Value_, name it `$count`, set its **Type** to `integer` and its **Default** to `0`. The component now knows a number.
 2. Add a button to the canvas and set its text to show `$count` — any text field's **fx** menu can point at a state value.
-3. With the button selected, open the **Events** tab and click **Add Event**. Set the event to `onclick`, choose the **$expression** mode, and build the one-step formula `$count += 1`.
+3. With the button selected, open the **Events** tab and click **Add Event**. Set the event to `onclick`, choose the **Expression** mode, and build the one-step formula `$count += 1`.
 4. Toggle **Preview** on and click the button. The number climbs — and if you open the **Data** activity, you can watch `$count` change in real time.
 
 No files were written by hand: Studio stored the value, the binding, and the handler inside the component's own JSON file.

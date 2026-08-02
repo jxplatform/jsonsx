@@ -24,13 +24,13 @@ The natural way to make a component is to design it in place first, then promote
 
 Studio saves the component as its own file in the project's `components/` folder, swaps your selection for an instance of it, and adds it to the [Elements panel](/docs/studio/design/elements) — drop more instances anywhere from there. If the component's slots need attention, Studio says so in the status bar.
 
-To open a component from an instance, right-click the instance and choose **Edit Component**, or click **→ Edit definition** under its props in the Properties panel.
+To open a component from an instance, right-click the instance and choose **Edit Component**, or click **→ Edit definition** under **Component Settings** in the Properties panel.
 
 ## Props: the component's options
 
 Props are the knobs an instance can turn — the card's title, its image, whether it's featured. A component's props come from its state: every plain value you declare in the component's **State** panel becomes a prop, with that value as its default. See **[Script & logic](/docs/studio/logic)** for declaring state.
 
-On an instance, the [Properties panel](/docs/studio/design/properties) shows a **Component Props** section with a fitting control per prop — checkbox, number field, dropdown, media or color picker. Each prop can also be _bound_: click the mode button beside its label to switch the prop to a state binding (or a template) and point it at one of the page's state values, so the instance follows live data instead of a fixed setting.
+On an instance, the [Properties panel](/docs/studio/design/properties) shows a **Component Settings** section with a fitting control per prop — checkbox, number field, dropdown, media or color picker. Each prop can also be _bound_: click the mode button beside its label to switch the prop to a state binding (or a template) and point it at one of the page's state values, so the instance follows live data instead of a fixed setting.
 
 ## Slots: openings for content
 

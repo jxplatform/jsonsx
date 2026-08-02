@@ -7,7 +7,7 @@ code:
 
 # Events panel
 
-Events is the right-panel tab where an element gets its behavior: what happens when it's clicked, typed into, submitted, or hovered. Select an element on the canvas, then click **Events** in the right panel — with nothing selected, the tab just asks you to select an element first.
+Events is the right-panel tab where an element gets its behavior: what happens when it's clicked, typed into, submitted, or hovered. Select an element on the canvas, then click **Events** in the right panel — with nothing selected, the tab invites you to click anything on the canvas to wire it up.
 
 ![The Events tab with an onclick binding in expression mode](../../images/events-panel.png)
 
@@ -21,11 +21,11 @@ Click **Add Event**. Studio creates a binding on the first free event name and p
 
 ## Three ways to respond
 
-**$ref — call a named function.** A picker lists the functions declared in the **[State panel](/docs/studio/logic/state)**; pick one and the event runs it. This is the tidiest option when the same behavior is used in more than one place.
+**Existing function — call something you already declared.** A picker lists the functions declared in the **[State panel](/docs/studio/logic/state)**; pick one and the event runs it. This is the tidiest option when the same behavior is used in more than one place.
 
-**$expression — an inline formula.** The event runs a single formula, edited right in the panel with live value badges — ideal for one-step reactions like `$count += 1`or`$menuOpen = true`. The full-screen icon opens it in the **[formula workspace](/docs/studio/logic/formula-workspace)**.
+**Expression — an inline formula.** The event runs a single formula, edited right in the panel with live value badges — ideal for one-step reactions like `$count += 1`or`$menuOpen = true`. The full-screen icon opens it in the **[formula workspace](/docs/studio/logic/formula-workspace)**.
 
-**inline — a handler written on the element itself.** A **Statements** / **Code** toggle picks how you write it: as visual **[statement](/docs/studio/logic/statements)** cards, or as JavaScript in a small text field with an **Open in editor** button for the real **[code editor](/docs/studio/logic/code)**.
+**Inline code — a handler written on the element itself.** A **Statements** / **Code** toggle picks how you write it: as visual **[statement](/docs/studio/logic/statements)** cards, or as JavaScript in a small text field with an **Open in editor** button for the real **[code editor](/docs/studio/logic/code)**.
 
 Switching modes replaces the binding with a fresh start in the new mode; undo restores the previous one.
 

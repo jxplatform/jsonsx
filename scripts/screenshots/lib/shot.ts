@@ -154,12 +154,46 @@ async function runAction(page: Page, action: ShotAction): Promise<void> {
     }
     case "canvasClick": {
       const frame = canvasFrame(page);
-      const el = await frame.waitForSelector(action.selector, { timeout: 15_000 });
-      // Puppeteer-core ≥20 names the option `count` (a `clickCount` key is silently ignored).
-      await el!.click({
+      // Design and Stylebook open fitted, so the canvas sits under a CSS scale transform.
+      // Puppeteer's ElementHandle.click() derives its point from the frame's own box model and does
+      // Not compose that transform, so under a fit it either lands on the wrong node or reports the
+      // Element as "not clickable". Map the content-space rect through the iframe's on-screen box
+      // Ourselves — getBoundingClientRect() on the iframe in the TOP document already carries scale.
+      const handle = await frame.waitForSelector(action.selector, { timeout: 15_000 });
+      const clickOpts = {
         count: action.clickCount ?? 1,
         ...(action.button ? { button: action.button } : {}),
+      };
+      // ClientWidth is the UNSCALED content width; box.width is the scaled on-screen width.
+      const scale = await page.evaluate(() => {
+        const iframe = document.querySelector<HTMLIFrameElement>("#canvas-wrap iframe");
+        if (!iframe || iframe.clientWidth <= 0) {
+          return 1;
+        }
+        return iframe.getBoundingClientRect().width / iframe.clientWidth;
       });
+      if (Math.abs(scale - 1) < 0.001) {
+        // Unscaled (edit mode sizes the frame to full content height and scrolls the wrapper).
+        // ElementHandle.click() scrolls the target into view first, which the manual path below
+        // Cannot do — so it stays the default wherever there is no transform to compose.
+        await handle!.click(clickOpts);
+        return;
+      }
+      const point = await handle!.evaluate((el: Element) => {
+        const r = el.getBoundingClientRect();
+        return { cx: r.x + r.width / 2, cy: r.y + r.height / 2 };
+      });
+      const mapped = await page.evaluate(
+        (cx: number, cy: number) => {
+          const iframe = document.querySelector<HTMLIFrameElement>("#canvas-wrap iframe")!;
+          const box = iframe.getBoundingClientRect();
+          const s = box.width / iframe.clientWidth;
+          return { x: box.x + cx * s, y: box.y + cy * s };
+        },
+        point.cx,
+        point.cy,
+      );
+      await page.mouse.click(mapped.x, mapped.y, clickOpts);
       return;
     }
     case "canvasType": {

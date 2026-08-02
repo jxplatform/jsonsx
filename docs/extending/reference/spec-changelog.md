@@ -55,6 +55,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.5-draft** (2026-08-02) — searchFiles, gitShow and openExternal RPC handlers registered on both launchers; styles/ staged into the packaged app.
 - **0.3.4-draft** (2026-07-31) — List the cfConnect? PAL member in the Publish/identity family — it ships in StudioPlatform and backs the hosted Cloudflare OAuth flow, but the table omitted it.
 - **0.3.3-draft** (2026-07-29) — PAL: launcher-only capabilities (updater, windowControls) stay off the StudioPlatform interface; adapter factories infer their return type and assert conformance instead of annotating it away.
 - **0.3.2-draft** (2026-07-29) — The desktop shell routes Studio preview links to the user's default browser via Utils.openExternal (§3.5).
@@ -96,6 +97,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `imports.md`
 
+- **0.1.7-draft** (2026-08-02) — Imports panel section renamed to Imported Modules in the UI.
 - **0.1.6-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.5-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.4-draft** (2026-06-10) — Consolidate markdown and csv handling to the parser package (`8b1ba6da`).
@@ -261,6 +263,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio-ui-guidelines.md`
 
+- **0.2.3** (2026-08-02) — One teaching empty-state pattern (new §11); focus-visible rings replace bare outline:none; settings writes surface failure at the control.
 - **0.2.2** (2026-08-02) — openModal shares showDialog's focus machinery: role/label at the wrapper, focus trap, focus restore, centralised Escape (§8.7).
 - **0.2.1** (2026-07-28) — Drag-and-drop conventions for external OS file drags (§8.2): copy dropEffect, the Files-type guard, tree highlights, and the canvas replace-vs-insert affordance.
 - **0.2.0** (2026-07-26) — Canvas caret replaces the inline-edit session (§8.3); click selects and places the caret (§8.1); canvas drags start only from the bar handle (§8.2); single-shape action bar (§8.6).
@@ -276,6 +279,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.3.8-draft** (2026-08-02) — Layout chrome is selectable and inert to the caret; Preview gates editing and scrolls for real; Design opens fitted; caret.active is a bridge fact; Open in Browser (Cmd+Shift+O); assistant column defaults closed.
 - **0.3.7-draft** (2026-07-29) — Share one bundler contract between the release build and the dev-server watcher; nothing may fetch Monaco at startup; restrict preview navigation to http/https/mailto/tel.
 - **0.3.6-draft** (2026-07-28) — Preview link clicks open the target in a real browser tab instead of navigating the canvas iframe away.
 - **0.3.5-draft** (2026-07-28) — IME composition suspends canvas commits; the editable region gets textbox/aria-multiline/label (§8.2.8).

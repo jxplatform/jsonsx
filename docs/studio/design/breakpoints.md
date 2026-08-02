@@ -35,7 +35,7 @@ Breakpoints layer in the same order a browser applies their media queries, so wh
 
 ## Define your breakpoints
 
-Breakpoints belong to the whole site. To edit them, click the **Settings** gear at the bottom of the activity bar, then find **Breakpoints** in the _General_ section. Each row is a name and a width condition, like `(min-width: 768px)`; add, rename, edit, or remove rows there.
+Breakpoints belong to the whole site. To edit them, click the **Settings** gear at the bottom of the activity bar, then find **Breakpoints** in the _General_ section — below **Site Name**, **Description**, and **Production URL**, which live in the same section. Each row is a name and a width condition, like `(min-width: 768px)`; add, rename, edit, or remove rows there. Every change writes to `project.json` as you make it, and if a write fails, the section says why instead of letting the row snap back.
 
 A single file can also carry breakpoints of its own: select the page root in [Layers](/docs/studio/design/layers) and open the **Media** section of the [Properties panel](/docs/studio/design/properties). There you set the file's **Base width** — how wide the Base canvas panel renders — and add breakpoints with a friendly name (Studio derives the stored name, "Tablet" becomes `--tablet`). File-level breakpoints add to the site's list for that file. More site-wide options live in **[Project settings](/docs/studio/projects/settings)**.
 

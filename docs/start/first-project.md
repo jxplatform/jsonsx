@@ -13,11 +13,13 @@ Download the desktop app for [macOS, Windows, or Linux](/docs/start/install) —
 
 ## 2. Create a project
 
-In Studio, choose **New Project**. Give it a name, choose the **Location** to create it in — **Browse…** opens your system's folder picker — name the folder, set your production URL, and pick a **deployment adapter** — Static, Cloudflare Pages, Node, or Bun. **Static** suits a site that's purely pages and content; if it will have a database, sign-ins, or server functions, pick one of the others — those hosts can run the small worker Jx builds for them. You can change this later in [project settings](/docs/studio/projects/settings).
+In Studio, choose **New Project**. The wizard opens on the [starter gallery](/templates) — a restaurant, shop, portfolio, SaaS landing, blog, and more. Each one is a complete, themed site (pages, components, content, and images) you can reshape into your own; Studio copies it in as plain files. The last card, **Start from scratch**, gives you an empty site with one page instead.
 
-Then pick a **template**. Start from **Blank** for an empty project, or clone one of the [starter sites](/templates) — a restaurant, shop, portfolio, SaaS landing, blog, and more. Each one is a complete, themed site (pages, components, content, and images) you can reshape into your own. Studio copies it in as plain files and opens it on the canvas.
+Click **Next**, give the project a name, and choose the **Location** to create it in — **Browse…** opens your system's folder picker. Studio derives the folder name from the name as you type and shows you the exact path before you commit to it. That's the whole form: it writes the files, starts a git repository for them, and opens the project on the canvas.
 
-![Jx Studio New Project dialog — template gallery, name, directory, production URL, and deployment adapter picker](../images/new-project-modal.png)
+Everything else about the site — its description, its production URL, the **deployment adapter** that packages it for your host — lives in [project settings](/docs/studio/projects/settings), where you can change it as often as you like. **Static** suits a site that's purely pages and content; if it will have a database, sign-ins, or server functions, pick one of the others, because those hosts can run the small worker Jx builds for them.
+
+![The New Project dialog with the starter gallery and the Start from scratch card](../images/new-project-modal.png)
 
 Already have a Jx project? Use **Open Project** to point Studio at a folder on disk, or **Clone** to pull one from git. (Developers who'd rather scaffold from a terminal can use `bun create @jxsuite` instead — see [CLI commands](/docs/framework/build/cli) — then open the result in Studio.)
 
@@ -45,11 +47,11 @@ Add a `count` to state, a button, and an `onclick` that increments it — you've
 
 ## 5. Commit and publish
 
-When you're happy, open **Source Control**. Review your changes, write a message, and **commit and sync** — or, for a brand-new project, **Publish to GitHub** and Studio creates the repository for you.
+When you're happy, open **Source Control**. Review your changes, write a message, and **commit and sync** — or, if the project has no remote yet, **Create GitHub repository** and Studio makes one and pushes to it for you.
 
 ![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](../images/git-commit.png)
 
-Here's the one boundary worth knowing: **Studio publishes code; it doesn't build or deploy the site.** It commits and pushes, and it sets the deploy adapter you chose in step 2. Your host takes it from there — building the site (`bunx jx build`) on every push and serving the `dist/` output from a CDN. If you picked one of the server-capable adapters in step 2, the build emits a small worker beside those files as well — that's the piece that runs a database, sign-ins, or server functions. See **[Git & publish](/docs/studio/publish)** for the full flow.
+Here's the one boundary worth knowing: **Studio publishes code; it doesn't build or deploy the site.** It commits and pushes, and it records the deploy adapter set in project settings. Your host takes it from there — building the site (`bunx jx build`) on every push and serving the `dist/` output from a CDN. With one of the server-capable adapters, the build emits a small worker beside those files as well — that's the piece that runs a database, sign-ins, or server functions. See **[Git & publish](/docs/studio/publish)** for the full flow.
 
 ## What's next
 

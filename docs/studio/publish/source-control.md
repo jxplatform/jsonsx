@@ -12,7 +12,9 @@ Source Control is Studio's built-in git client — a sidebar panel that records 
 
 ![The Source Control panel with sync status, branch selector, commit box, and changed files](../../images/git-panel.png)
 
-If the project isn't under version control yet, the panel offers **Initialize Repository** to start tracking it locally, and **Publish to GitHub** to go straight to a hosted repository — see **[GitHub](/docs/studio/publish/github)**.
+If the project isn't tracked by git yet, the panel explains what source control buys you and offers **Initialize Repository** to start tracking it locally, or **Create GitHub repository** to go straight to a hosted one — see **[GitHub](/docs/studio/publish/github)**. Projects created from the [New Project wizard](/docs/studio/projects/create) are already tracked, so you'll only meet this on a folder that came from somewhere else.
+
+With no project open at all, the panel says what source control is for and offers **Clone Git Repository** where the platform supports it.
 
 ## Review your changes
 
@@ -45,7 +47,7 @@ The bar at the top of the panel shows where you stand against the repository —
 
 Studio also pulls automatically when you open a project that has a remote, so a session starts from the current state. If a pull can't merge cleanly, Studio reports the error and changes nothing — with one exception: conflicts caused purely by Studio's own automated package updates are resolved for you (Studio discards its own machine-generated edits, pulls, and re-applies them; if _you_ edited those files it asks before discarding anything).
 
-A project with no remote yet shows **Local only (no remote)** here, with a **Publish to GitHub** shortcut.
+A project with no remote yet shows **Local only (no remote)** here, with a **Create GitHub repository** shortcut.
 
 ## Branches
 
@@ -53,7 +55,7 @@ The **Active branch** row shows which branch you're on. Use its picker to switch
 
 ## History
 
-The **History** tab lists your project's recent commits — message, author, and when — so you can see how the site got to where it is.
+The **History** tab lists your project's recent commits — message, author, and when — so you can see how the site got to where it is. Before your first commit it explains what one is; with nothing changed since the last commit, **Local Changes** says so too.
 
 ## Next
 

@@ -16,9 +16,9 @@ The AI sidebar is the assistant's home: a chat column on the right edge of the w
 
 ## Open it
 
-Click the **Toggle Assistant** chat-bubble button at the right end of the toolbar. Click it again to collapse the sidebar; drag its inner edge to resize it. Both the width and the open/closed state are remembered across sessions.
+Click the **Toggle Assistant** chat-bubble button at the right end of the toolbar. It starts closed, so the column is yours until you ask for it. Click the button again to collapse the sidebar; drag its inner edge to resize it. Both the width and the open/closed state are remembered across sessions.
 
-If no AI provider is set up yet, the sidebar shows the key form instead of a chat — see **[Connect a provider](/docs/studio/ai#connect-a-provider)**.
+If no AI provider is set up yet, the sidebar still opens on a chat, with one line under it — _No AI provider is connected yet_ — and an **Assistant: Settings…** button that opens the setup dialog. See **[Connect a provider](/docs/studio/ai#connect-a-provider)**.
 
 ## Send a message
 
@@ -28,7 +28,7 @@ The row under the message box holds the composer's controls:
 
 - **Attach context** (paperclip) — pin the current page or the selected element to your message (below).
 - The **model picker** — switch models mid-conversation; the list comes from your provider.
-- **API key & endpoint** (gear) — reopen the provider form.
+- **API key & endpoint** (gear) — reopen the **Assistant settings** dialog.
 - **Send** — becomes **Stop** while the assistant is replying; click it to halt the reply and any further actions.
 
 ## Attach context

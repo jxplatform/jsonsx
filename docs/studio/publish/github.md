@@ -21,11 +21,11 @@ The first time you use a GitHub feature, Studio asks you to sign in with a one-t
 
 Studio remembers the authorization on this device, so you won't be asked again on your next publish.
 
-## Publish to GitHub
+## Put the project on GitHub
 
-**Publish to GitHub** lives in the Source Control panel — it's offered when your project isn't a repository yet, and again in the sync bar while the project has no remote.
+**Create GitHub repository** lives in the Source Control panel — it's offered when your project isn't tracked by git yet, and again in the sync bar while the project has no remote.
 
-1. Click **Publish to GitHub**. Sign in first if prompted.
+1. Click **Create GitHub repository**. Sign in first if prompted.
 2. In the dialog, confirm the **Repository name** (prefilled with your project's name) and add an optional **Description**.
 3. Choose the visibility. **Private repository** is on by default — turn it off to make the code public.
 4. Click **Create Repository**.

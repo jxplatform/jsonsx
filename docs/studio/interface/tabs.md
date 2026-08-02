@@ -42,7 +42,7 @@ Saving writes the file in place, in your project folder — plain Markdown, JSON
 A tab keeps its own view state while it's open. Switch from a Markdown page in **Edit** to a component in **Design** and back, and each returns exactly as you left it:
 
 - its [mode](/docs/studio/interface/modes) and **Preview** toggle,
-- its zoom level and canvas position,
+- its canvas position, and the zoom — but only once you have set one yourself; until then Design keeps fitting the canvas to the panel,
 - its selected element and active right-panel tab.
 
 New files open in their natural mode — Markdown in **Edit**, spreadsheets in **Grid**, the project file in **Stylebook**.
@@ -52,7 +52,7 @@ New files open in their natural mode — Markdown in **Edit**, spreadsheets in *
 Below the tab strip, a second row carries the controls for the active tab:
 
 - **Back** and a breadcrumb trail, when you've drilled from a page into one of its components — click any crumb to jump back up.
-- The zoom controls for the current mode, including **Fit** on the pannable canvases.
+- The zoom controls for the current mode, including **Fit** on the pannable canvases. They are absent in **Preview**, which shows the page at its real size in a frame that scrolls itself.
 - The **Preview** toggle, the **Layout** toggle, and the preview pickers described in [Modes and the preview toggle](/docs/studio/interface/modes).
 - The **Auto / Light / Dark** color-scheme control, when the project declares a `prefers-color-scheme` breakpoint — it forces the canvas into either scheme (or follows your OS in Auto) without re-rendering. See [Breakpoints](/docs/studio/design/breakpoints).
 - Mode-specific actions, like **Export** in **Code** mode.

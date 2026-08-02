@@ -18,14 +18,17 @@ Every shortcut in Jx Studio, grouped by where it applies. macOS uses :kbd[⌘] w
 
 These work throughout Studio, even while typing in a field.
 
-| Action               | macOS     | Windows / Linux    |
-| -------------------- | --------- | ------------------ |
-| Save the active file | :kbd[⌘S]  | :kbd[Ctrl+S]       |
-| Open Quick Access    | :kbd[⌘P]  | :kbd[Ctrl+P]       |
-| Open a project       | :kbd[⌘O]  | :kbd[Ctrl+O]       |
-| Close the active tab | :kbd[⌘W]  | :kbd[Ctrl+W]       |
-| Undo                 | :kbd[⌘Z]  | :kbd[Ctrl+Z]       |
-| Redo                 | :kbd[⇧⌘Z] | :kbd[Ctrl+Shift+Z] |
+| Action                           | macOS     | Windows / Linux    |
+| -------------------------------- | --------- | ------------------ |
+| Save the active file             | :kbd[⌘S]  | :kbd[Ctrl+S]       |
+| Open Quick Access                | :kbd[⌘P]  | :kbd[Ctrl+P]       |
+| Open a project                   | :kbd[⌘O]  | :kbd[Ctrl+O]       |
+| Open the built page in a browser | :kbd[⇧⌘O] | :kbd[Ctrl+Shift+O] |
+| Close the active tab             | :kbd[⌘W]  | :kbd[Ctrl+W]       |
+| Undo                             | :kbd[⌘Z]  | :kbd[Ctrl+Z]       |
+| Redo                             | :kbd[⇧⌘Z] | :kbd[Ctrl+Shift+Z] |
+
+**Open the built page in a browser** needs a page with a resolvable route; when there isn't one the toolbar button is disabled and says why, and the shortcut reports the same reason in the status bar. See **[The workspace](/docs/studio/interface)**.
 
 ## Canvas — with an element selected
 

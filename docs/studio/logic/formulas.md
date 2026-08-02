@@ -26,7 +26,7 @@ Each position only offers the modes it supports (the button's tooltip names the 
 
 ![A Properties value row with the mode button showing the ${} template glyph in accent color](../../images/field-mode-button.png)
 
-Formulas also appear as their own state entries (_+ Add… > Expression_ in the State panel) and as event handlers (the **$expression** mode in the **[Events panel](/docs/studio/logic/events)**).
+Formulas also appear as their own state entries (_+ Add… > Expression_ in the State panel) and as event handlers (the **Expression** mode in the **[Events panel](/docs/studio/logic/events)**).
 
 ## The formula editor
 
@@ -34,6 +34,8 @@ A formula is a tree of small operations, and the editor edits one operation at a
 
 - **Operator** — what this step does. The picker groups the whole vocabulary: assignment, arithmetic, comparison, logical, conditional, array methods, pure string/array/number methods, aggregates (`map`, `filter`, `reduce`), and `call` for invoking a named formula. The complete list, with what each operator means, is the **[operator reference](/docs/framework/reference/operators)**.
 - **Target** and **Value** — the operands. Each one is a **lit** (a typed-in string, number, boolean, or null), a **$ref** (a state value), or an **expr** — a nested formula of its own, drawn indented beneath its parent.
+
+A **$ref** operand on a page that holds no values yet has nothing to pick from, so instead of an empty picker the row explains what a binding is and points you at the **[State panel](/docs/studio/logic/state)** to declare one.
 
 Operators bring their own rows: the conditional shows **If** / **Then** / **Else**; `switch` shows an **On** row plus one row per case and a default, with **+ Add case** to grow it; `call` shows a **Callee** and one argument row per parameter.
 

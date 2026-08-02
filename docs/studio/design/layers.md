@@ -17,11 +17,15 @@ Layers is the page's structure as a tree — every element in the open file, nes
 Each row shows a badge and a name. The badge tells you what the row is:
 
 - The element's type — `div`, `h2`, `img`, and so on.
-- **↻** — a [repeater](/docs/studio/design/repeaters), an element that renders once per item of a list.
-- **⇄** — a switch, an element that shows one of several cases; each case appears as a child row named after the case.
+- **↻** — a [repeating list](/docs/studio/design/repeaters), an element that renders one copy per item.
+- **⇄** — a condition, an element that shows one of several cases; each case appears as a child row named after the case.
 - **▣** — a slot, the placeholder where a component or layout receives content. Hover it to see the slot's name.
 
+Hover any badge for the plain-English version of what it marks.
+
 Text sits in its own dimmed, italic rows, and rows with children get a chevron — click it to collapse or expand that branch without changing the selection.
+
+An empty page has no tree to show, so the panel says so and offers **Add an element**, which switches the activity bar to **[Elements](/docs/studio/design/elements)**.
 
 ## Select and navigate
 

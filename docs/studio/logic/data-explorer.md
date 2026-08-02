@@ -23,12 +23,14 @@ Each state entry gets a row: its kind badge, its name, and a value summary —
 
 Click a row to expand the value as a tree. Nested objects and lists unfold a few levels deep, long lists show their first items with a "… N more" tail, and long strings are shortened — enough to verify shape and content without drowning in data.
 
+A page that declares nothing yet has nothing to show here, so the panel says what it is for and offers **Define data**, which takes you straight to the **[State panel](/docs/studio/logic/state)**.
+
 ## Refresh
 
 The values are a snapshot from the canvas render. Click **Refresh** in the panel's toolbar to re-render the canvas and read them again — useful after editing a data source, or when you want to re-fire a fetch.
 
 :::doc-note
-While you are editing, **Fetch (Request)** sources do not call out to the network on their own — they sit empty until you ask. Editing the page re-renders the canvas many times, and re-running every fetch each time would be slow and would hammer the API. Click **Refresh** to fetch for real, or switch on the **preview** toggle, where data behaves exactly as it will on the built site.
+While you are editing, **Fetch from a URL** sources do not call out to the network on their own — they sit empty until you ask. Editing the page re-renders the canvas many times, and re-running every fetch each time would be slow and would hammer the API. Click **Refresh** to fetch for real, or switch on the **preview** toggle, where data behaves exactly as it will on the built site.
 :::
 
 ## Test values for component options

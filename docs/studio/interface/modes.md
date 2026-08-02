@@ -7,6 +7,7 @@ code:
   - packages/studio/src/panels/toolbar.ts
   - packages/studio/src/tabs/tab.ts
   - packages/studio/src/panels/tab-bar.ts
+  - packages/studio/src/canvas/canvas-render.ts
 ---
 
 # Modes and the preview toggle

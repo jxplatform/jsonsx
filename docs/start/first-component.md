@@ -16,9 +16,9 @@ In this tutorial you build a `counter-card` component: a button and a line of te
 
 ## 1. Open a project
 
-Any project works. If you already have one from [Your first project](/docs/start/first-project), open it with **Open Project**. Otherwise choose **New Project…**, pick the **Blank** template, click **Next**, name the project (say, "Counter Demo"), and click **Create Project**. Every field of the modal is explained in **[Create a project](/docs/studio/projects/create)**.
+Any project works. If you already have one from [Your first project](/docs/start/first-project), open it with **Open Project**. Otherwise choose **New Project…**, scroll to the **Start from scratch** card at the end of the starter gallery, click **Next**, name the project (say, "Counter Demo"), and click **Create Project**. Every step of the wizard is explained in **[Create a project](/docs/studio/projects/create)**.
 
-![The New Project dialog with the template gallery, name, directory, production URL, and deployment adapter fields](../images/new-project-modal.png)
+![The New Project dialog with the starter gallery and the Start from scratch card](../images/new-project-modal.png)
 
 You should now see your project open on the canvas.
 
@@ -56,7 +56,7 @@ You should now see a button labeled **Add one** with an empty paragraph after it
 The component needs somewhere to keep its number. That's a state entry:
 
 1. Click **State** (the brackets icon) in the activity bar.
-2. Click the **+ Add…** picker at the bottom of the panel and choose **State Signal**. The new entry appears with a placeholder name and its editor open.
+2. Click the **+ Add…** picker at the bottom of the panel and choose **Value**. The new entry appears with a placeholder name and its editor open.
 3. Rename it first: type `count` into the **Name** field and press :kbd[Enter].
 4. Set **Type** to `integer` and leave **Default** at `0`.
 
@@ -81,7 +81,7 @@ The mode button takes on the accent color: this value is now dynamic, and the pa
 
 1. Select the button and click **Events** in the right panel.
 2. Click **Add Event**. A binding appears on `onclick` — and since the file has no functions yet, it starts as an inline handler.
-3. Switch the binding's mode to **$expression**, the mode for one-step reactions.
+3. Switch the binding's mode to **Expression**, the mode for one-step reactions.
 4. In the formula editor, set the **Operator** to `+=`, point the **Target** at `count` (a **$ref**), and type `1` as the **Value**.
 
 ![The Events tab with an onclick binding in expression mode incrementing count](../images/counter-onclick.png)

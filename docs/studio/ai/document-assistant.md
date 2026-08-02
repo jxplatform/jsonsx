@@ -11,6 +11,8 @@ code:
 
 The document assistant is what the **[AI sidebar](/docs/studio/ai/chat)** becomes when a page or component is open on the canvas: the same chat, now scoped to that document. It isn't a separate panel — opening a document simply hands the assistant that page's full structure and a set of precise editing abilities it doesn't have otherwise. This is the mode to use when you want to _see_ the assistant work and be able to take it back.
 
+The sidebar starts closed and stays however you last left it, so open it with **Toggle Assistant** first; provider setup lives in its **Assistant: Settings…** dialog rather than in the column itself.
+
 ![The sidebar with an assistant reply carrying edit chips beside the open page on the canvas](../../images/ai-document-assistant.png)
 
 ## What it can do on the open page

@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.4-draft
+**Version:** 0.3.5-draft
 **Status:** Pending
-**Updated:** 2026-07-31
+**Updated:** 2026-08-02
 **License:** MIT
 
 ---
@@ -817,6 +817,7 @@ Ensure desktop app matches dev-mode capabilities:
 
 ## Changelog
 
+- **0.3.5-draft** (2026-08-02) — searchFiles, gitShow and openExternal RPC handlers registered on both launchers; styles/ staged into the packaged app.
 - **0.3.4-draft** (2026-07-31) — List the cfConnect? PAL member in the Publish/identity family — it ships in StudioPlatform and backs the hosted Cloudflare OAuth flow, but the table omitted it.
 - **0.3.3-draft** (2026-07-29) — PAL: launcher-only capabilities (updater, windowControls) stay off the StudioPlatform interface; adapter factories infer their return type and assert conformance instead of annotating it away.
 - **0.3.2-draft** (2026-07-29) — The desktop shell routes Studio preview links to the user's default browser via Utils.openExternal (§3.5).
@@ -840,4 +841,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.4-draft_
+_Jx Studio Desktop Architecture Specification v0.3.5-draft_

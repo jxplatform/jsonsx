@@ -31,11 +31,11 @@ The items source is what makes a repeater useful. It can be:
 - **A content collection** — every blog post, product, or team member in your project's content. See **[Content types](/docs/studio/projects/content-types)**.
 - **A data source** — anything that produces a list, like a `Request` fetching from an API.
 
-Declaring and feeding these lives in **[Script & logic](/docs/studio/logic)**. With the repeater selected, the [Properties panel](/docs/studio/design/properties) shows a **Repeater** section where you can rebind **Items** and add or change **Filter** and **Sort** after the fact.
+Declaring and feeding these lives in **[Script & logic](/docs/studio/logic)**. With the repeater selected, the [Properties panel](/docs/studio/design/properties) shows a **Repeating list** section where you can rebind **Items** and add or change **Filter** and **Sort** after the fact.
 
 ## Edit the template
 
-Select the repeater and click **Edit template →** in the Repeater section — or just click into the repeated content on the canvas. On the design canvas the template renders once, as the single element you design; switch on the **Preview** toggle to see the list expanded with its real items (see **[Modes and preview](/docs/studio/interface/modes)**).
+Select the repeater and click **Edit template →** in the **Repeating list** section — or just click into the repeated content on the canvas. On the design canvas the template renders once, as the single element you design; switch on the **Preview** toggle to see the list expanded with its real items (see **[Modes and preview](/docs/studio/interface/modes)**).
 
 Inside the template, each item's data is in scope:
 

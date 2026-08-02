@@ -1,6 +1,6 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.2.2
+**Version:** 0.2.3
 **Status:** Implemented
 **Updated:** 2026-08-02
 **Applies to:** `packages/studio/`
@@ -559,6 +559,7 @@ When building new UI in Studio, verify:
 
 ## Changelog
 
+- **0.2.3** (2026-08-02) — One teaching empty-state pattern (new §11); focus-visible rings replace bare outline:none; settings writes surface failure at the control.
 - **0.2.2** (2026-08-02) — openModal shares showDialog's focus machinery: role/label at the wrapper, focus trap, focus restore, centralised Escape (§8.7).
 - **0.2.1** (2026-07-28) — Drag-and-drop conventions for external OS file drags (§8.2): copy dropEffect, the Files-type guard, tree highlights, and the canvas replace-vs-insert affordance.
 - **0.2.0** (2026-07-26) — Canvas caret replaces the inline-edit session (§8.3); click selects and places the caret (§8.1); canvas drags start only from the bar handle (§8.2); single-shape action bar (§8.6).

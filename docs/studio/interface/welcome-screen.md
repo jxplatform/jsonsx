@@ -51,7 +51,7 @@ This entry appears when Studio is connected to your GitHub account.
 2. Type in the filter field to narrow the list of repositories your account can reach.
 3. Click a repository — Studio imports it and opens it as a project.
 
-A repository must already contain a Jx project (a `project.json` file); if it doesn't, Studio tells you why it can't be added. Connecting your account is covered in **[Publish to GitHub](/docs/studio/publish/github)**.
+A repository must already contain a Jx project (a `project.json` file); if it doesn't, Studio tells you why it can't be added. Connecting your account is covered in **[GitHub](/docs/studio/publish/github)**.
 
 ## Repository access
 

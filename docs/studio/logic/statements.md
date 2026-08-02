@@ -16,7 +16,7 @@ Statements are function bodies built as a vertical list of visual steps instead 
 Anywhere a function body appears, a **Statements** / **Code** toggle picks the representation:
 
 - A **Function** entry's **Body** in the **[State panel](/docs/studio/logic/state)**.
-- An **inline** event handler in the **[Events panel](/docs/studio/logic/events)**.
+- An **Inline code** event handler in the **[Events panel](/docs/studio/logic/events)**.
 
 **Statements** is the structured editor described here; **Code** is a JavaScript text body — see **[Code editing](/docs/studio/logic/code)**.
 

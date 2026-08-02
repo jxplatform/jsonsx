@@ -19,11 +19,11 @@ Imports is where you decide which building blocks a document — or the whole si
 The panel follows whatever tab is active:
 
 - **A page, layout, or component open** — you're managing that document's imports: which components it can place.
-- **`project.json` open** — you're managing the whole site: packages, site-wide component availability, and class imports.
+- **`project.json` open** — you're managing the whole site: packages, site-wide component availability, and imported modules.
 
 ## Import your own components
 
-With a document open, the **Components** section lists what it already imports. Use the **Add component…** picker to import another component from your project — it becomes available to place in that document. The × beside an entry removes the import.
+With a document open, the **Components** section lists what it already imports. Use the **Add component…** picker to import another component from your project — it becomes available to place in that document. The × beside an entry removes the import. A document that imports nothing yet says what the section is for, and tells you if the project has no components to offer at all.
 
 If you mostly build by placing blocks from the [Elements panel](/docs/studio/design/elements), you rarely open this list — it's the same wiring, made visible.
 
@@ -45,9 +45,9 @@ Under each package section, every component has a checkbox. Nothing from a packa
 
 The × in a package's header (site context) removes the package entirely, along with everything you'd picked from it.
 
-## Class imports
+## Imported modules
 
-The site context also shows **Class Imports** — named behaviors your project's logic can refer to. This is advanced territory; most visual projects never touch it.
+The site context also shows **Imported Modules** — modules that give the project extra kinds of data, such as a content collection, a CMS, or an API client. Each one gets a name your **[data sources](/docs/studio/logic/data-sources)** can then choose from the **+ Add…** picker. Name one with the fields under the section. This is advanced territory; most visual projects never touch it.
 
 ## Stay up to date
 

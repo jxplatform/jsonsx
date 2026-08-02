@@ -366,7 +366,7 @@
                     "lineHeight": "1.7",
                     "margin": "0 0 2rem"
                   },
-                  "textContent": "Review changes, write a message, and commit-and-sync — right from Studio. Starting fresh? Publish to GitHub in a click and Studio creates the repo for you. From there, your host builds and publishes the site on every push — pages, assets, and the server tier if your project has one."
+                  "textContent": "Review changes, write a message, and commit-and-sync — right from Studio. Starting fresh? Create the GitHub repository in a click, from inside Studio. From there, your host builds and publishes the site on every push — pages, assets, and the server tier if your project has one."
                 },
                 {
                   "tagName": "div",
@@ -381,7 +381,7 @@
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "Publish to GitHub with one click (creates the repo)"
+                        "props.text": "Create a GitHub repository in one click"
                       }
                     },
                     {

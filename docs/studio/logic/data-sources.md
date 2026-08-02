@@ -20,7 +20,7 @@ Each source's editor shows just the fields that source needs.
 
 ## Request — fetch from a URL
 
-**Fetch (Request)** loads data over HTTP — a JSON API, most typically.
+**Fetch from a URL** loads data over HTTP — a JSON API, most typically.
 
 ![The State panel editing a Request source's URL, method, and timing](../../images/data-source-request.png)
 
@@ -96,7 +96,7 @@ Both extensions are covered from the other side — the tables, the settings, th
 
 ## External sources
 
-**External Module…** points an entry at a JavaScript module of your own (**Source** and **Prototype** fields); if the module describes its options, Studio renders them as a form, the same way it does for ContentCollection. Sources added by any other installed extension list themselves in the **+ Add…** picker the same way.
+**From a module…** points an entry at a JavaScript module of your own (**Source** and **Kind** fields); if the module describes its options, Studio renders them as a form, the same way it does for ContentCollection. Sources added by any other installed extension list themselves in the **+ Add…** picker the same way.
 
 :::doc-note
 Every source is stored as a small JSON object in the file's `state` — a `$prototype` naming the kind plus the fields above. Nothing here is code; the runtime interprets these declarations, as described in **[Reactivity](/docs/framework/concepts/reactivity)**. The table sources are rewritten at build time into ordinary fetches against `/_jx/data`, so no extension code ships to the browser.

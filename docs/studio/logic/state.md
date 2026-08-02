@@ -21,16 +21,16 @@ Entries are grouped into collapsible sections with counts — **State**, **Compu
 - The entry's name.
 - A short hint — a Request's method and URL, a storage entry's key, the first line of a function.
 
-Click a row to expand its editor in place; click again to collapse it. A file with no entries yet shows "No state defined".
+Click a row to expand its editor in place; click again to collapse it. A file with nothing declared yet says so and offers **Add a value**, which creates the first entry for you.
 
 ## Add an entry
 
 1. Click the **+ Add…** picker at the bottom of the panel.
 2. Choose what to add:
-   - **State Signal** — a plain value the component holds (text, a number, a flag, a list).
+   - **Value** — a plain value the component holds (text, a number, a flag, a list).
    - **Computed** — a value derived from other entries, recalculated automatically.
-   - **Fetch (Request)**, **LocalStorage**, **SessionStorage**, **IndexedDB**, **Cookie**, **Set**, **Map**, **FormData** — the built-in data sources, covered in **[Data sources](/docs/studio/logic/data-sources)**.
-   - **External Module…** — a data source provided by a JavaScript module you point at.
+   - **Fetch from a URL**, **LocalStorage**, **SessionStorage**, **IndexedDB**, **Cookie**, **Set**, **Map**, **FormData** — the built-in data sources, covered in **[Data sources](/docs/studio/logic/data-sources)**.
+   - **From a module…** — a data source provided by a JavaScript module you point at.
    - Any sources your project imports or its extensions provide (for example **ContentCollection**) appear next.
    - **Expression** — a named formula, covered in **[Formulas and expressions](/docs/studio/logic/formulas)**.
    - **Function** — a reusable piece of behavior, covered in **[Statements](/docs/studio/logic/statements)** and **[Code editing](/docs/studio/logic/code)**.
@@ -43,7 +43,7 @@ Click a row to expand its editor in place; click again to collapse it. A file wi
 
 ## Plain values
 
-A **State Signal** is the workhorse — the counter, the search text, the "menu open" flag. Its editor offers:
+A **Value** is the workhorse — the counter, the search text, the "menu open" flag. Its editor offers:
 
 - **Type** — `string`, `integer`, `number`, `boolean`, `array`, or `object`. Defaults you type are converted to match.
 - **Format** — for strings only: `image`, `date`, or `color`. An image-formatted value gets a media picker for its default.

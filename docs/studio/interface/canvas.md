@@ -34,6 +34,8 @@ In **Edit** mode the page scrolls like a normal browser page instead of panning,
 
 Click any element to select it. Studio outlines it, the right panel inspects it, and the status bar shows its position in the page structure — a clickable trail of its ancestors.
 
+That includes the parts of the page that come from its **[layout](/docs/studio/projects/pages-layouts-components)** — the header and footer render dimmed, under a `LAYOUT · layouts/base.json` chip, and clicking one selects it and offers **Open Layout →** in the right panel. They can't be typed into from here, because they belong to every page that uses that layout; see **[Layout elements](/docs/studio/design/properties#layout-elements)**.
+
 You can also move the selection from the keyboard: :kbd[↑] and :kbd[↓] step between siblings, :kbd[←] selects the parent, :kbd[→] steps into the first child, and :kbd[Esc] clears the selection. The full list is in the **[shortcut reference](/docs/studio/interface/shortcuts)**.
 
 ## The block action bar

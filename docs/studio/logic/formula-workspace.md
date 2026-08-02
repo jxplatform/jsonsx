@@ -17,7 +17,7 @@ The formula workspace gives one formula the entire canvas. The compact editors i
 Click the full-screen icon beside any formula:
 
 - On an **Expression** entry in the **[State panel](/docs/studio/logic/state)**.
-- On an **$expression** event binding in the **[Events panel](/docs/studio/logic/events)**.
+- On an **Expression** event binding in the **[Events panel](/docs/studio/logic/events)**.
 
 The canvas is replaced by the workspace, and the tab bar shows a breadcrumb — the file's name, then _fx_ and the formula's name. Click **Back** in the tab bar (or **Close** in the workspace header) to return to the normal canvas; your edits are already in the document.
 
