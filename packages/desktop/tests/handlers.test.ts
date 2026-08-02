@@ -29,6 +29,7 @@ const {
   discoverComponents,
   codeService,
   locateFile,
+  searchFiles,
   fetchPluginSchema,
   openProject,
   createProject,
@@ -555,6 +556,71 @@ describe("locateFile", () => {
     } finally {
       cleanup();
     }
+  });
+});
+
+// ─── searchFiles (Quick Access ⌘P) ─────────────────────────────────────────
+
+describe("searchFiles", () => {
+  function seed() {
+    setup();
+    mkdirSync(join(FIXTURES, "pages", "blog"), { recursive: true });
+    mkdirSync(join(FIXTURES, "node_modules", "pkg"), { recursive: true });
+    mkdirSync(join(FIXTURES, "dist"), { recursive: true });
+    writeFileSync(join(FIXTURES, "pages", "about.json"), "{}");
+    writeFileSync(join(FIXTURES, "pages", "blog", "about-us.md"), "# About");
+    writeFileSync(join(FIXTURES, "pages", "contact.json"), "{}");
+    writeFileSync(join(FIXTURES, "node_modules", "pkg", "about.json"), "{}");
+    writeFileSync(join(FIXTURES, "dist", "about.json"), "{}");
+  }
+
+  test("matches .json files anywhere under the root, project-relative", async () => {
+    seed();
+    try {
+      const hits = await searchFiles({ query: "about" });
+      expect(hits.map((h) => h.path)).toEqual(["pages/about.json"]);
+      const [hit] = hits;
+      expect(hit!.name).toBe("about.json");
+      expect(hit!.type).toBe("file");
+      expect(hit!.size).toBe(2);
+      expect(typeof hit!.modified).toBe("string");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("widens the search with the format registry's extensions (leading dot tolerated)", async () => {
+    seed();
+    try {
+      const hits = await searchFiles({ extensions: [".md"], query: "about" });
+      expect(hits.map((h) => h.path).toSorted()).toEqual([
+        "pages/about.json",
+        "pages/blog/about-us.md",
+      ]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("skips node_modules and dist, and returns [] for a query that matches nothing", async () => {
+    seed();
+    try {
+      const all = await searchFiles({ query: "" });
+      const paths = all.map((h) => h.path);
+      expect(paths).toContain("pages/about.json");
+      expect(paths).toContain("pages/contact.json");
+      expect(paths.some((p) => p.includes("node_modules"))).toBe(false);
+      expect(paths.some((p) => p.startsWith("dist/"))).toBe(false);
+
+      expect(await searchFiles({ query: "no-such-document" })).toEqual([]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("throws when no project is open", async () => {
+    setProjectRoot(null);
+    await expect(searchFiles({ query: "x" })).rejects.toThrow("No project open");
   });
 });
 

@@ -293,8 +293,8 @@ export function createDesktopPlatform() {
       await request("gitAddRemote", { name, url });
     },
 
-    async searchFiles(query: string) {
-      return request("searchFiles", { query }) as Promise<DirEntry[]>;
+    async searchFiles(query: string, extensions?: string[]) {
+      return request("searchFiles", { extensions, query }) as Promise<DirEntry[]>;
     },
 
     async listFormats() {

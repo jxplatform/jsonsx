@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { rpcParity } from "./_rpc-parity";
 
 // ─── Mock electrobun/bun ────────────────────────────────────────────────────
 
@@ -76,6 +77,8 @@ function makeSession(initialRoot: string | null) {
     discoverComponents: mock(async () => []),
     codeService: mock(async () => null),
     locateFile: mock(async () => null),
+    searchFiles: mock(async () => [{ name: "a.json", path: "pages/a.json", type: "file" }]),
+    openExternal: mock(async () => ({ ok: true })),
     fetchPluginSchema: mock(async () => null),
     jxResolve: mock(async () => ({ body: "{}", status: 200 })),
     jxServerFunction: mock(async () => ({ body: "{}", status: 200 })),
@@ -328,6 +331,8 @@ describe("per-window RPC", () => {
     await reqs.discoverComponents({} as never);
     await reqs.codeService({ action: "lint", payload: {} } as never);
     await reqs.locateFile({ name: "x.json" } as never);
+    await reqs.searchFiles({ extensions: [".md"], query: "abo" } as never);
+    await reqs.openExternal({ url: "https://example.com" } as never);
     await reqs.fetchPluginSchema({ src: "m.js" } as never);
     await reqs.formatAction({ action: "parse", format: "md" } as never);
     await reqs.jxResolve({ body: "{}" } as never);
@@ -336,6 +341,9 @@ describe("per-window RPC", () => {
     expect(session.handleDeleteFile).toHaveBeenCalledWith({ path: "a.json" });
     expect(session.listDirectory).toHaveBeenCalledWith({ dir: "src" });
     expect(session.listFormats).toHaveBeenCalledTimes(1);
+    // The format registry's extensions ride along; dropping them makes ⌘P .json-only.
+    expect(session.searchFiles).toHaveBeenCalledWith({ extensions: [".md"], query: "abo" });
+    expect(session.openExternal).toHaveBeenCalledWith({ url: "https://example.com" });
 
     // Data surface + secrets handlers (each forwards to the window's session).
     await reqs.dataConnections();
@@ -369,11 +377,13 @@ describe("per-window RPC", () => {
     await reqs.gitCheckout({ branch: "dev" } as never);
     await reqs.gitCreateBranch({ name: "f" } as never);
     await reqs.gitDiff({} as never);
+    await reqs.gitShow({ path: "a.json", ref: "HEAD" } as never);
     await reqs.gitDiscard({ files: ["a"] } as never);
     await reqs.gitInit();
     await reqs.gitAddRemote({ name: "origin", url: "u" } as never);
     expect(git.gitBranches).toHaveBeenCalledTimes(1);
     expect(git.gitCommit).toHaveBeenCalledWith({ message: "m" });
+    expect(git.gitShow).toHaveBeenCalledWith({ path: "a.json", ref: "HEAD" });
 
     // Package handlers.
     await reqs.listPackages();
@@ -454,6 +464,18 @@ describe("per-window RPC", () => {
     expect(createdWindows.at(-1)!.opts.title).toBe("Jx Studio");
     reqs.openProjectInNewWindow({ root: "/proj/sibling" } as never);
     expect(createdWindows.at(-1)!.opts.title).toBe(`sibling ${DASH} Jx Studio`);
+  });
+});
+
+// ─── Schema ↔ handler parity ────────────────────────────────────────────────
+
+describe("rpc schema parity", () => {
+  test("every request declared in rpc-schema.ts has a handler in this window's map", () => {
+    openProjectWindow("/proj/parity");
+    // No exemptions: the electrobun window IS the full desktop surface.
+    const parity = rpcParity(Object.keys(lastRequests()));
+    expect(parity.unhandled).toEqual([]);
+    expect(parity.undeclared).toEqual([]);
   });
 });
 

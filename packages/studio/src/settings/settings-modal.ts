@@ -145,14 +145,7 @@ function renderModal() {
 
   const tpl = html`
     <sp-underlay open @close=${closeSettingsModal}></sp-underlay>
-    <div
-      class="settings-modal"
-      @keydown=${(e: KeyboardEvent) => {
-        if (e.key === "Escape") {
-          closeSettingsModal();
-        }
-      }}
-    >
+    <div class="settings-modal">
       <div class="settings-modal-header">
         <h2 class="settings-modal-title">Settings</h2>
         <sp-action-button quiet size="s" @click=${closeSettingsModal} title="Close">
@@ -189,7 +182,7 @@ function renderModal() {
   `;
 
   if (!_handle) {
-    _handle = openModal(tpl);
+    _handle = openModal(tpl, { label: "Settings", onDismiss: closeSettingsModal });
   } else {
     _handle.update(tpl);
   }

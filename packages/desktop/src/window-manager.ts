@@ -261,6 +261,8 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         listExtensions: () => session.listExtensions(),
         listFormats: () => session.listFormats(),
         locateFile: (params) => session.locateFile(params),
+        openExternal: (params) => session.openExternal(params),
+        searchFiles: (params) => session.searchFiles(params),
         openProject: async () => {
           const result = await session.openProject();
           if (result) {
@@ -310,6 +312,7 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         gitLog: (params) => git.gitLog(params),
         gitPull: () => git.gitPull(),
         gitPush: (params) => git.gitPush(params),
+        gitShow: (params) => git.gitShow(params),
         gitStage: (params) => git.gitStage(params),
         gitStatus: () => git.gitStatus(),
         gitUnstage: (params) => git.gitUnstage(params),

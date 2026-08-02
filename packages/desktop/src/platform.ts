@@ -470,8 +470,8 @@ export function createDesktopPlatform() {
       await rpc.request.gitAddRemote({ name, url });
     },
 
-    async searchFiles(query: string) {
-      return rpc.request.searchFiles({ query });
+    async searchFiles(query: string, extensions?: string[]) {
+      return rpc.request.searchFiles({ query, ...(extensions != null && { extensions }) });
     },
 
     async listFormats() {

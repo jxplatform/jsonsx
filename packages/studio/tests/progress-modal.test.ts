@@ -23,6 +23,11 @@ function card(): Element | null {
   return modalLayer().querySelector(".progress-modal");
 }
 
+/** Press Escape inside the card — the layer wrapper, not the body, decides what happens. */
+function escape(): void {
+  card()?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+}
+
 afterEach(() => {
   modalLayer().innerHTML = "";
 });
@@ -72,6 +77,19 @@ describe("showProgressModal", () => {
     h.done();
     h.setStatus("late");
     h.fail("late");
+    h.done();
+    expect(card()).toBeNull();
+  });
+
+  test("Escape is swallowed while running and dismisses once it has failed", async () => {
+    const h = showProgressModal({ title: "Installing" });
+    await flush();
+    escape();
+    expect(card()).not.toBeNull();
+
+    h.fail("boom");
+    await flush();
+    escape();
     expect(card()).toBeNull();
   });
 });

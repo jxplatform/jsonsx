@@ -3,6 +3,7 @@
 
 import { getNodeAtPath, nodeLabel, renderOnly, statusbarEl, updateSession } from "../store";
 import { effect, effectScope } from "../reactivity";
+import { STATUS_MESSAGE } from "../ui/timing";
 import { activeTab } from "../workspace/workspace";
 import type { JxPath } from "../state";
 import type { EffectScope } from "@vue/reactivity";
@@ -129,7 +130,7 @@ function _onStatusbarClick(e: Event) {
  * @param {string} msg
  * @param {number} [duration]
  */
-export function statusMessage(msg: string, duration = 3000) {
+export function statusMessage(msg: string, duration = STATUS_MESSAGE) {
   statusMsg = msg;
   _rerender?.();
   clearTimeout(statusTimeout);

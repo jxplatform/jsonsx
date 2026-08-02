@@ -7,7 +7,6 @@
  */
 
 import { createProjectSession } from "./project-session";
-import { openExternal as utilsOpenExternal } from "./utils.ts";
 
 export { setFileDialog, setDirectoryDialog } from "./project-session";
 export type { ProjectSession, ProxyResult, StudioSchema } from "./project-session";
@@ -28,12 +27,7 @@ export const { fetchProjectSchemas } = _default;
 export const { formatAction } = _default;
 export const { openProject } = _default;
 
-/* Open a URL in the user's default browser (Studio Preview link clicks). Async only to match the
-   handler-map contract both launchers declare — `Record<string, (params) => Promise<unknown>>` — even
-   though the underlying Utils call is synchronous. */
-export async function openExternal({ url }: { url: string }): Promise<{ ok: boolean }> {
-  return { ok: utilsOpenExternal(url) };
-}
+export const { openExternal } = _default;
 export const { createProject } = _default;
 export const { listDirectory } = _default;
 export const { handleReadFile } = _default;
@@ -46,6 +40,7 @@ export const { handleResolveSiteContext } = _default;
 export const { discoverComponents } = _default;
 export const { codeService } = _default;
 export const { locateFile } = _default;
+export const { searchFiles } = _default;
 export const { fetchPluginSchema } = _default;
 export const { jxResolve } = _default;
 export const { jxServerFunction } = _default;

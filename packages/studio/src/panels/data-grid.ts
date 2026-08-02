@@ -56,7 +56,7 @@ export async function startPush(connection: string | undefined, onDone: () => vo
   if (pushDialog) {
     return;
   }
-  const handle = openModal(html``);
+  const handle = openModal(html``, { label: "Push Schema", onDismiss: closePushDialog });
   pushDialog = { connection, handle, onDone, phase: "loading", plan: null, result: null };
   renderPushDialog();
   const plan = await pushSchema({

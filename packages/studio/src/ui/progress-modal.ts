@@ -23,7 +23,6 @@ function card(body: TemplateResult): TemplateResult {
     <sp-underlay open></sp-underlay>
     <div
       class="progress-modal"
-      role="dialog"
       aria-live="polite"
       style="position:fixed;inset:0;margin:auto;width:min(420px,calc(100vw - 48px));max-height:calc(100vh - 96px);height:max-content;background:var(--bg-panel,#1e1e1e);border:1px solid var(--border,#3a3a3a);border-radius:var(--spectrum-corner-radius-200,8px);padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 8px 32px rgba(0,0,0,.4)"
     >
@@ -70,8 +69,8 @@ function errorView(title: string, message: string, onClose: () => void): Templat
 }
 
 export function showProgressModal(opts: { title: string; status?: string }): ProgressModalHandle {
-  const modal = openModal(runningView(opts.title, opts.status ?? ""));
   let closed = false;
+  let failed = false;
 
   const close = () => {
     if (closed) {
@@ -81,10 +80,22 @@ export function showProgressModal(opts: { title: string; status?: string }): Pro
     modal.close();
   };
 
+  const modal = openModal(runningView(opts.title, opts.status ?? ""), {
+    label: opts.title,
+    // The operation owns the modal until it ends: Escape is swallowed while the spinner is up, and
+    // Only dismisses once the error view (with its own Close button) has taken over.
+    onDismiss: () => {
+      if (failed) {
+        close();
+      }
+    },
+  });
+
   return {
     done: close,
     fail(message: string) {
       if (!closed) {
+        failed = true;
         modal.update(errorView(opts.title, message || "Unknown error", close));
       }
     },

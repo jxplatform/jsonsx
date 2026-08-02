@@ -341,7 +341,7 @@ function render(): void {
   if (_handle) {
     _handle.update(tpl);
   } else {
-    _handle = openModal(tpl);
+    _handle = openModal(tpl, { label: "Publish", onDismiss: close });
   }
 }
 

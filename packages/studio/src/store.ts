@@ -10,6 +10,7 @@
 // ─── Re-exports from state.js ────────────────────────────────────────────────
 
 import { activeTab } from "./workspace/workspace";
+import { INPUT_DEBOUNCE } from "./ui/timing";
 import type { JxPath } from "./state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { CanvasPanel } from "./types";
@@ -102,14 +103,15 @@ const _styleDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 /**
  * @param {string} prop
- * @param {number} ms
+ * @param {number | undefined} ms Debounce delay; `undefined` takes the standard input debounce.
  * @param {(...args: unknown[]) => void} fn
  */
 export function debouncedStyleCommit<A extends unknown[]>(
   prop: string,
-  ms: number,
+  ms: number | undefined,
   fn: (...args: A) => void,
 ) {
+  const delay = ms ?? INPUT_DEBOUNCE;
   return (...args: A) => {
     clearTimeout(_styleDebounceTimers.get(prop));
     _styleDebounceTimers.set(
@@ -117,7 +119,7 @@ export function debouncedStyleCommit<A extends unknown[]>(
       setTimeout(() => {
         _styleDebounceTimers.delete(prop);
         fn(...args);
-      }, ms),
+      }, delay),
     );
   };
 }

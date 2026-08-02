@@ -12,19 +12,10 @@ import { openModal } from "../ui/layers";
 
 let _handle: ReturnType<typeof openModal> | null = null;
 
-let _escHandler: ((e: KeyboardEvent) => void) | null = null;
-
 export function openBrowseModal() {
   if (_handle) {
     return;
   }
-
-  _escHandler = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      closeBrowseModal();
-    }
-  };
-  document.addEventListener("keydown", _escHandler, true);
 
   const tpl = html`
     <sp-underlay open @close=${closeBrowseModal}></sp-underlay>
@@ -53,16 +44,12 @@ export function openBrowseModal() {
     </div>
   `;
 
-  _handle = openModal(tpl);
+  _handle = openModal(tpl, { label: "Manage Files", onDismiss: closeBrowseModal });
 }
 
 export function closeBrowseModal() {
   if (!_handle) {
     return;
-  }
-  if (_escHandler) {
-    document.removeEventListener("keydown", _escHandler, true);
-    _escHandler = null;
   }
   _handle.close();
   _handle = null;

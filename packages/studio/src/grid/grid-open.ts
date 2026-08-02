@@ -165,5 +165,6 @@ export async function openGridSourcePicker(): Promise<void> {
         )}
       </sp-menu>
     </sp-dialog-wrapper>`,
+    { label: "Open Grid" },
   );
 }

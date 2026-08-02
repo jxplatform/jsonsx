@@ -38,25 +38,33 @@ export function isModalOpen(): boolean {
   return Boolean(_dialogLayer?.querySelector(UNDERLAID) || _modalLayer?.querySelector(UNDERLAID));
 }
 
-/** Focusable candidates in a dialog BODY, in the order a keyboard user would reach them. */
+/** Focusable candidates in an overlay body, in the order a keyboard user would reach them. */
 const BODY_FOCUSABLE =
-  'input, textarea, select, button, sp-textfield, sp-button, sp-picker, sp-checkbox, [tabindex]:not([tabindex="-1"])';
+  'a[href], input, textarea, select, button, sp-textfield, sp-button, sp-action-button, sp-picker, sp-checkbox, sp-menu-item, [tabindex]:not([tabindex="-1"])';
+
+/** The body's focusables that can actually take the caret right now. */
+function focusablesIn(slot: HTMLElement): HTMLElement[] {
+  return [...slot.querySelectorAll<HTMLElement>(BODY_FOCUSABLE)].filter(
+    (el) => !el.hasAttribute("disabled") && el.getAttribute("aria-hidden") !== "true",
+  );
+}
 
 /**
- * Hand the keyboard to a freshly opened dialog.
+ * Hand the keyboard to a freshly opened overlay.
  *
  * `sp-dialog-wrapper` only throws focus into itself when an `<sp-overlay>` drives it. Opened
  * directly through its `open` attribute — Studio's pattern, because this layer stack owns stacking
  * rather than Spectrum's overlay system — NOTHING does, so focus stays on whatever sits behind the
- * underlay: the dialog is unreachable by keyboard, <kbd>Escape</kbd> never reaches it, and
+ * underlay: the surface is unreachable by keyboard, <kbd>Escape</kbd> never reaches it, and
  * keystrokes keep landing in the app the underlay is blocking.
  *
- * Prefers the first focusable in the dialog BODY (a bespoke form's opening field), else the
- * wrapper's own cancel button — DialogWrapper renders cancel → secondary → confirm, so the first
- * shadow button is the least destructive landing spot. A body that already claimed focus
- * ({@link showPromptDialog}'s field) is left alone.
+ * Prefers the first focusable in the BODY (a bespoke form's opening field), else the wrapper's own
+ * cancel button — DialogWrapper renders cancel → secondary → confirm, so the first shadow button is
+ * the least destructive landing spot — else the slot itself, which carries `tabindex="-1"` so a
+ * body made only of static content (a progress spinner) still receives <kbd>Escape</kbd>. A body
+ * that already claimed focus ({@link showPromptDialog}'s field) is left alone.
  */
-function focusDialog(slot: HTMLElement): void {
+function focusOverlay(slot: HTMLElement): void {
   // Deferred a frame: the wrapper's buttons live in a shadow root Spectrum renders asynchronously.
   requestAnimationFrame(() => {
     if (!slot.isConnected || slot.contains(document.activeElement)) {
@@ -64,17 +72,85 @@ function focusDialog(slot: HTMLElement): void {
     }
     const wrapper = slot.querySelector("sp-dialog-wrapper");
     const target =
-      slot.querySelector<HTMLElement>(BODY_FOCUSABLE) ??
-      wrapper?.shadowRoot?.querySelector<HTMLElement>("sp-button") ??
-      null;
-    target?.focus();
+      focusablesIn(slot)[0] ?? wrapper?.shadowRoot?.querySelector<HTMLElement>("sp-button") ?? slot;
+    target.focus();
   });
+}
+
+/**
+ * Keep <kbd>Tab</kbd> inside the overlay: cycle through the body's focusables, wrapping at both
+ * ends. With no focusable body at all the caret stays on the slot — tabbing out of a surface the
+ * mouse cannot leave either would strand the keyboard behind the underlay.
+ */
+function trapTab(slot: HTMLElement, e: KeyboardEvent): void {
+  e.preventDefault();
+  const items = focusablesIn(slot);
+  if (items.length === 0) {
+    return;
+  }
+  const at = items.indexOf(document.activeElement as HTMLElement);
+  const next = e.shiftKey
+    ? items[at <= 0 ? items.length - 1 : at - 1]
+    : items[at === -1 || at === items.length - 1 ? 0 : at + 1];
+  next?.focus();
+}
+
+/** How an overlay slot behaves once it is up. */
+interface OverlaySlotOptions {
+  /** Layer host the slot is appended to. */
+  layer: HTMLElement;
+  /** Handle <kbd>Escape</kbd> pressed inside the slot; the callback owns `preventDefault`. */
+  onEscape?: (e: KeyboardEvent, slot: HTMLElement) => void;
+  /** Cycle <kbd>Tab</kbd> within the slot instead of letting it walk into the app behind. */
+  trapFocus?: boolean;
+}
+
+/**
+ * Open a slot in a layer with the full overlay keyboard contract: focus in on open, focus back to
+ * the opener on close, centralised <kbd>Escape</kbd>, and (optionally) a Tab trap.
+ *
+ * Both {@link showDialog} and {@link openModal} are thin wrappers over this — one contract, one
+ * implementation, so no surface can ship without the machinery.
+ */
+function openOverlaySlot(opts: OverlaySlotOptions): { slot: HTMLElement; release: () => void } {
+  const slot = document.createElement("div");
+  slot.style.pointerEvents = "auto";
+  // Focusable as a last resort, so a body with no controls still owns the keyboard (focusOverlay).
+  slot.tabIndex = -1;
+  // The slot is a zero-height wrapper around fixed-position bodies, so its own focus ring would
+  // Paint as a stray line across the top of the layer.
+  slot.style.outline = "none";
+  opts.layer.append(slot);
+  // Whoever held focus before the overlay took it, so it can be handed back (a dialog opened from a
+  // Toolbar button returns the caret to that button, not to <body>).
+  const restoreTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const onKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      opts.onEscape?.(e, slot);
+      return;
+    }
+    if (e.key === "Tab" && opts.trapFocus) {
+      trapTab(slot, e);
+    }
+  };
+  slot.addEventListener("keydown", onKeydown);
+  return {
+    release() {
+      slot.removeEventListener("keydown", onKeydown);
+      litRender(nothing, slot);
+      slot.remove();
+      if (restoreTo?.isConnected) {
+        restoreTo.focus();
+      }
+    },
+    slot,
+  };
 }
 
 /**
  * Show an ephemeral dialog. Returns a Promise that resolves when the dialog is dismissed.
  *
- * Takes the keyboard on open ({@link focusDialog}) and hands it back to the previously focused
+ * Takes the keyboard on open ({@link focusOverlay}) and hands it back to the previously focused
  * element on close. <kbd>Escape</kbd> dismisses by firing the wrapper's `close` event, so each
  * helper's own `@close` binding decides what "dismissed" resolves to; a bespoke body with no
  * `sp-dialog-wrapper` owns its own keys.
@@ -87,42 +163,32 @@ export function showDialog<T>(
   templateFn: (done: (value: T) => void) => TemplateResult,
 ): Promise<T> {
   return new Promise((resolve) => {
-    const slot = document.createElement("div");
-    slot.style.pointerEvents = "auto";
-    _dialogLayer.append(slot);
-    // Whoever held focus before the modal took it, so it can be handed back (a dialog opened from a
-    // Toolbar button returns the caret to that button, not to <body>).
-    const restoreTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const { release, slot } = openOverlaySlot({
+      layer: _dialogLayer,
+      onEscape(e, host) {
+        const wrapper = host.querySelector("sp-dialog-wrapper");
+        if (!wrapper) {
+          return;
+        }
+        // Stop it ALSO reaching the app behind (which clears the canvas selection on Escape).
+        e.preventDefault();
+        e.stopPropagation();
+        wrapper.dispatchEvent(new Event("close", { bubbles: true }));
+      },
+      // No Tab trap: the wrapper's action buttons live in a shadow root a light-DOM cycle cannot
+      // Enumerate, so trapping here would strand the caret on the body and never reach Cancel.
+    });
     let resolved = false;
-    const onKeydown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") {
-        return;
-      }
-      const wrapper = slot.querySelector("sp-dialog-wrapper");
-      if (!wrapper) {
-        return;
-      }
-      // Stop it ALSO reaching the app behind (which clears the canvas selection on Escape).
-      e.preventDefault();
-      e.stopPropagation();
-      wrapper.dispatchEvent(new Event("close", { bubbles: true }));
-    };
-    slot.addEventListener("keydown", onKeydown);
     const done = (value: T) => {
       if (resolved) {
         return;
       }
       resolved = true;
-      slot.removeEventListener("keydown", onKeydown);
-      litRender(nothing, slot);
-      slot.remove();
-      if (restoreTo?.isConnected) {
-        restoreTo.focus();
-      }
+      release();
       resolve(value);
     };
     litRender(templateFn(done), slot);
-    focusDialog(slot);
+    focusOverlay(slot);
   });
 }
 
@@ -361,20 +427,57 @@ export function showPromptDialog(
   });
 }
 
+/** Options accepted by {@link openModal}. */
+export interface ModalOptions {
+  /**
+   * Accessible name for the modal, applied as `aria-label` on the wrapper. Required: it is the only
+   * name assistive tech gets, and a per-modal opt-in would be forgotten.
+   */
+  label: string;
+  /**
+   * Whether <kbd>Escape</kbd> dismisses. `false` for modals that must not vanish mid-flight (a
+   * running operation, a step that has to be confirmed).
+   */
+  dismissible?: boolean;
+  /**
+   * What <kbd>Escape</kbd> runs. Defaults to the handle's own `close()`; pass the call site's close
+   * function when it keeps bookkeeping of its own (a module-level handle to clear).
+   */
+  onDismiss?: () => void;
+}
+
 /**
  * Open a persistent modal. Returns a handle with update() and close() methods.
  *
+ * The wrapper — not the body — owns the modal contract, so no surface can ship without it: the slot
+ * is the `role="dialog"` element, carries `aria-modal` and the caller's label, takes the keyboard
+ * on open, cycles <kbd>Tab</kbd> within itself, dismisses on <kbd>Escape</kbd>, and hands focus
+ * back to the opener on close. Bodies render content only.
+ *
  * @param {import("lit-html").TemplateResult} template
+ * @param {ModalOptions} opts
  */
-export function openModal(template: TemplateResult) {
-  const slot = document.createElement("div");
-  slot.style.pointerEvents = "auto";
-  _modalLayer.append(slot);
-  litRender(template, slot);
-  return {
+export function openModal(template: TemplateResult, opts: ModalOptions) {
+  const { release, slot } = openOverlaySlot({
+    layer: _modalLayer,
+    onEscape(e) {
+      if (opts.dismissible === false) {
+        return;
+      }
+      // Stop it ALSO reaching the app behind (which clears the canvas selection on Escape).
+      e.preventDefault();
+      e.stopPropagation();
+      (opts.onDismiss ?? handle.close)();
+    },
+    trapFocus: true,
+  });
+  slot.setAttribute("role", "dialog");
+  slot.setAttribute("aria-modal", "true");
+  slot.setAttribute("aria-label", opts.label);
+
+  const handle = {
     close() {
-      litRender(nothing, slot);
-      slot.remove();
+      release();
     },
     host: slot,
     /** @param {import("lit-html").TemplateResult} tpl */
@@ -382,6 +485,9 @@ export function openModal(template: TemplateResult) {
       litRender(tpl, slot);
     },
   };
+  litRender(template, slot);
+  focusOverlay(slot);
+  return handle;
 }
 
 /**

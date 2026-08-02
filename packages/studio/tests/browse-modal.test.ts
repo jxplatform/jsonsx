@@ -100,9 +100,9 @@ describe("openBrowseModal", () => {
 });
 
 describe("closing", () => {
-  test("Escape closes the modal and unregisters the handler", async () => {
+  test("Escape closes the modal (the layer wrapper owns the key)", async () => {
     await openAndSettle();
-    document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+    modal()?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
     expect(modal()).toBeNull();
     // A second Escape with no modal open is harmless
     document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
@@ -111,7 +111,7 @@ describe("closing", () => {
 
   test("other keys do not close the modal", async () => {
     await openAndSettle();
-    document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "a" }));
+    modal()?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "a" }));
     expect(modal()).not.toBeNull();
   });
 

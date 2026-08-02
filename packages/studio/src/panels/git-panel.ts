@@ -22,6 +22,7 @@ import { projectState, renderOnly, updateUi } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { showConfirmDialog, showPromptDialog } from "../ui/layers";
+import { POLL_GIT } from "../ui/timing";
 import { statusMessage } from "./statusbar";
 import { publishToGithub } from "../github/github-publish";
 import { pullWithPackageSync } from "../packages/pull-package-sync";
@@ -254,7 +255,7 @@ export function renderGitPanel(
       if (view.leftTab === "git" && !S.ui.gitLoading) {
         void refreshGitStatus();
       }
-    }, 30_000);
+    }, POLL_GIT);
   }
 
   const stagedFiles = status?.files?.filter((f: GitFileEntry) => f.staged) || [];

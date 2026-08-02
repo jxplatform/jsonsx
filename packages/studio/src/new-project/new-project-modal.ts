@@ -668,14 +668,7 @@ function renderModal() {
 
   const tpl = html`
     <sp-underlay open @close=${closeNewProjectModal}></sp-underlay>
-    <div
-      class="new-project-modal"
-      @keydown=${(e: KeyboardEvent) => {
-        if (e.key === "Escape") {
-          closeNewProjectModal();
-        }
-      }}
-    >
+    <div class="new-project-modal">
       <div class="new-project-modal-header">
         <h2 class="new-project-modal-title">Start new project from:</h2>
         <sp-action-button quiet size="s" @click=${closeNewProjectModal} title="Close">
@@ -716,7 +709,7 @@ function renderModal() {
   `;
 
   if (!_handle) {
-    _handle = openModal(tpl);
+    _handle = openModal(tpl, { label: "New Project", onDismiss: closeNewProjectModal });
   } else {
     _handle.update(tpl);
   }

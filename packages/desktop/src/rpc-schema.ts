@@ -274,8 +274,10 @@ export interface StudioRPC {
         response: void;
       };
       // Files
+      /* `extensions` mirrors the PAL's second argument (the format registry's document extensions);
+         declaring only `query` silently dropped it and made Quick Access .json-only on desktop. */
       searchFiles: {
-        params: { query: string };
+        params: { query: string; extensions?: string[] };
         response: DirEntry[];
       };
       // Formats

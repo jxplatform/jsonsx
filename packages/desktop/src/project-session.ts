@@ -32,7 +32,7 @@ import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import type { ExtensionsPayloadEntry } from "@jxsuite/compiler/format-host";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FsEventPayload, FsWatcherHandle, RenameReport } from "@jxsuite/server/refactor";
-import { openExternal } from "./utils.ts";
+import { openExternal as handUrlToOs } from "./utils.ts";
 import type {
   ComponentSlotMeta,
   DataPushRequest,
@@ -809,6 +809,15 @@ export function createProjectSession(initialRoot: string | null) {
     return null;
   }
 
+  /**
+   * Hand a URL to the OS (Studio's Preview link clicks). Wrapped in the RPC's params/response shape
+   * rather than re-exporting utils' bare `(url) => boolean`, so both launchers can register it
+   * straight into their handler map.
+   */
+  async function openExternal(params: { url: string }): Promise<{ ok: boolean }> {
+    return { ok: handUrlToOs(params.url) };
+  }
+
   async function locateFile(params: { name: string }): Promise<string | null> {
     const root = requireRoot();
     const glob = new Bun.Glob(`**/${params.name}`);
@@ -823,6 +832,42 @@ export function createProjectSession(initialRoot: string | null) {
     }
 
     return matches.length > 0 ? matches[0] : null;
+  }
+
+  /**
+   * Fuzzy filename search behind Studio's Quick Access (⌘P) — the desktop twin of the dev server's
+   * GET /__studio/files?glob=… . `extensions` carries the format registry's document extensions on
+   * top of the always-searched .json; a leading dot is tolerated on each. Directories never match
+   * (the glob ends in an extension), and paths come back project-relative like everywhere else.
+   */
+  async function searchFiles(params: {
+    query: string;
+    extensions?: string[];
+  }): Promise<DirEntry[]> {
+    const root = requireRoot();
+    const exts = ["json", ...(params.extensions ?? []).map((e) => e.replace(/^\./, ""))];
+    const glob = new Bun.Glob(`**/*${params.query}*.{${exts.join(",")}}`);
+    const results: DirEntry[] = [];
+
+    for await (const rawMatch of glob.scan({ cwd: root, dot: false })) {
+      const match = toPosix(rawMatch);
+      if (match.includes("node_modules") || match.includes("dist/")) {
+        continue;
+      }
+      const absPath = resolve(root, match);
+      try {
+        const s = await stat(absPath);
+        results.push({
+          modified: s.mtime.toISOString(),
+          name: basename(match),
+          path: match,
+          size: s.size,
+          type: "file",
+        });
+      } catch {}
+    }
+
+    return results;
   }
 
   async function fetchPluginSchema(params: {
@@ -994,6 +1039,7 @@ export function createProjectSession(initialRoot: string | null) {
     discoverComponents,
     codeService,
     locateFile,
+    searchFiles,
     fetchPluginSchema,
     jxResolve,
     jxServerFunction,

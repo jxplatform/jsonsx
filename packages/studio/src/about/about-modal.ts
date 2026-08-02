@@ -106,16 +106,7 @@ function renderPackages(): TemplateResult {
 function renderModal() {
   const tpl = html`
     <sp-underlay open @close=${closeAboutModal}></sp-underlay>
-    <div
-      class="about-modal"
-      role="dialog"
-      aria-label="About ${APP_NAME}"
-      @keydown=${(e: KeyboardEvent) => {
-        if (e.key === "Escape") {
-          closeAboutModal();
-        }
-      }}
-    >
+    <div class="about-modal">
       <div class="settings-modal-header">
         <h2 class="settings-modal-title">About ${APP_NAME}</h2>
         <sp-action-button quiet size="s" @click=${closeAboutModal} title="Close">
@@ -151,6 +142,6 @@ function renderModal() {
   if (_handle) {
     _handle.update(tpl);
   } else {
-    _handle = openModal(tpl);
+    _handle = openModal(tpl, { label: `About ${APP_NAME}`, onDismiss: closeAboutModal });
   }
 }

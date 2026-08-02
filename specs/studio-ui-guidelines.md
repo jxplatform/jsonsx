@@ -450,16 +450,37 @@ renders a dialog with no buttons.
 
 **Modal surfaces own the keyboard.** Studio opens `sp-dialog-wrapper` through its `open` attribute
 rather than Spectrum's `sp-overlay` (this layer stack owns stacking), and the wrapper only manages
-focus when an overlay drives it. `showDialog` therefore does it:
+focus when an overlay drives it. The layer stack therefore does it, once: `showDialog` and
+`openModal` are both thin wrappers over one internal slot helper, so no surface can ship without the
+machinery and no body hand-rolls its own.
 
-- On open it moves focus into the dialog — the first focusable in the body, else the wrapper's own
-  cancel button (DialogWrapper renders cancel → secondary → confirm, so the first shadow button is
-  the least destructive landing spot). A body that already claimed focus (`showPromptDialog`'s
-  field) keeps it.
-- On close it hands focus back to whatever held it before the dialog opened.
-- <kbd>Escape</kbd> dismisses by firing the wrapper's `close` event, so each helper's own `@close`
-  binding decides what "dismissed" resolves to. A bespoke body with no `sp-dialog-wrapper` owns its
-  own keys.
+- On open the slot moves focus into itself — the first enabled focusable in the body, else the
+  dialog wrapper's own cancel button (DialogWrapper renders cancel → secondary → confirm, so the
+  first shadow button is the least destructive landing spot), else the slot itself, which carries
+  `tabindex="-1"` so a body of static content (a progress spinner) still receives keys. A body that
+  already claimed focus (`showPromptDialog`'s field) keeps it.
+- On close the slot hands focus back to whatever held it before the surface opened.
+- <kbd>Escape</kbd> is centralised on the slot. In `showDialog` it fires the wrapper's `close`
+  event, so each helper's own `@close` binding decides what "dismissed" resolves to; a bespoke body
+  with no `sp-dialog-wrapper` owns its own keys.
+
+`openModal(template, opts)` adds the rest of the modal contract **at the wrapper**, never in the
+body:
+
+- `opts.label` is **required** and becomes `aria-label` on the slot, which is also the
+  `role="dialog"` / `aria-modal="true"` element. A modal body must not declare its own `role` — the
+  duplicate would nest one dialog inside another.
+- <kbd>Tab</kbd> and <kbd>Shift</kbd>+<kbd>Tab</kbd> cycle the body's enabled focusables, wrapping at
+  both ends; with nothing focusable the caret stays on the slot. Tabbing out of a surface the mouse
+  cannot leave either would strand the keyboard behind the underlay. `showDialog` does **not** trap:
+  its action buttons live in a shadow root a light-DOM cycle cannot enumerate, so a trap there would
+  strand the caret on the body and never reach Cancel.
+- <kbd>Escape</kbd> dismisses. `opts.onDismiss` overrides what that runs — pass the call site's own
+  close function when it keeps bookkeeping (a module-level handle to clear); the default is the
+  handle's `close()`. `opts.dismissible: false` opts out entirely, for a modal that must not vanish
+  mid-flight.
+- Dismissal `preventDefault`s and stops propagation, so the same keystroke does not ALSO clear the
+  canvas selection behind the underlay.
 
 `isModalOpen()` reports whether a surface with an underlay is up — a `showDialog` dialog, or an
 `openModal` body that renders its own `sp-underlay`. It is derived from the live DOM, not a
