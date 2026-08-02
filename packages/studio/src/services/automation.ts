@@ -158,6 +158,22 @@ const namedRow = (rowClass: string, nameClass: string, name: string) =>
   `xpath///div[contains(@class,"${rowClass}")][.//span[contains(@class,"${nameClass}")]` +
   `[normalize-space()="${name}"]]`;
 
+/**
+ * An Outline row, matched by its label OR its tag badge, case-insensitively.
+ *
+ * Outline labels are derived from the node, so they are deliberately not stable strings; the tag
+ * badge is. Accepting either keeps a shot working when a row's label changes shape.
+ */
+const layerRow = (name: string) => {
+  const lower = name.toLowerCase();
+  const fold = `translate(normalize-space(),"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")`;
+  return (
+    `xpath///div[contains(@class,"layer-row")]` +
+    `[.//span[contains(@class,"layer-label")][${fold}="${lower}"]` +
+    ` or .//span[contains(@class,"layer-tag")][${fold}="${lower}"]]`
+  );
+};
+
 /** An `sp-action-button` inside `container`, matched by its label. */
 const buttonIn = (container: string, label: string) =>
   `xpath///div[contains(@class,"${container}")]//sp-action-button[normalize-space()="${label}"]`;
@@ -247,10 +263,11 @@ export const AUTOMATION_COMMANDS: Record<string, AutomationCommand> = {
 
   // ── Layers ──
   "layers.contextMenu": {
-    press: (args) => ({
-      button: "right",
-      selector: namedRow("layer-row", "layer-label", str(args, "label")),
-    }),
+    // Matches the row's TAG BADGE as well as its label, and case-insensitively. Outline labels are
+    // Derived from the node ($title → #id → own text → .class → landmark → first text → "n items"),
+    // So they are deliberately not stable strings — a shot that names "article" must keep working
+    // When the row starts rendering "Article". The badge is the durable half of the pair.
+    press: (args) => ({ button: "right", selector: layerRow(str(args, "label")) }),
   },
 
   // ── Media ──

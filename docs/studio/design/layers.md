@@ -41,12 +41,18 @@ The name is a display title only — Studio stores it as a `$title` key on the e
 
 ## Rearrange the page
 
-Click a row to select it and its actions appear on the right:
+Select a row — or just hover it — and its actions appear on the right:
 
 - **Move up** / **Move down** arrows swap the element with its neighbors.
-- The **right arrow** moves the element inside the sibling above it (shown when that sibling can hold children).
+- The **right arrow** moves the element inside the sibling above it.
 - The **left arrow** moves the element out of its parent, to sit just after it.
-- **✕** deletes the element and everything inside it.
+- **⋮** holds **Duplicate** and **Delete**.
+
+An action that cannot apply — moving the first child up, say — is shown greyed rather than hidden, with a tooltip saying what it needs. The buttons never move under your cursor.
+
+:::doc-tip
+The tree is keyboard-navigable. :kbd[↑] and :kbd[↓] walk the rows, :kbd[→] and :kbd[←] expand and collapse, and :kbd[Home] / :kbd[End] jump to the ends.
+:::
 
 For bigger moves, drag the **⠿** handle — which appears on any row you hover — or the row itself. An indicator shows where the element will land: above or below the row under the cursor, or inside it as a child. You can also drag a row straight onto the canvas and drop it at the spot you see. Press :kbd[Esc] mid-drag to cancel with nothing changed. Dropping an element into itself or its own descendants is blocked.
 
