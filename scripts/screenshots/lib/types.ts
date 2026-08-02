@@ -50,6 +50,13 @@ export interface SeededPeer {
 }
 
 export type ShotAction =
+  /**
+   * Command-addressed step: names a Studio command id (`<category>.<verb>`) rather than a CSS
+   * selector, and lets `window.__jxAutomation.run` decide how to fire it. This is how a shot should
+   * drive the shell — chrome refactors move selectors, not command ids. Unknown ids throw inside
+   * the page, so a stale step fails the shot instead of silently capturing the wrong state.
+   */
+  | { args?: Record<string, unknown>; do: "run"; id: string }
   | { defName: string; do: "editDef" }
   | { do: "editFunction"; eventKey: string; path: (string | number)[] }
   | { do: "openBrowse" }
@@ -181,6 +188,7 @@ const ACTION_KINDS = new Set([
   "openNewProject",
   "openQuickSearch",
   "openSettings",
+  "run",
   "seedAssistant",
   "seedCollab",
   "seedPublish",
@@ -241,6 +249,9 @@ export function validateManifest(raw: unknown): Manifest {
     for (const action of shot.actions ?? []) {
       if (!ACTION_KINDS.has(action.do)) {
         fail(`shot "${shot.name}": unknown action "${action.do}"`);
+      }
+      if (action.do === "run" && (typeof action.id !== "string" || !action.id)) {
+        fail(`shot "${shot.name}": a run action needs a command id`);
       }
     }
     for (const wait of shot.waitFor ?? []) {

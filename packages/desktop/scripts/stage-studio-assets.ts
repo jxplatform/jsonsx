@@ -16,7 +16,7 @@ import { existsSync } from "node:fs";
  */
 const WORKER_BUNDLES = ["editor.worker.js", "json.worker.js", "ts.worker.js"];
 
-/** The vendored JetBrains Mono faces index.html declares via @font-face. */
+/** The vendored JetBrains Mono faces styles/tokens.css declares via @font-face. */
 const FONT_FILES = [
   "jetbrains-mono-400.woff2",
   "jetbrains-mono-500.woff2",
@@ -49,9 +49,25 @@ export async function stageStudioAssets(desktopDir: string): Promise<void> {
   }
   await cp(chunksSrc, join(outDir, "dist", "chunks"), { recursive: true });
 
+  // Studio chrome CSS. The entire design system — tokens, shell, canvas, panels, inspector,
+  // Overlays — is a set of plain stylesheets under packages/studio/styles that index.html <link>s
+  // Directly; no bundler ever sees them, so the directory has to ship verbatim and keep its names.
+  // Missing it is not a subtle regression: the packaged app boots with no tokens, no grid and no
+  // Panel chrome, so this refuses rather than shipping it.
+  const stylesSrc = join(studioDir, "styles");
+  if (!existsSync(stylesSrc)) {
+    throw new Error(
+      `Studio has no styles/ directory at ${stylesSrc} — the chrome stylesheet index.html links ` +
+        `is missing. Staging without it produces an app with no tokens, layout or panel chrome ` +
+        `at all, so this refuses rather than shipping it.`,
+    );
+  }
+  await cp(stylesSrc, join(outDir, "styles"), { recursive: true });
+
   // Monaco workers + webfonts. Both are addressed relatively — the workers against the BUNDLE's own
-  // Url (monaco-setup.ts), the fonts against the document (index.html @font-face) — so the staged
-  // Tree has to mirror packages/studio's layout exactly for either to resolve.
+  // Url (monaco-setup.ts), the fonts against the stylesheet (styles/tokens.css @font-face, which
+  // Resolves ../fonts) — so the staged tree has to mirror packages/studio's layout exactly for
+  // Either to resolve.
   await mkdir(join(outDir, "dist", "workers"), { recursive: true });
   for (const worker of WORKER_BUNDLES) {
     await copyFile(

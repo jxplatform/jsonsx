@@ -88,6 +88,10 @@ export default {
       "../starters/registry.json": "bun/registry.json",
       "../starters/sites": "bun/sites",
       "assets/studio/canvas.html": "views/studio/canvas.html",
+      // Content-hashed split chunks (Monaco, yjs, ajv and every on-demand import). studio.js reaches
+      // Them by relative URL, so the whole directory has to arrive under views/studio/dist/chunks or
+      // The editor dies at boot with a bare module-resolution error.
+      "assets/studio/dist/chunks": "views/studio/dist/chunks",
       "assets/studio/dist/iframe-entry.js": "views/studio/dist/iframe-entry.js",
       "assets/studio/dist/iframe-entry.js.map": "views/studio/dist/iframe-entry.js.map",
       "assets/studio/dist/init.js": "views/studio/dist/init.js",
@@ -100,6 +104,9 @@ export default {
       "assets/studio/dist/workers": "views/studio/dist/workers",
       "assets/studio/fonts": "views/studio/fonts",
       "assets/studio/index.html": "views/studio/index.html",
+      // The chrome stylesheet, six files index.html <link>s by relative URL. Missing here, the
+      // Packaged app renders the whole shell unstyled.
+      "assets/studio/styles": "views/studio/styles",
     },
   },
 

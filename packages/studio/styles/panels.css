@@ -1,0 +1,699 @@
+/* Jx Studio — panel rails.
+   Load after tokens.css, after shell.css and canvas.css.
+
+   Owns the activity bar, the right-rail panel tabs, the file tree and the
+   layers tree, plus the drag-and-drop chrome that belongs to them: the
+   layers drop indicator, the canvas drop indicator, git diff highlighting
+   and the insertion helper. The two canvas-side drop affordances live here
+   rather than in canvas.css because they are authored inline with the
+   layers drag logic and must keep their original cascade position. */
+
+/* ─── Activity bar (vertical icon tabs) ──────── */
+#activity-bar sp-tabs {
+  --mod-tabs-item-horizontal-spacing: 0px;
+  --mod-tabs-start-to-tab-item: 0px;
+  --mod-tabs-color: var(--fg-dim);
+  --mod-tabs-color-selected: var(--fg);
+}
+#activity-bar sp-tab {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-dim);
+  opacity: 0.6;
+  margin: 0;
+}
+.activity-badge {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--spectrum-corner-radius-200, 8px);
+  background: var(--accent);
+  color: var(--spectrum-white);
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+#activity-bar sp-tab:hover {
+  opacity: 1;
+}
+#activity-bar sp-tab[selected] {
+  color: var(--fg);
+  opacity: 1;
+}
+
+/* ─── Panel tabs (right: horizontal icon tabs) ── */
+.panel-tabs {
+  border-bottom: 1px solid var(--border);
+}
+.panel-tabs sp-tabs {
+  --mod-tabs-item-horizontal-spacing: 0px;
+  --mod-tabs-start-to-tab-item: 0px;
+  --mod-tabs-color: var(--fg-dim);
+  --mod-tabs-color-selected: var(--fg);
+  --spectrum-tabs-top-to-text: 0px;
+  --spectrum-tabs-bottom-to-text: 0px;
+}
+.panel-tabs sp-tab {
+  padding: 4px 10px;
+  color: var(--fg-dim);
+  opacity: 0.7;
+  min-block-size: unset;
+  block-size: 36px;
+  box-sizing: border-box;
+}
+.panel-tabs sp-tab:hover {
+  opacity: 1;
+}
+.panel-tabs sp-tab[selected] {
+  color: var(--fg);
+  opacity: 1;
+}
+.panel-body {
+  padding: 0;
+}
+
+/* ─── File tree ──────────────────────────────── */
+.files-toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.files-toolbar sp-search {
+  flex: 1;
+  --spectrum-textfield-height: 24px;
+}
+.file-tree {
+  overflow-y: auto;
+}
+.file-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  user-select: none;
+}
+.file-tree-item:hover {
+  background: var(--hover-bg);
+}
+.file-tree-item.selected {
+  background: var(--accent-20);
+}
+.file-tree-item.dragging {
+  opacity: 0.4;
+}
+.file-tree-item.drag-over {
+  background: var(--accent-20);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.file-tree.drag-over-root {
+  background: var(--hover-bg);
+}
+.file-tree-toggle {
+  width: 14px;
+  text-align: center;
+  font-size: 8px;
+  color: var(--fg-dim);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.file-tree-toggle.empty {
+  visibility: hidden;
+}
+.file-tree-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.file-tree-icon sp-icon-folder,
+.file-tree-icon sp-icon-folder-open,
+.file-tree-icon sp-icon-document,
+.file-tree-icon sp-icon-file-code,
+.file-tree-icon sp-icon-file-txt,
+.file-tree-icon sp-icon-file-css,
+.file-tree-icon sp-icon-image {
+  --spectrum-icon-size-100: 16px;
+}
+.file-tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.file-tree-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.project-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  gap: 6px;
+}
+.project-name {
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Layers ─────────────────────────────────── */
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  cursor: grab;
+  white-space: nowrap;
+  user-select: none;
+  border-left: 2px solid transparent;
+  transition: transform 150ms ease;
+}
+.layer-row:hover {
+  background: var(--hover-bg);
+}
+.layer-row.selected {
+  background: var(--accent-20);
+  border-left-color: var(--accent);
+}
+.layer-row.dragging {
+  opacity: 0.4;
+  transition: none;
+}
+.layer-row.drop-target {
+  background: var(--accent-15);
+  outline: 1px dashed var(--accent);
+  outline-offset: -1px;
+}
+.layer-indent {
+  flex-shrink: 0;
+}
+.layer-actions {
+  display: none;
+  align-items: center;
+  gap: 0;
+}
+/* Row actions are built for the SELECTED row only — five sp-action-buttons per row is
+   ~5 custom elements with shadow roots per visible row, which is what made a large document's
+   layer tree slow to render. The row itself stays fully draggable (dnd's canDrag excludes
+   only .layer-actions), so reordering non-selected rows is unaffected. */
+.layer-row.selected .layer-actions {
+  display: flex;
+}
+.layer-row:hover .layer-drag-handle,
+.layer-row.selected .layer-drag-handle {
+  display: inline-block;
+}
+.layer-row:has(.layer-title-input) .layer-actions {
+  display: none;
+}
+/* The grab affordance is a plain span, so it stays on every row (revealed on hover) while the
+   Spectrum action buttons are built for the selected row only. It sits OUTSIDE .layer-actions
+   so dnd's canDrag no longer refuses drags that start on it. */
+.layer-drag-handle {
+  display: none;
+  color: var(--fg-dim);
+  opacity: 0.6;
+  font-size: var(--spectrum-font-size-50, 11px);
+  cursor: grab;
+  padding: 0 4px 0 0;
+}
+.layer-toggle {
+  width: 14px;
+  text-align: center;
+  font-size: 9px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.layer-tag {
+  padding: 0 4px;
+  font-size: 10px;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  color: var(--accent-fg);
+  background: var(--tag);
+  flex-shrink: 0;
+}
+.layer-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 24px;
+  flex: 1;
+}
+.layer-title-input {
+  width: 100%;
+  background: var(--bg);
+  color: inherit;
+  border: 1px solid var(--accent, #3b82f6);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  font: inherit;
+  font-size: inherit;
+  padding: 0 2px;
+  outline: none;
+}
+.layer-dot {
+  font-size: 9px;
+  flex-shrink: 0;
+}
+.layer-delete {
+  color: var(--danger);
+}
+.map-tag {
+  background: var(--map) !important;
+  color: var(--accent-fg) !important;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+.repeater-perimeter {
+  border: 1px dashed color-mix(in srgb, var(--map) 25%, transparent);
+  border-radius: var(--radius);
+  padding: 4px;
+  min-height: 24px;
+  position: relative;
+}
+.repeater-perimeter::before {
+  content: "↻ Repeater";
+  position: absolute;
+  top: -9px;
+  left: 6px;
+  font-size: 9px;
+  color: color-mix(in srgb, var(--map) 50%, transparent);
+  background: var(--spectrum-white, #fff);
+  padding: 0 3px;
+  font-family: var(--font-mono);
+  pointer-events: none;
+}
+/* Empty element placeholders (design/edit mode only) */
+.empty-media-placeholder {
+  display: inline-block;
+  min-width: 120px;
+  min-height: 80px;
+  border: 1px dashed color-mix(in srgb, var(--fg-dim, #808080) 30%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--fg-dim, #808080) 5%, transparent)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' fill='none'%3E%3Crect x='4' y='8' width='32' height='24' rx='2' stroke='%23808080' stroke-opacity='.4' stroke-width='1.5'/%3E%3Ccircle cx='13' cy='16' r='3' stroke='%23808080' stroke-opacity='.4' stroke-width='1.5'/%3E%3Cpath d='M8 28l8-8 5 5 4-4 7 7' stroke='%23808080' stroke-opacity='.4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 40px no-repeat;
+  color: transparent;
+  font-size: 0;
+  overflow: hidden;
+}
+.empty-text-placeholder:not([contenteditable])::after {
+  content: "Click here to add text...";
+  color: color-mix(in srgb, var(--fg-dim, #808080) 40%, transparent);
+  font-style: italic;
+  font-size: 13px;
+  pointer-events: none;
+}
+.empty-container-placeholder {
+  border: 1px dashed color-mix(in srgb, var(--fg-dim, #808080) 25%, transparent);
+  border-radius: var(--radius);
+  min-height: 32px;
+  position: relative;
+}
+.empty-container-placeholder::after {
+  content: "Drag elements here...";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: color-mix(in srgb, var(--fg-dim, #808080) 40%, transparent);
+  font-style: italic;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  pointer-events: none;
+  white-space: nowrap;
+}
+[contenteditable="plaintext-only"]:focus {
+  outline: 1px solid var(--accent) !important;
+  outline-offset: -1px;
+}
+.switch-tag {
+  background: var(--switch-c) !important;
+  color: var(--accent-fg) !important;
+}
+.case-tag {
+  background: var(--case-c) !important;
+  color: var(--accent-fg) !important;
+  font-style: italic;
+  font-size: 9px;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slot-tag {
+  background: var(--slot-c) !important;
+  color: var(--accent-fg) !important;
+}
+.component-row {
+  opacity: 0.9;
+  cursor: grab;
+}
+.component-row.available {
+  opacity: 0.6;
+}
+.component-row.available:hover {
+  opacity: 0.8;
+}
+.component-tag {
+  font-size: 9px;
+  width: 18px;
+  text-align: center;
+}
+.components-section {
+  padding: 0 0 2px;
+}
+.imports-panel {
+  overflow-y: auto;
+  padding: 4px;
+}
+.imports-section {
+  margin-bottom: 12px;
+}
+.imports-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 2px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 600;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.imports-count {
+  font-weight: 400;
+  color: var(--text-hint);
+}
+.imports-list {
+  padding: 0 4px;
+}
+.import-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  border-radius: var(--radius);
+}
+.import-row:hover {
+  background: var(--hover-bg);
+}
+.import-name {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.import-path {
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+}
+.import-mono {
+  font-family: var(--font-mono, monospace);
+}
+.imports-empty {
+  padding: 8px 12px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--text-hint);
+  font-style: italic;
+}
+.import-add-form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+}
+.import-add-form sp-textfield {
+  flex: 1;
+}
+.import-picker {
+  width: 100%;
+}
+/* Head panel */
+.head-section-body {
+  padding: 0 4px;
+}
+.head-section-body .style-row > sp-textfield,
+.head-section-body .style-row > .media-picker {
+  width: 100%;
+}
+.head-add-form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+}
+.head-add-form sp-textfield {
+  flex: 1;
+}
+.head-add-form sp-picker {
+  min-width: 70px;
+}
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  margin-left: 8px;
+}
+.breadcrumb-item {
+  color: var(--fg-dim);
+  cursor: default;
+  white-space: nowrap;
+}
+.breadcrumb-item.clickable {
+  cursor: pointer;
+}
+.breadcrumb-item.clickable:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+.breadcrumb-item.current {
+  color: var(--fg);
+  font-weight: 600;
+}
+.breadcrumb-sep {
+  color: var(--fg-dim);
+}
+.element-card {
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.element-card:hover {
+  border-color: var(--accent);
+}
+.element-card-preview {
+  background: var(--spectrum-white, #fff);
+  padding: 6px 8px;
+  min-height: 32px;
+  max-height: 120px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+.element-card-preview > * {
+  max-width: 100%;
+  color: var(--canvas-fg-2);
+  margin: 0;
+  padding: 0;
+}
+.element-card-preview > hr {
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--canvas-muted);
+}
+.element-card-preview > input,
+.element-card-preview > textarea,
+.element-card-preview > select,
+.element-card-preview > button,
+.element-card-preview > progress,
+.element-card-preview > meter {
+  font-size: 10px;
+}
+.element-card-label {
+  padding: 2px 6px;
+  font-size: 10px;
+  color: var(--fg-dim);
+  background: var(--bg-input);
+  text-align: center;
+  font-family: var(--font-mono);
+}
+.elements-list {
+  border: none;
+}
+.elements-list sp-accordion-item {
+  --spectrum-accordion-item-header-font-size: var(--spectrum-font-size-50, 11px);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ─── Drop indicator ──────────────────────────── */
+.drop-indicator {
+  display: none;
+  position: absolute;
+  height: 2px;
+  background: var(--accent);
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* ─── Canvas drop indicator ───────────────────── */
+.canvas-drop-indicator {
+  position: absolute;
+  pointer-events: none;
+  z-index: 11;
+}
+.canvas-drop-indicator.line {
+  height: 2px;
+  background: var(--accent);
+}
+.canvas-drop-indicator.inside {
+  border: 2px dashed var(--accent);
+  background: var(--accent-8);
+}
+/* An external file drop over an existing image: "this picture is about to be replaced".
+   Solid, not dashed, so it reads differently from the insert indicator above. */
+.canvas-replace-target {
+  position: absolute;
+  pointer-events: none;
+  z-index: 11;
+  border: 2px solid var(--accent);
+  background: var(--accent-8);
+  border-radius: var(--radius);
+}
+
+/* ─── Git diff highlighting ──────────────────── */
+.element-diff-added {
+  background-color: color-mix(in srgb, var(--success) 15%, transparent);
+  outline: 1px solid var(--success);
+}
+.element-diff-removed {
+  background-color: color-mix(in srgb, var(--danger) 15%, transparent);
+  outline: 1px solid var(--danger);
+}
+.element-diff-modified {
+  background-color: color-mix(in srgb, var(--signal) 15%, transparent);
+  outline: 1px solid var(--signal);
+}
+
+/* ─── Insertion helper ─────────────────────────── */
+.insertion-helper {
+  position: absolute;
+  position-anchor: --jx-insert;
+  z-index: 12;
+  pointer-events: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  background: var(--bg-panel);
+  color: var(--accent);
+  font-size: var(--spectrum-font-size-100, 14px);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+  place-items: center;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.insertion-helper.visible {
+  display: grid;
+  opacity: 1;
+}
+.insertion-helper:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+  transform: scale(1.15);
+}
+/* Line pseudo element — extends beyond button as a visual cue */
+.insertion-helper::before {
+  content: "";
+  position: absolute;
+  background: var(--accent);
+  opacity: 0.5;
+  pointer-events: none;
+  border-radius: 1px;
+}
+/* Horizontal edges (column / block layout) */
+.insertion-helper[data-edge="top"],
+.insertion-helper[data-edge="bottom"] {
+  left: anchor(center);
+  translate: -50% 0;
+}
+.insertion-helper[data-edge="top"] {
+  bottom: anchor(top);
+  translate: -50% 50%;
+}
+.insertion-helper[data-edge="bottom"] {
+  top: anchor(bottom);
+  translate: -50% -50%;
+}
+.insertion-helper[data-edge="top"]::before,
+.insertion-helper[data-edge="bottom"]::before {
+  width: 80px;
+  height: 2px;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  z-index: -1;
+}
+/* Vertical edges (row / inline layout) */
+.insertion-helper[data-edge="left"],
+.insertion-helper[data-edge="right"] {
+  top: anchor(center);
+  translate: 0 -50%;
+}
+.insertion-helper[data-edge="left"] {
+  right: anchor(left);
+  translate: 50% -50%;
+}
+.insertion-helper[data-edge="right"] {
+  left: anchor(right);
+  translate: -50% -50%;
+}
+.insertion-helper[data-edge="left"]::before,
+.insertion-helper[data-edge="right"]::before {
+  height: 80px;
+  width: 2px;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  z-index: -1;
+}
+/* Empty container center */
+.insertion-helper[data-edge="center"] {
+  top: anchor(center);
+  left: anchor(center);
+  translate: -50% -50%;
+}

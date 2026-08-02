@@ -66,6 +66,8 @@ support), waits for the canvas iframe to ack `renderComplete`, then applies acti
     { "do": "openBrowse" }, // open the Manage Files modal
     { "do": "setZoom", "value": 0.9 },
     { "do": "setStatus", "value": "Ready" }, // normalize the status bar text
+    { "do": "run", "id": "view.toggleAssistant" }, // fire a Studio command by id
+    { "do": "run", "id": "state.selectSignal", "args": { "name": "posts" } },
   ],
   "waitFor": [
     // runs AFTER actions (baseline readiness is built in)
@@ -83,6 +85,25 @@ support), waits for the canvas iframe to ack `renderComplete`, then applies acti
   "variants": [{ "suffix": ".light", "theme": "light" }],
 }
 ```
+
+## Addressing the shell: `run`, never a selector
+
+A shot must never name a piece of Studio chrome. `{ "do": "run", "id": "…", "args": { … } }` names a
+**command id** (`<category>.<verb>`) and lets `window.__jxAutomation.run` decide how to fire it; the
+id→handler table lives in `packages/studio/src/services/automation.ts`. Chrome refactors move
+selectors, tab ids and toolbar buttons — they do not move command ids, so a shot survives them and
+`bun run docs:verify` stays green. An unknown id throws inside the page, failing the shot rather
+than quietly capturing the wrong state.
+
+A handful of actions have no programmatic seam yet (context-menu items, a Spectrum picker that only
+opens on a real pointer press, settings sub-navigation). Those live under the `INTERIM selector
+shims` banner in `automation.ts`: the handler resolves the control and hands its selector back, and
+the runner performs a genuine mouse press. Fixing them is a one-file job, and when the command
+registry lands each shim becomes a real handler with **no manifest change**.
+
+Only genuinely low-level input stays selector- or coordinate-addressed: `type`, `hover`,
+`dispatchDragOver`, and the canvas-iframe verbs (`canvasClick`, `canvasType`, `canvasKey`), which
+drive the _preview document_, not the shell.
 
 ## Partial / region captures
 

@@ -1,0 +1,265 @@
+/* Jx Studio — canvas surface.
+   Load after tokens.css, after shell.css.
+
+   Owns the multi-panel canvas frame (#canvas-wrap, .panzoom-wrap,
+   .canvas-panel* and the source/tab bar that sits above it), the
+   content-edit-mode canvas column, the selection/hover/layout overlay
+   boxes drawn over the rendered document, and the unified block action
+   bar plus its link popover. */
+
+/* ─── Canvas (multi-panel) ────────────────────── */
+#canvas-wrap {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.panzoom-wrap {
+  display: inline-flex;
+  gap: 24px;
+  align-items: flex-start;
+  transform-origin: 0 0;
+  margin-block: auto;
+}
+.canvas-panel {
+  flex-shrink: 0;
+}
+.source-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-width: 0;
+}
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+.tab-bar .tb-spacer {
+  flex: 1;
+}
+.tab-bar sp-picker.tab-bar-param {
+  max-width: 200px;
+}
+/* Zoom widget label: fixed floor so the row doesn't jitter as the % digits change. */
+.tab-bar .tb-zoom-label {
+  min-width: 48px;
+  font-family: var(--font-mono);
+}
+.source-editor {
+  flex: 1;
+  min-height: 0;
+}
+/* ─── Content edit mode canvas ─────────────── */
+.content-edit-canvas {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+.content-edit-column {
+  width: 100%;
+  min-height: 100%;
+}
+/* A content PAGE fills the viewport (a document-like surface you can click into below the
+   text). A component DEFINITION is a fragment — flooring its column to the viewport and letting
+   the flex parent vertical-stretch it leaves dead scrollable space below a short component.
+   `is-component` (set by renderCanvas when the doc root is a custom element) makes the column
+   hug its iframe and sit at the top instead. */
+.content-edit-column.is-component {
+  min-height: 0;
+  align-self: flex-start;
+}
+.content-edit-column .canvas-panel.full-width {
+  flex: 1;
+  min-width: 0;
+}
+.content-edit-column .canvas-panel-viewport {
+  border: none;
+  background: transparent;
+}
+.function-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  font-family: var(--font-mono);
+}
+.canvas-panel-header {
+  padding: 4px 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--font-mono);
+}
+.canvas-panel-header.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.canvas-panel-viewport {
+  position: relative;
+  background: var(--spectrum-white, #fff);
+  border: 1px solid var(--border);
+  /* The viewport is a light document surface, so pin a light color-scheme
+     for native form controls and scrollbars rendered inside it. */
+  color-scheme: light;
+}
+.canvas-panel-header.active + .canvas-panel-viewport {
+  border-color: var(--accent);
+}
+.canvas-panel-canvas {
+  isolation: isolate;
+}
+.canvas-panel-canvas * {
+  cursor: default;
+}
+.canvas-panel-canvas slot:empty {
+  display: block;
+  min-height: 3rem;
+  border: 2px dashed var(--spectrum-gray-400, #999);
+  border-radius: var(--radius);
+  position: relative;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(128, 128, 128, 0.03) 10px,
+    rgba(128, 128, 128, 0.03) 20px
+  );
+}
+.canvas-panel-canvas slot:empty::before {
+  content: "slot";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.75rem;
+  color: var(--spectrum-gray-500, #888);
+  font-family: var(--font-mono);
+  pointer-events: none;
+}
+/* Single-canvas fallback (no $media) */
+.canvas-panel.full-width {
+  min-width: 0;
+}
+.overlay-box {
+  position: absolute;
+  pointer-events: none;
+}
+.overlay-selection {
+  border: 2px solid var(--accent);
+}
+.overlay-hover {
+  border: 1px solid var(--accent-50);
+}
+.overlay-layout {
+  border-style: dashed !important;
+  border-color: var(--spectrum-purple-600, #9256d9) !important;
+}
+.overlay-layout-badge {
+  position: absolute;
+  top: -16px;
+  left: 0;
+  font-size: 9px;
+  padding: 1px 5px;
+  background: var(--spectrum-purple-600, #9256d9);
+  color: white;
+  border-radius: var(--radius);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+.overlay-label {
+  position: absolute;
+  top: -20px;
+  left: -2px;
+  padding: 1px 5px;
+  font-size: 10px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: var(--spectrum-corner-radius-75) var(--spectrum-corner-radius-75) 0 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ─── Unified block action bar ─────────────── */
+.block-action-bar {
+  position: fixed;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  padding: 2px 4px;
+  white-space: nowrap;
+  z-index: 100;
+}
+.block-action-bar .bar-tag {
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  color: var(--accent-fg);
+  background: var(--tag);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.block-action-bar .bar-tag--interactive {
+  cursor: pointer;
+}
+.block-action-bar .bar-tag--interactive:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+.block-action-bar .bar-drag-handle {
+  cursor: grab;
+  font-size: var(--spectrum-font-size-100, 14px);
+  padding: 0 4px;
+  opacity: 0.7;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  transform: translateY(1px);
+}
+.block-action-bar .bar-drag-handle:hover {
+  opacity: 1;
+}
+.block-action-bar .bar-drag-handle:active {
+  cursor: grabbing;
+}
+.block-action-bar sp-divider {
+  height: 20px;
+  margin: 0 2px;
+}
+
+.link-popover {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}

@@ -18,6 +18,7 @@
     "dist/workers",
     "index.html",
     "canvas.html",
+    "styles",
     "fonts"
   ],
   "type": "module",

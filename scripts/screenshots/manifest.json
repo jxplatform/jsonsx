@@ -660,8 +660,9 @@
           "value": "Ready"
         },
         {
-          "do": "click",
-          "selector": "sp-tab[value='layers']"
+          "do": "run",
+          "id": "view.toggleActivity",
+          "args": { "tab": "layers" }
         },
         {
           "do": "wait",
@@ -829,8 +830,8 @@
           "value": "Ready"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Right Panel']"
+          "do": "run",
+          "id": "view.toggleRightPanel"
         },
         {
           "do": "wait",
@@ -895,8 +896,9 @@
           "ms": 400
         },
         {
-          "do": "click",
-          "selector": "sp-accordion-item[label='Element']"
+          "do": "run",
+          "id": "inspector.toggleSection",
+          "args": { "section": "Element" }
         },
         {
           "do": "wait",
@@ -1022,8 +1024,8 @@
           "value": "Ready"
         },
         {
-          "do": "click",
-          "selector": ".expr-browse-catalog"
+          "do": "run",
+          "id": "formula.browseCatalog"
         },
         {
           "do": "wait",
@@ -1073,28 +1075,29 @@
           "value": "state"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Right Panel']"
+          "do": "run",
+          "id": "view.toggleRightPanel"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "wait",
           "ms": 600
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"signal-row\")][.//span[contains(@class,\"signal-name\")][normalize-space()=\"toggle0\"]]"
+          "do": "run",
+          "id": "state.selectSignal",
+          "args": { "name": "toggle0" }
         },
         {
           "do": "wait",
           "ms": 400
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Open in formula workspace']"
+          "do": "run",
+          "id": "formula.openWorkspace"
         },
         {
           "do": "wait",
@@ -1135,8 +1138,9 @@
           "ms": 600
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"signal-row\")][.//span[contains(@class,\"signal-name\")][normalize-space()=\"submitRsvp\"]]"
+          "do": "run",
+          "id": "state.selectSignal",
+          "args": { "name": "submitRsvp" }
         },
         {
           "do": "wait",
@@ -1188,8 +1192,8 @@
           "value": "layers"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "select",
@@ -1208,8 +1212,8 @@
           "value": "Ready"
         },
         {
-          "do": "click",
-          "selector": "sp-picker.selector-select"
+          "do": "run",
+          "id": "style.openSelectorMenu"
         },
         {
           "do": "wait",
@@ -1249,8 +1253,8 @@
           "value": "layers"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setStatus",
@@ -1269,8 +1273,8 @@
           "ms": 600
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Convert to Component']"
+          "do": "run",
+          "id": "element.convertToComponent"
         },
         {
           "do": "wait",
@@ -1462,8 +1466,8 @@
           "value": "layers"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setStatus",
@@ -1491,8 +1495,8 @@
           "ms": 500
         },
         {
-          "do": "click",
-          "selector": "xpath///sp-menu-item[normalize-space()=\"Repeat...\"]"
+          "do": "run",
+          "id": "element.repeat"
         },
         {
           "do": "wait",
@@ -1716,8 +1720,8 @@
           "value": "layers"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "select",
@@ -1736,8 +1740,8 @@
           "value": "Ready"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Browse media']"
+          "do": "run",
+          "id": "media.browse"
         },
         {
           "do": "wait",
@@ -1778,8 +1782,8 @@
           "value": "blocks"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setZoom",
@@ -1798,8 +1802,9 @@
           "ms": 400
         },
         {
-          "do": "click",
-          "selector": "sp-accordion-item[label='Element']"
+          "do": "run",
+          "id": "inspector.toggleSection",
+          "args": { "section": "Element" }
         },
         {
           "do": "wait",
@@ -1855,8 +1860,9 @@
           "ms": 400
         },
         {
-          "do": "click",
-          "selector": "sp-accordion-item[label='Element']"
+          "do": "run",
+          "id": "inspector.toggleSection",
+          "args": { "section": "Element" }
         },
         {
           "do": "wait",
@@ -1961,16 +1967,16 @@
           "value": "state"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setZoom",
           "value": 0.8
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Preview resolved values']"
+          "do": "run",
+          "id": "canvas.togglePreview"
         },
         {
           "do": "wait",
@@ -2010,16 +2016,16 @@
           "value": "layers"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setZoom",
           "value": 0.8
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Preview resolved values']"
+          "do": "run",
+          "id": "canvas.togglePreview"
         },
         {
           "do": "wait",
@@ -2055,8 +2061,8 @@
       },
       "actions": [
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Preview resolved values']"
+          "do": "run",
+          "id": "canvas.togglePreview"
         },
         {
           "do": "wait",
@@ -2071,8 +2077,9 @@
           "ms": 1000
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"data-row-header\")][.//span[contains(@class,\"data-name\")][normalize-space()=\"count\"]]"
+          "do": "run",
+          "id": "data.expandRow",
+          "args": { "name": "count" }
         },
         {
           "do": "wait",
@@ -2120,16 +2127,16 @@
           "value": "layers"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setZoom",
           "value": 0.8
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Preview resolved values']"
+          "do": "run",
+          "id": "canvas.togglePreview"
         },
         {
           "do": "wait",
@@ -2181,16 +2188,18 @@
           "ms": 1200
         },
         {
-          "do": "click",
-          "selector": "xpath///button[contains(@class,\"settings-nav-item\")][normalize-space()=\"Content Types\"]"
+          "do": "run",
+          "id": "settings.setSection",
+          "args": { "section": "content" }
         },
         {
           "do": "wait",
           "ms": 700
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"settings-list-panel\")]//sp-action-button[normalize-space()=\"posts\"]"
+          "do": "run",
+          "id": "settings.selectEntry",
+          "args": { "name": "posts" }
         },
         {
           "do": "wait",
@@ -2238,16 +2247,18 @@
           "ms": 1200
         },
         {
-          "do": "click",
-          "selector": "xpath///button[contains(@class,\"settings-nav-item\")][normalize-space()=\"Content Types\"]"
+          "do": "run",
+          "id": "settings.setSection",
+          "args": { "section": "content" }
         },
         {
           "do": "wait",
           "ms": 700
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"settings-list-panel\")]//sp-action-button[normalize-space()=\"posts\"]"
+          "do": "run",
+          "id": "settings.selectEntry",
+          "args": { "name": "posts" }
         },
         {
           "do": "wait",
@@ -2288,8 +2299,8 @@
       "canvasMode": "preview",
       "actions": [
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setActivity",
@@ -2300,17 +2311,17 @@
           "ms": 800
         },
         {
-          "do": "click",
-          "selector": "[data-path='content/posts']",
-          "button": "right"
+          "do": "run",
+          "id": "file.contextMenu",
+          "args": { "path": "content/posts" }
         },
         {
           "do": "wait",
           "ms": 500
         },
         {
-          "do": "click",
-          "selector": "xpath///sp-menu-item[normalize-space()=\"Edit Collection in Grid\"]"
+          "do": "run",
+          "id": "collection.editInGrid"
         },
         {
           "do": "wait",
@@ -2347,8 +2358,8 @@
           "value": "layers"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setZoom",
@@ -2400,8 +2411,9 @@
           "ms": 600
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"signal-row\")][.//span[contains(@class,\"signal-name\")][normalize-space()=\"posts\"]]"
+          "do": "run",
+          "id": "state.selectSignal",
+          "args": { "name": "posts" }
         },
         {
           "do": "wait",
@@ -2449,8 +2461,8 @@
           "value": "layers"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setStatus",
@@ -2469,17 +2481,17 @@
           "ms": 400
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"layer-row\")][.//span[contains(@class,\"layer-label\")][normalize-space()=\"article\"]]",
-          "button": "right"
+          "do": "run",
+          "id": "layers.contextMenu",
+          "args": { "label": "article" }
         },
         {
           "do": "wait",
           "ms": 500
         },
         {
-          "do": "click",
-          "selector": "xpath///sp-menu-item[normalize-space()=\"Repeat...\"]"
+          "do": "run",
+          "id": "element.repeat"
         },
         {
           "do": "wait",
@@ -2512,8 +2524,8 @@
           "value": "layers"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setStatus",
@@ -2532,8 +2544,8 @@
           "ms": 800
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Insert data']"
+          "do": "run",
+          "id": "element.insertData"
         },
         {
           "do": "wait",
@@ -2566,16 +2578,16 @@
           "value": "state"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setZoom",
           "value": 0.8
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Preview resolved values']"
+          "do": "run",
+          "id": "canvas.togglePreview"
         },
         {
           "do": "wait",
@@ -2615,16 +2627,16 @@
           "value": "layers"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "setZoom",
           "value": 0.8
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Preview resolved values']"
+          "do": "run",
+          "id": "canvas.togglePreview"
         },
         {
           "do": "wait",
@@ -2663,16 +2675,18 @@
           "ms": 1200
         },
         {
-          "do": "click",
-          "selector": "xpath///button[contains(@class,\"settings-nav-item\")][normalize-space()=\"Content Types\"]"
+          "do": "run",
+          "id": "settings.setSection",
+          "args": { "section": "content" }
         },
         {
           "do": "wait",
           "ms": 700
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"settings-list-panel\")]//sp-action-button[normalize-space()=\"posts\"]"
+          "do": "run",
+          "id": "settings.selectEntry",
+          "args": { "name": "posts" }
         },
         {
           "do": "wait",
@@ -2716,8 +2730,8 @@
           "value": "Ready"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Right Panel']"
+          "do": "run",
+          "id": "view.toggleRightPanel"
         },
         {
           "do": "setRightTab",
@@ -2860,8 +2874,8 @@
           "value": "Ready"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Right Panel']"
+          "do": "run",
+          "id": "view.toggleRightPanel"
         },
         {
           "do": "setRightTab",
@@ -2940,8 +2954,9 @@
           "ms": 1200
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"settings-list-panel\")]//sp-action-button[normalize-space()=\"comments\"]"
+          "do": "run",
+          "id": "settings.selectEntry",
+          "args": { "name": "comments" }
         },
         {
           "do": "wait",
@@ -2995,8 +3010,9 @@
           "ms": 1200
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"settings-list-panel\")]//sp-action-button[normalize-space()=\"main\"]"
+          "do": "run",
+          "id": "settings.selectEntry",
+          "args": { "name": "main" }
         },
         {
           "do": "wait",
@@ -3041,12 +3057,12 @@
           "value": "files"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Right Panel']"
+          "do": "run",
+          "id": "view.toggleRightPanel"
         },
         {
           "do": "openDataGrid",
@@ -3088,8 +3104,9 @@
           "ms": 600
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"signal-row\")][.//span[contains(@class,\"signal-name\")][normalize-space()=\"allPosts\"]]"
+          "do": "run",
+          "id": "state.selectSignal",
+          "args": { "name": "allPosts" }
         },
         {
           "do": "wait",
@@ -3134,8 +3151,8 @@
           "value": "Ready"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "seedPublish",
@@ -3194,8 +3211,8 @@
           "value": "Ready"
         },
         {
-          "do": "click",
-          "selector": "sp-action-button[title='Toggle Assistant']"
+          "do": "run",
+          "id": "view.toggleAssistant"
         },
         {
           "do": "select",
@@ -3272,8 +3289,9 @@
           "ms": 800
         },
         {
-          "do": "click",
-          "selector": "xpath///div[contains(@class,\"browse-filter-bar\")]//sp-action-button[normalize-space()=\"Media\"]"
+          "do": "run",
+          "id": "project.setBrowseCategory",
+          "args": { "category": "media" }
         },
         {
           "do": "wait",

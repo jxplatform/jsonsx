@@ -3,8 +3,9 @@
  *
  * The studio drives its styling from Spectrum design tokens (`--spectrum-*`) and a thin studio
  * semantic layer (`--bg`, `--accent`, `--radius`, `--font-mono`, …) declared on the `<sp-theme>`
- * element in `index.html`. Raw hex colours bypass that system and stop the UI from responding to
- * the Spectrum theme, so this guard fails (exit 1) when it finds a hard-coded hex that is not:
+ * element in `styles/tokens.css`. Raw hex colours bypass that system and stop the UI from
+ * responding to the Spectrum theme, so this guard fails (exit 1) when it finds a hard-coded hex
+ * that is not:
  *
  * - A fallback inside a token reference: var(--token, #hex)
  * - An explicitly allow-listed brand/structural colour (see ALLOWED_HEX)
@@ -82,7 +83,7 @@ const VENDOR_CLASS_PREFIXES = [
 /**
  * Classes emitted by `src/**` that no stylesheet defines — a **shrinking backlog**, not a
  * configuration knob. Every entry here is a surface held together by inline `style=` attributes
- * instead of the design system; the fix is to give it real CSS in `index.html` and delete the
+ * instead of the design system; the fix is to give it real CSS in `styles/*.css` and delete the
  * entry. The check fails both ways: adding a new orphan fails, and leaving a name here after it has
  * been given a stylesheet rule fails too, so the list can only ratchet down.
  *
@@ -633,6 +634,21 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     }
   }
 
+  /*
+   * The studio chrome stylesheet: `styles/tokens.css` plus the five region files that used to be
+   * one `<style>` block inside index.html. They are real chrome CSS, so they carry both roles the
+   * inline block did — definition source for the orphan rule, and subject of the hex/px rules.
+   */
+  for await (const rel of new Glob("styles/*.css").scan(root)) {
+    const source = await read(rel);
+    const { errors, warnings } = scanHex(rel, source);
+    hexErrors.push(...errors);
+    pxWarnings.push(...warnings);
+    for (const name of extractDefinedClasses(source)) {
+      defined.add(name);
+    }
+  }
+
   for await (const rel of new Glob("src/**/*.css").scan(root)) {
     for (const name of extractDefinedClasses(await read(rel))) {
       defined.add(name);
@@ -713,7 +729,7 @@ export function report(result: StyleCheckResult): number {
   if (orphans.length > 0) {
     console.error(
       `\n❌ ${orphans.length} class(es) emitted by src/ that no stylesheet defines. ` +
-        `Give them rules in index.html rather than inline style= attributes.`,
+        `Give them rules in styles/*.css rather than inline style= attributes.`,
     );
     for (const o of orphans) {
       console.error(`   ${o.text}  (${o.file}:${o.line})`);

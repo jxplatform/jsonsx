@@ -17,10 +17,21 @@ import type { ClipSpec, ResolvedShot, ShotAction, WaitCondition } from "./types"
  */
 const DIFF_THRESHOLD = 0.01;
 
+/**
+ * What `__jxAutomation.run` hands back. An empty object means the command executed in-page and the
+ * runner is done. A `click` means the command has no programmatic seam yet (see the INTERIM banner
+ * in packages/studio/src/services/automation.ts) and the runner must press the resolved control
+ * with a real mouse — the selector lives in the automation table, never in the manifest.
+ */
+interface AutomationRunResult {
+  click?: { button?: "left" | "right"; selector: string };
+}
+
 declare global {
   interface Window {
     __jxAutomation: {
       [method: string]: (...args: unknown[]) => unknown;
+      run: (id: string, args?: Record<string, unknown>) => AutomationRunResult;
       waitForCanvasReady: (timeoutMs?: number) => Promise<void>;
     };
   }
@@ -114,6 +125,20 @@ function canvasFrame(page: Page): Frame {
 
 async function runAction(page: Page, action: ShotAction): Promise<void> {
   switch (action.do) {
+    case "run": {
+      const result = (await page.evaluate(
+        (id, args) => window.__jxAutomation.run(id, args),
+        action.id,
+        action.args ?? {},
+      )) as AutomationRunResult;
+      if (result?.click) {
+        await page.click(
+          result.click.selector,
+          result.click.button ? { button: result.click.button } : {},
+        );
+      }
+      return;
+    }
     case "click": {
       await page.click(action.selector, action.button ? { button: action.button } : {});
       return;

@@ -1,0 +1,604 @@
+/* Jx Studio — inspector.
+   Load after tokens.css, after shell.css, canvas.css and panels.css.
+
+   Owns everything rendered inside the inspector rail: the field list, the
+   key-value style editor, the Spectrum-accordion style sidebar and its
+   grid Size panel, the signals tab, the data explorer, the binding toggle
+   and the events section. */
+
+/* ─── Inspector ──────────────────────────────── */
+.inspector-fields {
+  padding: 4px 8px 8px;
+}
+.inspector-fields.hidden {
+  display: none;
+}
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.field-label {
+  width: 80px;
+  flex-shrink: 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.field-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+}
+.field-input:focus {
+  border-color: var(--accent);
+}
+.field-input[type="checkbox"] {
+  width: auto;
+  flex: none;
+}
+textarea.field-input {
+  resize: vertical;
+  min-height: 60px;
+  font-family: var(--font-mono);
+}
+/* Spectrum components inside field rows */
+.field-row sp-textfield,
+.field-row sp-picker {
+  flex: 1;
+  min-width: 0;
+}
+.field-row sp-textfield {
+  --spectrum-textfield-height: 26px;
+}
+.field-row sp-picker {
+  --spectrum-picker-min-width: 0;
+}
+.field-row sp-checkbox {
+  flex: none;
+}
+.field-row sp-field-label {
+  width: 80px;
+  flex-shrink: 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  text-align: right;
+}
+.signal-editor .field-row sp-field-label {
+  width: 65px;
+  font-size: 10px;
+}
+.signal-editor .field-row sp-textfield {
+  --spectrum-textfield-height: 24px;
+}
+
+/* ─── Style editor (key-value list) ──────────── */
+.kv-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+.kv-key {
+  width: 90px;
+  flex-shrink: 0;
+}
+.kv-val {
+  flex: 1;
+  min-width: 0;
+}
+.kv-del {
+  width: 20px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 24px;
+}
+.kv-add {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  cursor: pointer;
+  color: var(--accent);
+}
+.kv-add:hover {
+  text-decoration: underline;
+}
+
+/* ─── Style sidebar (Spectrum accordion) ──────── */
+.style-sidebar sp-accordion {
+  border: none;
+}
+.style-sidebar sp-accordion-item {
+  --spectrum-accordion-item-header-font-size: var(--spectrum-font-size-50, 11px);
+}
+.style-sidebar sp-accordion-item [slot="heading"] {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.style-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 2px 0;
+}
+.style-row--child {
+  padding-left: 16px;
+}
+/* removed: .style-row--horizontal — all rows use top labels now */
+.style-row-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--fg-dim);
+}
+.set-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.set-dot:hover {
+  background: var(--danger);
+}
+.set-dot--section {
+  width: 7px;
+  height: 7px;
+}
+.style-row--warning .style-row-label {
+  color: var(--warning);
+}
+.style-row--warning .style-row-label::before {
+  content: "⚠ ";
+}
+.style-row > sp-textfield,
+.style-row > sp-number-field,
+.style-row > sp-picker,
+.style-row > sp-combobox,
+.style-row > textarea {
+  width: 100%;
+}
+.style-input-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.style-input-color sp-swatch {
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.style-input-color sp-textfield {
+  flex: 1;
+  min-width: 0;
+}
+.color-popover-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 200px;
+  overflow: hidden;
+}
+.color-popover-inner sp-textfield {
+  width: 100%;
+}
+.color-popover-swatches-label {
+  font-size: 10px;
+  color: var(--spectrum-gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.color-popover-inner sp-swatch-group {
+  --mod-swatch-border-color: var(--spectrum-gray-400);
+}
+.font-token-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.font-token-preview {
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1.3;
+}
+.font-token-name {
+  font-size: 9px;
+  color: var(--spectrum-gray-600);
+  font-family: monospace;
+}
+/* jx-styled-combobox — dual-mode styled combobox component */
+jx-styled-combobox {
+  display: contents;
+}
+jx-styled-combobox sp-picker {
+  width: 100%;
+}
+.jx-combobox-group {
+  display: inline-flex;
+  position: relative;
+  width: 100%;
+}
+.jx-combobox-group sp-textfield {
+  flex: 1 1 auto;
+  min-width: 0;
+  --mod-textfield-border-start-end-radius: 0;
+  --mod-textfield-border-end-end-radius: 0;
+  margin-inline-end: calc(-1 * var(--spectrum-border-width-100, 1px));
+}
+.jx-combobox-group sp-picker-button {
+  flex: 0 0 auto;
+  --mod-picker-button-border-start-start-radius: 0;
+  --mod-picker-button-border-end-start-radius: 0;
+  --mod-picker-button-border-color: var(--spectrum-gray-400);
+}
+/* Number-unit compound input: textfield + picker-button */
+.style-input-number-unit {
+  flex: 1;
+  min-width: 0;
+}
+/* Combobox-like composite: textfield + picker-button, matching sp-combobox visually */
+.input-group {
+  display: inline-flex;
+  position: relative;
+  width: 100%;
+}
+.input-group sp-textfield {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Zero out the inline-end corners so the textfield abuts the picker-button */
+  --mod-textfield-border-start-end-radius: 0;
+  --mod-textfield-border-end-end-radius: 0;
+  /* Pull textfield's border into the picker-button so they share one line */
+  margin-inline-end: calc(-1 * var(--spectrum-border-width-100, 1px));
+}
+.input-group sp-picker-button {
+  flex: 0 0 auto;
+  /* Zero out the inline-start corners to abut the textfield */
+  --mod-picker-button-border-start-start-radius: 0;
+  --mod-picker-button-border-end-start-radius: 0;
+  --mod-picker-button-border-color: var(--spectrum-gray-400);
+}
+.input-group.is-expression sp-picker-button {
+  display: none;
+}
+.input-group.is-expression sp-textfield {
+  --mod-textfield-text-color-default: var(--spectrum-accent-color-800);
+  --mod-textfield-border-start-end-radius: var(--spectrum-corner-radius-100);
+  --mod-textfield-border-end-end-radius: var(--spectrum-corner-radius-100);
+  margin-inline-end: 0;
+}
+.style-shorthand-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.style-shorthand-header sp-textfield {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Button-group + overflow picker-button combo */
+.button-group-combo {
+  display: inline-flex;
+  align-items: stretch;
+}
+.button-group-combo.has-overflow sp-action-group {
+  --mod-actionbutton-border-radius: 0;
+}
+.button-group-combo sp-picker-button {
+  flex: 0 0 auto;
+  --mod-picker-button-border-start-start-radius: 0;
+  --mod-picker-button-border-end-start-radius: 0;
+  --mod-picker-button-border-color: var(--spectrum-gray-400);
+  margin-inline-start: calc(-1 * var(--spectrum-border-width-100, 1px));
+}
+.button-group-combo sp-picker-button.has-selection {
+  --mod-picker-button-background-color: var(--spectrum-accent-background-color-default);
+}
+
+/* ─── Grid section layout (Size panel) ─── */
+.style-section-body--grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px 8px;
+}
+.style-section-body--grid .style-row {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ─── Signals tab ────────────────────────────── */
+.signal-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  user-select: none;
+}
+.signal-row:hover {
+  background: var(--hover-bg);
+}
+.signal-row.expanded {
+  background: var(--accent-10);
+  border-left-color: var(--accent);
+}
+.signal-badge {
+  padding: 0 4px;
+  font-size: 10px;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 18px;
+  text-align: center;
+}
+.signal-badge.state {
+  background: color-mix(in srgb, var(--signal) 25%, transparent);
+  color: var(--signal);
+}
+.signal-badge.computed {
+  background: color-mix(in srgb, var(--success) 25%, transparent);
+  color: var(--success);
+}
+.signal-badge.data {
+  background: color-mix(in srgb, var(--tag) 25%, transparent);
+  color: var(--tag);
+}
+.signal-badge.handler {
+  background: color-mix(in srgb, var(--handler) 25%, transparent);
+  color: var(--handler);
+}
+.signal-name {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-50, 11px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.signal-hint {
+  font-size: 10px;
+  color: var(--fg-dim);
+  flex-shrink: 0;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.signal-del {
+  visibility: hidden;
+  cursor: pointer;
+  color: var(--danger);
+  font-size: var(--spectrum-font-size-50, 11px);
+  flex-shrink: 0;
+}
+.signal-row:hover .signal-del {
+  visibility: visible;
+}
+.signal-editor {
+  padding: 4px 8px 8px 26px;
+  border-bottom: 1px solid var(--border);
+}
+/* Signals panel accordion (matches style-sidebar pattern) */
+.signals-panel sp-accordion {
+  border: none;
+}
+.signals-panel sp-accordion-item {
+  --spectrum-accordion-item-header-font-size: var(--spectrum-font-size-50, 11px);
+}
+.signals-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+/* ─── Data explorer ──────────────────────────── */
+.data-explorer-toolbar {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+.data-refresh-btn {
+  font-size: var(--spectrum-font-size-50, 11px);
+  padding: 2px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--fg);
+  cursor: pointer;
+}
+.data-refresh-btn:hover {
+  border-color: var(--accent);
+}
+.data-row {
+  border-bottom: 1px solid var(--border);
+}
+.data-row-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.data-row-header:hover {
+  background: var(--hover-bg);
+}
+.data-row-header::before {
+  content: "\25B6";
+  font-size: 8px;
+  color: var(--fg-dim);
+  transition: transform 0.15s;
+}
+.data-row-header.expanded::before {
+  transform: rotate(90deg);
+}
+.data-name {
+  flex: 1;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--spectrum-font-size-50, 11px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.data-type {
+  font-size: 10px;
+  color: var(--fg-dim);
+  flex-shrink: 0;
+}
+.data-tree {
+  padding: 2px 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.data-leaf,
+.data-branch {
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-family: var(--font-mono, monospace);
+  padding: 1px 8px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.data-key {
+  color: var(--data-key);
+}
+.data-value {
+  color: var(--fg);
+}
+.data-null {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+.data-string {
+  color: var(--data-string);
+}
+.data-number {
+  color: var(--data-number);
+}
+.data-boolean {
+  color: var(--data-boolean);
+}
+.data-object-label {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+.data-ellipsis {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+.data-pending {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.field-check {
+  width: auto;
+  margin: 0;
+}
+
+/* ─── Binding toggle ─────────────────────────── */
+.bind-toggle {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--spectrum-font-size-50, 11px);
+  cursor: pointer;
+  color: var(--fg-dim);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  flex-shrink: 0;
+}
+.bind-toggle:hover {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+.bind-toggle.bound {
+  color: var(--accent);
+}
+
+/* ─── Events section ─────────────────────────── */
+.events-panel {
+  padding: 8px;
+}
+.events-section {
+  margin-bottom: 8px;
+}
+.declared-event-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.event-code {
+  font-family: monospace;
+  color: var(--accent);
+}
+.event-source {
+  color: var(--fg-dim);
+  font-size: 10px;
+}
+.event-type {
+  margin-left: auto;
+  color: var(--fg-dim);
+  font-size: 10px;
+}
+.event-binding {
+  margin-bottom: 8px;
+}
+.event-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.event-name {
+  flex: 1;
+  min-width: 0;
+}
+.event-mode {
+  width: 72px;
+  flex-shrink: 0;
+}
+.event-handler {
+  width: 100%;
+}
+.event-body-row {
+  display: flex;
+  gap: 4px;
+  align-items: start;
+  margin-top: 3px;
+}
+.event-body-row sp-textfield {
+  flex: 1;
+  font-size: var(--spectrum-font-size-50, 11px);
+}
