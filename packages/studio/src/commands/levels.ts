@@ -19,8 +19,11 @@
  * applies the same check at registration so a violation cannot reach a running app either.
  *
  * Panel placements (the two rail groups, the navigator dock body, the bottom dock, the inspector
- * dock) are part of the same matrix in `studio-ui-guidelines.md` §12 but are not listed here: they
- * admit Panel records, and `registerPanel()` does not exist yet. They join this file with it.
+ * dock) are part of the same matrix in `studio-ui-guidelines.md` §12 and live here too, in
+ * {@link PANEL_PLACEMENT_MATRIX}: `registerPanel()` (`panels/panel-registry.ts`) now exists, so a
+ * Panel record declares a `level` for the same reason a Command does and is checked the same way.
+ * The two tables are separate because their placement VOCABULARIES are disjoint — a command is
+ * never "in the rail's upper group", and a panel is never "in the block action bar".
  */
 
 /** Containment level — WHAT a record acts on. Governs placement. CI-checked. */
@@ -112,6 +115,141 @@ export const PLACEMENT_MATRIX: Readonly<Record<Placement, PlacementRule>> = {
     note: "keyboard- and API-only; no rendered surface to be misplaced in",
   },
 };
+
+// ─── Panels ───────────────────────────────────────────────────────────────────
+
+/**
+ * Every surface a Panel record may occupy.
+ *
+ * The rail's two level groups are SEPARATE placements, not one "mixed" region — principle 2's whole
+ * point. `navigator` is the dock body below them, which hosts whichever panel the rail selected and
+ * prints that panel's level in its header, so it is the one panel placement admitting two levels.
+ */
+export const PANEL_PLACEMENTS = [
+  "rail/project",
+  "rail/document",
+  "navigator",
+  "inspector",
+  "dock.bottom",
+] as const;
+
+export type PanelPlacement = (typeof PANEL_PLACEMENTS)[number];
+
+/**
+ * The level × placement matrix for Panel records — normative copy, mirrored into
+ * `studio-ui-guidelines.md` §12 beside {@link PLACEMENT_MATRIX}.
+ *
+ * The rail rows are what stop it re-accreting: a panel cannot be filed in the PROJECT group because
+ * "it feels project-ish", only because the state it WRITES is the project's (principle 3).
+ */
+export const PANEL_PLACEMENT_MATRIX: Readonly<Record<PanelPlacement, PlacementRule>> = {
+  "rail/project": {
+    admits: ["project"],
+    note: "the rail's upper group — Files, Search, Source Control, Problems",
+  },
+  "rail/document": {
+    admits: ["document"],
+    note: "the rail's lower group — Outline, Page, Data, Packages",
+  },
+  navigator: {
+    admits: ["project", "document"],
+    note: "whichever level the hosted panel declares; the panel header prints it",
+  },
+  inspector: { admits: ["selection"], note: "the Inspector's tabs are selection surfaces" },
+  "dock.bottom": { admits: ["project", "document"], note: "the panel header states which" },
+};
+
+/** The subset of a Panel record this check reads. */
+export interface PlaceablePanel {
+  id: string;
+  level: Level;
+  /** The dock hosting the panel's body. */
+  dock: "navigator" | "inspector" | "bottom";
+  /** `false` for a panel with no rail button — it declares no rail-group placement. */
+  rail?: boolean | undefined;
+}
+
+/** One rejected (panel, placement) pair. Shaped like {@link PlacementViolation}, keyed by panel. */
+export interface PanelPlacementViolation {
+  panelId: string;
+  placement: string;
+  level: string;
+  message: string;
+}
+
+/** The dock body placement a panel's `dock` names. */
+function dockPlacement(dock: PlaceablePanel["dock"]): PanelPlacement {
+  return dock === "bottom" ? "dock.bottom" : dock;
+}
+
+/**
+ * Every placement a Panel record occupies: its dock body, plus its rail group when it has a button.
+ *
+ * The rail group is DERIVED from the level rather than declared, which is what makes "grouped by
+ * level with a divider" (§3.2 ②) a property of the data instead of an ordering convention in the
+ * rail's template. A rail panel whose level has no group (`application`, `selection`) therefore
+ * names a placement the matrix does not contain, and is rejected below.
+ */
+export function panelPlacements(panel: PlaceablePanel): string[] {
+  const placements: string[] = [dockPlacement(panel.dock)];
+  if (panel.rail !== false) {
+    placements.push(`rail/${panel.level}`);
+  }
+  return placements;
+}
+
+/** Whether `value` is one of the {@link PANEL_PLACEMENTS}. */
+export function isPanelPlacement(value: string): value is PanelPlacement {
+  return (PANEL_PLACEMENTS as readonly string[]).includes(value);
+}
+
+/** Check one Panel record against {@link PANEL_PLACEMENT_MATRIX}. */
+export function checkPanelPlacement(panel: PlaceablePanel): PanelPlacementViolation[] {
+  const violations: PanelPlacementViolation[] = [];
+  if (!isLevel(panel.level)) {
+    violations.push({
+      panelId: panel.id,
+      placement: "—",
+      level: String(panel.level),
+      message:
+        `declares unknown level "${String(panel.level)}" ` +
+        `(expected one of: ${LEVELS.join(", ")})`,
+    });
+    return violations;
+  }
+  for (const placement of panelPlacements(panel)) {
+    if (!isPanelPlacement(placement)) {
+      violations.push({
+        panelId: panel.id,
+        placement,
+        level: panel.level,
+        message:
+          `is level "${panel.level}" and would render in "${placement}", which is not a panel ` +
+          `placement — the rail has a group for project and one for document, and nothing else`,
+      });
+      continue;
+    }
+    const rule = PANEL_PLACEMENT_MATRIX[placement];
+    if (!rule.admits.includes(panel.level)) {
+      violations.push({
+        panelId: panel.id,
+        placement,
+        level: panel.level,
+        message:
+          `is level "${panel.level}" but "${placement}" admits only ` +
+          `${rule.admits.join(", ")} — ${rule.note}`,
+      });
+    }
+  }
+  return violations;
+}
+
+/** Check a whole panel set. Empty result = the set satisfies the matrix. */
+export function checkPanelPlacements(panels: readonly PlaceablePanel[]): PanelPlacementViolation[] {
+  return panels.flatMap((panel) => checkPanelPlacement(panel));
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
 
 /** The subset of a command record the placement check needs. */
 export interface PlaceableRecord {

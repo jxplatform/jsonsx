@@ -25,8 +25,56 @@ import type { CommandContext } from "./context";
 /** Which dock a toggle addresses. Mirrors the three dock toggles in the Command Bar. */
 export type DockId = "navigator" | "inspector" | "bottom";
 
-/** Palette modes, echoed as a removable chip in the input (plan §5.4). */
-export type PaletteMode = "picker" | "files" | "commands" | "nodes" | "signals";
+/**
+ * Palette modes, echoed as a removable chip in the input (plan §5.4).
+ *
+ * The value space is the palette's namespace, declared once here so a new mode is a new member
+ * rather than a new widget: P4's Problems and P7's content search slot in beside these.
+ */
+export type PaletteMode = "picker" | "files" | "commands" | "nodes" | "projects";
+
+/**
+ * One Navigator panel, as the ⌘1–8 direct keys address it.
+ *
+ * Structurally the part of `panels/panel-registry.ts`'s `PanelRecord` a chord needs, declared here
+ * rather than imported so this module keeps its one load-bearing property: it imports no state and
+ * no DOM, which is what lets the three CI checks load the command set in a bare Bun process. The
+ * ROSTER arrives by injection ({@link CommandDeps.navigatorPanels}) from the panel registry, so
+ * there is still exactly one place a panel is named.
+ */
+export interface RailPanel {
+  /** The stored `shell.leftTab` value. */
+  id: string;
+  /** The panel's human name, which is also the command's title after "Show ". */
+  title: string;
+  /** `false` for a panel with no rail button — reachable by name, not by number. */
+  rail?: boolean;
+  /** The panel's own visibility predicate, composed into the command's. */
+  when?: (ctx: CommandContext) => boolean;
+}
+
+/** How many rail panels get a ⌘N. §3.2 ② spends exactly this many slots, four per level group. */
+export const RAIL_CHORD_LIMIT = 8;
+
+/**
+ * The Inspector's four tabs, in the order §3.2 ⑨ names them — which is the order ⌘⇧1–4 follow.
+ *
+ * `"assistant"` is a different dock (it is the Inspector's second instance until P3.6 folds the
+ * column in), so it is not one of `shell.ts`'s `INSPECTOR_TAB_IDS`; the chord still belongs in the
+ * same run of four, because a user counting tabs does not know that.
+ */
+export interface InspectorTab {
+  /** The stored `session.ui.rightTab` value, or `"assistant"` for the assistant dock. */
+  id: string;
+  title: string;
+}
+
+export const INSPECTOR_TABS: readonly InspectorTab[] = [
+  { id: "properties", title: "Content" },
+  { id: "style", title: "Style" },
+  { id: "events", title: "Logic" },
+  { id: "assistant", title: "Assistant" },
+];
 
 /**
  * Everything the default command set needs from the rest of Studio.
@@ -47,6 +95,23 @@ export interface CommandDeps {
   toggleZen: () => void;
   openPalette: (mode: PaletteMode) => void;
   openProject: () => void | Promise<void>;
+  /**
+   * The Navigator's panels, in rail order — the roster ⌘1–8 is generated from.
+   *
+   * Injected rather than declared here so the panel registry stays the one place a panel is named,
+   * levelled and gated. An empty roster (the no-op deps) simply yields no `panel.focus.*` records.
+   */
+  navigatorPanels: readonly RailPanel[];
+  /**
+   * Toggle-FOCUS a Navigator panel (plan §5.3): reveal it and take focus, or — when it already has
+   * focus — collapse the dock and hand focus back to the pane. Deliberately not toggle-visible: ⌘1
+   * pressed from the canvas must land you in Files, not close it.
+   */
+  focusPanel: (panelId: string) => void;
+  /** Show an Inspector tab and focus the dock. `"assistant"` addresses the assistant dock. */
+  focusInspectorTab: (tabId: string) => void;
+  /** F6 / ⇧F6 — move focus to the next (or previous) shell region. */
+  cycleRegion: (direction: 1 | -1) => void;
 }
 
 /** A dependency set whose verbs do nothing — what the CI checks load the records with. */
@@ -64,6 +129,10 @@ export function noopCommandDeps(): CommandDeps {
     toggleZen: () => {},
     openPalette: () => {},
     openProject: () => {},
+    navigatorPanels: [],
+    focusPanel: () => {},
+    focusInspectorTab: () => {},
+    cycleRegion: () => {},
   };
 }
 
@@ -206,7 +275,10 @@ export function defaultCommands(deps: CommandDeps): AnyCommand[] {
       category: "Selection",
       level: "selection",
       keyScope: "canvas",
-      keybinding: "escape",
+      // Two spellings of ONE action, in the record rather than in a second `keymap.add` call beside
+      // The registration — which is what `editor/shortcuts.ts` had to do while this file was another
+      // Workstream's, and is exactly the second definition site the registry exists to prevent.
+      keybinding: ["escape", "arrowleft"],
       menus: ["palette"],
       group: "2_navigate",
       when: hasSelection,
@@ -288,6 +360,18 @@ export function defaultCommands(deps: CommandDeps): AnyCommand[] {
       run: () => deps.openPalette("commands"),
     },
 
+    {
+      id: "palette.openNodes",
+      title: "Go to Symbol in Document…",
+      category: "Selection",
+      level: "document",
+      menus: ["palette"],
+      group: "5_palette",
+      when: documentOpen,
+      requires: "an open document",
+      run: () => deps.openPalette("nodes"),
+    },
+
     // ── Project ──
     {
       id: "project.open",
@@ -299,8 +383,94 @@ export function defaultCommands(deps: CommandDeps): AnyCommand[] {
       group: "1_file",
       run: () => deps.openProject(),
     },
+    {
+      // The no-project palette stops being a hidden domain swap on `!projectState` and becomes a
+      // NAMED mode that works either way (plan §5.4) — same trigger, same chrome, stated feature.
+      id: "project.openRecent",
+      title: "Open Recent…",
+      category: "Project",
+      level: "project",
+      menus: ["commandbar/overflow", "statusbar/project", "palette"],
+      group: "1_file",
+      run: () => deps.openPalette("projects"),
+    },
+
+    // ── Direct keys (plan §5.3) ──
+    ...panelFocusCommands(deps),
+    ...inspectorFocusCommands(deps),
+    {
+      id: "view.cycleRegion",
+      title: "Focus Next Region",
+      category: "View",
+      level: "application",
+      keybinding: "f6",
+      menus: ["palette"],
+      group: "4_docks",
+      run: () => deps.cycleRegion(1),
+    },
+    {
+      id: "view.cycleRegionBack",
+      title: "Focus Previous Region",
+      category: "View",
+      level: "application",
+      keybinding: "shift+f6",
+      menus: ["palette"],
+      group: "4_docks",
+      run: () => deps.cycleRegion(-1),
+    },
   ];
   return commands;
+}
+
+/**
+ * ⌘1–8 — one record per rail panel, generated from {@link RAIL_PANELS}.
+ *
+ * Generated rather than written out eight times for the reason the whole registry exists: the rail,
+ * the chord, the palette row and the generated shortcut sheet are then four renderings of one list.
+ * Only the first eight get a chord; a ninth panel keeps its name and its palette row, which is the
+ * cost §2 principle 9 puts on chrome.
+ */
+export function panelFocusCommands(deps: CommandDeps): AnyCommand[] {
+  let chordsSpent = 0;
+  return deps.navigatorPanels.map((panel) => {
+    const command: AnyCommand = {
+      id: `panel.focus.${panel.id}`,
+      title: `Show ${panel.title}`,
+      category: "View",
+      // Application, like `view.setActivity`: revealing a panel arranges the workspace. What the
+      // PANEL acts on is the panel record's own level, and that is `registerPanel()`'s field.
+      level: "application",
+      menus: ["palette"],
+      group: "4_docks",
+      requires: "an open project",
+      // The panel's OWN `when` composes in, so a declared-but-unbuilt surface (Search, Problems)
+      // Has no palette row and no live chord — the record exists, the affordance does not.
+      when: (ctx: CommandContext) => ctx.project.open && (panel.when?.(ctx) ?? true),
+      run: () => deps.focusPanel(panel.id),
+    };
+    if (panel.rail !== false && chordsSpent < RAIL_CHORD_LIMIT) {
+      chordsSpent += 1;
+      command.keybinding = `mod+${chordsSpent}`;
+    }
+    return command;
+  });
+}
+
+/** ⌘⇧1–4 — one record per Inspector tab, generated from {@link INSPECTOR_TABS}. */
+export function inspectorFocusCommands(deps: CommandDeps): AnyCommand[] {
+  return INSPECTOR_TABS.map((tab, index) => {
+    const command: AnyCommand = {
+      id: `inspector.focus.${tab.id}`,
+      title: `Show ${tab.title}`,
+      category: "View",
+      level: "application",
+      keybinding: `mod+shift+${index + 1}`,
+      menus: ["palette"],
+      group: "4_docks",
+      run: () => deps.focusInspectorTab(tab.id),
+    };
+    return command;
+  });
 }
 
 /**

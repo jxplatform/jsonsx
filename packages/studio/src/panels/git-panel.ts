@@ -19,6 +19,7 @@ import type { GitLogEntry } from "../shell";
 import { showConfirmDialog, showPromptDialog } from "../ui/layers";
 import { POLL_GIT } from "../ui/timing";
 import { renderEmptyState } from "./empty-state";
+import { registerPanel } from "./panel-registry";
 import { statusMessage } from "./statusbar";
 import { publishToGithub } from "../github/github-publish";
 import { pullWithPackageSync } from "../packages/pull-package-sync";
@@ -797,4 +798,27 @@ export function cleanupGitPanel() {
     clearInterval(_pollTimer);
     _pollTimer = null;
   }
+}
+
+/**
+ * Contribute the Source Control panel.
+ *
+ * `level: "project"` — a branch, a working tree and a commit belong to the repository, not to
+ * whichever document happens to be focused. That is why the badge below reads `ctx.git.dirtyCount`
+ * (sourced from the hoisted `shell.git` record) and why this panel's render ignores `ctx.doc`
+ * entirely: the count used to come from `activeTab.session.ui.gitStatus`, so it vanished when the
+ * last tab closed and two tabs could disagree about the branch.
+ */
+export function registerGitPanel(): void {
+  registerPanel({
+    id: "git",
+    title: "Source Control",
+    level: "project",
+    dock: "navigator",
+    icon: "sp-icon-git-branch",
+    badge: (ctx) => ctx.git.dirtyCount || null,
+    // Through `deps`, not the local binding: `studio.ts` owns the wiring (the clone action and the
+    // Diff-state setter come from the bootstrap), and the Navigator has injected it all along.
+    render: (ctx) => ctx.deps.renderGitPanel(ctx.deps),
+  });
 }

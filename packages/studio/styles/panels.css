@@ -11,23 +11,72 @@
    Also owns the teaching empty-state layout emitted by
    src/panels/empty-state.ts, which every panel in the shell renders through. */
 
-/* ─── Activity bar (vertical icon tabs) ──────── */
-#activity-bar sp-tabs {
-  --mod-tabs-item-horizontal-spacing: 0px;
-  --mod-tabs-start-to-tab-item: 0px;
-  --mod-tabs-color: var(--fg-dim);
-  --mod-tabs-color-selected: var(--fg);
+/* ─── Navigator rail (labelled, grouped by level) ──────── */
+/* 56px, and every button names itself in 11px text under its icon. An icon whose only name is a
+   hover tooltip is not named (spec §12 region ②) — there were thirteen of those. */
+.rail-groups {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
 }
-#activity-bar sp-tab {
+.rail-group {
+  display: flex;
+  flex-direction: column;
+}
+/* The divider IS the level boundary: PROJECT above, DOCUMENT below. */
+.rail-divider {
+  height: 1px;
+  margin: 6px 10px;
+  background: var(--border);
+}
+.rail-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0;
+}
+.rail-item {
   position: relative;
-  width: 48px;
-  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 2px;
+  border: none;
+  border-left: 2px solid transparent;
+  background: none;
+  color: var(--fg-dim);
+  cursor: pointer;
+  opacity: 0.7;
+}
+.rail-item:hover {
+  opacity: 1;
+  background: var(--hover-bg);
+}
+.rail-item.selected {
+  opacity: 1;
+  color: var(--fg);
+  border-left-color: var(--accent);
+}
+.rail-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.rail-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--fg-dim);
-  opacity: 0.6;
-  margin: 0;
+  height: 20px;
+}
+.rail-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1.2;
 }
 .activity-badge {
   position: absolute;
@@ -46,12 +95,33 @@
   justify-content: center;
   pointer-events: none;
 }
-#activity-bar sp-tab:hover {
-  opacity: 1;
+/* ─── Panel header (title · level) ────────────── */
+/* Every Navigator panel renders under one. Six of eight had no header at all, so nothing on
+   screen said which panel you were in — or, for Packages, which of its two meanings it had. */
+.panel-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
 }
-#activity-bar sp-tab[selected] {
+.panel-header-title {
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--fg);
-  opacity: 1;
+}
+.panel-header-level::before {
+  content: "·";
+  margin-right: 6px;
+}
+.panel-header-level {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.panel-content {
+  min-height: 0;
 }
 
 /* ─── Panel tabs (right: horizontal icon tabs) ── */

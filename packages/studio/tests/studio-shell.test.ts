@@ -8,6 +8,7 @@
  * then drive directly.
  */
 import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { nothing } from "lit-html";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import {
   activateTab,
@@ -154,6 +155,16 @@ void mock.module("../src/editor/shortcuts.ts", () => ({
 }));
 
 void mock.module("../src/panels/block-action-bar.ts", () => ({
+  // The Outline's row actions render through `commandIcon`, and the Navigator now reaches
+  // Layers through the panel registry, so the mock has to carry it.
+  // The Outline's row actions render through these, and the Navigator now reaches Layers
+  // Through the panel registry, so the mock has to carry them.
+  commandIcon: mock(() => nothing),
+  commandTooltip: mock(() => ""),
+  runCommand: mock(() => {}),
+  selectionCommandRegistry: mock(() => ({ forPlacement: () => [] })),
+  showCommandOverflow: mock(() => {}),
+  withCommandTarget: mock((_path: unknown, fn: () => void) => fn()),
   dismissBlockActionBar: mock(() => {}),
   dismissLinkPopover: mock(() => {}),
   initBlockActionBar: (ctx: unknown) => {

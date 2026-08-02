@@ -24,10 +24,11 @@ import { renderFieldRow } from "../ui/field-row";
 import { rawTextArea, spTextField } from "../ui/field-input";
 import { expressionHint, renderExpressionEditor } from "../ui/expression-editor";
 import { renderEmptyState } from "./empty-state";
+import { registerPanel } from "./panel-registry";
 import { renderStatementEditor } from "./statement-editor";
 import { livePreviewExpression } from "../services/live-preview";
 import { renderMediaPicker } from "../ui/media-picker";
-import { renderOnly } from "../store";
+import { renderOnly, updateSession } from "../store";
 import { registerFormControl, renderForm } from "../ui/schema-form";
 import { resolveContextPointer } from "../services/context-resolver";
 import type { JsonSchema } from "../ui/schema-form";
@@ -1740,4 +1741,30 @@ export function signalsCommands(deps: SignalsCommandDeps): AnyCommand[] {
  */
 export function registerSignalsCommands(registry: CommandRegistry, deps: SignalsCommandDeps): void {
   registry.registerAll(signalsCommands(deps));
+}
+
+/**
+ * Contribute the State panel — **off the rail** (`rail: false`).
+ *
+ * `level: "document"`: it writes the open document's `state` block. §3.2's DOCUMENT group is
+ * Outline · Page · Data · Packages, and §11.2 folds this panel's editing into Data ("definitions +
+ * live values in one row"). That merge is not this change, so the record keeps its id, its region
+ * and its command reachability and gives up the rail button rather than pushing the group to five.
+ */
+export function registerStatePanel(): void {
+  registerPanel({
+    id: "state",
+    title: "State",
+    level: "document",
+    dock: "navigator",
+    icon: "sp-icon-brackets",
+    rail: false,
+    requiresDocument: "Open a page to give it data — values it can read, compute or fetch.",
+    render: (ctx) =>
+      ctx.deps.renderSignalsTemplate(ctx.doc as SignalsPanelState, {
+        renderCanvas: ctx.deps.renderCanvas,
+        renderLeftPanel: ctx.rerender,
+        updateSession,
+      }),
+  });
 }

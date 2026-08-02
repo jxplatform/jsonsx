@@ -279,3 +279,52 @@ describe("resolution through the scope stack", () => {
     expect(keymap.resolveEvent(keyEvent("s", { ctrl: true }), ["global"])).toBeUndefined();
   });
 });
+
+describe("the digit row, and the platform decision made once", () => {
+  test("⌘⇧2 resolves by physical key, whatever glyph the layout produces", () => {
+    // With ⇧ held, `key` is "@" on US, '"' on UK and "é" on FR. A chord table spelling
+    // `mod+shift+2` would fire on none of them; `code` is "Digit2" on all three.
+    const keymap = createKeymap({ mac: true });
+    keymap.add({ id: "inspector.focus.style", keybinding: "mod+shift+2" });
+    for (const glyph of ["@", '"', "é"]) {
+      expect(
+        keymap.resolveEvent({ ...keyEvent(glyph, { meta: true, shift: true }), code: "Digit2" }, [
+          "global",
+        ])?.commandId,
+      ).toBe("inspector.focus.style");
+    }
+  });
+
+  test("an unshifted digit resolves the same way with or without a code", () => {
+    const keymap = createKeymap({ mac: true });
+    keymap.add({ id: "panel.focus.files", keybinding: "mod+1" });
+    expect(keymap.resolveEvent(keyEvent("1", { meta: true }), ["global"])?.commandId).toBe(
+      "panel.focus.files",
+    );
+    expect(
+      keymap.resolveEvent({ ...keyEvent("1", { meta: true }), code: "Digit1" }, ["global"])
+        ?.commandId,
+    ).toBe("panel.focus.files");
+  });
+
+  test("a non-digit code is ignored, so letters still resolve by key", () => {
+    const keymap = createKeymap({ mac: true });
+    keymap.add({ id: "file.save", keybinding: "mod+s" });
+    expect(
+      keymap.resolveEvent({ ...keyEvent("s", { meta: true }), code: "KeyS" }, ["global"])
+        ?.commandId,
+    ).toBe("file.save");
+  });
+
+  test("the keymap exposes its platform decision, and formats an arbitrary chord with it", () => {
+    // ONE function styles a chord. Every surface that prints one asks here rather than re-detecting
+    // — which is what killed the hardcoded ⌘P the old toolbar showed Windows and Linux users.
+    const macKeymap = createKeymap({ mac: true });
+    expect(macKeymap.mac).toBe(true);
+    expect(macKeymap.format("mod+shift+p")).toBe("⌘⇧P");
+    const pcKeymap = createKeymap({ mac: false });
+    expect(pcKeymap.mac).toBe(false);
+    expect(pcKeymap.format("mod+shift+p")).toBe("Ctrl+Shift+P");
+    expect(pcKeymap.format("f6")).toBe("F6");
+  });
+});

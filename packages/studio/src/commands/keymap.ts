@@ -92,6 +92,16 @@ const KEY_LABELS: Readonly<Record<string, string>> = {
  */
 export interface KeyChordEvent {
   key: string;
+  /**
+   * The physical key, when the event carries one.
+   *
+   * Optional, and read for exactly one purpose: with ⇧ held, `key` is the SHIFTED glyph, so ⌘⇧2
+   * arrives as `"@"` on a US layout, `"\""` on a UK one and `"é"` on a French one. A chord table
+   * that spelled `mod+shift+2` would then never fire — which is precisely the run of chords ⌘⇧1–4
+   * (the Inspector tabs) needs. `code` is `"Digit2"` on all three, so the digit row resolves by
+   * position, the way a user counting tabs means it.
+   */
+  code?: string;
   metaKey: boolean;
   ctrlKey: boolean;
   altKey: boolean;
@@ -175,8 +185,14 @@ export function isMacPlatform(
  * `mod` is the platform's primary modifier: ⌘ on mac (where a separate ⌃ can still be held and
  * reads as `ctrl`), Ctrl elsewhere (where Ctrl is `mod` and never also `ctrl`).
  */
+/** `"Digit4"` → `"4"`; anything else → `undefined`. See {@link KeyChordEvent.code}. */
+function digitFromCode(code: string | undefined): string | undefined {
+  const match = /^Digit(\d)$/.exec(code ?? "");
+  return match?.[1];
+}
+
 export function chordFromEvent(event: KeyChordEvent, mac: boolean): string {
-  const key = event.key.toLowerCase();
+  const key = digitFromCode(event.code) ?? event.key.toLowerCase();
   const parsed: ParsedChord = {
     mod: mac ? event.metaKey : event.ctrlKey,
     ctrl: mac ? event.ctrlKey : false,
@@ -231,6 +247,16 @@ export interface KeymapMatch {
 }
 
 export interface Keymap {
+  /**
+   * Whether chords print with mac glyphs.
+   *
+   * Exposed because the platform decision is made ONCE, here, and every surface that prints a chord
+   * reads it rather than re-detecting: the hardcoded `⌘P` that `toolbar.ts` showed Windows and
+   * Linux users existed because there was nowhere else to ask.
+   */
+  readonly mac: boolean;
+  /** Format an arbitrary chord for this platform. {@link formatBinding} is this over a command's. */
+  format: (chord: string) => string;
   /** Index a record's bindings. Throws {@link KeybindingConflictError} on a same-scope clash. */
   add: (record: BindableRecord) => void;
   /** Drop a record's bindings — used when a registry is rebuilt, not in normal operation. */
@@ -268,6 +294,10 @@ export function createKeymap(options: { mac?: boolean } = {}): Keymap {
   }
 
   return {
+    mac,
+    format(chord) {
+      return formatChord(chord, mac);
+    },
     add(record) {
       const scope: KeyScope = record.keyScope ?? "global";
       const chords = chordsOf(record);

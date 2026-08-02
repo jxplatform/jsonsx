@@ -30,7 +30,14 @@
  * to the code that runs, so a chord and its behaviour cannot drift apart again.
  */
 
-import { canvasWrap, childIndex, childList, getNodeAtPath, parentElementPath } from "../store";
+import {
+  canvasWrap,
+  childIndex,
+  childList,
+  getNodeAtPath,
+  parentElementPath,
+  projectState,
+} from "../store";
 import { activeTab, closeTab, workspace } from "../workspace/workspace";
 import {
   mutateDuplicateNode,
@@ -48,18 +55,24 @@ import {
 } from "../canvas/canvas-utils";
 import { openQuickSearch } from "../panels/quick-search";
 import { shouldWarnOnClose, tabLabel } from "../panels/tab-strip";
-import { showConfirmDialog } from "../ui/layers";
+import { showConfirmDialog, showDialog } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
-import { DOCK_IDS, setDockCollapsed, shell } from "../shell";
+import { DOCK_IDS, setActivityTab, setDockCollapsed, shell } from "../shell";
+import { REGION_FOR_FOCUS, resolveRegion } from "../ui/regions";
+import { getPlatform, hasPlatform } from "../platform";
+import { statusMessage } from "../panels/statusbar";
+import { navigatorPanelSet } from "../panels/navigator-panels";
 import { copyNode, cutNode, pasteNode } from "./context-menu";
 
 import { keyScopeStack } from "../commands/context";
 import { defaultCommands } from "../commands/defaults";
+import { setActiveRegistry } from "../commands/active-registry";
 import { CommandUnavailableError } from "../commands/registry";
+import { html } from "lit-html";
 import type { CommandContext } from "../commands/context";
 import type { DockId as CommandDockId } from "../commands/defaults";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
-import type { DockId } from "../shell";
+import type { DockId, FocusRegion } from "../shell";
 import type { JxPath } from "../state";
 
 /** What the pointer handlers need from `studio.ts` on every gesture. */
@@ -71,10 +84,21 @@ export interface ShortcutPointerContext {
   applyTransform: () => void;
 }
 
+/** Where a project the user is about to pick should open. */
+export type ProjectOpenTarget = "thisWindow" | "newWindow";
+
 /** The verbs the default command set needs that are not implemented in this file. */
 export interface StudioCommandHooks {
   saveDocument: () => void | Promise<void>;
-  openProject: () => void | Promise<void>;
+  /**
+   * Open a project, in the window the user chose.
+   *
+   * The TARGET is the new half. `project.open` with a project already open used to route silently
+   * to `platform.openProjectInNewWindow` and return, so the click looked like it did nothing when
+   * the new window opened behind this one. The choice is now asked for ({@link openProjectFlow})
+   * and reported; honouring it is the bootstrap's side of the contract.
+   */
+  openProject: (target: ProjectOpenTarget) => void | Promise<void>;
   openInBrowser: () => void | Promise<void>;
 }
 
@@ -315,6 +339,174 @@ function toggleZen(): void {
   zenRestore = snapshot;
 }
 
+// ─── Region focus (F6) ────────────────────────────────────────────────────────
+
+/**
+ * The F6 ring, in reading order: rail → navigator → pane → inspector → dock → status (plan §5.3).
+ *
+ * `shell.focusRegion` has enumerated these six values since the shell record landed and nothing
+ * could act on it, because there was no map from the enum to the DOM. `ui/regions.ts` is that map;
+ * this is its consumer, and the reason `REGION_FOR_FOCUS` exists.
+ */
+export const REGION_CYCLE: readonly FocusRegion[] = [
+  "rail",
+  "navigator",
+  "pane",
+  "inspector",
+  "dock",
+  "status",
+];
+
+/**
+ * The next region in the ring that is actually on screen, or `null` when none is.
+ *
+ * Absent regions are SKIPPED rather than focused-and-lost: the bottom dock does not exist until P4
+ * and a collapsed Navigator has no host, so a ring that did not skip would strand the caret every
+ * second press. Pure, and injectable, so the walk is testable without a shell.
+ */
+export function nextRegion(
+  current: FocusRegion,
+  direction: 1 | -1,
+  isPresent: (region: FocusRegion) => boolean,
+): FocusRegion | null {
+  const start = REGION_CYCLE.indexOf(current);
+  const size = REGION_CYCLE.length;
+  for (let step = 1; step <= size; step++) {
+    const candidate = REGION_CYCLE[(start + direction * step + size * size) % size]!;
+    if (isPresent(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+/** The first element inside a region that can take the caret. */
+const REGION_FOCUSABLE =
+  'a[href], button, input, textarea, select, sp-action-button, sp-tab, sp-textfield, sp-picker, [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Move focus into a region and record that it moved.
+ *
+ * The record and the DOM are written together, deliberately: `focus.region` is a command-context
+ * key that the keyboard's own scope stack reads (`keyScopeStack` returns the dock stack for
+ * anything but the pane), so a focus move the record did not hear about would silently change which
+ * chords are live.
+ */
+export function focusShellRegion(region: FocusRegion): boolean {
+  const host = resolveRegion(REGION_FOR_FOCUS[region]);
+  if (!host) {
+    return false;
+  }
+  shell.focusRegion = region;
+  const inner = host.querySelector<HTMLElement>(REGION_FOCUSABLE);
+  if (inner) {
+    inner.focus();
+    return true;
+  }
+  // A bare `<div id>` shell host is not focusable on its own. Making it programmatically focusable
+  // Is the standard fix and costs nothing: -1 keeps it out of the Tab order, which is the point —
+  // F6 is the way in, Tab is the way around inside.
+  host.tabIndex = -1;
+  host.focus();
+  return true;
+}
+
+function cycleRegion(direction: 1 | -1): void {
+  const target = nextRegion(shell.focusRegion, direction, (region) =>
+    Boolean(resolveRegion(REGION_FOR_FOCUS[region])),
+  );
+  if (target) {
+    focusShellRegion(target);
+  }
+}
+
+// ─── Panel and inspector focus (⌘1–8, ⌘⇧1–4) ─────────────────────────────────
+
+/**
+ * Toggle-FOCUS, not toggle-visible (plan §5.3).
+ *
+ * ⌘1 from the canvas reveals Files and puts the caret in it; ⌘1 again — with Files already focused
+ * — collapses the dock and hands the caret back to the pane. The distinction matters because the
+ * common case is "take me there", and a toggle-visible binding makes that a coin flip on whichever
+ * panel happened to be showing.
+ */
+function focusPanel(panelId: string): void {
+  const alreadyThere =
+    shell.leftTab === panelId && !shell.docks.left.collapsed && shell.focusRegion === "navigator";
+  if (alreadyThere) {
+    setDockCollapsed("left", true);
+    focusShellRegion("pane");
+    return;
+  }
+  setActivityTab(panelId);
+  focusShellRegion("navigator");
+}
+
+/**
+ * ⌘⇧1–4 — show an Inspector tab and focus the dock.
+ *
+ * `"assistant"` is a different dock until P3.6 folds the column in, so it routes to that dock's own
+ * record; the other three go through `view.setRightTab`, whose `args` enum is the one declaration
+ * of which tabs exist.
+ */
+function focusInspectorTab(registry: CommandRegistry, tabId: string): void {
+  if (tabId === "assistant") {
+    setDockCollapsed("chat", false);
+    return;
+  }
+  setDockCollapsed("right", false);
+  if (registry.get("view.setRightTab") && registry.isEnabled("view.setRightTab")) {
+    void registry.run("view.setRightTab", { tab: tabId });
+  }
+  focusShellRegion("inspector");
+}
+
+// ─── Project: Open… ───────────────────────────────────────────────────────────
+
+/**
+ * Ask where the project should open, then say what happened.
+ *
+ * With no project open, or on a platform with one window, there is no choice to make and none is
+ * offered. With one open there IS a choice, and it was previously being made silently in the user's
+ * name: `openRecentProject` saw a live `projectState`, called `openProjectInNewWindow` and
+ * returned, so a window opened behind this one and the click read as a no-op.
+ */
+export async function openProjectFlow(hooks: StudioCommandHooks): Promise<void> {
+  const platform = hasPlatform() ? getPlatform() : null;
+  const multiWindow = typeof platform?.openProjectInNewWindow === "function";
+  if (!projectState || !multiWindow) {
+    await hooks.openProject("thisWindow");
+    return;
+  }
+  const openName = projectState.name;
+  const choice = await showDialog<ProjectOpenTarget | "cancel">(
+    (done) => html`
+      <sp-dialog-wrapper
+        open
+        underlay
+        headline="Open Project"
+        confirm-label="New Window"
+        secondary-label="This Window"
+        cancel-label="Cancel"
+        size="s"
+        @confirm=${() => done("newWindow")}
+        @secondary=${() => done("thisWindow")}
+        @cancel=${() => done("cancel")}
+        @close=${() => done("cancel")}
+      >
+        <p>${openName} is open in this window. Where should the project you pick open?</p>
+      </sp-dialog-wrapper>
+    `,
+  );
+  if (choice === "cancel") {
+    return;
+  }
+  await hooks.openProject(choice);
+  statusMessage(
+    choice === "newWindow" ? "Opening the project in a new window…" : "Opening the project…",
+  );
+}
+
 // ─── Command records owned by this file ───────────────────────────────────────
 
 /**
@@ -503,13 +695,17 @@ export function registerStudioCommands(
   registry.registerAll(
     defaultCommands({
       closeDocument,
+      cycleRegion,
       deleteSelection,
       duplicateSelection,
+      focusInspectorTab: (tabId) => focusInspectorTab(registry, tabId),
+      focusPanel,
       openInBrowser: () => hooks.openInBrowser(),
-      openPalette: () => {
-        openQuickSearch();
+      openPalette: (mode) => {
+        openQuickSearch(mode);
       },
-      openProject: () => hooks.openProject(),
+      navigatorPanels: navigatorPanelSet(),
+      openProject: () => openProjectFlow(hooks),
       redo: redoDocument,
       saveDocument: () => hooks.saveDocument(),
       selectParent,
@@ -522,19 +718,6 @@ export function registerStudioCommands(
     }),
   );
   registry.registerAll(canvasCommands(pointer));
-  /*
-   * ← is the second chord for Select Parent, alongside Escape.
-   *
-   * HANDOFF: it belongs in the record itself as `keybinding: ["escape", "arrowleft"]`. That record
-   * lives in `commands/defaults.ts`, which another workstream owns this wave, so the chord is added
-   * through the same keymap the record's own chord went into — one ACTION, one definition site, two
-   * spellings. Fold it into the record and delete this call.
-   */
-  registry.keymap.add({
-    id: "selection.selectParent",
-    keybinding: ["escape", "arrowleft"],
-    keyScope: "canvas",
-  });
 }
 
 // ─── The dispatcher ───────────────────────────────────────────────────────────
@@ -584,6 +767,10 @@ export function initShortcuts(
   registry: CommandRegistry,
   getContext: () => ShortcutPointerContext,
 ): void {
+  // Publish the composed registry to the chrome. `studio.ts` mounts the Command Bar and the Palette
+  // At the top of its body and builds the registry at the bottom, so this — the last bootstrap call
+  // Before the automation hook — is the point at which "the registry" exists to be rendered.
+  setActiveRegistry(registry);
   // Wheel handler: Ctrl+Scroll = zoom (cursor-centered), plain scroll = pan
   canvasWrap.addEventListener(
     "wheel",

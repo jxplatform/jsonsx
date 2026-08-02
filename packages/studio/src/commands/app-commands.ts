@@ -26,6 +26,7 @@
  */
 
 import { defaultCommands, noopCommandDeps } from "./defaults";
+import { navigatorPanelSet } from "../panels/navigator-panels";
 import { createCommandRegistry } from "./registry";
 import { emptyContext } from "./context";
 import { shellViewCommands } from "../shell";
@@ -69,7 +70,10 @@ function viaRegistration(): AnyCommand[] {
  */
 export function appCommandSet(): AnyCommand[] {
   return [
-    ...defaultCommands(noopCommandDeps()),
+    // The panel roster is the one dependency the checks must supply for real: the ⌘1–8 records are
+    // Generated from it, so an empty one would hide eight commands (and their chords) from the
+    // Level check, the chrome budget and the generated keyboard sheet alike.
+    ...defaultCommands({ ...noopCommandDeps(), navigatorPanels: navigatorPanelSet() }),
     ...viaRegistration(),
     ...shellViewCommands({ setInspectorTab: NO_OP }),
     ...canvasViewCommands({ getCanvasMode: () => "design", setCanvasMode: NO_OP }),

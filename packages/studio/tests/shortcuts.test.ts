@@ -29,9 +29,37 @@ void mock.module("../src/panels/quick-search.js", () => ({ openQuickSearch }));
 const copyNode = mock(async () => {});
 const cutNode = mock(async () => {});
 const pasteNode = mock(async () => {});
-void mock.module("../src/editor/context-menu.js", () => ({ copyNode, cutNode, pasteNode }));
+// `showContextMenu` / `dismissContextMenu` are not this file's business, but the panel registry it
+// Now reaches (through `navigatorPanelSet()`, the roster the ⌘1–8 records are generated from) pulls
+// In the Outline panel, which imports them. Replacing a module means answering for all its exports.
+const showContextMenu = mock(() => {});
+const dismissContextMenu = mock(() => {});
+void mock.module("../src/editor/context-menu.js", () => ({
+  copyNode,
+  cutNode,
+  dismissContextMenu,
+  pasteNode,
+  showContextMenu,
+}));
 
-const { initShortcuts, registerStudioCommands } = await import("../src/editor/shortcuts");
+const statusMessage = mock((_text: string) => {});
+void mock.module("../src/panels/statusbar.js", () => ({
+  mountStatusbar: () => {},
+  renderStatusbar: () => {},
+  setStatusbarRenderer: () => {},
+  statusMessage,
+  unmountStatusbar: () => {},
+}));
+
+const {
+  focusShellRegion,
+  initShortcuts,
+  nextRegion,
+  openProjectFlow,
+  REGION_CYCLE,
+  registerStudioCommands,
+} = await import("../src/editor/shortcuts");
+const { stampShellRegions } = await import("../src/ui/regions");
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { createLiveContext } = await import("../src/commands/live-context");
 const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
@@ -159,6 +187,7 @@ beforeEach(() => {
     copyNode,
     cutNode,
     pasteNode,
+    statusMessage,
   ]) {
     m.mockClear();
   }
@@ -921,5 +950,170 @@ describe("dispatcher", () => {
     workspace.activeTabId = null;
     const e = pressDoc("z", { ctrlKey: true });
     expect(e.defaultPrevented).toBe(false);
+  });
+});
+
+// ─── The direct keys (plan §5.3) ──────────────────────────────────────────────
+
+describe("direct keys", () => {
+  beforeEach(() => {
+    stampShellRegions();
+    shell.focusRegion = "pane";
+    setDockCollapsed("left", false);
+    setDockCollapsed("right", true);
+    setDockCollapsed("chat", true);
+  });
+
+  test("⌘1 reveals and focuses Files; ⌘1 again collapses and returns to the pane", () => {
+    shell.leftTab = "layers";
+    pressDoc("1", { ctrlKey: true });
+    expect(shell.leftTab).toBe("files");
+    expect(shell.docks.left.collapsed).toBe(false);
+    expect(shell.focusRegion).toBe("navigator");
+
+    // Toggle-FOCUS, not toggle-visible: the second press only closes because focus is already here.
+    pressDoc("1", { ctrlKey: true });
+    expect(shell.docks.left.collapsed).toBe(true);
+    expect(shell.focusRegion).toBe("pane");
+  });
+
+  test("⌘1 from another panel switches rather than closing", () => {
+    shell.leftTab = "layers";
+    shell.focusRegion = "navigator";
+    pressDoc("1", { ctrlKey: true });
+    expect(shell.leftTab).toBe("files");
+    expect(shell.docks.left.collapsed).toBe(false);
+  });
+
+  test("⌘⇧2 opens the Inspector dock, ⌘⇧4 the assistant", () => {
+    // `key` is the SHIFTED glyph on every layout, so the digit row resolves by `code`.
+    pressDoc("@", { code: "Digit2", ctrlKey: true, shiftKey: true });
+    expect(shell.docks.right.collapsed).toBe(false);
+    expect(shell.focusRegion).toBe("inspector");
+
+    pressDoc("$", { code: "Digit4", ctrlKey: true, shiftKey: true });
+    expect(shell.docks.chat.collapsed).toBe(false);
+  });
+
+  test("F6 walks the ring and ⇧F6 walks it back, skipping regions with no host", () => {
+    // Read through a helper: a literal assignment narrows `shell.focusRegion` for the rest of the
+    // Block, and the point of the test is that the record MOVES.
+    const focused = (): string => shell.focusRegion;
+    shell.focusRegion = "rail";
+    pressDoc("F6");
+    expect(focused()).toBe("navigator");
+    pressDoc("F6");
+    expect(focused()).toBe("pane");
+    pressDoc("F6");
+    expect(focused()).toBe("inspector");
+    // `dock.bottom` does not exist until P4, so the ring steps over it rather than stranding focus.
+    pressDoc("F6");
+    expect(focused()).toBe("status");
+    pressDoc("F6");
+    expect(focused()).toBe("rail");
+    pressDoc("F6", { shiftKey: true });
+    expect(focused()).toBe("status");
+  });
+});
+
+describe("nextRegion", () => {
+  const all = () => true;
+
+  test("the ring is the shell's reading order", () => {
+    expect([...REGION_CYCLE]).toEqual(["rail", "navigator", "pane", "inspector", "dock", "status"]);
+  });
+
+  test("wraps in both directions", () => {
+    expect(nextRegion("status", 1, all)).toBe("rail");
+    expect(nextRegion("rail", -1, all)).toBe("status");
+  });
+
+  test("skips regions that are not on screen", () => {
+    const present = (region: string) => region !== "navigator" && region !== "pane";
+    expect(nextRegion("rail", 1, present as never)).toBe("inspector");
+  });
+
+  test("returns null when nothing is on screen", () => {
+    expect(nextRegion("pane", 1, () => false)).toBeNull();
+  });
+});
+
+describe("focusShellRegion", () => {
+  test("focuses the first focusable inside the region", () => {
+    stampShellRegions();
+    const button = document.createElement("button");
+    document.querySelector("#left-panel")!.append(button);
+    try {
+      expect(focusShellRegion("navigator")).toBe(true);
+      expect(document.activeElement).toBe(button);
+      expect(shell.focusRegion).toBe("navigator");
+    } finally {
+      button.remove();
+    }
+  });
+
+  test("a bare host is made programmatically focusable rather than skipped", () => {
+    stampShellRegions();
+    const host = document.querySelector("#statusbar") as HTMLElement;
+    expect(focusShellRegion("status")).toBe(true);
+    expect(host.tabIndex).toBe(-1);
+  });
+
+  test("an absent region is refused, and the record is left alone", () => {
+    shell.focusRegion = "pane";
+    expect(focusShellRegion("dock")).toBe(false);
+    expect(shell.focusRegion).toBe("pane");
+  });
+});
+
+// ─── Project: Open… ───────────────────────────────────────────────────────────
+
+describe("openProjectFlow", () => {
+  function dialogWrapper(): HTMLElement | null {
+    return document.querySelector("sp-dialog-wrapper");
+  }
+
+  test("with one window there is no choice to make, and none is offered", async () => {
+    installMockPlatform();
+    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    await openProjectFlow(hooks);
+    expect(openProject).toHaveBeenCalledWith("thisWindow");
+    expect(dialogWrapper()).toBeNull();
+  });
+
+  test("with a project open on a multi-window platform it asks, and reports the outcome", async () => {
+    installMockPlatform({ openProjectInNewWindow: (async () => {}) as never });
+    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const pending = openProjectFlow(hooks);
+    await flush();
+    const wrapper = dialogWrapper()!;
+    expect(wrapper.getAttribute("headline")).toBe("Open Project");
+    expect(wrapper.getAttribute("secondary-label")).toBe("This Window");
+    wrapper.dispatchEvent(new Event("confirm", { bubbles: true }));
+    await pending;
+    expect(openProject).toHaveBeenCalledWith("newWindow");
+    expect(statusMessage).toHaveBeenCalledTimes(1);
+    expect(statusMessage.mock.calls[0]![0]).toContain("new window");
+  });
+
+  test("This Window is a real answer, not a dismissal", async () => {
+    installMockPlatform({ openProjectInNewWindow: (async () => {}) as never });
+    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const pending = openProjectFlow(hooks);
+    await flush();
+    dialogWrapper()!.dispatchEvent(new Event("secondary", { bubbles: true }));
+    await pending;
+    expect(openProject).toHaveBeenCalledWith("thisWindow");
+  });
+
+  test("cancelling opens nothing and says nothing", async () => {
+    installMockPlatform({ openProjectInNewWindow: (async () => {}) as never });
+    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const pending = openProjectFlow(hooks);
+    await flush();
+    dialogWrapper()!.dispatchEvent(new Event("cancel", { bubbles: true }));
+    await pending;
+    expect(openProject).not.toHaveBeenCalled();
+    expect(statusMessage).not.toHaveBeenCalled();
   });
 });

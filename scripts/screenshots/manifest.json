@@ -464,14 +464,14 @@
       "steps": [
         {
           "args": {
-            "tab": "blocks"
+            "tab": "insert"
           },
           "cmd": "view.setActivity"
         }
       ],
       "expect": [
         {
-          "region": "navigator/panel:blocks"
+          "region": "navigator/panel:insert"
         }
       ],
       "capture": [
@@ -525,14 +525,14 @@
       "steps": [
         {
           "args": {
-            "tab": "imports"
+            "tab": "packages"
           },
           "cmd": "view.setActivity"
         }
       ],
       "expect": [
         {
-          "region": "navigator/panel:imports"
+          "region": "navigator/panel:packages"
         }
       ],
       "capture": [
@@ -553,14 +553,14 @@
       "steps": [
         {
           "args": {
-            "tab": "head"
+            "tab": "page"
           },
           "cmd": "view.setActivity"
         }
       ],
       "expect": [
         {
-          "region": "navigator/panel:head"
+          "region": "navigator/panel:page"
         }
       ],
       "capture": [
@@ -1174,7 +1174,7 @@
       "steps": [
         {
           "args": {
-            "tab": "blocks"
+            "tab": "insert"
           },
           "cmd": "view.setActivity"
         },

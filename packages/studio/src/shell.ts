@@ -48,30 +48,73 @@ export type LayoutSelection = LayoutHit;
 export type DockId = "left" | "right" | "chat";
 
 /**
- * The Navigator's panel ids, in rail order.
+ * The Navigator's panel ids, in rail order, then the two that have no rail button.
  *
  * This is the DECLARATION `view.setActivity`'s `args` enum is built from, and it is the reason a
  * panel rename fails `scripts/check-shot-contract.ts` in the renaming PR naming both ids instead of
  * silently photographing the wrong panel (plan §13.5). `shell.leftTab` stays a `string` because it
  * is also read from persisted state written by an older build — the COMMAND is what refuses an
- * undeclared id, at the one door a caller comes through.
+ * undeclared id, at the one door a caller comes through, and {@link migratePanelId} is what turns a
+ * stale stored id into a current one before it gets there.
  *
- * HANDOFF: `panels/activity-bar.ts` renders the same eight `value`s from its own array, and
- * `panels/left-panel.ts` branches on them. Neither file is this workstream's; `tests/registry-gap-
- * commands.test.ts` asserts the three lists agree so the duplicate cannot drift while it lasts.
+ * The records themselves live in `panels/navigator-panels.ts`, one per owning module. This list is
+ * the same set written down in a module that imports no DOM, because `commands/app-commands.ts`
+ * must load the enum in a bare Bun process; `tests/navigator-panels.test.ts` asserts the two agree,
+ * so the duplicate cannot drift.
  */
 export const NAVIGATOR_PANEL_IDS = [
   "files",
-  "layers",
-  "imports",
-  "blocks",
-  "state",
-  "data",
-  "head",
+  "search",
   "git",
+  "problems",
+  "layers",
+  "page",
+  "data",
+  "packages",
+  "insert",
+  "state",
 ] as const;
 
 export type NavigatorPanelId = (typeof NAVIGATOR_PANEL_IDS)[number];
+
+/**
+ * Panel ids a previous build persisted, and what they are called now.
+ *
+ * Three renames, each fixing a name that described a mechanism rather than a task: `blocks` was an
+ * insert palette, `head` was an HTML element, `imports` was the verb and not the thing. A stored
+ * value is the one place those old strings can still arrive from, so they are translated once, on
+ * read, and then never again — there is no alias in the registry and no branch in the rail.
+ */
+const RENAMED_PANEL_IDS: Readonly<Record<string, NavigatorPanelId>> = {
+  blocks: "insert",
+  head: "page",
+  imports: "packages",
+};
+
+/** The panel the Navigator wakes up on when nothing usable is stored. */
+export const DEFAULT_PANEL_ID: NavigatorPanelId = "layers";
+
+/** Whether a string is a declared panel id. */
+export function isNavigatorPanelId(value: unknown): value is NavigatorPanelId {
+  return typeof value === "string" && (NAVIGATOR_PANEL_IDS as readonly string[]).includes(value);
+}
+
+/**
+ * Translate a stored panel id into a current one, or `null` when it names nothing.
+ *
+ * `null` rather than a default, so the caller decides: the boot path falls back to
+ * {@link DEFAULT_PANEL_ID}, and a test can tell "I stored junk" from "I stored `layers`".
+ */
+export function migratePanelId(stored: unknown): NavigatorPanelId | null {
+  if (typeof stored !== "string") {
+    return null;
+  }
+  const renamed = RENAMED_PANEL_IDS[stored];
+  if (renamed) {
+    return renamed;
+  }
+  return isNavigatorPanelId(stored) ? stored : null;
+}
 
 /**
  * The Inspector's tab ids, in strip order — the `value`s `panels/right-panel.ts` renders.
@@ -206,7 +249,14 @@ const DOCK_CLASS: Record<DockId, string> = {
   right: "right-collapsed",
 };
 
-/** The persisted dock record. Absent keys keep the declared default. */
+/**
+ * The persisted shell record. Absent keys keep the declared default.
+ *
+ * `leftTab` rides in the same record as the dock geometry because it is remembered for the same
+ * reason and by the same writer — one key, one shape, one `JSON.stringify`. P3.7 replaces the whole
+ * thing with a per-project session record; until then, adding a second localStorage key would
+ * recreate the two-writer bug this record was consolidated to fix.
+ */
 interface PersistedDocks {
   left?: number;
   right?: number;
@@ -214,6 +264,8 @@ interface PersistedDocks {
   leftCollapsed?: boolean;
   rightCollapsed?: boolean;
   chatCollapsed?: boolean;
+  /** The Navigator panel last shown. Migrated through {@link migratePanelId} on read. */
+  leftTab?: string;
 }
 
 /** Read the persisted dock record, tolerating absent/corrupt storage. */
@@ -269,7 +321,7 @@ function createShellState(): ShellState {
     git: freshGit(),
     layout: "design",
     layoutSelection: null,
-    leftTab: "layers",
+    leftTab: migratePanelId(saved.leftTab) ?? DEFAULT_PANEL_ID,
     settingsTab: "stylebook",
     stylebook: freshStylebook(),
     theme: readPersistedTheme(),
@@ -312,6 +364,7 @@ export function persistDocks(): void {
         chatCollapsed: shell.docks.chat.collapsed,
         left: shell.docks.left.width,
         leftCollapsed: shell.docks.left.collapsed,
+        leftTab: shell.leftTab,
         right: shell.docks.right.width,
         rightCollapsed: shell.docks.right.collapsed,
       } satisfies PersistedDocks),
@@ -378,9 +431,28 @@ export function unmountShell(): void {
   _scope = null;
 }
 
-/** Open or close a dock, and remember it. */
+/**
+ * Open or close a dock, and remember it.
+ *
+ * **The assistant is a tab of the Inspector dock, not a dock of its own.** It lost its fifth grid
+ * column: `#chat-panel` now shares `#right-panel`'s cell, one visible at a time. Two states are
+ * therefore unreachable, and this is where that is enforced rather than in CSS — opening the
+ * assistant opens the dock that hosts it, and closing that dock closes the assistant with it.
+ * Without the coupling, "assistant open, inspector collapsed" renders a 0px-wide chat.
+ *
+ * `"chat"` survives as a `DockId` because the collapse flag is exactly the state an inspector tab
+ * selection will be, and because `editor/shortcuts.ts` and `ui/panel-resize.ts` name it. What it no
+ * longer has is a width of its own: `docks.chat.width` drives nothing now that the column is gone.
+ */
 export function setDockCollapsed(dock: DockId, collapsed: boolean): void {
+  if (dock === "chat" && !collapsed && shell.docks.right.collapsed) {
+    shell.docks.right.collapsed = false;
+  }
+  if (dock === "right" && collapsed && !shell.docks.chat.collapsed) {
+    shell.docks.chat.collapsed = true;
+  }
   if (shell.docks[dock].collapsed === collapsed) {
+    persistDocks();
     return;
   }
   shell.docks[dock].collapsed = collapsed;
@@ -397,10 +469,17 @@ export function setDockWidth(dock: DockId, width: number): void {
   shell.docks[dock].width = width;
 }
 
-/** Reveal a Navigator panel: select it and make sure the dock is open. */
+/**
+ * Reveal a Navigator panel: select it, make sure the dock is open, and remember both.
+ *
+ * `persistDocks()` is called unconditionally rather than relying on `setDockCollapsed` — that only
+ * writes when the collapse flag actually changed, so re-picking a panel in an already-open dock
+ * would have been forgotten.
+ */
 export function setActivityTab(tab: string): void {
   shell.leftTab = tab;
   setDockCollapsed("left", false);
+  persistDocks();
 }
 
 /** Set the chrome theme, apply it, and remember it. */
@@ -503,8 +582,8 @@ export function shellViewCommands(deps: ShellCommandDeps): AnyCommand[] {
       when: projectOpen,
       aiTool: {
         description:
-          "Show one of the Navigator panels (Files, Layers, Imports, Elements, State, Data, " +
-          "Document, Source Control) and open the Navigator dock if it is closed.",
+          "Show one of the Navigator panels (Files, Search, Source Control, Problems, Outline, " +
+          "Page, Data, Packages, Insert, State) and open the Navigator dock if it is closed.",
         name: "show_navigator_panel",
       },
       run: (_ctx, args) => {

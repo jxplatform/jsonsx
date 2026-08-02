@@ -105,7 +105,9 @@ describe("the hook installed, over the composed registry", () => {
       .find((c) => c.id === "view.setActivity");
     const schema = record?.args as { properties: { tab: { enum: string[] } } } | undefined;
     expect(schema?.properties.tab.enum).toContain("layers");
-    expect(schema?.properties.tab.enum).not.toContain("page");
+    // The three ids this phase renamed are gone from the enum, which is what turns a stale
+    // Manifest step red in the PR that renamed them.
+    expect(schema?.properties.tab.enum).not.toContain("head");
   });
 });
 
@@ -151,8 +153,9 @@ describe("run() reaches the implementations", () => {
   });
 
   test("an undeclared panel id refuses through the hook, naming the declared set", async () => {
-    expect(await refusal("view.setActivity", { tab: "page" })).toContain(
-      "is not declared — declared: files, layers, imports, blocks, state, data, head, git",
+    expect(await refusal("view.setActivity", { tab: "head" })).toContain(
+      "is not declared — declared: " +
+        "files, search, git, problems, layers, page, data, packages, insert, state",
     );
   });
 

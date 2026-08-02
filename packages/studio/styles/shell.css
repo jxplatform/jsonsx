@@ -7,10 +7,13 @@
    drag-to-resize handles. */
 
 /* ─── Layout ─────────────────────────────────── */
+/* Four columns: rail | navigator | pane | inspector. The assistant's fifth column is gone —
+   it shares the inspector's cell, because folding it in costs zero additional width (spec §12
+   region ⑨). The rail is 56px, not 48px, because every button now carries a text label. */
 #app {
   display: grid;
   grid-template-rows: 36px auto auto auto minmax(0, 1fr) 24px;
-  grid-template-columns: 48px var(--panel-w-left) 1fr var(--panel-w-right) var(--panel-w-chat);
+  grid-template-columns: 56px var(--panel-w-left) 1fr var(--panel-w-right);
   height: 100%;
 }
 #toolbar {
@@ -239,11 +242,12 @@
   background: var(--bg);
   border-left: 1px solid var(--border);
 }
-/* Persistent AI chat sidebar — always a flex column (the chat UI owns its
-   own scrolling), unlike #right-panel which scrolls the whole panel. */
+/* The assistant, hosted by the Inspector dock: same cell, same width, one visible at a time —
+   which is what an inspector TAB is, ahead of the tab strip that will select it. Always a flex
+   column (the chat UI owns its own scrolling), unlike #right-panel which scrolls as a whole. */
 #chat-panel {
   grid-row: 2 / 6;
-  grid-column: 5;
+  grid-column: 4;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -273,11 +277,12 @@
 #app.right-collapsed #resize-right {
   display: none;
 }
-#app.chat-collapsed {
-  --panel-w-chat: 0px;
+/* The assistant and the inspector's own tabs share one cell, so opening one hides the other.
+   No width changes hands and no column appears — the dock is the same dock either way. */
+#app.chat-collapsed #chat-panel {
+  display: none;
 }
-#app.chat-collapsed #chat-panel,
-#app.chat-collapsed #resize-chat {
+#app:not(.chat-collapsed) #right-panel {
   display: none;
 }
 

@@ -96,9 +96,11 @@ describe("view.setActivity", () => {
   });
 
   test("refuses an undeclared panel id, naming every declared one", () => {
-    expect(() => registry.run("view.setActivity", { tab: "page" })).toThrow(
-      'command "view.setActivity" argument "tab": "page" is not declared — declared: ' +
-        "files, layers, imports, blocks, state, data, head, git",
+    // "head" is one of the three ids this phase renamed, so it is exactly the kind of value a
+    // Stale script or an older session still carries.
+    expect(() => registry.run("view.setActivity", { tab: "head" })).toThrow(
+      'command "view.setActivity" argument "tab": "head" is not declared — declared: ' +
+        "files, search, git, problems, layers, page, data, packages, insert, state",
     );
     expect(shell.leftTab).toBe("layers");
   });
@@ -222,11 +224,11 @@ describe("the enums do not drift from what the shell renders", () => {
   }
 
   test("the rail renders exactly NAVIGATOR_PANEL_IDS", () => {
-    // `panels/activity-bar.ts` keeps its own array of the same eight ids; this workstream does not
-    // Own that file, so the guard is here until one of them derives from the other.
-    expect(new Set(declaredValues("../src/panels/activity-bar.ts"))).toEqual(
-      new Set(NAVIGATOR_PANEL_IDS),
-    );
+    // The rail no longer declares any ids — it renders `railGroups()`. The guard is now that the
+    // Registry and this enum agree, which is asserted in `tests/panel-registry.test.ts`; here we
+    // Only check that the rail really has stopped keeping its own list.
+    expect(declaredValues("../src/panels/activity-bar.ts")).toEqual([]);
+    expect(NAVIGATOR_PANEL_IDS.length).toBe(10);
   });
 
   test("the Inspector renders exactly INSPECTOR_TAB_IDS", () => {

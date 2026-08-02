@@ -8,6 +8,7 @@ import { setActivityTab } from "../shell";
 import { activeTab } from "../workspace/workspace";
 import { booleanArg, stringArg, stringProperty } from "../commands/command-args";
 import { renderEmptyState } from "./empty-state";
+import { registerPanel } from "./panel-registry";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
 /** Expanded data entries set — persists across renders. */
@@ -344,4 +345,34 @@ export function registerDataExplorerCommands(
   deps: DataExplorerCommandDeps,
 ): void {
   registry.registerAll(dataExplorerCommands(deps));
+}
+
+/**
+ * Contribute the Data panel.
+ *
+ * `level: "document"` — the definitions it shows and the values it resolves belong to the open
+ * document. §11.2 folds the State panel's editing in here ("definitions + live values in one row");
+ * until it does, this record owns the DOCUMENT group's Data slot and `state` sits off-rail.
+ */
+export function registerDataPanel(): void {
+  registerPanel({
+    id: "data",
+    title: "Data",
+    level: "document",
+    dock: "navigator",
+    icon: "sp-icon-data",
+    requiresDocument: "Open a page to watch its data resolve while you edit.",
+    render: (ctx) =>
+      ctx.deps.renderDataExplorerTemplate(
+        ctx.doc?.document.state ?? {},
+        (ctx.doc?.canvas?.scope ?? null) as Record<string, unknown> | null,
+        {
+          defBadgeLabel: ctx.deps.defBadgeLabel,
+          defCategory: ctx.deps.defCategory,
+          refreshData: ctx.deps.refreshData,
+          renderCanvas: ctx.deps.renderCanvas,
+          renderLeftPanel: ctx.rerender,
+        },
+      ),
+  });
 }

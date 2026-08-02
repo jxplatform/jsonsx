@@ -1,55 +1,74 @@
 /// <reference lib="dom" />
 /**
- * Toolbar panel — extracted from studio.js renderToolbar(). Owns rendering of breadcrumbs, file
- * ops, feature toggles, and mode switcher.
+ * The Command Bar — region ① of UX-REDESIGN-PLAN §3.2, rendered FROM the registry.
+ *
+ * Every control in this band used to be hand-authored twice: once in `toolbarTemplate` and once in
+ * `minimalToolbarTemplate`, a retyped copy of the same buttons with `disabled` hard-coded on each
+ * one for the no-project case. That second copy is the canonical example of the defect §2 principle
+ * 1 names — a hand-maintained list of actions beside the definition site — and §2 principle 4 says
+ * enablement is a PREDICATE with a sentence, never a duplicated template. It is deleted. With no
+ * project open the same bar renders; the records' own `when` clauses empty it.
+ *
+ * What is left is four things, none of which decides what an action is called:
+ *
+ * - {@link tbCmd} renders one command: title, icon, `title="Save (⌘S)"` with the chord formatted for
+ *   THIS platform by `keymap.format` (the predecessor hardcoded `⌘P` and showed it to Windows and
+ *   Linux users), disabled state from `enablement`, and the `requires` sentence in the tooltip when
+ *   it is off — so no control is ever permanently dead with no explanation.
+ * - The primary verb cluster is `forPlacement("commandbar/primary")`, capped at five by
+ *   `scripts/check-chrome-budget.ts`; the ⬢ menu is `forPlacement("commandbar/overflow")`.
+ * - The **Command Center pill** (①a) is the app's address bar: `◈ project › document › selection`,
+ *   right-aligned ⌘K, each segment opening the palette pre-scoped. It replaces the Open Project
+ *   split button, the recents dropdown and the `Search files… ⌘P` trigger, and it gives Studio a
+ *   persistent project name for the first time — today it renders only in the Files panel header,
+ *   and the desktop titlebar is `titleBarStyle:"hidden"`.
+ * - The window controls, which are the one thing in here that is not an action.
+ *
+ * **Retired here, with a name, a chord and a residue** (§2 principle 9): Open Project + New Project
+ * + recents → the pill and `Project: Open Recent…`; `Manage` → `File: Browse Library`; `Publish` →
+ * the `Publish:` family; `Sync Project` → Source Control. The five-mode switcher leaves for the
+ * pane context bar (region ⑦) and is reachable meanwhile as `View: Set Canvas Mode` in the palette,
+ * which prompts for the mode from the record's own `args` enum.
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { openPublishPanel } from "../publish/publish-panel";
-import { updateSession } from "../store";
-import {
-  canRedo as tabCanRedo,
-  canUndo as tabCanUndo,
-  redo as tabRedo,
-  undo as tabUndo,
-} from "../tabs/transact";
-import { collabState } from "../collab/collab-state";
 import { presenceChipsTemplate } from "../collab/presence-chips";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
-import { view } from "../view";
-import { shell, toggleDock } from "../shell";
-import { clearRecentProjects, getRecentProjects, removeRecentProject } from "../recent-projects";
+import { shell } from "../shell";
 import { openQuickSearch } from "./quick-search";
-import { getPlatform } from "../platform";
-import { refreshGitStatus } from "./git-panel";
-import { openBrowseModal } from "../browse/browse-modal";
-import { openNewProjectModal } from "../new-project/new-project-modal";
 import { canvasBaseOrigin } from "../canvas/canvas-origin";
 import { getPreviewNavigateHandler } from "../canvas/preview-navigate";
 import { documentUrlPattern, dynamicRouteParams } from "../page-params";
-import { projectState } from "../state";
-import { isModalOpen } from "../ui/layers";
+import { getNodeAtPath, nodeLabel, projectState } from "../store";
+import { activeRegistry } from "../commands/active-registry";
 import { statusMessage } from "./statusbar";
 import type { Tab } from "../tabs/tab";
+import type { CommandRegistry } from "../commands/registry";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
 
-interface ToolbarCtx {
-  openProject: () => void;
+/**
+ * What the Command Bar is handed at mount.
+ *
+ * HANDOFF: **nothing here is read any more** — every control in the band is a command, so the bar
+ * asks the registry rather than the bootstrap. The fields stay declared, and optional, so
+ * `studio.ts`'s `toolbarPanel.mount(toolbarEl, { … })` object literal keeps type-checking; deleting
+ * them is one edit in that file, which is another workstream's this wave.
+ */
+export interface ToolbarCtx {
+  openProject?: () => void;
   openFile?: (path: string) => void;
-  saveFile: () => void;
-  getCanvasMode: () => string;
-  setCanvasMode: (mode: string) => void;
-  renderCanvas: () => void;
-  safeRenderRightPanel: () => void;
-  openRecentProject: (root: string) => Promise<void>;
-  closeFunctionEditor: () => void;
+  saveFile?: () => void;
+  getCanvasMode?: () => string;
+  setCanvasMode?: (mode: string) => void;
+  renderCanvas?: () => void;
+  safeRenderRightPanel?: () => void;
+  openRecentProject?: (root: string) => Promise<void>;
+  closeFunctionEditor?: () => void;
 }
 
 let _rootEl: HTMLElement | null = null;
-
-let _ctx: ToolbarCtx | null = null;
 
 /** Test override for the mac CSD layout — happy-dom forbids redefining navigator.platform. */
 let _isMacOverride: boolean | null = null;
@@ -66,34 +85,81 @@ function isMacPlatform(): boolean {
 
 let _scope: EffectScope | null = null;
 
-const toolbarIconMap = {
-  "sp-icon-artboard": html`<sp-icon-artboard slot="icon"></sp-icon-artboard>`,
-  "sp-icon-brush": html`<sp-icon-brush slot="icon"></sp-icon-brush>`,
-  "sp-icon-code": html`<sp-icon-code slot="icon"></sp-icon-code>`,
-  "sp-icon-delete": html`<sp-icon-delete slot="icon"></sp-icon-delete>`,
-  "sp-icon-document": html`<sp-icon-document slot="icon"></sp-icon-document>`,
-  "sp-icon-duplicate": html`<sp-icon-duplicate slot="icon"></sp-icon-duplicate>`,
-  "sp-icon-edit": html`<sp-icon-edit slot="icon"></sp-icon-edit>`,
-  "sp-icon-export": html`<sp-icon-export slot="icon"></sp-icon-export>`,
-  "sp-icon-folder-open": html`<sp-icon-folder-open slot="icon"></sp-icon-folder-open>`,
-  "sp-icon-gears": html`<sp-icon-gears slot="icon"></sp-icon-gears>`,
-  "sp-icon-preview": html`<sp-icon-preview slot="icon"></sp-icon-preview>`,
-  "sp-icon-redo": html`<sp-icon-redo slot="icon"></sp-icon-redo>`,
-  "sp-icon-save-floppy": html`<sp-icon-save-floppy slot="icon"></sp-icon-save-floppy>`,
-  "sp-icon-undo": html`<sp-icon-undo slot="icon"></sp-icon-undo>`,
-  "sp-icon-view-grid": html`<sp-icon-view-grid slot="icon"></sp-icon-view-grid>`,
-  "sp-icon-view-list": html`<sp-icon-view-list slot="icon"></sp-icon-view-list>`,
-} as Record<string, TemplateResult>;
+/**
+ * Icon key → Spectrum icon, for the `icon` a command record declares.
+ *
+ * The RECORD names the icon; this map only knows how to draw one. Keys are the record's vocabulary
+ * ("save", "undo"), not Spectrum tag names, so swapping the icon set is a change here and nowhere
+ * else — and a record that names an icon this bar cannot draw renders as a labelled button rather
+ * than as an empty one.
+ */
+const COMMAND_ICONS: Readonly<Record<string, TemplateResult>> = {
+  browser: html`<sp-icon-export slot="icon"></sp-icon-export>`,
+  redo: html`<sp-icon-redo slot="icon"></sp-icon-redo>`,
+  save: html`<sp-icon-save-floppy slot="icon"></sp-icon-save-floppy>`,
+  undo: html`<sp-icon-undo slot="icon"></sp-icon-undo>`,
+};
+
+// ─── One command, one control ─────────────────────────────────────────────────
+
+/** How {@link tbCmd} draws a record. Presentation only — never what the record means. */
+export interface TbCmdOptions {
+  /** Icon-only, with the title as the accessible name. Used by the dock toggles. */
+  compact?: boolean;
+  /** Rendered pressed. The dock toggles are the only controls with an on-state. */
+  selected?: boolean;
+  /** Override the record's icon — a dock toggle's glyph depends on which way the dock is. */
+  icon?: TemplateResult;
+}
 
 /**
- * @param {string} label
- * @param {() => void} onClick
- * @param {string} [iconTag]
+ * The tooltip a control shows: the action's name, plus its chord, or plus WHY it is off.
+ *
+ * One string, three sources, all from the record: `title`, `keymap.formatBinding` and `requires`.
+ * `tbBtnTpl(label, onClick, icon)` — the predecessor — could express none of them, which is why
+ * "Open in Browser" had to hand-build its own disabled variant with a bespoke reason string.
  */
-function tbBtnTpl(label: string, onClick: () => void, iconTag?: string) {
+export function commandTooltip(registry: CommandRegistry, id: string): string {
+  const command = registry.get(id);
+  if (!command) {
+    return "";
+  }
+  const reason = registry.disabledReason(id);
+  if (reason) {
+    return `${command.title} — requires ${reason}`;
+  }
+  const chord = registry.keymap.formatBinding(id);
+  return chord ? `${command.title} (${chord})` : command.title;
+}
+
+/**
+ * Render one command as a Command Bar button, or `nothing` when its `when` hides it.
+ *
+ * This is the whole of §5.5's first row: label, icon, tooltip, chord, disabled state and disabled
+ * reason all come off the record, so the bar cannot disagree with the palette, the keymap or the
+ * agent about any of them.
+ */
+export function tbCmd(registry: CommandRegistry, id: string, options: TbCmdOptions = {}) {
+  const command = registry.get(id);
+  if (!command || !registry.isVisible(id)) {
+    return nothing;
+  }
+  const enabled = registry.isEnabled(id);
+  const icon = options.icon ?? (command.icon ? COMMAND_ICONS[command.icon] : undefined);
   return html`
-    <sp-action-button size="s" title=${label} @click=${onClick}>
-      ${iconTag ? toolbarIconMap[iconTag] : nothing}<span class="tb-label">${label}</span>
+    <sp-action-button
+      size="s"
+      ?quiet=${options.compact === true}
+      ?selected=${options.selected === true}
+      title=${commandTooltip(registry, id)}
+      aria-label=${command.title}
+      ?disabled=${!enabled}
+      @click=${() => {
+        void registry.run(id);
+      }}
+    >
+      ${icon ?? nothing}
+      ${options.compact ? nothing : html`<span class="tb-label">${command.title}</span>`}
     </sp-action-button>
   `;
 }
@@ -170,8 +236,15 @@ function openUrlExternally(url: string) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-/** Run `View: Open in Browser`, reporting the blocking reason when there is one. */
-function runOpenInBrowser() {
+/**
+ * Run `View: Open in Browser`, reporting the blocking reason when there is one.
+ *
+ * Exported as the implementation the bootstrap hands to the record — the ⌘⇧O chord is the record's
+ * `keybinding` now, so the bespoke `document.addEventListener("keydown", …)` this file used to
+ * install (with its own `isModalOpen()` guard, its own shift test and no way to be rebound) is
+ * deleted.
+ */
+export function runOpenInBrowser() {
   const target = openInBrowserTarget(activeTab.value ?? null);
   if ("url" in target) {
     openUrlExternally(target.url);
@@ -180,77 +253,273 @@ function runOpenInBrowser() {
   statusMessage(target.reason);
 }
 
+// ─── ①a The Command Center pill ──────────────────────────────────────────────
+
+/** One segment of the address, and the palette mode it opens. */
+interface PillSegment {
+  key: string;
+  label: string;
+  title: string;
+  onClick: () => void;
+}
+
+/** The document's label: its path without the project root, which is already segment one. */
+export function documentSegmentLabel(tab: Tab | null): string {
+  const path = tab?.documentPath;
+  if (!path) {
+    return "No document";
+  }
+  const root = projectState?.projectRoot;
+  const trimmed = path.replace(/^\.\//, "");
+  return root && trimmed.startsWith(`${root}/`) ? trimmed.slice(root.length + 1) : trimmed;
+}
+
+/** The selection's label — the Outline's own `nodeLabel`, so the two never disagree. */
+export function selectionSegmentLabel(tab: Tab | null): string {
+  if (shell.layoutSelection) {
+    return "layout";
+  }
+  const selection = tab?.session.selection;
+  if (!tab || !selection) {
+    return "";
+  }
+  return nodeLabel(getNodeAtPath(tab.doc.document, selection));
+}
+
 /**
- * The Open in Browser control. Never absent: with no page resolvable it renders disabled and states
- * why in its tooltip, because "the button is missing" is not a thing a user can act on.
+ * `◈ project › document › selection`, right-aligned ⌘K.
+ *
+ * Four facts about where you are, in non-collapsible chrome (§4.4), each one click-through to the
+ * surface that owns it. The empty space between the segments opens the mode picker, which is what
+ * makes the pill an address bar rather than three buttons.
  */
-function openInBrowserTpl(tab: Tab | null) {
-  const target = openInBrowserTarget(tab);
-  const reason = "reason" in target ? target.reason : null;
+function commandCenterTpl(registry: CommandRegistry | null) {
+  const tab = activeTab.value ?? null;
+  const chord = registry?.keymap.formatBinding("palette.open") ?? "";
+  const selection = selectionSegmentLabel(tab);
+  const segments: PillSegment[] = [
+    {
+      key: "project",
+      label: projectState?.name ?? "No project",
+      title: "Switch project — opens Project: Open Recent…",
+      onClick: () => openQuickSearch("projects"),
+    },
+    {
+      key: "document",
+      label: documentSegmentLabel(tab),
+      title: "Go to a file",
+      onClick: () => openQuickSearch("files"),
+    },
+  ];
+  if (selection) {
+    segments.push({
+      key: "selection",
+      label: selection,
+      title: "Go to an element in this document",
+      onClick: () => openQuickSearch("nodes"),
+    });
+  }
   return html`
-    <sp-action-button
-      size="s"
-      title=${reason ? `Open in Browser — ${reason}` : "Open in Browser (⌘⇧O)"}
-      ?disabled=${Boolean(reason)}
-      @click=${runOpenInBrowser}
+    <div
+      class="tb-center"
+      role="group"
+      aria-label="Command Center"
+      @click=${() => openQuickSearch("picker")}
     >
-      ${toolbarIconMap["sp-icon-export"]}<span class="tb-label">Open in Browser</span>
-    </sp-action-button>
+      <span class="tb-center-mark" aria-hidden="true">◈</span>
+      ${segments.map(
+        (segment, index) => html`
+          ${index > 0 ? html`<span class="tb-center-sep" aria-hidden="true">›</span>` : nothing}
+          <button
+            class="tb-center-seg"
+            type="button"
+            title=${segment.title}
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              segment.onClick();
+            }}
+          >
+            ${segment.label}
+          </button>
+        `,
+      )}
+      ${chord ? html`<kbd class="tb-center-chord">${chord}</kbd>` : nothing}
+    </div>
   `;
 }
 
-/** ⌘⇧O / Ctrl+Shift+O. Shift makes `e.key` "O", so the ⌘O in editor/shortcuts.ts never sees it. */
-function onToolbarKeydown(e: KeyboardEvent) {
-  if (isModalOpen() || !(e.metaKey || e.ctrlKey) || !e.shiftKey || e.key.toLowerCase() !== "o") {
-    return;
-  }
-  e.preventDefault();
-  runOpenInBrowser();
-}
+// ─── The ⬢ app menu (commandbar/overflow) ────────────────────────────────────
 
 /**
- * Mount the toolbar panel.
+ * Everything that declared `commandbar/overflow` — the chrome's residue for retired controls.
  *
- * @param {HTMLElement} rootEl
- * @param {ToolbarCtx} ctx — { navigateBack, closeFunctionEditor, openProject, openFile, saveFile,
- *   parseMediaEntries, getCanvasMode, setCanvasMode, renderCanvas, safeRenderRightPanel }
+ * Rendered as a menu of the records themselves, so a command that moves from the primary cluster to
+ * the overflow keeps its name, its chord and its gate, and the move is one edit to its `menus`.
  */
-export function mount(rootEl: HTMLElement, ctx: ToolbarCtx) {
+function appMenuTpl(registry: CommandRegistry) {
+  const commands = registry.forPlacement("commandbar/overflow");
+  return html`
+    <overlay-trigger placement="bottom-start" triggered-by="click">
+      <sp-action-button size="s" quiet slot="trigger" title="Studio menu" aria-label="Studio menu">
+        <sp-icon-show-menu slot="icon"></sp-icon-show-menu>
+      </sp-action-button>
+      <sp-popover slot="click-content" tip>
+        <sp-menu
+          @change=${(e: Event) => {
+            const id = (e.target as unknown as HTMLInputElement).value;
+            if (registry.isEnabled(id)) {
+              void registry.run(id);
+            }
+          }}
+        >
+          ${commands.map(
+            (command) => html`
+              <sp-menu-item
+                value=${command.id}
+                ?disabled=${!registry.isEnabled(command.id)}
+                title=${commandTooltip(registry, command.id)}
+              >
+                ${command.title}
+                <span slot="value">${registry.keymap.formatBinding(command.id) ?? ""}</span>
+              </sp-menu-item>
+            `,
+          )}
+        </sp-menu>
+      </sp-popover>
+    </overlay-trigger>
+  `;
+}
+
+// ─── Window controls ──────────────────────────────────────────────────────────
+
+interface WindowControls {
+  minimize: () => void;
+  maximize: () => void;
+  close: () => void;
+}
+
+function windowControls(): WindowControls | undefined {
+  return (globalThis as unknown as { __jxPlatform?: { windowControls?: WindowControls } })
+    .__jxPlatform?.windowControls;
+}
+
+/** Client-side decorations. Mac puts them leading and close-first; everything else trailing. */
+function csdTpl(controls: WindowControls, mac: boolean) {
+  const minimize = html`
+    <sp-action-button
+      quiet
+      size="s"
+      title="Minimize"
+      class="csd-minimize"
+      @click=${() => controls.minimize()}
+    >
+      <sp-icon-remove slot="icon"></sp-icon-remove>
+    </sp-action-button>
+  `;
+  const maximize = html`
+    <sp-action-button
+      quiet
+      size="s"
+      title="Maximize"
+      class="csd-maximize"
+      @click=${() => controls.maximize()}
+    >
+      <sp-icon-rectangle slot="icon"></sp-icon-rectangle>
+    </sp-action-button>
+  `;
+  const close = html`
+    <sp-action-button
+      quiet
+      size="s"
+      title="Close"
+      class="csd-close"
+      @click=${() => controls.close()}
+    >
+      <sp-icon-close slot="icon"></sp-icon-close>
+    </sp-action-button>
+  `;
+  return mac
+    ? html`<sp-action-group class="window-controls mac" size="s">
+        ${close}${minimize}${maximize}
+      </sp-action-group>`
+    : html`<sp-action-group class="window-controls" size="s">
+        ${minimize}${maximize}${close}
+      </sp-action-group>`;
+}
+
+// ─── The three dock toggles ───────────────────────────────────────────────────
+
+const RAIL_RIGHT_OPEN = html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`;
+const RAIL_RIGHT_CLOSE = html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`;
+const RAIL_LEFT_OPEN = html`<sp-icon-rail-left-open slot="icon"></sp-icon-rail-left-open>`;
+const RAIL_LEFT_CLOSE = html`<sp-icon-rail-left-close slot="icon"></sp-icon-rail-left-close>`;
+const CHAT_ICON = html`<sp-icon-chat slot="icon"></sp-icon-chat>`;
+
+/**
+ * ▤▥▦ — the three docks, each rendered from its own record.
+ *
+ * The glyph flips with the dock's state and `?selected` reports it, so the control says which way
+ * it will go; the NAME and the chord still come from the record, which is why ⌘B and this button
+ * cannot drift apart the way ⌘W and the tab strip's × did.
+ */
+function dockTogglesTpl(registry: CommandRegistry) {
+  return html`
+    ${tbCmd(registry, "view.toggleNavigator", {
+      compact: true,
+      icon: shell.docks.left.collapsed ? RAIL_LEFT_OPEN : RAIL_LEFT_CLOSE,
+      selected: !shell.docks.left.collapsed,
+    })}
+    ${tbCmd(registry, "view.toggleInspector", {
+      compact: true,
+      icon: shell.docks.right.collapsed ? RAIL_RIGHT_OPEN : RAIL_RIGHT_CLOSE,
+      selected: !shell.docks.right.collapsed,
+    })}
+    ${tbCmd(registry, "view.toggleBottomDock", {
+      compact: true,
+      icon: CHAT_ICON,
+      selected: !shell.docks.chat.collapsed,
+    })}
+  `;
+}
+
+// ─── Mount ────────────────────────────────────────────────────────────────────
+
+/**
+ * Mount the Command Bar.
+ *
+ * @param rootEl The `#toolbar` host, stamped `commandbar` by `stampShellRegions()`.
+ * @param _ctx Ignored — see {@link ToolbarCtx}.
+ */
+export function mount(rootEl: HTMLElement, _ctx: ToolbarCtx = {}) {
   _rootEl = rootEl;
-  _ctx = ctx;
-  if (
-    (globalThis as unknown as { __jxPlatform?: { windowControls?: unknown } }).__jxPlatform
-      ?.windowControls
-  ) {
+  if (windowControls()) {
     rootEl.classList.add("electrobun-webkit-app-region-drag");
   }
-  document.addEventListener("keydown", onToolbarKeydown);
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
-      // Dock visibility and source control are shell state, tracked here so the rail/chat icons
-      // And the Sync button follow a flip made from anywhere — the automation runner, the New
-      // Project agent hand-off, the boot-time restore — not just this module's click handlers.
+      // Dock visibility, source control and the project are shell state, tracked here so the band
+      // Follows a flip made from anywhere — the automation runner, the New Project agent hand-off,
+      // The boot-time restore — not just this module's click handlers.
+      void shell.docks.left.collapsed;
       void shell.docks.right.collapsed;
       void shell.docks.chat.collapsed;
       void shell.git.status;
+      void shell.layoutSelection;
+      // The registry itself is reactive state: it is composed AFTER this mount runs, and reading it
+      // Here is what repaints the band from a skeleton into the real bar.
+      void activeRegistry();
       const tab = activeTab.value;
       if (tab) {
-        // Read reactive properties to establish tracking
         void tab.doc.document;
         void tab.doc.dirty;
         void tab.doc.mode;
         void tab.session.selection;
         void tab.session.ui.canvasMode;
-        void tab.session.ui.editingFunction;
-        void tab.session.ui.featureToggles;
         // Open in Browser needs a value for every route param before it can resolve a page.
         void tab.session.ui.previewParams;
-        void tab.session.ui.rightTab;
         void tab.history.index;
         void tab.history.snapshots.length;
-        void collabState(tab).status;
-        void collabState(tab).peers.length;
       }
       render();
     });
@@ -258,15 +527,13 @@ export function mount(rootEl: HTMLElement, ctx: ToolbarCtx) {
 }
 
 export function unmount() {
-  document.removeEventListener("keydown", onToolbarKeydown);
   _scope?.stop();
   _scope = null;
   _rootEl = null;
-  _ctx = null;
 }
 
 export function render() {
-  if (!_rootEl || !_ctx) {
+  if (!_rootEl) {
     return;
   }
   try {
@@ -276,425 +543,33 @@ export function render() {
   }
 }
 
-async function handleNewProject() {
-  const result = await openNewProjectModal();
-  if (result && _ctx) {
-    await _ctx.openRecentProject(result.root);
-  }
-}
-
 /**
- * The chevron dropdown beside "Open Project": New Project, the recent-projects list (each with a
- * remove affordance), and a clear-all action. Shared by both the minimal and full toolbars.
+ * The band.
  *
- * @param {ToolbarCtx} ctx
+ * ONE template for every state. With no project open the records' `when` clauses empty the primary
+ * cluster and the pill reads "No project"; there is no second variant to keep in step.
  */
-function recentMenuTpl(ctx: ToolbarCtx) {
-  const recentProjects = getRecentProjects();
-  return html`
-    <overlay-trigger placement="bottom-start" triggered-by="click">
-      <sp-action-button size="s" slot="trigger" title="Recent projects" class="tb-split-trigger">
-        <sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>
-      </sp-action-button>
-      <sp-popover slot="click-content" tip>
-        <sp-menu
-          @change=${(e: Event) => {
-            const val = (e.target as unknown as HTMLInputElement).value;
-            if (val === "__new__") {
-              void handleNewProject();
-            } else if (val === "__clear__") {
-              clearRecentProjects();
-              render();
-            } else {
-              void ctx.openRecentProject(val);
-            }
-          }}
-        >
-          <sp-menu-item value="__new__">New Project…</sp-menu-item>
-          ${
-            recentProjects.length > 0
-              ? html`
-                  <sp-menu-divider></sp-menu-divider>
-                  ${recentProjects.map(
-                    (p) => html`
-                      <sp-menu-item value=${p.root} title=${p.root}>
-                        ${p.name}
-                        <sp-action-button
-                          slot="end"
-                          quiet
-                          size="s"
-                          title="Remove from recent"
-                          @click=${(e: Event) => {
-                            e.stopPropagation();
-                            removeRecentProject(p.root);
-                            render();
-                          }}
-                        >
-                          <sp-icon-close slot="icon"></sp-icon-close>
-                        </sp-action-button>
-                      </sp-menu-item>
-                    `,
-                  )}
-                  <sp-menu-divider></sp-menu-divider>
-                  <sp-menu-item value="__clear__">Clear recent projects</sp-menu-item>
-                `
-              : nothing
-          }
-        </sp-menu>
-      </sp-popover>
-    </overlay-trigger>
-  `;
-}
-
-/** @param {ToolbarCtx} ctx */
-function minimalToolbarTemplate(ctx: ToolbarCtx) {
-  const recentProjectsTpl = recentMenuTpl(ctx);
-
-  const windowControls = (
-    globalThis as unknown as {
-      __jxPlatform?: {
-        windowControls?: {
-          minimize: () => void;
-          maximize: () => void;
-          close: () => void;
-        };
-      };
-    }
-  ).__jxPlatform?.windowControls;
-  const csdTpl = windowControls
-    ? html`
-        <sp-action-group class="window-controls" size="s">
-          <sp-action-button
-            quiet
-            size="s"
-            title="Minimize"
-            @click=${() => windowControls.minimize()}
-          >
-            <sp-icon-remove slot="icon"></sp-icon-remove>
-          </sp-action-button>
-          <sp-action-button
-            quiet
-            size="s"
-            title="Maximize"
-            @click=${() => windowControls.maximize()}
-          >
-            <sp-icon-rectangle slot="icon"></sp-icon-rectangle>
-          </sp-action-button>
-          <sp-action-button
-            quiet
-            size="s"
-            title="Close"
-            class="csd-close"
-            @click=${() => windowControls.close()}
-          >
-            <sp-icon-close slot="icon"></sp-icon-close>
-          </sp-action-button>
-        </sp-action-group>
-      `
-    : nothing;
-
-  return html`
-    <div class="tb-split-btn">
-      <sp-action-button
-        size="s"
-        class="tb-split-main"
-        title="Open Project"
-        @click=${ctx.openProject}
-      >
-        ${toolbarIconMap["sp-icon-folder-open"]}<span class="tb-label">Open Project</span>
-      </sp-action-button>
-      ${recentProjectsTpl}
-    </div>
-    ${tbBtnTpl("Manage", openBrowseModal, "sp-icon-view-list")}
-    <sp-action-button size="s" title="Save" disabled>
-      ${toolbarIconMap["sp-icon-save-floppy"]}<span class="tb-label">Save</span>
-    </sp-action-button>
-    ${openInBrowserTpl(null)}
-    <sp-action-group compact size="s">
-      <sp-action-button size="s" title="Undo" disabled>
-        ${toolbarIconMap["sp-icon-undo"]}<span class="tb-label">Undo</span>
-      </sp-action-button>
-      <sp-action-button size="s" title="Redo" disabled>
-        ${toolbarIconMap["sp-icon-redo"]}<span class="tb-label">Redo</span>
-      </sp-action-button>
-    </sp-action-group>
-    <div class="tb-spacer"></div>
-    <sp-action-button
-      class="tb-search-trigger"
-      size="s"
-      quiet
-      title="Search files (⌘P)"
-      @click=${openQuickSearch}
-    >
-      <sp-icon-search slot="icon"></sp-icon-search>
-      <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
-    </sp-action-button>
-    <div class="tb-spacer"></div>
-    <sp-action-group selects="single" size="s" compact>
-      ${modes.map(
-        (m) => html`
-          <sp-action-button size="s" title=${m.label} disabled ?selected=${m.key === "design"}>
-            ${toolbarIconMap[m.iconTag]}<span class="tb-label">${m.label}</span>
-          </sp-action-button>
-        `,
-      )}
-    </sp-action-group>
-    <sp-action-button quiet size="s" title="Toggle Right Panel" @click=${() => toggleDock("right")}>
-      ${
-        shell.docks.right.collapsed
-          ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
-          : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`
-      }
-    </sp-action-button>
-    ${chatToggleTpl()} ${csdTpl}
-  `;
-}
-
-/** Toggle for the persistent AI chat sidebar (selected = open). Shared by both layouts. */
-function chatToggleTpl() {
-  return html`
-    <sp-action-button
-      quiet
-      size="s"
-      title="Toggle Assistant"
-      ?selected=${!shell.docks.chat.collapsed}
-      @click=${() => toggleDock("chat")}
-    >
-      <sp-icon-chat slot="icon"></sp-icon-chat>
-    </sp-action-button>
-  `;
-}
-
-const modes = [
-  { iconTag: "sp-icon-edit", key: "edit", label: "Edit" },
-  { iconTag: "sp-icon-artboard", key: "design", label: "Design" },
-  { iconTag: "sp-icon-view-grid", key: "grid", label: "Grid" },
-  { iconTag: "sp-icon-code", key: "source", label: "Code" },
-  { iconTag: "sp-icon-brush", key: "stylebook", label: "Stylebook" },
-];
-
 function toolbarTemplate() {
-  const tab = activeTab.value;
-  if (!_ctx) {
-    return html``;
-  }
-  const ctx = _ctx;
-
-  if (!tab) {
-    return minimalToolbarTemplate(ctx);
-  }
-
-  const allowedModes = new Set(tab.capabilities.modes);
-  const canUndo = tabCanUndo(tab);
-  const canRedo = tabCanRedo(tab);
-  const canSave = tab.doc.dirty;
-
-  const S = {
-    dirty: tab.doc.dirty,
-    fileHandle: tab.fileHandle,
-    mode: tab.doc.mode,
-    selection: tab.session.selection,
-    ui: tab.session.ui,
-  };
-  // Base mode, not the effective mode: the switcher keeps Edit/Design highlighted while the
-  // Tab-bar preview toggle is on (preview is no longer a switchable mode).
-  const { canvasMode } = tab.session.ui;
-
-  const modeSwitcherTpl = html`
-    <sp-action-group selects="single" size="s" compact>
-      ${modes.map(
-        (m) => html`
-          <sp-action-button
-            size="s"
-            title=${m.label}
-            ?selected=${canvasMode === m.key}
-            ?disabled=${!allowedModes.has(m.key)}
-            @click=${() => {
-              if (canvasMode === m.key) {
-                return;
-              }
-              if (!allowedModes.has(m.key)) {
-                return;
-              }
-              if (S.ui.editingFunction && view.functionEditor) {
-                view.functionEditor.dispose();
-                view.functionEditor = null;
-              }
-              ctx.setCanvasMode(m.key);
-              view.panX = 0;
-              view.panY = 0;
-              /** @type {{ editingFunction: null; rightTab?: string }} */
-              const uiPatch: { editingFunction: null; rightTab?: string } = {
-                editingFunction: null,
-              };
-              if (m.key === "stylebook") {
-                uiPatch.rightTab = "style";
-              }
-              updateSession({ ui: uiPatch });
-              ctx.renderCanvas();
-              ctx.safeRenderRightPanel();
-            }}
-          >
-            ${toolbarIconMap[m.iconTag]}<span class="tb-label">${m.label}</span>
-          </sp-action-button>
-        `,
-      )}
-    </sp-action-group>
-  `;
-
-  const windowControls = (
-    globalThis as unknown as {
-      __jxPlatform?: {
-        windowControls?: {
-          minimize: () => void;
-          maximize: () => void;
-          close: () => void;
-        };
-      };
-    }
-  ).__jxPlatform?.windowControls;
-  const isMac = isMacPlatform();
-  const csdTpl = windowControls
-    ? isMac
-      ? html`
-          <sp-action-group class="window-controls mac" size="s">
-            <sp-action-button
-              quiet
-              size="s"
-              title="Close"
-              class="csd-close"
-              @click=${() => windowControls.close()}
-            >
-              <sp-icon-close slot="icon"></sp-icon-close>
-            </sp-action-button>
-            <sp-action-button
-              quiet
-              size="s"
-              title="Minimize"
-              class="csd-minimize"
-              @click=${() => windowControls.minimize()}
-            >
-              <sp-icon-remove slot="icon"></sp-icon-remove>
-            </sp-action-button>
-            <sp-action-button
-              quiet
-              size="s"
-              title="Maximize"
-              class="csd-maximize"
-              @click=${() => windowControls.maximize()}
-            >
-              <sp-icon-rectangle slot="icon"></sp-icon-rectangle>
-            </sp-action-button>
-          </sp-action-group>
-        `
-      : html`
-          <sp-action-group class="window-controls" size="s">
-            <sp-action-button
-              quiet
-              size="s"
-              title="Minimize"
-              class="csd-minimize"
-              @click=${() => windowControls.minimize()}
-            >
-              <sp-icon-remove slot="icon"></sp-icon-remove>
-            </sp-action-button>
-            <sp-action-button
-              quiet
-              size="s"
-              title="Maximize"
-              class="csd-maximize"
-              @click=${() => windowControls.maximize()}
-            >
-              <sp-icon-rectangle slot="icon"></sp-icon-rectangle>
-            </sp-action-button>
-            <sp-action-button
-              quiet
-              size="s"
-              title="Close"
-              class="csd-close"
-              @click=${() => windowControls.close()}
-            >
-              <sp-icon-close slot="icon"></sp-icon-close>
-            </sp-action-button>
-          </sp-action-group>
-        `
-    : nothing;
-
-  const recentProjectsTpl = recentMenuTpl(ctx);
-
+  const registry = activeRegistry();
+  const controls = windowControls();
+  const mac = isMacPlatform();
+  const csd = controls ? csdTpl(controls, mac) : nothing;
+  const tab = activeTab.value ?? null;
   return html`
-    ${isMac ? csdTpl : nothing}
-    <div class="tb-split-btn">
-      <sp-action-button
-        size="s"
-        class="tb-split-main"
-        title="Open Project"
-        @click=${ctx.openProject}
-      >
-        ${toolbarIconMap["sp-icon-folder-open"]}<span class="tb-label">Open Project</span>
-      </sp-action-button>
-      ${recentProjectsTpl}
-    </div>
-    ${tbBtnTpl("Manage", openBrowseModal, "sp-icon-view-list")}
-    ${tbBtnTpl("Publish", openPublishPanel)}
-    <sp-action-button size="s" title="Save" ?disabled=${!canSave} @click=${ctx.saveFile}>
-      ${toolbarIconMap["sp-icon-save-floppy"]}<span class="tb-label">Save</span>
-    </sp-action-button>
-    ${openInBrowserTpl(tab)}
-    <sp-action-group compact size="s">
-      <sp-action-button
-        size="s"
-        title="Undo"
-        ?disabled=${!canUndo}
-        @click=${() => tabUndo(activeTab.value!)}
-      >
-        ${toolbarIconMap["sp-icon-undo"]}<span class="tb-label">Undo</span>
-      </sp-action-button>
-      <sp-action-button
-        size="s"
-        title="Redo"
-        ?disabled=${!canRedo}
-        @click=${() => tabRedo(activeTab.value!)}
-      >
-        ${toolbarIconMap["sp-icon-redo"]}<span class="tb-label">Redo</span>
-      </sp-action-button>
-    </sp-action-group>
-    ${presenceChipsTemplate(tab)}
+    ${mac ? csd : nothing} ${registry ? appMenuTpl(registry) : nothing}
     <div class="tb-spacer"></div>
-    <sp-action-button
-      class="tb-search-trigger"
-      size="s"
-      quiet
-      title="Search files (⌘P)"
-      @click=${openQuickSearch}
-    >
-      <sp-icon-search slot="icon"></sp-icon-search>
-      <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
-    </sp-action-button>
+    ${commandCenterTpl(registry)}
+    <div class="tb-spacer"></div>
     ${
-      (shell.git.status?.behind ?? 0) > 0
-        ? html`<sp-action-button
-            size="s"
-            title="Sync Project"
-            @click=${async () => {
-              await getPlatform().gitPull();
-              await refreshGitStatus();
-            }}
-          >
-            <sp-icon-download slot="icon"></sp-icon-download>
-            <span class="tb-label">Sync Project</span>
-          </sp-action-button>`
+      registry
+        ? html`<sp-action-group compact size="s">
+            ${registry
+              .forPlacement("commandbar/primary")
+              .map((command) => tbCmd(registry, command.id))}
+          </sp-action-group>`
         : nothing
     }
-    <div class="tb-spacer"></div>
-    ${modeSwitcherTpl}
-    <sp-action-button quiet size="s" title="Toggle Right Panel" @click=${() => toggleDock("right")}>
-      ${
-        shell.docks.right.collapsed
-          ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
-          : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`
-      }
-    </sp-action-button>
-    ${chatToggleTpl()} ${isMac ? nothing : csdTpl}
+    ${tab ? presenceChipsTemplate(tab) : nothing} ${registry ? dockTogglesTpl(registry) : nothing}
+    ${mac ? nothing : csd}
   `;
 }

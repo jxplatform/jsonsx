@@ -49,6 +49,9 @@ import { mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { view } from "../view";
 import { setActivityTab } from "../shell";
 import { renderEmptyState } from "./empty-state";
+import { registerPanel } from "./panel-registry";
+import { renderStylebookLayersTemplate } from "./stylebook-layers-panel";
+import { selectStylebookTag, stylebookMeta } from "./stylebook-panel";
 import { isInlineElement } from "../editor/inline-edit";
 import { showContextMenu } from "../editor/context-menu";
 import { panToElement } from "../canvas/canvas-utils";
@@ -822,4 +825,40 @@ export function renderLayersTemplate(ctx: {
       </div>
     </div>
   `;
+}
+
+/**
+ * Contribute the Outline panel.
+ *
+ * `level: "document"` — it writes the open document's tree (reorder, rename, delete, duplicate).
+ * "Outline" rather than "Layers" is §3.2 ③'s name for it; the id stays `layers` because that is
+ * what `view.setActivity` and 26 screenshot steps address it by, and an id is not a label.
+ */
+export function registerLayersPanel(): void {
+  registerPanel({
+    id: "layers",
+    title: "Outline",
+    level: "document",
+    dock: "navigator",
+    icon: "sp-icon-layers",
+    requiresDocument: "Open a page to see the elements it is built from.",
+    render: (ctx) =>
+      ctx.deps.getCanvasMode() === "stylebook"
+        ? renderStylebookLayersTemplate({
+            selectStylebookTag,
+            stylebookMeta,
+          } as Parameters<typeof renderStylebookLayersTemplate>[0])
+        : renderLayersTemplate({
+            navigateToComponent: ctx.deps.navigateToComponent,
+            rerender: ctx.rerender,
+          }),
+    afterRender: (ctx, host) => {
+      if (ctx.deps.getCanvasMode() !== "stylebook") {
+        ctx.deps.registerLayersDnD();
+      }
+      host
+        .querySelector(".layer-row.selected")
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    },
+  });
 }

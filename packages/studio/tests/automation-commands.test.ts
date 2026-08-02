@@ -18,6 +18,9 @@ void mock.module("../src/panels/stylebook-panel", () => ({
   renderComponentPreview: async () => document.createElement("div"),
   renderStylebookMode: () => {},
   selectStylebookTag: () => {},
+  // The Outline record picks its stylebook variant from this catalogue; registering the panel
+  // Now pulls it in through `layers-panel.ts`.
+  stylebookMeta: {},
 }));
 
 const { AUTOMATION_COMMANDS, AutomationRefusedError, REFUSED_SEEDS, createAutomationApi, seedIds } =

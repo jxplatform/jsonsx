@@ -145,8 +145,8 @@ describe("left panel — project-level tabs", () => {
     expect(renders()).toBeGreaterThan(afterSubTab);
   });
 
-  test("blocks tab renders the elements palette and registers DnD", async () => {
-    shell.leftTab = "blocks";
+  test("insert panel renders the elements palette and registers DnD", async () => {
+    shell.leftTab = "insert";
     await mountWith();
     expect(leftPanel.querySelector('[data-block-tag="p"]')).not.toBeNull();
     expect(ctx.registerElementsDnD).toHaveBeenCalled();
@@ -185,9 +185,9 @@ describe("left panel — document tabs", () => {
     expect(ctx.registerLayersDnD).not.toHaveBeenCalled();
   });
 
-  test("imports tab passes document elements and a transact-backed applyMutation", async () => {
+  test("packages panel passes document elements and a transact-backed applyMutation", async () => {
     activeTab.value!.doc.document.$elements = ["@acme/widgets"] as never;
-    shell.leftTab = "imports";
+    shell.leftTab = "packages";
     await mountWith();
     expect(leftPanel.querySelector("#imports-rendered")).not.toBeNull();
     expect(captured.imports.documentElements).toEqual(["@acme/widgets"]);
@@ -226,12 +226,14 @@ describe("left panel — document tabs", () => {
     expect(captured.data[1]).toBeNull();
   });
 
-  test("unknown tab renders an empty panel body", async () => {
+  test("an id the registry does not declare says so instead of painting a blank body", async () => {
     shell.leftTab = "bogus";
     await mountWith();
     const body = leftPanel.querySelector(".panel-body") as HTMLElement;
     expect(body).not.toBeNull();
-    expect(body.children.length).toBe(0);
+    expect(body.querySelector(".empty-state-message")?.textContent).toBe(
+      'No Navigator panel is registered as "bogus".',
+    );
   });
 
   test("no active tab teaches what each document tab is for instead of painting a blank body", async () => {
@@ -251,7 +253,7 @@ describe("left panel — document tabs", () => {
   test("every document tab has its own no-document sentence", async () => {
     closeAllTabs();
     const seen = new Set<string>();
-    for (const tabName of ["layers", "imports", "state", "data", "head"]) {
+    for (const tabName of ["layers", "packages", "state", "data", "page"]) {
       shell.leftTab = tabName;
       await mountWith();
       const message = leftPanel.querySelector(".empty-state-message")?.textContent ?? "";
@@ -263,9 +265,9 @@ describe("left panel — document tabs", () => {
   });
 });
 
-describe("left panel — head tab", () => {
+describe("left panel — page panel", () => {
   test("non-content mode passes the document and transacts mutations directly", async () => {
-    shell.leftTab = "head";
+    shell.leftTab = "page";
     await mountWith();
     expect(leftPanel.querySelector("#head-rendered")).not.toBeNull();
     expect(captured.head.document).toBe(activeTab.value!.doc.document);
@@ -283,7 +285,7 @@ describe("left panel — head tab", () => {
       $head: [{ content: "x", tag: "meta" }],
       title: "FM Title",
     };
-    shell.leftTab = "head";
+    shell.leftTab = "page";
     await mountWith();
     expect(captured.head.document.title).toBe("FM Title");
     expect(captured.head.document.$head).toEqual([{ content: "x", tag: "meta" }]);
@@ -293,7 +295,7 @@ describe("left panel — head tab", () => {
     const tab = activeTab.value!;
     tab.doc.mode = "content";
     tab.doc.content.frontmatter = { title: "Old" };
-    shell.leftTab = "head";
+    shell.leftTab = "page";
     await mountWith();
 
     captured.head.applyMutation((doc: JxMutableNode) => {
@@ -312,7 +314,7 @@ describe("left panel — head tab", () => {
       $head: [{ content: "x", tag: "meta" }],
       title: "Same",
     };
-    shell.leftTab = "head";
+    shell.leftTab = "page";
     await mountWith();
 
     captured.head.applyMutation((doc: JxMutableNode) => {

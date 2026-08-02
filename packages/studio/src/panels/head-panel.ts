@@ -11,9 +11,11 @@ import { renderFieldRow } from "../ui/field-row";
 import { spTextArea, spTextField } from "../ui/field-input";
 import { renderMediaPicker } from "../ui/media-picker";
 import { projectState, renderOnly } from "../store";
-import type { DirEntry } from "../types";
+import type { DirEntry, JsonValue } from "../types";
 import { activeTab } from "../workspace/workspace";
 import { renderEmptyState } from "./empty-state";
+import { registerPanel } from "./panel-registry";
+import { mutateUpdateFrontmatter, transact } from "../tabs/transact";
 import { collectFmFields, renderFmField } from "./frontmatter-fields";
 import { isGoogleFontEntry, isGoogleFontPreconnect } from "../utils/google-fonts";
 import { invalidateLayoutCache } from "../site-context";
@@ -585,4 +587,78 @@ function renderFrontmatterSection() {
       </div>
     </div>
   `;
+}
+
+/** Overlay content-mode frontmatter title/`$head` onto the document the panel edits. */
+function buildHeadDoc(doc: JxMutableNode, fm: Record<string, unknown>): JxMutableNode {
+  const title = fm.title as string | undefined;
+  const $head = fm.$head as JxHeadEntry[] | undefined;
+  return {
+    ...doc,
+    ...(title === undefined ? {} : { title }),
+    ...($head === undefined ? {} : { $head }),
+  };
+}
+
+/**
+ * The mutation path for a content-mode document, where title and `$head` live in frontmatter.
+ *
+ * The panel edits a `JxMutableNode`; a markdown page's head fields are frontmatter keys. This
+ * adapts one to the other in the module that owns both, instead of in the Navigator orchestrator
+ * that owns neither.
+ */
+function applyContentMutation(rerender: () => void, fn: (doc: JxMutableNode) => void): void {
+  const tabNow = activeTab.value;
+  if (!tabNow) {
+    return;
+  }
+  const fmNow = (tabNow.doc.content?.frontmatter ?? {}) as Record<string, unknown>;
+  const fmHead = fmNow.$head as JxHeadEntry[] | undefined;
+  const tmp: JxMutableNode = {
+    ...(typeof fmNow.title === "string" ? { title: fmNow.title } : {}),
+    ...(fmHead ? { $head: [...fmHead] } : {}),
+  };
+  fn(tmp);
+  if (tmp.title !== fmNow.title) {
+    mutateUpdateFrontmatter(tabNow, "title", tmp.title as JsonValue);
+  }
+  const newHead = tmp.$head && tmp.$head.length > 0 ? tmp.$head : undefined;
+  // JxHeadEntry[] is JSON document content by construction.
+  mutateUpdateFrontmatter(tabNow, "$head", newHead as JsonValue);
+  rerender();
+}
+
+/**
+ * Contribute the Page panel.
+ *
+ * `level: "document"` — title, description, social card and custom `$head` entries are the open
+ * document's. The id is `page` now: "head" named an HTML element, and §3.2's DOCUMENT group calls
+ * the surface Page. P3.10 moves these fields into the in-stage Document Header card; until then the
+ * record is what keeps the surface addressable under one name.
+ */
+export function registerPagePanel(): void {
+  registerPanel({
+    id: "page",
+    title: "Page",
+    level: "document",
+    dock: "navigator",
+    icon: "sp-icon-view-all-tags",
+    requiresDocument: "Open a page to edit its title, description and social preview.",
+    render: (ctx) => {
+      const doc = ctx.doc!;
+      const isContent = doc.mode === "content";
+      const fm = doc.content?.frontmatter ?? {};
+      // Through `deps`, not the local binding: `studio.ts` owns the wiring, and the Navigator has
+      // Injected these renderers since before the registry existed.
+      return ctx.deps.renderHeadTemplate({
+        applyMutation: isContent
+          ? (fn) => applyContentMutation(ctx.rerender, fn)
+          : (fn) => {
+              transact(activeTab.value, fn);
+            },
+        document: isContent ? buildHeadDoc(doc.document, fm) : doc.document,
+        renderLeftPanel: ctx.rerender,
+      });
+    },
+  });
 }

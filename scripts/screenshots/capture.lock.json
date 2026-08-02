@@ -1,8 +1,8 @@
 {
   "images": {
     "docs/images/ai-document-assistant.png": {
-      "bytes": 1673950,
-      "capturedAt": "2026-08-02T18:56:55Z",
+      "bytes": 1680992,
+      "capturedAt": "2026-08-02T22:26:45Z",
       "capturedBy": "screenshots@local",
       "definition": "4b0d73c8135e295a1a7165b049715857d19c79bd0f2f178c0fd4f85e347232c4",
       "height": 2000,
@@ -11,7 +11,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "4fbefccccdfa1c04efd1a7af4b06f4b9d5f5b79174ec4e9a450d118d776ac524",
+      "sha256": "7f127278b57c228e3b43c11d272883837ecdae2652c394e902bb4aa0ab2d94cc",
       "shot": "ai-document-assistant",
       "width": 3840
     },
@@ -31,8 +31,8 @@
       "width": 640
     },
     "docs/images/ai-sidebar.png": {
-      "bytes": 1638627,
-      "capturedAt": "2026-08-02T18:56:49Z",
+      "bytes": 1644060,
+      "capturedAt": "2026-08-02T22:26:37Z",
       "capturedBy": "screenshots@local",
       "definition": "c9d3ee13b948f81e82589ce99d8fc58ee478551fecc70426bbaa8e6cc991374e",
       "height": 2000,
@@ -41,7 +41,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "6cced6184bea5cc78fe23e2f97663585e14a325dcb929915c2787aa33e7020bd",
+      "sha256": "d2c8dd1d121cf2842de8112147c72cc05509afb396c31018f3bc8ce0ded1792b",
       "shot": "ai-sidebar",
       "width": 3840
     },
@@ -76,8 +76,8 @@
       "width": 3840
     },
     "docs/images/blog-collection-state.png": {
-      "bytes": 57880,
-      "capturedAt": "2026-08-02T18:56:34Z",
+      "bytes": 59221,
+      "capturedAt": "2026-08-02T22:26:19Z",
       "capturedBy": "screenshots@local",
       "definition": "d0fa586b88beb8d1f72a260d23f31ad2c5794d4ac681aab0e470c40283b272cc",
       "height": 1240,
@@ -86,7 +86,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "9087bf8fcba479474d666cacb205440ab864b322a6eaad035402817062aa459b",
+      "sha256": "243d71ac1d0ce5ca8bbfd06f82e1913f608dab6d89657f6b518470a1c4506158",
       "shot": "blog-collection-state",
       "width": 480
     },
@@ -256,17 +256,17 @@
       "width": 480
     },
     "docs/images/counter-elements.png": {
-      "bytes": 184744,
-      "capturedAt": "2026-08-02T18:56:06Z",
+      "bytes": 190525,
+      "capturedAt": "2026-08-02T22:25:43Z",
       "capturedBy": "screenshots@local",
-      "definition": "e6920f006856bdbffd8c8ed9358c06cb6168470e6b290da623b03e19169e6c61",
+      "definition": "804b520463cbfdab27f70cbced9c53392d33336761b354fe03853a92d506885b",
       "height": 2000,
       "runtime": {
         "chromium": "150",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "30c1924414cd28c243ca480bfb24fa99105f5e5a46009bd374365fa9bdd21062",
+      "sha256": "cd31003f686a136747c53ac0da9b2e50b987e907469f7c5969b7412c18e1066e",
       "shot": "counter-elements",
       "width": 3840
     },
@@ -361,8 +361,8 @@
       "width": 3680
     },
     "docs/images/data-explorer.png": {
-      "bytes": 56259,
-      "capturedAt": "2026-08-02T18:55:29Z",
+      "bytes": 59627,
+      "capturedAt": "2026-08-02T22:25:00Z",
       "capturedBy": "screenshots@local",
       "definition": "7dff89b6dd9a305e7d0f92d76973a04156dd10b4e064da43dbe3fec177a7ed92",
       "height": 1880,
@@ -371,7 +371,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "e303b29bf5921139304a120c55b3fce4e32eadc7b3e431cde0ea1f69bcd29281",
+      "sha256": "0bc3583f7e6d4dd4d3bee92cda344a9dfff3c7cdff9c0fbef13e905786320160",
       "shot": "data-explorer-shot",
       "width": 480
     },
@@ -391,8 +391,8 @@
       "width": 3840
     },
     "docs/images/data-source-request.png": {
-      "bytes": 109854,
-      "capturedAt": "2026-08-02T18:57:06Z",
+      "bytes": 111170,
+      "capturedAt": "2026-08-02T22:27:00Z",
       "capturedBy": "screenshots@local",
       "definition": "d65c05cf48c5eee48305decac6c6e8b86fd3b3522be90aad3e2e7c3ecbca6059",
       "height": 1880,
@@ -401,7 +401,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "1fc84d247499c49360ed33b25277b4bf5a4c12b11608aed915b3b8d19bdd5998",
+      "sha256": "eb418799e353343c895279b25ed478eefb1202287ad5745dc3ffb6aa93f757a3",
       "shot": "data-source-request",
       "width": 480
     },
@@ -451,32 +451,32 @@
       "width": 560
     },
     "docs/images/document-panel.png": {
-      "bytes": 103363,
-      "capturedAt": "2026-08-02T18:55:24Z",
+      "bytes": 102789,
+      "capturedAt": "2026-08-02T22:28:11Z",
       "capturedBy": "screenshots@local",
-      "definition": "6677e05a2727e5dff04f5536dbff770910fd695761b77583d7d590c60014e507",
+      "definition": "81f2656cfafdb4a6e9304aa2f73247b574e495a0a63fb889128afc2b2f4962ae",
       "height": 1880,
       "runtime": {
         "chromium": "150",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "828fb18f1d201c71fc87411f9a390ad45dc43e9bd2ae530a4dd13debff8954ef",
+      "sha256": "f62858c06205151d7eb1b21ace763ca33572f01fdbfce25ba48efe9f4931dc2e",
       "shot": "document-panel-shot",
       "width": 480
     },
     "docs/images/elements-panel.png": {
-      "bytes": 56539,
-      "capturedAt": "2026-08-02T18:55:15Z",
+      "bytes": 59919,
+      "capturedAt": "2026-08-02T22:24:43Z",
       "capturedBy": "screenshots@local",
-      "definition": "54380da740077c6cdf75775212153cc1f2e42154e961ec38457ad88d564cb714",
+      "definition": "5c724ab422023ec4490fcc57ff086c3f53bfcd94c42ac73a3000b9a5cc94dfbe",
       "height": 1880,
       "runtime": {
         "chromium": "150",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "583b3713d9ce354cf28d8990e83e33d2581f390856f11bc03a7cfd0e055259b0",
+      "sha256": "4a41060c489a65a2dd1b01617d58077d907d0952749887f92fb73518564df5ec",
       "shot": "elements-panel-shot",
       "width": 480
     },
@@ -541,8 +541,8 @@
       "width": 542
     },
     "docs/images/git-panel.png": {
-      "bytes": 88212,
-      "capturedAt": "2026-08-02T18:54:44Z",
+      "bytes": 93248,
+      "capturedAt": "2026-08-02T22:24:08Z",
       "capturedBy": "screenshots@local",
       "definition": "d3185cbdc45ee73790b9b7c0cdc0800b2d864300143369748cd393cf19efb324",
       "height": 1880,
@@ -551,7 +551,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "aff361cb879c3f66c61621ce2f6726b4a84b2b4927fc68f6602d8b1ebbc1e7f4",
+      "sha256": "7811484a6dc5cf015894613f8160d0af92900ca911873c5d6d6abf67d11aedc1",
       "shot": "git-panel",
       "width": 480
     },
@@ -587,9 +587,9 @@
     },
     "docs/images/imports-panel.png": {
       "bytes": 27148,
-      "capturedAt": "2026-08-02T18:55:21Z",
+      "capturedAt": "2026-08-02T22:24:48Z",
       "capturedBy": "screenshots@local",
-      "definition": "d97068e4e54a832ba9417b3ad0b76764f5cdfa8caaecab0b16b59a24e2cfad2b",
+      "definition": "e411f30cc6f0534d247487dddb9dfc281ce36f81d78bd874293f9c8105f62289",
       "height": 1880,
       "runtime": {
         "chromium": "150",
@@ -616,8 +616,8 @@
       "width": 2094
     },
     "docs/images/layers-panel.png": {
-      "bytes": 98367,
-      "capturedAt": "2026-08-02T18:55:18Z",
+      "bytes": 100929,
+      "capturedAt": "2026-08-02T22:24:46Z",
       "capturedBy": "screenshots@local",
       "definition": "42d24096685ab55c5469b09efcc591d6afe22b676302550dac1c999aaa7313e0",
       "height": 1880,
@@ -626,7 +626,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "343b327b4e58ce988f42be0608524dc628259f702e8a7bdf9a0aafa3f3ffb04b",
+      "sha256": "1f318f2bbe3863056390a3aa6a2a74d727c207d960be2a02fd79c5e285454f5d",
       "shot": "layers-panel-shot",
       "width": 480
     },
@@ -871,8 +871,8 @@
       "width": 3840
     },
     "docs/images/tab-strip.png": {
-      "bytes": 2160,
-      "capturedAt": "2026-08-02T18:56:00Z",
+      "bytes": 6036,
+      "capturedAt": "2026-08-02T22:25:35Z",
       "capturedBy": "screenshots@local",
       "definition": "518143d28759c9d8f36ce0e198f41c60d36ec77f38d002eb9cfb9529d2c60d47",
       "height": 68,
@@ -881,9 +881,9 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "0ca02dd9365e0216aa13a8d532fac274feef71e4a58df4ba35ec4307136b60c6",
+      "sha256": "6236d7d428ed91598c2fcc5505482b24f87430c511fae66a7ab439367cd48182",
       "shot": "tab-strip-shot",
-      "width": 1436
+      "width": 1420
     },
     "docs/images/welcome-screen.png": {
       "bytes": 163125,

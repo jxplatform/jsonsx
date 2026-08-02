@@ -15,6 +15,9 @@ import { updateSiteConfig } from "../site-context";
 import { getPlatform } from "../platform";
 import { showConfirmDialog } from "../ui/layers";
 import { renderEmptyState } from "./empty-state";
+import { registerPanel } from "./panel-registry";
+import { activeTab } from "../workspace/workspace";
+import { transact } from "../tabs/transact";
 
 import type { ComponentEntry } from "../files/components";
 import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
@@ -489,4 +492,32 @@ function renderDocumentLevelImports({
       )}
     </div>
   `;
+}
+
+/**
+ * Contribute the Packages panel.
+ *
+ * `level: "document"` — it writes the open document's `$elements`. The id and the title are both
+ * `packages` now: "Imports" named the mechanism, and the panel silently changed meaning on
+ * `documentPath?.endsWith("project.json")` with nothing on screen saying so. The header the
+ * Navigator draws from this record ("PACKAGES · document") is where that stops.
+ */
+export function registerPackagesPanel(): void {
+  registerPanel({
+    id: "packages",
+    title: "Packages",
+    level: "document",
+    dock: "navigator",
+    icon: "sp-icon-box",
+    requiresDocument: "Open a page to choose which components it can use.",
+    render: (ctx) =>
+      ctx.deps.renderImportsTemplate({
+        applyMutation: (fn: (doc: JxMutableNode) => void) => {
+          transact(activeTab.value, fn);
+        },
+        documentElements: ctx.doc?.document.$elements ?? [],
+        documentPath: ctx.doc?.documentPath ?? null,
+        renderLeftPanel: ctx.rerender,
+      }),
+  });
 }

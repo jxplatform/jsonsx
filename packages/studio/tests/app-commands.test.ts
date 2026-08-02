@@ -30,6 +30,8 @@ describe("the set", () => {
       "formula",
       "inspector",
       "palette",
+      // One `panel.focus.<id>` per Navigator panel, generated from the panel registry's own roster.
+      "panel",
       "project",
       "selection",
       "settings",

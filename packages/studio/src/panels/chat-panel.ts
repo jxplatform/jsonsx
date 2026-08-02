@@ -1,6 +1,19 @@
 /// <reference lib="dom" />
 /**
- * Chat-panel.ts — the persistent AI chat sidebar (`#chat-panel` shell region).
+ * Chat-panel.ts — the assistant, hosted by the Inspector dock (`inspector.assistant` region).
+ *
+ * **It is no longer a column.** `#chat-panel` used to be a fifth permanent grid column ~300px wide;
+ * it now shares `#right-panel`'s cell, one of the two visible at a time, which is what an inspector
+ * TAB is (plan §3.2 ⑨ — folding the assistant in costs zero additional width). `shell.ts` enforces
+ * the two states that implies: opening the assistant opens the dock, and collapsing the dock closes
+ * the assistant.
+ *
+ * **The seam.** What is missing is the tab STRIP — the four labelled tabs (Content · Style · Logic ·
+ * Assistant) that select between them. Until it lands, the selector is `view.setAssistant {open}`
+ * and the Command Bar's assistant toggle, and `right-panel.ts` is untouched: it still owns
+ * `#right-panel` and its own three-tab strip, and this module still owns `#chat-panel`. Nothing
+ * here needs to move again when the strip arrives; the container it renders into becomes the fourth
+ * tab's body.
  *
  * Hosts the assistant UI from ai-panel.ts unconditionally: with no project (welcome screen), with a
  * project but no open document, and with a document open. The panel is mounted once at studio boot

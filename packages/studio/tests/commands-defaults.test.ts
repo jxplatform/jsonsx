@@ -6,12 +6,34 @@
  * record says. Wiring is next wave; the contract is now.
  */
 import { describe, expect, test } from "bun:test";
-import { defaultCommands, defaultCommandSet, noopCommandDeps } from "../src/commands/defaults";
-import type { CommandDeps, DockId, PaletteMode } from "../src/commands/defaults";
+import {
+  defaultCommands,
+  defaultCommandSet,
+  INSPECTOR_TABS,
+  noopCommandDeps,
+  panelFocusCommands,
+  RAIL_CHORD_LIMIT,
+} from "../src/commands/defaults";
+import type { CommandDeps, DockId, PaletteMode, RailPanel } from "../src/commands/defaults";
+import { appCommandSet } from "../src/commands/app-commands";
+import { navigatorPanelSet } from "../src/panels/navigator-panels";
 import { createCommandRegistry } from "../src/commands/registry";
 import { checkPlacements } from "../src/commands/levels";
 import { checkChromeBudget } from "../src/commands/budget";
 import { CAPABILITIES, emptyContext, makeContext } from "../src/commands/context";
+
+/**
+ * A stand-in rail, so the ⌘1–8 generator is testable without the panel registry.
+ *
+ * Four shapes in one list: two ordinary rail panels, one that holds a rail slot but is not built
+ * yet (`when: () => false`), and one that is reachable by name with no rail button at all.
+ */
+const RAIL_PANELS: readonly RailPanel[] = [
+  { id: "files", title: "Files" },
+  { id: "layers", title: "Outline" },
+  { id: "search", title: "Search", when: () => false },
+  { id: "insert", title: "Insert", rail: false },
+];
 
 /** Deps that record what a `run` asked for, so a command's body is observable. */
 function recordingDeps() {
@@ -29,6 +51,10 @@ function recordingDeps() {
     toggleZen: () => void calls.push("toggleZen"),
     openPalette: (mode: PaletteMode) => void calls.push(`openPalette:${mode}`),
     openProject: () => void calls.push("openProject"),
+    navigatorPanels: RAIL_PANELS,
+    focusPanel: (panelId: string) => void calls.push(`focusPanel:${panelId}`),
+    focusInspectorTab: (tabId: string) => void calls.push(`focusInspectorTab:${tabId}`),
+    cycleRegion: (direction: 1 | -1) => void calls.push(`cycleRegion:${direction}`),
   };
   return { calls, deps };
 }
@@ -180,7 +206,11 @@ describe("the implementations", () => {
     const registry = createCommandRegistry({ getContext: everythingContext, mac: true });
     registry.registerAll(defaultCommands(deps));
     for (const command of registry.list()) {
-      void registry.run(command.id);
+      // `panel.focus.search` stands for a declared-but-unbuilt surface: its own `when` refuses it,
+      // Which is the composition this loop should skip rather than assert against.
+      if (registry.isEnabled(command.id)) {
+        void registry.run(command.id);
+      }
     }
     expect(calls).toEqual([
       "saveDocument",
@@ -198,7 +228,15 @@ describe("the implementations", () => {
       "openPalette:picker",
       "openPalette:files",
       "openPalette:commands",
+      "openPalette:nodes",
       "openProject",
+      "openPalette:projects",
+      ...RAIL_PANELS.filter((panel) => panel.when?.(everythingContext()) !== false).map(
+        (panel) => `focusPanel:${panel.id}`,
+      ),
+      ...INSPECTOR_TABS.map((tab) => `focusInspectorTab:${tab.id}`),
+      "cycleRegion:1",
+      "cycleRegion:-1",
     ]);
   });
 
@@ -225,7 +263,110 @@ describe("the implementations", () => {
       deps.toggleZen();
       deps.openPalette("files");
       void deps.openProject();
+      deps.focusPanel("files");
+      deps.focusInspectorTab("style");
+      deps.cycleRegion(1);
     }).not.toThrow();
+  });
+});
+
+describe("the direct keys (plan §5.3)", () => {
+  /** The default set built over the stand-in rail, in a context where everything is live. */
+  function registryWithRail() {
+    const registry = createCommandRegistry({ getContext: everythingContext, mac: true });
+    registry.registerAll(defaultCommands({ ...noopCommandDeps(), navigatorPanels: RAIL_PANELS }));
+    return registry;
+  }
+
+  test("⌘1–8 are spent on rail panels, in rail order", () => {
+    const registry = registryWithRail();
+    expect(registry.keymap.resolveChord("mod+1", ["global"])?.commandId).toBe("panel.focus.files");
+    expect(registry.keymap.resolveChord("mod+2", ["global"])?.commandId).toBe("panel.focus.layers");
+    expect(registry.get("panel.focus.layers")?.title).toBe("Show Outline");
+  });
+
+  test("a rail-less panel keeps its name and its palette row, and spends no chord", () => {
+    // Principle 9's price for losing chrome, paid exactly: a name, a palette row, no number.
+    const registry = registryWithRail();
+    expect(registry.get("panel.focus.insert")?.title).toBe("Show Insert");
+    expect(registry.keymap.bindingsFor("panel.focus.insert")).toEqual([]);
+    // Search holds a rail slot even though it is not built, so it still consumes ⌘3.
+    expect(registry.keymap.resolveChord("mod+3", ["global"])?.commandId).toBe("panel.focus.search");
+  });
+
+  test("a declared-but-unbuilt panel has no live command", () => {
+    const registry = registryWithRail();
+    expect(registry.isVisible("panel.focus.search")).toBe(false);
+    expect(registry.isVisible("panel.focus.files")).toBe(true);
+  });
+
+  test("only the first eight rail panels get a chord", () => {
+    const many: RailPanel[] = Array.from({ length: 11 }, (_unused, index) => ({
+      id: `p${index}`,
+      title: `P${index}`,
+    }));
+    const deps = { ...noopCommandDeps(), navigatorPanels: many };
+    const bound = panelFocusCommands(deps).filter((command) => command.keybinding !== undefined);
+    expect(bound).toHaveLength(RAIL_CHORD_LIMIT);
+    expect(bound.at(-1)?.keybinding).toBe("mod+8");
+  });
+
+  test("the running app binds ⌘1–8 to the panel registry's own rail order", () => {
+    const registry = createCommandRegistry({ getContext: everythingContext, mac: true });
+    registry.registerAll(appCommandSet());
+    const rail = navigatorPanelSet().filter((panel) => panel.rail !== false);
+    for (const [index, panel] of rail.slice(0, RAIL_CHORD_LIMIT).entries()) {
+      expect(registry.keymap.resolveChord(`mod+${index + 1}`, ["global"])?.commandId).toBe(
+        `panel.focus.${panel.id}`,
+      );
+    }
+  });
+
+  test("panel focus hides with no project, and says what it needs", () => {
+    const registry = createCommandRegistry({ getContext: emptyContext, mac: true });
+    registry.registerAll(defaultCommands({ ...noopCommandDeps(), navigatorPanels: RAIL_PANELS }));
+    expect(registry.isVisible("panel.focus.files")).toBe(false);
+    expect(registry.get("panel.focus.files")?.requires).toBe("an open project");
+  });
+
+  test("⌘⇧1–4 are the four Inspector tabs, in the order §3.2 ⑨ names them", () => {
+    const registry = registryWithRail();
+    expect(INSPECTOR_TABS.map((tab) => tab.title)).toEqual([
+      "Content",
+      "Style",
+      "Logic",
+      "Assistant",
+    ]);
+    for (const [index, tab] of INSPECTOR_TABS.entries()) {
+      expect(registry.keymap.resolveChord(`mod+shift+${index + 1}`, ["global"])?.commandId).toBe(
+        `inspector.focus.${tab.id}`,
+      );
+    }
+  });
+
+  test("F6 and ⇧F6 cycle regions, and format for both platforms", () => {
+    const registry = registryWithRail();
+    expect(registry.keymap.resolveChord("f6", ["global"])?.commandId).toBe("view.cycleRegion");
+    expect(registry.keymap.resolveChord("shift+f6", ["global"])?.commandId).toBe(
+      "view.cycleRegionBack",
+    );
+    expect(registry.keymap.formatBinding("view.cycleRegionBack")).toBe("⇧F6");
+  });
+
+  test("Select Parent owns both its spellings — Escape and ←", () => {
+    // One ACTION, one definition site, two chords. The second used to be a bare `keymap.add` call
+    // Beside the registration in `editor/shortcuts.ts`, which is a second definition site.
+    const registry = registryWithRail();
+    expect(registry.keymap.bindingsFor("selection.selectParent")).toEqual(["escape", "arrowleft"]);
+    expect(registry.keymap.resolveChord("arrowleft", ["canvas", "global"])?.commandId).toBe(
+      "selection.selectParent",
+    );
+  });
+
+  test("Open Recent is a named mode that works with a project already open", () => {
+    const registry = registryWithRail();
+    expect(registry.isEnabled("project.openRecent")).toBe(true);
+    expect(registry.get("project.openRecent")?.title).toBe("Open Recent…");
   });
 });
 

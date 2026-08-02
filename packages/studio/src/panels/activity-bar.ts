@@ -1,5 +1,18 @@
 /// <reference lib="dom" />
-/** Activity bar — tab icons for switching left panel views. */
+/**
+ * Activity bar — the Navigator rail, rendered FROM the panel registry.
+ *
+ * There is no list of panels in this file. `railGroups()` returns the Navigator's records grouped
+ * by level and filtered by their own `when`, and the rail draws whatever that says: two groups with
+ * a divider between them, PROJECT above and DOCUMENT below (plan §3.2 ②). Adding a panel is a
+ * `registerPanel()` call in the module that owns it, and it appears here; there is nothing to
+ * update in step.
+ *
+ * The predecessor was an eight-item array literal — `{icon, label, value}` — whose `label` reached
+ * the screen only as a `title` attribute. Thirteen icons in this shell had no name but a hover
+ * tooltip, which is the accessibility failure §2 principle 6 names outright: **every rail button
+ * now carries an 11px text label under its icon**, and the rail is 56px wide to hold it.
+ */
 
 import { html, render as litRender, nothing } from "lit-html";
 import { activityBar } from "../store";
@@ -8,12 +21,19 @@ import { shell, toggleActivityTab } from "../shell";
 import { openSettingsModal } from "../settings/settings-modal";
 import { openAboutModal } from "../about/about-modal";
 import { refreshGitStatus } from "./git-panel";
+import { panelContext, railGroups } from "./panel-registry";
+import { registerNavigatorPanels } from "./navigator-panels";
+import type { PanelRecord } from "./panel-registry";
+import type { CommandContext } from "../commands/context";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
 
 let _scope: EffectScope | null = null;
 
 export function mount() {
+  // The rail is a rendering of the registry, so the registry has to exist before the first paint.
+  // Idempotent, and the Navigator dock calls it too — whichever mounts first wins.
+  registerNavigatorPanels();
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -86,67 +106,65 @@ export function tabIcon(tag: string, size?: string) {
   return fn ? fn(size || "s") : nothing;
 }
 
-export function renderActivityBar() {
-  const { leftTab } = shell;
-  const gitFileCount = shell.git.status?.files?.length || 0;
-  const tabs = [
-    { icon: "sp-icon-folder", label: "Files", value: "files" },
-    { icon: "sp-icon-layers", label: "Layers", value: "layers" },
-    { icon: "sp-icon-box", label: "Imports", value: "imports" },
-    { icon: "sp-icon-view-grid", label: "Elements", value: "blocks" },
-    { icon: "sp-icon-brackets", label: "State", value: "state" },
-    { icon: "sp-icon-data", label: "Data", value: "data" },
-    { icon: "sp-icon-view-all-tags", label: "Document", value: "head" },
-    { icon: "sp-icon-git-branch", label: "Source Control", value: "git" },
-  ];
-  const tpl = html`
-    <sp-tabs
-      selected=${shell.docks.left.collapsed ? "" : leftTab}
-      direction="vertical"
-      quiet
-      @change=${(e: Event) => {
-        // No repaint call: the rail and the left panel both track `shell` through the effects
-        // They already run, so selecting a tab is one state write.
-        toggleActivityTab((e.target as HTMLElement & { selected: string }).selected);
+/**
+ * One rail button.
+ *
+ * The label is REAL TEXT, not a `title` attribute — so it is the accessible name, it is readable
+ * without a pointer, and it survives a screenshot. `aria-pressed` states the toggle-focus semantics
+ * honestly: re-picking the open panel collapses the dock (see {@link toggleActivityTab}), which is a
+ * two-state control, not a one-way selection.
+ *
+ * `title` survives as a TOOLTIP only. Because the button has text content, that text is its
+ * accessible name and the attribute adds no second announcement (the reason the old `sp-tab` could
+ * not carry both) — it exists to restore the full string for "Source Control", which 56px ellipses.
+ * An icon whose only name is a tooltip is what principle 6 bans; a tooltip beside a label is not.
+ */
+function railButton(panel: PanelRecord, ctx: CommandContext, selected: boolean): TemplateResult {
+  const badge = panel.badge?.(ctx) ?? null;
+  return html`
+    <button
+      type="button"
+      class="rail-item${selected ? " selected" : ""}"
+      data-panel=${panel.id}
+      aria-pressed=${selected}
+      title=${panel.title}
+      @click=${() => {
+        // No repaint call: the rail and the Navigator both track `shell`, so selecting a panel is
+        // One state write.
+        toggleActivityTab(panel.id);
       }}
     >
-      ${tabs.map(
-        // `title` alone, deliberately: sp-tab renders its icon into an unnamed slot and keeps its
-        // Text label hidden, so the title attribute IS the accessible name as well as the tooltip.
-        // Adding aria-label with the same string just made every rail tab announce itself twice.
-        (t) => html`
-          <sp-tab value=${t.value} title=${t.label}>
-            ${tabIcon(t.icon, "m")}
-            ${
-              t.value === "git" && gitFileCount > 0
-                ? html`<span class="activity-badge">${gitFileCount}</span>`
-                : nothing
-            }
-          </sp-tab>
+      <span class="rail-icon">${tabIcon(panel.icon, "m")}</span>
+      <span class="rail-label">${panel.title}</span>
+      ${badge ? html`<span class="activity-badge">${badge}</span>` : nothing}
+    </button>
+  `;
+}
+
+export function renderActivityBar() {
+  const ctx = panelContext();
+  const groups = railGroups(ctx);
+  const active = shell.docks.left.collapsed ? "" : shell.leftTab;
+  const tpl = html`
+    <nav class="rail-groups" aria-label="Navigator panels">
+      ${groups.map(
+        (group, index) => html`
+          ${index === 0 ? nothing : html`<div class="rail-divider" role="separator"></div>`}
+          <div class="rail-group" role="group" aria-label=${group.label}>
+            ${group.panels.map((panel) => railButton(panel, ctx, panel.id === active))}
+          </div>
         `,
       )}
-    </sp-tabs>
-    <div
-      style="margin-top:auto;padding:8px 0;display:flex;flex-direction:column;align-items:center;gap:4px"
-    >
-      <sp-action-button
-        quiet
-        size="m"
-        title="About"
-        aria-label="About"
-        @click=${() => openAboutModal()}
-      >
-        <sp-icon-info slot="icon"></sp-icon-info>
-      </sp-action-button>
-      <sp-action-button
-        quiet
-        size="m"
-        title="Settings"
-        aria-label="Settings"
-        @click=${() => openSettingsModal()}
-      >
-        <sp-icon-settings slot="icon"></sp-icon-settings>
-      </sp-action-button>
+    </nav>
+    <div class="rail-footer">
+      <button type="button" class="rail-item" @click=${() => openAboutModal()}>
+        <span class="rail-icon"><sp-icon-info size="m"></sp-icon-info></span>
+        <span class="rail-label">About</span>
+      </button>
+      <button type="button" class="rail-item" @click=${() => openSettingsModal()}>
+        <span class="rail-icon"><sp-icon-settings size="m"></sp-icon-settings></span>
+        <span class="rail-label">Settings</span>
+      </button>
     </div>
   `;
   litRender(tpl, activityBar);

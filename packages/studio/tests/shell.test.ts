@@ -122,10 +122,12 @@ describe("dock mutators", () => {
     expect(saved.chatCollapsed).toBe(false);
   });
 
-  test("setting a dock to the state it already has is a no-op", () => {
-    localStorage.removeItem(STORAGE_KEY);
+  test("setting a dock to the state it already has leaves the state alone", () => {
+    // It still WRITES: `setActivityTab` routes through here, and the remembered panel has to be
+    // Persisted even when the dock was already open. What must not change is the dock itself.
     setDockCollapsed("left", false);
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(shell.docks.left.collapsed).toBe(false);
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}").leftCollapsed).toBe(false);
   });
 
   test("toggleDock flips and remembers", () => {
@@ -168,6 +170,37 @@ describe("the Navigator tab", () => {
     setDockCollapsed("left", true);
     toggleActivityTab("git");
     expect(shell.docks.left.collapsed).toBe(false);
+  });
+
+  test("the panel is remembered even when the dock was already open", () => {
+    // `setDockCollapsed` only writes when the flag CHANGES, so relying on it to persist the panel
+    // Would forget every selection made while the Navigator was already showing.
+    setDockCollapsed("left", false);
+    setActivityTab("data");
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}").leftTab).toBe("data");
+  });
+});
+
+describe("the assistant is a tab of the Inspector dock", () => {
+  test("opening it opens the dock that hosts it", () => {
+    setDockCollapsed("right", true);
+    setDockCollapsed("chat", false);
+    expect(shell.docks.right.collapsed).toBe(false);
+    expect(shell.docks.chat.collapsed).toBe(false);
+  });
+
+  test("collapsing the Inspector dock takes the assistant with it", () => {
+    setDockCollapsed("chat", false);
+    setDockCollapsed("right", true);
+    expect(shell.docks.chat.collapsed).toBe(true);
+  });
+
+  test("the unreachable state — assistant open over a 0px column — cannot be produced", () => {
+    // The assistant shares the inspector's cell now; there is no fifth column and no width of its
+    // Own, so "open" with the host dock collapsed would render nothing at all.
+    setDockCollapsed("chat", false);
+    toggleDock("right");
+    expect(shell.docks.chat.collapsed || !shell.docks.right.collapsed).toBe(true);
   });
 
   test("a rail selection is observable by an effect, with no renderer wiring", () => {

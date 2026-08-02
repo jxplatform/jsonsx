@@ -23,6 +23,7 @@ import { ensureDependenciesInstalled } from "../packages/ensure-deps";
 import { maybePromptJxsuiteUpdate } from "../packages/jxsuite-update";
 import { autoSyncProjectOnOpen } from "../packages/pull-package-sync";
 import { markLocalMutation } from "./fs-events";
+import { registerPanel } from "../panels/panel-registry";
 import { UPLOAD_ACCEPT, isImage, uploadAssets } from "./media-upload";
 import { isCollabPath } from "../collab/collab-state";
 import {
@@ -1284,4 +1285,28 @@ export async function reloadFileInTab(path: string) {
       return;
     }
   }
+}
+
+/**
+ * Contribute the Files panel.
+ *
+ * `level: "project"` because it WRITES project files — create, rename, delete, move. It reads the
+ * focused document only to highlight a row, and principle 3 files a surface by what it writes.
+ */
+export function registerFilesPanel(): void {
+  registerPanel({
+    id: "files",
+    title: "Files",
+    level: "project",
+    dock: "navigator",
+    icon: "sp-icon-folder",
+    render: (ctx) => ctx.deps.renderFilesTemplate(),
+    afterRender: (ctx, host) => {
+      const tree = host.querySelector(".file-tree") as HTMLElement | null;
+      if (tree) {
+        ctx.deps.setupTreeKeyboard(tree);
+      }
+      ctx.deps.registerFileTreeDnD({ renderLeftPanel: ctx.rerender });
+    },
+  });
 }

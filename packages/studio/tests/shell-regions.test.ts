@@ -105,7 +105,7 @@ function leftCtx(overrides: Record<string, unknown> = {}) {
 
 describe("navigator/panel:<id>", () => {
   /** Every panel the left panel routes to — the ids that come free from one stamp. */
-  const PANELS = ["files", "git", "blocks", "layers", "imports", "state", "data", "head"];
+  const PANELS = ["files", "git", "insert", "layers", "packages", "state", "data", "page"];
 
   for (const panel of PANELS) {
     test(`"${panel}" is addressable without anyone authoring its id`, async () => {

@@ -440,3 +440,57 @@ describe("mutateUpdateFrontmatter", () => {
     disposeTab(tab);
   });
 });
+
+describe("the debug history-consistency assertion", () => {
+  /**
+   * Ops-based undo/redo and checkpoint replay must land on the same state. The check only runs
+   * behind the `jx-canvas-debug` flag — it JSON-stringifies the whole document twice per step, so
+   * it cannot be on by default — which means nothing exercises it unless a test sets the flag.
+   */
+  test("stays silent when the flag is off, and when replay agrees", () => {
+    const errors: unknown[][] = [];
+    const realError = console.error;
+    console.error = (...args: unknown[]) => void errors.push(args);
+    try {
+      const tab = makeTab();
+      transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }));
+      undo(tab);
+      redo(tab);
+      expect(errors).toHaveLength(0);
+
+      localStorage.setItem("jx-canvas-debug", "1");
+      undo(tab);
+      redo(tab);
+      // The ops path and the replay path agree, so the flag being on changes nothing.
+      expect(errors).toHaveLength(0);
+      disposeTab(tab);
+    } finally {
+      localStorage.removeItem("jx-canvas-debug");
+      console.error = realError;
+    }
+  });
+
+  test("reports divergence when the live document has drifted from its snapshot", () => {
+    const errors: unknown[][] = [];
+    const realError = console.error;
+    console.error = (...args: unknown[]) => void errors.push(args);
+    try {
+      localStorage.setItem("jx-canvas-debug", "1");
+      const tab = makeTab();
+      transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }));
+
+      // Drift the live document behind history's back — exactly the class of bug the assertion
+      // Exists to catch, and the only way to reach its reporting branch.
+      (tab.doc.document.children as JxMutableNode[]).push({ tagName: "em" });
+      undo(tab);
+      redo(tab);
+
+      expect(errors.length).toBeGreaterThan(0);
+      expect(String(errors[0]?.[0])).toContain("diverged from checkpoint replay");
+      disposeTab(tab);
+    } finally {
+      localStorage.removeItem("jx-canvas-debug");
+      console.error = realError;
+    }
+  });
+});
