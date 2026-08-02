@@ -17,7 +17,8 @@ import { collabState } from "../collab/collab-state";
 import { presenceChipsTemplate } from "../collab/presence-chips";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
-import { applyPanelCollapse, onPanelCollapse, view } from "../view";
+import { view } from "../view";
+import { shell, toggleDock } from "../shell";
 import { clearRecentProjects, getRecentProjects, removeRecentProject } from "../recent-projects";
 import { openQuickSearch } from "./quick-search";
 import { getPlatform } from "../platform";
@@ -64,9 +65,6 @@ function isMacPlatform(): boolean {
 }
 
 let _scope: EffectScope | null = null;
-
-/** Drops the panel-collapse subscription registered in {@link mount}. */
-let _unsubscribeCollapse: (() => void) | null = null;
 
 const toolbarIconMap = {
   "sp-icon-artboard": html`<sp-icon-artboard slot="icon"></sp-icon-artboard>`,
@@ -227,16 +225,15 @@ export function mount(rootEl: HTMLElement, ctx: ToolbarCtx) {
     rootEl.classList.add("electrobun-webkit-app-region-drag");
   }
   document.addEventListener("keydown", onToolbarKeydown);
-  /* The effect below can only track REACTIVE state, and `view` is a plain object — so flipping a
-     dock from anywhere but this module's own click handlers (the automation runner, the New
-     Project agent hand-off, the boot-time restore) repositioned the panels and left the rail/chat
-     icons showing the opposite state. Subscribe to the change instead. RESIDUE FOR P2: when
-     `shell.ts` owns dock visibility reactively, this subscription and the explicit render() calls
-     in the two toggle handlers all go away. */
-  _unsubscribeCollapse = onPanelCollapse(render);
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
+      // Dock visibility and source control are shell state, tracked here so the rail/chat icons
+      // And the Sync button follow a flip made from anywhere — the automation runner, the New
+      // Project agent hand-off, the boot-time restore — not just this module's click handlers.
+      void shell.docks.right.collapsed;
+      void shell.docks.chat.collapsed;
+      void shell.git.status;
       const tab = activeTab.value;
       if (tab) {
         // Read reactive properties to establish tracking
@@ -250,7 +247,6 @@ export function mount(rootEl: HTMLElement, ctx: ToolbarCtx) {
         // Open in Browser needs a value for every route param before it can resolve a page.
         void tab.session.ui.previewParams;
         void tab.session.ui.rightTab;
-        void tab.session.ui.gitStatus;
         void tab.history.index;
         void tab.history.snapshots.length;
         void collabState(tab).status;
@@ -263,8 +259,6 @@ export function mount(rootEl: HTMLElement, ctx: ToolbarCtx) {
 
 export function unmount() {
   document.removeEventListener("keydown", onToolbarKeydown);
-  _unsubscribeCollapse?.();
-  _unsubscribeCollapse = null;
   _scope?.stop();
   _scope = null;
   _rootEl = null;
@@ -445,18 +439,9 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
         `,
       )}
     </sp-action-group>
-    <sp-action-button
-      quiet
-      size="s"
-      title="Toggle Right Panel"
-      @click=${() => {
-        view.rightPanelCollapsed = !view.rightPanelCollapsed;
-        applyPanelCollapse();
-        render();
-      }}
-    >
+    <sp-action-button quiet size="s" title="Toggle Right Panel" @click=${() => toggleDock("right")}>
       ${
-        view.rightPanelCollapsed
+        shell.docks.right.collapsed
           ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
           : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`
       }
@@ -472,12 +457,8 @@ function chatToggleTpl() {
       quiet
       size="s"
       title="Toggle Assistant"
-      ?selected=${!view.chatPanelCollapsed}
-      @click=${() => {
-        view.chatPanelCollapsed = !view.chatPanelCollapsed;
-        applyPanelCollapse();
-        render();
-      }}
+      ?selected=${!shell.docks.chat.collapsed}
+      @click=${() => toggleDock("chat")}
     >
       <sp-icon-chat slot="icon"></sp-icon-chat>
     </sp-action-button>
@@ -691,7 +672,7 @@ function toolbarTemplate() {
       <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
     </sp-action-button>
     ${
-      (activeTab.value?.session.ui.gitStatus?.behind ?? 0) > 0
+      (shell.git.status?.behind ?? 0) > 0
         ? html`<sp-action-button
             size="s"
             title="Sync Project"
@@ -707,18 +688,9 @@ function toolbarTemplate() {
     }
     <div class="tb-spacer"></div>
     ${modeSwitcherTpl}
-    <sp-action-button
-      quiet
-      size="s"
-      title="Toggle Right Panel"
-      @click=${() => {
-        view.rightPanelCollapsed = !view.rightPanelCollapsed;
-        applyPanelCollapse();
-        render();
-      }}
-    >
+    <sp-action-button quiet size="s" title="Toggle Right Panel" @click=${() => toggleDock("right")}>
       ${
-        view.rightPanelCollapsed
+        shell.docks.right.collapsed
           ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
           : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`
       }

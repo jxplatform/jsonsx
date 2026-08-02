@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { html } from "lit-html";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { CanvasPanel } from "../src/types";
+import { shell } from "../src/shell";
 
 // ─── iframe-host mock (captures stylebook mounts + pans) ────────────────────────
 
@@ -143,8 +144,8 @@ describe("renderStylebookMode", () => {
   });
 
   test("the chrome bar filter narrows the generated doc; Customized toggles the session flag", async () => {
-    const tab = makeTab();
-    tab.session.ui.stylebookFilter = "h1";
+    makeTab();
+    shell.stylebook.filter = "h1";
     renderStylebookMode(ctx);
     expect(mounts[0]!.generated.tagToCardPath.has("h1")).toBe(true);
     expect(mounts[0]!.generated.tagToCardPath.has("ul")).toBe(false);
@@ -152,12 +153,12 @@ describe("renderStylebookMode", () => {
     const toggle = document.querySelector(".sb-chrome button") as HTMLButtonElement;
     toggle.click();
     await flush();
-    expect(tab.session.ui.stylebookCustomizedOnly).toBe(true);
+    expect(shell.stylebook.customizedOnly).toBe(true);
 
     const input = document.querySelector(".sb-chrome input") as HTMLInputElement;
     input.value = "table";
     input.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(tab.session.ui.stylebookFilter).toBe("table");
+    expect(shell.stylebook.filter).toBe("table");
   });
 });
 
@@ -167,7 +168,7 @@ describe("selectStylebookTag", () => {
   test("writes the stylebook selection session state (selection stays a path-empty [])", () => {
     const tab = makeTab();
     selectStylebookTag("table th", "md");
-    expect(tab.session.ui.stylebookSelection).toBe("table th");
+    expect(shell.stylebook.selection).toBe("table th");
     expect(tab.session.ui.activeSelector).toBe("table th");
     expect(tab.session.ui.rightTab).toBe("style");
     expect(tab.session.ui.activeMedia).toBe("md");

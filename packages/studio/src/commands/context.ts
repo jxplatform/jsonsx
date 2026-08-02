@@ -1,0 +1,170 @@
+/**
+ * Context.ts — the record every `when` / `enablement` predicate closes over.
+ *
+ * One flat-ish record of the facts a command can be gated on (UX-REDESIGN-PLAN §5.2). Predicates
+ * are plain closures over this record — the shape `services/gated-registry.ts` already ships for
+ * the AI's tools — not a serialisable string DSL. §13 rejects the DSL explicitly: a `"project.open
+ * && editor.kind == 'canvas'"` grammar needs a tokenizer, a parser and a reactive evaluator to buy
+ * serialisability nothing in Studio consumes.
+ *
+ * This module owns the SHAPE and a pure builder. It deliberately imports nothing from the state
+ * modules: the registry takes a `getContext()` thunk, so wiring the live sources (the reactive
+ * `shell` record, `workspace`, `activeTab`) is a next-wave change to one function, and every test
+ * here builds its own context with {@link makeContext} instead of standing up the app.
+ *
+ * `capability.*` mirrors the Platform Abstraction Layer so cloud / desktop / dev-server differences
+ * stop being `if (platform.x)` scattered across templates and become one `when` clause per
+ * command.
+ */
+
+/** PAL-derived capability keys. One `when` clause replaces a scattered `if (platform.x)`. */
+export const CAPABILITIES = [
+  "gitClone",
+  "importSite",
+  "openProjectInNewWindow",
+  "dataRows",
+  "windowControls",
+  "findReferences",
+] as const;
+
+export type Capability = (typeof CAPABILITIES)[number];
+
+/** Which shell region owns focus. Drives the keyboard scope stack and F6 region cycling. */
+export type FocusRegion =
+  | "rail"
+  | "navigator"
+  | "pane"
+  | "inspector"
+  | "dock"
+  | "status"
+  | "palette";
+
+/** The editor kind the focused pane is rendering. */
+export type EditorKind = "canvas" | "grid" | "code" | "diff" | "library" | "config" | "none";
+
+/** The Canvas view axis — one control, three values (§4.2). */
+export type CanvasView = "edit" | "design" | "preview";
+
+/** Facts a command may be gated on. Every field is a plain value; predicates read, never write. */
+export interface CommandContext {
+  project: {
+    open: boolean;
+    isSite: boolean;
+    isRepo: boolean;
+  };
+  git: {
+    ahead: number;
+    behind: number;
+    dirtyCount: number;
+  };
+  document: {
+    open: boolean;
+    dirty: boolean;
+    /** Format class of the open document — "json", "md", "css", … */
+    mode: string;
+    canUndo: boolean;
+    canRedo: boolean;
+  };
+  editor: {
+    kind: EditorKind;
+  };
+  canvas: {
+    view: CanvasView;
+  };
+  pane: {
+    count: number;
+    derived: boolean;
+  };
+  selection: {
+    count: number;
+    /** Tag or node kind of the primary selection, "" when nothing is selected. */
+    kind: string;
+    isRoot: boolean;
+    isComponentInstance: boolean;
+    isLayoutNode: boolean;
+  };
+  /**
+   * Whether a live text caret owns the keyboard. Derived host-side in `iframe-host.ts` from the
+   * editStart / selectionChanged / editEnd messages the canvas bridge already sends — this is the
+   * fact that stops ⌘C/⌘X/⌘V being stolen from a writer mid-sentence.
+   */
+  caret: {
+    active: boolean;
+  };
+  focus: {
+    region: FocusRegion;
+  };
+  modal: {
+    open: boolean;
+  };
+  collab: {
+    attached: boolean;
+    readOnly: boolean;
+    sourceCanonical: boolean;
+  };
+  ai: {
+    configured: boolean;
+    streaming: boolean;
+  };
+  capability: Record<Capability, boolean>;
+}
+
+/** A partial context, one group at a time — what tests and call sites actually write. */
+export type CommandContextPatch = {
+  [K in keyof CommandContext]?: Partial<CommandContext[K]>;
+};
+
+/**
+ * The zero context: no project, no document, no selection, no capabilities.
+ *
+ * This is the honest cold-start state, which makes it the right default for the `when` predicates
+ * to be tested against — a command that is enabled here has said so deliberately.
+ */
+export function emptyContext(): CommandContext {
+  return {
+    project: { open: false, isSite: false, isRepo: false },
+    git: { ahead: 0, behind: 0, dirtyCount: 0 },
+    document: { open: false, dirty: false, mode: "", canUndo: false, canRedo: false },
+    editor: { kind: "none" },
+    canvas: { view: "design" },
+    pane: { count: 1, derived: false },
+    selection: {
+      count: 0,
+      kind: "",
+      isRoot: false,
+      isComponentInstance: false,
+      isLayoutNode: false,
+    },
+    caret: { active: false },
+    focus: { region: "pane" },
+    modal: { open: false },
+    collab: { attached: false, readOnly: false, sourceCanonical: false },
+    ai: { configured: false, streaming: false },
+    capability: {
+      gitClone: false,
+      importSite: false,
+      openProjectInNewWindow: false,
+      dataRows: false,
+      windowControls: false,
+      findReferences: false,
+    },
+  };
+}
+
+/**
+ * Build a context by overriding groups of {@link emptyContext}.
+ *
+ * Group-level merge, not a deep one: `makeContext({ selection: { count: 1 } })` keeps the other
+ * selection fields at their empty defaults. One level is all the record has, and a general deep
+ * merge would be a second thing to get right.
+ */
+export function makeContext(patch: CommandContextPatch = {}): CommandContext {
+  const base = emptyContext();
+  for (const key of Object.keys(patch) as (keyof CommandContext)[]) {
+    const group = patch[key];
+    if (group) {
+      Object.assign(base[key], group);
+    }
+  }
+  return base;
+}

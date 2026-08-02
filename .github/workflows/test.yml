@@ -185,6 +185,13 @@ jobs:
       # Core packages must never depend on extension packages — see
       # specs/extensions.md §2 and scripts/check-dep-rules.ts.
       - run: bun scripts/check-dep-rules.ts
+      # Studio commands: every declared `menus` placement must admit the command's
+      # containment level (the level × placement matrix — UX-REDESIGN-PLAN §5.1,
+      # normative copy in specs/studio-ui-guidelines.md §12).
+      - run: bun scripts/check-command-levels.ts
+      # Studio chrome is capped: ≤5 commands in the Command Bar's primary cluster,
+      # ≤4 tabs per dock. See UX-REDESIGN-PLAN §2, principle 9.
+      - run: bun scripts/check-chrome-budget.ts
       - run: bun run typecheck
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
       # which the root's two strictest flags reject 165 times) so it needs its own pass — without

@@ -17,7 +17,7 @@
 
 import { render as litRender } from "lit-html";
 import { effect, effectScope } from "../reactivity";
-import { applyPanelCollapse, view } from "../view";
+import { setDockCollapsed } from "../shell";
 import { workspace } from "../workspace/workspace";
 import { consumePendingAgentPrompt, hasPendingAgentPrompt } from "../services/agent-seed";
 import {
@@ -67,10 +67,7 @@ export function mount(host: HTMLElement | null) {
       if (!root || !hasPendingAgentPrompt(root)) {
         return;
       }
-      if (view.chatPanelCollapsed) {
-        view.chatPanelCollapsed = false;
-        applyPanelCollapse();
-      }
+      setDockCollapsed("chat", false);
       const prompt = consumePendingAgentPrompt(root);
       if (prompt) {
         // Defer past the current render so the assistant machinery is in place before the send.

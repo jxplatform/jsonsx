@@ -2,6 +2,7 @@
 /** Statusbar — status message display for Jx Studio */
 
 import { getNodeAtPath, nodeLabel, renderOnly, statusbarEl, updateSession } from "../store";
+import { shell } from "../shell";
 import { effect, effectScope } from "../reactivity";
 import { STATUS_MESSAGE } from "../ui/timing";
 import { activeTab } from "../workspace/workspace";
@@ -30,6 +31,7 @@ export function mountStatusbar() {
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
+      void shell.stylebook.selection;
       const tab = activeTab.value;
       if (!tab) {
         return;
@@ -38,7 +40,6 @@ export function mountStatusbar() {
       void tab.doc.document;
       void tab.doc.mode;
       void tab.session.selection;
-      void tab.session.ui.stylebookSelection;
       renderStatusbar();
     });
   });
@@ -95,8 +96,8 @@ export function renderStatusbar() {
       i += step;
     }
     parts.push(`Path: ${pathSegments.join(' <span class="sb-path-sep">&gt;</span> ')}`);
-  } else if (tab?.session.ui.stylebookSelection) {
-    const sel = tab.session.ui.stylebookSelection;
+  } else if (shell.stylebook.selection) {
+    const sel = shell.stylebook.selection;
     parts.push(`Style: ${esc(sel.replaceAll(" ", " > "))}`);
   }
   if (statusMsg) {

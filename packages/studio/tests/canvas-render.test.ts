@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:
 import { canvasPanels, canvasWrap, initShellRefs, setProjectState } from "../src/store";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
+import { shell } from "../src/shell";
 import { setFormats } from "../src/format/format-host";
 import { initCanvasUtils, setEditZoom } from "../src/canvas/canvas-utils";
 import { MARKDOWN_FORMAT } from "./format-fixture";
@@ -1264,7 +1265,7 @@ describe("stylebook mode", () => {
   });
 
   test("filter changes force a full stylebook re-render", () => {
-    const tab = openSyncedTab();
+    openSyncedTab();
     setMode("stylebook");
     const updates: Record<string, unknown>[] = [];
     styleUpdateImpl = (style) => {
@@ -1272,17 +1273,17 @@ describe("stylebook mode", () => {
       return 1;
     };
     renderCanvas();
-    tab.session.ui.stylebookFilter = "head";
+    shell.stylebook.filter = "head";
     renderCanvas();
     expect(renderStylebookMode).toHaveBeenCalledTimes(2);
     expect(updates).toHaveLength(0);
   });
 
   test("customized-only toggle also forces a full re-render", () => {
-    const tab = openSyncedTab();
+    openSyncedTab();
     setMode("stylebook");
     renderCanvas();
-    tab.session.ui.stylebookCustomizedOnly = true;
+    shell.stylebook.customizedOnly = true;
     renderCanvas();
     expect(renderStylebookMode).toHaveBeenCalledTimes(2);
   });

@@ -14,7 +14,7 @@ import { effect, effectScope } from "../reactivity";
 import { createPanelScheduler } from "./panel-scheduler";
 import type { PanelScheduler } from "./panel-scheduler";
 import { activeTab } from "../workspace/workspace";
-import { view } from "../view";
+import { shell } from "../shell";
 import { mutateUpdateFrontmatter, transact } from "../tabs/transact";
 import type { GitDiffState, JsonValue } from "../types";
 import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
@@ -77,16 +77,21 @@ export function mount(ctx: LeftPanelCtx) {
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
+      // Shell state is tracked with no tab open — which panel is showing, and the project-level
+      // State the project-level panels draw from. A document-less rail tab still repaints.
+      void shell.leftTab;
+      void shell.settingsTab;
+      void shell.git.status;
+      void shell.git.loading;
+      void shell.git.error;
+      void shell.git.subTab;
+      void shell.git.logEntries;
       const tab = activeTab.value;
       if (tab) {
         // Track properties the left panel reads
         void tab.doc.document;
         void tab.doc.mode;
         void tab.session.selection;
-        void tab.session.ui.settingsTab;
-        void tab.session.ui.gitStatus;
-        void tab.session.ui.gitLoading;
-        void tab.session.ui.gitError;
       }
       render();
     });
@@ -128,7 +133,7 @@ function _doRender() {
     }
   }
 
-  if (view.leftTab === "layers") {
+  if (shell.leftTab === "layers") {
     const sel = leftPanel.querySelector(".layer-row.selected");
     if (sel) {
       sel.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -162,7 +167,7 @@ function buildHeadDoc(doc: JxMutableNode, fm: Record<string, unknown>): JxMutabl
 
 function _render() {
   const ctx = _ctx as LeftPanelCtx;
-  const tab = view.leftTab;
+  const tab = shell.leftTab;
 
   // ── Project-level panels: render based on projectState, independent of active tab ──
 
@@ -177,9 +182,7 @@ function _render() {
   }
 
   if (tab === "git") {
-    const aTab = activeTab.value;
-    const ui: Parameters<LeftPanelCtx["renderGitPanel"]>[0]["ui"] = aTab ? aTab.session.ui : {};
-    litRender(html`<div class="panel-body">${ctx.renderGitPanel({ ui }, ctx)}</div>`, leftPanel);
+    litRender(html`<div class="panel-body">${ctx.renderGitPanel(ctx)}</div>`, leftPanel);
     return;
   }
 

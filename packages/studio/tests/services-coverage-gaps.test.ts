@@ -28,7 +28,7 @@ const { renderCheck } = await import("../src/services/render-critic");
 const { formatPreviewValue } = await import("../src/utils/preview-format");
 const { getCfAccountId, getCfToken } = await import("../src/services/cf-settings");
 const { getProjectList, resetProjectList, seedProjectList } = await import("../src/project-list");
-const { view } = await import("../src/view");
+const { shell } = await import("../src/shell");
 const { workspace } = await import("../src/workspace/workspace");
 const state = await import("../src/state");
 
@@ -41,7 +41,6 @@ function makeDeps(): AutomationDeps & { render: ReturnType<typeof mock> } {
     openQuickSearchPalette: mock(() => {}),
     openSettingsModal: mock(() => {}),
     render: mock(() => {}),
-    renderActivityBar: mock(() => {}),
     seedAssistantMessages: mock(() => {}),
     seedPublishConnected: mock(() => {}),
     setCanvasMode: mock(() => {}),
@@ -53,7 +52,7 @@ describe("automation showWelcome", () => {
   test("closes tabs, clears project state, and stages the catalogue", () => {
     resetWorkspaceWithTab();
     state.setProjectState({ expanded: new Set(), projectConfig: null } as never);
-    view.chatPanelCollapsed = false;
+    shell.docks.chat.collapsed = false;
     const projects: ProjectListEntry[] = [
       { description: "A demo site", name: "Demo", root: "/demo" },
     ];
@@ -61,7 +60,7 @@ describe("automation showWelcome", () => {
     createAutomationApi(deps).showWelcome({ projects });
     expect(workspace.tabs.size).toBe(0);
     expect(state.projectState).toBeNull();
-    expect(view.chatPanelCollapsed).toBe(true);
+    expect(shell.docks.chat.collapsed).toBe(true);
     expect(getProjectList()).toEqual(projects);
     expect(deps.render).toHaveBeenCalledTimes(1);
     resetProjectList();

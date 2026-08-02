@@ -15,6 +15,7 @@ import { collabSourceContext } from "../collab/collab-session";
 import { attachCursorStyles } from "../collab/monaco-cursors";
 import type { AwarenessLike } from "../collab/monaco-cursors";
 import { view } from "../view";
+import { shell } from "../shell";
 import { parseSourceForPath, serializeDocument } from "../files/file-ops";
 import { detachGridPanel, gridPanelMounted, renderGridMode } from "../grid/grid-panel";
 import { formatByName, formatForPath } from "../format/format-host";
@@ -466,8 +467,8 @@ function renderCanvasImpl() {
   // Filter/Customized changes fall through to the full rebuild (they change which specimens exist),
   // As does a zero-host post (no stylebook iframe live yet).
   if (canvasMode === "stylebook" && !modeChanged) {
-    const curFilter = tab.session.ui.stylebookFilter || "";
-    const curCustomized = Boolean(tab.session.ui.stylebookCustomizedOnly);
+    const curFilter = shell.stylebook.filter;
+    const curCustomized = shell.stylebook.customizedOnly;
     const filterChanged =
       curFilter !== _prevStylebookFilter || curCustomized !== _prevStylebookCustomizedOnly;
     if (!filterChanged) {
@@ -548,8 +549,8 @@ function renderCanvasImpl() {
 
   // Stylebook mode: render element catalog with panzoom surface
   if (canvasMode === "stylebook") {
-    _prevStylebookFilter = tab.session.ui.stylebookFilter || "";
-    _prevStylebookCustomizedOnly = Boolean(tab.session.ui.stylebookCustomizedOnly);
+    _prevStylebookFilter = shell.stylebook.filter;
+    _prevStylebookCustomizedOnly = shell.stylebook.customizedOnly;
     renderStylebookMode({
       applyTransform,
       canvasPanelTemplate,

@@ -10,6 +10,7 @@ import { live } from "lit-html/directives/live.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { COMMON_SELECTORS, debouncedStyleCommit, getNodeAtPath, isNestedSelector } from "../store";
 import { activeTab } from "../workspace/workspace";
+import { shell } from "../shell";
 import { selectStylebookTag } from "./stylebook-panel";
 import {
   mutateUpdateMediaNestedStyle,
@@ -949,15 +950,13 @@ export function renderStylePanelTemplate(ctx: { getCanvasMode: () => string }) {
   if (!tab) {
     return noDocument();
   }
-  if (ctx.getCanvasMode() === "stylebook" && tab.session.ui.stylebookSelection) {
+  if (ctx.getCanvasMode() === "stylebook" && shell.stylebook.selection) {
     const node = tab.doc.document;
     if (!node) {
       return noDocument();
     }
     return html`
-      <div class="stylebook-style-header">
-        Styling: &lt;${tab.session.ui.stylebookSelection}&gt;
-      </div>
+      <div class="stylebook-style-header">Styling: &lt;${shell.stylebook.selection}&gt;</div>
       ${styleSidebarTemplate(
         node,
         tab.session.ui.activeMedia,

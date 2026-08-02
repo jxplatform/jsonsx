@@ -13,9 +13,10 @@ import { ref } from "lit-html/directives/ref.js";
 import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
 
-import { canvasPanels, canvasWrap, projectState, updateSession, updateUi } from "../store";
+import { canvasPanels, canvasWrap, projectState, updateSession } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
+import { shell } from "../shell";
 import { componentRegistry } from "../files/components";
 import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
 import { parseMediaEntries } from "../utils/canvas-media";
@@ -56,19 +57,19 @@ export { default as stylebookMeta } from "../../data/stylebook-meta.json";
  */
 export function renderStylebookMode(ctx: StylebookCtx) {
   const tab = activeTab.value;
-  const filter = (tab?.session.ui.stylebookFilter || "").toLowerCase();
-  const customizedOnly = tab?.session.ui.stylebookCustomizedOnly;
+  const filter = shell.stylebook.filter.toLowerCase();
+  const { customizedOnly } = shell.stylebook;
 
   const effectiveMedia = getEffectiveMedia(tab?.doc.document?.$media);
   const { sizeBreakpoints, baseWidth } = parseMediaEntries(effectiveMedia);
   const hasMedia = sizeBreakpoints.length > 0;
 
   const onFilterInput = (e: Event) => {
-    updateUi("stylebookFilter", (e.target as HTMLInputElement).value);
+    shell.stylebook.filter = (e.target as HTMLInputElement).value;
   };
 
   const onCustomizedToggle = () => {
-    updateUi("stylebookCustomizedOnly", !tab?.session.ui.stylebookCustomizedOnly);
+    shell.stylebook.customizedOnly = !shell.stylebook.customizedOnly;
   };
 
   const chromeBarTpl = html`
@@ -81,12 +82,12 @@ export function renderStylebookMode(ctx: StylebookCtx) {
           class="field-input"
           style="flex:1;max-width:200px"
           placeholder="Filter…"
-          .value=${live(tab?.session.ui.stylebookFilter)}
+          .value=${live(shell.stylebook.filter)}
           @input=${onFilterInput}
         />
         <button
           class=${classMap({
-            active: Boolean(tab?.session.ui.stylebookCustomizedOnly),
+            active: shell.stylebook.customizedOnly,
             "tb-toggle": true,
           })}
           @click=${onCustomizedToggle}
@@ -186,19 +187,19 @@ export function renderStylebookMode(ctx: StylebookCtx) {
 /**
  * Select a tag in the stylebook — shared by the canvas hit handler (via studio's
  * setStylebookHitHandler wiring), the stylebook layers panel, and the style panel. The host's
- * selection watcher tracks `ui.stylebookSelection` and measures the selected tag's card, so no
+ * selection watcher tracks `shell.stylebook.selection` and measures the selected tag's card, so no
  * direct overlay drawing happens here.
  *
  * @param {string} tag
  * @param {string | null} [media]
  */
 export function selectStylebookTag(tag: string, media?: string | null, { panCanvas = false } = {}) {
+  shell.stylebook.selection = tag;
   updateSession({
     selection: [],
     ui: {
       activeSelector: tag,
       rightTab: "style",
-      stylebookSelection: tag,
       ...(media !== undefined ? { activeMedia: media } : {}),
     },
   });

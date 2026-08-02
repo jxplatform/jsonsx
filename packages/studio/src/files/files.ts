@@ -50,7 +50,8 @@ import {
   refreshExtensionUi,
   refreshFormats,
 } from "../format/format-host";
-import { view } from "../view";
+import { resetProjectShell, setActivityTab } from "../shell";
+import { cleanupGitPanel } from "../panels/git-panel";
 import { addRecentProject, trackRecentFile } from "../recent-projects";
 import type { TemplateResult } from "lit-html";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -137,18 +138,9 @@ export async function loadProject() {
 /**
  * Open a project via the platform adapter.
  *
- * @param {{
- *   renderActivityBar: () => void;
- *   renderLeftPanel: () => void;
- * }} ctx
+ * @param {{ renderLeftPanel: () => void }} ctx
  */
-export async function openProject({
-  renderActivityBar,
-  renderLeftPanel,
-}: {
-  renderActivityBar: () => void;
-  renderLeftPanel: () => void;
-}) {
+export async function openProject({ renderLeftPanel }: { renderLeftPanel: () => void }) {
   try {
     const platform = getPlatform();
     const result = await platform.openProject();
@@ -206,9 +198,12 @@ export async function openProject({
     }
     requireProjectState().projectDirs = foundDirs;
 
-    view.leftTab = "files";
+    // Source control, the stylebook selection and the settings tab describe the project being
+    // Left behind. The poll timer goes with them; the panel re-arms it on its next render.
+    cleanupGitPanel();
+    resetProjectShell();
+    setActivityTab("files");
     addRecentProject(requireProjectState().name, requireProjectState().projectRoot);
-    renderActivityBar();
     renderLeftPanel();
     statusMessage(`Opened project: ${requireProjectState().name}`);
 

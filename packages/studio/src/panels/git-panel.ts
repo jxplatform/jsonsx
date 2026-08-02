@@ -7,20 +7,14 @@
 import { html, nothing } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { flushAllCollab } from "../collab/collab-session";
-import type {
-  GitBranchesResult,
-  GitDiffState,
-  GitFileStatus,
-  GitStatusResult,
-  StudioPlatform,
-} from "../types";
+import type { GitDiffState, GitFileStatus, StudioPlatform } from "../types";
 import { live } from "lit-html/directives/live.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform";
 import { formatForPath } from "../format/format-host";
-import { projectState, renderOnly, updateUi } from "../store";
-import { activeTab } from "../workspace/workspace";
-import { view } from "../view";
+import { projectState } from "../store";
+import { shell } from "../shell";
+import type { GitLogEntry } from "../shell";
 import { showConfirmDialog, showPromptDialog } from "../ui/layers";
 import { POLL_GIT } from "../ui/timing";
 import { renderEmptyState } from "./empty-state";
@@ -28,31 +22,16 @@ import { statusMessage } from "./statusbar";
 import { publishToGithub } from "../github/github-publish";
 import { pullWithPackageSync } from "../packages/pull-package-sync";
 
-interface GitLogEntry {
-  hash: string;
-  message: string;
-  author: string;
-  date: string;
-}
-
 type GitFileEntry = GitFileStatus;
-
-interface GitUiState {
-  gitStatus?: Partial<GitStatusResult> | null;
-  gitBranches?: Partial<GitBranchesResult> | null;
-  gitLoading?: boolean;
-  gitError?: string | null;
-  gitCommitMessage?: string;
-  gitLogEntries?: GitLogEntry[] | null;
-}
 
 export async function refreshGitStatus() {
   if (!projectState) {
     return;
   }
   const plat = getPlatform();
-  updateUi("gitLoading", true);
-  updateUi("gitError", null);
+  const { git } = shell;
+  git.loading = true;
+  git.error = null;
   try {
     // Settled independently, not Promise.all: outside a work tree `git branch` exits non-zero
     // While `git status` answers cleanly with isRepo:false. Letting the branch lookup reject the
@@ -60,10 +39,10 @@ export async function refreshGitStatus() {
     // Again, and span — a request per render for as long as the tab stayed open.
     const [status, branches] = await Promise.allSettled([plat.gitStatus(), plat.gitBranches()]);
     if (status.status === "fulfilled") {
-      updateUi("gitStatus", status.value);
+      git.status = status.value;
     }
     if (branches.status === "fulfilled") {
-      updateUi("gitBranches", branches.value);
+      git.branches = branches.value;
     }
     // A branch lookup that fails on a repo-less project is expected, not an error worth showing;
     // Anything else (including a failed status) surfaces.
@@ -74,14 +53,13 @@ export async function refreshGitStatus() {
           ? branches.reason
           : null;
     if (failure) {
-      updateUi("gitError", errorMessage(failure));
+      git.error = errorMessage(failure);
     }
-    _lastUpdated = new Date();
+    git.lastUpdated = Date.now();
   } catch (error) {
-    updateUi("gitError", errorMessage(error));
+    git.error = errorMessage(error);
   } finally {
-    updateUi("gitLoading", false);
-    renderOnly("leftPanel");
+    git.loading = false;
   }
 }
 
@@ -132,64 +110,63 @@ export function platformSupportsClone() {
 async function gitAction(action: string, body?: unknown) {
   const plat = getPlatform() as Record<string, (...args: unknown[]) => Promise<unknown>> &
     StudioPlatform;
-  updateUi("gitLoading", true);
-  updateUi("gitError", null);
+  shell.git.loading = true;
+  shell.git.error = null;
   try {
     await plat[action]!(body);
     await refreshGitStatus();
   } catch (error) {
-    updateUi("gitError", errorMessage(error));
-    updateUi("gitLoading", false);
-    renderOnly("leftPanel");
+    shell.git.error = errorMessage(error);
+    shell.git.loading = false;
   }
 }
 
 /** Pull via the package-aware orchestrator; same loading/error contract as gitAction. */
 async function doPull() {
-  updateUi("gitLoading", true);
-  updateUi("gitError", null);
+  shell.git.loading = true;
+  shell.git.error = null;
   try {
     await pullWithPackageSync();
     await refreshGitStatus();
   } catch (error) {
-    updateUi("gitError", errorMessage(error));
-    updateUi("gitLoading", false);
-    renderOnly("leftPanel");
-  }
-}
-
-let _pollTimer = null as ReturnType<typeof setInterval> | null;
-let _lastUpdated = null as Date | null;
-let _gitSubTab = "changes";
-
-async function fetchGitLog() {
-  const plat = getPlatform();
-  try {
-    const entries = await plat.gitLog(30);
-    updateUi("gitLogEntries", entries);
-    renderOnly("leftPanel");
-  } catch (error) {
-    updateUi("gitError", errorMessage(error));
-    renderOnly("leftPanel");
+    shell.git.error = errorMessage(error);
+    shell.git.loading = false;
   }
 }
 
 /**
- * @param {{ ui: GitUiState }} S
+ * The background refresh handle. The interval itself is infrastructure, not state — the sub-tab and
+ * the "last updated" stamp it used to sit beside are on `shell.git`, so opening a second project no
+ * longer inherits the first one's History selection and timestamp.
+ */
+let _pollTimer = null as ReturnType<typeof setInterval> | null;
+
+async function fetchGitLog() {
+  const plat = getPlatform();
+  try {
+    shell.git.logEntries = await plat.gitLog(30);
+  } catch (error) {
+    shell.git.error = errorMessage(error);
+  }
+}
+
+/**
+ * Render the Source Control panel.
+ *
+ * Takes no state argument: everything it reads is project-level and lives on `shell.git`, which is
+ * the whole point of the hoist — the panel renders identically with no document open.
+ *
  * @param {{
  *   setCanvasMode?: (mode: string) => void;
  *   setGitDiffState?: (state: GitDiffState | null) => void;
  *   cloneRepository?: () => void;
  * }} ctx
  */
-export function renderGitPanel(
-  S: { ui: GitUiState },
-  ctx: {
-    setCanvasMode?: (mode: string) => void;
-    setGitDiffState?: (state: GitDiffState | null) => void;
-    cloneRepository?: () => void;
-  },
-) {
+export function renderGitPanel(ctx: {
+  setCanvasMode?: (mode: string) => void;
+  setGitDiffState?: (state: GitDiffState | null) => void;
+  cloneRepository?: () => void;
+}) {
   if (!projectState) {
     return html`<div class="git-panel git-panel-empty">
       ${renderEmptyState({
@@ -208,14 +185,12 @@ export function renderGitPanel(
       })}
     </div>`;
   }
-  const status = S.ui.gitStatus;
-  const branches = S.ui.gitBranches;
-  const loading = S.ui.gitLoading;
+  const { branches, loading, status } = shell.git;
 
   // First paint kicks off the fetch. A refresh that already failed must NOT re-arm it here, or the
   // Render it triggers becomes the next render's reason to fetch again; the Refresh button and the
   // Poll timer are the ways back.
-  if (!status && !loading && !S.ui.gitError) {
+  if (!status && !loading && !shell.git.error) {
     void refreshGitStatus();
     return html`<div class="git-panel">
       <div class="git-loading">Loading...</div>
@@ -257,7 +232,7 @@ export function renderGitPanel(
 
   if (!_pollTimer) {
     _pollTimer = setInterval(() => {
-      if (view.leftTab === "git" && !S.ui.gitLoading) {
+      if (shell.leftTab === "git" && !shell.git.loading) {
         void refreshGitStatus();
       }
     }, POLL_GIT);
@@ -268,12 +243,11 @@ export function renderGitPanel(
   const totalChanges = status?.files?.length || 0;
 
   const doCommit = async () => {
-    const tab = activeTab.value;
-    const msg = tab?.session.ui.gitCommitMessage?.trim();
+    const msg = shell.git.commitMessage.trim();
     if (!msg) {
       return;
     }
-    updateUi("gitCommitMessage", "");
+    shell.git.commitMessage = "";
     // Fold co-editing sessions into the backend's tree first so the commit never misses
     // Trailing keystrokes (the mirror is debounced).
     await flushAllCollab();
@@ -281,14 +255,13 @@ export function renderGitPanel(
   };
 
   const doCommitAndSync = async () => {
-    const tab = activeTab.value;
-    const msg = tab?.session.ui.gitCommitMessage?.trim();
+    const msg = shell.git.commitMessage.trim();
     if (!msg) {
       return;
     }
-    updateUi("gitCommitMessage", "");
-    updateUi("gitLoading", true);
-    updateUi("gitError", null);
+    shell.git.commitMessage = "";
+    shell.git.loading = true;
+    shell.git.error = null;
     await flushAllCollab();
     const plat = getPlatform();
     try {
@@ -296,9 +269,8 @@ export function renderGitPanel(
       await plat.gitPush();
       await refreshGitStatus();
     } catch (error) {
-      updateUi("gitError", errorMessage(error));
-      updateUi("gitLoading", false);
-      renderOnly("leftPanel");
+      shell.git.error = errorMessage(error);
+      shell.git.loading = false;
     }
   };
 
@@ -307,8 +279,8 @@ export function renderGitPanel(
   const syncLabel = isUpToDate
     ? "Up to date"
     : `${status?.ahead ? `${status.ahead} ahead` : ""}${status?.ahead && status?.behind ? ", " : ""}${status?.behind ? `${status.behind} behind` : ""}`;
-  const lastUpdatedStr = _lastUpdated
-    ? _lastUpdated.toLocaleTimeString([], {
+  const lastUpdatedStr = shell.git.lastUpdated
+    ? new Date(shell.git.lastUpdated).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
       })
@@ -451,23 +423,22 @@ export function renderGitPanel(
 
   // ─── 3. Tabs: Local Changes / History ────────────────────────────────────
   const switchTab = (tab: string) => {
-    _gitSubTab = tab;
-    if (tab === "history" && !S.ui.gitLogEntries) {
+    shell.git.subTab = tab;
+    if (tab === "history" && !shell.git.logEntries) {
       void fetchGitLog();
     }
-    renderOnly("leftPanel");
   };
 
   const tabsT = html`
     <div class="git-tabs">
       <button
-        class="git-tab ${_gitSubTab === "changes" ? "active" : ""}"
+        class="git-tab ${shell.git.subTab === "changes" ? "active" : ""}"
         @click=${() => switchTab("changes")}
       >
         Local Changes${totalChanges > 0 ? ` (${totalChanges})` : ""}
       </button>
       <button
-        class="git-tab ${_gitSubTab === "history" ? "active" : ""}"
+        class="git-tab ${shell.git.subTab === "history" ? "active" : ""}"
         @click=${() => switchTab("history")}
       >
         History
@@ -484,8 +455,10 @@ export function renderGitPanel(
         multiline
         class="git-commit-input"
         placeholder="Describe your changes"
-        .value=${live(S.ui.gitCommitMessage || "")}
-        @input=${(e: Event) => updateUi("gitCommitMessage", (e.target as HTMLInputElement).value)}
+        .value=${live(shell.git.commitMessage)}
+        @input=${(e: Event) => {
+          shell.git.commitMessage = (e.target as HTMLInputElement).value;
+        }}
         @keydown=${(e: KeyboardEvent) => {
           if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
             e.preventDefault();
@@ -552,7 +525,7 @@ export function renderGitPanel(
 
       try {
         const plat = getPlatform();
-        updateUi("gitLoading", true);
+        shell.git.loading = true;
 
         const [originalContent, currentContent] = await Promise.all([
           file.status === "A"
@@ -568,7 +541,7 @@ export function renderGitPanel(
           originalContent,
         };
 
-        updateUi("gitDiffState", diffState);
+        shell.git.diffState = diffState;
 
         if (ctx?.setCanvasMode) {
           if (ctx.setGitDiffState) {
@@ -577,9 +550,9 @@ export function renderGitPanel(
           ctx.setCanvasMode("git-diff");
         }
       } catch (error) {
-        updateUi("gitError", `Failed to load diff: ${errorMessage(error)}`);
+        shell.git.error = `Failed to load diff: ${errorMessage(error)}`;
       } finally {
-        updateUi("gitLoading", false);
+        shell.git.loading = false;
       }
     };
 
@@ -748,7 +721,7 @@ export function renderGitPanel(
   `;
 
   // ─── 6. History tab content ──────────────────────────────────────────────
-  const logEntries = S.ui.gitLogEntries || [];
+  const logEntries = shell.git.logEntries || [];
   const historyT = html`
     <div class="git-history">
       ${
@@ -777,9 +750,9 @@ export function renderGitPanel(
   return html`
     <div class="git-panel">
       ${syncBarT} ${branchSelectorT} ${tabsT}
-      ${_gitSubTab === "changes" ? html`${commitT}${changesT}` : historyT}
+      ${shell.git.subTab === "changes" ? html`${commitT}${changesT}` : historyT}
       ${loading ? html`<div class="git-loading">Loading...</div>` : nothing}
-      ${S.ui.gitError ? html`<div class="git-error">${S.ui.gitError}</div>` : nothing}
+      ${shell.git.error ? html`<div class="git-error">${shell.git.error}</div>` : nothing}
     </div>
   `;
 }
@@ -807,6 +780,7 @@ function _relativeDate(iso: string) {
   return d.toLocaleDateString();
 }
 
+/** Stop the background refresh. Called on unmount and whenever a different project is opened. */
 export function cleanupGitPanel() {
   if (_pollTimer) {
     clearInterval(_pollTimer);

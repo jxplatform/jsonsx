@@ -2,7 +2,7 @@ import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
 import { render } from "lit-html";
 import { renderDataExplorerTemplate } from "../src/panels/data-explorer";
-import { view } from "../src/view";
+import { shell } from "../src/shell";
 
 const noop = () => {};
 const callbacks = {
@@ -49,6 +49,6 @@ describe("renderDataExplorerTemplate", () => {
     const action = container.querySelector(".empty-state-action") as HTMLElement;
     expect(action.textContent?.trim()).toBe("Define data");
     action.click();
-    expect(view.leftTab).toBe("state");
+    expect(shell.leftTab).toBe("state");
   });
 });

@@ -1,75 +1,35 @@
 /// <reference lib="dom" />
 /**
- * Panel-resize.js — Draggable resize handles for left and right sidebars.
+ * Panel-resize.js — Draggable resize handles for the left, right and assistant docks.
  *
- * Self-initializing module. Import it and the resize handles become interactive. Persists widths to
- * localStorage so they survive page reloads.
+ * Self-initializing module. Import it and the resize handles become interactive.
+ *
+ * The handles are the only thing here: dock widths, their persistence and their projection onto the
+ * grid's CSS custom properties all belong to the reactive `shell` record (`../shell`). A drag
+ * writes `setDockWidth()` and the shell's own effect moves the column; release persists once.
  */
 
-import { applyPanelCollapse, view } from "../view";
+import { DOCK_DEFAULT_WIDTHS, persistDocks, setDockWidth, shell } from "../shell";
+import type { DockId } from "../shell";
 
-const STORAGE_KEY = "jx-studio-panel-widths";
 const MIN_WIDTH = 160;
 const MAX_RATIO = 0.5; // Max 50% of viewport
-const DEFAULT_LEFT = 240;
-const DEFAULT_RIGHT = 280;
-const DEFAULT_CHAT = 320;
 
-const root = document.documentElement;
-
-/** Read a px-valued CSS custom property as a number (e.g. "320px" → 320). */
-function readPxVar(cssVar: string): number {
-  return Number(getComputedStyle(root).getPropertyValue(cssVar).replace(/px$/, ""));
-}
-
-// ─── Restore saved widths & collapse state ──────────────────────────────────
-
-try {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as {
-    left?: number;
-    right?: number;
-    chat?: number;
-    leftCollapsed?: boolean;
-    rightCollapsed?: boolean;
-    chatCollapsed?: boolean;
-  };
-  if (saved.left) {
-    root.style.setProperty("--panel-w-left", `${saved.left}px`);
-  }
-  if (saved.right) {
-    root.style.setProperty("--panel-w-right", `${saved.right}px`);
-  }
-  if (saved.chat) {
-    root.style.setProperty("--panel-w-chat", `${saved.chat}px`);
-  }
-  if (saved.leftCollapsed) {
-    view.leftPanelCollapsed = true;
-  }
-  if (saved.rightCollapsed) {
-    view.rightPanelCollapsed = true;
-  }
-  if (saved.chatCollapsed) {
-    view.chatPanelCollapsed = true;
-  }
-  applyPanelCollapse();
-} catch {
-  // Ignore
-}
-
-// ─── Setup handles ───────────────────────────────────────────────────────────
+/** Which handle drives which dock, and which direction widens it. */
+const HANDLES: { selector: string; dock: DockId; side: "left" | "right" }[] = [
+  { dock: "left", selector: "#resize-left", side: "left" },
+  { dock: "right", selector: "#resize-right", side: "right" },
+  { dock: "chat", selector: "#resize-chat", side: "right" },
+];
 
 /**
+ * Wire one handle to one dock.
+ *
  * @param {HTMLElement} handle
- * @param {string} cssVar
- * @param {"left" | "right"} side
- * @param {number} defaultWidth
+ * @param {DockId} dock
+ * @param {"left" | "right"} side — which way a rightward drag grows the dock
  */
-function setupHandle(
-  handle: HTMLElement,
-  cssVar: string,
-  side: "left" | "right",
-  defaultWidth: number,
-) {
+function setupHandle(handle: HTMLElement, dock: DockId, side: "left" | "right") {
   let drag: { startX: number; startWidth: number } | null = null;
 
   handle.addEventListener("pointerdown", (e) => {
@@ -81,9 +41,7 @@ function setupHandle(
     }
     handle.classList.add("dragging");
     document.body.style.userSelect = "none";
-
-    const current = readPxVar(cssVar) || defaultWidth;
-    drag = { startWidth: current, startX: e.clientX };
+    drag = { startWidth: shell.docks[dock].width, startX: e.clientX };
   });
 
   handle.addEventListener("pointermove", (e) => {
@@ -92,8 +50,8 @@ function setupHandle(
     }
     const delta = side === "left" ? e.clientX - drag.startX : drag.startX - e.clientX;
     const maxWidth = window.innerWidth * MAX_RATIO;
-    const newWidth = Math.round(Math.min(maxWidth, Math.max(MIN_WIDTH, drag.startWidth + delta)));
-    root.style.setProperty(cssVar, `${newWidth}px`);
+    const clamped = Math.max(MIN_WIDTH, drag.startWidth + delta);
+    setDockWidth(dock, Math.round(Math.min(maxWidth, clamped)));
   });
 
   handle.addEventListener("pointerup", (e) => {
@@ -108,38 +66,23 @@ function setupHandle(
     }
     handle.classList.remove("dragging");
     document.body.style.userSelect = "";
-    persistWidths();
+    persistDocks();
   });
 
   handle.addEventListener("dblclick", () => {
-    root.style.setProperty(cssVar, `${defaultWidth}px`);
-    persistWidths();
+    setDockWidth(dock, DOCK_DEFAULT_WIDTHS[dock]);
+    persistDocks();
   });
 }
 
-function persistWidths() {
-  const left = readPxVar("--panel-w-left") || DEFAULT_LEFT;
-  const right = readPxVar("--panel-w-right") || DEFAULT_RIGHT;
-  const chat = readPxVar("--panel-w-chat") || DEFAULT_CHAT;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ chat, left, right }));
-  } catch {
-    // Storage full or unavailable
+/** Attach every handle present in the document. Idempotent per element by construction. */
+export function mountPanelResize(): void {
+  for (const { dock, selector, side } of HANDLES) {
+    const handle = document.querySelector<HTMLElement>(selector);
+    if (handle) {
+      setupHandle(handle, dock, side);
+    }
   }
 }
 
-// ─── Initialize ──────────────────────────────────────────────────────────────
-
-const resizeLeft = document.querySelector<HTMLElement>("#resize-left");
-const resizeRight = document.querySelector<HTMLElement>("#resize-right");
-const resizeChat = document.querySelector<HTMLElement>("#resize-chat");
-
-if (resizeLeft) {
-  setupHandle(resizeLeft, "--panel-w-left", "left", DEFAULT_LEFT);
-}
-if (resizeRight) {
-  setupHandle(resizeRight, "--panel-w-right", "right", DEFAULT_RIGHT);
-}
-if (resizeChat) {
-  setupHandle(resizeChat, "--panel-w-chat", "right", DEFAULT_CHAT);
-}
+mountPanelResize();

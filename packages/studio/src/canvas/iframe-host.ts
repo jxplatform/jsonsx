@@ -37,7 +37,7 @@ import {
   updateUi,
 } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
-import { setLayoutSelection } from "../view";
+import { setLayoutSelection, shell } from "../shell";
 import { formatEditableVerdicts } from "../format/constraints";
 import { formatByName } from "../format/format-host";
 import { collabState } from "../collab/collab-state";
@@ -846,7 +846,7 @@ function ensureSelectionWatch(): void {
       const sel = activeTab.value?.session.selection ?? null;
       // Track the stylebook selection too: stylebook hosts measure the selected TAG's card
       // (session.selection is deliberately [] in stylebook mode).
-      void activeTab.value?.session.ui.stylebookSelection;
+      void shell.stylebook.selection;
       for (const host of liveHosts) {
         requestSelection(host, sel);
       }
@@ -952,7 +952,7 @@ function requestStylebookSelection(host: HostState): void {
     liveHosts.delete(host);
     return;
   }
-  const tag = activeTab.value?.session.ui.stylebookSelection ?? null;
+  const tag = shell.stylebook.selection;
   const cardPath = tag ? host.stylebook?.tagToCardPath.get(tag) : undefined;
   if (!tag || !cardPath) {
     host.overlay.setSelection(null);
@@ -1273,7 +1273,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       if (state.stylebook) {
         // Decode to a tag; suppress the box when hovering the selected tag (legacy parity).
         const tag = msg.hit ? resolveStylebookTag(state.stylebook.pathToTag, msg.hit.path) : null;
-        const selected = activeTab.value?.session.ui.stylebookSelection ?? null;
+        const selected = shell.stylebook.selection;
         if (msg.hit && tag && tag !== selected) {
           state.overlay.setHover(canvasRectToParent(msg.hit.rect));
         } else {
@@ -1329,9 +1329,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       if (msg.reqId === state.selReqId) {
         const [hit] = msg.hits;
         const rect = hit ? canvasRectToParent(hit.rect) : null;
-        const sbTag = state.stylebook
-          ? (activeTab.value?.session.ui.stylebookSelection ?? null)
-          : null;
+        const sbTag = state.stylebook ? shell.stylebook.selection : null;
         state.overlay.setSelection(rect, sbTag ? `<${sbTag}>` : null);
         if (rect) {
           state.lastSelectionRect = rect;

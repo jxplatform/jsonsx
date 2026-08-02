@@ -39,6 +39,7 @@ import { mutateUpdateDef, mutateUpdateProperty, transactDoc } from "./tabs/trans
 import { effect } from "./reactivity";
 
 import { view } from "./view";
+import { mountShell, resetProjectShell, setActivityTab, shell } from "./shell";
 
 import { isEditing } from "./editor/inline-edit";
 import { applyTransform, initCanvasUtils } from "./canvas/canvas-utils";
@@ -125,7 +126,7 @@ import { html, render as litRender } from "lit-html";
 
 import webdata from "../data/webdata.json";
 import { renderDataExplorerTemplate } from "./panels/data-explorer";
-import { cloneRepository, renderGitPanel } from "./panels/git-panel";
+import { cleanupGitPanel, cloneRepository, renderGitPanel } from "./panels/git-panel";
 
 // ─── Spectrum Web Components ──────────────────────────────────────────────────
 // Explicit class imports + registration — bare side-effect imports are tree-shaken
@@ -136,7 +137,7 @@ import "./ui/panel-resize.js";
 import "./ui/form-controls.js";
 import { initLayers, showSaveDiscardDialog } from "./ui/layers";
 import { initShortcuts } from "./editor/shortcuts";
-import { renderActivityBar, mount as mountActivityBar } from "./panels/activity-bar";
+import { mount as mountActivityBar } from "./panels/activity-bar";
 import * as toolbarPanel from "./panels/toolbar";
 import * as overlaysPanel from "./panels/overlays";
 import * as frontmatterPanelMod from "./panels/frontmatter-panel";
@@ -194,15 +195,13 @@ function getCanvasMode() {
 /** @param {string} mode */
 function setCanvasMode(mode: string) {
   if (getCanvasMode() === "git-diff" && mode !== "git-diff") {
-    gitDiffState = null;
+    shell.git.diffState = null;
   }
   const tab = activeTab.value;
   if (tab) {
     tab.session.ui.canvasMode = mode;
   }
 }
-
-let gitDiffState: GitDiffState | null = null;
 
 // ─── Component registry ───────────────────────────────────────────────────────
 
@@ -241,7 +240,7 @@ async function navigateToComponent(componentPath: string) {
     tab.doc.sourceFormat = null;
     tab.documentPath = componentPath;
     tab.session.selection = null;
-    view.leftTab = "layers";
+    setActivityTab("layers");
     tab.session.ui.activeMedia = null;
     tab.session.ui.activeSelector = null;
 
@@ -301,7 +300,7 @@ async function navigateBack() {
   tab.doc.sourceFormat = frame.sourceFormat as string | null;
   tab.documentPath = frame.documentPath as string | null;
   tab.session.selection = frame.selection as JxPath | null;
-  view.leftTab = "layers";
+  setActivityTab("layers");
 
   render();
   statusMessage("Returned to parent document");
@@ -326,7 +325,7 @@ async function navigateToLevel(targetIndex: number) {
   tab.doc.sourceFormat = frame.sourceFormat as string | null;
   tab.documentPath = frame.documentPath as string | null;
   tab.session.selection = frame.selection as JxPath | null;
-  view.leftTab = "layers";
+  setActivityTab("layers");
 
   render();
   statusMessage("Returned to parent document");
@@ -415,7 +414,6 @@ installAutomationHook({
   openQuickSearchPalette: openQuickSearch,
   openSettingsModal,
   render,
-  renderActivityBar,
   seedAssistantMessages,
   seedPublishConnected,
   setCanvasMode,
@@ -427,6 +425,8 @@ mountResizeEdges();
 // ─── Render loop ──────────────────────────────────────────────────────────────
 
 initShellRefs();
+// One effect projects the dock record onto the shell grid — collapse classes and column widths.
+mountShell();
 
 // Mount extracted panel modules
 toolbarPanel.mount(toolbarEl, {
@@ -488,7 +488,8 @@ setStylebookHitHandler((tag, media) => {
   if (tag) {
     selectStylebookTag(tag, media);
   } else {
-    updateSession({ ui: { activeSelector: null, stylebookSelection: null } });
+    shell.stylebook.selection = null;
+    updateSession({ ui: { activeSelector: null } });
   }
 });
 // Commit-on-parent-click: a pointerdown in PARENT chrome outside the edit-session chrome (format
@@ -550,12 +551,12 @@ registerCanvasDndBridge();
 initCanvasRender({
   getCanvasMode,
   get gitDiffState() {
-    return gitDiffState;
+    return shell.git.diffState;
   },
   openFileFromTree,
   setCanvasMode,
   setGitDiffState: (state: GitDiffState | null) => {
-    gitDiffState = state;
+    shell.git.diffState = state;
   },
 });
 
@@ -608,12 +609,14 @@ effect(() => {
     void tab.session.ui.preview;
     void tab.session.ui.previewParams;
     void tab.session.ui.previewProps;
-    void tab.session.ui.settingsTab;
     void tab.session.ui.showLayout;
-    void tab.session.ui.stylebookTab;
-    void tab.session.ui.stylebookFilter;
-    void tab.session.ui.stylebookCustomizedOnly;
   }
+  // Project-level render inputs: the stylebook catalogue's filters and the settings section are
+  // Shell state, so a change repaints the canvas with or without a document focused.
+  void shell.settingsTab;
+  void shell.stylebook.tab;
+  void shell.stylebook.filter;
+  void shell.stylebook.customizedOnly;
   scheduleCanvasRender();
 });
 // Color-scheme preview is a document-level attribute flip inside the iframe — deliberately its
@@ -665,7 +668,7 @@ leftPanelMod.mount({
   renderSignalsTemplate,
   setCanvasMode,
   setGitDiffState: (state: GitDiffState | null) => {
-    gitDiffState = state;
+    shell.git.diffState = state;
   },
   setupTreeKeyboard,
   webdata,
@@ -925,10 +928,7 @@ async function openProject() {
     }
     return;
   }
-  const result = await _openProject({
-    renderActivityBar: () => renderActivityBar(),
-    renderLeftPanel,
-  });
+  const result = await _openProject({ renderLeftPanel });
   ensureFsSync();
   return result;
 }
@@ -953,6 +953,11 @@ async function openRecentProject(root: string) {
     }
 
     platform.projectRoot = root;
+    // Source control, the stylebook selection and the settings tab describe the project being
+    // Left behind; carrying them over showed the previous repository's branch and file count
+    // Under the new project's name. The poll timer is re-armed by the panel's next render.
+    cleanupGitPanel();
+    resetProjectShell();
     // The format registry is cached per project — the previous root's registry (often empty on a
     // Fresh desktop launch) must not answer for this project, or non-JSON documents fail with
     // "No format class imported" until a reload. Mirrors openProject in files.ts.
@@ -1000,8 +1005,7 @@ async function openRecentProject(root: string) {
     }
 
     addRecentProject(requireProjectState().name, root);
-    view.leftTab = "files";
-    renderActivityBar();
+    setActivityTab("files");
     renderLeftPanel();
     statusMessage(`Opened project: ${requireProjectState().name}`);
 

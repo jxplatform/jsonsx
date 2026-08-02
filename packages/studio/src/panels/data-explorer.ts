@@ -4,7 +4,7 @@
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import type { TemplateResult } from "lit-html";
-import { view } from "../view";
+import { setActivityTab } from "../shell";
 import { renderEmptyState } from "./empty-state";
 
 /** Expanded data entries set — persists across renders. */
@@ -94,8 +94,7 @@ export function renderDataExplorerTemplate(
                 label: "Define data",
                 run: () => {
                   // The definitions live one rail tab over; this is the panel that fills this one.
-                  view.leftTab = "state";
-                  renderLeftPanel();
+                  setActivityTab("state");
                 },
               },
             ],

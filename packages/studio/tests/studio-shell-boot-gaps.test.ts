@@ -9,7 +9,7 @@ import { flush, installMockPlatform } from "./harness";
 import { expect, mock, test } from "bun:test";
 import { hasPlatform, getPlatform } from "../src/platform";
 import { renderOnly, setProjectState } from "../src/store";
-import { view } from "../src/view";
+import { shell } from "../src/shell";
 
 (globalThis as unknown as { happyDOM: { setURL: (u: string) => void } }).happyDOM.setURL(
   "http://localhost:3000/",
@@ -182,7 +182,7 @@ test("the statusbar renderer wiring delegates to renderStatusbar", () => {
 test("the files tab renders through studio's renderFilesTemplate wiring", async () => {
   installMockPlatform();
   setProjectState(null);
-  view.leftTab = "files";
+  shell.leftTab = "files";
   renderOnly("leftPanel");
   await rafTurn();
   await flush();

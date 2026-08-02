@@ -32,7 +32,8 @@ void mock.module("../src/panels/statusbar.js", () => ({
 }));
 
 const toolbar = await import("../src/panels/toolbar");
-const { applyPanelCollapse, view } = await import("../src/view");
+const { view } = await import("../src/view");
+const { resetProjectShell, shell } = await import("../src/shell");
 const { setProjectState } = await import("../src/state");
 const { setPreviewNavigateHandler } = await import("../src/canvas/preview-navigate");
 const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
@@ -88,8 +89,9 @@ let platformState: MockPlatformState;
 beforeEach(() => {
   closeAllTabs();
   localStorage.clear();
-  view.rightPanelCollapsed = false;
-  view.chatPanelCollapsed = true;
+  shell.docks.right.collapsed = false;
+  shell.docks.chat.collapsed = true;
+  resetProjectShell();
   view.panX = 0;
   view.panY = 0;
   view.functionEditor = null;
@@ -299,16 +301,16 @@ describe("minimal toolbar (no open tab)", () => {
     expect(root.querySelector("sp-icon-rail-right-close")).not.toBeNull();
     click(root.querySelector("sp-action-button[title='Toggle Right Panel']")!);
     await flush();
-    expect(view.rightPanelCollapsed).toBe(true);
+    expect(shell.docks.right.collapsed).toBe(true);
     expect(root.querySelector("sp-icon-rail-right-open")).not.toBeNull();
 
     click(root.querySelector("sp-action-button[title='Toggle Right Panel']")!);
     await flush();
-    expect(view.rightPanelCollapsed).toBe(false);
+    expect(shell.docks.right.collapsed).toBe(false);
   });
 
   test("assistant toggle flips the chat sidebar collapse state", async () => {
-    view.chatPanelCollapsed = false;
+    shell.docks.chat.collapsed = false;
     toolbar.mount(root, makeCtx());
     await flush();
 
@@ -316,11 +318,11 @@ describe("minimal toolbar (no open tab)", () => {
     expect(toggle()).not.toBeNull();
     click(toggle());
     await flush();
-    expect(view.chatPanelCollapsed).toBe(true);
+    expect(shell.docks.chat.collapsed).toBe(true);
 
     click(toggle());
     await flush();
-    expect(view.chatPanelCollapsed).toBe(false);
+    expect(shell.docks.chat.collapsed).toBe(false);
   });
 
   test("window controls render and dispatch when the platform provides them", async () => {
@@ -508,17 +510,17 @@ describe("full toolbar (active tab)", () => {
     expect(root.querySelector("sp-icon-rail-right-close")).not.toBeNull();
     click(root.querySelector("sp-action-button[title='Toggle Right Panel']")!);
     await flush();
-    expect(view.rightPanelCollapsed).toBe(true);
+    expect(shell.docks.right.collapsed).toBe(true);
     expect(root.querySelector("sp-icon-rail-right-open")).not.toBeNull();
   });
 
   test("Sync Project appears when behind upstream and pulls then refreshes", async () => {
-    const tab = openTestTab();
+    openTestTab();
     toolbar.mount(root, makeCtx());
     await flush();
     expect(root.textContent).not.toContain("Sync Project");
 
-    tab.session.ui.gitStatus = { behind: 2 } as any;
+    shell.git.status = { behind: 2 } as any;
     await flush();
     const sync = btn(root, "Sync Project");
     click(sync);
@@ -528,8 +530,8 @@ describe("full toolbar (active tab)", () => {
   });
 
   test("no Sync Project when up to date", async () => {
-    const tab = openTestTab();
-    tab.session.ui.gitStatus = { behind: 0 } as any;
+    openTestTab();
+    shell.git.status = { behind: 0 } as any;
     toolbar.mount(root, makeCtx());
     await flush();
     expect(root.textContent).not.toContain("Sync Project");
@@ -795,19 +797,18 @@ describe("dock toggles", () => {
       // Default is closed, so the toggle is not selected.
       expect(toggle().hasAttribute("selected")).toBe(false);
 
-      // `view` is a plain object — nothing reactive fires here. The toolbar has to learn about
-      // It through applyPanelCollapse's subscription, or its icons lie about the shell.
-      view.chatPanelCollapsed = false;
-      view.rightPanelCollapsed = true;
-      applyPanelCollapse();
+      // A bare state write, with no repaint call beside it: the toolbar's own effect tracks the
+      // Dock record, so a flip from anywhere (automation, the agent hand-off, the boot restore)
+      // Reaches its icons. This is what the onPanelCollapse subscription used to stand in for.
+      shell.docks.chat.collapsed = false;
+      shell.docks.right.collapsed = true;
       await flush();
       expect(toggle().hasAttribute("selected")).toBe(true);
       expect(root.querySelector("sp-icon-rail-right-open")).not.toBeNull();
 
-      // Unmount drops the subscription.
+      // Unmount stops the tracking.
       toolbar.unmount();
-      view.chatPanelCollapsed = true;
-      applyPanelCollapse();
+      shell.docks.chat.collapsed = true;
       await flush();
       expect(toggle().hasAttribute("selected")).toBe(true);
     } finally {

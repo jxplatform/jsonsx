@@ -4,6 +4,7 @@
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { activeTab } from "../workspace/workspace";
+import { shell } from "../shell";
 import { componentRegistry } from "../files/components";
 
 import type { StylebookEntry } from "./stylebook-panel";
@@ -37,10 +38,10 @@ export function renderStylebookLayersTemplate(ctx: {
 }) {
   const tab = activeTab.value;
   const rootStyle = tab?.doc.document?.style || {};
-  const selectedTag = tab?.session.ui.stylebookSelection;
+  const selectedTag = shell.stylebook.selection;
   const selectedLeaf = selectedTag?.includes(" ") ? selectedTag.split(" ").pop() : selectedTag;
 
-  if (tab?.session.ui.stylebookTab === "elements") {
+  if (shell.stylebook.tab === "elements") {
     /**
      * @param {StylebookEntry} entry
      * @param {number} depth

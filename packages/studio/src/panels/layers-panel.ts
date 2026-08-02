@@ -29,6 +29,7 @@ import {
   transactDoc,
 } from "../tabs/transact";
 import { view } from "../view";
+import { setActivityTab } from "../shell";
 import { renderEmptyState } from "./empty-state";
 import { isInlineElement } from "../editor/inline-edit";
 import { showContextMenu } from "../editor/context-menu";
@@ -483,8 +484,7 @@ export function renderLayersTemplate(ctx: {
                   {
                     label: "Add an element",
                     run: () => {
-                      view.leftTab = "blocks";
-                      ctx.rerender();
+                      setActivityTab("blocks");
                     },
                   },
                 ],

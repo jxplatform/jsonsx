@@ -2,10 +2,9 @@
 /** Activity bar — tab icons for switching left panel views. */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { activityBar, renderOnly } from "../store";
+import { activityBar } from "../store";
 import { effect, effectScope } from "../reactivity";
-import { activeTab } from "../workspace/workspace";
-import { applyPanelCollapse, view } from "../view";
+import { shell, toggleActivityTab } from "../shell";
 import { openSettingsModal } from "../settings/settings-modal";
 import { openAboutModal } from "../about/about-modal";
 import { refreshGitStatus } from "./git-panel";
@@ -18,14 +17,13 @@ export function mount() {
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
-      const tab = activeTab.value;
-      if (tab) {
-        const gs = tab.session.ui.gitStatus;
-        // The badge needs a status once. A refresh that already failed must not re-arm this: the
-        // Effect re-runs on the very state the failure writes, so retrying here spins.
-        if (!gs && !tab.session.ui.gitLoading && !tab.session.ui.gitError) {
-          void refreshGitStatus();
-        }
+      // Source control is PROJECT state, so the badge is fetched and drawn without reference to
+      // Any tab. Sourcing it from `activeTab` is what made it vanish when the last tab closed.
+      // The badge needs a status once. A refresh that already failed must not re-arm this: the
+      // Effect re-runs on the very state the failure writes, so retrying here spins.
+      const { error, loading, status } = shell.git;
+      if (!status && !loading && !error) {
+        void refreshGitStatus();
       }
       renderActivityBar();
     });
@@ -89,9 +87,8 @@ export function tabIcon(tag: string, size?: string) {
 }
 
 export function renderActivityBar() {
-  const tab = activeTab.value;
-  const { leftTab } = view;
-  const gitFileCount = tab?.session.ui.gitStatus?.files?.length || 0;
+  const { leftTab } = shell;
+  const gitFileCount = shell.git.status?.files?.length || 0;
   const tabs = [
     { icon: "sp-icon-folder", label: "Files", value: "files" },
     { icon: "sp-icon-layers", label: "Layers", value: "layers" },
@@ -104,21 +101,13 @@ export function renderActivityBar() {
   ];
   const tpl = html`
     <sp-tabs
-      selected=${view.leftPanelCollapsed ? "" : leftTab}
+      selected=${shell.docks.left.collapsed ? "" : leftTab}
       direction="vertical"
       quiet
       @change=${(e: Event) => {
-        const clicked = (e.target as HTMLElement & { selected: string }).selected;
-        if (clicked === view.leftTab && !view.leftPanelCollapsed) {
-          view.leftPanelCollapsed = true;
-          applyPanelCollapse();
-        } else {
-          view.leftTab = clicked;
-          view.leftPanelCollapsed = false;
-          applyPanelCollapse();
-          renderOnly("leftPanel");
-        }
-        renderActivityBar();
+        // No repaint call: the rail and the left panel both track `shell` through the effects
+        // They already run, so selecting a tab is one state write.
+        toggleActivityTab((e.target as HTMLElement & { selected: string }).selected);
       }}
     >
       ${tabs.map(

@@ -4,8 +4,8 @@ import { describe, expect, test } from "bun:test";
 const STORAGE_KEY = "jx-studio-panel-widths";
 const root = document.documentElement;
 
-// Panel-resize is a self-initializing module: it restores saved widths/collapse state and binds
-// The resize handles at import time, so the fixture must exist before the dynamic import below.
+// Both modules read storage at import time — `shell` builds its dock record, `panel-resize` binds
+// The handles — so the fixture must exist before the dynamic imports below.
 localStorage.setItem(
   STORAGE_KEY,
   JSON.stringify({
@@ -24,8 +24,10 @@ document.body.innerHTML = `
   <div id="resize-chat"></div>
 `;
 
-const { view } = await import("../src/view");
+const { mountShell, shell } = await import("../src/shell");
 await import("../src/ui/panel-resize");
+// The grid is projected by the shell's own effect, not by the resize module.
+mountShell();
 
 const leftHandle = document.querySelector("#resize-left") as HTMLElement;
 const rightHandle = document.querySelector("#resize-right") as HTMLElement;
@@ -39,9 +41,9 @@ function widthOf(cssVar: string): string {
   return root.style.getPropertyValue(cssVar);
 }
 
-/** Start width the handler will read back for a var (computed style, falling back to default). */
-function startWidth(cssVar: string, fallback: number): number {
-  return Number(getComputedStyle(root).getPropertyValue(cssVar).replace(/px$/, "")) || fallback;
+/** The width a drag will start from, read where the handler reads it. */
+function startWidth(dock: "left" | "right" | "chat"): number {
+  return shell.docks[dock].width;
 }
 
 describe("import-time restore", () => {
@@ -51,10 +53,10 @@ describe("import-time restore", () => {
     expect(widthOf("--panel-w-chat")).toBe("360px");
   });
 
-  test("saved collapse flags restore view state and #app classes", () => {
-    expect(view.leftPanelCollapsed).toBe(true);
-    expect(view.rightPanelCollapsed).toBe(true);
-    expect(view.chatPanelCollapsed).toBe(true);
+  test("saved collapse flags restore shell state and #app classes", () => {
+    expect(shell.docks.left.collapsed).toBe(true);
+    expect(shell.docks.right.collapsed).toBe(true);
+    expect(shell.docks.chat.collapsed).toBe(true);
     const app = document.querySelector("#app") as HTMLElement;
     expect(app.classList.contains("left-collapsed")).toBe(true);
     expect(app.classList.contains("right-collapsed")).toBe(true);
@@ -77,7 +79,7 @@ describe("left handle drag", () => {
   });
 
   test("dragging right grows the left panel by the pointer delta", () => {
-    const start = startWidth("--panel-w-left", 240);
+    const start = startWidth("left");
     drag(leftHandle, "pointerdown", 100);
     drag(leftHandle, "pointermove", 150);
     expect(widthOf("--panel-w-left")).toBe(`${start + 50}px`);
@@ -124,7 +126,7 @@ describe("left handle drag", () => {
 
 describe("right handle drag", () => {
   test("dragging left grows the right panel (inverted delta)", () => {
-    const start = startWidth("--panel-w-right", 280);
+    const start = startWidth("right");
     drag(rightHandle, "pointerdown", 500);
     drag(rightHandle, "pointermove", 460);
     expect(widthOf("--panel-w-right")).toBe(`${start + 40}px`);
@@ -139,7 +141,7 @@ describe("right handle drag", () => {
 
 describe("chat handle drag", () => {
   test("dragging left grows the chat sidebar (inverted delta) and persists it", () => {
-    const start = startWidth("--panel-w-chat", 320);
+    const start = startWidth("chat");
     drag(chatHandle, "pointerdown", 800);
     drag(chatHandle, "pointermove", 770);
     expect(widthOf("--panel-w-chat")).toBe(`${start + 30}px`);

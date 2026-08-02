@@ -14,7 +14,7 @@ import { setProjectState } from "../state";
 import { seedProjectList } from "../project-list";
 import { activeTab, closeAllTabs, workspace } from "../workspace/workspace";
 import type { ProjectListEntry } from "../types";
-import { applyPanelCollapse, view } from "../view";
+import { setActivityTab, setDockCollapsed, shell, toggleActivityTab } from "../shell";
 import { setEditZoom as applyEditZoomLevel } from "../canvas/canvas-utils";
 import { collabState } from "../collab/collab-state";
 import type { PeerPresence } from "../collab/collab-state";
@@ -31,7 +31,6 @@ export interface AutomationDeps {
   openQuickSearchPalette: () => void;
   openSettingsModal: (section?: string) => void;
   render: () => void;
-  renderActivityBar: () => void;
   seedAssistantMessages: (messages: SeededAssistantMessage[]) => void;
   seedPublishConnected: (options: { accountId?: string; deployment: PagesDeploymentInfo }) => void;
   setCanvasMode: (mode: string) => void;
@@ -336,9 +335,9 @@ export const AUTOMATION_COMMANDS: Record<string, AutomationCommand> = {
   "view.toggleActivity": { run: (api, args) => api.toggleActivity(str(args, "tab")) },
   // Idempotent by design, unlike the rail's toggleActivity. A manifest step that says "close the
   // Assistant" must mean it whichever way the default currently points — these two used to be
-  // Blind toggles driven by pressing the button, so flipping `chatPanelCollapsed` to default-closed
-  // Silently inverted 18 shots. `applyPanelCollapse()` notifies the toolbar via onPanelCollapse,
-  // So the chrome repaints without pressing anything.
+  // Blind toggles driven by pressing the button, so flipping the assistant to default-closed
+  // Silently inverted 18 shots. The dock lives on the reactive shell record, so the chrome
+  // Repaints without pressing anything.
   "view.setAssistant": { run: (api, args) => api.setAssistant(bool(args, "open")) },
   "view.setRightPanel": { run: (api, args) => api.setRightPanel(bool(args, "open")) },
 };
@@ -416,8 +415,7 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
       if (options?.projects) {
         seedProjectList(options.projects);
       }
-      view.chatPanelCollapsed = true;
-      applyPanelCollapse();
+      setDockCollapsed("chat", true);
       deps.render();
     },
     getState() {
@@ -425,7 +423,7 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
         activeTabId: workspace.activeTabId,
         canvasMode: deps.getCanvasMode(),
         canvasStatus: activeTab.value?.session.canvas.status ?? null,
-        leftTab: view.leftTab,
+        leftTab: shell.leftTab,
       };
     },
     select(path: JxPath | null) {
@@ -436,11 +434,7 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
       deps.render();
     },
     setActivity(tab: string) {
-      view.leftTab = tab;
-      view.leftPanelCollapsed = false;
-      applyPanelCollapse();
-      renderOnly("leftPanel");
-      deps.renderActivityBar();
+      setActivityTab(tab);
     },
     setCanvasMode(mode: string) {
       deps.setCanvasMode(mode);
@@ -450,8 +444,7 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
       // "assistant" now lives in the persistent chat sidebar, not the right panel — keep the
       // Screenshot-manifest verb working by opening that sidebar instead.
       if (tab === "assistant") {
-        view.chatPanelCollapsed = false;
-        applyPanelCollapse();
+        setDockCollapsed("chat", false);
         renderOnly("chatPanel");
         deps.render();
         return;
@@ -475,29 +468,18 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
       applyEditZoomLevel(zoom);
     },
     setAssistant(open: boolean) {
-      view.chatPanelCollapsed = !open;
-      applyPanelCollapse();
+      setDockCollapsed("chat", !open);
       renderOnly("chatPanel");
       deps.render();
     },
     setRightPanel(open: boolean) {
-      view.rightPanelCollapsed = !open;
-      applyPanelCollapse();
+      setDockCollapsed("right", !open);
       deps.render();
     },
     toggleActivity(tab: string) {
       // Mirrors the activity bar's own sp-tabs @change handler: re-picking the open tab collapses
       // The left panel rather than reselecting it.
-      if (tab === view.leftTab && !view.leftPanelCollapsed) {
-        view.leftPanelCollapsed = true;
-        applyPanelCollapse();
-      } else {
-        view.leftTab = tab;
-        view.leftPanelCollapsed = false;
-        applyPanelCollapse();
-        renderOnly("leftPanel");
-      }
-      deps.renderActivityBar();
+      toggleActivityTab(tab);
     },
     togglePreview() {
       // Matches the tab bar's Preview button, which relies on reactivity alone to repaint.

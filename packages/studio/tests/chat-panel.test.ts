@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { initShellRefs } from "../src/store";
 import { closeAllTabs, setWorkspaceProject } from "../src/workspace/workspace";
 import { setPendingAgentPrompt } from "../src/services/agent-seed";
-import { view } from "../src/view";
+import { shell } from "../src/shell";
 
 // Chat-panel hosts ai-panel, which instantiates a document assistant at module load. Mock it
 // (before the dynamic import below) so no send ever touches the network.
@@ -69,7 +69,7 @@ beforeEach(() => {
   closeAllTabs();
   setWorkspaceProject(null);
   globalThis.localStorage.clear();
-  view.chatPanelCollapsed = false;
+  shell.docks.chat.collapsed = false;
   assistantSend.mockClear();
 });
 
@@ -113,7 +113,7 @@ describe("chat panel", () => {
 
   test("consumes a pending agent prompt when the workspace adopts its project root", async () => {
     globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-test");
-    view.chatPanelCollapsed = true;
+    shell.docks.chat.collapsed = true;
     setPendingAgentPrompt("/proj-c", "build a landing page");
     mount(chatHost());
     await flush(4);
@@ -123,7 +123,7 @@ describe("chat panel", () => {
     await flush(6);
 
     // The sidebar force-opens, the localStorage entry is consumed, and the prompt is sent.
-    expect(view.chatPanelCollapsed).toBe(false);
+    expect(shell.docks.chat.collapsed).toBe(false);
     expect(document.querySelector("#app")!.classList.contains("chat-collapsed")).toBe(false);
     expect(globalThis.localStorage.getItem("jx.ai.pendingAgentPrompt:/proj-c")).toBeNull();
     expect(assistantSend).toHaveBeenCalledWith("build a landing page");

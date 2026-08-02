@@ -13,9 +13,7 @@ import { render as litRender } from "lit-html";
 // ─── Controllable module state (captured by mock.module factories) ───────────
 
 let mockPlatform: any;
-let ui: Record<string, any> = {};
-const activeTabRef: { value: any } = { value: null };
-const viewObj: Record<string, any> = { leftTab: "git" };
+const activeTabRef: { value: any } = { value: { session: { ui: {} } } };
 let calls: [string, ...unknown[]][] = [];
 let statusMessages: string[] = [];
 let confirmCalls: string[] = [];
@@ -37,10 +35,6 @@ void mock.module("../src/workspace/workspace.js", () => ({
   closeTab: () => {},
   openTab: () => {},
   renameTab: () => {},
-}));
-
-void mock.module("../src/view.js", () => ({
-  view: viewObj,
 }));
 
 void mock.module("../src/ui/layers.js", () => ({
@@ -101,8 +95,12 @@ void mock.module("../src/packages/pull-package-sync.js", () => ({
 }));
 
 const { setProjectState } = (await import("../src/state.js")) as any;
+const { resetProjectShell, shell } = await import("../src/shell.js");
 const { cleanupGitPanel, cloneRepository, refreshGitStatus, renderGitPanel } =
   await import("../src/panels/git-panel.js");
+
+// Source control is project state now; `shell.git` is where the panel reads and writes it.
+const git = shell.git as unknown as Record<string, any>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -162,14 +160,14 @@ function freshPlatform(): any {
 }
 
 function seedRepoUi(overrides: Record<string, unknown> = {}) {
-  ui.gitBranches = { branches: ["main", "dev"], current: "main" };
-  ui.gitStatus = baseStatus();
-  Object.assign(ui, overrides);
+  git.branches = { branches: ["main", "dev"], current: "main" };
+  git.status = baseStatus();
+  Object.assign(git, overrides);
 }
 
 function renderPanel(ctx: any = {}) {
   const div = document.createElement("div");
-  litRender(renderGitPanel({ ui } as any, ctx), div);
+  litRender(renderGitPanel(ctx), div);
   return div;
 }
 
@@ -193,8 +191,8 @@ function fileRowAction(div: HTMLElement, path: string, title: string) {
 }
 
 beforeEach(() => {
-  ui = {};
-  activeTabRef.value = { session: { ui } };
+  resetProjectShell();
+  activeTabRef.value = { session: { ui: {} } };
   calls = [];
   statusMessages = [];
   confirmCalls = [];
@@ -206,7 +204,7 @@ beforeEach(() => {
     host.remove();
   }
   dialogHosts = [];
-  viewObj.leftTab = "git";
+  shell.leftTab = "git";
   mockPlatform = freshPlatform();
   pullSyncCalls = 0;
   pullSyncImpl = async () => {};
@@ -223,10 +221,10 @@ afterEach(() => {
 describe("refreshGitStatus", () => {
   test("populates status and branches, clears loading", async () => {
     await refreshGitStatus();
-    expect(ui.gitStatus.branch).toBe("main");
-    expect(ui.gitBranches).toEqual({ branches: ["main", "dev"], current: "main" });
-    expect(ui.gitLoading).toBe(false);
-    expect(ui.gitError).toBeNull();
+    expect(git.status.branch).toBe("main");
+    expect(git.branches).toEqual({ branches: ["main", "dev"], current: "main" });
+    expect(git.loading).toBe(false);
+    expect(git.error).toBeNull();
     expect(callNames()).toContain("gitStatus");
     expect(callNames()).toContain("gitBranches");
   });
@@ -236,8 +234,8 @@ describe("refreshGitStatus", () => {
       throw new Error("status boom");
     });
     await refreshGitStatus();
-    expect(String(ui.gitError)).toContain("status boom");
-    expect(ui.gitLoading).toBe(false);
+    expect(String(git.error)).toContain("status boom");
+    expect(git.loading).toBe(false);
   });
 
   test("does nothing when no project is open", async () => {
@@ -260,8 +258,8 @@ describe("refreshGitStatus", () => {
       throw new Error("not a git repository");
     });
     await refreshGitStatus();
-    expect(ui.gitStatus.isRepo).toBe(false);
-    expect(ui.gitError).toBeNull();
+    expect(git.status.isRepo).toBe(false);
+    expect(git.error).toBeNull();
   });
 
   test("surfaces a branch failure on a project that IS a repo", async () => {
@@ -269,8 +267,8 @@ describe("refreshGitStatus", () => {
       throw new Error("branches boom");
     });
     await refreshGitStatus();
-    expect(ui.gitStatus.isRepo).toBe(true);
-    expect(String(ui.gitError)).toContain("branches boom");
+    expect(git.status.isRepo).toBe(true);
+    expect(String(git.error)).toContain("branches boom");
   });
 });
 
@@ -352,12 +350,12 @@ describe("panel bootstrap", () => {
     expect(div.textContent).toContain("Loading...");
     await flush();
     expect(callNames()).toContain("gitStatus");
-    expect(ui.gitStatus.isRepo).toBe(true);
+    expect(git.status.isRepo).toBe(true);
   });
 
   test("a failed refresh does not re-arm the background fetch", async () => {
     // Otherwise the render triggered by the failure is the next render's reason to fetch again.
-    ui.gitError = "status boom";
+    git.error = "status boom";
     const div = renderPanel();
     await flush();
     expect(callNames()).not.toContain("gitStatus");
@@ -365,7 +363,7 @@ describe("panel bootstrap", () => {
   });
 
   test("initialize repository button runs gitInit and refreshes", async () => {
-    ui.gitStatus = { ahead: 0, behind: 0, branch: "", files: [], isRepo: false, remotes: [] };
+    git.status = { ahead: 0, behind: 0, branch: "", files: [], isRepo: false, remotes: [] };
     const div = renderPanel();
     click(findButton(div, "Initialize Repository"));
     await flush();
@@ -376,7 +374,7 @@ describe("panel bootstrap", () => {
   });
 
   test("publish button in non-repo state calls publishToGithub with project name", async () => {
-    ui.gitStatus = { ahead: 0, behind: 0, branch: "", files: [], isRepo: false, remotes: [] };
+    git.status = { ahead: 0, behind: 0, branch: "", files: [], isRepo: false, remotes: [] };
     const div = renderPanel();
     click(findButton(div, "Create GitHub repository"));
     await flush();
@@ -386,7 +384,7 @@ describe("panel bootstrap", () => {
   test("no-remote sync bar publish falls back to default project name", async () => {
     setProjectState({});
     seedRepoUi();
-    ui.gitStatus.remotes = [];
+    git.status.remotes = [];
     const div = renderPanel();
     click(findButton(div, "Create GitHub repository"));
     await flush();
@@ -402,14 +400,14 @@ describe("panel bootstrap", () => {
 
   test("an empty file list teaches what lands in the changes tab", () => {
     seedRepoUi();
-    ui.gitStatus.files = [];
+    git.status.files = [];
     const div = renderPanel();
     expect(div.textContent).toContain("Nothing to commit.");
     expect(div.querySelector('[title="Stage all"]')).toBeNull();
   });
 
   test("error and loading indicators render from ui state", () => {
-    seedRepoUi({ gitError: "broken pipe", gitLoading: true });
+    seedRepoUi({ error: "broken pipe", loading: true });
     const div = renderPanel();
     expect(div.querySelector(".git-error")!.textContent).toContain("broken pipe");
     expect(div.textContent).toContain("Loading...");
@@ -454,8 +452,8 @@ describe("sync bar actions", () => {
     click(div.querySelector('[title^="Pull"]'));
     await flush();
     expect(pullSyncCalls).toBe(1);
-    expect(String(ui.gitError)).toContain("pull broke");
-    expect(ui.gitLoading).toBe(false);
+    expect(String(git.error)).toContain("pull broke");
+    expect(git.loading).toBe(false);
   });
 
   test("failing git action records error and stops loading", async () => {
@@ -466,8 +464,8 @@ describe("sync bar actions", () => {
     const div = renderPanel();
     click(div.querySelector('[title="Fetch"]'));
     await flush();
-    expect(String(ui.gitError)).toContain("net down");
-    expect(ui.gitLoading).toBe(false);
+    expect(String(git.error)).toContain("net down");
+    expect(git.loading).toBe(false);
   });
 });
 
@@ -534,11 +532,11 @@ describe("commit form", () => {
     const input = div.querySelector(".git-commit-input") as any;
     input.value = "hello commit";
     input.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(ui.gitCommitMessage).toBe("hello commit");
+    expect(git.commitMessage).toBe("hello commit");
   });
 
   test("Ctrl+Enter commits and clears the message", async () => {
-    seedRepoUi({ gitCommitMessage: "  quick fix  " });
+    seedRepoUi({ commitMessage: "  quick fix  " });
     const div = renderPanel();
     const input = div.querySelector(".git-commit-input")!;
     input.dispatchEvent(
@@ -551,12 +549,12 @@ describe("commit form", () => {
     );
     await flush();
     expect(calls).toContainEqual(["gitCommit", "quick fix"]);
-    expect(ui.gitCommitMessage).toBe("");
+    expect(git.commitMessage).toBe("");
     expect(callNames()).toContain("gitStatus");
   });
 
   test("Cmd+Enter commits on macOS", async () => {
-    seedRepoUi({ gitCommitMessage: "mac commit" });
+    seedRepoUi({ commitMessage: "mac commit" });
     const div = renderPanel();
     const input = div.querySelector(".git-commit-input")!;
     input.dispatchEvent(
@@ -587,14 +585,14 @@ describe("commit form", () => {
   });
 
   test("commit and sync commits, pushes, then refreshes", async () => {
-    seedRepoUi({ gitCommitMessage: "sync msg" });
+    seedRepoUi({ commitMessage: "sync msg" });
     const div = renderPanel();
     click(div.querySelector(".git-commit-btn"));
     await flush();
     expect(calls).toContainEqual(["gitCommit", "sync msg"]);
     expect(callNames()).toContain("gitPush");
     expect(callNames()).toContain("gitStatus");
-    expect(ui.gitCommitMessage).toBe("");
+    expect(git.commitMessage).toBe("");
   });
 
   test("commit and sync without a message does nothing", async () => {
@@ -607,19 +605,19 @@ describe("commit form", () => {
   });
 
   test("commit and sync records error when push fails", async () => {
-    seedRepoUi({ gitCommitMessage: "doomed" });
+    seedRepoUi({ commitMessage: "doomed" });
     mockPlatform.gitPush = log("gitPush", async () => {
       throw new Error("push boom");
     });
     const div = renderPanel();
     click(div.querySelector(".git-commit-btn"));
     await flush();
-    expect(String(ui.gitError)).toContain("push boom");
-    expect(ui.gitLoading).toBe(false);
+    expect(String(git.error)).toContain("push boom");
+    expect(git.loading).toBe(false);
   });
 
   test("split menu toggles and commit-only item commits without pushing", async () => {
-    seedRepoUi({ gitCommitMessage: "menu msg" });
+    seedRepoUi({ commitMessage: "menu msg" });
     const div = renderPanel();
     const menu = div.querySelector(".git-split-menu")!;
     expect(menu.hasAttribute("hidden")).toBe(true);
@@ -648,7 +646,7 @@ describe("file rows", () => {
     await flush();
     expect(calls).toContainEqual(["gitShow", { path: "src/page.json", ref: "HEAD" }]);
     expect(calls).toContainEqual(["readFile", "src/page.json"]);
-    expect(ui.gitDiffState).toEqual({
+    expect(git.diffState).toEqual({
       currentContent: "CURRENT",
       filePath: "src/page.json",
       fileStatus: "M",
@@ -656,7 +654,7 @@ describe("file rows", () => {
     });
     expect(modes).toEqual(["git-diff"]);
     expect(diffs.length).toBe(1);
-    expect(ui.gitLoading).toBe(false);
+    expect(git.loading).toBe(false);
   });
 
   test("clicking an added file uses an empty original without gitShow", async () => {
@@ -665,8 +663,8 @@ describe("file rows", () => {
     click(div.querySelector('.git-file-name[title="src/new.json"]'));
     await flush();
     expect(callNames()).not.toContain("gitShow");
-    expect(ui.gitDiffState.originalContent).toBe("");
-    expect(ui.gitDiffState.fileStatus).toBe("A");
+    expect(git.diffState.originalContent).toBe("");
+    expect(git.diffState.fileStatus).toBe("A");
   });
 
   test("diff state is stored even without canvas-mode context", async () => {
@@ -674,7 +672,7 @@ describe("file rows", () => {
     const div = renderPanel({});
     click(div.querySelector('.git-file-name[title="src/page.json"]'));
     await flush();
-    expect(ui.gitDiffState.filePath).toBe("src/page.json");
+    expect(git.diffState.filePath).toBe("src/page.json");
   });
 
   test("deleted files and non-format files are ignored on click", async () => {
@@ -695,9 +693,9 @@ describe("file rows", () => {
     const div = renderPanel({});
     click(div.querySelector('.git-file-name[title="src/page.json"]'));
     await flush();
-    expect(String(ui.gitError)).toContain("Failed to load diff");
-    expect(String(ui.gitError)).toContain("read fail");
-    expect(ui.gitLoading).toBe(false);
+    expect(String(git.error)).toContain("Failed to load diff");
+    expect(String(git.error)).toContain("read fail");
+    expect(git.loading).toBe(false);
   });
 
   test("discard asks for confirmation then discards", async () => {
@@ -804,7 +802,7 @@ describe("history tab", () => {
     click(tabButtons(div)[1]);
     await flush();
     expect(calls).toContainEqual(["gitLog", 30]);
-    expect(ui.gitLogEntries).toEqual(entries);
+    expect(git.logEntries).toEqual(entries);
 
     div = renderPanel();
     const text = div.textContent!;
@@ -820,7 +818,7 @@ describe("history tab", () => {
   });
 
   test("history with cached empty entries teaches what a commit is, without refetch", async () => {
-    seedRepoUi({ gitLogEntries: [] });
+    seedRepoUi({ logEntries: [] });
     let div = renderPanel();
     click(tabButtons(div)[1]);
     await flush();
@@ -838,7 +836,7 @@ describe("history tab", () => {
     const div = renderPanel();
     click(tabButtons(div)[1]);
     await flush();
-    expect(String(ui.gitError)).toContain("log boom");
+    expect(String(git.error)).toContain("log boom");
     click(renderPanel().querySelectorAll(".git-tab")[0]);
   });
 
@@ -872,20 +870,20 @@ describe("poll timer", () => {
     expect(pollMs).toBe(30_000);
 
     calls = [];
-    ui.gitLoading = false;
+    git.loading = false;
     pollCb!();
     await flush();
     expect(callNames()).toContain("gitStatus");
 
     calls = [];
-    ui.gitLoading = true;
+    git.loading = true;
     pollCb!();
     await flush();
     expect(calls).toEqual([]);
 
     calls = [];
-    ui.gitLoading = false;
-    viewObj.leftTab = "layers";
+    git.loading = false;
+    shell.leftTab = "layers";
     pollCb!();
     await flush();
     expect(calls).toEqual([]);

@@ -18,11 +18,11 @@ void mock.module("../src/about/about-modal.js", () => ({
 }));
 
 const store = await import("../src/store");
-const { initShellRefs, registerRenderer } = store;
+const { initShellRefs } = store;
 // `activityBar` is an `export let` populated by initShellRefs — read it via the namespace
 // Object so the live binding is preserved.
 const bar = () => store.activityBar;
-const { view } = await import("../src/view");
+const { mountShell, resetProjectShell, shell, unmountShell } = await import("../src/shell");
 const { closeAllTabs } = await import("../src/workspace/workspace");
 const { mount, renderActivityBar, tabIcon, unmount } = await import("../src/panels/activity-bar");
 
@@ -38,8 +38,9 @@ beforeAll(() => {
 
 beforeEach(() => {
   closeAllTabs();
-  view.leftTab = "layers";
-  view.leftPanelCollapsed = false;
+  shell.leftTab = "layers";
+  shell.docks.left.collapsed = false;
+  resetProjectShell();
   refreshGitStatus.mockClear();
   openSettingsModal.mockClear();
   openAboutModal.mockClear();
@@ -140,69 +141,83 @@ describe("renderActivityBar", () => {
   });
 
   test("selects the current left tab when panel is open", () => {
-    view.leftTab = "files";
+    shell.leftTab = "files";
     renderActivityBar();
     expect(bar().querySelector("sp-tabs")?.getAttribute("selected")).toBe("files");
   });
 
   test("selects nothing when left panel is collapsed", () => {
-    view.leftPanelCollapsed = true;
+    shell.docks.left.collapsed = true;
     renderActivityBar();
     expect(bar().querySelector("sp-tabs")?.getAttribute("selected")).toBe("");
   });
 
   test("shows git badge with changed file count", () => {
-    const tab = resetWorkspaceWithTab();
-    tab.session.ui.gitStatus = { files: [{}, {}, {}] } as any;
+    shell.git.status = { files: [{}, {}, {}] } as any;
     renderActivityBar();
     const badge = bar().querySelector(".activity-badge");
     expect(badge?.textContent).toBe("3");
   });
 
   test("omits git badge when there are no changed files", () => {
-    const tab = resetWorkspaceWithTab();
-    tab.session.ui.gitStatus = { files: [] } as any;
+    shell.git.status = { files: [] } as any;
     renderActivityBar();
     expect(bar().querySelector(".activity-badge")).toBeNull();
   });
 
-  test("change to a different tab opens it and re-renders the left panel", () => {
-    const leftPanelRenderer = mock(() => {});
-    registerRenderer("leftPanel", leftPanelRenderer);
-    view.leftTab = "layers";
+  test("the badge survives closing the last tab", () => {
+    // Source Control is PROJECT state. Sourcing the badge from `activeTab` is what made it vanish
+    // The moment the last document closed, and what would make a level:"project" rail group lie.
+    resetWorkspaceWithTab();
+    shell.git.status = { files: [{}, {}] } as any;
+    renderActivityBar();
+    expect(bar().querySelector(".activity-badge")?.textContent).toBe("2");
+
+    closeAllTabs();
+    renderActivityBar();
+    expect(bar().querySelector(".activity-badge")?.textContent).toBe("2");
+  });
+
+  test("change to a different tab opens it", () => {
+    // No renderOnly("leftPanel") assertion any more: the panel tracks `shell.leftTab` itself, and
+    // A manual repaint beside the state write is exactly what the split removes.
+    mountShell();
+    shell.leftTab = "layers";
     renderActivityBar();
     const tabsEl = bar().querySelector("sp-tabs") as HTMLElement & { selected: string };
     tabsEl.selected = "files";
     tabsEl.dispatchEvent(new Event("change", { bubbles: true }));
 
-    expect(view.leftTab).toBe("files");
-    expect(view.leftPanelCollapsed).toBe(false);
-    expect(leftPanelRenderer).toHaveBeenCalled();
+    expect(shell.leftTab).toBe("files");
+    expect(shell.docks.left.collapsed).toBe(false);
     expect(document.querySelector("#app")?.classList.contains("left-collapsed")).toBe(false);
+    unmountShell();
   });
 
   test("change to the already-open tab collapses the panel", () => {
-    view.leftTab = "files";
-    view.leftPanelCollapsed = false;
+    mountShell();
+    shell.leftTab = "files";
+    shell.docks.left.collapsed = false;
     renderActivityBar();
     const tabsEl = bar().querySelector("sp-tabs") as HTMLElement & { selected: string };
     tabsEl.selected = "files";
     tabsEl.dispatchEvent(new Event("change", { bubbles: true }));
 
-    expect(view.leftPanelCollapsed).toBe(true);
+    expect(shell.docks.left.collapsed).toBe(true);
     expect(document.querySelector("#app")?.classList.contains("left-collapsed")).toBe(true);
+    unmountShell();
   });
 
   test("change to current tab while collapsed re-opens it", () => {
-    view.leftTab = "files";
-    view.leftPanelCollapsed = true;
+    shell.leftTab = "files";
+    shell.docks.left.collapsed = true;
     renderActivityBar();
     const tabsEl = bar().querySelector("sp-tabs") as HTMLElement & { selected: string };
     tabsEl.selected = "files";
     tabsEl.dispatchEvent(new Event("change", { bubbles: true }));
 
-    expect(view.leftPanelCollapsed).toBe(false);
-    expect(view.leftTab).toBe("files");
+    expect(shell.docks.left.collapsed).toBe(false);
+    expect(shell.leftTab).toBe("files");
   });
 
   test("settings button opens the settings modal", () => {
@@ -223,9 +238,9 @@ describe("renderActivityBar", () => {
 // ─── mount / unmount ──────────────────────────────────────────────────────────
 
 describe("mount", () => {
-  test("renders immediately and requests git status for a fresh tab", async () => {
-    const tab = resetWorkspaceWithTab();
-    expect(tab.session.ui.gitStatus).toBeNull();
+  test("renders immediately and requests git status once", async () => {
+    resetWorkspaceWithTab();
+    expect(shell.git.status).toBeNull();
     mount();
     await flush();
     expect(refreshGitStatus).toHaveBeenCalled();
@@ -233,48 +248,45 @@ describe("mount", () => {
   });
 
   test("does not refresh git status while loading or already loaded", async () => {
-    const tab = resetWorkspaceWithTab();
-    tab.session.ui.gitLoading = true;
+    shell.git.loading = true;
     mount();
     await flush();
     expect(refreshGitStatus).not.toHaveBeenCalled();
 
     // Set status first — effects trigger synchronously, so clearing the loading flag while
     // Status is still null would legitimately re-probe.
-    tab.session.ui.gitStatus = { files: [] } as any;
-    tab.session.ui.gitLoading = false;
+    shell.git.status = { files: [] } as any;
+    shell.git.loading = false;
     await flush();
     expect(refreshGitStatus).not.toHaveBeenCalled();
   });
 
   test("re-renders the badge when git status changes", async () => {
-    const tab = resetWorkspaceWithTab();
-    tab.session.ui.gitStatus = { files: [] } as any;
+    shell.git.status = { files: [] } as any;
     mount();
     await flush();
     expect(bar().querySelector(".activity-badge")).toBeNull();
 
-    tab.session.ui.gitStatus = { files: [{}] } as any;
+    shell.git.status = { files: [{}] } as any;
     await flush();
     expect(bar().querySelector(".activity-badge")?.textContent).toBe("1");
   });
 
-  test("renders without a tab (no git probe)", async () => {
+  test("probes for status with no tab open — the panel level is project, not document", async () => {
     closeAllTabs();
     mount();
     await flush();
-    expect(refreshGitStatus).not.toHaveBeenCalled();
+    expect(refreshGitStatus).toHaveBeenCalled();
     expect(bar().querySelector("sp-tabs")).not.toBeNull();
   });
 
   test("unmount stops reactive updates", async () => {
-    const tab = resetWorkspaceWithTab();
-    tab.session.ui.gitStatus = { files: [] } as any;
+    shell.git.status = { files: [] } as any;
     mount();
     await flush();
     unmount();
 
-    tab.session.ui.gitStatus = { files: [{}, {}] } as any;
+    shell.git.status = { files: [{}, {}] } as any;
     await flush();
     expect(bar().querySelector(".activity-badge")).toBeNull();
   });

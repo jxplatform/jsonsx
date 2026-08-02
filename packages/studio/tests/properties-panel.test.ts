@@ -19,6 +19,7 @@ import {
 import { componentRegistry } from "../src/files/components";
 import { resetSlotModeMemory } from "../src/ui/dynamic-slot";
 import { view } from "../src/view";
+import { shell } from "../src/shell";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -71,7 +72,7 @@ function sleep(ms: number) {
 
 beforeEach(() => {
   navCalls.length = 0;
-  view.layoutSelection = null;
+  shell.layoutSelection = null;
   view.showAddBreakpointForm = false;
   view.addBreakpointPreview = "";
   componentRegistry.length = 0;
@@ -121,7 +122,7 @@ describe("layout selection panel", () => {
 
   test("shows tag, class, and the layout file the element came from", async () => {
     openDoc({ children: [], tagName: "div" });
-    view.layoutSelection = headerHit;
+    shell.layoutSelection = headerHit;
 
     const c = await renderPanel();
     expect(section(c, "Layout Element")).not.toBeNull();
@@ -132,14 +133,14 @@ describe("layout selection panel", () => {
 
   test("a layout selection wins over the document selection (a layout node is not in this doc)", async () => {
     openDoc({ children: [{ tagName: "p" }], tagName: "div" }, ["children", 0]);
-    view.layoutSelection = headerHit;
+    shell.layoutSelection = headerHit;
     const c = await renderPanel();
     expect(section(c, "Layout Element")).not.toBeNull();
   });
 
   test("Open Layout → opens the file AND selects the clicked node in it, then releases", async () => {
     const tab = openDoc({ children: [], tagName: "div" });
-    view.layoutSelection = headerHit;
+    shell.layoutSelection = headerHit;
     // Stand in for studio.ts's navigateToComponent: it swaps the tab's document in place.
     const navigate = async (path: string) => {
       await Promise.resolve();
@@ -155,12 +156,12 @@ describe("layout selection panel", () => {
     expect(navCalls).toEqual(["layouts/base.json"]);
     expect(tab.session.selection).toEqual(["children", 0, "children", 0]);
     // The layout is now the OPEN document, so its nodes are ordinary content again.
-    expect(view.layoutSelection).toBeNull();
+    expect(shell.layoutSelection).toBeNull();
   });
 
   test("navigating somewhere other than the layout leaves the selection alone", async () => {
     const tab = openDoc({ children: [], tagName: "div" });
-    view.layoutSelection = headerHit;
+    shell.layoutSelection = headerHit;
     const navigate = async () => {
       await Promise.resolve();
       tab.documentPath = "components/other.json";
@@ -175,7 +176,7 @@ describe("layout selection panel", () => {
 
   test("falls back to generic labels when the hit names no tag, class, or file", async () => {
     openDoc({ children: [], tagName: "div" });
-    view.layoutSelection = {
+    shell.layoutSelection = {
       className: "",
       layoutFile: "",
       layoutPath: [],

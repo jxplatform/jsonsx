@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { canvasPanels } from "../src/store";
 import { collabState } from "../src/collab/collab-state";
+import { shell } from "../src/shell";
 import type { CanvasPanel } from "../src/types";
 import type { Tab } from "../src/tabs/tab";
 
@@ -222,13 +223,13 @@ describe("not-ready selection gates", () => {
   });
 
   test("a stylebook tag selection on a not-yet-ready host posts no measure", async () => {
-    const tab = resetWorkspaceWithTab() as Tab;
+    resetWorkspaceWithTab();
     const canvasEl = document.createElement("div");
     document.body.append(canvasEl);
     mountStylebookCanvas(1, STYLEBOOK_GENERATED(), canvasEl, 800); // Never 'ready'.
     const ch = channels.at(-1)!;
     ch.posts.length = 0;
-    tab.session.ui.stylebookSelection = "h1";
+    shell.stylebook.selection = "h1";
     await flush();
     expect(ch.posts.some((p) => p.kind === "measure")).toBe(false);
   });

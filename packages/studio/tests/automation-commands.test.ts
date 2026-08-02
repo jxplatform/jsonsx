@@ -12,7 +12,7 @@ import type { AutomationArgs, AutomationDeps } from "../src/services/automation"
 
 const { AUTOMATION_COMMANDS, createAutomationApi } = await import("../src/services/automation");
 const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
-const { view } = await import("../src/view");
+const { shell } = await import("../src/shell");
 const { activeTab, closeAllTabs } = await import("../src/workspace/workspace");
 
 function makeDeps(): AutomationDeps {
@@ -24,7 +24,6 @@ function makeDeps(): AutomationDeps {
     openQuickSearchPalette: mock(() => {}),
     openSettingsModal: mock(() => {}),
     render: mock(() => {}),
-    renderActivityBar: mock(() => {}),
     seedAssistantMessages: mock(() => {}),
     seedPublishConnected: mock(() => {}),
     setCanvasMode: mock(() => {}),
@@ -100,9 +99,9 @@ describe("run", () => {
 
   test("a state-driven command executes in-page and asks the runner for nothing", () => {
     const api = createAutomationApi(makeDeps());
-    view.leftTab = "files";
+    shell.leftTab = "files";
     expect(api.run("view.setActivity", { tab: "state" })).toEqual({});
-    expect(view.leftTab).toBe("state");
+    expect(shell.leftTab).toBe("state");
   });
 
   test("an INTERIM command hands its control back for a real mouse press", () => {
@@ -186,23 +185,23 @@ describe("argument coercion", () => {
 
 describe("view toggles", () => {
   test("the chat and right-panel commands are idempotent setters, not blind toggles", () => {
-    // These were `press` shims driving the real button, because the toolbar could not see
-    // View.*PanelCollapsed. It now subscribes via onPanelCollapse, so they set state directly —
-    // And they take `open` rather than toggling, so flipping a default cannot silently invert
-    // Every manifest step that used them (which is exactly what happened to 23 of them).
+    // These were `press` shims driving the real button, because the toolbar could not see the
+    // Dock flags. Dock state is reactive now, so they set it directly — and they take `open`
+    // Rather than toggling, so flipping a default cannot silently invert every manifest step
+    // That used them (which is exactly what happened to 23 of them).
     const api = createAutomationApi(makeDeps());
 
     api.run("view.setAssistant", { open: true });
-    expect(view.chatPanelCollapsed).toBe(false);
+    expect(shell.docks.chat.collapsed).toBe(false);
     api.run("view.setAssistant", { open: true });
-    expect(view.chatPanelCollapsed).toBe(false);
+    expect(shell.docks.chat.collapsed).toBe(false);
     api.run("view.setAssistant", { open: false });
-    expect(view.chatPanelCollapsed).toBe(true);
+    expect(shell.docks.chat.collapsed).toBe(true);
 
     api.run("view.setRightPanel", { open: false });
-    expect(view.rightPanelCollapsed).toBe(true);
+    expect(shell.docks.right.collapsed).toBe(true);
     api.run("view.setRightPanel", { open: true });
-    expect(view.rightPanelCollapsed).toBe(false);
+    expect(shell.docks.right.collapsed).toBe(false);
   });
 
   test("a non-boolean `open` fails the shot rather than capturing the wrong state", () => {
@@ -224,17 +223,16 @@ describe("view toggles", () => {
   test("toggleActivity opens another tab, then collapses the panel when re-picked", () => {
     const deps = makeDeps();
     const api = createAutomationApi(deps);
-    view.leftTab = "files";
-    view.leftPanelCollapsed = true;
+    shell.leftTab = "files";
+    shell.docks.left.collapsed = true;
     api.toggleActivity("layers");
-    expect(view.leftTab).toBe("layers");
-    expect(view.leftPanelCollapsed).toBe(false);
+    expect(shell.leftTab).toBe("layers");
+    expect(shell.docks.left.collapsed).toBe(false);
     api.toggleActivity("layers");
-    expect(view.leftPanelCollapsed).toBe(true);
+    expect(shell.docks.left.collapsed).toBe(true);
     // Re-picking a collapsed tab reopens it rather than toggling again.
     api.toggleActivity("layers");
-    expect(view.leftPanelCollapsed).toBe(false);
-    expect(deps.renderActivityBar).toHaveBeenCalledTimes(3);
+    expect(shell.docks.left.collapsed).toBe(false);
   });
 });
 

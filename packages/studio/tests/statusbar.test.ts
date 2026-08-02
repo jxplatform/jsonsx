@@ -9,6 +9,7 @@ import {
   statusMessage,
   unmountStatusbar,
 } from "../src/panels/statusbar";
+import { resetProjectShell, shell } from "../src/shell";
 
 beforeAll(() => {
   const bar = document.createElement("div");
@@ -19,6 +20,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   closeAllTabs();
+  resetProjectShell();
   statusbarEl.innerHTML = "";
   setStatusbarRenderer(renderStatusbar);
 });
@@ -129,8 +131,8 @@ describe("renderStatusbar", () => {
   });
 
   test("stylebook selection shows Style path when no node selection", () => {
-    const tab = resetWorkspaceWithTab();
-    tab.session.ui.stylebookSelection = "ul li";
+    resetWorkspaceWithTab();
+    shell.stylebook.selection = "ul li";
     renderStatusbar();
     expect(statusbarEl.innerHTML).toContain("Style: ul &gt; li");
     expect(statusbarEl.textContent).toContain("Style: ul > li");
@@ -141,7 +143,7 @@ describe("renderStatusbar", () => {
       children: [{ tagName: "p", textContent: "Hi" }],
       tagName: "div",
     });
-    tab.session.ui.stylebookSelection = "h1";
+    shell.stylebook.selection = "h1";
     tab.session.selection = ["children", 0];
     renderStatusbar();
     expect(statusbarEl.innerHTML).toContain("Selected:");
@@ -151,7 +153,7 @@ describe("renderStatusbar", () => {
   test("parts are joined with separators", () => {
     const tab = resetWorkspaceWithTab();
     tab.doc.mode = "content";
-    tab.session.ui.stylebookSelection = "h1";
+    shell.stylebook.selection = "h1";
     renderStatusbar();
     expect(statusbarEl.innerHTML).toContain("Content Mode  |  Style: h1");
   });

@@ -11,6 +11,7 @@ import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { activeTab, closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
 import { view } from "../src/view";
+import { shell } from "../src/shell";
 import { resetZoom } from "../src/canvas/canvas-utils";
 import type { Tab } from "../src/tabs/tab";
 
@@ -370,7 +371,7 @@ describe("navigateToComponent", () => {
     expect(tab.session.documentStack).toHaveLength(1);
     expect((tab.session.documentStack![0] as any).documentPath).toBe("pages/current.json");
     expect(tab.session.selection).toBeNull();
-    expect(view.leftTab).toBe("layers");
+    expect(shell.leftTab).toBe("layers");
     expect(statusMessages.at(-1)).toBe("Editing component: my-card");
   });
 
@@ -702,10 +703,10 @@ describe("canvas render effects", () => {
   });
 
   test("UI flag changes always schedule a render", async () => {
-    const tab = openShellTab();
+    openShellTab();
     await flush();
     scheduleCanvasRenderMock.mockClear();
-    tab.session.ui.settingsTab = "fonts";
+    shell.settingsTab = "fonts";
     expect(scheduleCanvasRenderMock).toHaveBeenCalled();
   });
 });
@@ -714,7 +715,7 @@ describe("openRecentProject", () => {
   test("loads project.json, rebuilds project state, and opens the project", async () => {
     await toolbarCtx.openRecentProject("/recent/site");
     expect(platform.projectRoot).toBe("/recent/site");
-    expect(view.leftTab).toBe("files");
+    expect(shell.leftTab).toBe("files");
     expect(statusMessages).toContain("Opened project: Recent Project");
   });
 
@@ -1002,11 +1003,11 @@ describe("stylebook hit routing", () => {
     const tab = openShellTab();
     expect(stylebookHit).not.toBeNull();
     stylebookHit!("button", "sm");
-    expect(tab.session.ui.stylebookSelection).toBe("button");
+    expect(shell.stylebook.selection).toBe("button");
     expect(tab.session.ui.activeSelector).toBe("button");
     expect(tab.session.ui.activeMedia).toBe("sm");
     stylebookHit!(null, null);
-    expect(tab.session.ui.stylebookSelection).toBeNull();
+    expect(shell.stylebook.selection).toBeNull();
     expect(tab.session.ui.activeSelector).toBeNull();
   });
 });

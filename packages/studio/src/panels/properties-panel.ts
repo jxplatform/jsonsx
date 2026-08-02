@@ -17,8 +17,9 @@ import {
   transactDoc,
 } from "../tabs/transact";
 import { activeTab } from "../workspace/workspace";
-import { setLayoutSelection, view } from "../view";
-import type { LayoutSelection } from "../view";
+import { view } from "../view";
+import { setLayoutSelection, shell } from "../shell";
+import type { LayoutSelection } from "../shell";
 import { componentRegistry } from "../files/components";
 import { widgetForType } from "./style-inputs";
 import { renderFieldRow } from "../ui/field-row";
@@ -1117,7 +1118,7 @@ async function openLayoutAtNode(
 function renderLayoutSelectionPanel(ctx: {
   navigateToComponent: (path: string) => void | Promise<void>;
 }) {
-  const selection = view.layoutSelection as LayoutSelection;
+  const selection = shell.layoutSelection as LayoutSelection;
   const tagName = selection.tagName || "element";
   const { className } = selection;
   const displayPath = selection.layoutFile || "layout";
@@ -1185,7 +1186,7 @@ export function renderPropertiesPanelTemplate(ctx: {
   }
 
   // Layout element selected — show read-only info with link to open layout
-  if (view.layoutSelection) {
+  if (shell.layoutSelection) {
     return renderLayoutSelectionPanel(ctx);
   }
 

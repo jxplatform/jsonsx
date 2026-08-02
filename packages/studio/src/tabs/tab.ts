@@ -6,9 +6,6 @@ import type {
   DocumentStackEntry,
   FormulaEditDef,
   FunctionEditDef,
-  GitBranchesResult,
-  GitDiffState,
-  GitStatusResult,
   InlineEditDef,
   JsonValue,
 } from "../types";
@@ -54,17 +51,6 @@ export interface TabUi {
   styleShorthands: Record<string, boolean>;
   styleFilter: string;
   styleFilterActive: boolean;
-  stylebookSelection: string | null;
-  stylebookTab: string;
-  stylebookFilter: string;
-  stylebookCustomizedOnly: boolean;
-  settingsTab: string;
-  gitStatus: GitStatusResult | null;
-  gitBranches: GitBranchesResult | null;
-  gitCommitMessage: string;
-  gitLoading: boolean;
-  gitError: string | null;
-  gitDiffState: GitDiffState | null;
   pendingInlineEdit: InlineEditDef | null;
 }
 
@@ -161,12 +147,6 @@ function createDefaultUi(canvasMode: string, preview = false) {
     editingFunction: null,
     featureToggles: {},
     frontmatterOpen: true,
-    gitBranches: null,
-    gitCommitMessage: "",
-    gitDiffState: null,
-    gitError: null,
-    gitLoading: false,
-    gitStatus: null,
     inspectorSections: {},
     pendingInlineEdit: null,
     preview,
@@ -174,16 +154,11 @@ function createDefaultUi(canvasMode: string, preview = false) {
     previewParams: {},
     previewProps: null,
     rightTab: "properties",
-    settingsTab: "stylebook",
     showLayout: true,
     styleFilter: "",
     styleFilterActive: false,
     styleSections: {},
     styleShorthands: {},
-    stylebookCustomizedOnly: false,
-    stylebookFilter: "",
-    stylebookSelection: null,
-    stylebookTab: "elements",
     zoom: 1,
   };
 }

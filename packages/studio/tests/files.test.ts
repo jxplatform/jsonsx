@@ -20,6 +20,7 @@ import {
   openProject,
   reloadFileInTab,
 } from "../src/files/files";
+import { shell } from "../src/shell";
 import type { DirEntry, StudioPlatform } from "../src/types";
 import type { StudioState } from "../src/state";
 
@@ -361,7 +362,6 @@ describe("openProject", () => {
     const calls: string[] = [];
     return {
       calls,
-      renderActivityBar: () => calls.push("activity"),
       renderLeftPanel: () => calls.push("left"),
     };
   }
@@ -407,7 +407,9 @@ describe("openProject", () => {
     expect(st.dirs.has("pages")).toBe(true);
     expect(st.dirs.has("components")).toBe(true);
 
-    expect(ctx.calls).toEqual(["activity", "left"]);
+    // The rail is no longer repainted by hand: it tracks `shell.leftTab`, which openProject sets.
+    expect(ctx.calls).toEqual(["left"]);
+    expect(shell.leftTab).toBe("files");
     expect(activeTab.value?.documentPath).toBe("pages/index.json");
 
     const recent = JSON.parse(localStorage.getItem("jx-studio-recent-projects") ?? "[]");

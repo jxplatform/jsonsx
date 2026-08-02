@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import * as storeActual from "../src/store";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
+import { shell } from "../src/shell";
 
 // Make debounced style commits synchronous so @input handlers fire without real 400ms timers.
 void mock.module("../src/store", () => ({
@@ -150,7 +151,7 @@ describe("renderStylePanelTemplate empty states", () => {
 
   test("stylebook mode with null document → the same open-a-page state", async () => {
     const tab = setupTab({});
-    tab.session.ui.stylebookSelection = "h1";
+    shell.stylebook.selection = "h1";
     (tab.doc as unknown as Record<string, unknown>).document = null;
     const c = await renderPanel("stylebook");
     expect(c.querySelector(".empty-state-message")?.textContent).toBe(
@@ -163,9 +164,9 @@ describe("renderStylePanelTemplate empty states", () => {
 
 describe("stylebook mode", () => {
   test("renders header and merges site style into effective style", async () => {
-    const tab = setupTab({});
+    setupTab({});
     resetStudioState({ projectConfig: { style: { textAlign: "center" } } });
-    tab.session.ui.stylebookSelection = "h1";
+    shell.stylebook.selection = "h1";
     const c = await renderPanel("stylebook");
     expect(c.querySelector(".stylebook-style-header")?.textContent).toContain("h1");
     const r = row(c, "textAlign");

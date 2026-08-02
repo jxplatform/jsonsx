@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { flush, resetStudioState, resetWorkspaceWithTab, stubRect } from "./harness";
 import { activeTab } from "../src/workspace/workspace";
 import { reactive } from "../src/reactivity";
+import { resetProjectShell, shell } from "../src/shell";
 import { canvasPanels, canvasWrap, initShellRefs, registerRenderer } from "../src/store";
 import { clearDragGhost, setDragGhost } from "../src/panels/drag-ghost";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
@@ -113,6 +114,7 @@ beforeEach(() => {
   document.body.innerHTML = "";
   resolved = structuredClone(DEFAULT_RESOLVED);
   resolveCalls = 0;
+  resetProjectShell();
 });
 
 describe("mountIframeCanvas", () => {
@@ -481,7 +483,7 @@ describe("iframe canvas interaction", () => {
   });
 
   test("a layoutHit selects the layout chrome, clears the document selection, and labels the box", async () => {
-    const { setLayoutSelection, view } = await import("../src/view");
+    const { setLayoutSelection } = await import("../src/shell");
     setLayoutSelection(null);
     const canvasEl = await mountReady();
 
@@ -503,11 +505,11 @@ describe("iframe canvas interaction", () => {
       kind: "layoutHit",
     });
 
-    expect(view.layoutSelection).toMatchObject({
-      layoutFile: "layouts/base.json",
-      layoutPath: ["children", 0, "children", 0],
-      tagName: "a",
-    });
+    // Read through the reactive record field by field: `shell.layoutSelection` is a proxy, so
+    // Structural matchers compare the handler rather than the hit.
+    expect(shell.layoutSelection?.layoutFile).toBe("layouts/base.json");
+    expect(shell.layoutSelection?.layoutPath).toEqual(["children", 0, "children", 0]);
+    expect(shell.layoutSelection?.tagName).toBe("a");
     expect(activeTab.value?.session.selection).toBeNull();
     const sel = canvasEl.querySelector(".overlay-selection") as HTMLElement;
     expect(sel.style.display).toBe("block");
@@ -518,7 +520,7 @@ describe("iframe canvas interaction", () => {
       hit: { path: ["children", 1], rect: { height: 20, width: 100, x: 10, y: 5 } },
       kind: "hit",
     });
-    expect(view.layoutSelection).toBeNull();
+    expect(shell.layoutSelection).toBeNull();
   });
 
   test("hover draws the hover box unless it coincides with the selection", async () => {
@@ -2279,7 +2281,7 @@ describe("stylebook host capability", () => {
 
   test("hover decodes to a tag and suppresses the box over the SELECTED tag", async () => {
     const { canvasEl, channel } = await mountStylebookReady();
-    activeTab.value!.session.ui.stylebookSelection = "p";
+    shell.stylebook.selection = "p";
     await flush();
     const hover = canvasEl.querySelector(".overlay-hover") as HTMLElement;
 
@@ -2329,7 +2331,7 @@ describe("stylebook host capability", () => {
     const { canvasEl, channel } = await mountStylebookReady();
     channel.posts.length = 0;
 
-    activeTab.value!.session.ui.stylebookSelection = "p";
+    shell.stylebook.selection = "p";
     await flush();
     const measure = channel.posts.find((p) => p.kind === "measure") as Msg;
     expect(measure).toMatchObject({ kind: "measure", paths: [CARD_PATH] });
@@ -2346,7 +2348,7 @@ describe("stylebook host capability", () => {
 
     // A tag with no card in this host's doc clears the box without a round-trip.
     channel.posts.length = 0;
-    activeTab.value!.session.ui.stylebookSelection = "table";
+    shell.stylebook.selection = "table";
     await flush();
     expect(channel.posts.some((p) => p.kind === "measure")).toBe(false);
     expect(sel.style.display).toBe("none");

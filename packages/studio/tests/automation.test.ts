@@ -7,7 +7,7 @@ const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) 
 const { createAutomationApi, installAutomationHook, shouldInstallAutomation } =
   await import("../src/services/automation");
 const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
-const { view } = await import("../src/view");
+const { shell } = await import("../src/shell");
 const { activeTab, closeAllTabs } = await import("../src/workspace/workspace");
 const { updateCanvas } = await import("../src/store");
 
@@ -78,9 +78,9 @@ describe("installAutomationHook", () => {
 });
 
 describe("createAutomationApi", () => {
-  test("getState reflects tab, canvas, and view state", () => {
+  test("getState reflects tab, canvas, and shell state", () => {
     resetWorkspaceWithTab(undefined, { id: "shot-tab" });
-    view.leftTab = "files";
+    shell.leftTab = "files";
     const api = createAutomationApi(makeDeps());
     const state = api.getState();
     expect(state.activeTabId).toBe("shot-tab");
@@ -116,11 +116,10 @@ describe("createAutomationApi", () => {
   test("setActivity switches the left panel tab and uncollapses", () => {
     const deps = makeDeps();
     const api = createAutomationApi(deps);
-    view.leftPanelCollapsed = true;
+    shell.docks.left.collapsed = true;
     api.setActivity("layers");
-    expect(view.leftTab).toBe("layers");
-    expect(view.leftPanelCollapsed).toBe(false);
-    expect(deps.renderActivityBar).toHaveBeenCalledTimes(1);
+    expect(shell.leftTab).toBe("layers");
+    expect(shell.docks.left.collapsed).toBe(false);
   });
 
   test("setCanvasMode delegates to studio and rerenders", () => {
@@ -164,10 +163,10 @@ describe("createAutomationApi", () => {
     const deps = makeDeps();
     const api = createAutomationApi(deps);
     api.setRightTab("style");
-    view.chatPanelCollapsed = true;
+    shell.docks.chat.collapsed = true;
     api.setRightTab("assistant");
     // The retired tab value maps to the persistent chat sidebar…
-    expect(view.chatPanelCollapsed).toBe(false);
+    expect(shell.docks.chat.collapsed).toBe(false);
     // …and the right panel's own tab selection is untouched.
     const ui = activeTab.value?.session.ui as unknown as Record<string, unknown>;
     expect(ui.rightTab).toBe("style");
