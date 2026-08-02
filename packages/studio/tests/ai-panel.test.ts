@@ -1,7 +1,7 @@
 /**
- * Tests for src/panels/ai-panel.ts — the assistant tab orchestrator: key gate, the chat ↔ sessions
- * view machine, the rAF render loop driven by the reactive chat-state watcher, stick-to-bottom
- * auto-scroll, and the seedAssistantPrompt hand-off.
+ * Tests for src/panels/ai-panel.ts — the assistant tab orchestrator: the chat ↔ sessions view
+ * machine, the `Assistant: Settings…` credentials dialog, the rAF render loop driven by the
+ * reactive chat-state watcher, stick-to-bottom auto-scroll, and the seedAssistantPrompt hand-off.
  *
  * The document assistant is mocked (reactive chat-state, recorded session API); the panel module
  * holds singleton state, so these tests run as one ordered scenario.
@@ -86,10 +86,12 @@ void mock.module("../src/services/document-assistant", () => ({
 const {
   bindAiPanelHost,
   mountAiPanel,
+  openAssistantSettings,
   renderAiPanelTemplate,
   seedAssistantMessages,
   seedAssistantPrompt,
 } = await import("../src/panels/ai-panel");
+const { initLayers } = await import("../src/ui/layers");
 
 // The panel renders into its bound host via the rAF loop, exactly as in the app.
 const host = document.createElement("div");
@@ -98,8 +100,36 @@ bindAiPanelHost(host);
 mountAiPanel();
 mountAiPanel(); // Idempotent
 
+// The credentials form left the panel for a dialog, so these tests need the overlay layers.
+for (const id of ["layer-popover", "layer-modal", "layer-dialog"]) {
+  if (!document.querySelector(`#${id}`)) {
+    const el = document.createElement("div");
+    el.id = id;
+    document.body.append(el);
+  }
+}
+initLayers();
+
 function q<T extends Element = HTMLElement>(sel: string) {
   return host.querySelector(sel) as T | null;
+}
+
+/** Query inside the dialog layer — where `Assistant: Settings…` renders. */
+function d<T extends Element = HTMLElement>(sel: string) {
+  return document.querySelector(`#layer-dialog ${sel}`) as T | null;
+}
+
+/** The dialog's `<sp-button>` whose label contains `label`. */
+function dialogButton(label: string) {
+  return [...document.querySelectorAll("#layer-dialog sp-button")].find((b) =>
+    b.textContent?.includes(label),
+  ) as HTMLElement | undefined;
+}
+
+/** Open `Assistant: Settings…` from the in-panel notice and settle its first render. */
+async function openSettingsFromNotice() {
+  pointer(q(".ai-setup-notice sp-button")!, "click");
+  await flush(3);
 }
 
 beforeEach(() => {
@@ -109,16 +139,53 @@ beforeEach(() => {
 // ─── Ordered scenario (module-level singleton state) ─────────────────────────
 
 describe("ai-panel", () => {
-  test("gates the chat behind the credentials form when no key is stored", async () => {
+  test("keeps the chat and offers the settings action when no key is stored", async () => {
     globalThis.localStorage.clear();
     pushMessage("user", "pre-existing");
     await flush(3); // Watcher → rAF render
-    expect(q(".ai-creds-form")).not.toBeNull();
-    expect(q(".ai-chat-messages")).toBeNull();
+    // The panel is a chat, not a credentials form — the transcript and composer are both up.
+    expect(q(".ai-chat-messages")).not.toBeNull();
+    expect(q(".ai-composer textarea")).not.toBeNull();
+    expect(q(".ai-creds-form")).toBeNull();
+    // …with one line and the action that fixes it.
+    expect(q(".ai-setup-notice")!.textContent).toContain("No AI provider is connected yet.");
+    expect(q(".ai-setup-notice sp-button")!.textContent).toContain("Assistant: Settings…");
     chatState.messages.length = 0;
   });
 
-  test("offers Connect Cloudflare on managed platforms and unlocks after connecting", async () => {
+  test("Assistant: Settings… opens the credentials dialog and Close dismisses it", async () => {
+    globalThis.localStorage.clear();
+    await flush(3);
+    await openSettingsFromNotice();
+    expect(d(".ai-creds-form")).not.toBeNull();
+    expect(d("sp-dialog-wrapper")!.getAttribute("headline")).toBe("Assistant settings");
+    // The form is Spectrum controls now, not raw inputs with inline styles.
+    expect(document.querySelectorAll("#layer-dialog sp-textfield").length).toBeGreaterThan(0);
+    expect(d(".ai-creds-form input")).toBeNull();
+
+    d("sp-dialog-wrapper")!.dispatchEvent(new Event("close", { bubbles: true }));
+    await flush(3);
+    expect(d(".ai-creds-form")).toBeNull();
+    expect(q(".ai-setup-notice")).not.toBeNull();
+  });
+
+  test("saving a key in the dialog closes it and retires the notice", async () => {
+    globalThis.localStorage.clear();
+    await flush(3);
+    await openSettingsFromNotice();
+    const field = d<HTMLInputElement>("sp-textfield")!;
+    field.value = "sk-from-dialog";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    pointer(dialogButton("Save")!, "click");
+    await flush(3);
+    expect(globalThis.localStorage.getItem("jx.ai.openaiKey")).toBe("sk-from-dialog");
+    expect(d(".ai-creds-form")).toBeNull();
+    expect(q(".ai-setup-notice")).toBeNull();
+    globalThis.localStorage.clear();
+    await flush(3);
+  });
+
+  test("offers Connect Cloudflare in the dialog and retires the notice after connecting", async () => {
     globalThis.localStorage.clear();
     const realFetch = globalThis.fetch;
     // Managed platform, Workers AI not yet connected.
@@ -129,25 +196,25 @@ describe("ai-panel", () => {
     mockPlatform.cfConnect = cfConnect;
     pushMessage("user", "nudge render");
     await flush(3);
+    await openSettingsFromNotice();
     // Both real paths show: the managed connect CTA above the BYOK form.
-    expect(q(".ai-managed-connect")).not.toBeNull();
-    expect(q(".ai-creds-form")).not.toBeNull();
+    expect(d(".ai-managed-connect")).not.toBeNull();
+    expect(d(".ai-creds-form")).not.toBeNull();
 
-    // Connecting flips /models to configured — the gate opens into the chat.
+    // Connecting flips /models to configured — the notice retires.
     (globalThis as Record<string, unknown>).fetch = async () =>
       Response.json(
         { models: [{ id: "@cf/meta/llama-4" }], configured: true, managed: true },
         { status: 200 },
       );
-    const button = [...host.querySelectorAll("sp-button")].find((b) =>
-      b.textContent?.includes("Connect Cloudflare"),
-    )!;
-    pointer(button, "click");
+    pointer(dialogButton("Connect Cloudflare")!, "click");
     await flush(6);
     expect(cfConnect).toHaveBeenCalledTimes(1);
-    expect(q(".ai-managed-connect")).toBeNull();
+    expect(d(".ai-managed-connect")).toBeNull();
+    expect(q(".ai-setup-notice")).toBeNull();
     expect(q(".ai-composer textarea")).not.toBeNull();
 
+    d("sp-dialog-wrapper")!.dispatchEvent(new Event("close", { bubbles: true }));
     chatState.messages.length = 0;
     delete mockPlatform.cfConnect;
     invalidateModelCache();
@@ -155,7 +222,7 @@ describe("ai-panel", () => {
     await flush(3);
   });
 
-  test("unlocks without a key when the proxy reports itself configured (managed platforms)", async () => {
+  test("no notice at all when the proxy reports itself configured (managed platforms)", async () => {
     globalThis.localStorage.clear();
     const realFetch = globalThis.fetch;
     (globalThis as Record<string, unknown>).fetch = async () =>
@@ -166,7 +233,7 @@ describe("ai-panel", () => {
     await fetchAvailableModels({ force: true });
     pushMessage("user", "cloud hello");
     await flush(3);
-    expect(q(".ai-creds-form")).toBeNull();
+    expect(q(".ai-setup-notice")).toBeNull();
     expect(q(".ai-composer textarea")).not.toBeNull();
     chatState.messages.length = 0;
     invalidateModelCache();
@@ -178,7 +245,7 @@ describe("ai-panel", () => {
     globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-test");
     pushMessage("user", "hello");
     await flush(3);
-    expect(q(".ai-creds-form")).toBeNull();
+    expect(q(".ai-setup-notice")).toBeNull();
     expect(q(".ai-chat-header")).not.toBeNull();
     expect(q(".ai-composer textarea")).not.toBeNull();
     expect(q(".ai-msg-user")!.textContent).toContain("hello");
@@ -269,17 +336,27 @@ describe("ai-panel", () => {
     expect(q(".ai-chat-title")!.textContent).toBe("New chat");
   });
 
-  test("the composer gear opens the credentials form; Cancel returns to the chat", async () => {
+  test("the composer gear opens the settings dialog; Cancel closes it, chat untouched", async () => {
     pointer(q("sp-action-button[title='API key & endpoint']")!, "click");
     await flush(3);
-    expect(q(".ai-creds-form")).not.toBeNull();
-    const cancel = [...host.querySelectorAll("sp-button")].find((b) =>
-      b.textContent?.includes("Cancel"),
-    )!;
-    pointer(cancel, "click");
-    await flush(3);
-    expect(q(".ai-creds-form")).toBeNull();
+    expect(d(".ai-creds-form")).not.toBeNull();
+    // The chat behind the dialog never went anywhere — that is the whole point of the move.
     expect(q(".ai-chat-messages")).not.toBeNull();
+    // Cancel is offered because a key exists at this point in the scenario.
+    pointer(dialogButton("Cancel")!, "click");
+    await flush(3);
+    expect(d(".ai-creds-form")).toBeNull();
+    expect(q(".ai-chat-messages")).not.toBeNull();
+  });
+
+  test("openAssistantSettings resolves when the dialog is dismissed", async () => {
+    const closed = openAssistantSettings();
+    await flush(3);
+    expect(d(".ai-creds-form")).not.toBeNull();
+    d("sp-dialog-wrapper")!.dispatchEvent(new Event("cancel", { bubbles: true }));
+    expect(await closed).toBeNull();
+    await flush(3);
+    expect(d(".ai-creds-form")).toBeNull();
   });
 
   test("seedAssistantPrompt ignores blank prompts and sends real ones", async () => {
@@ -327,11 +404,11 @@ describe("ai-panel", () => {
     expect(renderAiPanelTemplate()).toBeDefined();
   });
 
-  test("seedAssistantMessages stages a canned conversation and opens the key gate", async () => {
+  test("seedAssistantMessages stages a canned conversation and retires the notice", async () => {
     globalThis.localStorage.clear();
     chatState.messages.length = 0;
-    await flush(3); // With no key the gate is up again.
-    expect(q(".ai-creds-form")).not.toBeNull();
+    await flush(3); // With no key the setup notice is back.
+    expect(q(".ai-setup-notice")).not.toBeNull();
 
     seedAssistantMessages([
       {
@@ -346,9 +423,9 @@ describe("ai-panel", () => {
       },
     ]);
     await flush(3);
-    // The inert demo key opened the gate (localStorage only — no request fires)…
+    // The inert demo key landed (localStorage only — no request fires)…
     expect(globalThis.localStorage.getItem("jx.ai.openaiKey")).toBe("sk-demo");
-    expect(q(".ai-creds-form")).toBeNull();
+    expect(q(".ai-setup-notice")).toBeNull();
     // …and the canned transcript renders with context chips and tool chips.
     expect(q(".ai-msg-user")!.textContent).toContain("Make the hero friendlier");
     expect(q(".ai-context-chip")!.textContent).toContain("Page: pages/index.md");

@@ -423,3 +423,28 @@ describe("renderLayersTemplate — keyed rows", () => {
     expect(para!.style.display).not.toBe("none");
   });
 });
+
+describe("renderLayersTemplate — empty state", () => {
+  test("a page with nothing on it teaches what the outline lists, and opens Insert", async () => {
+    let rerenders = 0;
+    view.leftTab = "layers";
+    resetWorkspaceWithTab({ children: [], tagName: "div" } as JxMutableNode, {
+      id: "empty-doc-tab",
+    });
+    // Content mode drops the root row, so the tree really is empty.
+    activeTab.value!.doc.mode = "content";
+    await renderLayers({
+      rerender: () => {
+        rerenders += 1;
+      },
+    });
+    expect(host.querySelectorAll(".layer-row")).toHaveLength(0);
+    expect(host.querySelector(".empty-state-message")?.textContent).toBe(
+      "This page is empty. Everything you add to it is listed here, in order.",
+    );
+
+    (host.querySelector(".empty-state-action") as HTMLElement).click();
+    expect(view.leftTab).toBe("blocks");
+    expect(rerenders).toBe(1);
+  });
+});

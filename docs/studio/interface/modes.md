@@ -62,6 +62,17 @@ Alongside the toggle, the tab bar offers:
 - For components, a small field per component option so you can try test values.
 - For pages that use a layout, a **Layout** toggle to show or hide the elements the layout contributes.
 
+**Preview does not edit.** While it is on, clicking the page selects nothing, no outlines are drawn,
+the insertion **+** and the canvas menu give way to your browser's own, nothing can be dropped in,
+and the keys that change the document do nothing. Anything you had selected is still selected when
+you switch Preview back off. Save, Undo and Redo keep working throughout.
+
+**Preview scrolls like a real page.** Instead of the open surface you pan around in Design, Preview
+puts one page-sized frame in the pane and lets it scroll itself — so sticky headers stick, elements
+that animate as they come into view actually do, and anything that reacts to scrolling behaves the
+way it will for a visitor. There is no zoom control in Preview for the same reason: it is showing
+you the page at its real size.
+
 Switch Preview off to go back to editing — the mode switcher stays on Edit or Design the whole time.
 
 **Clicking a link in Preview opens that page in a new browser tab**, rather than replacing the canvas. Links within the same page — the ones that jump to a heading — still scroll where you would expect.

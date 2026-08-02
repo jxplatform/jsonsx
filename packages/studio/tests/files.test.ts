@@ -11,6 +11,7 @@ import { activeTab, closeAllTabs, openTab, workspace } from "../src/workspace/wo
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import {
   findHomePage,
+  initProjectRepo,
   loadDirectory,
   loadProject,
   openFileFromTree,
@@ -304,6 +305,52 @@ describe("findHomePage", () => {
     siteState();
 
     expect(await findHomePage()).toBeNull();
+  });
+});
+
+// ─── initProjectRepo ──────────────────────────────────────────────────────────
+
+describe("initProjectRepo", () => {
+  test("binds to the new root and initialises a repository the scaffold does not have", async () => {
+    const { state } = installFsPlatform(
+      {},
+      { gitStatus: (async () => ({ files: [], isRepo: false })) as never },
+    );
+    expect(await initProjectRepo("/home/dev/Sites/fresh")).toBe(true);
+    // Activation comes first: gitInit takes no argument and would otherwise run against whichever
+    // Project the window was already serving.
+    const order = state.calls.map((c) => c[0]).filter((n) => n !== "listFormats");
+    expect(order).toEqual(["activate", "gitInit"]);
+    expect(state.calls.find((c) => c[0] === "activate")?.[1]).toBe("/home/dev/Sites/fresh");
+  });
+
+  test("leaves an existing repository alone", async () => {
+    const { state } = installFsPlatform(
+      {},
+      { gitStatus: (async () => ({ files: [], isRepo: true })) as never },
+    );
+    expect(await initProjectRepo("/home/dev/Sites/cloned")).toBe(false);
+    expect(state.calls.map((c) => c[0])).not.toContain("gitInit");
+  });
+
+  test("skips repository-backed platforms entirely", async () => {
+    const { state } = installFsPlatform({}, { createDestination: "repo" });
+    expect(await initProjectRepo("acme/site@main")).toBe(false);
+    expect(state.calls.map((c) => c[0])).not.toContain("activate");
+    expect(state.calls.map((c) => c[0])).not.toContain("gitInit");
+  });
+
+  test("reports a git failure without failing the create", async () => {
+    installFsPlatform(
+      {},
+      {
+        gitInit: (async () => {
+          throw new Error("git not installed");
+        }) as never,
+        gitStatus: (async () => ({ files: [], isRepo: false })) as never,
+      },
+    );
+    expect(await initProjectRepo("/home/dev/Sites/gitless")).toBe(false);
   });
 });
 

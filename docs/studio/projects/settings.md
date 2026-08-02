@@ -1,6 +1,6 @@
 ---
 title: "Project settings"
-description: "A tour of the Settings modal in Jx Studio: general options, head tags, CSS variables, definitions, dependencies, and extension-added sections."
+description: "A tour of the Settings modal in Jx Studio: general options, head tags, CSS variables, data shapes, dependencies, and extension-added sections."
 code:
   - packages/studio/src/settings/settings-modal.ts
   - packages/studio/src/settings/general-settings.ts
@@ -17,12 +17,15 @@ The Settings modal holds everything that applies to your whole site rather than 
 
 ![The Settings modal open on the General section, with the section list on the left](../../images/settings-modal.png)
 
-Changes save as you make them — there is no separate save button.
+Changes save as you make them — there is no separate save button. If a save can't be written, the General section says so under the field you were editing rather than quietly reverting it.
 
 ## General
 
 The basics of the site:
 
+- **Site Name** — what the site is called. This is the name you gave it when [creating the project](/docs/studio/projects/create), and this is where you change it afterwards. It can't be left blank.
+- **Description** — one or two sentences about the site, used by search engines and link previews. Studio stores it as the site-wide `<meta name="description">` tag, so it also shows up in the **Head** section; clearing it here removes the tag.
+- **Production URL** — where the published site lives, as a full address starting with `http://` or `https://`. Sitemap generation is switched on by having one, and absolute links are built from it. Clearing the field turns the sitemap back off.
 - **Favicon** — click **Upload Favicon** and pick an image; Studio copies it into your project and shows the current one beside the button.
 - **Platform Adapter** — how the build packages the site for your host: **Static**, **Bun**, **Node**, **Cloudflare Workers**, or **Cloudflare Pages**. This is the same choice you made when [creating the project](/docs/studio/projects/create). **Static** emits plain files for any host that serves them; the other four additionally package the site's server tier, which is what answers a database, sign-ins, or server functions. One of them becomes _required_ once the project has a database or sign-ins — the build stops with an error on **Static**. Server functions still build on **Static**, but only these four actually serve them. See [Build output and adapters](/docs/framework/site/deployment) for what each one writes into `dist/`.
 - **Breakpoints** — the screen sizes your design responds to, as name/value rows. The **Base** row is your default canvas width; **+ Add Breakpoint** adds another, and the × button removes one.
@@ -39,9 +42,9 @@ What goes into every page's `<head>` — the invisible part of a web page that l
 
 Your design tokens — the named colors, fonts, and sizes your styles refer to, grouped into **Colors** (each with a color swatch you can click to pick), **Fonts** (each with a live preview line), **Sizes & Spacing**, and **Other**. Edit a value and every element that uses the token updates; sizes can also carry per-breakpoint overrides so spacing tightens on small screens.
 
-## Definitions
+## Data Shapes
 
-Reusable field schemas — descriptions of data shapes (an API response, a shared record type) that other parts of the project can refer to. Definitions use the same visual field builder as content types: named fields with a type, an optional format, and a required toggle. Most sites never need this section; for modeling your content itself, use **[Content types](/docs/studio/projects/content-types)** instead.
+Reusable descriptions of a piece of data — an API response, a shared record type — that other parts of the project can refer to. Data shapes use the same visual field builder as content types: named fields with a type, an optional format, and a required toggle. **New Data Shape** adds one; pick a shape on the left to edit its fields. Most sites never need this section; for modeling your content itself, use **[Content types](/docs/studio/projects/content-types)** instead.
 
 ## Dependencies
 

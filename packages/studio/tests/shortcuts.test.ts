@@ -12,7 +12,7 @@ import {
   resetWorkspaceWithTab,
   stubRect,
 } from "./harness";
-import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 // ─── Module mocks (must precede the shortcuts import) ─────────────────────────
 
@@ -24,13 +24,18 @@ const cutNode = mock(async () => {});
 const pasteNode = mock(async () => {});
 void mock.module("../src/editor/context-menu.js", () => ({ copyNode, cutNode, pasteNode }));
 
+// The caret lives in the canvas IFRAME, so the guard reads the host's bridge-derived flag rather
+// Than the parent bundle's (permanently false) isEditing(). Stub the flag; iframe-host's own tests
+// Prove it is derived from editStart / selectionChanged / editEnd.
+let caretActive = false;
+void mock.module("../src/canvas/iframe-host.js", () => ({ isCaretActive: () => caretActive }));
+
 const { initShortcuts } = await import("../src/editor/shortcuts");
 const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
 const store = await import("../src/store");
 const { initShellRefs } = store;
 const { activeTab, openTab, workspace } = await import("../src/workspace/workspace");
 const { initLayers } = await import("../src/ui/layers");
-const { startEditing, isEditing, stopEditing } = await import("../src/editor/inline-edit");
 
 // ─── Environment setup ────────────────────────────────────────────────────────
 
@@ -117,6 +122,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   canvasMode = "design";
+  caretActive = false;
   panX = 0;
   panY = 0;
   for (const m of [
@@ -133,12 +139,6 @@ beforeEach(() => {
   }
   store.canvasPanels.length = 0;
   resetWorkspaceWithTab(freshDoc());
-});
-
-afterEach(() => {
-  if (isEditing()) {
-    stopEditing();
-  }
 });
 
 function pressDoc(key: string, init: KeyboardEventInit = {}) {
@@ -381,41 +381,64 @@ describe("keydown guards", () => {
     // The caret must survive a save: saveFile flushes every canvas frame's pending text itself, so
     // Ending the block here would be a second, racing commit path — and would eject the writer
     // From their sentence every time they hit save.
-    const p = document.createElement("p");
-    p.textContent = "edit me";
-    document.body.append(p);
-    startEditing(p, ["children", 0], {
-      onCommit: () => {},
-      onEnd: () => {},
-      onInsert: () => {},
-      onSplit: () => {},
-    });
-    expect(isEditing()).toBe(true);
+    caretActive = true;
     pressDoc("s", { ctrlKey: true });
     expect(saveFile).toHaveBeenCalledTimes(1);
-    expect(isEditing()).toBe(true);
-    stopEditing();
-    p.remove();
   });
 
-  test("ctrl+w while inline editing is prevented and other keys pass through", () => {
-    const p = document.createElement("p");
-    document.body.append(p);
-    startEditing(p, ["children", 0], {
-      onCommit: () => {},
-      onEnd: () => {},
-      onInsert: () => {},
-      onSplit: () => {},
-    });
+  test("ctrl+w while the caret is in a block is prevented and other keys pass through", () => {
+    caretActive = true;
     const e = pressDoc("w", { ctrlKey: true });
     expect(e.defaultPrevented).toBe(true);
 
     activeTab.value!.session.selection = ["children", 0];
     pressDoc("Escape");
-    // Editing guard returns early — selection untouched
+    // Caret guard returns early — selection untouched
     expect(activeTab.value!.session.selection).toEqual(["children", 0]);
-    stopEditing();
-    p.remove();
+  });
+
+  /* The bug this guard exists for. The guard used to read the PARENT bundle's isEditing(), whose
+     `activeEl` is always null (the caret is in the cross-origin canvas iframe), so the three
+     clipboard chords fell straight through to the element-level handlers: copying a phrase copied
+     the whole <p>, and ⌘X mid-sentence deleted the paragraph. */
+  describe("the caret owns the clipboard chords", () => {
+    test.each([
+      ["c", () => copyNode],
+      ["x", () => cutNode],
+      ["v", () => pasteNode],
+    ])("ctrl+%s reaches the element handler with no caret", (key, handler) => {
+      activeTab.value!.session.selection = ["children", 0];
+      pressDoc(key, { ctrlKey: true });
+      expect(handler()).toHaveBeenCalledTimes(1);
+    });
+
+    test.each([
+      ["c", () => copyNode],
+      ["x", () => cutNode],
+      ["v", () => pasteNode],
+    ])("ctrl+%s is left to the caret while text is being edited", (key, handler) => {
+      caretActive = true;
+      activeTab.value!.session.selection = ["children", 0];
+      const e = pressDoc(key, { ctrlKey: true });
+      expect(handler()).not.toHaveBeenCalled();
+      // Not preventDefaulted either — the chord belongs to the frame the caret is in.
+      expect(e.defaultPrevented).toBe(false);
+    });
+
+    test("⌘X mid-sentence leaves the paragraph in the document", () => {
+      caretActive = true;
+      activeTab.value!.session.selection = ["children", 0];
+      pressDoc("x", { ctrlKey: true });
+      expect(cutNode).not.toHaveBeenCalled();
+      expect(activeTab.value!.doc.document.children).toHaveLength(3);
+    });
+
+    test("Delete does not remove the selected node while the caret is live", () => {
+      caretActive = true;
+      activeTab.value!.session.selection = ["children", 0];
+      pressDoc("Delete");
+      expect(activeTab.value!.doc.document.children).toHaveLength(3);
+    });
   });
 });
 
@@ -652,5 +675,64 @@ describe("plain shortcuts", () => {
     activeTab.value!.session.selection = ["children", 0];
     pressDoc("a");
     expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+  });
+});
+
+// ─── Preview refuses to edit ──────────────────────────────────────────────────
+// Preview is the shipped page: it draws no overlays, posts no hits, and scrolls its own frame
+// Instead of panning a transform. Every keyboard and pointer path that would edit or pan is gated.
+
+describe("preview mode", () => {
+  beforeEach(() => {
+    canvasMode = "preview";
+  });
+
+  test("the wheel is left to the frame — no pan, no preventDefault", () => {
+    const e = wheel(wrapEl(), { deltaX: 10, deltaY: 20 });
+    expect(e.defaultPrevented).toBe(false);
+    expect(setPan).not.toHaveBeenCalled();
+  });
+
+  test("ctrl+wheel does not zoom an artboard that isn't there", () => {
+    wheel(wrapEl(), { ctrlKey: true, deltaY: -100 });
+    expect(activeTab.value!.session.ui.zoom ?? 1).toBe(1);
+  });
+
+  test("middle-mouse drag does not pan", () => {
+    const down = new PointerEvent("pointerdown", {
+      bubbles: true,
+      button: 1,
+      cancelable: true,
+      pointerId: 9,
+    });
+    wrapEl().dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(false);
+  });
+
+  test.each(["d", "x", "v"])("ctrl+%s does not mutate the document", (key) => {
+    activeTab.value!.session.selection = ["children", 0];
+    pressDoc(key, { ctrlKey: true });
+    expect(cutNode).not.toHaveBeenCalled();
+    expect(pasteNode).not.toHaveBeenCalled();
+    expect(activeTab.value!.doc.document.children).toHaveLength(3);
+  });
+
+  test.each(["0", "=", "-"])("ctrl+%s writes no phantom zoom to carry back to Design", (key) => {
+    pressDoc(key, { ctrlKey: true });
+    expect(activeTab.value!.session.ui.zoom ?? 1).toBe(1);
+  });
+
+  test.each(["Delete", "Backspace", "Enter"])("%s does not mutate the document", (key) => {
+    activeTab.value!.session.selection = ["children", 0];
+    pressDoc(key);
+    expect(activeTab.value!.doc.document.children).toHaveLength(3);
+  });
+
+  test("ctrl+s still saves and Escape still clears the selection", () => {
+    activeTab.value!.session.selection = ["children", 0];
+    pressDoc("s", { ctrlKey: true });
+    expect(saveFile).toHaveBeenCalledTimes(1);
+    pressDoc("Escape");
+    expect(activeTab.value!.session.selection).toBeNull();
   });
 });

@@ -29,9 +29,10 @@ import {
 import { isComponentDoc, substitutePreviewProps } from "../component-props";
 import { rewriteContentAssets } from "./content-assets";
 
-import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
+import type { JxElement, JxMutableNode, JxPath } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
 import type { ContentSectionEntry } from "../types";
+import type { LayoutMarker } from "./path-mapping";
 import type { WireMapperCtx } from "./iframe-protocol";
 
 let _ctx: { getCanvasMode: () => string } | null = null;
@@ -77,26 +78,30 @@ function findPageContentPrefix(
 }
 
 /**
- * Recursively mark all nodes in a layout doc tree with $__layout: true so we can identify which
- * rendered DOM elements came from the layout vs page content.
+ * Recursively mark every node of a layout doc tree with its ORIGIN — `$__layout: { file, path }` —
+ * so the renderer can both tell layout nodes apart from page content and say which node of which
+ * file each one is. The marker used to be a bare `true`, which made a layout node identifiable but
+ * unaddressable: the canvas could tell you had clicked something it could not edit, but not what
+ * you had clicked or where to go to edit it. `path` is the node's own path inside `file`, so the
+ * editor can open the layout with that node selected. See {@link LayoutMarker}.
  */
-function markLayoutNodes(node: JxMutableNode) {
+export function markLayoutNodes(node: JxMutableNode, file: string, path: JxPath = []) {
   if (!node || typeof node !== "object") {
     return;
   }
-  node.$__layout = true;
+  node.$__layout = { file, path } satisfies LayoutMarker;
   if (Array.isArray(node.children)) {
-    for (const child of node.children) {
+    for (const [i, child] of node.children.entries()) {
       if (typeof child === "string") {
         continue;
       }
-      markLayoutNodes(child);
+      markLayoutNodes(child, file, [...path, "children", i]);
     }
   }
-  if (node.$elements) {
-    for (const el of node.$elements) {
+  if (Array.isArray(node.$elements)) {
+    for (const [i, el] of node.$elements.entries()) {
       if (typeof el !== "string") {
-        markLayoutNodes(el as JxMutableNode);
+        markLayoutNodes(el as JxMutableNode, file, [...path, "$elements", i]);
       }
     }
   }
@@ -150,7 +155,9 @@ export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
     if (layoutPath) {
       const layoutDoc = (await resolveLayoutDoc(layoutPath)) as JxMutableNode | null;
       if (layoutDoc) {
-        markLayoutNodes(layoutDoc);
+        // The SAME normalization resolveLayoutDoc reads the file with, so the marker's `file` is a
+        // Path the editor can hand straight to navigateToComponent when the author asks to open it.
+        markLayoutNodes(layoutDoc, layoutPath.replace(/^\.\//, ""));
         const pageForSlots = canvasMode === "preview" ? structuredClone(toRaw(doc)) : renderDoc;
         const merged = distributePageIntoLayout(layoutDoc, pageForSlots);
         renderDoc =

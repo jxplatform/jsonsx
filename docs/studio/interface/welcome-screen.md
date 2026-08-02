@@ -1,6 +1,6 @@
 ---
 title: "Welcome screen"
-description: "What Jx Studio shows before a project is open, and every way to start: new project, open, clone, add a repository, and recent projects."
+description: "What Jx Studio shows before a project is open, and every way to start: new project, open, clone, add a repository, and your recent projects."
 code:
   - packages/studio/src/panels/welcome-screen.ts
   - packages/studio/src/new-project/add-repo-modal.ts
@@ -8,24 +8,20 @@ code:
 
 # Welcome screen
 
-When Jx Studio starts with no project open, the canvas area shows the welcome screen: a **Start** list of ways to get a project in front of you, followed by your projects and recent history. Everything on it is one or two clicks from a working canvas.
+When Jx Studio starts with no project open, the canvas area shows the Start pane: a **Start** list of ways to get a project in front of you, followed by your recent projects and, on platforms that keep a catalogue, the rest of your projects. Everything on it is one or two clicks from a working canvas.
 
-![The Jx Studio welcome screen with Start actions, the Projects list, and Recent files](../../images/welcome-screen.png)
+![The Jx Studio Start pane with Start actions, Recent projects, and the Projects list](../../images/welcome-screen.png)
 
 ## Start a new project
 
 1. Click **New Project…**.
-2. Pick where to start from: a built-in **Template**, a **Starter Site**, an **Import** of an existing site, or an **Agent** prompt describing what you want.
-3. Click **Next**, name the project, choose the **Location** to create it in, and adjust the design quickstart (colors, fonts, logo).
-4. Click **Create Project** — Studio writes the files where you pointed it and opens the project.
+2. Pick a starting point: a **starter site** from the gallery that opens first, the **Start from scratch** card at the end of it, an **Import** of an existing site, or an **Agent** prompt describing what you want.
+3. Click **Next**, name the project, and choose the **Location** to create it in.
+4. Click **Create Project** — Studio writes the files where you pointed it, initializes a git repository, and opens the project.
 
-![The New Project dialog with the template gallery and project parameters](../../images/new-project-modal.png)
+![The New Project dialog with the starter gallery and the Start from scratch card](../../images/new-project-modal.png)
 
-The full walkthrough is in **[Create a project](/docs/studio/projects/create)**.
-
-## Start from an example
-
-**Start from an Example…** opens the same New Project dialog directly on the **Starter Site** tab — a gallery of complete, themed sites (restaurant, shop, portfolio, blog, and more) that Studio copies in as plain files you own. It's the quickest way to a working site on a first run. Browse the gallery in **[Starter templates](/docs/studio/projects/starters)**.
+The full walkthrough is in **[Create a project](/docs/studio/projects/create)**. There is no separate "start from an example" button: the starter gallery _is_ the first step of New Project.
 
 ## Open an existing project
 
@@ -61,7 +57,7 @@ A repository must already contain a Jx project (a `project.json` file); if it do
 
 Studio only sees the repositories you have granted the **Jx Suite GitHub App** access to. There are two places to change that.
 
-If your account is connected but Studio can't reach any repositories yet, a **Repository access** section appears on the welcome screen with an **Install the Jx Suite GitHub App** link. Follow it and choose **All repositories** so Studio can create and open projects on your behalf.
+If your account is connected but Studio can't reach any repositories yet, a **Repository access** section appears on the Start pane with an **Install the Jx Suite GitHub App** link. Follow it and choose **All repositories** so Studio can create and open projects on your behalf.
 
 Once the App is installed, the repository picker (**Open Project…** and **Add Existing Repository…**) carries the same controls in its footer, so you never have to leave the dialog to widen access:
 
@@ -69,15 +65,15 @@ Once the App is installed, the repository picker (**Open Project…** and **Add 
 2. Save the change on GitHub, then come back to Studio.
 3. Click **Refresh** — the picker re-reads your repositories and the newly granted ones appear.
 
-## Projects and Recent
+## Recent and Projects
 
 Below the Start actions:
 
+- **Recent** lists projects you've opened, newest first. Each row is the project's name, the folder that distinguishes it from your other projects, and when you last opened it — never a raw absolute path. If two projects share a name, Studio shows as much of the path as it takes to tell them apart, and the full path is in the row's tooltip. Click a row to reopen it, use the **✕** beside it to drop that one entry, or **Clear all** to empty the list. Clearing the list doesn't touch the projects themselves — only the history.
 - **Projects** lists the projects your Studio installation knows about that you haven't opened recently. Click one to open it.
-- **Recent** lists projects you've opened, newest first. Click one to reopen it, use the **✕** beside an entry to drop it from the list, or **Clear** to empty the list. Clearing the list doesn't touch the projects themselves — only the history.
 
 :::doc-tip
-You don't need the mouse: press :kbd[⌘P] (macOS) or :kbd[Ctrl+P] (Windows/Linux) on the welcome screen and [Quick Access](/docs/studio/interface/quick-access) lists your recent projects to reopen.
+You don't need the mouse: press :kbd[⌘P] (macOS) or :kbd[Ctrl+P] (Windows/Linux) on the Start pane and [Quick Access](/docs/studio/interface/quick-access) lists your recent projects to reopen.
 :::
 
 ## Next

@@ -15,7 +15,7 @@ Everything in Jx Studio happens in one window. This page is your map: what each 
 
 ## The toolbar
 
-The top row holds project-wide actions: **Open Project** (with a dropdown of recent projects), **Manage**, **Publish**, **Save**, and **Undo**/**Redo**, plus a search field and the mode switcher. Read more in **[The workspace](/docs/studio/interface)**.
+The top row holds project-wide actions: **Open Project** (with a dropdown of recent projects), **Manage**, **Publish**, **Save**, **Open in Browser**, and **Undo**/**Redo**, plus a search field and the mode switcher. Read more in **[The workspace](/docs/studio/interface)**.
 
 ## The mode switcher
 

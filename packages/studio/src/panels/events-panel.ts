@@ -4,6 +4,7 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { activeTab } from "../workspace/workspace";
 import { mutateAddDef, mutateUpdateProperty, transactDoc } from "../tabs/transact";
+import { clickAnythingTo, renderEmptyState, staleSelectionMessage } from "./empty-state";
 import { renderExpressionEditor } from "../ui/expression-editor";
 import { renderStatementEditor } from "./statement-editor";
 import { livePreviewExpression } from "../services/live-preview";
@@ -38,11 +39,11 @@ export function eventsSidebarTemplate(helpers: { isCustomElementDoc: () => boole
   const selection = tab?.session.selection;
   const document = tab?.doc.document;
   if (!selection) {
-    return html`<div class="empty-state">Select an element to edit events</div>`;
+    return renderEmptyState({ message: clickAnythingTo("wire it up") });
   }
   const node = getNodeAtPath(document!, selection);
   if (!node) {
-    return html`<div class="empty-state">Node not found</div>`;
+    return renderEmptyState({ message: staleSelectionMessage() });
   }
 
   const defs = document!.state || {};
@@ -162,9 +163,9 @@ export function eventsSidebarTemplate(helpers: { isCustomElementDoc: () => boole
                     }
                   }}
                 >
-                  <sp-menu-item value="inline">inline</sp-menu-item>
-                  <sp-menu-item value="$expression">$expression</sp-menu-item>
-                  <sp-menu-item value="ref">$ref</sp-menu-item>
+                  <sp-menu-item value="inline">Inline code</sp-menu-item>
+                  <sp-menu-item value="$expression">Expression</sp-menu-item>
+                  <sp-menu-item value="ref">Existing function</sp-menu-item>
                 </sp-picker>
                 <sp-action-button
                   size="xs"

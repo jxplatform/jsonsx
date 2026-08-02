@@ -17,7 +17,8 @@ test("corrupt saved state is ignored and collapse flags stay default", () => {
   expect(root.style.getPropertyValue("--panel-w-chat")).toBe("");
   expect(view.leftPanelCollapsed).toBe(false);
   expect(view.rightPanelCollapsed).toBe(false);
-  expect(view.chatPanelCollapsed).toBe(false);
+  // The assistant column's default IS collapsed (view.ts) — corrupt storage leaves it there.
+  expect(view.chatPanelCollapsed).toBe(true);
 });
 
 test("missing handles leave the document inert (no listeners bound)", () => {

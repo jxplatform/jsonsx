@@ -57,7 +57,7 @@ layers panel, for instance. Once the cursor is in the text it owns these keys; s
 | Pan sideways           | :kbd[Shift] + scroll | :kbd[Shift] + scroll |
 | Pan by dragging        | middle-mouse drag    | middle-mouse drag    |
 
-In **Edit** mode the zoom keys resize the content itself (the text reflows), and the page scrolls instead of panning.
+In **Edit** mode the zoom keys resize the content itself (the text reflows), and the page scrolls instead of panning. In **Preview** there is nothing to zoom or pan — the page scrolls in its own frame, and the keys on this page that would change the document are refused.
 
 ## Writing
 
@@ -86,7 +86,11 @@ With the cursor in text on the canvas.
 | Line break, same paragraph | :kbd[Shift+Enter]                    | :kbd[Shift+Enter] |
 | Join onto the block above  | :kbd[Backspace] at the block's start | same              |
 | Pull the next block up     | :kbd[Delete] at the block's end      | same              |
+| Copy / cut / paste text    | :kbd[⌘C] / :kbd[⌘X] / :kbd[⌘V]       | :kbd[Ctrl] + same |
 | Save                       | :kbd[⌘S]                             | :kbd[Ctrl+S]      |
+
+With the cursor in text these are text operations: they copy the words you highlighted, not the
+block they sit in. The element versions in the table above only apply when nothing has the cursor.
 
 The block menu opens when :kbd[/] is typed at the start of a line or after a space. Saving always
 writes what is on screen — your writing reaches the document as you pause, so there is no need to

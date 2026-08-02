@@ -80,8 +80,8 @@ const ARGS: Record<string, AutomationArgs> = {
   "view.setStatus": { text: "Ready" },
   "view.setTheme": { color: "light" },
   "view.toggleActivity": { tab: "layers" },
-  "view.toggleAssistant": {},
-  "view.toggleRightPanel": {},
+  "view.setAssistant": { open: false },
+  "view.setRightPanel": { open: false },
 };
 
 beforeEach(() => {
@@ -185,17 +185,30 @@ describe("argument coercion", () => {
 });
 
 describe("view toggles", () => {
-  test("the chat and right-panel toggles stay button-driven, not state-driven", () => {
-    // The toolbar's effect tracks the active tab's session, not view.*PanelCollapsed — flipping
-    // Those from outside leaves its own rail/chat icons stale. Until it tracks them, these two
-    // Commands must resolve to the real button so the toolbar's local render runs.
+  test("the chat and right-panel commands are idempotent setters, not blind toggles", () => {
+    // These were `press` shims driving the real button, because the toolbar could not see
+    // View.*PanelCollapsed. It now subscribes via onPanelCollapse, so they set state directly —
+    // And they take `open` rather than toggling, so flipping a default cannot silently invert
+    // Every manifest step that used them (which is exactly what happened to 23 of them).
     const api = createAutomationApi(makeDeps());
-    expect(api.run("view.toggleAssistant")).toEqual({
-      click: { selector: "sp-action-button[title='Toggle Assistant']" },
-    });
-    expect(api.run("view.toggleRightPanel")).toEqual({
-      click: { selector: "sp-action-button[title='Toggle Right Panel']" },
-    });
+
+    api.run("view.setAssistant", { open: true });
+    expect(view.chatPanelCollapsed).toBe(false);
+    api.run("view.setAssistant", { open: true });
+    expect(view.chatPanelCollapsed).toBe(false);
+    api.run("view.setAssistant", { open: false });
+    expect(view.chatPanelCollapsed).toBe(true);
+
+    api.run("view.setRightPanel", { open: false });
+    expect(view.rightPanelCollapsed).toBe(true);
+    api.run("view.setRightPanel", { open: true });
+    expect(view.rightPanelCollapsed).toBe(false);
+  });
+
+  test("a non-boolean `open` fails the shot rather than capturing the wrong state", () => {
+    const api = createAutomationApi(makeDeps());
+    expect(() => api.run("view.setAssistant", { open: "yes" })).toThrow(/must be a boolean/);
+    expect(() => api.run("view.setAssistant")).toThrow(/must be a boolean/);
   });
 
   test("togglePreview flips the tab bar's preview flag without a forced rerender", () => {

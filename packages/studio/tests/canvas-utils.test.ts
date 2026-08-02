@@ -6,19 +6,28 @@ import {
   canvasPanelTemplate,
   centerCanvas,
   clampEditZoom,
+  clampPanZoom,
   EDIT_ZOOM_MAX,
   EDIT_ZOOM_MIN,
+  fitOnCanvasEntry,
   fitToScreen,
+  hasExplicitZoom,
   initCanvasUtils,
+  markExplicitZoom,
   observeCenterUntilStable,
+  PAN_ZOOM_MAX,
+  PAN_ZOOM_MIN,
   panToElement,
   panToParentRect,
   requestEditZoom,
+  resetExplicitZoom,
   resetZoom,
   setEditZoom,
+  setUserZoom,
   updateActivePanelHeaders,
 } from "../src/canvas/canvas-utils";
 import { canvasPanels, canvasWrap, initShellRefs, registerRenderer } from "../src/store";
+import { closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
 import type { CanvasPanel } from "../src/types";
 
@@ -238,6 +247,118 @@ describe("fitToScreen", () => {
     canvasPanels.push({} as never);
     fitToScreen();
     expect(setZoomDirect).toHaveBeenCalledWith(0.05);
+  });
+});
+
+// ─── Author zoom vs. the automatic fit on entering a panzoom mode ─────────────
+
+describe("pan zoom clamping", () => {
+  test("clamps to the supported range", () => {
+    expect(clampPanZoom(100)).toBe(PAN_ZOOM_MAX);
+    expect(clampPanZoom(0)).toBe(PAN_ZOOM_MIN);
+    expect(clampPanZoom(1.5)).toBe(1.5);
+  });
+});
+
+describe("explicit author zoom", () => {
+  beforeEach(() => {
+    resetExplicitZoom();
+  });
+
+  test("setUserZoom clamps, records the document, and applies the transform", () => {
+    const tab = resetWorkspaceWithTab();
+    const wrap = makePanzoomWrap();
+    expect(hasExplicitZoom()).toBe(false);
+
+    setUserZoom(99);
+
+    expect(tab.session.ui.zoom).toBe(PAN_ZOOM_MAX);
+    expect(hasExplicitZoom()).toBe(true);
+    expect(wrap.style.transform).toContain("scale(");
+  });
+
+  test("setUserZoom and markExplicitZoom are no-ops with no tab open", () => {
+    closeAllTabs();
+    setUserZoom(2);
+    markExplicitZoom();
+    expect(hasExplicitZoom()).toBe(false);
+  });
+
+  test("the record is per document, so another document still auto-fits", () => {
+    const tab = resetWorkspaceWithTab();
+    tab.documentPath = "pages/index.md";
+    markExplicitZoom();
+    expect(hasExplicitZoom()).toBe(true);
+    tab.documentPath = "pages/about.md";
+    expect(hasExplicitZoom()).toBe(false);
+  });
+});
+
+describe("fitOnCanvasEntry", () => {
+  beforeEach(() => {
+    resetExplicitZoom();
+    resetWorkspaceWithTab();
+  });
+
+  test("fits a wide artboard that would otherwise land clipped", () => {
+    const wrap = makePanzoomWrap();
+    defineMetric(canvasWrap, "clientWidth", 700);
+    defineMetric(canvasWrap, "clientHeight", 600);
+    stubRect(wrap, { height: 0, width: 1312 });
+    canvasPanels.push({ _width: 1280 } as never);
+
+    fitOnCanvasEntry();
+
+    // 1280 + 32 padding = 1312 → the artboard is scaled down to fit 700px of viewport.
+    expect(setZoomDirect).toHaveBeenCalledWith(700 / 1312);
+  });
+
+  test("never magnifies past life size", () => {
+    const wrap = makePanzoomWrap();
+    defineMetric(canvasWrap, "clientWidth", 2000);
+    defineMetric(canvasWrap, "clientHeight", 1200);
+    stubRect(wrap, { height: 0, width: 432 });
+    canvasPanels.push({ _width: 400 } as never);
+
+    fitOnCanvasEntry();
+
+    expect(setZoomDirect).toHaveBeenCalledWith(1);
+  });
+
+  test("the Fit control may still magnify", () => {
+    const wrap = makePanzoomWrap();
+    defineMetric(canvasWrap, "clientWidth", 2000);
+    defineMetric(canvasWrap, "clientHeight", 1200);
+    stubRect(wrap, { height: 0, width: 432 });
+    canvasPanels.push({ _width: 400 } as never);
+
+    fitToScreen();
+
+    expect(setZoomDirect).toHaveBeenCalledWith(2000 / 432);
+  });
+
+  test("preserves a zoom the author set for this document", () => {
+    const wrap = makePanzoomWrap();
+    defineMetric(canvasWrap, "clientWidth", 700);
+    canvasPanels.push({ _width: 1280 } as never);
+    zoom = 0.5;
+    markExplicitZoom();
+
+    fitOnCanvasEntry();
+
+    expect(setZoomDirect).not.toHaveBeenCalled();
+    expect(wrap.style.transform).toContain("scale(0.5)");
+  });
+
+  test("leaves the zoom alone when the viewport has no measurable width", () => {
+    // A hidden or not-yet-laid-out pane would otherwise fit to the 5% floor.
+    makePanzoomWrap();
+    defineMetric(canvasWrap, "clientWidth", 0);
+    canvasPanels.push({ _width: 1280 } as never);
+
+    fitOnCanvasEntry();
+
+    expect(setZoomDirect).not.toHaveBeenCalled();
   });
 });
 

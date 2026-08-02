@@ -25,6 +25,7 @@ import {
   applyEditZoom,
   applyTransform,
   canvasPanelTemplate,
+  fitOnCanvasEntry,
   observeCenterUntilStable,
   updateActivePanelHeaders,
 } from "./canvas-utils";
@@ -372,11 +373,11 @@ function renderCanvasImpl() {
     mode: tab.doc.mode,
     ui: tab.session.ui,
   };
-  // Base mode drives the host surface (panel structure, panzoom vs centered column). The preview
-  // Toggle changes only what the iframe renders — resolveCanvasDocument reads the effective mode
-  // Via its own getCanvasMode. Flipping the toggle therefore re-renders panels in place (no
-  // ModeChanged teardown, no pan reset).
-  const { canvasMode } = S.ui;
+  // The EFFECTIVE mode drives the host surface (panel structure, panzoom vs centered column vs the
+  // Preview stage). Preview is its own surface — a real, viewport-sized iframe that scrolls its own
+  // Document — so flipping the toggle IS a mode transition and rebuilds the surface, rather than
+  // Re-rendering the previous mode's panels in place.
+  const canvasMode = ctx.getCanvasMode();
 
   // Advance render generation so stale async renders from the previous cycle bail out
   view.renderGeneration += 1;
@@ -555,6 +556,28 @@ function renderCanvasImpl() {
       observeCenterUntilStable,
       updateActivePanelHeaders,
     });
+    if (modeChanged) {
+      fitOnCanvasEntry();
+    }
+    return;
+  }
+
+  /* Preview — the fidelity surface. One stage, one iframe, sized to the pane and scrolling its own
+     document, with no panzoom-wrap: the pan transform is precisely what stopped `position:sticky`,
+     scroll-driven animation and IntersectionObserver reveals from ever firing in the one mode whose
+     job is to show the page as it ships. The host keeps the iframe at its CSS height for the same
+     reason (see the `contentHeight` case in iframe-host.ts), and gates every editing affordance —
+     hits, hover, the insertion "+", the Jx context menu and drops — off this render. */
+  if (canvasMode === "preview") {
+    if (modeChanged) {
+      canvasWrap.style.padding = "0";
+      canvasWrap.style.display = "block";
+      canvasWrap.style.overflow = "hidden";
+    }
+    const { tpl: panelTpl, panel } = canvasPanelTemplate(null, null, true);
+    litRender(html`<div class="preview-stage">${panelTpl}</div>`, canvasWrap);
+    canvasPanels.push(panel as unknown as CanvasPanel);
+    renderCanvasIntoPanel(panel as unknown as CanvasPanel, S.ui.featureToggles);
     return;
   }
 
@@ -765,6 +788,10 @@ function renderCanvasImpl() {
     renderCanvasIntoPanel(panel as unknown as CanvasPanel, featureToggles);
     applyTransform();
     if (modeChanged) {
+      // Fit BEFORE centering: the fit picks the zoom, centerCanvas then places the artboard at that
+      // Zoom (and top-aligns it, which beats fit's vertical centering for a page taller than the
+      // Viewport).
+      fitOnCanvasEntry();
       observeCenterUntilStable();
     }
     return;
@@ -827,6 +854,8 @@ function renderCanvasImpl() {
   // Apply current zoom + pan transform
   applyTransform();
   if (modeChanged) {
+    // See the single-panel path: fit picks the zoom, centerCanvas then places the artboards.
+    fitOnCanvasEntry();
     observeCenterUntilStable();
   }
 }

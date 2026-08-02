@@ -29,6 +29,12 @@ import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
 import { computeInheritedStyle } from "../utils/inherited-style";
 import { mediaDisplayName } from "./shared";
 import {
+  clickAnythingTo,
+  openPageAction,
+  renderEmptyState,
+  staleSelectionMessage,
+} from "./empty-state";
+import {
   allConditionsPass,
   autoOpenSections,
   compressBorderSide,
@@ -935,13 +941,18 @@ function styleSidebarTemplate(
  */
 export function renderStylePanelTemplate(ctx: { getCanvasMode: () => string }) {
   const tab = activeTab.value;
+  const noDocument = () =>
+    renderEmptyState({
+      actions: [openPageAction()],
+      message: "Open a page to style what you click.",
+    });
   if (!tab) {
-    return html`<div class="empty-state">No document loaded</div>`;
+    return noDocument();
   }
   if (ctx.getCanvasMode() === "stylebook" && tab.session.ui.stylebookSelection) {
     const node = tab.doc.document;
     if (!node) {
-      return html`<div class="empty-state">No document loaded</div>`;
+      return noDocument();
     }
     return html`
       <div class="stylebook-style-header">
@@ -956,11 +967,11 @@ export function renderStylePanelTemplate(ctx: { getCanvasMode: () => string }) {
     `;
   }
   if (!tab.session.selection) {
-    return html`<div class="empty-state">Select an element to style</div>`;
+    return renderEmptyState({ message: clickAnythingTo("style it") });
   }
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
   if (!node) {
-    return html`<div class="empty-state">Select an element to style</div>`;
+    return renderEmptyState({ message: staleSelectionMessage() });
   }
   return styleSidebarTemplate(node, tab.session.ui.activeMedia, tab.session.ui.activeSelector);
 }

@@ -159,6 +159,32 @@
 .canvas-panel.full-width {
   min-width: 0;
 }
+/* ─── Preview stage ────────────────────────────
+   Preview is the fidelity view: one frame, sized to the pane, scrolling its
+   own document so sticky positioning, scroll-driven animation and
+   IntersectionObserver reveals behave as they will in production. That means
+   no panzoom-wrap and no content-height growth — so every box between the
+   stage and the iframe needs a definite height for the frame's `height:100%`
+   to resolve against, and the artboard chrome (border, page surface) is
+   dropped: this is the page, not a specimen of it. */
+.preview-stage {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+.preview-stage .canvas-panel {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+.preview-stage .canvas-panel-viewport {
+  flex: 1;
+  height: 100%;
+  border: none;
+}
+.preview-stage .canvas-panel-canvas {
+  height: 100%;
+}
 .overlay-box {
   position: absolute;
   pointer-events: none;
@@ -169,6 +195,15 @@
 .overlay-hover {
   border: 1px solid var(--accent-50);
 }
+/* Layout-chrome selection: the author clicked a header/footer the LAYOUT file contributes, not
+   page content. Purple + dashed says "selected, but not yours to edit here" — it must never read
+   as the ordinary accent-solid selection, because Backspace and typing do not apply to it.
+
+   This is the PARENT half of a two-realm affordance. The always-on treatment — the dimmed region
+   and its `LAYOUT · layouts/base.json` chip — cannot live here: layout nodes are inside the
+   cross-origin canvas iframe, so their rules ship in the CSS string in `canvas/iframe-render.ts`
+   (EDIT_PLACEHOLDER_CSS), a separate document. These two classes style the parent-drawn selection
+   overlay, which floats above the iframe in canvas space. */
 .overlay-layout {
   border-style: dashed !important;
   border-color: var(--spectrum-purple-600, #9256d9) !important;
@@ -177,6 +212,8 @@
   position: absolute;
   top: -16px;
   left: 0;
+  max-width: 100%;
+  overflow: hidden;
   font-size: 9px;
   padding: 1px 5px;
   background: var(--spectrum-purple-600, #9256d9);
@@ -184,6 +221,8 @@
   border-radius: var(--radius);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   pointer-events: none;
 }
 .overlay-label {

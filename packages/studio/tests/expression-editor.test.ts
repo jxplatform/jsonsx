@@ -406,11 +406,41 @@ describe("ref picker", () => {
     expect(items[0]!.textContent!.trim()).toBe("count");
   });
 
-  test("empty stateDefs shows a disabled placeholder item", () => {
+  test("nothing to bind to → the shared empty state replaces the picker entirely", () => {
     const { container } = mount({ operator: "=", target: { $ref: "" } }, { stateDefs: [] });
-    const item = row(container, "target").querySelector("sp-menu-item")!;
-    expect(item.textContent).toContain("No state defined");
-    expect(item.hasAttribute("disabled")).toBe(true);
+    const target = row(container, "target");
+    // A picker whose only entry was a disabled "No state defined" was a dead end; the region now
+    // Says what a binding IS, in the same voice as every other empty region in the shell.
+    expect(target.querySelector("sp-picker[placeholder='Select…']")).toBeNull();
+    const empty = target.querySelector(".empty-state")!;
+    expect(empty.classList.contains("empty-state--compact")).toBe(true);
+    expect(empty.querySelector(".empty-state-message")?.textContent).toBe(
+      "A binding points at a value this page holds.",
+    );
+    expect(empty.querySelector(".empty-state-detail")?.textContent).toBe(
+      "Add one in the State panel and it shows up here.",
+    );
+  });
+
+  test("no state but event refs available → the picker still renders, with no dead entry", () => {
+    const { container } = mount(
+      { operator: "=", target: { $ref: "" } },
+      { allowEventRef: true, stateDefs: [] },
+    );
+    const target = row(container, "target");
+    expect(target.querySelector(".empty-state")).toBeNull();
+    const values = [...target.querySelectorAll("sp-menu-item")].map((i) => i.getAttribute("value"));
+    expect(values).toEqual(["event#/detail", "event#/target/value"]);
+  });
+
+  test("an existing ref keeps the picker even with no state defined", () => {
+    const { container } = mount(
+      { operator: "=", target: { $ref: "#/state/gone" } },
+      { stateDefs: [] },
+    );
+    const target = row(container, "target");
+    expect(target.querySelector(".empty-state")).toBeNull();
+    expect(target.querySelector("sp-picker")).not.toBeNull();
   });
 
   test("allowEventRef adds event refs after a divider", () => {

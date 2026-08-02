@@ -97,6 +97,13 @@ export interface OverlayLayer {
    * shows exactly one of them. `placement` is overlay-local like the others; null hides it.
    */
   setReplaceTarget: (placement: OverlayPlacement | null) => void;
+  /**
+   * Hide (or restore) the whole layer. Preview renders get it suppressed: the editing affordances
+   * are gated message-by-message in the host, and this is the single switch that guarantees none of
+   * them can be PAINTED over a page that is supposed to look shipped — including any box a
+   * still-in-flight reply from a pre-preview render would otherwise land.
+   */
+  setSuppressed: (suppressed: boolean) => void;
   /** The clickable "+" button, so the caller can attach click + hover (grace-timer) listeners. */
   readonly insertButton: HTMLButtonElement;
   /** The layer root element (caller appends it over the iframe). */
@@ -174,6 +181,9 @@ export function createOverlayLayer(doc: Document = document): OverlayLayer {
     setHover: (placement) => place(hoverBox, placement),
     setInsertZone: (placement, edge = "center") => placeInsertButton(insertButton, placement, edge),
     setReplaceTarget: (placement) => place(replaceBox, placement),
+    setSuppressed: (suppressed) => {
+      root.style.display = suppressed ? "none" : "";
+    },
     setPresence: (items) => {
       presenceGroup.replaceChildren();
       for (const item of items) {

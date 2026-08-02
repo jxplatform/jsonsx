@@ -44,6 +44,13 @@ void mock.module("../src/view.js", () => ({
 }));
 
 void mock.module("../src/ui/layers.js", () => ({
+  // Reached transitively (progress-modal, quick-search); the panel never calls them.
+  getLayerSlot: (_kind: string, id: string) => {
+    const el = document.createElement("div");
+    el.id = id;
+    return el;
+  },
+  openModal: () => Promise.resolve(null),
   showConfirmDialog: async (headline: string) => {
     confirmCalls.push(headline);
     return confirmResult;
@@ -371,7 +378,7 @@ describe("panel bootstrap", () => {
   test("publish button in non-repo state calls publishToGithub with project name", async () => {
     ui.gitStatus = { ahead: 0, behind: 0, branch: "", files: [], isRepo: false, remotes: [] };
     const div = renderPanel();
-    click(findButton(div, "Publish to GitHub"));
+    click(findButton(div, "Create GitHub repository"));
     await flush();
     expect(publishCalls).toEqual([{ projectName: "proj" }]);
   });
@@ -381,7 +388,7 @@ describe("panel bootstrap", () => {
     seedRepoUi();
     ui.gitStatus.remotes = [];
     const div = renderPanel();
-    click(findButton(div, "Publish to GitHub"));
+    click(findButton(div, "Create GitHub repository"));
     await flush();
     expect(publishCalls).toEqual([{ projectName: "my-project" }]);
   });
@@ -393,11 +400,11 @@ describe("panel bootstrap", () => {
     expect(div.textContent).toContain("Last updated");
   });
 
-  test("empty file list renders 'No changes'", () => {
+  test("an empty file list teaches what lands in the changes tab", () => {
     seedRepoUi();
     ui.gitStatus.files = [];
     const div = renderPanel();
-    expect(div.textContent).toContain("No changes");
+    expect(div.textContent).toContain("Nothing to commit.");
     expect(div.querySelector('[title="Stage all"]')).toBeNull();
   });
 
@@ -812,14 +819,14 @@ describe("history tab", () => {
     click(tabButtons(div)[0]); // Restore module sub-tab state
   });
 
-  test("history with cached empty entries shows 'No history' without refetch", async () => {
+  test("history with cached empty entries teaches what a commit is, without refetch", async () => {
     seedRepoUi({ gitLogEntries: [] });
     let div = renderPanel();
     click(tabButtons(div)[1]);
     await flush();
     expect(callNames()).not.toContain("gitLog");
     div = renderPanel();
-    expect(div.textContent).toContain("No history");
+    expect(div.textContent).toContain("No commits yet.");
     click(tabButtons(div)[0]);
   });
 

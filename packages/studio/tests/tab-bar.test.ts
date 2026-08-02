@@ -17,7 +17,8 @@ import type { Tab } from "../src/tabs/tab";
 
 const tabBar = await import("../src/panels/tab-bar");
 const { closeAllTabs } = await import("../src/workspace/workspace");
-const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
+const { hasExplicitZoom, initCanvasUtils, resetExplicitZoom } =
+  await import("../src/canvas/canvas-utils");
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -239,6 +240,40 @@ describe("zoom widget", () => {
     await flush();
     expect(root.querySelector(".tb-zoom")).not.toBeNull();
     expect(hasBtn(root, "Fit")).toBe(true);
+  });
+
+  test("preview has no zoom widget — its frame is a viewport, not an artboard", async () => {
+    openTestTab();
+    tabBar.mount(root, makeCtx({ getCanvasMode: mock(() => "preview") }));
+    await flush();
+    expect(root.querySelector(".tb-zoom")).toBeNull();
+  });
+
+  test("stepping the panzoom marks the document, so re-entering Design keeps it", async () => {
+    resetExplicitZoom();
+    const tab = openTestTab();
+    tab.session.ui.zoom = 2;
+    tabBar.mount(root, makeCtx({ getCanvasMode: mock(() => "design") }));
+    await flush();
+    expect(hasExplicitZoom()).toBe(false);
+
+    pointer(btn(root, "+"), "click");
+    await flush();
+    expect(hasExplicitZoom()).toBe(true);
+  });
+
+  test("Fit and 100% both count as the author choosing a zoom", async () => {
+    resetExplicitZoom();
+    openTestTab();
+    tabBar.mount(root, makeCtx({ getCanvasMode: mock(() => "design") }));
+    await flush();
+
+    pointer(btn(root, "Fit"), "click");
+    expect(hasExplicitZoom()).toBe(true);
+
+    resetExplicitZoom();
+    pointer(root.querySelector(".tb-zoom-label") as HTMLElement, "click");
+    expect(hasExplicitZoom()).toBe(true);
   });
 
   test("the widget is hidden in source mode and while the function editor is open", async () => {

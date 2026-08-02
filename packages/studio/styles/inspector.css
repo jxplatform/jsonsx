@@ -39,10 +39,13 @@
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  outline: none;
 }
 .field-input:focus {
   border-color: var(--accent);
+}
+.field-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 .field-input[type="checkbox"] {
   width: auto;

@@ -101,6 +101,8 @@ export interface AutomationApi {
   setEditZoom: (zoom: number) => void;
   toggleActivity: (tab: string) => void;
   togglePreview: () => void;
+  setAssistant: (open: boolean) => void;
+  setRightPanel: (open: boolean) => void;
   waitForCanvasReady: (timeoutMs?: number) => Promise<void>;
 }
 
@@ -120,6 +122,14 @@ function num(args: AutomationArgs, key: string): number {
   const value = args[key];
   if (typeof value !== "number") {
     throw new TypeError(`automation command argument "${key}" must be a number`);
+  }
+  return value;
+}
+
+function bool(args: AutomationArgs, key: string): boolean {
+  const value = args[key];
+  if (typeof value !== "boolean") {
+    throw new TypeError(`automation command argument "${key}" must be a boolean`);
   }
   return value;
 }
@@ -324,17 +334,13 @@ export const AUTOMATION_COMMANDS: Record<string, AutomationCommand> = {
   "view.setStatus": { run: (api, args) => api.setStatus(str(args, "text")) },
   "view.setTheme": { run: (api, args) => api.setTheme(str(args, "color")) },
   "view.toggleActivity": { run: (api, args) => api.toggleActivity(str(args, "tab")) },
-  // INTERIM, and for a sharper reason than the rest: the toolbar's reactive effect tracks the
-  // Active tab's session, NOT view.chatPanelCollapsed / view.rightPanelCollapsed. Flipping those
-  // From outside repositions the panels but leaves the toolbar's own rail/chat icons stale until
-  // Something unrelated retriggers the effect. Until the toolbar tracks its own state, pressing
-  // The button — which calls the toolbar's module-local render — is the only faithful path.
-  "view.toggleAssistant": {
-    press: () => ({ selector: "sp-action-button[title='Toggle Assistant']" }),
-  },
-  "view.toggleRightPanel": {
-    press: () => ({ selector: "sp-action-button[title='Toggle Right Panel']" }),
-  },
+  // Idempotent by design, unlike the rail's toggleActivity. A manifest step that says "close the
+  // Assistant" must mean it whichever way the default currently points — these two used to be
+  // Blind toggles driven by pressing the button, so flipping `chatPanelCollapsed` to default-closed
+  // Silently inverted 18 shots. `applyPanelCollapse()` notifies the toolbar via onPanelCollapse,
+  // So the chrome repaints without pressing anything.
+  "view.setAssistant": { run: (api, args) => api.setAssistant(bool(args, "open")) },
+  "view.setRightPanel": { run: (api, args) => api.setRightPanel(bool(args, "open")) },
 };
 
 /** The hook is opt-in per page load: only `?automation=1` installs it. */
@@ -467,6 +473,17 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
       // Deliberately NOT deps.render(): live edit zoom must never re-render the canvas (it would
       // Rebuild the iframe DOM) — setEditZoom applies bare style writes, matching production paths.
       applyEditZoomLevel(zoom);
+    },
+    setAssistant(open: boolean) {
+      view.chatPanelCollapsed = !open;
+      applyPanelCollapse();
+      renderOnly("chatPanel");
+      deps.render();
+    },
+    setRightPanel(open: boolean) {
+      view.rightPanelCollapsed = !open;
+      applyPanelCollapse();
+      deps.render();
     },
     toggleActivity(tab: string) {
       // Mirrors the activity bar's own sp-tabs @change handler: re-picking the open tab collapses

@@ -122,8 +122,11 @@ export function renderActivityBar() {
       }}
     >
       ${tabs.map(
+        // `title` alone, deliberately: sp-tab renders its icon into an unnamed slot and keeps its
+        // Text label hidden, so the title attribute IS the accessible name as well as the tooltip.
+        // Adding aria-label with the same string just made every rail tab announce itself twice.
         (t) => html`
-          <sp-tab value=${t.value} title=${t.label} aria-label=${t.label}>
+          <sp-tab value=${t.value} title=${t.label}>
             ${tabIcon(t.icon, "m")}
             ${
               t.value === "git" && gitFileCount > 0

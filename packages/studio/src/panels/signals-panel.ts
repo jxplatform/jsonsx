@@ -23,6 +23,7 @@ import {
 import { renderFieldRow } from "../ui/field-row";
 import { rawTextArea, spTextField } from "../ui/field-input";
 import { expressionHint, renderExpressionEditor } from "../ui/expression-editor";
+import { renderEmptyState } from "./empty-state";
 import { renderStatementEditor } from "./statement-editor";
 import { livePreviewExpression } from "../services/live-preview";
 import { renderMediaPicker } from "../ui/media-picker";
@@ -416,6 +417,29 @@ function cemTypeText(type: JsonValue | undefined): string {
 // ─── Left panel: Signals ─────────────────────────────────────────────────────
 
 /**
+ * Add a def from one of the built-in templates under a free name, and expand it for editing. Shared
+ * by the "+ Add…" picker and the panel's empty state, so both create the same thing.
+ */
+function addTemplateDef(type: string, S: SignalsPanelState, ctx: SignalsPanelCtx) {
+  const template = DEF_TEMPLATES[type];
+  if (!template) {
+    return;
+  }
+  const nameBase = type === "function" ? "newFunction" : "$newSignal";
+  let n = nameBase;
+  let i = 1;
+  while (S.document.state && S.document.state[n]) {
+    n = nameBase + i;
+    i += 1;
+  }
+  transactDoc(activeTab.value, (t) =>
+    mutateAddDef(t, n, structuredClone(template) as Record<string, JsonValue>),
+  );
+  expandedSignal = n;
+  ctx.renderLeftPanel();
+}
+
+/**
  * @param {SignalsPanelState} S
  * @param {SignalsPanelCtx} ctx
  */
@@ -506,7 +530,16 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
   return html`
     <div class="signals-panel">
       <sp-accordion allow-multiple size="s"> ${catTemplates} </sp-accordion>
-      ${entries.length === 0 ? html`<div class="empty-state">No state defined</div>` : nothing}
+      ${
+        entries.length === 0
+          ? renderEmptyState({
+              actions: [{ label: "Add a value", run: () => addTemplateDef("state", S, ctx) }],
+              message:
+                "Data lives here — values this page can read, compute or fetch, " +
+                "ready to bind to any element.",
+            })
+          : nothing
+      }
       <div class="signals-add">
         <sp-picker
           size="s"
@@ -577,29 +610,13 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
               return;
             }
 
-            const template = DEF_TEMPLATES[type];
-            if (!template) {
-              return;
-            }
-            const isFunction = type === "function";
-            const nameBase = isFunction ? "newFunction" : "$newSignal";
-            let n = nameBase;
-            let i = 1;
-            while (S.document.state && S.document.state[n]) {
-              n = nameBase + i;
-              i += 1;
-            }
-            transactDoc(activeTab.value, (t) =>
-              mutateAddDef(t, n, structuredClone(template) as Record<string, JsonValue>),
-            );
-            expandedSignal = n;
-            ctx.renderLeftPanel();
+            addTemplateDef(type, S, ctx);
           }}
         >
-          <sp-menu-item value="state">State Signal</sp-menu-item>
+          <sp-menu-item value="state">Value</sp-menu-item>
           <sp-menu-item value="computed">Computed</sp-menu-item>
           <sp-menu-divider></sp-menu-divider>
-          <sp-menu-item value="request">Fetch (Request)</sp-menu-item>
+          <sp-menu-item value="request">Fetch from a URL</sp-menu-item>
           <sp-menu-item value="localStorage">LocalStorage</sp-menu-item>
           <sp-menu-item value="sessionStorage">SessionStorage</sp-menu-item>
           <sp-menu-item value="indexedDB">IndexedDB</sp-menu-item>
@@ -607,7 +624,7 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
           <sp-menu-item value="set">Set</sp-menu-item>
           <sp-menu-item value="map">Map</sp-menu-item>
           <sp-menu-item value="formData">FormData</sp-menu-item>
-          <sp-menu-item value="external">External Module…</sp-menu-item>
+          <sp-menu-item value="external">From a module…</sp-menu-item>
           ${
             projectState?.projectConfig?.imports
               ? html`<sp-menu-divider></sp-menu-divider>${Object.keys(
@@ -1565,7 +1582,7 @@ export function renderExternalPrototypeEditorTemplate(
               );
               pluginSchemaCache.delete(`${v}::${def.$prototype}`);
             })}
-            ${signalFieldRow("Prototype", def.$prototype || "", (v: string) => {
+            ${signalFieldRow("Kind", def.$prototype || "", (v: string) => {
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateDef(t, name, { $prototype: v || undefined }),
               );

@@ -216,14 +216,32 @@ describe("left panel — document tabs", () => {
     expect(body.children.length).toBe(0);
   });
 
-  test("no active tab renders an empty panel body for document tabs", async () => {
+  test("no active tab teaches what each document tab is for instead of painting a blank body", async () => {
     closeAllTabs();
     view.leftTab = "layers";
     await mountWith();
     const body = leftPanel.querySelector(".panel-body") as HTMLElement;
-    expect(body).not.toBeNull();
-    expect(body.children.length).toBe(0);
+    expect(body.querySelector(".empty-state-message")?.textContent).toBe(
+      "Open a page to see the elements it is built from.",
+    );
+    expect((body.querySelector(".empty-state-action") as HTMLElement).textContent?.trim()).toBe(
+      "Open a page…",
+    );
     expect(ctx.registerLayersDnD).not.toHaveBeenCalled();
+  });
+
+  test("every document tab has its own no-document sentence", async () => {
+    closeAllTabs();
+    const seen = new Set<string>();
+    for (const tabName of ["layers", "imports", "state", "data", "head"]) {
+      view.leftTab = tabName;
+      await mountWith();
+      const message = leftPanel.querySelector(".empty-state-message")?.textContent ?? "";
+      expect(message.startsWith("Open a page to")).toBe(true);
+      seen.add(message);
+      unmount();
+    }
+    expect(seen.size).toBe(5);
   });
 });
 

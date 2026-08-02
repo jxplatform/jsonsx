@@ -17,7 +17,7 @@ Studio has a built-in AI assistant: a chat sidebar that doesn't just talk about 
 
 ![The assistant sidebar open beside a page on the canvas, mid-conversation](../images/ai-sidebar.png)
 
-Open it with the **Toggle Assistant** chat-bubble button at the right end of the toolbar. The sidebar is always available — before you open a project, with a project open, and with a page on the canvas — and what the assistant can do grows with each of those states.
+Open it with the **Toggle Assistant** chat-bubble button at the right end of the toolbar. The sidebar starts closed — it's a ~300px column, and an editor shouldn't spend a third of your window on a conversation you didn't ask for — and stays however you last left it. It's available in every state: before you open a project, with a project open, and with a page on the canvas. What the assistant can do grows with each of those.
 
 ## What it can do
 
@@ -33,11 +33,11 @@ Each request gets five working rounds — five turns of thinking and calling too
 
 ## Connect a provider
 
-The first time you open the sidebar (and any time AI isn't connected yet), the chat is replaced by a short setup screen. It offers whichever routes your Studio supports.
+Until AI is connected, the sidebar shows the chat as usual with one line beneath it — _No AI provider is connected yet_ — and an **Assistant: Settings…** button. That button opens a dialog offering whichever routes your Studio supports. A provider key is something you set once for the whole app, so it lives in a dialog rather than occupying the sidebar.
 
 ### Connect Cloudflare (Jx Cloud)
 
-On Jx Cloud the screen leads with **Connect Cloudflare**: Studio brokers **Workers AI** on your own Cloudflare account, so you need no API key and no third-party provider account. Click **Connect Cloudflare**, approve the authorization in the Cloudflare window that opens, and you land back in Studio with the assistant unlocked. Inference runs on — and bills to — your own Cloudflare account; Jx only brokers the request.
+On Jx Cloud the dialog leads with **Connect Cloudflare**: Studio brokers **Workers AI** on your own Cloudflare account, so you need no API key and no third-party provider account. Click **Connect Cloudflare**, approve the authorization in the Cloudflare window that opens, and you land back in Studio with the assistant connected. Inference runs on — and bills to — your own Cloudflare account; Jx only brokers the request.
 
 This option appears only where a platform can run that hosted flow. The desktop app and the dev server show the key form alone.
 
@@ -50,7 +50,7 @@ Below the Cloudflare option (or on its own, everywhere else) is the **AI provide
 3. Optionally set an **Endpoint** — leave it empty for OpenAI, or point it at a compatible server such as a local LLM (for example `http://localhost:11434/v1`).
 4. Click **Save**.
 
-To change any of this later, click the gear button (**API key & endpoint**) at the bottom of the sidebar. You can also switch models per conversation with the model picker next to the message box.
+To change any of this later, click the gear button (**API key & endpoint**) at the bottom of the sidebar — it reopens the same dialog. You can also switch models per conversation with the model picker next to the message box.
 
 :::doc-note
 The key, endpoint, and model choice are stored locally on your machine, per browser or app install. If the Studio backend you're running already holds credentials — a dev server started with an `OPENAI_API_KEY` environment variable, or a Cloudflare account you connected earlier — the assistant unlocks without asking for anything.

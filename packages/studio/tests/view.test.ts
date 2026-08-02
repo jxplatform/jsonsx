@@ -1,7 +1,7 @@
 /** View state (C7): applyPanelCollapse DOM + localStorage behavior in src/view.ts. */
 import "./with-dom.js";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { applyPanelCollapse, view } from "../src/view";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { applyPanelCollapse, onPanelCollapse, setLayoutSelection, view } from "../src/view";
 
 const STORAGE_KEY = "jx-studio-panel-widths";
 
@@ -92,7 +92,7 @@ describe("applyPanelCollapse", () => {
     expect(saved.rightCollapsed).toBe(true);
   });
 
-  test("corrupt stored JSON is swallowed; classes still applied", () => {
+  test("corrupt stored JSON is swallowed and replaced, classes still applied", () => {
     const app = mountApp();
     localStorage.setItem(STORAGE_KEY, "{not valid json");
     view.leftPanelCollapsed = true;
@@ -100,8 +100,33 @@ describe("applyPanelCollapse", () => {
     expect(() => applyPanelCollapse()).not.toThrow();
 
     expect(app.classList.contains("left-collapsed")).toBe(true);
-    // The save was aborted by the parse error, leaving the corrupt value in place.
-    expect(localStorage.getItem(STORAGE_KEY)).toBe("{not valid json");
+    // An unreadable record reads as empty and is written over, rather than pinning the panel
+    // Layout to whatever corrupt string happens to be in storage forever.
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+    expect(saved.leftCollapsed).toBe(true);
+  });
+
+  test("notifies subscribers, and unsubscribing stops that", () => {
+    mountApp();
+    const seen = mock(() => {});
+    const off = onPanelCollapse(seen);
+
+    applyPanelCollapse();
+    expect(seen).toHaveBeenCalledTimes(1);
+    applyPanelCollapse();
+    expect(seen).toHaveBeenCalledTimes(2);
+
+    off();
+    applyPanelCollapse();
+    expect(seen).toHaveBeenCalledTimes(2);
+  });
+
+  test("does not notify when there is no #app to lay out", () => {
+    const seen = mock(() => {});
+    const off = onPanelCollapse(seen);
+    applyPanelCollapse();
+    expect(seen).not.toHaveBeenCalled();
+    off();
   });
 });
 
@@ -110,5 +135,24 @@ describe("view defaults", () => {
     expect(view.leftTab).toBeString();
     expect(view.dndCleanups).toBeArray();
     expect(view.elementsCollapsed).toBeInstanceOf(Set);
+  });
+});
+
+describe("setLayoutSelection", () => {
+  test("adopts and releases the canvas layout-chrome selection", () => {
+    // `view.layoutSelection` shipped with a reader (the properties panel's layout panel) and no
+    // Writer anywhere, so clicking a header selected nothing. This is that writer.
+    expect(view.layoutSelection).toBeNull();
+    const hit = {
+      className: "site-header",
+      layoutFile: "layouts/base.json",
+      layoutPath: ["children", 0],
+      rect: { height: 40, width: 800, x: 0, y: 0 },
+      tagName: "header",
+    };
+    setLayoutSelection(hit);
+    expect(view.layoutSelection).toBe(hit);
+    setLayoutSelection(null);
+    expect(view.layoutSelection).toBeNull();
   });
 });

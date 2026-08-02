@@ -440,3 +440,56 @@ describe("preview link interception", () => {
     expect(posts.some((p) => p.kind === "previewNavigate")).toBe(false);
   });
 });
+
+// ─── Preview reports nothing pointable ──────────────────────────────────────────
+// Preview is the shipped page: there is no selection, no hover box, no insertion "+" and no Jx
+// Element menu, so the frame withholds all four. (The host refuses the same messages independently
+// — the canvas bundle ships prebuilt, so neither side relies on the other's build being current.)
+
+describe("preview suppresses the editing affordances", () => {
+  let stop: (() => void) | undefined;
+  afterEach(() => {
+    stop?.();
+    stop = undefined;
+  });
+
+  function startPreview() {
+    const { channel, posts } = fakeChannel();
+    stop = startInteraction(channel, document, {
+      getMode: () => "preview",
+      getShadowDoc: () => ({ children: [{ tagName: "p" }], tagName: "div" }) as JxMutableNode,
+    });
+    return posts;
+  }
+
+  test("a click on a plain element posts no hit", () => {
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 0, y: 0 });
+    const posts = startPreview();
+    inner.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    expect(posts).toHaveLength(0);
+  });
+
+  test("a pointermove posts neither hover nor insertion zones", async () => {
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 0, y: 0 });
+    const posts = startPreview();
+    await movePointer(inner, { clientX: 5, clientY: 1 });
+    expect(posts).toHaveLength(0);
+  });
+
+  test("leaving the canvas posts nothing either", async () => {
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 0, y: 0 });
+    const posts = startPreview();
+    await movePointer(inner, { clientX: 5, clientY: 1 });
+    document.dispatchEvent(new MouseEvent("pointerleave", { bubbles: false }));
+    expect(posts).toHaveLength(0);
+  });
+
+  test("right-click keeps the browser's own menu", () => {
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 0, y: 0 });
+    const posts = startPreview();
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    inner.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(posts.some((p) => p.kind === "contextMenu")).toBe(false);
+  });
+});

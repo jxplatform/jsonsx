@@ -126,7 +126,7 @@ describe("open", () => {
     const navLabels = [...modal()!.querySelectorAll(".settings-nav-item")].map((b) =>
       b.textContent?.trim(),
     );
-    expect(navLabels).toEqual(["General", "Head", "CSS Variables", "Definitions", "Dependencies"]);
+    expect(navLabels).toEqual(["General", "Head", "CSS Variables", "Data Shapes", "Dependencies"]);
     expect(navButton("General").classList.contains("active")).toBe(true);
 
     // The deferred rAF render filled the content area with the General section
@@ -142,7 +142,7 @@ describe("open", () => {
 
   test("reopening after close resets the active section to General", async () => {
     await openAndSettle();
-    pointer(navButton("Definitions"), "click");
+    pointer(navButton("Data Shapes"), "click");
     await flush();
     closeSettingsModal();
     await flush();
@@ -175,9 +175,9 @@ describe("section navigation", () => {
     expect(content().querySelectorAll(".css-var-row").length).toBe(1);
   });
 
-  test("Definitions section renders the defs editor with the project $defs", async () => {
+  test("Data Shapes section renders the defs editor with the project $defs", async () => {
     await openAndSettle();
-    pointer(navButton("Definitions"), "click");
+    pointer(navButton("Data Shapes"), "click");
     await flush();
     const labels = [...content().querySelectorAll(".settings-list-panel sp-action-button")].map(
       (b) => b.textContent?.trim(),
@@ -191,12 +191,12 @@ describe("section navigation", () => {
     const navLabels = [...modal()!.querySelectorAll(".settings-nav-item")].map((b) =>
       b.textContent?.trim(),
     );
-    // Order 50 lands between Definitions (40) and Dependencies (60) — the historical position.
+    // Order 50 lands between Data Shapes (40) and Dependencies (60) — the historical position.
     expect(navLabels).toEqual([
       "General",
       "Head",
       "CSS Variables",
-      "Definitions",
+      "Data Shapes",
       "Content Types",
       "Dependencies",
     ]);

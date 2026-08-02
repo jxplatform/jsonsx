@@ -1,10 +1,11 @@
 /// <reference lib="dom" />
 /**
- * Definitions Editor — visual editor for project-level $defs (JSON Schema type definitions).
+ * Data Shapes editor — visual editor for project-level $defs (JSON Schema type definitions).
  *
  * Manages entries in project.json `$defs` — reusable type schemas for external datasets, API
  * responses, CMS payloads, etc. Same concept as component-level $defs but scoped to the entire
- * project.
+ * project. "Data shape" is the user-facing name; the on-disk key stays `$defs` and the section key
+ * stays `definitions`.
  */
 
 import { html, render as litRender } from "lit-html";
@@ -401,7 +402,7 @@ function handleDeleteDef(rerender: () => void) {
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 /**
- * Render the definitions editor.
+ * Render the Data Shapes editor.
  *
  * @param {HTMLElement} container
  */
@@ -435,7 +436,7 @@ export function renderDefsEditor(container: HTMLElement) {
               <div class="settings-inline-form">
                 <sp-textfield
                   size="s"
-                  placeholder="TypeName"
+                  placeholder="ProductReview"
                   .value=${newDefName}
                   @input=${(e: Event) => {
                     newDefName = (e.target as HTMLInputElement).value;
@@ -464,7 +465,7 @@ export function renderDefsEditor(container: HTMLElement) {
                   rerender();
                 }}
               >
-                <sp-icon-add slot="icon"></sp-icon-add> New Definition
+                <sp-icon-add slot="icon"></sp-icon-add> New Data Shape
               </sp-action-button>
             `
       }
@@ -474,7 +475,9 @@ export function renderDefsEditor(container: HTMLElement) {
   // Right column — schema editor
   let editorTpl;
   if (!selectedDef || !defs[selectedDef]) {
-    editorTpl = html`<div class="settings-empty-state">Select or create a type definition</div>`;
+    editorTpl = html`<div class="settings-empty-state">
+      Pick a data shape on the left, or create one.
+    </div>`;
   } else {
     const def = defs[selectedDef] as ContentTypeSchema;
     const properties = def.properties || {};
@@ -508,7 +511,7 @@ export function renderDefsEditor(container: HTMLElement) {
           <sp-action-button
             size="xs"
             quiet
-            title="Delete definition"
+            title="Delete data shape"
             @click=${() => handleDeleteDef(rerender)}
           >
             <sp-icon-delete slot="icon"></sp-icon-delete>

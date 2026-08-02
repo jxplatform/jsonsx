@@ -84,6 +84,7 @@ const {
   hostDragGeometry,
   hostForCanvas,
   INSERT_HIDE_DELAY,
+  isCaretActive,
   liveDragHostAt,
   mountIframeCanvas,
   mountStylebookCanvas,
@@ -477,6 +478,47 @@ describe("iframe canvas interaction", () => {
     expect(sel.style.top).toBe("5px");
     expect(sel.style.width).toBe("100px");
     expect(sel.style.height).toBe("20px");
+  });
+
+  test("a layoutHit selects the layout chrome, clears the document selection, and labels the box", async () => {
+    const { setLayoutSelection, view } = await import("../src/view");
+    setLayoutSelection(null);
+    const canvasEl = await mountReady();
+
+    // Select a real node first — the layout hit has to retire it, not sit beside it.
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } },
+      kind: "hit",
+    });
+    expect(activeTab.value?.session.selection).toEqual(["children", 0]);
+
+    channels[0]!.deliver({
+      hit: {
+        className: "",
+        layoutFile: "layouts/base.json",
+        layoutPath: ["children", 0, "children", 0],
+        rect: { height: 21, width: 110, x: 24, y: 12 },
+        tagName: "a",
+      },
+      kind: "layoutHit",
+    });
+
+    expect(view.layoutSelection).toMatchObject({
+      layoutFile: "layouts/base.json",
+      layoutPath: ["children", 0, "children", 0],
+      tagName: "a",
+    });
+    expect(activeTab.value?.session.selection).toBeNull();
+    const sel = canvasEl.querySelector(".overlay-selection") as HTMLElement;
+    expect(sel.style.display).toBe("block");
+    expect(sel.style.left).toBe("24px");
+
+    // And selecting a document node again clears the layout selection.
+    channels[0]!.deliver({
+      hit: { path: ["children", 1], rect: { height: 20, width: 100, x: 10, y: 5 } },
+      kind: "hit",
+    });
+    expect(view.layoutSelection).toBeNull();
   });
 
   test("hover draws the hover box unless it coincides with the selection", async () => {
@@ -2514,5 +2556,157 @@ describe("external file drop dispatch", () => {
     Object.defineProperty(over, "dataTransfer", { value: { types: ["text/plain"] } });
     canvasEl.dispatchEvent(over);
     expect(over.defaultPrevented).toBe(false);
+  });
+});
+
+// ─── Caret.active across the bridge ─────────────────────────────────────────────
+// The inline-edit session runs inside the cross-origin canvas frame, so the parent bundle's own
+// IsEditing() is permanently false. The host derives the answer from the three messages the bridge
+// Already carries, and the editor's ⌘C/⌘X/⌘V guard reads it.
+
+describe("isCaretActive", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+  });
+
+  test("false with no session", async () => {
+    await mountReady();
+    expect(isCaretActive()).toBe(false);
+  });
+
+  test("editStart opens it and editEnd closes it", async () => {
+    await mountReady();
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
+    expect(isCaretActive()).toBe(true);
+    channels[0]!.deliver({ kind: "editEnd" });
+    expect(isCaretActive()).toBe(false);
+  });
+
+  test("a selectionChanged snapshot alone proves the caret is live", async () => {
+    // A snapshot only ever posts from a live session, so it recovers the flag if the editStart that
+    // Opened the session never landed.
+    await mountReady();
+    channels[0]!.deliver({
+      activeTags: [],
+      collapsed: false,
+      kind: "selectionChanged",
+      link: { active: false, href: null },
+      localScope: null,
+      path: ["children", 0],
+      rect: null,
+      seq: 1,
+    });
+    expect(isCaretActive()).toBe(true);
+    channels[0]!.deliver({ kind: "editEnd" });
+    expect(isCaretActive()).toBe(false);
+  });
+
+  test("a frame torn down mid-session cannot latch the flag on", async () => {
+    // No editEnd ever arrives when the iframe goes away with the caret in it (a mode switch, a
+    // Closed tab) — a stored boolean would go on stealing ⌘C forever.
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
+    expect(isCaretActive()).toBe(true);
+    canvasEl.remove();
+    expect(isCaretActive()).toBe(false);
+  });
+});
+
+// ─── Preview is truthful ────────────────────────────────────────────────────────
+// Preview must behave like the shipped page: nothing selectable, nothing outlined, nothing
+// Droppable, and a frame that scrolls its own document instead of being grown to its content.
+
+describe("preview renders", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+    resolved.mapperCtx = { ...(resolved.mapperCtx as object), canvasMode: "preview" };
+  });
+
+  /** Mount a ready host whose render mode is preview. */
+  async function mountPreview(): Promise<HTMLElement> {
+    return mountReady();
+  }
+
+  test("the overlay layer is suppressed, and restored by the next editable render", async () => {
+    const canvasEl = await mountPreview();
+    const overlay = canvasEl.querySelector(".jx-canvas-iframe-overlay") as HTMLElement;
+    expect(overlay.style.display).toBe("none");
+
+    resolved.mapperCtx = { ...(resolved.mapperCtx as object), canvasMode: "design" };
+    await mountIframeCanvas(2, {} as never, canvasEl, null, activeTab.value?.id ?? null);
+    expect(overlay.style.display).toBe("");
+  });
+
+  test("a hit selects nothing", async () => {
+    const canvasEl = await mountPreview();
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } },
+      kind: "hit",
+    });
+    expect(activeTab.value?.session.selection).toBeNull();
+    const sel = canvasEl.querySelector(".overlay-selection") as HTMLElement;
+    expect(sel.style.display).toBe("none");
+  });
+
+  test("hover draws no box", async () => {
+    const canvasEl = await mountPreview();
+    channels[0]!.deliver({
+      hit: { path: ["children", 1], rect: { height: 8, width: 40, x: 2, y: 3 } },
+      kind: "hover",
+    });
+    expect((canvasEl.querySelector(".overlay-hover") as HTMLElement).style.display).toBe("none");
+  });
+
+  test("no insertion +", async () => {
+    const canvasEl = await mountPreview();
+    channels[0]!.deliver({
+      kind: "insertZones",
+      zones: [
+        {
+          edge: "top",
+          index: 0,
+          parentPath: [],
+          rect: { height: 0, width: 100, x: 0, y: 0 },
+        },
+      ],
+    });
+    expect((canvasEl.querySelector(".insertion-helper") as HTMLElement).style.display).toBe("none");
+  });
+
+  test("the Jx context menu never opens", async () => {
+    let shown = 0;
+    setCanvasContextMenuHandler({
+      dismiss: () => {},
+      show: () => {
+        shown += 1;
+      },
+    });
+    await mountPreview();
+    channels[0]!.deliver({ kind: "contextMenu", path: ["children", 0], x: 5, y: 6 });
+    expect(shown).toBe(0);
+  });
+
+  test("an inline-edit session cannot start, so no caret is reported", async () => {
+    await mountPreview();
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
+    expect(isCaretActive()).toBe(false);
+  });
+
+  test("a file drop is refused", async () => {
+    let calls = 0;
+    setFileDropHandler(async () => {
+      calls += 1;
+    });
+    await mountPreview();
+    channels[0]!.deliver({ files: [], hit: null, kind: "fileDrop", preview: null });
+    expect(calls).toBe(0);
+  });
+
+  test("the frame stays a real viewport instead of growing to its content", async () => {
+    const canvasEl = await mountPreview();
+    const iframe = canvasEl.querySelector("iframe")!;
+    channels[0]!.deliver({ fragment: false, height: 4000, kind: "contentHeight" });
+    expect(iframe.style.height).toBe("100%");
+    expect(iframe.style.minHeight).toBe("0px");
   });
 });

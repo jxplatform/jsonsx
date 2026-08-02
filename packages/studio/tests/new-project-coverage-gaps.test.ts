@@ -113,7 +113,7 @@ describe("new-project modal gaps", () => {
     const creds = document.querySelector("#layer-modal .ai-creds-form") as HTMLElement;
     expect(creds).toBeTruthy();
 
-    const keyInput = creds.querySelector('input[type="password"]') as HTMLInputElement;
+    const keyInput = creds.querySelector('sp-textfield[type="password"]') as HTMLInputElement;
     keyInput.value = "sk-fresh-key";
     keyInput.dispatchEvent(new Event("input", { bubbles: true }));
     const save = [...creds.querySelectorAll("sp-button")].find((b) =>
@@ -127,40 +127,32 @@ describe("new-project modal gaps", () => {
     expect(document.querySelector("#layer-modal .new-project-agent-prompt")).toBeTruthy();
   });
 
-  test("the Parameters step labels the chosen template source", () => {
-    installMockPlatform();
+  test("the Name step labels the scratch source when no starters exist", () => {
+    installMockPlatform(); // No listStarters → the scratch card is the whole gallery.
     void openNewProjectModal();
     clickFooter("Next");
-    expect(contextText()).toContain("Template · Blank");
+    expect(contextText()).toBe("Start from scratch");
+    // Nothing blocks Next: there is always a valid selection.
+    expect(errorText()).toBeNull();
   });
 
-  test("the starter tab requires a selection before Next", () => {
-    installMockPlatform(); // No listStarters → nothing auto-selected.
-    void openNewProjectModal();
-    switchTab("starter");
-    expect(document.querySelector("#layer-modal .new-project-tab-intro")?.textContent).toContain(
-      "No starter sites",
-    );
-    clickFooter("Next");
-    expect(errorText()).toContain("Choose a starter site");
-  });
-
-  test("starter cards select on click and seed the Parameters step", async () => {
+  test("starter cards select on click and label the Name step", async () => {
     installMockPlatform({ listStarters: async () => STARTERS });
     void openNewProjectModal();
     await flush();
-    switchTab("starter");
     const cards = [...document.querySelectorAll("#layer-modal .new-project-template")];
-    expect(cards).toHaveLength(2);
+    // Two starters plus the trailing scratch card.
+    expect(cards).toHaveLength(3);
     (cards[1] as HTMLElement).dispatchEvent(new Event("click", { bubbles: true }));
     await flush();
     const reCards = [...document.querySelectorAll("#layer-modal .new-project-template")];
     expect(reCards[1]!.classList.contains("selected")).toBe(true);
 
     clickFooter("Next");
-    expect(contextText()).toContain("Starter Site · Bakery");
-    // The starter's tagline seeds the description field.
-    expect(labelledField("Description").value).toBe("Fresh daily");
+    expect(contextText()).toContain("Starter site · Bakery");
+    // Step 2 is Name + Location only — the description field left with the design quickstart.
+    expect(labelledField("Project Name *")).toBeTruthy();
+    expect(labelledField("Location *")).toBeTruthy();
   });
 
   test("Back and tab switches are ignored while a create is in flight", async () => {
@@ -181,12 +173,12 @@ describe("new-project modal gaps", () => {
     clickFooter("Create Project");
     expect(footerButtons().some((b) => b.textContent?.includes("Creating…"))).toBe(true);
 
-    clickFooter("Back"); // Guarded: the wizard must stay on the Parameters step.
-    expect(document.querySelector("#layer-modal .new-project-step-heading")).toBeTruthy();
+    clickFooter("Back"); // Guarded: the wizard must stay on the Name step.
+    expect(document.querySelector("#layer-modal .new-project-name")).toBeTruthy();
 
-    staleTabs.selected = "starter"; // A stale tab strip cannot hijack the flow mid-create.
+    staleTabs.selected = "agent"; // A stale tab strip cannot hijack the flow mid-create.
     staleTabs.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(document.querySelector("#layer-modal .new-project-step-heading")).toBeTruthy();
+    expect(document.querySelector("#layer-modal .new-project-name")).toBeTruthy();
 
     releaseCreate();
     expect(await promise).toEqual({

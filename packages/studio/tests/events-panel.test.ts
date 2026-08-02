@@ -57,14 +57,14 @@ describe("eventsSidebarTemplate — empty states", () => {
   test("no selection shows prompt", async () => {
     resetWorkspaceWithTab(makeDoc());
     const container = await renderInto(eventsSidebarTemplate(notCustom));
-    expect(container.textContent).toContain("Select an element to edit events");
+    expect(container.textContent).toContain("Click anything on the canvas to wire it up.");
   });
 
   test("selection pointing at missing node shows not-found", async () => {
     const tab = resetWorkspaceWithTab(makeDoc());
     tab.session.selection = ["children", 9];
     const container = await renderInto(eventsSidebarTemplate(notCustom));
-    expect(container.textContent).toContain("Node not found");
+    expect(container.textContent).toContain("no longer on the page");
   });
 });
 

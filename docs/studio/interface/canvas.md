@@ -26,7 +26,9 @@ In **Design** and **Stylebook** mode the canvas is an open surface you move arou
 - **Zoom** — hold :kbd[⌘] (macOS) or :kbd[Ctrl] (Windows/Linux) and scroll; the canvas zooms toward your cursor. :kbd[⌘=] / :kbd[Ctrl+=] zooms in, :kbd[⌘-] / :kbd[Ctrl+-] zooms out, and :kbd[⌘0] / :kbd[Ctrl+0] resets to 100%.
 - The zoom controls in the tab bar do the same, plus **Fit** to bring the whole canvas into view.
 
-In **Edit** mode the page scrolls like a normal browser page instead of panning, and :kbd[Ctrl]-scrolling zooms the content itself — the text reflows at the new size, like browser page zoom.
+**Design opens already fitted.** Switching into Design or Stylebook scales the canvas down so the whole thing is in view, so a wide layout never lands cut off at the edge of the panel. It never scales _up_ past 100%, and it never overrides you: once you have set a zoom yourself — with the controls, :kbd[Ctrl]-scroll or the chords — that file keeps your zoom for the rest of the session.
+
+In **Edit** mode the page scrolls like a normal browser page instead of panning, and :kbd[Ctrl]-scrolling zooms the content itself — the text reflows at the new size, like browser page zoom. In **Preview** the page scrolls too, and there is nothing to pan or zoom — see **[Modes](/docs/studio/interface/modes)**.
 
 ## Selecting elements
 

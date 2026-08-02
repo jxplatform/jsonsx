@@ -23,6 +23,7 @@ import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { showConfirmDialog, showPromptDialog } from "../ui/layers";
 import { POLL_GIT } from "../ui/timing";
+import { renderEmptyState } from "./empty-state";
 import { statusMessage } from "./statusbar";
 import { publishToGithub } from "../github/github-publish";
 import { pullWithPackageSync } from "../packages/pull-package-sync";
@@ -191,17 +192,20 @@ export function renderGitPanel(
 ) {
   if (!projectState) {
     return html`<div class="git-panel git-panel-empty">
-      <div class="git-empty-state">
-        <p>Open a project to use source control.</p>
-        ${
-          platformSupportsClone()
-            ? html`<sp-action-button size="m" @click=${() => ctx.cloneRepository?.()}>
-                <sp-icon-download slot="icon"></sp-icon-download>
-                Clone Git Repository
-              </sp-action-button>`
-            : nothing
-        }
-      </div>
+      ${renderEmptyState({
+        actions: platformSupportsClone()
+          ? [
+              {
+                icon: html`<sp-icon-download slot="icon"></sp-icon-download>`,
+                label: "Clone Git Repository",
+                run: () => ctx.cloneRepository?.(),
+              },
+            ]
+          : [],
+        message:
+          "Source control keeps every version of a project, so any change can be undone. " +
+          "Open a project to see its history.",
+      })}
     </div>`;
   }
   const status = S.ui.gitStatus;
@@ -220,33 +224,34 @@ export function renderGitPanel(
 
   if (status && !status.isRepo) {
     return html`<div class="git-panel git-panel-empty">
-      <div class="git-empty-state">
-        <p>This project is not yet a git repository.</p>
-        <sp-action-button
-          size="m"
-          @click=${async () => {
-            statusMessage("Initializing repository…");
-            await getPlatform().gitInit();
-            statusMessage("Repository initialized");
-            await refreshGitStatus();
-          }}
-          ?disabled=${loading}
-        >
-          <sp-icon-add slot="icon"></sp-icon-add>
-          Initialize Repository
-        </sp-action-button>
-        <sp-action-button
-          size="m"
-          @click=${() =>
-            publishToGithub({
-              projectName: projectState?.name || "my-project",
-            })}
-          ?disabled=${loading}
-        >
-          <sp-icon-share slot="icon"></sp-icon-share>
-          Publish to GitHub
-        </sp-action-button>
-      </div>
+      ${renderEmptyState({
+        actions: [
+          {
+            disabled: Boolean(loading),
+            icon: html`<sp-icon-add slot="icon"></sp-icon-add>`,
+            label: "Initialize Repository",
+            run: () => {
+              void (async () => {
+                statusMessage("Initializing repository…");
+                await getPlatform().gitInit();
+                statusMessage("Repository initialized");
+                await refreshGitStatus();
+              })();
+            },
+          },
+          {
+            disabled: Boolean(loading),
+            icon: html`<sp-icon-share slot="icon"></sp-icon-share>`,
+            label: "Create GitHub repository",
+            run: () => {
+              void publishToGithub({ projectName: projectState?.name || "my-project" });
+            },
+          },
+        ],
+        message:
+          "This project is not tracked by git yet. Start tracking it to keep a history " +
+          "of every change and to publish it anywhere.",
+      })}
     </div>`;
   }
 
@@ -381,7 +386,7 @@ export function renderGitPanel(
             ?disabled=${loading}
           >
             <sp-icon-share slot="icon"></sp-icon-share>
-            Publish to GitHub
+            Create GitHub repository
           </sp-action-button>
         </div>
       `;
@@ -734,7 +739,10 @@ export function renderGitPanel(
                 `,
               )}
             `
-          : html`<div class="git-empty">No changes</div>`
+          : renderEmptyState({
+              compact: true,
+              message: "Nothing to commit. Files you edit and save show up here.",
+            })
       }
     </div>
   `;
@@ -745,7 +753,10 @@ export function renderGitPanel(
     <div class="git-history">
       ${
         logEntries.length === 0
-          ? html`<div class="git-empty">No history</div>`
+          ? renderEmptyState({
+              compact: true,
+              message: "No commits yet. Each commit you make is a version you can come back to.",
+            })
           : repeat(
               logEntries,
               (e: GitLogEntry) => e.hash,

@@ -29,6 +29,7 @@ import {
   transactDoc,
 } from "../tabs/transact";
 import { view } from "../view";
+import { renderEmptyState } from "./empty-state";
 import { isInlineElement } from "../editor/inline-edit";
 import { showContextMenu } from "../editor/context-menu";
 import { panToElement } from "../canvas/canvas-utils";
@@ -207,15 +208,15 @@ export function renderLayersTemplate(ctx: {
     if (nodeType === "map") {
       badgeClass = "layer-tag map-tag";
       badgeText = "↻";
-      badgeTitle = "Repeater (mapped array)";
+      badgeTitle = "Repeating list — one copy per item";
     } else if (nodeType === "case" || nodeType === "case-ref") {
       badgeClass = "layer-tag case-tag";
       badgeText = path.at(-1);
-      badgeTitle = `$switch case: ${path.at(-1)}`;
+      badgeTitle = `Condition case: ${path.at(-1)}`;
     } else if (jxNode.$switch) {
       badgeClass = "layer-tag switch-tag";
       badgeText = "⇄";
-      badgeTitle = "$switch";
+      badgeTitle = "Condition";
     } else if (jxNode.tagName === "slot") {
       const slotName = jxNode.attributes?.name;
       badgeClass = "layer-tag slot-tag";
@@ -475,11 +476,26 @@ export function renderLayersTemplate(ctx: {
           ctx.rerender();
         }}
       >
-        ${repeat(
-          layerRows,
-          (r) => r.key,
-          (r) => r.tpl,
-        )}
+        ${
+          layerRows.length === 0
+            ? renderEmptyState({
+                actions: [
+                  {
+                    label: "Add an element",
+                    run: () => {
+                      view.leftTab = "blocks";
+                      ctx.rerender();
+                    },
+                  },
+                ],
+                message: "This page is empty. Everything you add to it is listed here, in order.",
+              })
+            : repeat(
+                layerRows,
+                (r) => r.key,
+                (r) => r.tpl,
+              )
+        }
       </div>
     </div>
   `;

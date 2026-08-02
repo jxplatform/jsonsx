@@ -452,4 +452,19 @@ describe("Import — streaming flow", () => {
     expect(labels.at(-1)).toContain("Import Site");
     expect(document.querySelector("#layer-modal .new-project-error")).toBeNull();
   });
+
+  test("dismissing the modal mid-import aborts the run instead of trapping the user", async () => {
+    setKey();
+    importPlatform();
+    const promise = reachParams();
+    npFillLocation();
+    clickFooter("Import Site");
+    await flush();
+    expect(captured!.signal?.aborted).toBe(false);
+
+    closeNewProjectModal();
+    expect(captured!.signal?.aborted).toBe(true);
+    expect(modal()).toBeNull();
+    expect(await promise).toBeNull();
+  });
 });

@@ -2,6 +2,7 @@ import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
 import { render } from "lit-html";
 import { renderDataExplorerTemplate } from "../src/panels/data-explorer";
+import { view } from "../src/view";
 
 const noop = () => {};
 const callbacks = {
@@ -38,10 +39,16 @@ describe("renderDataExplorerTemplate", () => {
     expect(container.textContent).toContain("allPosts");
   });
 
-  test("shows 'No state defined' when state is empty", () => {
+  test("with no data it teaches what the panel is for and offers the definition site", () => {
     const result = renderDataExplorerTemplate({}, null, callbacks);
     const container = document.createElement("div");
     render(result, container);
-    expect(container.textContent).toContain("No state defined");
+    expect(container.querySelector(".empty-state-message")?.textContent).toContain(
+      "Every value this page defines shows up here",
+    );
+    const action = container.querySelector(".empty-state-action") as HTMLElement;
+    expect(action.textContent?.trim()).toBe("Define data");
+    action.click();
+    expect(view.leftTab).toBe("state");
   });
 });

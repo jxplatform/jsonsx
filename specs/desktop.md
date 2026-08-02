@@ -250,7 +250,9 @@ projectState = {
 
 A new project is written **only** where the user said to put it. No backend picks a destination on its own, and none falls back to its own root — an unspecified destination is an error, not a default.
 
-`StudioPlatform.createDestination` declares which kind of destination the platform takes, and the New Project modal renders the matching fields on its Parameters step:
+**The wizard is two steps, and the second collects identity only.** Step 1 (_Choose a starting point_) offers the starter gallery — with one **Start from scratch** card at its end for the minimal scaffold — plus the Import and Agent sources on their own tabs. Step 2 (_Name your project_) collects the project name and the destination, and nothing else: the site's URL, its deployment adapter and its design tokens are project settings, editable for the life of the project, so they are not creation-time decisions. **Cancel is available on both steps**, alongside the underlay, `Escape` and the header close button; dismissing the modal while an import is streaming aborts the run rather than trapping the user behind it.
+
+`StudioPlatform.createDestination` declares which kind of destination the platform takes, and the New Project modal renders the matching fields on its Name step:
 
 | `createDestination` | Platforms           | Fields collected                            | `createProject({ destination })`                             |
 | ------------------- | ------------------- | ------------------------------------------- | ------------------------------------------------------------ |
@@ -286,7 +288,9 @@ Returns { root, config } and the modal opens it
 
 A live preview under the fields shows the resolved destination (`/home/you/Sites/my-site`, or `acme/my-site`) before anything is written.
 
-**Import shares this destination.** The Import tab is one of the four New Project sources, so it collects the same Location field and sends the resolved absolute path as `ImportSiteOptions.directory`. A relative directory reaching a backend means a caller skipped the field and is refused.
+**Every created project is a git repository.** A scaffold that is not under version control has no undo for its first destructive action, and nothing in the app says so. On the create path — every source, including Import and Agent — Studio therefore binds the backend to the new root (`activate`), reads `gitStatus`, and runs `gitInit` when the tree is not already a repository. It is skipped entirely on `createDestination: "repo"` platforms, where the project _is_ a repository by construction, and a git failure is reported without failing the create: the project that was written stays written.
+
+**Import shares this destination.** The Import tab is one of the three New Project sources, so it collects the same Location field and sends the resolved absolute path as `ImportSiteOptions.directory`. A relative directory reaching a backend means a caller skipped the field and is refused.
 
 ---
 

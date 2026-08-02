@@ -513,9 +513,18 @@
   font-family: inherit;
   line-height: 1.4;
 }
+/* Pointer focus gets the accent border only; keyboard focus additionally gets a real ring.
+   `outline: none` on plain `:focus` is what makes a control untraversable by keyboard, so the
+   suppression is scoped to `:focus:not(:focus-visible)` and never applies to the caret's own path. */
 .ai-composer-input:focus {
   border-color: var(--accent);
+}
+.ai-composer-input:focus:not(:focus-visible) {
   outline: none;
+}
+.ai-composer-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .ai-composer-row {
   display: flex;
@@ -571,22 +580,17 @@
 .ai-session-row:hover .ai-session-delete {
   visibility: visible;
 }
-.ai-status-center {
+/* The in-panel residue of the retired credentials gate: one sentence and the action that
+   fixes it, sitting between the transcript and the composer. */
+.ai-setup-notice {
+  flex-shrink: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  flex: 1;
-  gap: 12px;
-  padding: 24px;
-  text-align: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
   color: var(--fg-dim);
-  font-size: var(--spectrum-font-size-75, 12px);
-}
-.ai-code-snippet {
-  background: var(--bg-input);
-  padding: 4px 8px;
-  border-radius: var(--radius);
   font-size: var(--spectrum-font-size-50, 11px);
 }
 .ai-managed-connect {
@@ -605,6 +609,54 @@
   color: var(--fg-dim);
   font-size: var(--spectrum-font-size-50, 11px);
   margin-top: 6px;
+}
+
+/* ─── Assistant settings (ui/ai-credentials-form.ts) ──────── */
+/* The provider credentials form. Hosted by the `Assistant: Settings…` dialog and by the New
+   Project modal's Import/Agent gates, so it sizes itself and never assumes a column. */
+.ai-settings-dialog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.ai-creds-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+  text-align: left;
+}
+.ai-creds-title {
+  align-self: center;
+  font-weight: 600;
+}
+.ai-creds-note {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.ai-creds-label {
+  margin-top: 4px;
+  font-weight: 500;
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.ai-creds-field {
+  width: 100%;
+}
+.ai-creds-models {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-creds-error {
+  color: var(--danger);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.ai-creds-actions {
+  display: flex;
+  align-self: flex-end;
+  gap: 8px;
 }
 #statusbar {
   grid-row: 6;

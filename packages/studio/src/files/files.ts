@@ -220,6 +220,42 @@ export async function openProject({
 }
 
 /**
+ * Give a freshly created project a git repository, so its first irreversible action is recoverable.
+ *
+ * Runs on the create/import path only, immediately after the backend has written the project — the
+ * scaffold is not a repository and nothing else in Studio says so, while Delete and Rename are one
+ * confirm click away. `activate` binds the backend to the new root first, because `gitInit` takes
+ * no argument and would otherwise run against whichever project the window was serving.
+ *
+ * Never re-initialises, and never runs on repository-backed platforms (`createDestination: "repo"`
+ * — a cloud project _is_ a GitHub repository, and its `gitInit` is a no-op by design).
+ *
+ * @param {string} root Absolute root of the project just created.
+ * @returns {Promise<boolean>} Whether a repository was initialised.
+ */
+export async function initProjectRepo(root: string): Promise<boolean> {
+  const platform = getPlatform();
+  if (platform.createDestination !== "path") {
+    return false;
+  }
+  try {
+    await platform.activate(root);
+    const status = await platform.gitStatus();
+    if (status.isRepo) {
+      return false;
+    }
+    await platform.gitInit();
+    statusMessage("Initialized a git repository for this project");
+    return true;
+  } catch (error) {
+    // Version control is a safety net, not a precondition — a project that was written stays
+    // Written. Say so rather than failing the create the user just completed.
+    statusMessage(`Could not initialize a git repository: ${errorMessage(error)}`);
+    return false;
+  }
+}
+
+/**
  * The project's home page path (`pages/index.<page-ext>` or `pages/index.json`), or null if none.
  * Lists `pages/` once and matches by name — a directory read returns 200 with `[]` for a missing
  * dir, so this never provokes the console 404s a blind per-candidate read would.

@@ -12,6 +12,7 @@ import { createPanelScheduler } from "./panel-scheduler";
 import type { PanelScheduler } from "./panel-scheduler";
 import { activeTab } from "../workspace/workspace";
 import { tabIcon } from "./activity-bar";
+import { openPageAction, renderEmptyState } from "./empty-state";
 import { eventsSidebarTemplate } from "./events-panel";
 import { isCustomElementDoc } from "./signals-panel";
 
@@ -50,21 +51,20 @@ export function mount(ctx: RightPanelCtx) {
   _scope.run(() => {
     effect(() => {
       const tab = activeTab.value;
-      if (!tab) {
-        return;
+      // No tab is a state the inspector renders (its no-document empty state), not one it skips.
+      if (tab) {
+        // Track properties the right panel reads
+        void tab.doc.document;
+        void tab.session.selection;
+        void tab.session.ui.rightTab;
+        void tab.session.ui.activeMedia;
+        void tab.session.ui.activeSelector;
+        void tab.session.ui.styleSections;
+        void tab.session.ui.styleShorthands;
+        void tab.session.ui.styleFilter;
+        void tab.session.ui.styleFilterActive;
+        void tab.session.ui.inspectorSections;
       }
-      // Track properties the right panel reads
-      void tab.doc.document;
-      void tab.session.selection;
-      void tab.session.ui.rightTab;
-      void tab.session.ui.activeMedia;
-      void tab.session.ui.activeSelector;
-      void tab.session.ui.styleSections;
-      void tab.session.ui.styleShorthands;
-      void tab.session.ui.styleFilter;
-      void tab.session.ui.styleFilterActive;
-      void tab.session.ui.inspectorSections;
-
       render();
     });
   });
@@ -105,6 +105,29 @@ function _ensureContainers() {
   _styleContainer.className = "panel-body";
 }
 
+/**
+ * Paint the inspector's own no-document state. The three tab containers are dropped rather than
+ * hidden so the next real render rebuilds them, and lit's part is cleared alongside the DOM so the
+ * emptied root can be rendered into again.
+ */
+function _renderNoDocument() {
+  _propsContainer = null;
+  _eventsContainer = null;
+  _styleContainer = null;
+  rightPanel.textContent = "";
+  // @ts-expect-error — clear Lit's internal state so the cleared root re-renders cleanly
+  delete rightPanel["_$litPart$"];
+  litRender(
+    html`<div class="panel-body">
+      ${renderEmptyState({
+        actions: [openPageAction()],
+        message: "Open a page to inspect and style what you click.",
+      })}
+    </div>`,
+    rightPanel,
+  );
+}
+
 function _doRender() {
   if (!_ctx) {
     return;
@@ -113,7 +136,7 @@ function _doRender() {
     const ctx = _ctx as RightPanelCtx;
     const aTab = activeTab.value;
     if (!aTab) {
-      rightPanel.textContent = "";
+      _renderNoDocument();
       return;
     }
     const S = {

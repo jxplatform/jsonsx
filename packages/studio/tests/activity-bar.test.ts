@@ -121,6 +121,24 @@ describe("renderActivityBar", () => {
     expect(bar().querySelector("sp-action-button[title='About']")).not.toBeNull();
   });
 
+  test("each rail tab is named exactly once", () => {
+    renderActivityBar();
+    const tabs = [...bar().querySelectorAll("sp-tab")];
+    // Title is both the tooltip and (sp-tab keeps its text label hidden) the accessible name.
+    expect(tabs.map((t) => t.getAttribute("title"))).toEqual([
+      "Files",
+      "Layers",
+      "Imports",
+      "Elements",
+      "State",
+      "Data",
+      "Document",
+      "Source Control",
+    ]);
+    // A duplicate aria-label carrying the same string made every tab announce itself twice.
+    expect(tabs.every((t) => !t.hasAttribute("aria-label"))).toBe(true);
+  });
+
   test("selects the current left tab when panel is open", () => {
     view.leftTab = "files";
     renderActivityBar();

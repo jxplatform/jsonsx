@@ -16,8 +16,13 @@ import {
   undo as tabUndo,
   transactDoc,
 } from "../tabs/transact";
-import { applyEditZoom, requestEditZoom, setEditZoom } from "../canvas/canvas-utils";
-import { isEditing } from "./inline-edit";
+import {
+  applyEditZoom,
+  markExplicitZoom,
+  requestEditZoom,
+  setEditZoom,
+} from "../canvas/canvas-utils";
+import { isCaretActive } from "../canvas/iframe-host";
 import { copyNode, cutNode, pasteNode } from "./context-menu";
 import { openQuickSearch } from "../panels/quick-search";
 import { shouldWarnOnClose } from "../panels/tab-strip";
@@ -25,6 +30,20 @@ import { isModalOpen, showConfirmDialog } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
 
 import type { JxPath } from "../state";
+
+/**
+ * Modifier chords Preview refuses. Duplicate / cut / paste mutate the document, which Preview does
+ * not do; the zoom chords drive an artboard transform Preview does not have. Save, undo/redo,
+ * close, open and the palette are app-level and still work.
+ */
+const PREVIEW_REFUSED_CHORDS: ReadonlySet<string> = new Set(["d", "x", "v", "0", "=", "+", "-"]);
+
+/**
+ * Bare keys Preview refuses: every one of them mutates the selected node. A selection carried in
+ * from Design is invisible here (Preview draws no overlays and posts no hits), so acting on it
+ * would be a blind edit.
+ */
+const PREVIEW_REFUSED_KEYS: ReadonlySet<string> = new Set(["Delete", "Backspace", "Enter"]);
 
 /**
  * Initialise all keyboard (and wheel/pointer) shortcuts.
@@ -79,6 +98,13 @@ export function initShortcuts(
       if (canvasMode === "manage") {
         return;
       }
+      /* Preview scrolls for real. Its frame is a normally-sized viewport over its own document, so
+         the wheel belongs to that document — panning a transform here is exactly what stopped
+         `position:sticky`, scroll-driven animation and IntersectionObserver reveals from ever
+         firing. Nothing is preventDefaulted, and there is no artboard to zoom. */
+      if (canvasMode === "preview") {
+        return;
+      }
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         // Zoom towards cursor
@@ -92,6 +118,8 @@ export function initShortcuts(
         // Adjust pan so the point under cursor stays stationary
         setPan(cursorX - (cursorX - panX) * ratio, cursorY - (cursorY - panY) * ratio);
         activeTab.value!.session.ui.zoom = newZoom;
+        // The author chose this zoom, so re-entering Design keeps it instead of auto-fitting.
+        markExplicitZoom();
       } else if (e.shiftKey) {
         // Shift+scroll = horizontal pan
         setPan(panX - e.deltaY, panY);
@@ -107,9 +135,9 @@ export function initShortcuts(
   // Middle-mouse drag panning
   canvasWrap.addEventListener("pointerdown", (e: PointerEvent) => {
     const ctx = getContext();
-    if (ctx.canvasMode === "edit") {
+    if (ctx.canvasMode === "edit" || ctx.canvasMode === "preview") {
       return;
-    } // No panning in edit mode
+    } // No panning in edit mode, and preview scrolls its own frame rather than panning
     if (e.button !== 1) {
       return;
     } // Middle button only
@@ -168,11 +196,16 @@ export function initShortcuts(
       }
       return;
     }
-    if (isEditing()) {
+    /* A live text caret owns the keyboard. The caret is in the canvas IFRAME, so the parent bundle's
+       own `isEditing()` is permanently false here — reading it (as this did) meant ⌘C copied the
+       whole <p> instead of the selected phrase and ⌘X deleted the paragraph out from under the
+       writer. {@link isCaretActive} derives the answer from the bridge's editStart /
+       selectionChanged / editEnd messages, so the element-level clipboard and structural handlers
+       below stay away while the author is typing. Save is the one exception: it flushes the canvas
+       frames itself, so ending the session here would be a second, racing commit path. */
+    if (isCaretActive()) {
       if (mod && e.key === "s") {
         e.preventDefault();
-        // SaveFile flushes the canvas frames itself; ending the local session here would be a
-        // Second, racing commit path.
         saveFile();
       }
       if (mod && e.key === "w") {
@@ -184,6 +217,13 @@ export function initShortcuts(
       // Grid mode: copy/paste/duplicate/zoom belong to the grid engine (Tabulator clipboard
       // Needs the native events); only tab/app-level chords pass through.
       if (canvasMode === "grid" && !["o", "p", "s", "w", "z", "Z"].includes(e.key)) {
+        return;
+      }
+      /* Preview edits nothing and zooms nothing. The structural chords are refused (preview posts
+         no hits, so a selection carried in from Design is not something the author can see, let
+         alone aim at), and so are the zoom chords — there is no artboard, and a phantom `ui.zoom`
+         written here would be waiting for them back in Design. */
+      if (canvasMode === "preview" && PREVIEW_REFUSED_CHORDS.has(e.key)) {
         return;
       }
       switch (e.key) {
@@ -299,6 +339,12 @@ export function initShortcuts(
     // Grid mode: Delete/Escape/Enter/arrows drive the grid's own range clearing and cell
     // Navigation — never the canvas document.
     if (canvasMode === "grid") {
+      return;
+    }
+
+    // Preview refuses the destructive bare keys; Escape and the arrows stay (they only move or
+    // Clear the selection, which is how the author leaves Preview with a clean slate).
+    if (canvasMode === "preview" && PREVIEW_REFUSED_KEYS.has(e.key)) {
       return;
     }
 

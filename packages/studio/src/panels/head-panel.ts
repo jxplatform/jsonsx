@@ -13,6 +13,7 @@ import { renderMediaPicker } from "../ui/media-picker";
 import { projectState, renderOnly } from "../store";
 import type { DirEntry } from "../types";
 import { activeTab } from "../workspace/workspace";
+import { renderEmptyState } from "./empty-state";
 import { collectFmFields, renderFmField } from "./frontmatter-fields";
 import { isGoogleFontEntry, isGoogleFontPreconnect } from "../utils/google-fonts";
 import { invalidateLayoutCache } from "../site-context";
@@ -485,7 +486,12 @@ export function renderHeadTemplate({
                   })}
                 </div>
               `
-            : html`<div class="imports-empty">No custom tags</div>`
+            : renderEmptyState({
+                compact: true,
+                message:
+                  "Custom tags add your own meta, link and script elements to this page — " +
+                  "analytics, verification, a webfont. Add one below.",
+              })
         }
 
         <!-- Add custom tag form -->

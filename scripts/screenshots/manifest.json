@@ -371,7 +371,7 @@
           "do": "showWelcome",
           "projects": [
             {
-              "name": "Bistro & Café",
+              "name": "Bistro & Caf\u00e9",
               "root": "~/Sites/bistro",
               "description": "~/Sites/bistro"
             },
@@ -662,7 +662,9 @@
         {
           "do": "run",
           "id": "view.toggleActivity",
-          "args": { "tab": "layers" }
+          "args": {
+            "tab": "layers"
+          }
         },
         {
           "do": "wait",
@@ -831,7 +833,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleRightPanel"
+          "id": "view.setRightPanel",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "wait",
@@ -898,7 +903,9 @@
         {
           "do": "run",
           "id": "inspector.toggleSection",
-          "args": { "section": "Element" }
+          "args": {
+            "section": "Element"
+          }
         },
         {
           "do": "wait",
@@ -1076,11 +1083,17 @@
         },
         {
           "do": "run",
-          "id": "view.toggleRightPanel"
+          "id": "view.setRightPanel",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "wait",
@@ -1089,7 +1102,9 @@
         {
           "do": "run",
           "id": "state.selectSignal",
-          "args": { "name": "toggle0" }
+          "args": {
+            "name": "toggle0"
+          }
         },
         {
           "do": "wait",
@@ -1140,7 +1155,9 @@
         {
           "do": "run",
           "id": "state.selectSignal",
-          "args": { "name": "submitRsvp" }
+          "args": {
+            "name": "submitRsvp"
+          }
         },
         {
           "do": "wait",
@@ -1193,7 +1210,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "select",
@@ -1254,7 +1274,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setStatus",
@@ -1467,7 +1490,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setStatus",
@@ -1721,7 +1747,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "select",
@@ -1783,7 +1812,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setZoom",
@@ -1804,7 +1836,9 @@
         {
           "do": "run",
           "id": "inspector.toggleSection",
-          "args": { "section": "Element" }
+          "args": {
+            "section": "Element"
+          }
         },
         {
           "do": "wait",
@@ -1862,7 +1896,9 @@
         {
           "do": "run",
           "id": "inspector.toggleSection",
-          "args": { "section": "Element" }
+          "args": {
+            "section": "Element"
+          }
         },
         {
           "do": "wait",
@@ -1968,7 +2004,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setZoom",
@@ -2017,7 +2056,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setZoom",
@@ -2079,7 +2121,9 @@
         {
           "do": "run",
           "id": "data.expandRow",
-          "args": { "name": "count" }
+          "args": {
+            "name": "count"
+          }
         },
         {
           "do": "wait",
@@ -2128,7 +2172,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setZoom",
@@ -2190,7 +2237,9 @@
         {
           "do": "run",
           "id": "settings.setSection",
-          "args": { "section": "content" }
+          "args": {
+            "section": "content"
+          }
         },
         {
           "do": "wait",
@@ -2199,7 +2248,9 @@
         {
           "do": "run",
           "id": "settings.selectEntry",
-          "args": { "name": "posts" }
+          "args": {
+            "name": "posts"
+          }
         },
         {
           "do": "wait",
@@ -2249,7 +2300,9 @@
         {
           "do": "run",
           "id": "settings.setSection",
-          "args": { "section": "content" }
+          "args": {
+            "section": "content"
+          }
         },
         {
           "do": "wait",
@@ -2258,7 +2311,9 @@
         {
           "do": "run",
           "id": "settings.selectEntry",
-          "args": { "name": "posts" }
+          "args": {
+            "name": "posts"
+          }
         },
         {
           "do": "wait",
@@ -2300,7 +2355,10 @@
       "actions": [
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setActivity",
@@ -2313,7 +2371,9 @@
         {
           "do": "run",
           "id": "file.contextMenu",
-          "args": { "path": "content/posts" }
+          "args": {
+            "path": "content/posts"
+          }
         },
         {
           "do": "wait",
@@ -2359,7 +2419,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setZoom",
@@ -2413,7 +2476,9 @@
         {
           "do": "run",
           "id": "state.selectSignal",
-          "args": { "name": "posts" }
+          "args": {
+            "name": "posts"
+          }
         },
         {
           "do": "wait",
@@ -2462,7 +2527,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setStatus",
@@ -2483,7 +2551,9 @@
         {
           "do": "run",
           "id": "layers.contextMenu",
-          "args": { "label": "article" }
+          "args": {
+            "label": "article"
+          }
         },
         {
           "do": "wait",
@@ -2525,7 +2595,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setStatus",
@@ -2579,7 +2652,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setZoom",
@@ -2628,7 +2704,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setZoom",
@@ -2677,7 +2756,9 @@
         {
           "do": "run",
           "id": "settings.setSection",
-          "args": { "section": "content" }
+          "args": {
+            "section": "content"
+          }
         },
         {
           "do": "wait",
@@ -2686,7 +2767,9 @@
         {
           "do": "run",
           "id": "settings.selectEntry",
-          "args": { "name": "posts" }
+          "args": {
+            "name": "posts"
+          }
         },
         {
           "do": "wait",
@@ -2731,7 +2814,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleRightPanel"
+          "id": "view.setRightPanel",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setRightTab",
@@ -2750,7 +2836,7 @@
             },
             {
               "role": "assistant",
-              "content": "Done — I rewrote the hero headline to \"Find the home that fits your life on the north shore.\" and softened the subheading to match. Want me to warm up the call-to-action button too?"
+              "content": "Done \u2014 I rewrote the hero headline to \"Find the home that fits your life on the north shore.\" and softened the subheading to match. Want me to warm up the call-to-action button too?"
             }
           ]
         },
@@ -2811,15 +2897,15 @@
             },
             {
               "role": "assistant",
-              "content": "The hero pairs the headline with a search card — visitors can filter by price, beds, and baths before they scroll. Below it, a stats band builds trust with the agency's track record."
+              "content": "The hero pairs the headline with a search card \u2014 visitors can filter by price, beds, and baths before they scroll. Below it, a stats band builds trust with the agency's track record."
             },
             {
               "role": "user",
-              "content": "Make this headline a little shorter.\n\n---- attached context ----\nPage: pages/index.md\nSelected element at [\"children\",0]: <re-hero> \"Find the home that fits your life…\""
+              "content": "Make this headline a little shorter.\n\n---- attached context ----\nPage: pages/index.md\nSelected element at [\"children\",0]: <re-hero> \"Find the home that fits your life\u2026\""
             },
             {
               "role": "assistant",
-              "content": "Trimmed it to \"Find the home that fits your life.\" — still warm, but it now sits on two lines above the search card.",
+              "content": "Trimmed it to \"Find the home that fits your life.\" \u2014 still warm, but it now sits on two lines above the search card.",
               "toolCalls": [
                 {
                   "name": "set_property",
@@ -2875,7 +2961,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleRightPanel"
+          "id": "view.setRightPanel",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "setRightTab",
@@ -2894,7 +2983,7 @@
             },
             {
               "role": "assistant",
-              "content": "Done — I added a one-line welcome under the stats band and bumped the eyebrow's contrast. Both edits are on the canvas now; undo works as usual if you want to step back.",
+              "content": "Done \u2014 I added a one-line welcome under the stats band and bumped the eyebrow's contrast. Both edits are on the canvas now; undo works as usual if you want to step back.",
               "toolCalls": [
                 {
                   "name": "add_child",
@@ -2902,7 +2991,7 @@
                 },
                 {
                   "name": "set_text",
-                  "arguments": "{\"path\":[\"children\",1,\"children\",2],\"text\":\"Welcome home — let's find yours.\"}"
+                  "arguments": "{\"path\":[\"children\",1,\"children\",2],\"text\":\"Welcome home \u2014 let's find yours.\"}"
                 },
                 {
                   "name": "set_style",
@@ -2956,7 +3045,9 @@
         {
           "do": "run",
           "id": "settings.selectEntry",
-          "args": { "name": "comments" }
+          "args": {
+            "name": "comments"
+          }
         },
         {
           "do": "wait",
@@ -3012,7 +3103,9 @@
         {
           "do": "run",
           "id": "settings.selectEntry",
-          "args": { "name": "main" }
+          "args": {
+            "name": "main"
+          }
         },
         {
           "do": "wait",
@@ -3058,11 +3151,17 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "run",
-          "id": "view.toggleRightPanel"
+          "id": "view.setRightPanel",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "openDataGrid",
@@ -3106,7 +3205,9 @@
         {
           "do": "run",
           "id": "state.selectSignal",
-          "args": { "name": "allPosts" }
+          "args": {
+            "name": "allPosts"
+          }
         },
         {
           "do": "wait",
@@ -3152,7 +3253,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "seedPublish",
@@ -3212,7 +3316,10 @@
         },
         {
           "do": "run",
-          "id": "view.toggleAssistant"
+          "id": "view.setAssistant",
+          "args": {
+            "open": false
+          }
         },
         {
           "do": "select",
@@ -3291,7 +3398,9 @@
         {
           "do": "run",
           "id": "project.setBrowseCategory",
-          "args": { "category": "media" }
+          "args": {
+            "category": "media"
+          }
         },
         {
           "do": "wait",

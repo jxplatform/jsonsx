@@ -2,7 +2,7 @@ import "./with-dom.js";
 import { afterEach, describe, expect, test } from "bun:test";
 import { fakeChannelPair } from "../src/canvas/iframe-channel";
 import { flush } from "./harness";
-import { bootCanvasIframe, startCanvasIframe } from "../src/canvas/iframe-entry";
+import { bootCanvasIframe, layoutHitFor, startCanvasIframe } from "../src/canvas/iframe-entry";
 import type { IframeToParent, ParentToIframe, WireMapperCtx } from "../src/canvas/iframe-protocol";
 
 const WIRE_CTX: WireMapperCtx = {
@@ -1011,6 +1011,32 @@ describe("startCanvasIframe — content-height auto-sizing + wheel forwarding", 
     expect(evt.defaultPrevented).toBe(true);
   });
 
+  test("PREVIEW leaves the wheel alone so the frame scrolls for real", async () => {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.parent.post({
+      ...(renderMsg(1, freshH1(), freshH1()) as Extract<ParentToIframe, { kind: "render" }>),
+      mapperCtx: { ...WIRE_CTX, canvasMode: "preview" },
+      mode: "preview",
+    });
+    pair.flush();
+    await flush();
+    pair.flush();
+    acks.length = 0;
+
+    const evt = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 7 });
+    container.ownerDocument.dispatchEvent(evt);
+    pair.flush();
+
+    // Neither swallowed nor forwarded: preview is a real viewport and the document scrolls itself.
+    expect(acks.some((m) => m.kind === "forwardWheel")).toBe(false);
+    expect(evt.defaultPrevented).toBe(false);
+  });
+
   test("teardown removes the wheel listener: a later wheel dispatch posts nothing", async () => {
     const { acks, container, pair } = await bootRendered(1);
     teardown!();
@@ -1322,5 +1348,173 @@ describe("startCanvasIframe — stylebook mode", () => {
     pair.flush();
     const hit = acks.find((m) => m.kind === "hit") as { hit: { path: unknown } } | undefined;
     expect(hit?.hit.path).toEqual(["children", 0]);
+  });
+});
+
+// ─── Layout chrome: the first click a new author makes ─────────────────────────
+
+describe("layoutHitFor", () => {
+  test("resolves the nearest layout region and reads its origin off the DOM", () => {
+    const header = document.createElement("header");
+    header.className = "site-header";
+    header.dataset.jxLayoutRegion = "";
+    header.dataset.jxLayoutFile = "layouts/base.json";
+    header.dataset.jxLayoutPath = '["children",0]';
+    const h1 = document.createElement("h1");
+    h1.dataset.jxLayoutRegion = "";
+    h1.dataset.jxLayoutFile = "layouts/base.json";
+    h1.dataset.jxLayoutPath = '["children",0,"children",0]';
+    header.append(h1);
+    document.body.append(header);
+
+    // The INNERMOST region answers: "My Site" is the thing the author pointed at, and it is the
+    // Node the layout should open at — not the whole header.
+    expect(layoutHitFor(h1)).toMatchObject({
+      className: "",
+      layoutFile: "layouts/base.json",
+      layoutPath: ["children", 0, "children", 0],
+      tagName: "h1",
+    });
+    expect(layoutHitFor(header)).toMatchObject({ className: "site-header", tagName: "header" });
+    header.remove();
+  });
+
+  test("page content always wins: a node with a document path is never a layout hit", () => {
+    const main = document.createElement("main");
+    main.dataset.jxLayoutRegion = "";
+    main.dataset.jxLayoutPath = "[]";
+    const p = document.createElement("p");
+    p.dataset.jxPath = '["children",0]';
+    main.append(p);
+    document.body.append(main);
+    expect(layoutHitFor(p)).toBeNull();
+    main.remove();
+  });
+
+  test("returns null for empty canvas and for non-element targets", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    expect(layoutHitFor(div)).toBeNull();
+    expect(layoutHitFor(null)).toBeNull();
+    expect(layoutHitFor(document.createTextNode("x"))).toBeNull();
+    div.remove();
+  });
+
+  test("a region with no stamped origin degrades to an empty file and root path", () => {
+    const el = document.createElement("footer");
+    el.dataset.jxLayoutRegion = "";
+    document.body.append(el);
+    expect(layoutHitFor(el)).toMatchObject({ layoutFile: "", layoutPath: [] });
+    el.remove();
+  });
+});
+
+describe("startCanvasIframe — layout chrome clicks", () => {
+  /** A layout with a header + footer around a <main> that holds the page's <p>. */
+  const LAYOUT_FILE = "layouts/base.json";
+  const mark = (path: (string | number)[]) => ({ file: LAYOUT_FILE, path });
+  const wrappedDoc = () => ({
+    $__layout: mark([]),
+    children: [
+      {
+        $__layout: mark(["children", 0]),
+        children: [
+          { $__layout: mark(["children", 0, "children", 0]), children: ["My Site"], tagName: "h1" },
+        ],
+        tagName: "header",
+      },
+      {
+        $__layout: mark(["children", 1]),
+        children: [{ children: ["Hello"], tagName: "p" }],
+        tagName: "main",
+      },
+    ],
+    tagName: "div",
+  });
+
+  const LAYOUT_CTX: WireMapperCtx = {
+    arrayPaths: [],
+    canvasMode: "design",
+    layoutWrapped: true,
+    pageContentOffset: 0,
+    pageContentPrefix: ["children", 1, "children"],
+  };
+
+  async function bootWrapped(mode: "design" | "preview" = "design") {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.parent.post({
+      ...(renderMsg(1, wrappedDoc(), wrappedDoc()) as Extract<ParentToIframe, { kind: "render" }>),
+      mapperCtx: { ...LAYOUT_CTX, canvasMode: mode },
+      mode,
+    });
+    pair.flush();
+    await flush();
+    pair.flush();
+    acks.length = 0;
+    return { acks, container, pair };
+  }
+
+  test('clicking "My Site" in the layout header posts a layoutHit naming the file and node', async () => {
+    const { acks, container, pair } = await bootWrapped();
+    const h1 = container.querySelector("h1") as HTMLElement;
+    // The bug this closes: no data-jx-path here, so the ordinary hit path reports nothing at all.
+    expect(h1.dataset.jxPath).toBeUndefined();
+
+    h1.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    pair.flush();
+
+    expect(acks.some((m) => m.kind === "hit")).toBe(false);
+    const layout = acks.find((m) => m.kind === "layoutHit") as
+      | Extract<IframeToParent, { kind: "layoutHit" }>
+      | undefined;
+    expect(layout?.hit).toMatchObject({
+      layoutFile: LAYOUT_FILE,
+      layoutPath: ["children", 0, "children", 0],
+      tagName: "h1",
+    });
+  });
+
+  test("no caret can land in layout chrome: the header subtree is contenteditable=false", async () => {
+    const { container } = await bootWrapped();
+    expect(container.querySelector("header")!.getAttribute("contenteditable")).toBe("false");
+    expect(container.querySelector("h1")!.getAttribute("contenteditable")).toBe("false");
+    // …but the <main> that wraps the page content stays a live part of the editing host.
+    expect(container.querySelector("main")!.getAttribute("contenteditable")).toBeNull();
+    expect(container.querySelector("main")!.dataset.jxLayoutRegion).toBeUndefined();
+  });
+
+  test("clicking real page content still selects it, and posts no layoutHit", async () => {
+    const { acks, container, pair } = await bootWrapped();
+    const p = container.querySelector("p") as HTMLElement;
+    expect(p.dataset.jxPath).toBe('["children",0]');
+
+    p.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    pair.flush();
+
+    expect(acks.some((m) => m.kind === "layoutHit")).toBe(false);
+    const hit = acks.find((m) => m.kind === "hit") as { hit: { path: unknown } } | undefined;
+    expect(hit?.hit.path).toEqual(["children", 0]);
+  });
+
+  test("preview reports nothing: it is the shipped page, not a document to point at", async () => {
+    const { acks, container, pair } = await bootWrapped("preview");
+    container.querySelector("h1")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    pair.flush();
+    expect(acks.some((m) => m.kind === "layoutHit")).toBe(false);
+  });
+
+  test("teardown removes the layout click listener", async () => {
+    const { acks, container, pair } = await bootWrapped();
+    teardown!();
+    teardown = undefined;
+    acks.length = 0;
+    container.querySelector("h1")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    pair.flush();
+    expect(acks.some((m) => m.kind === "layoutHit")).toBe(false);
   });
 });

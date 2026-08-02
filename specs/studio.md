@@ -31,13 +31,23 @@ At the component level, Studio is a visual builder for individual Jx files. At t
 
 ### 3.1 Layout
 
-Three-column layout:
+Four-column layout:
 
-| Column | Content                                    |
-| ------ | ------------------------------------------ |
-| Left   | Activity bar + panel (layers, files, etc.) |
-| Center | Canvas (live preview) + Toolbar            |
-| Right  | Inspector (properties, style, state, code) |
+| Column    | Content                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------- |
+| Left      | Activity bar + panel (layers, files, etc.)                                                  |
+| Center    | Canvas (live preview) + Toolbar                                                             |
+| Right     | Inspector (properties, style, state, code)                                                  |
+| Assistant | AI chat sidebar — **collapsed by default**, toggled from the toolbar, remembered per window |
+
+Each column's collapsed state persists to `localStorage` and is adopted at boot in both directions,
+so a remembered "open" reopens the assistant against its closed default.
+
+An AI provider key is an application-level setting configured once, not a state of the assistant
+column: it is edited in the `Assistant: Settings…` dialog (opened from the composer's gear, or from
+the setup notice the panel shows when nothing is connected) over the overlay contract in
+`studio-ui-guidelines.md` §8.7. With no provider connected, the panel still renders a chat inviting
+a conversation with that one action beneath it — it is never replaced by a credentials form.
 
 ### 3.2 Data Flow
 
@@ -163,6 +173,22 @@ Design and Content are both **editable modes** and behave identically for text: 
 live caret (§8.2). They differ only in what the document is — Content mode opens a format-backed
 document (`.md` via its format class, §8.1), Design mode a native `.json` one.
 
+**Preview does not edit, and it scrolls for real.** Preview is the fidelity view, so every editing
+affordance is gated off it: a click selects nothing, no hover or selection box is drawn, the
+insertion "+" is withheld, the canvas context menu gives way to the browser's own, nothing may be
+dropped onto it, and the destructive keyboard chords (duplicate, cut, paste, Delete, Backspace,
+Enter) are refused. A selection carried in from an editable mode survives in the model — returning
+restores it — but is not actionable while Preview is shown. Both realms enforce this: the frame
+withholds the messages, and the host refuses them, because the canvas bundle ships prebuilt and
+neither side may assume the other's build is current.
+
+Preview also renders on its own surface rather than the pan/zoom artboard. Editable modes grow the
+canvas iframe to its full content height so the parent overlay can reach every node, and pan a
+transform in place of scrolling; both are incompatible with fidelity, because a frame that is as
+tall as its document never scrolls, so `position: sticky`, scroll-driven animation and
+`IntersectionObserver` reveals can never fire. Preview therefore mounts ONE frame at the pane's own
+size, which scrolls its own document. It has no zoom control and no pan.
+
 **Following a link in Preview leaves the canvas.** Editable modes de-link anchors — the runtime stamps
 `href` onto `data-jx-href`, so a click selects the element instead of navigating. Preview keeps them
 live, where a click would navigate the canvas iframe and destroy the render along with the editing
@@ -209,6 +235,14 @@ The design canvas supports pan and zoom:
 - **Zoom**: Ctrl+scroll wheel, pinch gesture, or toolbar controls
 - **Fit to view**: Intelligent centering of documents on load and window resize
 - **Responsive presets**: Width presets matching `$media` breakpoints
+
+**Entering a pan/zoom mode fits the artboard.** Design and Stylebook apply a fit on the mode
+transition, capped at 100% so a narrow artboard is never magnified, and skipped when the pane has no
+measurable width (fitting an unlaid-out pane would land on the 5% floor). Without it a 1280px
+artboard opened at 100% in a ~700px pane and was cut off mid-word. The fit is a default, not a
+policy: any zoom the author sets by hand — the tab bar's −/+/100%/Fit controls, Ctrl+scroll, or the
+zoom chords — is recorded against that tab's document for the session, and re-entering the mode
+restores it instead of re-fitting. Preview takes no part in any of this (§4.2).
 
 ### 4.4 Block Action Bar
 
@@ -769,9 +803,18 @@ An ambiguous component (two or more image props) falls through to an insert rath
 | `Cmd+Z` / `Ctrl+Z`             | Undo                                          |
 | `Cmd+Shift+Z` / `Ctrl+Shift+Z` | Redo                                          |
 | `Cmd+D` / `Ctrl+D`             | Duplicate selected node                       |
+| `Cmd+Shift+O` / `Ctrl+Shift+O` | Open in Browser (§10.1)                       |
 | `Cmd+0` / `Cmd+=` / `Cmd+-`    | Zoom reset / in / out                         |
 
-**With a caret in the canvas** — the caret owns the editing and navigation keys:
+**Whether a caret is active is a bridge fact, not a local one.** The editing session runs inside the
+canvas iframe, so the shell cannot see the caret in its own realm — it derives `caret.active` from
+the session messages the bridge already carries (`editStart` opens it, `selectionChanged` proves it
+is still live, `editEnd` closes it), and treats a frame that has left the document as having no
+caret, since a frame torn down mid-session never posts `editEnd`. Reading a shell-local editing flag
+instead is what let the element-level clipboard handlers steal `Cmd+C` / `Cmd+X` / `Cmd+V` from a
+live caret: copying a phrase copied the whole block, and cutting mid-sentence deleted the paragraph.
+
+**With a caret in the canvas** — the caret owns the editing and navigation keys, and the clipboard:
 
 | Shortcut                               | Action                                                         |
 | -------------------------------------- | -------------------------------------------------------------- |
@@ -782,6 +825,7 @@ An ambiguous component (two or more image props) falls through to an insert rath
 | `Shift+Enter`                          | Line break within the block                                    |
 | `Backspace` at a block start           | Join onto the previous block                                   |
 | `Delete` at a block end                | Pull the next block up                                         |
+| `Cmd+C` / `Cmd+X` / `Cmd+V`            | Copy / cut / paste the TEXT selection, never the block         |
 | `Cmd+B` / `Cmd+I` / `` Cmd+` ``        | Bold / italic / code                                           |
 | `/`                                    | Slash menu (at a block start or after a space)                 |
 | `Escape`                               | Dismiss the caret                                              |
@@ -800,6 +844,29 @@ An ambiguous component (two or more image props) falls through to an insert rath
 | --------------------- | ----------- |
 | `Space` + drag        | Pan canvas  |
 | `Ctrl+scroll` / pinch | Zoom canvas |
+
+### 10.1 Open in Browser
+
+Studio closes the loop from "I changed something" to "I looked at the real page": **Open in Browser**
+(toolbar, beside Save; `Cmd+Shift+O`) hands the active page's BUILT output to the user's own browser
+through the same seam Preview link clicks use (`canvas/preview-navigate.ts`, §4.2), so on desktop it
+reaches the real browser rather than a webview.
+
+The URL is the canvas origin (the server already serving the project) plus the compiler's output
+path for the document's route — `dist/<route>/index.html`, or `dist/<route>.html` under
+`build.trailingSlash: "never"`. The action is never hidden: when a page cannot be resolved it renders
+**disabled with the reason in its tooltip**, one of —
+
+| Condition                       | Reason                                                            |
+| ------------------------------- | ----------------------------------------------------------------- |
+| No open document                | Open a page to view it in a browser.                              |
+| Project is not a site           | This project does not build a site.                               |
+| Document is not under `pages/`  | Only pages have a route — `<path>` is not under pages/.           |
+| Catch-all route (`[...rest]`)   | Catch-all routes match many pages — open a generated one instead. |
+| Dynamic route with unset params | Pick a value for `:<param>` to open one of this route's pages.    |
+| Canvas origin is not `http(s)`  | No local server is serving this project yet.                      |
+
+Invoked by chord while blocked, the reason goes to the status bar instead of opening nothing.
 
 ---
 

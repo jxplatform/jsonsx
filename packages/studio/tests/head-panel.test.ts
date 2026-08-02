@@ -277,7 +277,9 @@ describe("custom $head entries", () => {
   test("shows empty message when there are no custom entries", async () => {
     const { container } = await renderHead({ $head: [...managed], tagName: "div" });
     const section = sectionByTitle(container, "Custom Tags")!;
-    expect(section.querySelector(".imports-empty")?.textContent).toBe("No custom tags");
+    expect(section.querySelector(".empty-state-message")?.textContent).toContain(
+      "Custom tags add your own meta, link and script elements",
+    );
     expect(section.querySelector(".imports-count")?.textContent).toBe("0");
   });
 

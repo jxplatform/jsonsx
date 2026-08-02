@@ -27,7 +27,8 @@
         <div id="right-panel"></div>
         <div id="resize-chat" class="resize-handle"></div>
         <div id="chat-panel"></div>
-        <div id="statusbar"></div>
+        <!-- The app's only status channel: announce what lands in it (spec §12 region ⑫). -->
+        <div id="statusbar" role="status" aria-live="polite"></div>
       </div>
       <div
         id="layer-popover"

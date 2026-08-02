@@ -17,7 +17,8 @@ import {
   transactDoc,
 } from "../tabs/transact";
 import { activeTab } from "../workspace/workspace";
-import { view } from "../view";
+import { setLayoutSelection, view } from "../view";
+import type { LayoutSelection } from "../view";
 import { componentRegistry } from "../files/components";
 import { widgetForType } from "./style-inputs";
 import { renderFieldRow } from "../ui/field-row";
@@ -32,6 +33,12 @@ import {
 } from "../utils/studio-utils";
 import { classifyHref, composeHref } from "../utils/link-target";
 import type { LinkKind } from "../utils/link-target";
+import {
+  clickAnythingTo,
+  openPageAction,
+  renderEmptyState,
+  staleSelectionMessage,
+} from "./empty-state";
 import { collectCssParts, isCustomElementDoc } from "./signals-panel";
 import { mediaDisplayName } from "./shared";
 import { getCssInitialMap } from "./style-utils";
@@ -413,7 +420,10 @@ function renderComponentPropsFieldsTemplate(
   const tab = activeTab.value;
   const comp = componentRegistry.find((c) => c.tagName === node.tagName);
   if (!comp || !comp.props) {
-    return html`<div class="empty-state">Component not found</div>`;
+    return renderEmptyState({
+      compact: true,
+      message: "This component is not in the project's library, so it has no settings to show.",
+    });
   }
   const isNpm = comp.source === "npm";
   const currentVals = isNpm ? node.attributes || {} : node.$props || {};
@@ -542,7 +552,14 @@ function renderComponentPropsFieldsTemplate(
         `;
       },
     )}
-    ${comp.props.length === 0 ? html`<div class="empty-state">No props defined</div>` : nothing}
+    ${
+      comp.props.length === 0
+        ? renderEmptyState({
+            compact: true,
+            message: "This component has no settings to fill in yet.",
+          })
+        : nothing
+    }
     ${
       comp.path
         ? html`<span class="kv-add" @click=${() => navigateToComponent(comp.path!)}
@@ -1075,14 +1092,35 @@ function renderPageSection(node: JxMutableNode) {
 
 // ─── Layout selection panel ─────────────────────────────────────────────────
 
-function renderLayoutSelectionPanel(ctx: { navigateToComponent: (path: string) => void }) {
-  const { el, layoutPath } = view.layoutSelection as {
-    el: HTMLElement;
-    layoutPath: string;
-  };
-  const tagName = el?.tagName?.toLowerCase() || "element";
-  const className = el?.className || "";
-  const displayPath = layoutPath || "layout";
+/**
+ * Open the layout file the selection came from, WITH the clicked node selected.
+ *
+ * `navigateToComponent` swaps the tab's document (pushing the page onto the document stack) and
+ * clears the selection, so the node has to be re-selected once it resolves — otherwise "Open Layout
+ * →" dropped the author into a layout file with nothing selected and left them to find the header
+ * again by eye. The layout selection is released either way: the layout is now the open document,
+ * so its nodes are ordinary editable content.
+ */
+async function openLayoutAtNode(
+  navigate: (path: string) => void | Promise<void>,
+  selection: LayoutSelection,
+): Promise<void> {
+  await navigate(selection.layoutFile || "layout");
+  setLayoutSelection(null);
+  const tab = activeTab.value;
+  if (tab && tab.documentPath === selection.layoutFile) {
+    tab.session.selection = selection.layoutPath;
+  }
+  renderOnly("rightPanel");
+}
+
+function renderLayoutSelectionPanel(ctx: {
+  navigateToComponent: (path: string) => void | Promise<void>;
+}) {
+  const selection = view.layoutSelection as LayoutSelection;
+  const tagName = selection.tagName || "element";
+  const { className } = selection;
+  const displayPath = selection.layoutFile || "layout";
 
   return html`
     <div class="style-sidebar">
@@ -1113,9 +1151,12 @@ function renderLayoutSelectionPanel(ctx: { navigateToComponent: (path: string) =
                 : nothing
             }
             <div style="font-size:10px;color:var(--fg-dim);padding:4px 0;font-style:italic">
-              This element is part of the page layout. Edit it by opening the layout file.
+              This element comes from ${displayPath}, which wraps every page that uses it. Open the
+              layout to edit it.
             </div>
-            <span class="kv-add" @click=${() => ctx.navigateToComponent(displayPath)}
+            <span
+              class="kv-add"
+              @click=${() => void openLayoutAtNode(ctx.navigateToComponent, selection)}
               >Open Layout →</span
             >
           </div>
@@ -1137,7 +1178,10 @@ export function renderPropertiesPanelTemplate(ctx: {
 }) {
   const tab = activeTab.value;
   if (!tab) {
-    return html`<div class="empty-state">No document loaded</div>`;
+    return renderEmptyState({
+      actions: [openPageAction()],
+      message: "Open a page to inspect and style what you click.",
+    });
   }
 
   // Layout element selected — show read-only info with link to open layout
@@ -1146,11 +1190,11 @@ export function renderPropertiesPanelTemplate(ctx: {
   }
 
   if (!tab.session.selection) {
-    return html`<div class="empty-state">Select an element to inspect</div>`;
+    return renderEmptyState({ message: clickAnythingTo("edit its content") });
   }
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
   if (!node) {
-    return html`<div class="empty-state">Node not found</div>`;
+    return renderEmptyState({ message: staleSelectionMessage() });
   }
 
   const path = tab.session.selection;
@@ -1366,7 +1410,7 @@ export function renderPropertiesPanelTemplate(ctx: {
               node.$id
                 ? html`<span
                     class="set-dot"
-                    title="Clear $id"
+                    title="Clear ID"
                     @click=${(e: Event) => {
                       e.stopPropagation();
                       transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "$id"));
@@ -1470,7 +1514,7 @@ export function renderPropertiesPanelTemplate(ctx: {
 
   const repeaterT = isMapNode
     ? html`
-        <sp-accordion-item label="Repeater" open>
+        <sp-accordion-item label="Repeating list" open>
           <div class="style-section-body">
             ${renderRepeaterFieldsTemplate(node, path, mapSignals)}
           </div>
@@ -1480,7 +1524,7 @@ export function renderPropertiesPanelTemplate(ctx: {
 
   const switchT = isSwitchNode
     ? html`
-        <sp-accordion-item label="Switch" open>
+        <sp-accordion-item label="Condition" open>
           <div class="style-section-body">
             ${renderSwitchFieldsTemplate(node, path, mapSignals)}
           </div>
@@ -1500,9 +1544,12 @@ export function renderPropertiesPanelTemplate(ctx: {
               <div class="style-section-body">
                 ${
                   entries.length === 0
-                    ? html`<div class="empty-state">
-                        No attributes declared. Set "attribute" on a state entry.
-                      </div>`
+                    ? renderEmptyState({
+                        compact: true,
+                        message:
+                          "Attributes let a page set this component from markup. " +
+                          'Name an "attribute" on a data entry to expose it here.',
+                      })
                     : entries.map(([key, d]) => {
                         const def = d as Record<string, unknown>;
                         return html`
@@ -1542,7 +1589,7 @@ export function renderPropertiesPanelTemplate(ctx: {
 
   const compPropsT = isCustomInstance
     ? html`
-        <sp-accordion-item label="Component Props" open>
+        <sp-accordion-item label="Component Settings" open>
           <div class="style-section-body">
             ${renderComponentPropsFieldsTemplate(node, path, mapSignals, ctx.navigateToComponent)}
           </div>

@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 /**
- * Settings modal — site-wide project settings (CSS variables, definitions, content types, head,
+ * Settings modal — site-wide project settings (CSS variables, data shapes, content types, head,
  * general). Modeled after VS Code / Obsidian settings panels: left sidebar nav + right content
  * area. Sections come from a registry: built-ins register at module init, and extensions add
  * descriptor-contributed sections through `registerSettingsSection`.
@@ -84,7 +84,7 @@ registerSettingsSection({
 registerSettingsSection({
   icon: "sp-icon-data",
   key: "definitions",
-  label: "Definitions",
+  label: "Data Shapes",
   order: 40,
   render: renderDefsEditor,
 });

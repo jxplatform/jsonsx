@@ -1111,6 +1111,116 @@ describe("design mode", () => {
   });
 });
 
+// ─── Fit on entering a panzoom mode ───────────────────────────────────────────
+// Design used to open at 100%, so a 1280px artboard landed clipped mid-word in a ~700px pane.
+
+describe("fit on entering Design", () => {
+  /** Give the (layout-less) canvas wrap a measurable viewport. */
+  function sizeViewport(width: number, height = 600) {
+    Object.defineProperty(canvasWrap, "clientWidth", { configurable: true, value: width });
+    Object.defineProperty(canvasWrap, "clientHeight", { configurable: true, value: height });
+  }
+
+  test("scales a wide artboard down to the pane on the mode transition", async () => {
+    sizeViewport(700);
+    openSyncedTab({
+      $media: { "--": "1280px" },
+      children: [{ tagName: "p", textContent: "Hello" }],
+      tagName: "div",
+    } as never);
+    renderCanvas();
+    await flush();
+    // 1280 + 32 padding = 1312 of artboard in 700px of pane.
+    expect(zoom).toBeCloseTo(700 / 1312);
+  });
+
+  test("a re-render in the same mode does not re-fit over the author's zoom", async () => {
+    sizeViewport(700);
+    openSyncedTab({
+      $media: { "--": "1280px" },
+      children: [{ tagName: "p", textContent: "Hello" }],
+      tagName: "div",
+    } as never);
+    renderCanvas();
+    await flush();
+    zoom = 1;
+    renderCanvas();
+    await flush();
+    expect(zoom).toBe(1);
+  });
+
+  test("stylebook entry fits too — its specimen sheet is the same artboard", async () => {
+    sizeViewport(700);
+    // The real renderStylebookMode builds the panzoom surface; the mock stands in for it.
+    renderStylebookMode.mockImplementation(() => {
+      const wrap = document.createElement("div");
+      canvasWrap.append(wrap);
+      view.panzoomWrap = wrap as HTMLDivElement;
+      canvasPanels.push({ _width: 800 } as never);
+    });
+    try {
+      openSyncedTab();
+      setMode("stylebook");
+      renderCanvas();
+      await flush();
+      // The specimen sheet (800) + 32 padding of artboard in 700px of pane.
+      expect(zoom).toBeCloseTo(700 / 832);
+    } finally {
+      renderStylebookMode.mockImplementation(() => {});
+    }
+  });
+});
+
+// ─── Preview: a real, scrolling frame ─────────────────────────────────────────
+
+describe("preview mode", () => {
+  test("renders one full-bleed stage with no panzoom transform", async () => {
+    openSyncedTab();
+    setMode("preview");
+    renderCanvas();
+    await flush();
+
+    expect(canvasWrap.querySelector(".preview-stage")).not.toBeNull();
+    expect(canvasWrap.querySelector(".panzoom-wrap")).toBeNull();
+    expect(view.panzoomWrap).toBeNull();
+    expect(canvasPanels.length).toBe(1);
+    const panel = canvasPanels[0] as unknown as CanvasPanel;
+    expect(panel.element?.classList.contains("full-width")).toBe(true);
+    expect(panel.canvas?.querySelector("p")?.textContent).toBe("Hello");
+  });
+
+  test("entering and leaving preview is a real mode transition", async () => {
+    openSyncedTab();
+    renderCanvas();
+    await flush();
+    expect(canvasWrap.querySelector(".panzoom-wrap")).not.toBeNull();
+
+    // The effective mode flips while the BASE mode stays "design" — the preview toggle.
+    canvasModeFn = () => "preview";
+    renderCanvas();
+    await flush();
+    expect(canvasWrap.querySelector(".preview-stage")).not.toBeNull();
+    expect(canvasWrap.querySelector(".panzoom-wrap")).toBeNull();
+
+    canvasModeFn = () => canvasMode;
+    renderCanvas();
+    await flush();
+    expect(canvasWrap.querySelector(".preview-stage")).toBeNull();
+    expect(canvasWrap.querySelector(".panzoom-wrap")).not.toBeNull();
+  });
+
+  test("preview over a base of edit still gets the stage, not the edit column", async () => {
+    openSyncedTab();
+    setMode("edit");
+    canvasModeFn = () => "preview";
+    renderCanvas();
+    await flush();
+    expect(canvasWrap.querySelector(".preview-stage")).not.toBeNull();
+    expect(canvasWrap.querySelector(".content-edit-canvas")).toBeNull();
+    canvasModeFn = () => canvasMode;
+  });
+});
+
 // ─── Stylebook mode ───────────────────────────────────────────────────────────
 
 describe("stylebook mode", () => {

@@ -17,13 +17,20 @@ import { collabState } from "../collab/collab-state";
 import { presenceChipsTemplate } from "../collab/presence-chips";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
-import { applyPanelCollapse, view } from "../view";
+import { applyPanelCollapse, onPanelCollapse, view } from "../view";
 import { clearRecentProjects, getRecentProjects, removeRecentProject } from "../recent-projects";
 import { openQuickSearch } from "./quick-search";
 import { getPlatform } from "../platform";
 import { refreshGitStatus } from "./git-panel";
 import { openBrowseModal } from "../browse/browse-modal";
 import { openNewProjectModal } from "../new-project/new-project-modal";
+import { canvasBaseOrigin } from "../canvas/canvas-origin";
+import { getPreviewNavigateHandler } from "../canvas/preview-navigate";
+import { documentUrlPattern, dynamicRouteParams } from "../page-params";
+import { projectState } from "../state";
+import { isModalOpen } from "../ui/layers";
+import { statusMessage } from "./statusbar";
+import type { Tab } from "../tabs/tab";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
 
@@ -58,6 +65,9 @@ function isMacPlatform(): boolean {
 
 let _scope: EffectScope | null = null;
 
+/** Drops the panel-collapse subscription registered in {@link mount}. */
+let _unsubscribeCollapse: (() => void) | null = null;
+
 const toolbarIconMap = {
   "sp-icon-artboard": html`<sp-icon-artboard slot="icon"></sp-icon-artboard>`,
   "sp-icon-brush": html`<sp-icon-brush slot="icon"></sp-icon-brush>`,
@@ -66,6 +76,7 @@ const toolbarIconMap = {
   "sp-icon-document": html`<sp-icon-document slot="icon"></sp-icon-document>`,
   "sp-icon-duplicate": html`<sp-icon-duplicate slot="icon"></sp-icon-duplicate>`,
   "sp-icon-edit": html`<sp-icon-edit slot="icon"></sp-icon-edit>`,
+  "sp-icon-export": html`<sp-icon-export slot="icon"></sp-icon-export>`,
   "sp-icon-folder-open": html`<sp-icon-folder-open slot="icon"></sp-icon-folder-open>`,
   "sp-icon-gears": html`<sp-icon-gears slot="icon"></sp-icon-gears>`,
   "sp-icon-preview": html`<sp-icon-preview slot="icon"></sp-icon-preview>`,
@@ -89,6 +100,116 @@ function tbBtnTpl(label: string, onClick: () => void, iconTag?: string) {
   `;
 }
 
+// ─── View: Open in Browser ───────────────────────────────────────────────────
+
+/** Where `View: Open in Browser` would go, or the sentence explaining why it cannot go anywhere. */
+export type BrowserTarget = { url: string } | { reason: string };
+
+/**
+ * Resolve the active document's built page to a URL on the server already serving this project.
+ *
+ * The origin is the canvas's own ({@link canvasBaseOrigin}) — the one a Preview link click resolves
+ * against — and the path mirrors the compiler's `routeToOutputPath` exactly, so `/blog/hello/` asks
+ * for `dist/blog/hello/index.html` under `trailingSlash: "always"` and `dist/blog/hello.html` under
+ * `"never"`. Every server Studio runs against (the monorepo dev server via its active-project
+ * fallback, `jx dev` via its root, the desktop loopback project server) serves that path.
+ *
+ * Everything that is not a page resolves to a REASON rather than to nothing: a disabled control the
+ * user can hover is discoverable, an absent one is not.
+ */
+export function openInBrowserTarget(tab: Tab | null): BrowserTarget {
+  const documentPath = tab?.documentPath?.replace(/^\.\//, "");
+  if (!documentPath) {
+    return { reason: "Open a page to view it in a browser." };
+  }
+  if (!projectState?.isSiteProject) {
+    return { reason: "This project does not build a site." };
+  }
+  if (!documentPath.startsWith("pages/")) {
+    return { reason: `Only pages have a route — ${documentPath} is not under pages/.` };
+  }
+  let route = documentUrlPattern(documentPath);
+  if (route.includes("*")) {
+    return { reason: "Catch-all routes match many pages — open a generated one instead." };
+  }
+  const params = dynamicRouteParams(documentPath);
+  if (params.length > 0) {
+    const chosen = (tab?.session.ui.previewParams ?? {}) as Record<string, string>;
+    const missing = params.filter((name) => !chosen[name]);
+    if (missing.length > 0) {
+      const names = missing.map((name) => `:${name}`).join(", ");
+      return { reason: `Pick a value for ${names} to open one of this route's pages.` };
+    }
+    route = route.replaceAll(/:(\w+)/g, (_m, name: string) => encodeURIComponent(chosen[name]!));
+  }
+  const origin = canvasBaseOrigin();
+  if (!origin.startsWith("http://") && !origin.startsWith("https://")) {
+    return { reason: "No local server is serving this project yet." };
+  }
+  const trailingSlash = projectState.projectConfig?.build?.trailingSlash ?? "always";
+  const output =
+    route === "/"
+      ? "/index.html"
+      : trailingSlash === "always"
+        ? `${route}/index.html`
+        : `${route}.html`;
+  return { url: `${origin}/dist${output}` };
+}
+
+/**
+ * Hand a URL to the user's real browser.
+ *
+ * Reuses the seam the desktop launchers already register for Preview link clicks
+ * (`canvas/preview-navigate.ts`), which routes through the OS rather than navigating a webview with
+ * no address bar; the browser build falls back to a new tab.
+ */
+function openUrlExternally(url: string) {
+  const override = getPreviewNavigateHandler();
+  if (override) {
+    override(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+/** Run `View: Open in Browser`, reporting the blocking reason when there is one. */
+function runOpenInBrowser() {
+  const target = openInBrowserTarget(activeTab.value ?? null);
+  if ("url" in target) {
+    openUrlExternally(target.url);
+    return;
+  }
+  statusMessage(target.reason);
+}
+
+/**
+ * The Open in Browser control. Never absent: with no page resolvable it renders disabled and states
+ * why in its tooltip, because "the button is missing" is not a thing a user can act on.
+ */
+function openInBrowserTpl(tab: Tab | null) {
+  const target = openInBrowserTarget(tab);
+  const reason = "reason" in target ? target.reason : null;
+  return html`
+    <sp-action-button
+      size="s"
+      title=${reason ? `Open in Browser — ${reason}` : "Open in Browser (⌘⇧O)"}
+      ?disabled=${Boolean(reason)}
+      @click=${runOpenInBrowser}
+    >
+      ${toolbarIconMap["sp-icon-export"]}<span class="tb-label">Open in Browser</span>
+    </sp-action-button>
+  `;
+}
+
+/** ⌘⇧O / Ctrl+Shift+O. Shift makes `e.key` "O", so the ⌘O in editor/shortcuts.ts never sees it. */
+function onToolbarKeydown(e: KeyboardEvent) {
+  if (isModalOpen() || !(e.metaKey || e.ctrlKey) || !e.shiftKey || e.key.toLowerCase() !== "o") {
+    return;
+  }
+  e.preventDefault();
+  runOpenInBrowser();
+}
+
 /**
  * Mount the toolbar panel.
  *
@@ -105,6 +226,14 @@ export function mount(rootEl: HTMLElement, ctx: ToolbarCtx) {
   ) {
     rootEl.classList.add("electrobun-webkit-app-region-drag");
   }
+  document.addEventListener("keydown", onToolbarKeydown);
+  /* The effect below can only track REACTIVE state, and `view` is a plain object — so flipping a
+     dock from anywhere but this module's own click handlers (the automation runner, the New
+     Project agent hand-off, the boot-time restore) repositioned the panels and left the rail/chat
+     icons showing the opposite state. Subscribe to the change instead. RESIDUE FOR P2: when
+     `shell.ts` owns dock visibility reactively, this subscription and the explicit render() calls
+     in the two toggle handlers all go away. */
+  _unsubscribeCollapse = onPanelCollapse(render);
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -118,6 +247,8 @@ export function mount(rootEl: HTMLElement, ctx: ToolbarCtx) {
         void tab.session.ui.canvasMode;
         void tab.session.ui.editingFunction;
         void tab.session.ui.featureToggles;
+        // Open in Browser needs a value for every route param before it can resolve a page.
+        void tab.session.ui.previewParams;
         void tab.session.ui.rightTab;
         void tab.session.ui.gitStatus;
         void tab.history.index;
@@ -131,6 +262,9 @@ export function mount(rootEl: HTMLElement, ctx: ToolbarCtx) {
 }
 
 export function unmount() {
+  document.removeEventListener("keydown", onToolbarKeydown);
+  _unsubscribeCollapse?.();
+  _unsubscribeCollapse = null;
   _scope?.stop();
   _scope = null;
   _rootEl = null;
@@ -281,6 +415,7 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
     <sp-action-button size="s" title="Save" disabled>
       ${toolbarIconMap["sp-icon-save-floppy"]}<span class="tb-label">Save</span>
     </sp-action-button>
+    ${openInBrowserTpl(null)}
     <sp-action-group compact size="s">
       <sp-action-button size="s" title="Undo" disabled>
         ${toolbarIconMap["sp-icon-undo"]}<span class="tb-label">Undo</span>
@@ -524,6 +659,7 @@ function toolbarTemplate() {
     <sp-action-button size="s" title="Save" ?disabled=${!canSave} @click=${ctx.saveFile}>
       ${toolbarIconMap["sp-icon-save-floppy"]}<span class="tb-label">Save</span>
     </sp-action-button>
+    ${openInBrowserTpl(tab)}
     <sp-action-group compact size="s">
       <sp-action-button
         size="s"

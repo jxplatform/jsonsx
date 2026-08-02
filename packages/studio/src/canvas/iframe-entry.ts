@@ -49,6 +49,7 @@ import type {
   DragSrcKind,
   FileDropHit,
   IframeToParent,
+  LayoutHit,
   ParentToIframe,
 } from "./iframe-protocol";
 import type { JxDocument, JxMutableNode, JxStyle } from "@jxsuite/schema/types";
@@ -107,6 +108,34 @@ export function fileDropHitFor(
     path,
     rect: rectFor(targetEl),
     tagName: (node?.tagName ?? targetEl.tagName).toLowerCase(),
+  };
+}
+
+/**
+ * Resolve a click to the layout-chrome node it landed on, or null when it did not land on one.
+ *
+ * Page content wins outright: a `[data-jx-path]` ancestor means the runtime rendered this node from
+ * the page document, and {@link file://./iframe-interaction.ts} already reports it as a normal
+ * `hit`. Only when no page node claims the click does the nearest `[data-jx-layout-region]` — the
+ * dimmed, frozen chrome the layout contributed — answer for it.
+ */
+export function layoutHitFor(target: EventTarget | null): LayoutHit | null {
+  if (!(target instanceof Element)) {
+    return null;
+  }
+  if (target.closest("[data-jx-path]")) {
+    return null;
+  }
+  const el = target.closest("[data-jx-layout-region]");
+  if (!(el instanceof HTMLElement)) {
+    return null;
+  }
+  return {
+    className: typeof el.className === "string" ? el.className : "",
+    layoutFile: el.dataset.jxLayoutFile ?? "",
+    layoutPath: parseJxPath(el.dataset.jxLayoutPath ?? "[]"),
+    rect: rectFor(el),
+    tagName: el.tagName.toLowerCase(),
   };
 }
 
@@ -280,9 +309,27 @@ export function startCanvasIframe(opts: {
     getMode: () => currentMode,
     getShadowDoc: () => shadowDoc,
   });
+  // Report clicks that land on LAYOUT chrome. The interaction wiring above only knows about
+  // `[data-jx-path]` nodes, and layout chrome has none — so this is the listener that makes "My
+  // Site" in the header answer a click at all. It runs in CAPTURE alongside the interaction click
+  // Handler; the two are disjoint by construction (`layoutHitFor` refuses anything a page node
+  // Claims), so exactly one of them posts per click.
+  const onLayoutClick = (e: Event) => {
+    if (currentMode !== "design" && currentMode !== "edit") {
+      return;
+    }
+    const hit = layoutHitFor(e.target);
+    if (hit) {
+      channel.post({ hit, kind: "layoutHit" });
+    }
+  };
+  container.ownerDocument.addEventListener("click", onLayoutClick, true);
   // Forward global-shortcut keystrokes to the parent — its shortcut handler is bound to the editor
   // Document, so without this they'd be swallowed whenever focus is inside the canvas iframe.
-  const stopKeyForwarding = startKeyForwarding(channel, container.ownerDocument);
+  // `isEditing` is the real "is a caret session live" predicate: the canvas root is PERMANENTLY
+  // Contenteditable, so "the target is editable" is true even with no session, and the clipboard
+  // Chords have to be split on the session — not on editability — to reach the right owner.
+  const stopKeyForwarding = startKeyForwarding(channel, container.ownerDocument, isEditing);
   // Run inline editing (contenteditable) here, posting committed/split/insert results to the parent.
   // The shadow-doc accessor gates prop-bound sessions on the RAW instance prop value (template/$ref
   // Valued props render display sugar and must not be plain-text edited).
@@ -325,7 +372,16 @@ export function startCanvasIframe(opts: {
   // The iframe is sized to its content (never scrolls itself), so wheel events over it are meant for
   // The parent canvas: ctrl/cmd+wheel = zoom, plain = pan. A cross-origin OOPIF doesn't bubble wheel to
   // The parent, so forward the deltas + modifiers + cursor; the host redispatches to its wheel handler.
+  //
+  // PREVIEW is the exception, and it is not a small one. There the host keeps the iframe at the
+  // Preview stage's own height and the document scrolls FOR REAL, which is the whole point of the
+  // View — sticky headers, scroll-driven animation and IntersectionObserver reveals only fire when
+  // Something actually scrolls. Swallowing the wheel here (this handler used to preventDefault
+  // Unconditionally) made the one view whose job is fidelity the one view you could not scroll.
   const onWheel = (e: WheelEvent) => {
+    if (currentMode === "preview") {
+      return;
+    }
     e.preventDefault();
     channel.post({
       ctrlKey: e.ctrlKey,
@@ -683,6 +739,7 @@ export function startCanvasIframe(opts: {
     stopImageRetry();
     stopAutoScroll();
     heightObserver?.disconnect();
+    container.ownerDocument.removeEventListener("click", onLayoutClick, true);
     container.ownerDocument.removeEventListener("wheel", onWheel);
     container.ownerDocument.removeEventListener("dragenter", onNativeDragOver, true);
     container.ownerDocument.removeEventListener("dragleave", onNativeDragLeave, true);

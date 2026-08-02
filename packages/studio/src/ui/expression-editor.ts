@@ -7,6 +7,7 @@ import { renderFieldRow } from "./field-row";
 import { renderFormulaChips } from "./formula-chips";
 import { applyCatalogPick, calleeEntry, formulaCatalog } from "./formula-catalog";
 import { openFormulaPalette } from "./formula-palette";
+import { renderEmptyState } from "../panels/empty-state";
 
 import type {
   JxExpressionNode,
@@ -343,6 +344,16 @@ function renderRefPicker(
   const allRefs = [...stateRefs, ...eventRefs];
   const isCustom = refVal && !allRefs.includes(refVal);
 
+  // Nothing to pick and nothing already picked: a picker whose only entry is a disabled "No state
+  // Defined" is a dead end. Say what a binding is instead, in the shell's one empty-state voice.
+  if (allRefs.length === 0 && !refVal) {
+    return renderEmptyState({
+      compact: true,
+      detail: "Add one in the State panel and it shows up here.",
+      message: "A binding points at a value this page holds.",
+    });
+  }
+
   return html`
     <sp-picker
       size="s"
@@ -357,13 +368,9 @@ function renderRefPicker(
         onRefChange(val);
       }}
     >
-      ${
-        stateRefs.length > 0
-          ? stateRefs.map(
-              (r) => html`<sp-menu-item value=${r}>${r.replace("#/state/", "")}</sp-menu-item>`,
-            )
-          : html`<sp-menu-item disabled>No state defined</sp-menu-item>`
-      }
+      ${stateRefs.map(
+        (r) => html`<sp-menu-item value=${r}>${r.replace("#/state/", "")}</sp-menu-item>`,
+      )}
       ${
         eventRefs.length > 0
           ? html`

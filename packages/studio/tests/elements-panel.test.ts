@@ -254,3 +254,32 @@ describe("renderElementsTemplate — components section", () => {
     expect(view.elementsCollapsed.has("Components")).toBe(false);
   });
 });
+
+describe("renderElementsTemplate — empty states", () => {
+  test("a filter that matches nothing says so and offers to clear itself", async () => {
+    let rerenders = 0;
+    view.elementsFilter = "zzz";
+    await renderElements(() => {
+      rerenders += 1;
+    });
+    expect(host.querySelector(".empty-state-message")?.textContent).toBe(
+      "Nothing here matches \u201Czzz\u201D.",
+    );
+    (host.querySelector(".empty-state-action") as HTMLElement).click();
+    expect(view.elementsFilter).toBe("");
+    expect(rerenders).toBe(1);
+  });
+
+  test("an empty palette teaches what the region is for, with no action to offer", async () => {
+    const tpl = renderElementsTemplate({
+      defaultDef,
+      rerender: () => {},
+      webdata: { elements: {} },
+    });
+    await renderInto(tpl, host);
+    expect(host.querySelector(".empty-state-message")?.textContent).toContain(
+      "Elements you can drop onto the page live here",
+    );
+    expect(host.querySelector(".empty-state-action")).toBeNull();
+  });
+});

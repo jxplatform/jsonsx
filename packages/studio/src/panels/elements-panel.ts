@@ -8,6 +8,7 @@ import { mutateInsertNode, transactDoc } from "../tabs/transact";
 import { view } from "../view";
 import { getEffectiveElements } from "../site-context";
 import { buildComponentInstance, componentRegistry } from "../files/components";
+import { renderEmptyState } from "./empty-state";
 
 import type { ComponentEntry } from "../files/components";
 import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
@@ -155,6 +156,9 @@ export function renderElementsTemplate(ctx: {
         `
       : nothing;
 
+  const nothingToShow =
+    componentsAccordion === nothing && categories.every((entry) => entry === nothing);
+
   return html`
     <sp-search
       size="s"
@@ -165,6 +169,30 @@ export function renderElementsTemplate(ctx: {
         ctx.rerender();
       }}
     ></sp-search>
+    ${
+      nothingToShow
+        ? renderEmptyState(
+            view.elementsFilter
+              ? {
+                  actions: [
+                    {
+                      label: "Clear the filter",
+                      run: () => {
+                        view.elementsFilter = "";
+                        ctx.rerender();
+                      },
+                    },
+                  ],
+                  message: `Nothing here matches “${view.elementsFilter}”.`,
+                }
+              : {
+                  message:
+                    "Elements you can drop onto the page live here — " +
+                    "text, images, layout containers and your own components.",
+                },
+          )
+        : nothing
+    }
     <sp-accordion class="elements-list" allow-multiple
       >${componentsAccordion}${categories}</sp-accordion
     >

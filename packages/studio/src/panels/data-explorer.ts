@@ -4,6 +4,8 @@
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import type { TemplateResult } from "lit-html";
+import { view } from "../view";
+import { renderEmptyState } from "./empty-state";
 
 /** Expanded data entries set — persists across renders. */
 const expandedDataKeys = new Set();
@@ -86,7 +88,19 @@ export function renderDataExplorerTemplate(
     </div>
     ${
       entries.length === 0
-        ? html`<div class="empty-state">No state defined</div>`
+        ? renderEmptyState({
+            actions: [
+              {
+                label: "Define data",
+                run: () => {
+                  // The definitions live one rail tab over; this is the panel that fills this one.
+                  view.leftTab = "state";
+                  renderLeftPanel();
+                },
+              },
+            ],
+            message: "Every value this page defines shows up here with what it resolved to.",
+          })
         : entries.map(([name, def]) => {
             const value = scope[name];
             const unwrapped = unwrapSignal(value);

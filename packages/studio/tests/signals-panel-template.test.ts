@@ -184,10 +184,16 @@ describe("renderSignalsTemplate structure", () => {
     expect(findRow(h.container, "plain")?.querySelector(".signal-badge")?.textContent).toBe("S");
   });
 
-  test("no state → empty-state message and no accordion items", () => {
+  test("no state → the empty state teaches, and its button adds the same def the picker does", () => {
     const h = setup(undefined);
-    expect(h.container.querySelector(".empty-state")?.textContent).toBe("No state defined");
+    expect(h.container.querySelector(".empty-state-message")?.textContent).toContain(
+      "Data lives here",
+    );
     expect(h.container.querySelectorAll("sp-accordion-item").length).toBe(0);
+
+    (h.container.querySelector(".empty-state-action") as HTMLElement).click();
+    expect(docState().$newSignal).toEqual({ default: "", type: "string" } as never);
+    expect(h.calls.left).toBeGreaterThan(0);
   });
 
   test("accordion toggle collapses and re-expands a category", async () => {
@@ -613,7 +619,7 @@ describe("data source editors", () => {
     const h = setup({ $ext: { $prototype: "Widget", $src: "./w.js" } });
     const editor = await expand(h, "$ext");
     expect(editor.querySelector('[data-prop="Source"]')).not.toBeNull();
-    expect(editor.querySelector('[data-prop="Prototype"]')).not.toBeNull();
+    expect(editor.querySelector('[data-prop="Kind"]')).not.toBeNull();
   });
 });
 

@@ -51,7 +51,6 @@ const DATA_FILES = [
      triplets; hexes appear only in the annotation comments. */
   "src/ui/jx-theme.ts",
   /* <input type="color"> needs a real hex default; same category as color-selector.ts. */
-  "src/new-project/design-fields.ts",
   /* Example project.json style block shown to the LLM as prompt content, not actual
      chrome CSS — the hexes are illustrative data, like a colour picker's default. */
   "src/services/ai-system-prompt.ts",
@@ -238,8 +237,6 @@ export const ALLOWED_ORPHANS = new Set<string>([
   // Owner: settings/schema-field-ui.ts
   "schema-field-label",
   "schema-field-ref-target",
-  // Owner: ui/ai-credentials-form.ts
-  "ai-creds-form",
   // Owner: ui/dynamic-slot.ts
   "dynamic-slot",
   "dynamic-slot-mode",

@@ -116,6 +116,35 @@ describe("resolveCanvasDocument", () => {
     expect(result.mapperCtx.pageContentPrefix).not.toBeNull();
   });
 
+  test("marks every layout node with the FILE and its own path inside that file", async () => {
+    // A bare `true` here is what made layout chrome unaddressable: the canvas could tell you had
+    // Clicked something it could not edit, but not what, nor where to go and edit it.
+    resetStudioState({ isSiteProject: true, projectConfig: {} });
+    installMockPlatform({}, { "layouts/base.json": JSON.stringify(LAYOUT) });
+    const result = await resolve(
+      {
+        $layout: "./layouts/base.json",
+        children: [{ tagName: "p", textContent: "Page content" }],
+        tagName: "div",
+      } as unknown as JxMutableNode,
+      { documentPath: "pages/home.json" },
+    );
+    const root = result.renderDoc;
+    // The `./` prefix is stripped, so the marker's file is a path navigateToComponent can open.
+    expect(root.$__layout).toEqual({ file: "layouts/base.json", path: [] });
+    const header = (root.children as JxMutableNode[])[0]!;
+    expect(header.tagName).toBe("header");
+    expect(header.$__layout).toEqual({ file: "layouts/base.json", path: ["children", 0] });
+    // …down through $elements too (component refs the layout brings with it).
+    expect((root.$elements as JxMutableNode[])[0]!.$__layout).toEqual({
+      file: "layouts/base.json",
+      path: ["$elements", 0],
+    });
+    // The page's own node is NOT marked — that is the whole distinction.
+    const main = (root.children as JxMutableNode[])[1]!;
+    expect((main.children as JxMutableNode[])[0]!.$__layout).toBeUndefined();
+  });
+
   test("skips layout wrapping when the tab's showLayout toggle is off", async () => {
     resetStudioState({ isSiteProject: true, projectConfig: {} });
     installMockPlatform({}, { "layouts/base.json": JSON.stringify(LAYOUT) });

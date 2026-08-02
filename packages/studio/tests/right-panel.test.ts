@@ -53,12 +53,27 @@ describe("right panel", () => {
     expect(visible.length).toBe(1);
   });
 
-  test("clears the panel when no tab is active", async () => {
+  test("with no tab it teaches what the inspector needs instead of clearing", async () => {
     closeAllTabs();
     mount(makeCtx() as never);
     render();
     await flush(4);
-    expect(rightPanel.textContent).toBe("");
+    expect(rightPanel.querySelector("sp-tabs")).toBeNull();
+    expect(rightPanel.querySelector(".empty-state-message")?.textContent).toBe(
+      "Open a page to inspect and style what you click.",
+    );
+  });
+
+  test("the no-document state is replaced when a tab opens", async () => {
+    closeAllTabs();
+    mount(makeCtx() as never);
+    render();
+    await flush(4);
+    resetWorkspaceWithTab();
+    render();
+    await flush(4);
+    expect(rightPanel.textContent).not.toContain("Open a page to inspect");
+    expect(rightPanel.querySelector("sp-tabs")).not.toBeNull();
   });
 
   test("routes to events and style tabs", async () => {

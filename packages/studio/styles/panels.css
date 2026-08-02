@@ -6,7 +6,10 @@
    layers drop indicator, the canvas drop indicator, git diff highlighting
    and the insertion helper. The two canvas-side drop affordances live here
    rather than in canvas.css because they are authored inline with the
-   layers drag logic and must keep their original cascade position. */
+   layers drag logic and must keep their original cascade position.
+
+   Also owns the teaching empty-state layout emitted by
+   src/panels/empty-state.ts, which every panel in the shell renders through. */
 
 /* ─── Activity bar (vertical icon tabs) ──────── */
 #activity-bar sp-tabs {
@@ -109,6 +112,12 @@
 }
 .file-tree-item:hover {
   background: var(--hover-bg);
+}
+/* Roving tabindex (src/files/files.ts) moves focus between rows, so the ring is
+   the only thing telling a keyboard user where they are. */
+.file-tree-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 .file-tree-item.selected {
   background: var(--accent-20);
@@ -269,7 +278,10 @@
   font: inherit;
   font-size: inherit;
   padding: 0 2px;
-  outline: none;
+}
+.layer-title-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 .layer-dot {
   font-size: 9px;
@@ -434,12 +446,6 @@
 .import-mono {
   font-family: var(--font-mono, monospace);
 }
-.imports-empty {
-  padding: 8px 12px;
-  font-size: var(--spectrum-font-size-50, 11px);
-  color: var(--text-hint);
-  font-style: italic;
-}
 .import-add-form {
   display: flex;
   align-items: center;
@@ -554,6 +560,50 @@
 .elements-list sp-accordion-item {
   --spectrum-accordion-item-header-font-size: var(--spectrum-font-size-50, 11px);
   border-bottom: 1px solid var(--border);
+}
+
+/* ─── Teaching empty states ──────────────────── */
+/* The one empty-state pattern, emitted by src/panels/empty-state.ts: a sentence
+   saying what the region is for, then the button that fills it. `.empty-state`
+   itself (padding, centring, dimmed colour) is declared in overlays.css; these
+   rules add the teaching layout on top of it, and the compact variant wins on
+   specificity because overlays.css loads last. */
+.empty-state--teach {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.empty-state-message {
+  max-width: 34ch;
+  line-height: 1.5;
+}
+.empty-state-detail {
+  max-width: 34ch;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  opacity: 0.8;
+}
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.empty-state-action {
+  flex: none;
+}
+/* Inline section inside an otherwise populated panel — reads as a note above its
+   own add form rather than as a whole empty region. */
+.empty-state.empty-state--compact {
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.empty-state--compact .empty-state-actions {
+  justify-content: flex-start;
 }
 
 /* ─── Drop indicator ──────────────────────────── */

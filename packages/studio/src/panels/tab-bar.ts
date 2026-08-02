@@ -13,7 +13,13 @@ import { html, render as litRender, nothing } from "lit-html";
 import { projectState, updateUi } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
-import { applyTransform, fitToScreen, resetZoom, setEditZoom } from "../canvas/canvas-utils";
+import {
+  fitToScreen,
+  markExplicitZoom,
+  resetZoom,
+  setEditZoom,
+  setUserZoom,
+} from "../canvas/canvas-utils";
 import { getEffectiveLayoutPath, getEffectiveMedia } from "../site-context";
 import { isSchemeQuery } from "../utils/canvas-media";
 import { dynamicRouteParams, loadParamValues, pagePathsDef } from "../page-params";
@@ -219,22 +225,17 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
     `;
   } else if (
     !takeover &&
-    (canvasMode === "design" ||
-      canvasMode === "stylebook" ||
-      canvasMode === "git-diff" ||
-      canvasMode === "preview")
+    (canvasMode === "design" || canvasMode === "stylebook" || canvasMode === "git-diff")
   ) {
+    // Preview is deliberately absent: its frame is a real viewport that scrolls its own document,
+    // Not an artboard on a pan/zoom surface, so there is nothing here to zoom.
     const zoom = S.ui.zoom ?? 1;
-    const setPanZoom = (next: number) => {
-      tab.session.ui.zoom = Math.min(5, Math.max(0.05, next));
-      applyTransform();
-    };
     zoomTpl = html`
       <sp-action-group compact size="s" class="tb-zoom">
         <sp-action-button
           size="s"
           title="Zoom out (Ctrl+-)"
-          @click=${() => setPanZoom((tab.session.ui.zoom ?? 1) / 1.2)}
+          @click=${() => setUserZoom((tab.session.ui.zoom ?? 1) / 1.2)}
         >
           −
         </sp-action-button>
@@ -242,18 +243,28 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
           size="s"
           class="tb-zoom-label"
           title="Reset to 100% (Ctrl+0)"
-          @click=${() => resetZoom()}
+          @click=${() => {
+            markExplicitZoom();
+            resetZoom();
+          }}
         >
           ${Math.round(zoom * 100)}%
         </sp-action-button>
         <sp-action-button
           size="s"
           title="Zoom in (Ctrl+=)"
-          @click=${() => setPanZoom((tab.session.ui.zoom ?? 1) * 1.2)}
+          @click=${() => setUserZoom((tab.session.ui.zoom ?? 1) * 1.2)}
         >
           +
         </sp-action-button>
-        <sp-action-button size="s" title="Fit to screen" @click=${() => fitToScreen()}>
+        <sp-action-button
+          size="s"
+          title="Fit to screen"
+          @click=${() => {
+            markExplicitZoom();
+            fitToScreen();
+          }}
+        >
           Fit
         </sp-action-button>
       </sp-action-group>

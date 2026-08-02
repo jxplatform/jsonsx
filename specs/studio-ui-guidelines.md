@@ -82,21 +82,26 @@ Use CSS custom properties from `:root` — never hardcode color values.
 ### 3.1 Application Grid
 
 ```
-┌──────────┬────────────┬────────────────────┬──────────────┐
-│ Toolbar  │            │                    │              │  36px
-├──────────┼────────────┼────────────────────┼──────────────┤
-│ Activity │   Left     │      Canvas        │   Right      │  flex
-│ Bar      │   Panel    │                    │   Panel      │
-│ (48px)   │  (240px)   │       (1fr)        │   (280px)    │
-├──────────┼────────────┼────────────────────┼──────────────┤
-│ Status   │            │                    │              │  24px
-└──────────┴────────────┴────────────────────┴──────────────┘
+┌──────────┬────────────┬────────────────────┬──────────────┬───────────────┐
+│ Toolbar                                                                   │  36px
+├──────────┴────────────┴────────────────────┴──────────────┴───────────────┤
+│ Tab strip / context bar / frontmatter (full-width, each conditional)      │  auto
+├──────────┬────────────┬────────────────────┬──────────────┬───────────────┤
+│ Activity │   Left     │      Canvas        │   Right      │  Assistant    │  flex
+│ Bar      │   Panel    │                    │   Panel      │  (collapsed   │
+│ (48px)   │  (240px)   │       (1fr)        │   (280px)    │   by default) │
+├──────────┴────────────┴────────────────────┴──────────────┴───────────────┤
+│ Status bar                                                                │  24px
+└───────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Panel widths: `--panel-w-left: 240px`, `--panel-w-right: 280px`
+- Panel widths: `--panel-w-left: 240px`, `--panel-w-right: 280px`, `--panel-w-chat: 320px`
 - Activity bar: 48px wide, icon tabs (48x48px each)
 - Toolbar height: 36px
-- Status bar height: 24px
+- Status bar height: 24px — `role="status"` + `aria-live="polite"`, the app's one status channel
+- A collapsed column sets its width variable to `0px` and `display: none`s the region and its resize
+  handle. The assistant column starts collapsed; every column's state round-trips through
+  `localStorage` in both directions (a remembered "open" must reopen a default-closed column)
 
 ### 3.2 Panel Structure
 
@@ -543,6 +548,14 @@ When building new UI in Studio, verify:
 - [ ] Event handlers call `e.stopPropagation()` when wrapping Spectrum events in light DOM components
 - [ ] Text entry and confirmation go through `ui/layers.ts` (§8.7) — never `prompt()`, `confirm()`, or `alert()`
 - [ ] `sp-dialog-wrapper` labels use kebab-case attributes (`confirm-label`, not `confirmLabel`)
+- [ ] Every class emitted from TypeScript has a rule in `styles/*.css` — no `style=` attribute doing
+      a stylesheet's job (`scripts/check-styles.ts` fails on orphans, and on allow-list entries that
+      have since been styled)
+- [ ] A control carries ONE accessible name. `title` and `aria-label` with the same string make
+      screen readers announce it twice — pick the one the component actually uses
+- [ ] A control that cannot act renders **disabled with the reason in its tooltip**, never absent
+- [ ] `outline: none` is scoped to `:focus:not(:focus-visible)` and paired with a `:focus-visible`
+      ring — suppressing the ring on plain `:focus` makes the control untraversable by keyboard
 
 ## Changelog
 

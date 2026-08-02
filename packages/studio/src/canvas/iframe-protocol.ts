@@ -240,6 +240,29 @@ export interface DropPreview {
   edge: "top" | "bottom" | "inside";
 }
 
+/**
+ * A click that landed on LAYOUT chrome — a header, a footer, anything the layout file contributes
+ * that is not the page's own content. Such a node has no page-document path, so it can never be a
+ * {@link NodeHit}; it is addressed by the layout FILE it came from plus its path inside that file.
+ *
+ * This is the message that makes the first click a new author makes do something. On a default
+ * project the two most conspicuous strings on the page ("My Site", "Built with Jx") both come from
+ * `layouts/base.json`, and before this existed clicking either one selected nothing, hovered
+ * nothing and posted nothing.
+ */
+export interface LayoutHit {
+  /** Project-relative path of the layout document, e.g. `layouts/base.json`. */
+  layoutFile: string;
+  /** The clicked node's path WITHIN that layout document (what to select once it is open). */
+  layoutPath: (string | number)[];
+  /** The rendered tag, for the panel's `<header>` label. */
+  tagName: string;
+  /** The rendered class list, shown read-only in the panel. */
+  className: string;
+  /** The node's box, in iframe-viewport coords (same convention as {@link NodeHit}). */
+  rect: SerializableRect;
+}
+
 /** A document path plus the iframe-space rect of the node it resolves to. */
 export interface NodeHit {
   path: (string | number)[];
@@ -309,6 +332,10 @@ export type IframeToParent =
   // Render. Posted right after `renderComplete`; values are JSON-safe deep clones (see serialize-scope).
   | { kind: "dataScope"; gen: number; scope: Record<string, unknown> }
   | { kind: "hit"; hit: NodeHit }
+  // A click on layout chrome (see {@link LayoutHit}). Distinct from `hit` because the target is not
+  // In the page document at all: the parent adopts it as `view.layoutSelection` (which shows the
+  // Read-only layout panel with its "Open Layout →" action) rather than as a document selection.
+  | { kind: "layoutHit"; hit: LayoutHit }
   | { kind: "hover"; hit: NodeHit | null }
   // Candidate insertion "+" zones for the hovered node, recomputed on pointermove (cross-origin
   // Cousin of the legacy insertion-helper). `null` clears the "+" (cursor mid-element / left the

@@ -26,6 +26,7 @@ On the left:
 - **Manage** opens the project browser — see [Browse your project](/docs/studio/projects/browse).
 - **Publish** opens the publish panel — see [Git & publish](/docs/studio/publish).
 - **Save** writes the active file to disk. It's only enabled when the file has unsaved changes — Studio never saves on its own. See [Tabs and files](/docs/studio/interface/tabs).
+- **Open in Browser** (:kbd[Cmd+Shift+O]) opens the built version of the page you're editing, at its real route, in your own browser. It's the fastest way to check the actual page rather than the canvas's approximation of it. The button is always there: when the open file has no route it's disabled and its tooltip says why — a component isn't a page, a `[slug]` route needs a value picked in the tab bar first, and a page you haven't built yet has nothing to serve.
 - **Undo** and **Redo** step through the active file's edit history.
 
 In the middle, the **Search files…** field opens [Quick Access](/docs/studio/interface/quick-access). When your project has new commits waiting on the remote, a **Sync Project** button appears here to pull them.
@@ -34,7 +35,7 @@ On the right:
 
 - The **mode switcher** — **Edit**, **Design**, **Grid**, **Code**, **Stylebook** — changes how the canvas presents the open file. See [Modes and the preview toggle](/docs/studio/interface/modes).
 - A toggle collapses and restores the right panel.
-- A chat icon toggles the Assistant sidebar.
+- A chat icon toggles the [Assistant sidebar](/docs/studio/ai), which starts closed and stays however you last left it.
 
 In the desktop app, the window's minimize, maximize, and close controls also live in this row.
 
@@ -91,7 +92,9 @@ The strip along the bottom of the window shows:
 - The selected element and its **path** — the chain of elements from the page root down to your selection. Each step in the path is clickable, so you can jump to any ancestor.
 - **Content Mode** when the open file is a content document.
 - In **Stylebook** mode, the style rule you're editing.
-- Short, temporary messages such as "Saved" after a save.
+- Short, temporary messages such as "Saved" after a save, or the reason an action couldn't run.
+
+It's a live region, so a screen reader announces what lands in it without you having to go looking.
 
 ## Next
 

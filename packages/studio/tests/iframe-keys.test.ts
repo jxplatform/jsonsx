@@ -76,6 +76,37 @@ describe("shouldForwardKey — with a caret in the canvas", () => {
       expect(shouldForwardKey(inEditable({ key: k }))).toBe(false);
     }
   });
+
+  test("the clipboard belongs to the BROWSER while a caret session is live", () => {
+    // Not forwarded AND (in startKeyForwarding) not preventDefaulted, so ⌘C copies the selected
+    // Text natively. This has to key off the SESSION, not off editability: the canvas root is
+    // Permanently contenteditable, so an editability test is true even with no caret and would
+    // Kill structural ⌘C/⌘X/⌘V too.
+    for (const k of ["c", "x", "v"]) {
+      expect(shouldForwardKey(inEditable({ key: k, metaKey: true }), true)).toBe(false);
+      expect(shouldForwardKey(inEditable({ ctrlKey: true, key: k }), true)).toBe(false);
+    }
+    // Case-insensitive, like the formatting chords.
+    expect(shouldForwardKey(inEditable({ key: "C", metaKey: true, shiftKey: true }), true)).toBe(
+      false,
+    );
+  });
+
+  test("with NO session live the clipboard chords are structural and still forward", () => {
+    for (const k of ["c", "x", "v"]) {
+      expect(shouldForwardKey(inEditable({ key: k, metaKey: true }))).toBe(true);
+    }
+  });
+
+  test("a live session does not hand the browser anything else", () => {
+    expect(shouldForwardKey(inEditable({ key: "s", metaKey: true }), true)).toBe(true);
+    expect(shouldForwardKey(inEditable({ ctrlKey: true, key: "z" }), true)).toBe(true);
+  });
+
+  test("clipboard chords outside an editable target always forward", () => {
+    // A live session elsewhere must not disarm ⌘C over a non-editable target.
+    expect(shouldForwardKey(key({ key: "c", metaKey: true }), true)).toBe(true);
+  });
 });
 
 describe("serializeKey", () => {
@@ -140,6 +171,47 @@ describe("startKeyForwarding", () => {
     input.dispatchEvent(key({ key: "Backspace" })); // Target is the input.
     expect(posts).toEqual([]);
     input.remove();
+    stop();
+  });
+
+  test("a live session leaves ⌘C to the browser: not forwarded, not preventDefaulted", () => {
+    const posts: IframeToParent[] = [];
+    const stop = startKeyForwarding(
+      { post: (m: IframeToParent) => posts.push(m) } as never,
+      document,
+      () => true,
+    );
+    const host = document.createElement("div");
+    host.contentEditable = "true";
+    document.body.append(host);
+    const e = key({ key: "c", metaKey: true });
+    host.dispatchEvent(e);
+
+    expect(posts).toEqual([]);
+    // The crucial half: a preventDefault here would make ⌘C a silent no-op mid-sentence.
+    expect(e.defaultPrevented).toBe(false);
+    host.remove();
+    stop();
+  });
+
+  test("the session predicate is read per keystroke, not captured at wiring time", () => {
+    const posts: IframeToParent[] = [];
+    let live = false;
+    const stop = startKeyForwarding(
+      { post: (m: IframeToParent) => posts.push(m) } as never,
+      document,
+      () => live,
+    );
+    const host = document.createElement("div");
+    host.contentEditable = "true";
+    document.body.append(host);
+
+    host.dispatchEvent(key({ key: "c", metaKey: true }));
+    expect(posts).toHaveLength(1); // No session → structural copy forwards.
+    live = true;
+    host.dispatchEvent(key({ key: "c", metaKey: true }));
+    expect(posts).toHaveLength(1); // Session live → the browser keeps it.
+    host.remove();
     stop();
   });
 

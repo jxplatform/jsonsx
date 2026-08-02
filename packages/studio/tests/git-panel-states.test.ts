@@ -22,6 +22,13 @@ void mock.module("../src/view.js", () => ({
 }));
 
 void mock.module("../src/ui/layers.js", () => ({
+  // Reached transitively (progress-modal, quick-search); the panel never calls them.
+  getLayerSlot: (_kind: string, id: string) => {
+    const el = document.createElement("div");
+    el.id = id;
+    return el;
+  },
+  openModal: () => Promise.resolve(null),
   showConfirmDialog: async () => true,
   showDialog: async () => null,
   showPromptDialog: async () => null,
@@ -105,9 +112,9 @@ describe("renderGitPanel — state rendering", () => {
     };
     const result = renderGitPanel({ ui }, {});
     const output = renderToString(result);
-    expect(output).toContain("not yet a git repository");
+    expect(output).toContain("not tracked by git yet");
     expect(output).toContain("Initialize Repository");
-    expect(output).toContain("Publish to GitHub");
+    expect(output).toContain("Create GitHub repository");
   });
 
   test("git repo with no remotes — shows 'Local only' sync bar with publish", () => {
@@ -126,7 +133,7 @@ describe("renderGitPanel — state rendering", () => {
     const result = renderGitPanel({ ui }, {});
     const output = renderToString(result);
     expect(output).toContain("Local only");
-    expect(output).toContain("Publish to GitHub");
+    expect(output).toContain("Create GitHub repository");
     expect(output).not.toContain("Up to date");
   });
 
@@ -146,7 +153,7 @@ describe("renderGitPanel — state rendering", () => {
     const result = renderGitPanel({ ui }, {});
     const output = renderToString(result);
     expect(output).toContain("Up to date");
-    expect(output).not.toContain("Publish to GitHub");
+    expect(output).not.toContain("Create GitHub repository");
     expect(output).not.toContain("Local only");
   });
 

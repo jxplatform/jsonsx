@@ -282,8 +282,14 @@ export function requestEditZoom(zoom: number) {
   });
 }
 
-/** Calculate zoom + pan to fit all panels within the viewport. */
-export function fitToScreen() {
+/**
+ * Calculate zoom + pan to fit all panels within the viewport.
+ *
+ * `maxZoom` caps the result. The Fit control passes the full {@link PAN_ZOOM_MAX} (asking to fit is
+ * asking to magnify a small artboard too); the automatic fit on entering a panzoom mode passes 1,
+ * because arriving at a document should never blow it up past life size.
+ */
+export function fitToScreen({ maxZoom = PAN_ZOOM_MAX }: { maxZoom?: number } = {}) {
   if (!view.panzoomWrap) {
     return;
   }
@@ -304,7 +310,7 @@ export function fitToScreen() {
 
   const fitZoomW = wrapWidth / totalPanelWidth;
   const fitZoomH = wrapHeight / maxPanelHeight;
-  const fitZoom = Math.min(5, Math.max(0.05, Math.min(fitZoomW, fitZoomH)));
+  const fitZoom = Math.min(maxZoom, Math.max(PAN_ZOOM_MIN, Math.min(fitZoomW, fitZoomH)));
 
   _ctx.setZoomDirect(fitZoom);
 
@@ -313,6 +319,84 @@ export function fitToScreen() {
   view.panX = Math.max(0, (wrapWidth - scaledWidth) / 2);
   view.panY = Math.max(0, (wrapHeight - scaledHeight) / 2);
   applyTransform();
+}
+
+// ─── Pan-zoom (design / stylebook / git-diff artboards) ──────────────────────
+
+export const PAN_ZOOM_MIN = 0.05;
+
+export const PAN_ZOOM_MAX = 5;
+
+/** Clamp a pan-zoom value to the supported range. */
+export function clampPanZoom(zoom: number): number {
+  return Math.min(PAN_ZOOM_MAX, Math.max(PAN_ZOOM_MIN, zoom));
+}
+
+/**
+ * Documents whose pan-zoom the author has set by hand this session, keyed per tab + document.
+ *
+ * Entering a panzoom mode fits the artboard automatically ({@link fitOnCanvasEntry}) — a 1280px
+ * artboard used to land clipped mid-word in a ~700px viewport. That default must not overwrite a
+ * zoom the author chose, so every author-driven zoom path records its document here. Session-scoped
+ * on purpose: the fit is about arriving at a document, so a reload starts fresh.
+ */
+const explicitZoomDocs = new Set<string>();
+
+/** The registry key for the active tab's document (null when no tab is open). */
+function zoomKey(): string | null {
+  const tab = activeTab.value;
+  return tab ? `${tab.id}::${tab.documentPath ?? ""}` : null;
+}
+
+/** Record that the author chose the active document's current pan-zoom. */
+export function markExplicitZoom(): void {
+  const key = zoomKey();
+  if (key) {
+    explicitZoomDocs.add(key);
+  }
+}
+
+/** Whether the author has set an explicit pan-zoom for the active document this session. */
+export function hasExplicitZoom(): boolean {
+  const key = zoomKey();
+  return key !== null && explicitZoomDocs.has(key);
+}
+
+/** Drop every recorded author zoom — for tests and a fresh session. */
+export function resetExplicitZoom(): void {
+  explicitZoomDocs.clear();
+}
+
+/**
+ * Set the active tab's pan-zoom on the author's behalf: clamped, recorded as explicit (so entering
+ * the mode again keeps it) and applied. Every author-facing pan-zoom control routes through here.
+ */
+export function setUserZoom(zoom: number): void {
+  const tab = activeTab.value;
+  if (!tab) {
+    return;
+  }
+  tab.session.ui.zoom = clampPanZoom(zoom);
+  markExplicitZoom();
+  applyTransform();
+}
+
+/**
+ * Fit the artboard when a pane enters a panzoom mode (Design, Stylebook), unless the author already
+ * chose a zoom for this document — then that zoom is restored instead.
+ *
+ * Called on the mode transition only. At that point the panels exist with their declared widths but
+ * the iframes have not painted, so the fit is driven by width, which is the axis that was broken:
+ * Design opened at 100% and cut a 1280px artboard off mid-word.
+ */
+export function fitOnCanvasEntry(): void {
+  // An unmeasurable viewport (the pane is hidden, or layout has not run yet) would fit to the 5%
+  // Floor, which is worse than the clipping this replaces. Leave the zoom alone.
+  if (hasExplicitZoom() || canvasWrap.clientWidth <= 0) {
+    applyTransform();
+    return;
+  }
+  fitToScreen({ maxZoom: 1 });
 }
 
 /** Reset zoom to 100% and re-center horizontally. */

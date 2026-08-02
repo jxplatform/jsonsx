@@ -124,10 +124,16 @@
   padding: 12px 16px;
   font-size: var(--spectrum-font-size-100, 14px);
   border: none;
+  /* Pointer focus only — the keyboard ring is restored below. */
   outline: none;
   background: var(--spectrum-gray-75, #141414);
   color: var(--spectrum-gray-900, #e0e0e0);
   border-bottom: 1px solid var(--spectrum-gray-300, #393939);
+}
+
+.quick-search-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 .quick-search-results {
   overflow-y: auto;
@@ -507,6 +513,24 @@ sp-table-row:has(.browse-thumb) {
   font-size: var(--spectrum-font-size-75, 12px);
   color: var(--fg-dim);
 }
+/* A write that failed, or a value the field refuses. Rendered under the control it belongs to
+   (or under the section title for a whole-file write failure) — settings save on change, so a
+   silent rejection would otherwise read as "my edit just vanished". */
+.settings-field-error {
+  margin: 6px 0 0;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--danger);
+}
+.settings-site-name,
+.settings-site-url {
+  width: 100%;
+  max-width: 420px;
+}
+.settings-site-description {
+  width: 100%;
+  max-width: 420px;
+  min-height: 64px;
+}
 .settings-field-row {
   display: flex;
   gap: 8px;
@@ -777,61 +801,6 @@ sp-table-row:has(.browse-thumb) {
   font-size: var(--spectrum-font-size-75, 12px);
   color: var(--fg-dim);
 }
-.new-project-step-heading {
-  font-size: var(--spectrum-font-size-200, 16px);
-  font-weight: 600;
-  color: var(--fg);
-  margin-bottom: 4px;
-}
-.new-project-design-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-.new-project-design-heading {
-  font-size: var(--spectrum-font-size-75, 12px);
-  font-weight: 600;
-  color: var(--fg);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.new-project-color-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.new-project-color-row .new-project-label {
-  min-width: 90px;
-}
-.new-project-color-row sp-textfield {
-  flex: 1;
-}
-.new-project-logo-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--fg);
-  font-size: var(--spectrum-font-size-75, 12px);
-}
-.new-project-logo-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--fg-dim);
-}
-.new-project-media-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.new-project-media-row .new-project-media-name {
-  width: 110px;
-}
-.new-project-media-row .new-project-media-value {
-  flex: 1;
-}
 .new-project-templates {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -884,6 +853,17 @@ sp-table-row:has(.browse-thumb) {
   color: var(--fg-dim);
   margin-top: 2px;
   line-height: 1.3;
+}
+
+/* The one non-starter card, last in the gallery and spanning it, so the sites lead. */
+.new-project-scratch {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+}
+.new-project-scratch .new-project-template-blank {
+  width: 96px;
+  flex-shrink: 0;
 }
 /* CSS Vars editor */
 .css-vars-group {
@@ -1122,7 +1102,13 @@ sp-table-row:has(.browse-thumb) {
   border: none;
   padding: 8px;
   resize: none;
+  /* Pointer focus only — the keyboard ring is restored below. */
   outline: none;
+}
+
+#source-view:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 /* ─── Empty state ────────────────────────────── */
@@ -1178,7 +1164,13 @@ sp-table-row:has(.browse-thumb) {
   background: var(--bg-input);
   border: 1px solid var(--accent);
   border-radius: var(--radius);
+  /* Pointer focus only — the keyboard ring is restored below. */
   outline: none;
+}
+
+.selector-custom-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 
 /* ─── Git panel ──────────────────────────────── */
@@ -1504,29 +1496,10 @@ sp-table-row:has(.browse-thumb) {
   background: color-mix(in srgb, var(--danger) 8%, transparent);
   border-bottom: 1px solid var(--border);
 }
-.git-empty {
-  padding: 16px 8px;
-  text-align: center;
-  color: var(--fg-dim);
-  font-size: var(--spectrum-font-size-75, 12px);
-}
 
 .git-panel-empty {
   justify-content: center;
   align-items: center;
-}
-.git-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 24px 16px;
-  text-align: center;
-  color: var(--fg-dim);
-}
-.git-empty-state p {
-  margin: 0;
-  font-size: var(--spectrum-font-size-75, 12px);
 }
 .git-sync-bar--no-remote {
   gap: 8px;
@@ -1834,7 +1807,7 @@ sp-table-row:has(.browse-thumb) {
   box-shadow: 0 0 0 3px var(--accent-15);
 }
 
-/* ─── Welcome screen ─────────────────────────── */
+/* ─── Start pane (no project open) ─────────────────────────── */
 .welcome-screen {
   width: 100%;
   height: 100%;
@@ -1845,9 +1818,9 @@ sp-table-row:has(.browse-thumb) {
   overflow-y: auto;
 }
 .welcome-content {
-  max-width: 500px;
+  max-width: 560px;
   width: 100%;
-  padding: 0 24px;
+  padding: 0 24px 48px;
 }
 .welcome-title {
   font-size: 28px;
@@ -1872,45 +1845,36 @@ sp-table-row:has(.browse-thumb) {
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
-.welcome-action {
+.welcome-actions {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 5px 8px;
-  margin: 0;
-  background: none;
-  border: none;
-  border-radius: var(--radius);
-  font: inherit;
-  font-size: 13px;
-  color: var(--accent);
-  cursor: pointer;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+.welcome-action {
+  --mod-actionbutton-content-color-default: var(--accent);
+  --mod-actionbutton-content-color-hover: var(--accent);
+
+  justify-content: flex-start;
   text-align: left;
-}
-.welcome-action:hover {
-  background: var(--hover-bg);
-  text-decoration: underline;
-}
-.welcome-action-icon {
-  flex-shrink: 0;
-  opacity: 0.8;
-}
-a.welcome-action {
-  text-decoration: none;
-  box-sizing: border-box;
 }
 .welcome-install-note {
   margin: 4px 8px 0;
   font-size: 12px;
   color: var(--fg-dim);
 }
+.welcome-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
 .welcome-recent {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: baseline;
   gap: 12px;
   width: 100%;
-  padding: 4px 8px;
+  padding: 5px 8px;
   margin: 0;
   background: none;
   border: none;
@@ -1926,16 +1890,20 @@ a.welcome-action {
 }
 .welcome-recent-name {
   color: var(--accent);
-  flex-shrink: 0;
-}
-.welcome-recent-name:hover {
-  text-decoration: underline;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .welcome-recent-path {
   color: var(--fg-dim);
   font-size: var(--spectrum-font-size-75, 12px);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.welcome-recent-when {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
   white-space: nowrap;
 }
 .welcome-section-header {
@@ -1945,17 +1913,9 @@ a.welcome-action {
   gap: 12px;
 }
 .welcome-clear {
-  padding: 0 4px;
-  background: none;
-  border: none;
-  font: inherit;
-  font-size: var(--spectrum-font-size-75, 12px);
-  color: var(--fg-dim);
-  cursor: pointer;
-}
-.welcome-clear:hover {
-  color: var(--fg);
-  text-decoration: underline;
+  --mod-actionbutton-content-color-default: var(--fg-dim);
+
+  flex-shrink: 0;
 }
 .welcome-recent-row {
   display: flex;
@@ -1967,22 +1927,11 @@ a.welcome-action {
 }
 .welcome-recent-remove {
   flex-shrink: 0;
-  padding: 2px 6px;
-  background: none;
-  border: none;
-  font: inherit;
-  font-size: var(--spectrum-font-size-75, 12px);
-  color: var(--fg-dim);
-  cursor: pointer;
   opacity: 0;
-  border-radius: var(--radius);
 }
-.welcome-recent-row:hover .welcome-recent-remove {
+.welcome-recent-row:hover .welcome-recent-remove,
+.welcome-recent-remove:focus-visible {
   opacity: 1;
-}
-.welcome-recent-remove:hover {
-  color: var(--fg);
-  background: var(--hover-bg);
 }
 
 /* ─── Grid editor (Tabulator theme over Spectrum tokens) ─────────────── */
@@ -2161,7 +2110,13 @@ a.welcome-action {
   border-radius: var(--spectrum-corner-radius-75, 2px);
   padding: 2px 6px;
   font: inherit;
+  /* Pointer focus only — the keyboard ring is restored below. */
   outline: none;
+}
+
+.jx-grid-editor .jx-grid-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 .jx-grid-editor .jx-grid-checkbox {
   margin: 0 auto;
@@ -2183,9 +2138,15 @@ a.welcome-action {
   min-width: 60px;
   background: transparent;
   border: none;
+  /* Pointer focus only — the keyboard ring is restored below. */
   outline: none;
   color: var(--fg);
   font: inherit;
+}
+
+.jx-grid-pill-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 .jx-grid-chip-x {
   background: none;

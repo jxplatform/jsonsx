@@ -731,14 +731,14 @@ function mountExternal(
 }
 
 describe("renderExternalPrototypeEditorTemplate", () => {
-  test("shows Source/Prototype fields when the prototype is not imported", () => {
+  test("shows Source/Kind fields when the prototype is not imported", () => {
     const m = mountExternal({ $prototype: "Widget", $src: "./w.js" });
     expect(m.container.querySelector('[data-prop="Source"]')).not.toBeNull();
-    expect(m.container.querySelector('[data-prop="Prototype"]')).not.toBeNull();
+    expect(m.container.querySelector('[data-prop="Kind"]')).not.toBeNull();
     expect(m.container.querySelector('[data-prop="Export"]')).toBeNull();
   });
 
-  test("Source/Prototype commits update the def and invalidate the schema cache", () => {
+  test("Source/Kind commits update the def and invalidate the schema cache", () => {
     pluginSchemaCache.set("./w.js::Widget", null);
     pluginSchemaCache.set("./new.js::Widget", { properties: {} });
     const m = mountExternal({ $prototype: "Widget", $src: "./w.js" });
@@ -748,7 +748,7 @@ describe("renderExternalPrototypeEditorTemplate", () => {
 
     pluginSchemaCache.set("./new.js::Gadget", { properties: {} });
     m.rerender();
-    commitValue(fieldEl(m.container, "Prototype", "sp-textfield"), "Gadget");
+    commitValue(fieldEl(m.container, "Kind", "sp-textfield"), "Gadget");
     expect((pluginDef() as { $prototype: string }).$prototype).toBe("Gadget");
     expect(pluginSchemaCache.has("./new.js::Gadget")).toBe(false);
   });

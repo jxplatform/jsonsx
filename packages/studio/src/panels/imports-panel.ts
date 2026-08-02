@@ -2,7 +2,7 @@
 /**
  * Imports panel — context-aware import manager with cherry-pick component selection.
  *
- * When editing project.json: shows Class Imports, Dependencies (add/remove packages), and
+ * When editing project.json: shows imported modules, Dependencies (add/remove packages), and
  * per-package component toggles for cherry-picking individual elements. When editing a
  * page/layout/component/content type: shows Component Imports ($ref picker) and per-package
  * component toggles.
@@ -14,6 +14,7 @@ import { projectState } from "../store";
 import { updateSiteConfig } from "../site-context";
 import { getPlatform } from "../platform";
 import { showConfirmDialog } from "../ui/layers";
+import { renderEmptyState } from "./empty-state";
 
 import type { ComponentEntry } from "../files/components";
 import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
@@ -109,7 +110,7 @@ export function renderImportsTemplate({
   });
 }
 
-// ─── Site-level: Class Imports + Dependencies + Component Cherry-pick ─────────
+// ─── Site-level: Imported Modules + Dependencies + Component Cherry-pick ──────
 
 /** @param {() => void} renderLeftPanel */
 function renderSiteLevelImports(renderLeftPanel: () => void) {
@@ -121,10 +122,10 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
 
   return html`
     <div class="imports-panel">
-      <!-- Class Imports -->
+      <!-- Imported modules ($prototype sources) -->
       <div class="imports-section">
         <div class="imports-section-header">
-          <span class="imports-section-title">Class Imports</span>
+          <span class="imports-section-title">Imported Modules</span>
           <span class="imports-count">${entries.length}</span>
         </div>
         ${
@@ -154,7 +155,12 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
                   )}
                 </div>
               `
-            : html`<div class="imports-empty">No class imports</div>`
+            : renderEmptyState({
+                compact: true,
+                message:
+                  "Imported modules give this project extra kinds of data — " +
+                  "a content collection, a CMS, an API client. Name one below.",
+              })
         }
         <div class="import-add-form">
           <sp-textfield placeholder="Name" size="s" class="import-add-name"></sp-textfield>
@@ -388,7 +394,14 @@ function renderDocumentLevelImports({
                   )}
                 </div>
               `
-            : nothing
+            : renderEmptyState({
+                compact: true,
+                message:
+                  availableComponents.length > 0
+                    ? "Components you add here can be dropped onto this page. Pick one below."
+                    : "Components you add here can be dropped onto this page. " +
+                      "This project has none yet — create one from any selection on the canvas.",
+              })
         }
         ${
           availableComponents.length > 0

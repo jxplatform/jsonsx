@@ -116,33 +116,46 @@ afterEach(() => {
 // ─── Empty states ────────────────────────────────────────────────────────────
 
 describe("renderStylePanelTemplate empty states", () => {
-  test("no open tab → No document loaded", async () => {
+  test("no open tab → the shared open-a-page state, with the button that does it", async () => {
     resetStudioState();
     closeAllTabs();
     const c = await renderPanel();
-    expect(c.textContent).toContain("No document loaded");
+    expect(c.querySelector(".empty-state-message")?.textContent).toBe(
+      "Open a page to style what you click.",
+    );
+    expect((c.querySelector(".empty-state-action") as HTMLElement).textContent?.trim()).toBe(
+      "Open a page…",
+    );
   });
 
-  test("tab without selection → prompt to select", async () => {
+  test("tab without selection → the one shared canvas verb", async () => {
     resetStudioState();
     resetWorkspaceWithTab();
     const c = await renderPanel();
-    expect(c.textContent).toContain("Select an element to style");
+    // The rail must not read as three different requirements: Properties, Events and Style all
+    // Ask for a selection with the same sentence.
+    expect(c.querySelector(".empty-state-message")?.textContent).toBe(
+      "Click anything on the canvas to style it.",
+    );
   });
 
-  test("selection pointing at a missing node → prompt to select", async () => {
+  test("selection pointing at a missing node → names the loss, then the shared verb", async () => {
     const tab = setupTab({});
     tab.session.selection = ["children", 9];
     const c = await renderPanel();
-    expect(c.textContent).toContain("Select an element to style");
+    expect(c.querySelector(".empty-state-message")?.textContent).toBe(
+      "That element is no longer on the page. Click anything on the canvas to pick another one.",
+    );
   });
 
-  test("stylebook mode with null document → No document loaded", async () => {
+  test("stylebook mode with null document → the same open-a-page state", async () => {
     const tab = setupTab({});
     tab.session.ui.stylebookSelection = "h1";
     (tab.doc as unknown as Record<string, unknown>).document = null;
     const c = await renderPanel("stylebook");
-    expect(c.textContent).toContain("No document loaded");
+    expect(c.querySelector(".empty-state-message")?.textContent).toBe(
+      "Open a page to style what you click.",
+    );
   });
 });
 

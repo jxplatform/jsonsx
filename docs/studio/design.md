@@ -14,7 +14,7 @@ Design is the visual canvas — the mode for shaping structure and style. Switch
 
 ## A canvas per breakpoint
 
-Instead of one canvas you resize, Design shows a live panel for **every breakpoint** your project defines — phone, tablet, and desktop side by side, each labeled with its name and width. Your responsive rules evaluate for real in each panel, so a change that only applies on small screens shows up only in the small-screen panel. Click a panel's header to make that breakpoint the active one for styling, and pan and zoom the surface to fit — see **[The canvas](/docs/studio/interface/canvas)** for the controls.
+Instead of one canvas you resize, Design shows a live panel for **every breakpoint** your project defines — phone, tablet, and desktop side by side, each labeled with its name and width. Your responsive rules evaluate for real in each panel, so a change that only applies on small screens shows up only in the small-screen panel. Click a panel's header to make that breakpoint the active one for styling. Design opens with the whole set already scaled to fit the panel, and you can pan and zoom from there — see **[The canvas](/docs/studio/interface/canvas)** for the controls.
 
 Breakpoints themselves — where they come from and how overrides cascade — are covered in **[Breakpoints](/docs/studio/design/breakpoints)**.
 

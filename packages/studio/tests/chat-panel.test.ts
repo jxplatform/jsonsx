@@ -84,13 +84,16 @@ afterEach(() => {
 });
 
 describe("chat panel", () => {
-  test("renders the credentials gate with no tab and no project", async () => {
+  test("renders the chat with no tab and no project, offering the settings action", async () => {
     mount(chatHost());
     await flush(4);
     const container = chatHost().querySelector(".panel-body") as HTMLElement;
     expect(container).toBeTruthy();
-    // No key stored and no configured proxy → the key gate shows, chat still reachable.
-    expect(container.querySelector(".ai-creds-form")).toBeTruthy();
+    // No key stored and no configured proxy → still a chat, with the setup action beneath it.
+    // The credentials form itself lives in the `Assistant: Settings…` dialog, not this column.
+    expect(container.querySelector(".ai-creds-form")).toBeNull();
+    expect(container.querySelector(".ai-chat-header")).toBeTruthy();
+    expect(container.querySelector(".ai-setup-notice")).toBeTruthy();
   });
 
   test("renders the chat view once a key exists, with or without an open tab", async () => {

@@ -19,6 +19,7 @@ import { mutateUpdateFrontmatter, transact } from "../tabs/transact";
 import type { GitDiffState, JsonValue } from "../types";
 import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
 
+import { openPageAction, renderEmptyState } from "./empty-state";
 import { renderLayersTemplate } from "./layers-panel";
 import { renderStylebookLayersTemplate } from "./stylebook-layers-panel";
 import { renderElementsTemplate } from "./elements-panel";
@@ -135,6 +136,19 @@ function _doRender() {
   }
 }
 
+/**
+ * What each document-level rail tab is for, said in the words of the thing it needs. A rail tab
+ * with no document renders this instead of a bare `.panel-body` — the ring collapses to a sentence,
+ * not to an empty box.
+ */
+const NO_DOCUMENT_COPY: Record<string, string> = {
+  data: "Open a page to watch its data resolve while you edit.",
+  head: "Open a page to edit its title, description and social preview.",
+  imports: "Open a page to choose which components it can use.",
+  layers: "Open a page to see the elements it is built from.",
+  state: "Open a page to give it data — values it can read, compute or fetch.",
+};
+
 /** Overlay content-mode frontmatter title/$head onto the document for the head panel. */
 function buildHeadDoc(doc: JxMutableNode, fm: Record<string, unknown>): JxMutableNode {
   const title = fm.title as string | undefined;
@@ -185,7 +199,13 @@ function _render() {
 
   const aTab = activeTab.value;
   if (!aTab) {
-    litRender(html`<div class="panel-body"></div>`, leftPanel);
+    const message = NO_DOCUMENT_COPY[tab];
+    litRender(
+      html`<div class="panel-body">
+        ${message ? renderEmptyState({ actions: [openPageAction()], message }) : nothing}
+      </div>`,
+      leftPanel,
+    );
     return;
   }
 

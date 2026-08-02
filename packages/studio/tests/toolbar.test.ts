@@ -26,8 +26,15 @@ void mock.module("../src/new-project/new-project-modal.js", () => ({
   openNewProjectModal,
 }));
 
+const statusMessage = mock((_text: string) => {});
+void mock.module("../src/panels/statusbar.js", () => ({
+  statusMessage,
+}));
+
 const toolbar = await import("../src/panels/toolbar");
-const { view } = await import("../src/view");
+const { applyPanelCollapse, view } = await import("../src/view");
+const { setProjectState } = await import("../src/state");
+const { setPreviewNavigateHandler } = await import("../src/canvas/preview-navigate");
 const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -82,6 +89,7 @@ beforeEach(() => {
   closeAllTabs();
   localStorage.clear();
   view.rightPanelCollapsed = false;
+  view.chatPanelCollapsed = true;
   view.panX = 0;
   view.panY = 0;
   view.functionEditor = null;
@@ -90,6 +98,9 @@ beforeEach(() => {
   refreshGitStatus.mockClear();
   openBrowseModal.mockClear();
   openNewProjectModal.mockClear();
+  statusMessage.mockClear();
+  setProjectState(null);
+  setPreviewNavigateHandler(null);
   ({ state: platformState } = installMockPlatform());
   root = document.createElement("div");
   document.body.append(root);
@@ -98,8 +109,46 @@ beforeEach(() => {
 afterEach(() => {
   toolbar.unmount();
   root.remove();
+  setPreviewNavigateHandler(null);
+  setProjectState(null);
   delete (globalThis as any).__jxPlatform;
 });
+
+// ─── View: Open in Browser ────────────────────────────────────────────────────
+
+/** The origin the mock platform's canvas — and therefore the built site — is served from. */
+const SITE_ORIGIN = "http://127.0.0.1:4321";
+
+/** Stage a site project whose pages resolve to real routes on a loopback project server. */
+function openSiteProject(trailingSlash?: "always" | "never") {
+  (globalThis as any).__jxPlatform.canvasUrl = `${SITE_ORIGIN}/__studio__/canvas.html`;
+  setProjectState({
+    dirs: new Map(),
+    expanded: new Set(),
+    isSiteProject: true,
+    name: "acme",
+    projectConfig: (trailingSlash ? { build: { trailingSlash } } : {}) as never,
+    projectRoot: "/acme",
+    searchQuery: "",
+    selectedPath: null,
+  });
+}
+
+function openInBrowserBtn(): HTMLElement {
+  return root.querySelector("sp-action-button[title^='Open in Browser']") as HTMLElement;
+}
+
+function pressOpenInBrowser(): void {
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "O",
+      metaKey: true,
+      shiftKey: true,
+    }),
+  );
+}
 
 // ─── Minimal toolbar (no tab) ─────────────────────────────────────────────────
 
@@ -534,6 +583,235 @@ describe("full toolbar (active tab)", () => {
       expect(root.firstElementChild?.classList.contains("window-controls")).toBe(true);
     } finally {
       toolbar.setMacPlatformForTests(null);
+    }
+  });
+});
+
+// ─── View: Open in Browser ────────────────────────────────────────────────────
+
+describe("View: Open in Browser", () => {
+  test("opens the built page at its real route through the preview-navigate seam", async () => {
+    openSiteProject();
+    closeAllTabs();
+    openTab({
+      capabilities: { modes: ALL_MODES },
+      document: { children: [], tagName: "div" },
+      documentPath: "pages/blog/hello.md",
+      id: "page-tab",
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    toolbar.mount(root, makeCtx());
+    await flush();
+
+    const button = openInBrowserBtn();
+    expect(button.hasAttribute("disabled")).toBe(false);
+    expect(button.getAttribute("title")).toBe("Open in Browser (⌘⇧O)");
+    click(button);
+    expect(opened).toEqual([`${SITE_ORIGIN}/dist/blog/hello/index.html`]);
+
+    // ⌘⇧O is the same action, and ⌘O (Open Project) never sees it — Shift makes e.key "O".
+    pressOpenInBrowser();
+    expect(opened).toHaveLength(2);
+  });
+
+  test("the root page resolves to dist/index.html", async () => {
+    openSiteProject();
+    closeAllTabs();
+    openTab({
+      capabilities: { modes: ALL_MODES },
+      document: { children: [], tagName: "div" },
+      documentPath: "./pages/index.md",
+      id: "root-page",
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    toolbar.mount(root, makeCtx());
+    await flush();
+    click(openInBrowserBtn());
+    expect(opened).toEqual([`${SITE_ORIGIN}/dist/index.html`]);
+  });
+
+  test("trailingSlash: never asks for the flat .html the compiler emits", async () => {
+    openSiteProject("never");
+    closeAllTabs();
+    openTab({
+      capabilities: { modes: ALL_MODES },
+      document: { children: [], tagName: "div" },
+      documentPath: "pages/about.json",
+      id: "about-page",
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    toolbar.mount(root, makeCtx());
+    await flush();
+    click(openInBrowserBtn());
+    expect(opened).toEqual([`${SITE_ORIGIN}/dist/about.html`]);
+  });
+
+  test("a dynamic route waits for its params, then opens the chosen page", async () => {
+    openSiteProject();
+    closeAllTabs();
+    const tab = openTab({
+      capabilities: { modes: ALL_MODES },
+      document: { children: [], tagName: "div" },
+      documentPath: "pages/blog/[slug].json",
+      id: "dynamic-page",
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    toolbar.mount(root, makeCtx());
+    await flush();
+
+    expect(openInBrowserBtn().hasAttribute("disabled")).toBe(true);
+    expect(openInBrowserBtn().getAttribute("title")).toContain("Pick a value for :slug");
+
+    tab.session.ui.previewParams = { slug: "getting started" };
+    await flush();
+    expect(openInBrowserBtn().hasAttribute("disabled")).toBe(false);
+    click(openInBrowserBtn());
+    expect(opened).toEqual([`${SITE_ORIGIN}/dist/blog/getting%20started/index.html`]);
+  });
+
+  test("non-page documents disable the control with the reason in its tooltip", async () => {
+    openSiteProject();
+    closeAllTabs();
+    openTab({
+      capabilities: { modes: ALL_MODES },
+      document: { children: [], tagName: "div" },
+      documentPath: "components/Card.json",
+      id: "component-tab",
+    });
+    toolbar.mount(root, makeCtx());
+    await flush();
+    const button = openInBrowserBtn();
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("title")).toContain("components/Card.json is not under pages/");
+  });
+
+  test("without a site project, and with no tab at all, the reason says so", async () => {
+    openTestTab();
+    toolbar.mount(root, makeCtx());
+    await flush();
+    expect(openInBrowserBtn().getAttribute("title")).toContain("does not build a site");
+
+    toolbar.unmount();
+    closeAllTabs();
+    toolbar.mount(root, makeCtx());
+    await flush();
+    // The minimal toolbar keeps the control, disabled — an absent button teaches nothing.
+    expect(openInBrowserBtn().hasAttribute("disabled")).toBe(true);
+    expect(openInBrowserBtn().getAttribute("title")).toContain("Open a page to view it");
+  });
+
+  test("a non-http canvas origin (the views:// desktop shell, pre-activate) is refused", async () => {
+    openSiteProject();
+    (globalThis as any).__jxPlatform.canvasUrl = "views://studio/canvas.html";
+    closeAllTabs();
+    openTab({
+      capabilities: { modes: ALL_MODES },
+      document: { children: [], tagName: "div" },
+      documentPath: "pages/index.md",
+      id: "no-server",
+    });
+    toolbar.mount(root, makeCtx());
+    await flush();
+    expect(openInBrowserBtn().hasAttribute("disabled")).toBe(true);
+    expect(openInBrowserBtn().getAttribute("title")).toContain("No local server");
+  });
+
+  test("catch-all routes are refused with a reason", async () => {
+    openSiteProject();
+    closeAllTabs();
+    openTab({
+      capabilities: { modes: ALL_MODES },
+      document: { children: [], tagName: "div" },
+      documentPath: "pages/docs/[...rest].json",
+      id: "catchall",
+    });
+    toolbar.mount(root, makeCtx());
+    await flush();
+    expect(openInBrowserBtn().getAttribute("title")).toContain("Catch-all routes match many pages");
+  });
+
+  test("the chord reports the blocking reason instead of opening nothing", async () => {
+    toolbar.mount(root, makeCtx());
+    await flush();
+    pressOpenInBrowser();
+    expect(statusMessage).toHaveBeenCalledTimes(1);
+    expect(statusMessage.mock.calls[0]![0]).toContain("Open a page to view it");
+  });
+
+  test("the chord ignores plain ⌘O and stops firing after unmount", async () => {
+    toolbar.mount(root, makeCtx());
+    await flush();
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "o", metaKey: true }),
+    );
+    expect(statusMessage).not.toHaveBeenCalled();
+
+    toolbar.unmount();
+    pressOpenInBrowser();
+    expect(statusMessage).not.toHaveBeenCalled();
+  });
+
+  test("falls back to a new browser tab when no platform override is registered", async () => {
+    openSiteProject();
+    closeAllTabs();
+    openTab({
+      capabilities: { modes: ALL_MODES },
+      document: { children: [], tagName: "div" },
+      documentPath: "pages/index.md",
+      id: "fallback-page",
+    });
+    const calls: unknown[][] = [];
+    const originalOpen = window.open;
+    (window as any).open = (...args: unknown[]) => {
+      calls.push(args);
+      return null;
+    };
+    try {
+      toolbar.mount(root, makeCtx());
+      await flush();
+      click(openInBrowserBtn());
+      expect(calls).toEqual([[`${SITE_ORIGIN}/dist/index.html`, "_blank", "noopener,noreferrer"]]);
+    } finally {
+      window.open = originalOpen;
+    }
+  });
+});
+
+// ─── Panel-collapse tracking ──────────────────────────────────────────────────
+
+describe("dock toggles", () => {
+  test("the assistant toggle reflects state flipped from outside the toolbar", async () => {
+    const app = document.createElement("div");
+    app.id = "app";
+    document.body.append(app);
+    try {
+      toolbar.mount(root, makeCtx());
+      await flush();
+      const toggle = () => root.querySelector("sp-action-button[title='Toggle Assistant']")!;
+      // Default is closed, so the toggle is not selected.
+      expect(toggle().hasAttribute("selected")).toBe(false);
+
+      // `view` is a plain object — nothing reactive fires here. The toolbar has to learn about
+      // It through applyPanelCollapse's subscription, or its icons lie about the shell.
+      view.chatPanelCollapsed = false;
+      view.rightPanelCollapsed = true;
+      applyPanelCollapse();
+      await flush();
+      expect(toggle().hasAttribute("selected")).toBe(true);
+      expect(root.querySelector("sp-icon-rail-right-open")).not.toBeNull();
+
+      // Unmount drops the subscription.
+      toolbar.unmount();
+      view.chatPanelCollapsed = true;
+      applyPanelCollapse();
+      await flush();
+      expect(toggle().hasAttribute("selected")).toBe(true);
+    } finally {
+      app.remove();
     }
   });
 });

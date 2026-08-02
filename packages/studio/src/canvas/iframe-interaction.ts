@@ -95,8 +95,10 @@ export interface InteractionDeps {
    */
   getShadowDoc: () => JxMutableNode | null;
   /**
-   * The live render's canvas mode. Insertion "+" zones are a document-editing affordance —
-   * suppressed for stylebook renders (specimens aren't insert targets). Absent = permissive.
+   * The live render's canvas mode. Editing affordances are suppressed per mode: insertion "+" zones
+   * are meaningless for stylebook renders (specimens aren't insert targets), and preview reports
+   * nothing at all beyond link intent — no hit, no hover, no zones, no Jx context menu — because a
+   * preview is the shipped page, not a document you can point at. Absent = permissive.
    */
   getMode?: () => string;
   /**
@@ -129,6 +131,14 @@ export function startInteraction(
   let lastZonesKey: string | null = null;
   let lastGen = deps?.getGen?.() ?? 0;
 
+  /**
+   * Whether this render is a preview. Preview is the fidelity view: it has no selection, no hover
+   * box, no insertion "+" and no Jx element menu, so the frame reports none of them. (The host
+   * refuses the same messages independently — the iframe bundle ships prebuilt, so neither side may
+   * rely on the other's build being current.)
+   */
+  const isPreview = () => deps?.getMode?.() === "preview";
+
   const onClick = (e: Event) => {
     /*
      * Preview keeps anchors live, so a click would navigate this iframe and destroy the render (and
@@ -139,14 +149,17 @@ export function startInteraction(
      * Design/edit never reach this: the runtime de-links anchors onto `data-jx-href` there, so there
      * is no navigation to intercept and a click means "select this element".
      */
-    if (deps?.getMode?.() === "preview" && e.target instanceof Element) {
-      const anchor = e.target.closest("a[href]");
-      const href = anchor?.getAttribute("href");
-      if (href && !href.startsWith("#")) {
-        e.preventDefault();
-        channel.post({ href, kind: "previewNavigate" });
-        return;
+    if (isPreview()) {
+      if (e.target instanceof Element) {
+        const anchor = e.target.closest("a[href]");
+        const href = anchor?.getAttribute("href");
+        if (href && !href.startsWith("#")) {
+          e.preventDefault();
+          channel.post({ href, kind: "previewNavigate" });
+        }
       }
+      // No hit post: a click in preview is a click on the page, never a selection.
+      return;
     }
     const hit = nearestHit(e.target);
     if (hit) {
@@ -163,6 +176,9 @@ export function startInteraction(
    * the key was ever compared — a forced layout per mouse move, thrown away almost every time.
    */
   const reportHover = (el: HTMLElement | null) => {
+    if (isPreview()) {
+      return;
+    }
     const key = el?.dataset.jxPath ?? null;
     if (key === lastHoverKey) {
       return;
@@ -186,7 +202,7 @@ export function startInteraction(
 
   /** Resolve + post the insertion "+" zones for an iframe-viewport cursor, deduped by key. */
   const reportInsertZones = (target: EventTarget | null, cursor: { x: number; y: number }) => {
-    if (!deps || deps.getMode?.() === "stylebook") {
+    if (!deps || deps.getMode?.() === "stylebook" || isPreview()) {
       return;
     }
     syncZoneGen();
@@ -242,7 +258,7 @@ export function startInteraction(
       return;
     }
     reportHover(null);
-    if (deps && lastZonesKey !== "none") {
+    if (deps && !isPreview() && lastZonesKey !== "none") {
       lastZonesKey = "none";
       channel.post({ kind: "insertZones", zones: null });
     }
@@ -250,6 +266,11 @@ export function startInteraction(
 
   const onContextMenu = (e: Event) => {
     const me = e as MouseEvent;
+    // Preview keeps the NATIVE menu: the Jx element menu's verbs (duplicate, delete, paste, wrap)
+    // Are document edits, and preview does not edit. Copy Link Address does what it says instead.
+    if (isPreview()) {
+      return;
+    }
     // Inside the ACTIVE editable keep the NATIVE menu (spellcheck / paste) — the session owns it.
     const active = isEditing() ? getActiveElement() : null;
     if (active && e.target instanceof Node && active.contains(e.target)) {

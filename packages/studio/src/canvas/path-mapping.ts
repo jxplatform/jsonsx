@@ -22,17 +22,67 @@ export interface PathMapCtx {
   arrayPaths: Set<string>;
 }
 
-/** A render node either belongs to the layout chrome (no document path) or maps to a document path. */
-export type RenderNodeClass = { kind: "layout" } | { kind: "path"; path: JxPath };
+/**
+ * The marker `markLayoutNodes` stamps on every node of a resolved layout document (see
+ * {@link file://./canvas-live-render.ts}). It names the layout FILE and the node's own path inside
+ * that file — enough for the editor to select the node, label it, and open the layout at it. It
+ * used to be a bare `true`, which is why clicking layout chrome on a fresh project selected nothing
+ * at all: the render had thrown away the only two facts needed to act on the click.
+ */
+export interface LayoutMarker {
+  /** Project-relative path of the layout document, e.g. `layouts/base.json`. */
+  file: string;
+  /** The node's path WITHIN the layout document. */
+  path: JxPath;
+}
+
+/**
+ * A render node either belongs to the layout (carrying its origin in the layout file, since it has
+ * no page-document path) or maps to a page-document path.
+ *
+ * `chrome` distinguishes the two very different kinds of layout node. Most are chrome — a header, a
+ * footer, a `<noscript>` — regions the page cannot edit in place. But the nodes on the path down to
+ * the `<slot>` (the layout root, the `<main>` around it) WRAP the page content, so they must stay
+ * transparent: dimming or freezing them would dim and freeze the whole document. Only chrome is
+ * dimmed, labelled, and made `contenteditable="false"`.
+ */
+export type RenderNodeClass =
+  | { kind: "layout"; layoutFile: string; layoutPath: JxPath; chrome: boolean }
+  | { kind: "path"; path: JxPath };
+
+/**
+ * Whether `path` is the page-content container or one of its ancestors — i.e. whether this node's
+ * subtree contains the distributed page content. `prefix` is the render path of the container whose
+ * children hold that content (`PathMapCtx.pageContentPrefix`).
+ */
+export function wrapsPageContent(path: JxPath, prefix: JxPath | null): boolean {
+  if (!prefix) {
+    return false;
+  }
+  return path.length <= prefix.length && path.every((seg, i) => prefix[i] === seg);
+}
 
 /**
  * Resolve a runtime render path to a document path (or flag it as layout-originated). Pure — the
- * caller decides whether to record the result in a WeakMap or a `data-jx-path` attribute.
+ * caller decides whether to record the result in a WeakMap or `data-jx-*` attributes.
  */
 export function classifyRenderNode(path: JxPath, def: unknown, ctx: PathMapCtx): RenderNodeClass {
-  // Layout-originated nodes have no page-document path; the caller marks them (data-jx-layout).
-  if (ctx.layoutWrapped && typeof def === "object" && (def as { $__layout?: unknown })?.$__layout) {
-    return { kind: "layout" };
+  // Layout-originated nodes have no page-document path; the caller stamps their origin instead
+  // (data-jx-layout-path / data-jx-layout-file).
+  const marker =
+    ctx.layoutWrapped && typeof def === "object"
+      ? (def as { $__layout?: unknown } | null)?.$__layout
+      : undefined;
+  if (marker) {
+    const origin = (typeof marker === "object" ? marker : {}) as Partial<LayoutMarker>;
+    return {
+      // The root is never chrome even when the layout distributed nothing: it IS the render, and a
+      // Dimmed, frozen root would be a canvas nobody can touch.
+      chrome: path.length > 0 && !wrapsPageContent(path, ctx.pageContentPrefix),
+      kind: "layout",
+      layoutFile: typeof origin.file === "string" ? origin.file : "",
+      layoutPath: Array.isArray(origin.path) ? origin.path : [],
+    };
   }
 
   let mappedPath = path;

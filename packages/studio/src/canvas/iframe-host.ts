@@ -37,6 +37,7 @@ import {
   updateUi,
 } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
+import { setLayoutSelection } from "../view";
 import { formatEditableVerdicts } from "../format/constraints";
 import { formatByName } from "../format/format-host";
 import { collabState } from "../collab/collab-state";
@@ -87,6 +88,12 @@ interface HostState {
   presenceReqId: number;
   /** Serialized peer path → presence box meta for the in-flight presence measure. */
   presenceMeta: Map<string, { color: string; label: string }>;
+  /**
+   * Whether this host's iframe currently renders a PREVIEW. Preview is the fidelity view, so the
+   * host refuses every editing message from it ({@link PREVIEW_BLOCKED}), suppresses the overlay
+   * layer, and leaves the iframe at its CSS height so the frame scrolls its own document.
+   */
+  preview: boolean;
   /** Whether an inline-edit session is live in this host's iframe (drives the format toolbar). */
   editing: boolean;
   /** The prop a live plain session edits (prop-bound text) — null for rich sessions/none. */
@@ -724,6 +731,22 @@ function resolveStylebookTag(
  */
 let activeEditHost: HostState | null = null;
 
+/**
+ * Whether a text caret is live in a canvas iframe — the parent realm's only honest answer to "is
+ * the author typing right now".
+ *
+ * The editing session runs INSIDE the cross-origin canvas frame, so `editor/inline-edit.ts`'s
+ * `isEditing()` — a module-local `activeEl` in the PARENT bundle — is permanently false here. The
+ * bridge already carries the truth: `editStart` opens a session, `selectionChanged` proves the
+ * caret is still live in it, `editEnd` closes it. Derived rather than stored per host, so a frame
+ * torn down mid-session (a mode switch, a closed tab) can never latch the flag on and go on
+ * stealing ⌘C from a caret that no longer exists.
+ */
+export function isCaretActive(): boolean {
+  const host = activeEditHost;
+  return Boolean(host?.editing && host.iframe.isConnected);
+}
+
 /** Injected toolbar re-render (set by studio.ts → renderBlockActionBar); avoids a panel→host cycle. */
 let toolbarRefresh: (() => void) | null = null;
 
@@ -974,6 +997,9 @@ function ensureHost(canvasEl: HTMLElement): HostState {
   const iframeOrigin = new URL(canvasUrl, location.href).origin;
   const iframe = document.createElement("iframe");
   iframe.className = "jx-canvas-iframe";
+  // Without a title the whole canvas is an unlabelled frame to assistive tech — and the canvas is
+  // The artefact, not chrome.
+  iframe.title = "Canvas — live page render";
   iframe.style.cssText =
     "width:100%;min-height:480px;height:100%;border:0;display:block;background:#fff";
   // Preserve any query already on canvasUrl (e.g. electrobun's ?win=7) and append the token (always)
@@ -1031,6 +1057,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     pendingTabIds: new Map(),
     presenceMeta: new Map(),
     presenceReqId: -1,
+    preview: false,
     ready: false,
     selectionPath: null,
     selReqId: 0,
@@ -1125,8 +1152,41 @@ function onInsertButtonClick(state: HostState, e: MouseEvent): void {
   insertZoneClickHandler?.(state.overlay.insertButton, zone);
 }
 
+/**
+ * Messages a PREVIEW render is not allowed to act on. Preview must behave like the shipped page:
+ * clicking selects nothing, nothing is outlined, there is no insertion "+", the browser's own
+ * context menu stands, nothing can be dropped into it, and no text can be typed into it.
+ *
+ * The frame withholds most of these itself ({@link file://./iframe-interaction.ts}'s mode gate),
+ * but the canvas bundle ships prebuilt in `dist/`, so the host refuses them independently rather
+ * than trusting the frame's build to be current. Cleanup messages (`dragEnd`, `fileDragLeave`) are
+ * deliberately NOT blocked — they only tear affordances down.
+ */
+const PREVIEW_BLOCKED: ReadonlySet<IframeToParent["kind"]> = new Set([
+  "contextMenu",
+  "dragOver",
+  "dropResult",
+  "editCommit",
+  "editCommitProp",
+  "editInsert",
+  "editMerge",
+  "editRangeReplace",
+  "editSplit",
+  "editStart",
+  "fileDragOver",
+  "fileDrop",
+  "hit",
+  "hover",
+  "insertZones",
+  "layoutHit",
+  "nativeDragEnter",
+]);
+
 /** Handle a message the iframe posted back: ready handshake, pointer hit/hover, measured geometry. */
 function handleMessage(state: HostState, msg: IframeToParent): void {
+  if (state.preview && PREVIEW_BLOCKED.has(msg.kind)) {
+    return;
+  }
   switch (msg.kind) {
     case "ready": {
       state.ready = true;
@@ -1139,6 +1199,9 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "hit": {
+      // Selecting a real document node retires any layout selection — the two are alternatives, and
+      // A stale layout panel next to a fresh element selection would name the wrong thing.
+      setLayoutSelection(null);
       // The clicked panel becomes the ACTIVE panel (same as clicking its header): getActivePanel(),
       // Header highlighting, and the style panel's breakpoint context all follow the click — and the
       // Block action bar anchors to the panel the selection was actually made in, not panel 0.
@@ -1182,6 +1245,28 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         state.overlay.setSelection(rect);
         state.lastSelectionRect = rect;
       }
+      return;
+    }
+    case "layoutHit": {
+      // A click on layout chrome — a node with no page-document path, so it can never become a
+      // `session.selection`. Before this it selected nothing and posted nothing, which is what made
+      // The first click a new user makes (the site name in the header) appear to do nothing at all.
+      // Specimen catalogs have no layout, so the stylebook host ignores it.
+      if (state.stylebook) {
+        return;
+      }
+      canvasContextMenuHandler?.dismiss();
+      setLayoutSelection(msg.hit);
+      // Mutually exclusive with a document selection: the inspector renders one panel or the other.
+      state.selectionPath = null;
+      const tab = activeTab.value;
+      if (tab) {
+        tab.session.selection = null;
+      }
+      const rect = canvasRectToParent(msg.hit.rect);
+      state.overlay.setSelection(rect, `LAYOUT · ${msg.hit.layoutFile}`);
+      state.lastSelectionRect = rect;
+      renderOnly("rightPanel");
       return;
     }
     case "hover": {
@@ -1305,6 +1390,16 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "contentHeight": {
+      /* Preview keeps the iframe a REAL VIEWPORT: it stays at the CSS height the preview stage gives
+         it and scrolls its own document, so `position:sticky`, scroll-driven animation and
+         IntersectionObserver reveals fire exactly as they will in production. Growing the frame to
+         its content height — what every editing mode needs, so the parent overlay can reach every
+         node — is what stopped all three from ever firing in the one view whose job is fidelity. */
+      if (state.preview) {
+        state.iframe.style.height = "100%";
+        state.iframe.style.minHeight = "0px";
+        return;
+      }
       // Size the iframe element to its document so the canvas never scrolls internally — the parent
       // Canvas pans/scrolls instead, every node stays inside the iframe box (hit-testable), and the
       // Overlay (drawn in canvas space) tracks it. The cssText's 480px `min-height` is a
@@ -1447,6 +1542,16 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       }
       state.lastSnapshotSeq = msg.seq;
       state.snapshot = msg;
+      /* A snapshot posts ONLY from a live session (the frame's `onSelectionChange` returns early
+         when nothing is being edited), so it is independent proof that a caret is alive in this
+         host — the third of the three messages {@link isCaretActive} is derived from. Adopting the
+         host here recovers the flag if the `editStart` that opened the session never landed, and it
+         cannot resurrect a finished one: the frame stops posting snapshots before it posts
+         `editEnd`, and the channel is FIFO. */
+      if (!state.editing) {
+        state.editing = true;
+        activeEditHost = state;
+      }
       toolbarRefresh?.();
       return;
     }
@@ -1742,8 +1847,12 @@ export async function mountIframeCanvas(
     ...(editableTags ? { editableTags } : {}),
     ...(consumeAllowAutoRequests() ? { allowAutoRequests: true } : {}),
   };
-  // A mode switch to preview mid-split must not start an edit session in the preview render.
-  if (message.mode === "preview") {
+  // Preview is the fidelity view: no editing messages are honoured from it, no overlay is painted
+  // Over it, and the frame stays viewport-sized so it scrolls for real. A mode switch to preview
+  // Mid-split must likewise not start an edit session in the preview render.
+  state.preview = message.mode === "preview";
+  state.overlay.setSuppressed(state.preview);
+  if (state.preview) {
     state.pendingEnterEdit = null;
   }
   if (state.ready) {
@@ -1773,6 +1882,8 @@ export function mountStylebookCanvas(
   const state = ensureHost(canvasEl);
   state.pendingTabIds.set(gen, null);
   state.stylebook = { pathToTag: generated.pathToTag, tagToCardPath: generated.tagToCardPath };
+  state.preview = false;
+  state.overlay.setSuppressed(false);
   state.pendingEnterEdit = null;
   state.iframe.style.width = widthPx ? `${widthPx}px` : "100%";
   // Two independent plain clones: the iframe renders `doc` and folds styleUpdates into `shadowDoc`

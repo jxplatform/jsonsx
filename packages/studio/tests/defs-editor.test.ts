@@ -95,9 +95,9 @@ describe("defs list panel", () => {
   test("renders empty state when nothing is selected", () => {
     const { container } = setup({});
     expect(container.querySelector(".settings-empty-state")?.textContent).toContain(
-      "Select or create a type definition",
+      "Pick a data shape on the left, or create one.",
     );
-    expect(container.querySelectorAll(".settings-list-panel sp-action-button").length).toBe(1); // Only "New Definition"
+    expect(container.querySelectorAll(".settings-list-panel sp-action-button").length).toBe(1); // Only "New Data Shape"
   });
 
   test("lists existing definition names and selecting one shows its editor", () => {
@@ -119,7 +119,7 @@ describe("defs list panel", () => {
 describe("new definition flow", () => {
   test("create via Enter trims the name, selects it, and persists with tab indent", async () => {
     const { container, state } = setup({});
-    pointer(buttonByText(container, "New Definition"), "click");
+    pointer(buttonByText(container, "New Data Shape"), "click");
     const input = container.querySelector(".settings-inline-form sp-textfield")!;
     setAndFire(input, "  ApiResponse  ", "input");
     key(input, "Enter");
@@ -135,7 +135,7 @@ describe("new definition flow", () => {
 
   test("create via the Create button", async () => {
     const { container, state } = setup({});
-    pointer(buttonByText(container, "New Definition"), "click");
+    pointer(buttonByText(container, "New Data Shape"), "click");
     setAndFire(container.querySelector(".settings-inline-form sp-textfield")!, "Product", "input");
     pointer(buttonByText(container, "Create"), "click");
     expect(config().$defs.Product).toBeDefined();
@@ -145,7 +145,7 @@ describe("new definition flow", () => {
 
   test("blank name is rejected and the form stays open", async () => {
     const { container, state } = setup({});
-    pointer(buttonByText(container, "New Definition"), "click");
+    pointer(buttonByText(container, "New Data Shape"), "click");
     const input = container.querySelector(".settings-inline-form sp-textfield")!;
     setAndFire(input, "   ", "input");
     key(input, "Enter");
@@ -159,7 +159,7 @@ describe("new definition flow", () => {
 
   test("duplicate name does not overwrite the existing definition", async () => {
     const { container, state } = setup(postDefs());
-    pointer(buttonByText(container, "New Definition"), "click");
+    pointer(buttonByText(container, "New Data Shape"), "click");
     const input = container.querySelector(".settings-inline-form sp-textfield")!;
     setAndFire(input, "Post", "input");
     key(input, "Enter");
@@ -171,7 +171,7 @@ describe("new definition flow", () => {
 
   test("missing project config is a safe no-op", () => {
     const { container } = setup(null);
-    pointer(buttonByText(container, "New Definition"), "click");
+    pointer(buttonByText(container, "New Data Shape"), "click");
     const input = container.querySelector(".settings-inline-form sp-textfield")!;
     setAndFire(input, "Whatever", "input");
     expect(() => key(input, "Enter")).not.toThrow();
@@ -183,7 +183,7 @@ describe("new definition flow", () => {
     resetStudioState({ projectConfig: {} as unknown });
     const container = document.createElement("div");
     renderDefsEditor(container);
-    pointer(buttonByText(container, "New Definition"), "click");
+    pointer(buttonByText(container, "New Data Shape"), "click");
     const input = container.querySelector(".settings-inline-form sp-textfield")!;
     setAndFire(input, "Fresh", "input");
     key(input, "Enter");
@@ -566,7 +566,7 @@ describe("delete definition", () => {
     const { container, state } = setup(postDefs());
     selectDef(container, "Post");
     pointer(
-      container.querySelector('.settings-editor-header [title="Delete definition"]')!,
+      container.querySelector('.settings-editor-header [title="Delete data shape"]')!,
       "click",
     );
     expect(config().$defs.Post).toBeUndefined();
@@ -586,7 +586,7 @@ describe("delete definition", () => {
     expect(fresh.querySelector(".settings-empty-state")).not.toBeNull();
     // Delete on the stale container's header is a guarded no-op
     pointer(
-      container.querySelector('.settings-editor-header [title="Delete definition"]')!,
+      container.querySelector('.settings-editor-header [title="Delete data shape"]')!,
       "click",
     );
     expect(config().$defs).toEqual({});
