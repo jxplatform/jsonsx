@@ -41,21 +41,205 @@ declare global {
 const FREEZE_CSS =
   "*, *::before, *::after { animation: none !important; transition: none !important; caret-color: transparent !important; }";
 
-async function freezeFrame(frame: Frame): Promise<void> {
-  try {
-    await frame.evaluate((css) => {
-      const style = document.createElement("style");
-      style.dataset.jxScreenshotFreeze = "1";
-      style.textContent = css;
-      document.head.append(style);
-    }, FREEZE_CSS);
-  } catch {
-    // Frame may have detached or be about:blank — freezing is best-effort per frame.
-  }
+/**
+ * Install the freeze into the document that is about to be parsed.
+ *
+ * The freeze used to be injected into every live frame at one moment in the shot — after which
+ * `setCanvasMode` rebuilt the canvas iframe DOM, so 58 of 61 shots photographed a frame created
+ * AFTER the freeze and therefore unfrozen. Frozen-ness has to be a property of the document, not of
+ * a moment in the runner, so this runs as an on-new-document script (which Chromium applies to the
+ * page AND to every frame it later creates) and is re-applied to any frame that attaches with a
+ * document already in flight.
+ *
+ * The style is appended to `documentElement`, not `head`: this executes before the parser has built
+ * a `<head>`, and a `<style>` applies wherever it sits in the tree.
+ */
+function installFreeze(css: string): void {
+  const add = () => {
+    if (document.querySelector("style[data-jx-screenshot-freeze]")) {
+      return;
+    }
+    const style = document.createElement("style");
+    style.dataset.jxScreenshotFreeze = "1";
+    style.textContent = css;
+    (document.head ?? document.documentElement).append(style);
+  };
+  add();
+  document.addEventListener("DOMContentLoaded", add, { once: true });
+}
+
+/**
+ * Arm the freeze for `page` and every frame it will ever create, plus any frame that attaches with
+ * its document already under way. Must be called BEFORE the first navigation.
+ */
+async function armFreeze(page: Page): Promise<void> {
+  await page.evaluateOnNewDocument(installFreeze, FREEZE_CSS);
+  page.on("frameattached", (frame: Frame) => {
+    void frame.evaluate(installFreeze, FREEZE_CSS).catch(() => {
+      // Detached / about:blank / cross-origin-without-a-document — the on-new-document script
+      // Covers the frame's real document either way.
+    });
+  });
 }
 
 async function hook(page: Page, method: string, ...args: unknown[]): Promise<unknown> {
   return page.evaluate((m, a) => window.__jxAutomation[m]!(...a), method, args);
+}
+
+// ─── Quiescence: the one predicate that is allowed to fail ──────────────────────
+
+/**
+ * Connections that are open BY DESIGN and never complete: the dev server's live-reload EventSource
+ * and the collab WebSocket. Counting them as in-flight would mean the page is never quiet, which is
+ * how a real predicate turns back into a sleep.
+ */
+const LONG_LIVED_PATHS = ["/__reload", "/__studio/collab"];
+const LONG_LIVED_TYPES = new Set(["eventsource", "websocket"]);
+
+/** How long a single request may stay in flight before the tracker stops counting it. */
+const REQUEST_STALL_MS = 20_000;
+
+/**
+ * Counts the page's outstanding network requests, across every frame.
+ *
+ * This exists because of a measured failure: the `hero` shot captured first in a process and
+ * captured tenth produced two different pictures at RMSE 0.150, and the difference was that the
+ * starter site's webfonts (fetched from a remote host inside the canvas iframe) had not swapped in
+ * yet on the cold one. Nothing in the runner was waiting for them — `document.fonts.ready` in the
+ * canvas frame resolves "loaded" against an EMPTY font set while the frame is still blank. The
+ * honest predicate is "the page has stopped fetching", and it names what it was still fetching when
+ * it times out.
+ */
+function trackRequests(page: Page): { pending: () => string[] } {
+  const inFlight = new Map<string, number>();
+  const ignorable = (url: string, type: string) =>
+    LONG_LIVED_TYPES.has(type) || LONG_LIVED_PATHS.some((p) => url.includes(p));
+  page.on("request", (req) => {
+    if (!ignorable(req.url(), req.resourceType())) {
+      inFlight.set(req.url(), Date.now());
+    }
+  });
+  const settle = (req: { url: () => string }) => inFlight.delete(req.url());
+  page.on("requestfinished", settle);
+  page.on("requestfailed", settle);
+  return {
+    pending: () => {
+      const now = Date.now();
+      for (const [url, started] of inFlight) {
+        if (now - started > REQUEST_STALL_MS) {
+          inFlight.delete(url);
+        }
+      }
+      return [...inFlight.keys()];
+    },
+  };
+}
+
+/**
+ * Per-frame render readiness: no font load in flight, no running Web Animation, and a focus ring
+ * that has stopped moving. Returns the reasons it is NOT ready, so a timeout can say so instead of
+ * being answered with another 500 ms.
+ *
+ * Focus is a condition here, not something the runner simply sets, because a dialog's own focus
+ * management is asynchronous and will happily overwrite a blur that ran a frame too early.
+ * Measured: `new-project` and `settings-modal` grew and lost a blue `:focus-visible` ring on the
+ * modal's close button between two runs of the same tree, purely on whether the runner's blur
+ * landed before or after the overlay's autofocus. Waiting for focus to be STABLE (rather than
+ * insisting it be nowhere) is correct in both worlds: where nothing claims focus the blur stands
+ * and no ring is photographed, and where a focus trap claims it the ring is photographed every
+ * single time.
+ */
+function frameBlockers(): string[] {
+  const blocked: string[] = [];
+  const loading = [...document.fonts].filter((f) => f.status === "loading").length;
+  if (loading > 0 || document.fonts.status === "loading") {
+    blocked.push(`${loading || 1} font face(s) loading`);
+  }
+  const running = document.getAnimations().filter((a) => a.playState === "running").length;
+  if (running > 0) {
+    blocked.push(`${running} animation(s) running`);
+  }
+  /* Images are covered by the network condition and deliberately NOT by an `img.complete` sweep.
+     Measured, both naive predicates are wrong: "no broken image" never clears (the design canvas
+     renders unresolved bindings as literal srcs like `{$map/item/image}`, and several starters ship
+     a 404 favicon), and "no incomplete image" never clears either (`loading="lazy"` images below the
+     fold stay incomplete forever). Both blocked 8 of 61 shots for the full 30s timeout.
+
+     What remains uncovered is `installCanvasImageRetry`'s 150/300/450ms re-fire ladder: in the gaps
+     BETWEEN those timers the network is quiet and nothing is in flight, so a capture can land on an
+     alt-text placeholder that the next retry would have filled. Only the app knows a retry is
+     pending, which is precisely why §13.4 puts "images decoded" inside the canvas's own `idle`
+     message rather than in the runner. Left for that; a sleep here would be the wrong shape and
+     would be the first step back toward 73 seconds of them. */
+  const w = window as unknown as { __jxShotFocus?: Element | null };
+  const active = document.activeElement;
+  if (!("__jxShotFocus" in w) || w.__jxShotFocus !== active) {
+    w.__jxShotFocus = active;
+    blocked.push(`focus moved to <${active?.tagName.toLowerCase() ?? "none"}>`);
+  }
+  return blocked;
+}
+
+/** Everything blocking a truthful capture right now, named. Empty means "photograph it". */
+async function quiescenceBlockers(page: Page, net: { pending: () => string[] }): Promise<string[]> {
+  const blocked = net.pending().map((url) => `network: ${url}`);
+  for (const frame of page.frames()) {
+    try {
+      const reasons = await frame.evaluate(frameBlockers);
+      const label = frame === page.mainFrame() ? "shell" : "canvas";
+      blocked.push(...reasons.map((r) => `${label}: ${r}`));
+    } catch {
+      // Detached mid-poll — it cannot be blocking a capture it is not in.
+    }
+  }
+  return blocked;
+}
+
+/**
+ * Block until the page is quiet for two consecutive animation frames, or REJECT naming what is
+ * still outstanding. Rejecting is the whole point: a sleep cannot fail, so a slow subsystem gets
+ * answered with a bigger number and the wrong capture is accepted.
+ */
+async function waitForQuiescence(
+  page: Page,
+  net: { pending: () => string[] },
+  timeoutMs = 30_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let clean = 0;
+  let last: string[] = [];
+  while (Date.now() < deadline) {
+    last = await quiescenceBlockers(page, net);
+    if (last.length === 0) {
+      clean += 1;
+      if (clean >= 2) {
+        return;
+      }
+    } else {
+      clean = 0;
+    }
+    await runWait(page, { frames: 1, type: "settle" });
+  }
+  throw new Error(`page never went quiet (${timeoutMs}ms). Blocked by:\n  ${last.join("\n  ")}`);
+}
+
+/**
+ * Put the pointer and the keyboard focus somewhere the shot DECLARED, which today means nowhere.
+ *
+ * `:hover` and `:focus-visible` visibly change dense panels, and neither was controlled: the
+ * pointer stayed wherever the last click action left it and focus stayed in whatever the last
+ * interaction touched, so a panel that re-rendered under a stationary cursor could pick up a hover
+ * ring the shot never asked for.
+ */
+async function resetPointerAndFocus(page: Page): Promise<void> {
+  // Off-canvas: no element is under the cursor, so nothing matches :hover.
+  await page.mouse.move(-1, -1);
+  await page.evaluate(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body) {
+      active.blur();
+    }
+  });
 }
 
 async function runWait(page: Page, wait: WaitCondition): Promise<void> {
@@ -451,17 +635,59 @@ async function resolveRegionClip(
   return rect;
 }
 
-async function captureRegions(page: Page, shot: ResolvedShot, ctx: ShotContext): Promise<string[]> {
+/**
+ * Record every scroll offset in the page so a region measurement can be undone.
+ *
+ * {@link resolveRegionClip} scrolls the region into view, which leaves the page somewhere the NEXT
+ * region did not ask for — and 16 shots capture two or more regions, so region #2 was being
+ * measured against region #1's scroll position. The refs live on `window` rather than in a data
+ * attribute because an attribute would be in the photograph.
+ */
+async function saveScrollState(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __jxShotScroll?: [Element, number, number][] };
+    w.__jxShotScroll = [...document.querySelectorAll("*")].map(
+      (el) => [el, el.scrollTop, el.scrollLeft] as [Element, number, number],
+    );
+  });
+}
+
+/** Put every scroll offset back where {@link saveScrollState} found it. */
+async function restoreScrollState(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __jxShotScroll?: [Element, number, number][] };
+    for (const [el, top, left] of w.__jxShotScroll ?? []) {
+      if (el.scrollTop !== top) {
+        el.scrollTop = top;
+      }
+      if (el.scrollLeft !== left) {
+        el.scrollLeft = left;
+      }
+    }
+    w.__jxShotScroll = undefined;
+  });
+}
+
+async function captureRegions(
+  page: Page,
+  shot: ResolvedShot,
+  ctx: ShotContext,
+  net: { pending: () => string[] },
+): Promise<string[]> {
   const written: string[] = [];
   for (const region of shot.regions ?? []) {
-    // Re-settle so any scroll from the previous region's scrollIntoView is stable before measuring.
-    await runWait(page, { frames: 1, type: "settle" });
+    // Every region measures from the SAME page state: save it, scroll to measure, capture, put it
+    // Back. Otherwise region N's scrollIntoView is region N+1's starting position.
+    await saveScrollState(page);
     const clip = await resolveRegionClip(page, region);
+    await resetPointerAndFocus(page);
+    await waitForQuiescence(page, net);
     const outPath = join(ctx.outDir, `${region.name}.png`);
     // CaptureBeyondViewport: false — see captureVariant (region clips are clamped to the viewport).
     const buffer = Buffer.from(await page.screenshot({ captureBeyondViewport: false, clip }));
     await writeIfChanged(page, outPath, buffer, ctx, shot.name);
     written.push(outPath);
+    await restoreScrollState(page);
   }
   return written;
 }
@@ -472,6 +698,7 @@ export async function executeShot(
   ctx: ShotContext,
 ): Promise<string[]> {
   const written: string[] = [];
+  const net = trackRequests(page);
   await page.setViewport({
     deviceScaleFactor: shot.deviceScaleFactor,
     height: shot.viewport.height,
@@ -487,10 +714,14 @@ export async function executeShot(
   const url = `${ctx.serverUrl}${ctx.studioPath}?${params}`;
   ctx.log(`[shot:${shot.name}] ${url}`);
 
-  // Shots share one browser, and Studio persists panel widths/collapse state to localStorage —
-  // A shot that collapses a panel would otherwise leak that layout into every later shot (order-
-  // Dependent captures). Clear storage before the app boots so every shot starts from defaults.
+  // Studio persists panel widths/collapse state to localStorage. The shot's own browser context is
+  // Already fresh, so this is belt-and-braces against a same-context reload rather than the primary
+  // Isolation — but it costs one line and it is the difference between "starts from defaults" being
+  // A property and being a hope.
   await page.evaluateOnNewDocument(() => localStorage.clear());
+  // Frozen-ness must be a property of every document this page will ever load, including the canvas
+  // Iframes that setCanvasMode rebuilds AFTER this point. Arm before navigating.
+  await armFreeze(page);
   await page.goto(url, { timeout: 120_000, waitUntil: "networkidle2" });
   await page.waitForFunction(() => Boolean(window.__jxAutomation), { timeout: 30_000 });
 
@@ -507,9 +738,6 @@ export async function executeShot(
           { frames: 2, type: "settle" },
         ],
   );
-  for (const frame of page.frames()) {
-    await freezeFrame(frame);
-  }
 
   if (shot.theme !== "dark") {
     await hook(page, "setTheme", shot.theme);
@@ -522,13 +750,15 @@ export async function executeShot(
     await runAction(page, action);
   }
   await runWaits(page, shot.waitFor);
+  await resetPointerAndFocus(page);
+  await waitForQuiescence(page, net);
 
   const main = await captureVariant(page, shot, ctx, `${shot.name}.png`);
   if (main) {
     written.push(main);
   }
 
-  written.push(...(await captureRegions(page, shot, ctx)));
+  written.push(...(await captureRegions(page, shot, ctx, net)));
 
   for (const variant of shot.variants ?? []) {
     if (variant.theme) {
@@ -538,6 +768,8 @@ export async function executeShot(
       await runAction(page, action);
     }
     await runWaits(page, variant.waitFor ?? shot.waitFor);
+    await resetPointerAndFocus(page);
+    await waitForQuiescence(page, net);
     const v = await captureVariant(page, shot, ctx, `${shot.name}${variant.suffix}.png`);
     if (v) {
       written.push(v);

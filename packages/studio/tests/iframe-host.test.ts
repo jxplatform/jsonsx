@@ -72,6 +72,7 @@ void mock.module("../src/canvas/canvas-live-render", () => ({
 }));
 
 const {
+  adoptCanvasPreviewMode,
   adoptDragSession,
   allowAutoRequestsOnNextRender,
   beginDragSession,
@@ -2710,5 +2711,126 @@ describe("preview renders", () => {
     channels[0]!.deliver({ fragment: false, height: 4000, kind: "contentHeight" });
     expect(iframe.style.height).toBe("100%");
     expect(iframe.style.minHeight).toBe("0px");
+  });
+});
+
+// ─── The preview flag and the frame box are ONE state transition ────────────────
+// Frame sizing has two inputs on two different clocks: the render mode (synchronous, decided by the
+// Renderer) and the content measurement (asynchronous, posted by the iframe — and DEDUPED by it, so
+// An unchanged measurement produces no message at all). Before this was derived rather than
+// Incremental, an entering-preview render whose measurement had already landed stayed content-sized
+// Forever: there was no second message to correct it. The camera caught it; a user switching into
+// Preview loses the same race.
+
+describe("preview frame sizing is derived, not incremental", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+  });
+
+  test("entering preview re-sizes the frame from the retained measurement, with no new message", async () => {
+    // Design render: the iframe measures its content and the frame grows to it.
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    channels[0]!.deliver({ fragment: false, height: 1234, kind: "contentHeight" });
+    expect(iframe.style.height).toBe("1234px");
+
+    // Switch the SAME host to preview. The iframe posts nothing: its measurement is unchanged, and
+    // It only posts on a change. The frame must still become a real viewport.
+    resolved.mapperCtx = { ...(resolved.mapperCtx as object), canvasMode: "preview" };
+    await mountIframeCanvas(2, {} as never, canvasEl, null, activeTab.value?.id ?? null);
+    expect(iframe.style.height).toBe("100%");
+    expect(iframe.style.minHeight).toBe("0px");
+  });
+
+  test("leaving preview restores the content-sized frame from the retained measurement", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    channels[0]!.deliver({ fragment: false, height: 1234, kind: "contentHeight" });
+
+    resolved.mapperCtx = { ...(resolved.mapperCtx as object), canvasMode: "preview" };
+    await mountIframeCanvas(2, {} as never, canvasEl, null, activeTab.value?.id ?? null);
+    expect(iframe.style.height).toBe("100%");
+
+    resolved.mapperCtx = { ...(resolved.mapperCtx as object), canvasMode: "design" };
+    await mountIframeCanvas(3, {} as never, canvasEl, null, activeTab.value?.id ?? null);
+    expect(iframe.style.height).toBe("1234px");
+    expect(iframe.style.minHeight).toBe("480px");
+  });
+
+  test("a measurement that lands mid-resolve is re-answered under the mode that actually renders", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+
+    // Hold the next mount's document resolution open — this is the window in which the host does
+    // Not yet know the incoming mode.
+    let release: (() => void) | null = null;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const previewResolved = {
+      ...resolved,
+      mapperCtx: { ...(resolved.mapperCtx as object), canvasMode: "preview" },
+    };
+    void mock.module("../src/canvas/canvas-live-render", () => ({
+      resolveCanvasDocument: async () => {
+        await gate;
+        return previewResolved;
+      },
+    }));
+
+    const mounting = mountIframeCanvas(4, {} as never, canvasEl, null, activeTab.value?.id ?? null);
+    // Mid-resolve the iframe measures and posts. The host has not adopted the preview flag yet.
+    channels[0]!.deliver({ fragment: false, height: 4000, kind: "contentHeight" });
+    release!();
+    await mounting;
+
+    expect(iframe.style.height).toBe("100%");
+    expect(iframe.style.minHeight).toBe("0px");
+
+    // Restore the shared stub for the rest of the file.
+    void mock.module("../src/canvas/canvas-live-render", () => ({
+      resolveCanvasDocument: () => {
+        resolveCalls += 1;
+        return Promise.resolve(resolved);
+      },
+    }));
+  });
+
+  test("adoptCanvasPreviewMode sizes the frame synchronously, before any mount awaits", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    channels[0]!.deliver({ fragment: false, height: 1234, kind: "contentHeight" });
+    expect(iframe.style.height).toBe("1234px");
+
+    // No await between the declaration and the assertion: this is the whole point of the seam.
+    adoptCanvasPreviewMode(canvasEl, true);
+    expect(iframe.style.height).toBe("100%");
+    expect(iframe.style.minHeight).toBe("0px");
+
+    adoptCanvasPreviewMode(canvasEl, false);
+    expect(iframe.style.height).toBe("1234px");
+  });
+
+  test("a fragment measurement keeps its dropped floor across a preview round trip", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    channels[0]!.deliver({ fragment: true, height: 300, kind: "contentHeight" });
+    expect(iframe.style.minHeight).toBe("0px");
+
+    adoptCanvasPreviewMode(canvasEl, true);
+    adoptCanvasPreviewMode(canvasEl, false);
+    expect(iframe.style.height).toBe("300px");
+    expect(iframe.style.minHeight).toBe("0px");
+  });
+
+  test("before any measurement, leaving preview leaves the cssText defaults alone", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    adoptCanvasPreviewMode(canvasEl, true);
+    expect(iframe.style.minHeight).toBe("0px");
+    adoptCanvasPreviewMode(canvasEl, false);
+    // Nothing measured, so there is nothing to restore — the frame keeps whatever preview left it
+    // At rather than inventing a height.
+    expect(iframe.style.height).toBe("100%");
   });
 });

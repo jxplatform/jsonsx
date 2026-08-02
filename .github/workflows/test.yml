@@ -192,6 +192,12 @@ jobs:
       # Studio chrome is capped: ≤5 commands in the Command Bar's primary cluster,
       # ≤4 tabs per dock. See UX-REDESIGN-PLAN §2, principle 9.
       - run: bun scripts/check-chrome-budget.ts
+      # Screenshot manifest — Lane 1 of the gate (UX-REDESIGN-PLAN §13.5). No browser,
+      # seconds: every shot step must name a declared, scriptable command with valid
+      # args, no `toggle*` id, and no CSS/XPath selector beyond the committed budget.
+      # `docs:verify` below checks only that referenced images EXIST; this is the check
+      # that turns a panel or command rename into a red X in the PR that caused it.
+      - run: bun scripts/check-shot-contract.ts
       - run: bun run typecheck
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
       # which the root's two strictest flags reject 165 times) so it needs its own pass — without

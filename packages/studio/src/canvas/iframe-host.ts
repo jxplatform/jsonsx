@@ -92,8 +92,20 @@ interface HostState {
    * Whether this host's iframe currently renders a PREVIEW. Preview is the fidelity view, so the
    * host refuses every editing message from it ({@link PREVIEW_BLOCKED}), suppresses the overlay
    * layer, and leaves the iframe at its CSS height so the frame scrolls its own document.
+   *
+   * Never assign this directly — go through {@link setHostPreview}, which applies the frame sizing
+   * the flag implies in the SAME state transition. See {@link applyFrameSizing}.
    */
   preview: boolean;
+  /**
+   * The last content height this host's iframe measured and posted, or null before the first
+   * measurement. Retained (rather than consumed and dropped) because frame sizing is a function of
+   * `preview` too, and the iframe DEDUPES `contentHeight` on an unchanged measurement — so leaving
+   * preview cannot rely on a fresh message arriving to restore the content-sized frame.
+   */
+  contentHeight: number | null;
+  /** Whether the last measured content was a component-definition fragment (drops the 480px floor). */
+  contentFragment: boolean;
   /** Whether an inline-edit session is live in this host's iframe (drives the format toolbar). */
   editing: boolean;
   /** The prop a live plain session edits (prop-bound text) — null for rich sessions/none. */
@@ -500,6 +512,69 @@ function syncEditZoomViewportHeight(state: HostState): void {
   const match = /scale\(([\d.]+)\)/.exec(state.canvasEl.style.transform);
   const scale = match ? Number(match[1]!) : 1;
   viewport.style.height = scale === 1 ? "" : `${state.iframe.offsetHeight * scale}px`;
+}
+
+/**
+ * Write the iframe's box from the host's CURRENT state — the render mode and the last content
+ * measurement — and nothing else. Frame sizing is derived, never incremental, because the two
+ * inputs arrive on different clocks: `preview` flips synchronously inside a mount, the measurement
+ * arrives asynchronously over the channel, and the iframe DEDUPES a repeated measurement (so "the
+ * next `contentHeight` will fix it" is false). Deriving both branches from one function called at
+ * every transition of either input is what makes the two impossible to disagree.
+ *
+ * Preview keeps the iframe a REAL VIEWPORT: it stays at the CSS height the preview stage gives it
+ * and scrolls its own document, so `position:sticky`, scroll-driven animation and
+ * IntersectionObserver reveals fire exactly as they will in production. Growing the frame to its
+ * content height — what every editing mode needs, so the parent overlay can reach every node — is
+ * what stopped all three from ever firing in the one view whose job is fidelity.
+ *
+ * The cssText's 480px `min-height` is a pre-measurement floor so an empty/short PAGE stays a usable
+ * canvas; a component DEFINITION (fragment) instead hugs its content, so drop the floor for it once
+ * measured (else a short component leaves dead space below — pages keep the floor and stay tall via
+ * `#jx-canvas-root`).
+ */
+function applyFrameSizing(state: HostState): void {
+  if (state.preview) {
+    state.iframe.style.height = "100%";
+    state.iframe.style.minHeight = "0px";
+    return;
+  }
+  if (state.contentHeight === null) {
+    // Nothing measured yet — the cssText defaults (height:100%; min-height:480px) stand.
+    return;
+  }
+  state.iframe.style.height = `${state.contentHeight}px`;
+  state.iframe.style.minHeight = state.contentFragment ? "0px" : "480px";
+  syncEditZoomViewportHeight(state);
+}
+
+/**
+ * Adopt a render mode's preview-ness as ONE state transition: the flag, the overlay suppression,
+ * the dropped pending edit and the frame box all move together. Mounts must call this rather than
+ * assigning `state.preview` — a mount resolves its document asynchronously, so between the mode
+ * changing and the flag landing the host would otherwise answer a `contentHeight` with the previous
+ * mode's sizing rule and never get a second chance to correct it.
+ */
+function setHostPreview(state: HostState, preview: boolean): void {
+  state.preview = preview;
+  state.overlay.setSuppressed(preview);
+  if (preview) {
+    state.pendingEnterEdit = null;
+  }
+  applyFrameSizing(state);
+}
+
+/**
+ * Declare, SYNCHRONOUSLY, which kind of render `canvasEl`'s host is about to receive.
+ *
+ * {@link mountIframeCanvas} resolves its document asynchronously, so the mode it will post is not
+ * known to the host until an await has passed. The renderer knows it before the await — it is the
+ * mode it just built the surface for — so it says so here, and the host's frame box moves with the
+ * flag rather than trailing it. Without this the `contentHeight` the iframe posts during the
+ * resolve is answered under the OUTGOING mode's sizing rule.
+ */
+export function adoptCanvasPreviewMode(canvasEl: HTMLElement, preview: boolean): void {
+  setHostPreview(ensureHost(canvasEl), preview);
 }
 
 /** Post a parent→iframe drag message to `host`'s channel (the coordinator builds it purely). */
@@ -1041,6 +1116,8 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     canvasEl,
     canvasUrl,
     channel,
+    contentFragment: false,
+    contentHeight: null,
     editing: false,
     editingProp: null,
     iframe,
@@ -1388,25 +1465,11 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "contentHeight": {
-      /* Preview keeps the iframe a REAL VIEWPORT: it stays at the CSS height the preview stage gives
-         it and scrolls its own document, so `position:sticky`, scroll-driven animation and
-         IntersectionObserver reveals fire exactly as they will in production. Growing the frame to
-         its content height — what every editing mode needs, so the parent overlay can reach every
-         node — is what stopped all three from ever firing in the one view whose job is fidelity. */
-      if (state.preview) {
-        state.iframe.style.height = "100%";
-        state.iframe.style.minHeight = "0px";
-        return;
-      }
-      // Size the iframe element to its document so the canvas never scrolls internally — the parent
-      // Canvas pans/scrolls instead, every node stays inside the iframe box (hit-testable), and the
-      // Overlay (drawn in canvas space) tracks it. The cssText's 480px `min-height` is a
-      // Pre-measurement floor so an empty/short PAGE stays a usable canvas; a component DEFINITION
-      // (fragment) instead hugs its content, so drop the floor for it once measured (else a short
-      // Component leaves dead space below — pages keep the floor and stay tall via #jx-canvas-root).
-      state.iframe.style.height = `${msg.height}px`;
-      state.iframe.style.minHeight = msg.fragment ? "0px" : "480px";
-      syncEditZoomViewportHeight(state);
+      // The measurement is STATE, not an instruction: record it, then re-derive the frame box from
+      // (preview flag, last measurement) so the two can never disagree. See applyFrameSizing.
+      state.contentHeight = msg.height;
+      state.contentFragment = msg.fragment;
+      applyFrameSizing(state);
       return;
     }
     case "dragOver": {
@@ -1847,12 +1910,10 @@ export async function mountIframeCanvas(
   };
   // Preview is the fidelity view: no editing messages are honoured from it, no overlay is painted
   // Over it, and the frame stays viewport-sized so it scrolls for real. A mode switch to preview
-  // Mid-split must likewise not start an edit session in the preview render.
-  state.preview = message.mode === "preview";
-  state.overlay.setSuppressed(state.preview);
-  if (state.preview) {
-    state.pendingEnterEdit = null;
-  }
+  // Mid-split must likewise not start an edit session in the preview render. The flag and the frame
+  // Box move together (setHostPreview) — this assignment sits AFTER an await, so any contentHeight
+  // That landed while the document resolved was answered under the previous mode's rule.
+  setHostPreview(state, message.mode === "preview");
   if (state.ready) {
     state.channel.post(message);
   } else {
@@ -1880,8 +1941,7 @@ export function mountStylebookCanvas(
   const state = ensureHost(canvasEl);
   state.pendingTabIds.set(gen, null);
   state.stylebook = { pathToTag: generated.pathToTag, tagToCardPath: generated.tagToCardPath };
-  state.preview = false;
-  state.overlay.setSuppressed(false);
+  setHostPreview(state, false);
   state.pendingEnterEdit = null;
   state.iframe.style.width = widthPx ? `${widthPx}px` : "100%";
   // Two independent plain clones: the iframe renders `doc` and folds styleUpdates into `shadowDoc`

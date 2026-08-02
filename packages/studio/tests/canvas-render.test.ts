@@ -28,6 +28,12 @@ type IframeMount = (
 ) => Promise<void>;
 // The stylebook fast path posts style updates to live stylebook hosts; tests control the count.
 let styleUpdateImpl: (style: Record<string, unknown>) => number = () => 0;
+/**
+ * Every synchronous preview-mode declaration the renderer made, in order. The renderer must tell
+ * the host what kind of render is coming BEFORE it awaits the resolved document (see
+ * adoptCanvasPreviewMode) — these records are how a test sees that call happened, and with what.
+ */
+const previewAdoptions: { canvas: HTMLElement; preview: boolean }[] = [];
 let iframeImpl: IframeMount = async (_gen, doc, canvas) => {
   canvas.innerHTML = "";
   const root = document.createElement("div");
@@ -128,6 +134,8 @@ void mock.module("../src/canvas/canvas-live-render.js", () => ({
 }));
 
 void mock.module("../src/canvas/iframe-host.js", () => ({
+  adoptCanvasPreviewMode: (canvas: HTMLElement, preview: boolean) =>
+    previewAdoptions.push({ canvas, preview }),
   commitActiveEditSession: () => {},
   postStyleUpdateToStylebookHosts: (style: Record<string, unknown>) => styleUpdateImpl(style),
   getEditBarAnchorRect: () => null,

@@ -33,6 +33,7 @@ import {
 import { parseMediaEntries } from "../utils/canvas-media";
 import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
 import {
+  adoptCanvasPreviewMode,
   commitActiveEditSession,
   mountIframeCanvas,
   postStyleUpdateToStylebookHosts,
@@ -888,6 +889,12 @@ function renderCanvasIntoPanel(
 
   canvasPerf.panelRenders += 1;
   panel.ready = false;
+
+  // The host's frame box depends on whether this is a preview render, and mountIframeCanvas only
+  // Learns that after it has awaited the resolved document — one await during which the iframe can
+  // Post a contentHeight that the OUTGOING mode would answer. Declare it here, before the await,
+  // Where it is already known: this is the mode whose surface was just built.
+  adoptCanvasPreviewMode(canvas, _ctx?.getCanvasMode() === "preview");
 
   // Overrides (git-diff docs) mount with a null tab identity: their iframes must never route doc
   // Mutations anywhere. The real doc carries its tab id so edit/drop messages route to THAT tab.

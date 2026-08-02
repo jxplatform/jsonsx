@@ -1,0 +1,32 @@
+{
+  "contract": 1,
+  "outDir": "docs/images",
+  "server": { "studioPath": "packages/studio", "url": "http://127.0.0.1:3000" },
+  "defaults": { "project": "packages/starters/sites/restaurant", "theme": "dark" },
+  "shots": [
+    {
+      "name": "tab-strip-shot",
+      "docs": ["studio/interface/tabs"],
+      "steps": [
+        { "cmd": "view.showPanel", "args": { "panel": "layers" } },
+        { "cmd": "file.open", "args": { "path": "pages/menu.md" } },
+        { "cmd": "view.setActivity", "args": { "tab": "page" } },
+        { "seed": "git", "args": { "fixture": "dirty-3" } }
+      ],
+      "expect": [{ "region": "navigator/panel:git" }],
+      "capture": [
+        { "image": "tab-strip", "of": "pane.primary/tabs", "padding": 3 },
+        { "image": "href-field", "of": "inspector/field:href" }
+      ]
+    },
+    {
+      "name": "git-panel",
+      "docs": ["studio/publish"],
+      "steps": [
+        { "cmd": "canvas.setZoom", "args": { "zoom": 1 } },
+        { "cmd": "view.setAssistant", "args": { "open": false } }
+      ],
+      "capture": [{ "image": "git-panel", "of": "navigator/panel:git" }]
+    }
+  ]
+}
