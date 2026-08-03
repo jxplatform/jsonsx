@@ -127,7 +127,7 @@ export const CONTRACT_BUDGET = {
   regionSelectors: 0,
   clipSelectors: 0,
   argSelectors: 0,
-  inputSteps: 19,
+  inputSteps: 18,
   nonDerivedRegions: 12,
   unstable: 7,
 } as const;

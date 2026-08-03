@@ -53,6 +53,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 | Command                | Id                           | Shortcut | Level       | Requires                                                                          |
 | ---------------------- | ---------------------------- | -------- | ----------- | --------------------------------------------------------------------------------- |
+| Delete Layout          | `view.deleteLayout`          | —        | application | an open project                                                                   |
 | Focus Next Region      | `view.cycleRegion`           | `F6`     | application | —                                                                                 |
 | Focus Previous Region  | `view.cycleRegionBack`       | `⇧F6`    | application | —                                                                                 |
 | Focus Primary Pane     | `pane.focusPrimary`          | —        | document    | a split pane grid                                                                 |
@@ -61,10 +62,14 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Open in Browser        | `view.openInBrowser`         | `⌘⇧O`    | document    | a built page to open                                                              |
 | Open Selector Menu     | `style.openSelectorMenu`     | —        | selection   | the Style tab showing a selected element                                          |
 | Preferences…           | `app.preferences`            | `⌘,`     | application | —                                                                                 |
+| Rename Layout          | `view.renameLayout`          | —        | application | an open project                                                                   |
+| Reset Layout           | `view.resetLayout`           | —        | application | an open project                                                                   |
 | Run Command…           | `palette.openCommands`       | `⌘⇧P`    | application | —                                                                                 |
+| Save Layout            | `view.saveLayout`            | —        | application | an open project                                                                   |
 | Set Canvas Mode        | `canvas.setMode`             | —        | document    | an open document                                                                  |
 | Set Edit Zoom          | `canvas.setEditZoom`         | —        | document    | a document in edit mode                                                           |
 | Set Fit                | `canvas.setFit`              | —        | document    | an open document                                                                  |
+| Set Pane Zoom          | `pane.setZoomed`             | —        | document    | a split pane grid                                                                 |
 | Set Style Selector     | `style.setSelector`          | —        | selection   | an element selection                                                              |
 | Set Theme              | `view.setTheme`              | —        | application | —                                                                                 |
 | Set Zoom               | `canvas.setZoom`             | —        | document    | a document on the pan-zoom surface                                                |
@@ -89,6 +94,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Show State             | `panel.focus.state`          | —        | application | an open project                                                                   |
 | Show Style             | `inspector.focus.style`      | `⌘⇧2`    | application | —                                                                                 |
 | Split Right            | `pane.splitRight`            | `⌘\`     | document    | a document that can open as Code, Config, Diff, Grid or Library beside the canvas |
+| Switch Layout          | `view.setLayout`             | —        | application | an open project                                                                   |
 | Toggle Bottom Dock     | `view.toggleBottomDock`      | `⌘J`     | application | —                                                                                 |
 | Toggle Inspector Dock  | `view.toggleInspector`       | `⌘⌥B`    | application | —                                                                                 |
 | Toggle Navigator Dock  | `view.toggleNavigator`       | `⌘B`     | application | —                                                                                 |
@@ -111,6 +117,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Previous Tab           | `document.previousTab`  | `⌃⇧Tab` or `⌘⇧Tab` | document | a second open document                            |
 | Reopen Closed Document | `document.reopenClosed` | `⌘⇧T`              | document | a document closed in this session                 |
 | Select State Entry     | `state.selectSignal`    | —                  | document | an open document that defines state               |
+| Set Document Pinned    | `document.setPinned`    | —                  | document | an open document                                  |
 
 ## Project
 

@@ -67,7 +67,7 @@ describe("the records themselves", () => {
     expect(checkPlacements(shellViewCommands(deps))).toEqual([]);
   });
 
-  test("all five ids register, and none of them is a toggle", () => {
+  test("every id registers, and none of them is a toggle", () => {
     const ids = registry.list().map((c) => c.id);
     expect(ids).toEqual([
       "view.setActivity",
@@ -75,15 +75,25 @@ describe("the records themselves", () => {
       "view.setNavigator",
       "view.setRightPanel",
       "view.setAssistant",
+      "view.setLayout",
+      "view.saveLayout",
+      "view.renameLayout",
+      "view.deleteLayout",
+      "view.resetLayout",
       "view.setTheme",
     ]);
     expect(ids.filter((id) => /\.toggle[A-Z]/.test(id))).toEqual([]);
   });
 
-  test("every record declares an args schema — the palette prompt and the AI parameters", () => {
-    for (const command of registry.list()) {
-      expect(command.args).toBeDefined();
-    }
+  test("every record that takes arguments declares a schema for them", () => {
+    // The palette prompt and the AI parameter list are both projections of `args`, so a verb with
+    // Parameters must declare them — and `view.resetLayout`, which has none, must NOT declare an
+    // Empty schema that would have the palette prompt for nothing.
+    const undeclared = registry
+      .list()
+      .filter((command) => !command.args)
+      .map((command) => command.id);
+    expect(undeclared).toEqual(["view.resetLayout"]);
   });
 });
 

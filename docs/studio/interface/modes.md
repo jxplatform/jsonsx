@@ -1,18 +1,18 @@
 ---
-title: "Modes and the preview toggle"
-description: "Edit, Design, Grid, Code, and Stylebook — what each canvas mode is for, which files offer which modes, and how the Preview toggle fits in."
+title: "Modes and views"
+description: "Edit, Design, Preview, Grid, Code and Project Styles — what each editor and view is for, and which files offer which."
 spec:
   - studio.md#4.2
 code:
   - packages/studio/src/panels/toolbar.ts
   - packages/studio/src/tabs/tab.ts
-  - packages/studio/src/panels/tab-bar.ts
+  - packages/studio/src/panels/pane-context.ts
   - packages/studio/src/canvas/canvas-render.ts
 ---
 
-# Modes and the preview toggle
+# Modes and views
 
-The mode switcher on the right side of the toolbar changes how the canvas presents the open file: **Edit**, **Design**, **Grid**, **Code**, and **Stylebook**. A mode is a lens, not a different app — the same file underneath, shown the way that suits the job. Modes that don't apply to the current file are disabled, and every open file remembers its own mode as you switch between tabs.
+Two controls on the [context bar](/docs/studio/interface/tabs) decide how the open file is presented, and they answer different questions. **Editor** is _which editor_ — **Canvas**, **Grid**, **Code**, **Diff** or **Project Styles** — and it lists only the editors this file supports, so there is nothing in it to be disabled. **View** is _which view of the canvas_ — **Edit**, **Design** or **Preview** — and it appears only while the Canvas editor is open. A view is a lens, not a different app: the same file underneath, shown the way that suits the job. Every open file remembers both as you switch between tabs.
 
 ## Edit
 
@@ -32,36 +32,36 @@ Grid is for tabular data. Files like CSV spreadsheets open as an editable table:
 
 ## Code
 
-Code shows the file as raw source in a full code editor with syntax highlighting — the same editor VS Code uses. It's the escape hatch when you want to see exactly what Studio wrote, and the **Export** button in the tab bar saves a copy of the file elsewhere. Everything you can do here you can also do visually; see **[Script & logic](/docs/studio/logic)** for where code fits in Studio.
+Code shows the file as raw source in a full code editor with syntax highlighting — the same editor VS Code uses. It's the escape hatch when you want to see exactly what Studio wrote, and the **Export** button at the right of the context bar saves a copy of the file elsewhere. Everything you can do here you can also do visually; see **[Script & logic](/docs/studio/logic)** for where code fits in Studio.
 
 ## Stylebook
 
-Stylebook is the catalog of your project's element defaults — every heading, button, and link rendered with its base style, so you set the look of each element type once for the whole site. Selecting Stylebook switches the right panel to the **Style** tab automatically. See **[Design mode](/docs/studio/design)** for how it fits into styling.
+Project Styles is the catalog of your project's element defaults — every heading, button, and link rendered with its base style, so you set the look of each element type once for the whole site. Selecting it switches the right panel to the **Style** tab automatically. See **[Design mode](/docs/studio/design)** for how it fits into styling.
 
 ![Jx Studio Stylebook mode showing element defaults across breakpoints](../../images/stylebook.png)
 
-## Which files offer which modes
+## Which files offer what
 
-Every file opens in its natural mode, and only sensible modes are enabled:
+Every file opens in its natural editor and view, and the two controls offer only what that file supports:
 
-| File                               | Opens in      | Also available                                                  |
-| ---------------------------------- | ------------- | --------------------------------------------------------------- |
-| Markdown pages and content (`.md`) | **Edit**      | **Design**, **Code**, and the **Preview** toggle                |
-| Components and pages (`.json`)     | **Edit**      | **Design**, **Code**, **Stylebook**, and the **Preview** toggle |
-| Spreadsheets (`.csv`)              | **Grid**      | **Code**                                                        |
-| The project file (`project.json`)  | **Stylebook** | **Code**                                                        |
+| File                               | Opens in           | Editor also offers           | View also offers        |
+| ---------------------------------- | ------------------ | ---------------------------- | ----------------------- |
+| Markdown pages and content (`.md`) | **Canvas** · Edit  | **Code**                     | **Design**, **Preview** |
+| Components and pages (`.json`)     | **Canvas** · Edit  | **Code**, **Project Styles** | **Design**, **Preview** |
+| Spreadsheets (`.csv`)              | **Grid**           | **Code**                     | —                       |
+| The project file (`project.json`)  | **Project Styles** | **Code**                     | —                       |
 
-Installed format extensions can add their own file types with their own mode lists, so this table can grow with your project.
+Installed format extensions can add their own file types with their own lists, so this table can grow with your project.
 
-## The Preview toggle
+## Preview
 
-**Preview** is not a sixth mode — it's a toggle in the tab bar that layers onto Edit and Design. Switch it on and the canvas shows the page with its real data resolved: dynamic text filled in, repeated lists expanded, exactly what a visitor gets.
+**Preview** is the third value of the **View** control, beside Edit and Design — one control, three values, so the bar can never show you Design while the canvas is previewing. Pick it and the canvas shows the page with its real data resolved: dynamic text filled in, repeated lists expanded, exactly what a visitor gets.
 
-Alongside the toggle, the tab bar offers:
+What it resolves _with_ comes from the **Context** control beside it:
 
 - For pages with dynamic addresses (a product page, a blog post), a picker per URL parameter so you choose which real record to preview.
 - For components, a small field per component option so you can try test values.
-- For pages that use a layout, a **Layout** toggle to show or hide the elements the layout contributes.
+- For pages that use a layout, a **Show layout elements** switch, inside the Context popover, that hides or shows what the layout contributes.
 
 **Preview does not edit.** While it is on, clicking the page selects nothing, no outlines are drawn,
 the insertion **+** and the canvas menu give way to your browser's own, nothing can be dropped in,
@@ -74,7 +74,7 @@ that animate as they come into view actually do, and anything that reacts to scr
 way it will for a visitor. There is no zoom control in Preview for the same reason: it is showing
 you the page at its real size.
 
-Switch Preview off to go back to editing — the mode switcher stays on Edit or Design the whole time.
+Pick **Edit** or **Design** to go back to editing.
 
 **Clicking a link in Preview opens that page in a new browser tab**, rather than replacing the canvas. Links within the same page — the ones that jump to a heading — still scroll where you would expect.
 
@@ -85,4 +85,4 @@ That new tab is the best way to check a project properly: it is your real browse
 ## Next
 
 - Learn the canvas itself — pan, zoom, selection, inserting — in **[The canvas](/docs/studio/interface/canvas)**
-- See how each tab remembers its mode in **[Tabs and files](/docs/studio/interface/tabs)**
+- See how each tab remembers its editor and view in **[Tabs and files](/docs/studio/interface/tabs)**

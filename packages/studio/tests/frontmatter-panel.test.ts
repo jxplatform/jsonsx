@@ -2,18 +2,31 @@
  * The Document Header card — the three deleted gates (collection, canvas mode, document mode), the
  * ONE reserved-key policy (`title` has a named row and never doubles as a generic property), the
  * Route line, the SEO and Raw-head disclosures, the commit paths, and reactive re-render.
+ *
+ * The card has no host of its own any more: `#frontmatter-panel` is deleted and the STAGE hands one
+ * over. These tests play the stage's part with `attachDocumentHeaderHost`; `canvas-render.test.ts`
+ * covers where the stage actually puts it.
  */
 import { flush, installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { frontmatterPanelEl, initShellRefs, registerRenderer } from "../src/store";
+import { initShellRefs, registerRenderer } from "../src/store";
 import { invalidateMediaCache } from "../src/ui/media-picker";
 import { closeAllTabs } from "../src/workspace/workspace";
 import { mutateUpdateFrontmatter, transactDoc } from "../src/tabs/transact";
 import { collectFmFields } from "../src/panels/frontmatter-fields";
 import { RESERVED_FM_KEYS } from "../src/panels/head-panel";
 
-const { hasDocumentHeader, mount, render, unmount } =
+const { attachDocumentHeaderHost, documentHeaderHost, hasDocumentHeader, mount, render, unmount } =
   await import("../src/panels/frontmatter-panel");
+
+/** The node the card paints into — whatever the stage (here, the test) last handed over. */
+function host(): HTMLElement {
+  const el = documentHeaderHost();
+  if (!el) {
+    throw new Error("no Document Header host is attached");
+  }
+  return el;
+}
 
 // Panel scheduler coalesces via requestAnimationFrame; make it synchronous-ish.
 (globalThis as unknown as Record<string, unknown>).requestAnimationFrame = (
@@ -31,15 +44,28 @@ const FM_SCHEMA = {
   required: ["title"],
 };
 
+/**
+ * Stand up the shell and play the stage's part.
+ *
+ * `withPanelHost: false` is the real state of every canvas mode that draws no document header — the
+ * card must simply have nowhere to paint, and saying so must not throw.
+ */
 function setShell(withPanelHost = true) {
   document.body.innerHTML = `<div id="app">
-    <div id="toolbar"></div><div id="tab-bar"></div>
-    ${withPanelHost ? '<div id="frontmatter-panel" hidden></div>' : ""}
+    <div id="toolbar"></div>
     <div id="activity-bar"></div><div id="left-panel"></div>
-    <div id="canvas-wrap"></div><div id="right-panel"></div><div id="chat-panel"></div>
+    <div id="canvas-wrap">
+      <div class="content-edit-canvas"><div class="content-edit-column">
+        <div class="doc-header-host in-column"></div>
+      </div></div>
+    </div>
+    <div id="right-panel"></div>
     <div id="statusbar"></div>
   </div>`;
   initShellRefs();
+  attachDocumentHeaderHost(
+    withPanelHost ? document.querySelector<HTMLElement>(".doc-header-host") : null,
+  );
 }
 
 function setupContentTab(
@@ -68,7 +94,7 @@ function fireChange(el: Element, value: string): void {
 }
 
 function row(prop: string): HTMLElement {
-  const el = frontmatterPanelEl.querySelector(`[data-prop="${prop}"]`);
+  const el = host().querySelector(`[data-prop="${prop}"]`);
   if (!el) {
     throw new Error(`row not found: ${prop}`);
   }
@@ -76,7 +102,7 @@ function row(prop: string): HTMLElement {
 }
 
 function summaries(): string[] {
-  return [...frontmatterPanelEl.querySelectorAll("summary")].map((s) => s.textContent!.trim());
+  return [...host().querySelectorAll("summary")].map((s) => s.textContent!.trim());
 }
 
 beforeEach(() => {
@@ -99,7 +125,7 @@ describe("the three deleted gates", () => {
   test("appears for a document that matches NO content collection", async () => {
     setupContentTab({ title: "Hello" }, { withSchema: false });
     await mountAndFlush();
-    expect(frontmatterPanelEl.hidden).toBe(false);
+    expect(host().hidden).toBe(false);
     expect((row("title").querySelector("sp-textfield") as any).value).toBe("Hello");
   });
 
@@ -107,7 +133,7 @@ describe("the three deleted gates", () => {
     setupContentTab({ title: "Hello" });
     await mountAndFlush();
     // The card takes no canvas mode at all; there is no predicate left to fail.
-    expect(frontmatterPanelEl.hidden).toBe(false);
+    expect(host().hidden).toBe(false);
     expect(mount.length).toBe(0);
   });
 
@@ -116,26 +142,63 @@ describe("the three deleted gates", () => {
     tab.doc.mode = "component";
     tab.doc.document.title = "A JSON page";
     await mountAndFlush();
-    expect(frontmatterPanelEl.hidden).toBe(false);
+    expect(host().hidden).toBe(false);
     expect((row("title").querySelector("sp-textfield") as any).value).toBe("A JSON page");
   });
 
   test("hidden only when the document genuinely has no header", async () => {
     setupContentTab({}, { withSchema: false });
     await mountAndFlush();
-    expect(frontmatterPanelEl.hidden).toBe(true);
+    expect(host().hidden).toBe(true);
   });
 
-  test("hidden with no active tab; mount without a host element is a no-op", async () => {
+  test("hidden with no active tab; a stage that hosts nothing is a no-op", async () => {
     resetStudioState({ projectConfig: {} });
     closeAllTabs();
     await mountAndFlush();
-    expect(frontmatterPanelEl.hidden).toBe(true);
+    expect(host().hidden).toBe(true);
     unmount();
 
     setShell(false);
     mount();
+    expect(documentHeaderHost()).toBeNull();
     render(); // Must not throw with no host bound
+  });
+});
+
+describe("the stage owns the host", () => {
+  test("attaching a new host moves the card onto it and repaints there", async () => {
+    setupContentTab({ title: "Hello" });
+    await mountAndFlush();
+    const first = host();
+    expect(first.querySelector(".doc-header")).toBeTruthy();
+
+    const second = document.createElement("div");
+    second.className = "doc-header-host pinned";
+    document.querySelector("#canvas-wrap")!.append(second);
+    attachDocumentHeaderHost(second);
+    await flush(4);
+
+    expect(documentHeaderHost()).toBe(second);
+    expect(second.querySelector(".doc-header")).toBeTruthy();
+  });
+
+  test("re-attaching the SAME host is inert — the canvas re-renders far more often than it moves", async () => {
+    setupContentTab({ title: "Hello" });
+    await mountAndFlush();
+    const el = host();
+    attachDocumentHeaderHost(el);
+    await flush(4);
+    expect(documentHeaderHost()).toBe(el);
+    expect(el.querySelectorAll(".doc-header").length).toBe(1);
+  });
+
+  test("the card stamps its own region, so no shell host has to name it", async () => {
+    setupContentTab({ title: "Hello" });
+    await mountAndFlush();
+    expect((host().querySelector(".doc-header") as HTMLElement).dataset.jxRegion).toBe(
+      "pane.primary/frontmatter",
+    );
   });
 });
 
@@ -155,7 +218,7 @@ describe("one reserved-key policy", () => {
   test("title renders ONCE, as the card's named row, not also as a generic property", async () => {
     setupContentTab({ title: "My Post" });
     await mountAndFlush();
-    expect(frontmatterPanelEl.querySelectorAll('[data-prop="title"]').length).toBe(1);
+    expect(host().querySelectorAll('[data-prop="title"]').length).toBe(1);
     // The named row has no required-marker suffix: it is the card's own control, not a schema field.
     expect(row("title").querySelector("sp-field-label")?.textContent).toBe("Title");
   });
@@ -192,19 +255,19 @@ describe("route and disclosures", () => {
   test("a page states its route; a non-page states none", async () => {
     setupContentTab({ title: "Home" }, { documentPath: "pages/index.md", isSite: true });
     await mountAndFlush();
-    expect(frontmatterPanelEl.querySelector(".doc-header-route")?.textContent).toBe("/");
+    expect(host().querySelector(".doc-header-route")?.textContent).toBe("/");
 
     setupContentTab({ title: "Post" }, { documentPath: "posts/hello.json" });
     render();
     await flush(4);
-    expect(frontmatterPanelEl.querySelector(".doc-header-route")).toBeNull();
+    expect(host().querySelector(".doc-header-route")).toBeNull();
   });
 
   test("SEO and Raw head tags are both disclosed, closed by default", async () => {
     setupContentTab({ title: "Hello" });
     await mountAndFlush();
     expect(summaries()).toEqual(["SEO", "Raw head tags"]);
-    for (const d of frontmatterPanelEl.querySelectorAll("details")) {
+    for (const d of host().querySelectorAll("details")) {
       expect((d as HTMLDetailsElement).open).toBe(false);
     }
   });
@@ -222,7 +285,7 @@ describe("route and disclosures", () => {
   test("Raw head tags lists what no structured control owns, and says so when empty", async () => {
     const tab = setupContentTab({ title: "Hello" });
     await mountAndFlush();
-    expect(frontmatterPanelEl.querySelector(".doc-header-empty")).toBeTruthy();
+    expect(host().querySelector(".doc-header-empty")).toBeTruthy();
 
     tab.doc.content.frontmatter = {
       $head: [{ attributes: { content: "me", name: "author" }, tagName: "meta" }],
@@ -230,7 +293,7 @@ describe("route and disclosures", () => {
     };
     render();
     await flush(4);
-    const items = [...frontmatterPanelEl.querySelectorAll(".doc-header-raw li code")];
+    const items = [...host().querySelectorAll(".doc-header-raw li code")];
     expect(items.map((i) => i.textContent)).toEqual(['<meta name="author">']);
   });
 });
@@ -261,13 +324,18 @@ describe("commits and reactivity", () => {
     expect((row("subtitle").querySelector("sp-textfield") as any).value).toBe("After");
   });
 
-  test("unmount stops reactive re-rendering", async () => {
+  test("unmount stops reactive re-rendering and releases the stage's host", async () => {
     const tab = setupContentTab({ subtitle: "Before" });
     await mountAndFlush();
+    // Held across the unmount on purpose: the DOM stays where the stage put it, but nothing paints
+    // Into it again.
+    const painted = host();
     unmount();
+    expect(documentHeaderHost()).toBeNull();
     transactDoc(tab, (t: any) => mutateUpdateFrontmatter(t, "subtitle", "After"));
     await flush(4);
-    expect((row("subtitle").querySelector("sp-textfield") as any).value).toBe("Before");
+    const field = painted.querySelector('[data-prop="subtitle"] sp-textfield') as any;
+    expect(field.value).toBe("Before");
   });
 
   test("image field's Browse button appears once the async media cache resolves", async () => {
@@ -331,24 +399,24 @@ describe("the other commit path and the disclosure state", () => {
   test("a disclosure remembers that it was opened, per tab", async () => {
     setupContentTab({ title: "Hello" }, { id: "fm-a" });
     await mountAndFlush();
-    const seo = frontmatterPanelEl.querySelector("details") as HTMLDetailsElement;
+    const seo = host().querySelector("details") as HTMLDetailsElement;
     seo.open = true;
     seo.dispatchEvent(new Event("toggle"));
     render();
     await flush(4);
-    expect((frontmatterPanelEl.querySelector("details") as HTMLDetailsElement).open).toBe(true);
+    expect((host().querySelector("details") as HTMLDetailsElement).open).toBe(true);
 
-    (frontmatterPanelEl.querySelector("details") as HTMLDetailsElement).open = false;
-    frontmatterPanelEl.querySelector("details")!.dispatchEvent(new Event("toggle"));
+    (host().querySelector("details") as HTMLDetailsElement).open = false;
+    host().querySelector("details")!.dispatchEvent(new Event("toggle"));
     render();
     await flush(4);
-    expect((frontmatterPanelEl.querySelector("details") as HTMLDetailsElement).open).toBe(false);
+    expect((host().querySelector("details") as HTMLDetailsElement).open).toBe(false);
   });
 
   test("a render after the host has gone is a no-op, not a throw", async () => {
     setupContentTab({ title: "Hello" });
     await mountAndFlush();
-    setShell(false); // Re-inits the store refs; the host is now null
+    setShell(false); // The stage redrew without a header slot; the host is now null
     render();
     await flush(4);
   });

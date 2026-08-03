@@ -4,7 +4,7 @@ description: "How tabs work in Jx Studio — opening and switching files, dirty 
 code:
   - packages/studio/src/panels/tab-strip.ts
   - packages/studio/src/tabs/tab.ts
-  - packages/studio/src/panels/tab-bar.ts
+  - packages/studio/src/panels/pane-context.ts
 ---
 
 # Tabs and files
@@ -61,15 +61,19 @@ Opening a component from the canvas, the Layers tree or the inspector's **Edit c
 
 The new tab carries a small **↳** marker, and hovering it names the document you drilled in from.
 
-## The tab bar
+## The context bar
 
-Below the tab strip, a second row carries the controls for the active tab:
+Below the tab strip, a labelled row states three things about the active tab — and only those three:
 
-- **Back** and a breadcrumb trail, when you are inside part of a document that has no file of its own — a repeater's template, or a function body. Click any crumb to jump back up, and Studio puts you back exactly as you left it: same breakpoint, same selected element, same right-panel tab, same zoom.
-- The zoom controls for the current mode, including **Fit** on the pannable canvases. They are absent in **Preview**, which shows the page at its real size in a frame that scrolls itself.
-- The **Preview** toggle, the **Layout** toggle, and the preview pickers described in [Modes and the preview toggle](/docs/studio/interface/modes).
-- The **Auto / Light / Dark** color-scheme control, when the project declares a `prefers-color-scheme` breakpoint — it forces the canvas into either scheme (or follows your OS in Auto) without re-rendering. See [Breakpoints](/docs/studio/design/breakpoints).
-- Mode-specific actions, like **Export** in **Code** mode.
+- **Editor** — which editor is open on this file: **Canvas**, **Code**, **Grid**, **Diff** or **Project Styles**. The list offers only the editors this file actually supports, so it never holds an entry that cannot be picked.
+- **View** — for the Canvas editor, **Edit │ Design │ Preview** as one control with three values. See [Modes and views](/docs/studio/interface/modes).
+- **Context** — what the page is being rendered _with_: the breakpoint, the color scheme, any feature queries, and whether the layout's own elements are shown. The summary reads at a glance (`Base · Auto`); open it for the full set, and for **Manage contexts…**, which takes you to where breakpoints and schemes are defined. Beside it, **resolving with** carries the document's own data — a picker per URL parameter on a dynamic page, a small field per option on a component.
+
+**Back** and a breadcrumb trail appear at the left when you are inside part of a document that has no file of its own — a repeater's template, or a function body. Click any crumb to jump back up, and Studio puts you back exactly as you left it: same breakpoint, same selected element, same right-panel tab, same zoom.
+
+**Zoom floats over the canvas**, bottom-right, rather than sitting in the bar: the zoom buttons, the percentage (click it for 100%), and a **fit** picker — **Fit page**, **Fit width**, **Actual size**, **No fit** — which is remembered per document, so coming back to a file frames it the way you left it. There is no zoom in **Preview**, which shows the page at its real size in a frame that scrolls itself.
+
+Mode-specific actions sit at the right of the bar — **Export**, in the **Code** editor.
 
 ## Next
 

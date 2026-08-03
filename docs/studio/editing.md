@@ -14,7 +14,7 @@ Edit is for writing. Open a content page and the canvas becomes the page itself 
 
 ![Jx Studio editing markdown content inline with a WYSIWYG editor](../images/mode-edit.png)
 
-Markdown pages open in Edit automatically. For anything else, pick **Edit** in the mode switcher at the right end of the toolbar — see **[Modes and the preview toggle](/docs/studio/interface/modes)**.
+Markdown pages open in Edit automatically. For anything else, pick **Edit** in the **View** control on the context bar — see **[Modes and views](/docs/studio/interface/modes)**.
 
 ## What lives here
 

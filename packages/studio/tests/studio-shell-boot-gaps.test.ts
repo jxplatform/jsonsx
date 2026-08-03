@@ -121,16 +121,16 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
   withCommandTarget: <T>(_path: unknown, fn: () => T) => fn(),
 }));
 
-interface TabBarCtx {
+interface PaneContextCtx {
   closeFormulaWorkspace: () => void;
   closeFunctionEditor: () => Promise<void> | void;
   navigateBack: () => Promise<void> | void;
   navigateToLevel: (i: number) => Promise<void> | void;
 }
-let tabBarCtx: TabBarCtx | null = null;
-void mock.module("../src/panels/tab-bar.ts", () => ({
-  mount: (_host: HTMLElement, ctx: TabBarCtx) => {
-    tabBarCtx = ctx;
+let paneCtx: PaneContextCtx | null = null;
+void mock.module("../src/panels/pane-context.ts", () => ({
+  mount: (_host: HTMLElement, ctx: PaneContextCtx) => {
+    paneCtx = ctx;
   },
   render: mock(() => {}),
   unmount: mock(() => {}),
@@ -180,13 +180,13 @@ test("the idle css-props filler is a no-op once the datalist is gone", () => {
   expect(document.querySelector("#css-props")).toBeNull();
 });
 
-test("the tab-bar context wires studio's navigation callbacks", async () => {
-  expect(tabBarCtx).not.toBeNull();
+test("the pane-context bar wires studio's navigation callbacks", async () => {
+  expect(paneCtx).not.toBeNull();
   // With no active tab (or nothing being edited) every callback is a guarded no-op.
-  expect(() => tabBarCtx!.closeFormulaWorkspace()).not.toThrow();
-  await tabBarCtx!.closeFunctionEditor();
-  await tabBarCtx!.navigateBack();
-  await tabBarCtx!.navigateToLevel(0);
+  expect(() => paneCtx!.closeFormulaWorkspace()).not.toThrow();
+  await paneCtx!.closeFunctionEditor();
+  await paneCtx!.navigateBack();
+  await paneCtx!.navigateToLevel(0);
 });
 
 test("the statusbar renderer wiring delegates to renderStatusbar", () => {

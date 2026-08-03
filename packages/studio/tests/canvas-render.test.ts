@@ -3,7 +3,13 @@
  * panel events, stylebook, editors, statusbar, overlays) are mocked via mock.module so the tests
  * can drive every renderCanvas dispatch path deterministically and assert the produced DOM.
  */
-import { flush, resetStudioState, resetWorkspaceWithTab, stubRect } from "./harness";
+import {
+  flush,
+  installMockPlatform,
+  resetStudioState,
+  resetWorkspaceWithTab,
+  stubRect,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { canvasPanels, canvasWrap, initShellRefs, setProjectState } from "../src/store";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
@@ -194,6 +200,8 @@ void mock.module("../src/files/file-ops.js", () => ({
 
 const { initCanvasRender, renderCanvas, renderOverlays, scheduleCanvasRender } =
   await import("../src/canvas/canvas-render");
+const { mount: mountDocHeader, unmount: unmountDocHeader } =
+  await import("../src/panels/frontmatter-panel");
 
 // ─── Test context ─────────────────────────────────────────────────────────────
 
@@ -1331,5 +1339,105 @@ describe("renderOverlays", () => {
   test("delegates to the overlays panel renderer", () => {
     renderOverlays();
     expect(overlaysRender).toHaveBeenCalled();
+  });
+});
+
+// ─── The Document Header card's slot (§3.2 ⑧) ─────────────────────────────────
+
+/**
+ * `#frontmatter-panel` is deleted; the stage draws the card's host. What is asserted here is WHERE
+ * — the two authoring views put it in different places for a reason, and every other surface must
+ * put it nowhere at all.
+ */
+describe("the Document Header slot", () => {
+  // The card really renders here — its SEO block reaches for the media listing, so the stage needs
+  // A platform. Local to this block: the rest of the file asserts dispatch, not panel content.
+  beforeEach(() => {
+    installMockPlatform();
+    mountDocHeader();
+  });
+
+  afterEach(() => {
+    unmountDocHeader();
+  });
+
+  /** A tab whose document genuinely has a header (`hasDocumentHeader` is the only predicate). */
+  function openHeaderedTab() {
+    const tab = openSyncedTab();
+    tab.doc.document.title = "Designing for slowness";
+    return tab;
+  }
+
+  const slot = () => canvasWrap.querySelector(".doc-header-host");
+
+  test("Edit puts it INSIDE the document column, above the artefact", async () => {
+    openHeaderedTab();
+    setMode("edit");
+    renderCanvas();
+    await flush();
+
+    const column = canvasWrap.querySelector(".content-edit-column")!;
+    expect(column.firstElementChild?.classList.contains("doc-header-host")).toBe(true);
+    expect(slot()?.classList.contains("in-column")).toBe(true);
+    // In the column means in the document's own scroller: it scrolls with the artefact.
+    expect(slot()?.closest(".content-edit-canvas")).not.toBeNull();
+  });
+
+  test("Design pins it above the panzoom surface, and stacks the stage to make room", async () => {
+    openHeaderedTab();
+    setMode("design");
+    renderCanvas();
+    await flush();
+
+    expect(slot()?.classList.contains("pinned")).toBe(true);
+    // The artboards are drawn under a transform; the card must not be inside it.
+    expect(slot()?.closest(".panzoom-wrap")).toBeNull();
+    expect(canvasWrap.style.flexDirection).toBe("column");
+    expect(canvasWrap.style.alignItems).toBe("stretch");
+  });
+
+  test("Design with breakpoints pins one slot, not one per artboard", async () => {
+    const tab = openSyncedTab({
+      $media: { "--": "400px", tablet: "(min-width: 768px)" },
+      children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+      title: "Two artboards",
+    } as never);
+    expect(tab.doc.document.title).toBe("Two artboards");
+    setMode("design");
+    renderCanvas();
+    await flush();
+
+    expect(canvasWrap.querySelectorAll(".doc-header-host").length).toBe(1);
+    expect(canvasWrap.querySelectorAll(".canvas-panel").length).toBeGreaterThan(1);
+  });
+
+  test("a document with no header gets no slot, and the stage stays a row", async () => {
+    openSyncedTab();
+    setMode("design");
+    renderCanvas();
+    await flush();
+
+    expect(slot()).toBeNull();
+    expect(canvasWrap.style.flexDirection).toBe("");
+  });
+
+  test("Preview, Source and Grid draw no header — they are not authoring views", async () => {
+    openHeaderedTab();
+    for (const mode of ["preview", "source", "grid"]) {
+      setMode(mode);
+      renderCanvas();
+      await flush();
+      expect(slot()).toBeNull();
+    }
+  });
+
+  test("the sub-editors take the whole stage, so there is no document on it to head", async () => {
+    const tab = openHeaderedTab();
+    setMode("edit");
+    tab.session.ui.editingFunction = { path: [], prop: "onclick" } as never;
+    renderCanvas();
+    await flush();
+    expect(slot()).toBeNull();
   });
 });

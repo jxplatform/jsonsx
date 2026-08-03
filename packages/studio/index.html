@@ -17,8 +17,10 @@
       <div id="app">
         <div id="toolbar"></div>
         <div id="tab-strip"></div>
-        <div id="tab-bar"></div>
-        <div id="frontmatter-panel" hidden></div>
+        <!-- The pane's own chrome (spec §12 regions ⑦ and ⑩): the context bar and the floating
+             zoom pod, stacked over the stage in the pane's grid cell. #tab-bar was a row of the
+             APPLICATION grid, which a per-pane surface can never be. -->
+        <div id="pane-chrome"></div>
         <div id="activity-bar"></div>
         <div id="left-panel"></div>
         <div id="resize-left" class="resize-handle"></div>

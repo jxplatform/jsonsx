@@ -22,6 +22,11 @@ import { detachGridPanel, gridPanelMounted, renderGridMode } from "../grid/grid-
 import { formatByName, formatForPath } from "../format/format-host";
 import { modelUriFor } from "../services/model-uri";
 import { renderWelcome } from "../panels/welcome-screen";
+import {
+  attachDocumentHeaderHost,
+  documentHeaderHost,
+  hasDocumentHeader,
+} from "../panels/frontmatter-panel";
 import { projectState } from "../state";
 import {
   applyEditZoom,
@@ -57,6 +62,7 @@ import { mediaDisplayName } from "../panels/shared";
 import { statusMessage } from "../panels/statusbar";
 import * as overlaysPanel from "../panels/overlays";
 
+import type { TemplateResult } from "lit-html";
 import type { CanvasPanel, GitDiffState } from "../types";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -139,6 +145,39 @@ function hardClearCanvasWrap() {
   canvasWrap.textContent = "";
   // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
   delete canvasWrap["_$litPart$"];
+}
+
+/**
+ * Hand the Document Header card the node the stage just made for it.
+ *
+ * One stable callback, so Lit invokes it once per host element rather than on every render. The
+ * `undefined` branch is Lit reporting a removal WITHOUT saying which node — and the two placements
+ * share this callback, so an Edit→Design swap can report the outgoing host after the incoming one
+ * has already been bound. Connectivity is the fact that settles it: only a host that really left
+ * the document releases the card.
+ */
+const _bindDocHeaderHost = (el: Element | undefined) => {
+  if (el) {
+    attachDocumentHeaderHost(el as HTMLElement);
+    return;
+  }
+  if (!documentHeaderHost()?.isConnected) {
+    attachDocumentHeaderHost(null);
+  }
+};
+
+/**
+ * The stage's slot for the Document Header card.
+ *
+ * `in-column` is Edit: the card is a block of the artefact's own column and scrolls with it.
+ * `pinned` is Design: the artboards are drawn under a pan/zoom transform, so the card sits above
+ * the surface at 1:1 and keeps its own scroll.
+ *
+ * @param {"in-column" | "pinned"} placement
+ * @returns {TemplateResult}
+ */
+function docHeaderSlot(placement: "in-column" | "pinned"): TemplateResult {
+  return html`<div class="doc-header-host ${placement}" ${ref(_bindDocHeaderHost)}></div>`;
 }
 
 /**
@@ -362,6 +401,7 @@ function renderCanvasImpl() {
     // No active tab — reset every piece of canvas view state so reopening a file can never inherit
     // A stale Lit part, a dead Monaco editor, or a mismatched prevCanvasMode (the toxic states that
     // Previously left the canvas unrenderable until a full reload).
+    attachDocumentHeaderHost(null);
     resetCanvasView();
     // Nothing is open. A dev-server root that is only a workspace/monorepo (no project.json) still
     // Populates projectState, but it is not an open project — the file tree prompts to open one and
@@ -382,6 +422,22 @@ function renderCanvasImpl() {
   // Document — so flipping the toggle IS a mode transition and rebuilds the surface, rather than
   // Re-rendering the previous mode's panels in place.
   const canvasMode = ctx.getCanvasMode();
+
+  /* The Document Header card (§3.2 ⑧) is drawn by the STAGE, not by a band above it. Two surfaces
+     draw a page you can author: the centered Edit column, where the card goes INSIDE the document
+     column and scrolls with the artefact, and the Design artboards, where it is pinned above the
+     panzoom surface because a form drawn at the artboard's scale is a picture of a form, not a
+     control. `hasDocumentHeader` is the only remaining predicate and it is a fact about the
+     DOCUMENT; the sub-editors (function body, formula workspace) take the whole stage, so there is
+     no document on it to head. */
+  const wantsDocHeader =
+    !S.ui.editingFunction &&
+    !S.ui.editingFormula &&
+    (canvasMode === "edit" || canvasMode === "design") &&
+    hasDocumentHeader(tab);
+  if (!wantsDocHeader) {
+    attachDocumentHeaderHost(null);
+  }
 
   // Advance render generation so stale async renders from the previous cycle bail out
   view.renderGeneration += 1;
@@ -733,7 +789,9 @@ function renderCanvasImpl() {
           panel.scrollContainer = (el as HTMLElement) || null;
         })}
       >
-        <div class=${columnClass} style="max-width:${baseWidth}px">${panelTpl}</div>
+        <div class=${columnClass} style="max-width:${baseWidth}px">
+          ${wantsDocHeader ? docHeaderSlot("in-column") : nothing}${panelTpl}
+        </div>
       </div>
     `;
     litRender(editTpl, canvasWrap);
@@ -751,6 +809,13 @@ function renderCanvasImpl() {
     canvasWrap.style.padding = "0";
     canvasWrap.style.overflow = "hidden";
   }
+  /* The stage stacks when it carries the card: header first, artboards below. Set on every render
+     rather than on the transition, because whether a document HAS a header changes with the tab and
+     not with the mode. `editors.ts` and `formula-workspace.ts` already claim the column this way —
+     `#canvas-wrap` is a row by default and each surface states its own axis. */
+  canvasWrap.style.flexDirection = wantsDocHeader ? "column" : "";
+  canvasWrap.style.alignItems = wantsDocHeader ? "stretch" : "";
+  const designHeaderTpl = wantsDocHeader ? docHeaderSlot("pinned") : nothing;
 
   const {
     sizeBreakpoints,
@@ -774,6 +839,7 @@ function renderCanvasImpl() {
     );
     litRender(
       html`
+        ${designHeaderTpl}
         <div
           class="panzoom-wrap"
           style="transform-origin:0 0"
@@ -826,6 +892,7 @@ function renderCanvasImpl() {
 
   litRender(
     html`
+      ${designHeaderTpl}
       <div
         class="panzoom-wrap"
         style="transform-origin:0 0"

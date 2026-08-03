@@ -495,8 +495,13 @@ async function regionPoint(page: Page, id: string, at: string): Promise<{ x: num
  */
 async function runInput(page: Page, step: InputStep, at: string): Promise<void> {
   if (step.input === "caret") {
+    // REVEAL, then measure. `pointAt` answers where the node is right now, which is off-screen for
+    // Anything below the fold — and a click at an off-viewport point silently selects nothing, so
+    // The shot fails later and somewhere else. `revealPath` scrolls/pans the node into view and
+    // Returns the settled point, which is what makes a caret step survive a layout change: the
+    // Document Header card landing in-column moved this very node 203px down the page.
     const point = await page.evaluate(
-      (path) => window.__jxAutomation.probe.pointAt({ path }),
+      (path) => window.__jxAutomation.probe.revealPath(path),
       step.path,
     );
     if (!point) {

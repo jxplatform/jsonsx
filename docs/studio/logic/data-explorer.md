@@ -35,9 +35,9 @@ While you are editing, **Fetch from a URL** sources do not call out to the netwo
 
 ## Test values for component options
 
-A component file renders on the canvas with its options at their defaults. To see it with real-looking data, use the option fields in the tab bar: one small field per component option, as introduced in **[Modes and the preview toggle](/docs/studio/interface/modes)**.
+A component file renders on the canvas with its options at their defaults. To see it with real-looking data, use the option fields on the context bar, under **resolving with**: one small field per component option, as introduced in **[Modes and views](/docs/studio/interface/modes)**.
 
-1. Open a component file. The tab bar shows a field named after each option.
+1. Open a component file. The context bar shows a field named after each option.
 2. Type a test value. Values that read as JSON are treated that way — `42` is a number, `true` a flag, `["a","b"]` a list — and anything else is text.
 3. The canvas re-renders with the value, and the Data activity, template previews, and formula badges all see it.
 4. Clear the field to return that option to its authored default.

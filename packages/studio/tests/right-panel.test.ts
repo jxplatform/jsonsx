@@ -34,7 +34,7 @@ function makeCtx() {
 
 /** The tab bodies that are not hidden. Exactly one, always. */
 function visibleBodies(): HTMLElement[] {
-  return [...rightPanel.querySelectorAll(".panel-body")].filter(
+  return [...rightPanel.querySelectorAll<HTMLElement>(".panel-body")].filter(
     (el) => (el as HTMLElement).style.display !== "none",
   ) as HTMLElement[];
 }
@@ -80,7 +80,7 @@ describe("the four tabs", () => {
     mount(makeCtx() as never);
     render();
     await flush(4);
-    const regions = [...rightPanel.querySelectorAll(".panel-body")].map(
+    const regions = [...rightPanel.querySelectorAll<HTMLElement>(".panel-body")].map(
       (el) => el.dataset.jxRegion,
     );
     expect(regions).toEqual(INSPECTOR_TAB_IDS.map((id) => `inspector/tab:${id}`));

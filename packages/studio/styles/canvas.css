@@ -2,7 +2,7 @@
    Load after tokens.css, after shell.css.
 
    Owns the multi-panel canvas frame (#canvas-wrap, .panzoom-wrap,
-   .canvas-panel* and the source/tab bar that sits above it), the
+   .canvas-panel*), the pane's context bar and floating zoom pod, the
    content-edit-mode canvas column, the selection/hover/layout overlay
    boxes drawn over the rendered document, and the unified block action
    bar plus its link popover. */
@@ -31,24 +31,139 @@
   flex: 1;
   min-width: 0;
 }
-.tab-bar {
+/* ─── ⑦ The pane context bar ───────────────────
+   Three separately-LABELLED axes — Editor kind, Canvas view, Rendering context — where five
+   unlabelled ones used to sit in a row styled identically to the tab strip above it. The label is
+   load-bearing: it is what stops the band re-accreting into an anonymous strip of chips. */
+.pane-context {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
+  gap: 12px;
+  height: 28px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-panel);
+  min-width: 0;
+  overflow: hidden;
 }
-.tab-bar .tb-spacer {
+.pane-context .pc-spacer {
   flex: 1;
 }
-.tab-bar sp-picker.tab-bar-param {
-  max-width: 200px;
+.pc-axis {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
-/* Zoom widget label: fixed floor so the row doesn't jitter as the % digits change. */
-.tab-bar .tb-zoom-label {
+.pc-axis-label {
+  font-size: var(--spectrum-font-size-50, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.pc-static {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  white-space: nowrap;
+}
+.pc-context-trigger {
+  font-variant-numeric: tabular-nums;
+}
+/* The document data a render resolves against, beside the context it resolves in. */
+.pc-resolving {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.pc-resolving-label {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.pc-resolving sp-picker.pc-param,
+.pc-resolving sp-textfield.pc-prop {
+  max-width: 140px;
+}
+/* The editor-kind dropdown and the view segments both sit on a 28px band: cap them so a long
+   document name in the breadcrumb cannot push an axis off the end of the bar. */
+.pc-editor-kind {
+  max-width: 140px;
+}
+.pc-view {
+  flex-shrink: 0;
+}
+.pc-export {
+  flex-shrink: 0;
+}
+
+/* The rendering-context popover: one column of labelled groups over a footer that leaves for the
+   definition site. This control only SELECTS (§2 principle 5) — nothing in it defines a
+   breakpoint, a scheme or a feature query. */
+.pc-ctx {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  min-width: 240px;
+  max-width: 340px;
+}
+.pc-ctx-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pc-ctx-label {
+  font-size: var(--spectrum-font-size-50, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+}
+.pc-ctx-group sp-picker.pc-param,
+.pc-ctx-group sp-textfield.pc-prop {
+  max-width: 100%;
+}
+.pc-context-popover {
+  max-width: 360px;
+}
+.pc-sizes {
+  flex-wrap: wrap;
+}
+.pc-layout-switch {
+  margin: 0;
+}
+.pc-ctx-manage {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--accent, #3b82f6);
+  font-size: var(--spectrum-font-size-75, 12px);
+  cursor: pointer;
+}
+.pc-ctx-manage:hover {
+  text-decoration: underline;
+}
+
+/* ─── ⑩ The floating zoom pod ──────────────────
+   Bottom-right of the pane, over the stage — a viewport control, which is not a document axis and
+   so never belonged in a band beside one. */
+.pane-zoom {
+  align-self: flex-end;
+  margin: 0 12px 12px 0;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+}
+.pane-zoom .pc-zoom-label {
   min-width: 48px;
   font-family: var(--font-mono);
+}
+.pane-zoom .pc-fit {
+  max-width: 120px;
 }
 .source-editor {
   flex: 1;
@@ -97,16 +212,38 @@
 }
 
 /* ─── Document Header card ─────────────────────
-   Region ⑧: the artefact's own header, not a band the canvas mode summons. Capped at 40vh with its
-   own scroll so a schema with twenty fields can never push the stage off screen. */
+   Region ⑧: the artefact's own header, drawn IN the stage. `#frontmatter-panel` — a fourth
+   full-width band up to 40vh that appeared and vanished as a side effect of the canvas mode — is
+   gone, grid row and all.
+
+   Two placements, because the stage draws a page two ways. In Edit the card is `in-column`: a block
+   of the document's own centered column that scrolls with it, so it is part of the artefact rather
+   than a strip above it. In Design the artboards are under a pan/zoom transform, and a form drawn
+   at 40% is a picture of a form — so the card is `pinned` above the surface at 1:1, and that is the
+   one placement that still needs a cap. */
+.doc-header-host[hidden] {
+  display: none;
+}
+.doc-header-host.in-column {
+  display: block;
+  padding-bottom: 16px;
+}
+.doc-header-host.pinned {
+  flex-shrink: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
 .doc-header {
   display: flex;
   flex-direction: column;
-  max-height: 40vh;
-  overflow-y: auto;
   padding: 8px 12px 10px;
   background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.doc-header-host.pinned .doc-header {
+  border-width: 0 0 1px;
+  border-radius: 0;
 }
 .doc-header-bar {
   display: flex;

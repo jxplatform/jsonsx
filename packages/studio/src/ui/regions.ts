@@ -273,11 +273,15 @@ export function focusRegionOf(el: Element | null): FocusRegion | null {
  * `panels/chat-panel.ts` on whatever container hosts the assistant, which is now the Inspector's
  * fourth tab body. That is the whole argument for naming the role rather than the div, and the
  * reason this table lost a row without any shot losing its subject.
+ *
+ * `pane.primary/frontmatter` left the table for the same reason. It named `#frontmatter-panel`, a
+ * grid row; the Document Header card is now drawn INSIDE the stage, so
+ * `panels/frontmatter-panel.ts` stamps the id on the card's own `<section>` wherever the stage puts
+ * it. Two rows gone, no shot re-pointed.
  */
 export const SHELL_REGION_HOSTS: Readonly<Record<string, string>> = {
   "#activity-bar": "rail",
   "#canvas-wrap": "pane.primary",
-  "#frontmatter-panel": "pane.primary/frontmatter",
   "#left-panel": "navigator",
   "#right-panel": "inspector",
   "#statusbar": "statusbar",

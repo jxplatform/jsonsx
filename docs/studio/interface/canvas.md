@@ -24,7 +24,7 @@ In **Design** and **Stylebook** mode the canvas is an open surface you move arou
 
 - **Pan** — scroll with the mouse wheel or trackpad. Hold :kbd[Shift] while scrolling to pan sideways, or drag with the middle mouse button.
 - **Zoom** — hold :kbd[⌘] (macOS) or :kbd[Ctrl] (Windows/Linux) and scroll; the canvas zooms toward your cursor. :kbd[⌘=] / :kbd[Ctrl+=] zooms in, :kbd[⌘-] / :kbd[Ctrl+-] zooms out, and :kbd[⌘0] / :kbd[Ctrl+0] resets to 100%.
-- The zoom controls in the tab bar do the same, plus **Fit** to bring the whole canvas into view.
+- The zoom pod floating at the canvas's bottom-right does the same, plus a **fit** picker — **Fit page**, **Fit width**, **Actual size** — remembered per document.
 
 **Design opens already fitted.** Switching into Design or Stylebook scales the canvas down so the whole thing is in view, so a wide layout never lands cut off at the edge of the panel. It never scales _up_ past 100%, and it never overrides you: once you have set a zoom yourself — with the controls, :kbd[Ctrl]-scroll or the chords — that file keeps your zoom for the rest of the session.
 
@@ -49,7 +49,9 @@ A small floating toolbar appears above the selected element:
 - For a component instance, **Edit Component** opens the component itself; for anything else, **Convert to Component** turns the selection into a reusable component.
 - While you're editing text, formatting buttons (bold, italic, and friends) and an **Insert data** button join the bar. See [Edit mode](/docs/studio/editing).
 
-![A selected element on the canvas with the floating block action bar above it](../../images/block-action-bar.png)
+:::doc-tip
+The bar keeps one shape. An action that cannot apply to the current selection — moving the first child up, deleting the document root — is shown greyed with a tooltip saying what it needs, rather than disappearing. Buttons never move under your cursor.
+:::
 
 ## Inserting elements
 

@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 /**
- * The Document Header card (§3.2 ⑧) — the artefact's own header, above the stage.
+ * The Document Header card (§3.2 ⑧) — the artefact's own header, drawn IN the stage.
  *
  * It replaces the old "Properties" bar, which was a fourth full-width band that **appeared and
  * vanished as a side effect of the canvas mode** with no control to summon it, and which showed
@@ -16,18 +16,26 @@
  * - The **document-mode gate** (`doc.mode === "content"`) — a JSON page carries `title` and `$head`
  *   directly on the root node, and it has a header for exactly the same reason.
  *
- * What it renders instead: **any** document with frontmatter or `$head`, in every mode — Title,
- * Route, the layout picker, the schema-and-frontmatter field list, a collapsible SEO block and a
- * "Raw head tags" disclosure.
+ * What it renders instead: **any** document with frontmatter or `$head`, in every named layout and
+ * in both authoring views of the stage — Title, Route, the layout picker, the
+ * schema-and-frontmatter field list, a collapsible SEO block and a "Raw head tags" disclosure.
+ * `hasDocumentHeader` is the whole predicate, and it is a fact about the DOCUMENT.
  *
  * **One reserved-key policy, one `collectFmFields` call.** The two field sets this card merges used
  * to disagree: this module passed an empty reserved set and `head-panel.ts` passed `{title}`, so
  * `title` could render twice with two different commit paths. `RESERVED_FM_KEYS` wins and is
  * imported, not restated — see the note on its declaration.
+ *
+ * **The card has no host of its own.** `#frontmatter-panel` — the grid row, the `hidden` div, the
+ * `frontmatterPanelEl` ref and the 40vh cap that came with them — is deleted. The STAGE renders the
+ * host now ({@link attachDocumentHeaderHost}, called from a `ref` in `canvas/canvas-render.ts`), so
+ * the card sits inside the artefact rather than in a band above it. This module keeps only the
+ * focus-aware scheduler and the reactive effect, because a field commit must still repaint the card
+ * WITHOUT repainting the canvas — a full canvas render remounts the document iframe.
  */
 
 import { html, nothing, render as litRender } from "lit-html";
-import { frontmatterPanelEl, projectState } from "../store";
+import { projectState } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { effect, effectScope } from "../reactivity";
 import { createPanelScheduler } from "./panel-scheduler";
@@ -60,6 +68,7 @@ import type { PanelScheduler } from "./panel-scheduler";
 import type { TemplateResult } from "lit-html";
 
 let _scheduler: PanelScheduler | null = null;
+let _host: HTMLElement | null = null;
 let _scope: { stop: () => void; run: <T>(fn: () => T) => T | undefined } | null = null;
 
 /** Per-document disclosure state, keyed by tab id — not stored on the document. */
@@ -67,18 +76,46 @@ const _seoOpen = new Set<string>();
 const _rawOpen = new Set<string>();
 
 /**
- * Mount the Document Header card: bind the focus-aware scheduler to its host and re-render
- * reactively on tab / document / frontmatter changes.
+ * The element the stage has made available for the card, or `null` while no stage hosts it.
+ *
+ * Called from a lit `ref` in `canvas/canvas-render.ts`, so the host's lifetime is the stage's: the
+ * canvas creates it when it draws a document that has a header and drops it otherwise. The
+ * scheduler is re-created per host because it binds `focusin`/`focusout` to that exact node, and
+ * the focus guard is the whole reason this module still owns a render path of its own.
+ *
+ * @param {HTMLElement | null} el
+ */
+export function attachDocumentHeaderHost(el: HTMLElement | null): void {
+  if (el === _host) {
+    return;
+  }
+  _scheduler?.unbind();
+  _scheduler = null;
+  _host = el;
+  if (!el) {
+    return;
+  }
+  _scheduler = createPanelScheduler({ render: _doRender, root: el });
+  _scheduler.bindFocus();
+  _scheduler.schedule();
+}
+
+/**
+ * The host the stage last handed over, or `null`. The stage reads it back to settle Lit's
+ * order-independent detach report; nothing else needs to know where the card lives.
+ */
+export function documentHeaderHost(): HTMLElement | null {
+  return _host;
+}
+
+/**
+ * Mount the Document Header card: subscribe to the tab / document / frontmatter reads it renders
+ * from, so a change repaints the card without repainting the canvas around it.
  *
  * The card takes no context. It used to take `getCanvasMode()` purely to decide whether to exist,
  * and that predicate is the thing this change deletes.
  */
 export function mount() {
-  if (!frontmatterPanelEl) {
-    return;
-  }
-  _scheduler = createPanelScheduler({ render: _doRender, root: frontmatterPanelEl });
-  _scheduler.bindFocus();
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -111,6 +148,7 @@ export function unmount() {
   _scope = null;
   _scheduler?.unbind();
   _scheduler = null;
+  _host = null;
   _seoOpen.clear();
   _rawOpen.clear();
 }
@@ -147,26 +185,30 @@ export function hasDocumentHeader(tab: Tab): boolean {
 }
 
 function _doRender() {
-  if (!frontmatterPanelEl) {
+  const host = _host;
+  if (!host) {
     return;
   }
   const tab = activeTab.value;
   if (!tab || !hasDocumentHeader(tab)) {
-    // Lit leaves comment markers, so the host is hidden explicitly rather than relying on :empty.
-    litRender(nothing, frontmatterPanelEl);
-    frontmatterPanelEl.hidden = true;
+    // The stage decides whether the host exists; this only covers the window between a document
+    // Losing its header and the canvas noticing. Lit leaves comment markers, so `:empty` cannot be
+    // The signal and the host is hidden explicitly.
+    litRender(nothing, host);
+    host.hidden = true;
     return;
   }
-  litRender(documentHeaderTemplate(tab), frontmatterPanelEl);
-  frontmatterPanelEl.hidden = false;
+  litRender(documentHeaderTemplate(tab), host);
+  host.hidden = false;
 }
 
 /**
  * The card.
  *
- * Exported as a template so the stage can host it directly once `#canvas-wrap` becomes a column —
- * the region id (`pane.primary/frontmatter`) already names the ROLE rather than the node, which is
- * what makes that move a layout change instead of a rename.
+ * Exported as a template because the STAGE hosts it: `canvas-render.ts` emits the host div and this
+ * module paints into it. The region id (`pane.primary/frontmatter`) rides on the `<section>` rather
+ * than on a shell host, which is what made the move a layout change instead of a rename — the id
+ * names the card's PLACE in the pane, and the pane still has one.
  *
  * @param {Tab} tab
  * @returns {TemplateResult}
@@ -195,7 +237,11 @@ export function documentHeaderTemplate(tab: Tab): TemplateResult {
   const head = headDoc.$head ?? [];
 
   return html`
-    <section class="doc-header" aria-label="Document header">
+    <section
+      class="doc-header"
+      aria-label="Document header"
+      data-jx-region="pane.primary/frontmatter"
+    >
       <header class="doc-header-bar">
         <span class="doc-header-title">${collection ? collection.name : "Document"}</span>
         ${

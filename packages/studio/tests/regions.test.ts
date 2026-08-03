@@ -244,11 +244,20 @@ describe("a region named by ROLE outlives the node it was minted on", () => {
     expect(focusRegionOf(host.querySelector("#assistant"))).toBe("inspector");
   });
 
-  test("the frontmatter bar is still named the same way", () => {
-    expect(SHELL_REGION_HOSTS["#frontmatter-panel"]).toBe("pane.primary/frontmatter");
-    const host = tree(`<div id="frontmatter-panel"></div>`);
+  test("`pane.primary/frontmatter` outlived `#frontmatter-panel` the same way", () => {
+    // It named a grid row. The row is gone and the Document Header card is drawn inside the stage,
+    // Where `panels/frontmatter-panel.ts` stamps the id on the card's own <section> — so the table
+    // Has one fewer row and `properties-bar`'s crop still resolves.
+    expect(SHELL_REGION_HOSTS["#frontmatter-panel"]).toBeUndefined();
+    expect(isRegionId("pane.primary/frontmatter")).toBe(true);
+    const host = tree(
+      `<div id="canvas-wrap"><section class="doc-header" id="card"
+         data-jx-region="pane.primary/frontmatter"></section></div>`,
+    );
     stampShellRegions(host);
-    expect(resolveRegion("pane.primary/frontmatter", host)?.id).toBe("frontmatter-panel");
+    expect(resolveRegion("pane.primary/frontmatter", host)?.id).toBe("card");
+    // It is a PART of the primary pane, so focus lands in the pane it belongs to.
+    expect(focusRegionOf(host.querySelector("#card"))).toBe("pane");
   });
 });
 

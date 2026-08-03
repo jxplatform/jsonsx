@@ -26,14 +26,13 @@ On the left:
 - **Manage** opens the project browser — see [Browse your project](/docs/studio/projects/browse).
 - **Publish** opens the publish panel — see [Git & publish](/docs/studio/publish).
 - **Save** writes the active file to disk. It's only enabled when the file has unsaved changes — Studio never saves on its own. See [Tabs and files](/docs/studio/interface/tabs).
-- **Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the built version of the page you're editing, at its real route, in your own browser. It's the fastest way to check the actual page rather than the canvas's approximation of it. The button is always there: when the open file has no route it's disabled and its tooltip says why — a component isn't a page, a `[slug]` route needs a value picked in the tab bar first, and a page you haven't built yet has nothing to serve.
+- **Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the built version of the page you're editing, at its real route, in your own browser. It's the fastest way to check the actual page rather than the canvas's approximation of it. The button is always there: when the open file has no route it's disabled and its tooltip says why — a component isn't a page, a `[slug]` route needs a value picked on the context bar first, and a page you haven't built yet has nothing to serve.
 - **Undo** and **Redo** step through the active file's edit history.
 
 In the middle, the **Search files…** field opens [Quick Access](/docs/studio/interface/quick-access). When your project has new commits waiting on the remote, a **Sync Project** button appears here to pull them.
 
 On the right:
 
-- The **mode switcher** — **Edit**, **Design**, **Grid**, **Code**, **Stylebook** — changes how the canvas presents the open file. See [Modes and the preview toggle](/docs/studio/interface/modes).
 - A toggle collapses and restores the right panel.
 - A chat icon shows the [Assistant](/docs/studio/ai), which is the right panel's fourth tab.
 
@@ -79,12 +78,12 @@ Studio remembers your layout — panel widths and which panels are collapsed car
 
 The center region renders the open file live. How you interact with it depends on the current mode; panning, zooming, selection, and direct manipulation are covered in **[The canvas](/docs/studio/interface/canvas)**.
 
-## Tab strip and tab bar
+## Tab strip and context bar
 
 Two rows sit between the toolbar and the canvas:
 
 - The **tab strip** shows one tab per open file, with a dot marking unsaved changes.
-- The **tab bar** below it carries per-file controls: a **Back** breadcrumb when you've drilled into a nested component, zoom controls, the **Preview** toggle, and mode-specific actions like **Export** in Code mode.
+- The **context bar** below it states three things about the open file, each under its own label: which **Editor** is open on it, which **View** of the canvas, and the rendering **Context** it resolves in. Zoom is not among them — it floats over the canvas, bottom-right.
 
 Both are covered in **[Tabs and files](/docs/studio/interface/tabs)**.
 
@@ -101,6 +100,6 @@ It's a live region, so a screen reader announces what lands in it without you ha
 
 ## Next
 
-- Meet the five canvas modes in **[Modes and the preview toggle](/docs/studio/interface/modes)**
+- Meet the editors and views in **[Modes and views](/docs/studio/interface/modes)**
 - Work directly on the page in **[The canvas](/docs/studio/interface/canvas)**
 - Learn the **[keyboard shortcuts](/docs/studio/interface/shortcuts)**

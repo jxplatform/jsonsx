@@ -38,7 +38,7 @@ Component files open in **Edit** mode. In the mode switcher on the right side of
 
 ![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](../images/mode-design.png)
 
-The canvas now shows your component once per breakpoint — empty for the moment — and the right panel offers the **Properties**, **Events**, and **Style** tabs. Modes are just lenses on the same file; see **[Modes and the preview toggle](/docs/studio/interface/modes)**.
+The canvas now shows your component once per breakpoint — empty for the moment — and the right panel offers the **Properties**, **Events**, and **Style** tabs. Views are just lenses on the same file; see **[Modes and views](/docs/studio/interface/modes)**.
 
 ## 4. Add a button and a text line
 
@@ -90,7 +90,7 @@ The formula reads `$count += 1` in the chip strip, and green badges beside the o
 
 ## 8. Try it in Preview
 
-Switch on the **Preview** toggle in the tab bar. The paragraph now shows `0` — the real, resolved value. Click **Add one** a few times.
+Pick **Preview** in the **View** control on the context bar. The paragraph now shows `0` — the real, resolved value. Click **Add one** a few times.
 
 ![The canvas with Preview on, the paragraph showing the climbed count](../images/counter-preview.png)
 
@@ -106,9 +106,9 @@ When a page ever looks wrong, this panel is where you find out what it actually 
 
 ## 10. Try a test value
 
-Because `count` is a plain state value on a component, it's also one of the component's _props_ — an option a page can set when it uses the card. The tab bar shows a small field named after each prop:
+Because `count` is a plain state value on a component, it's also one of the component's _props_ — an option a page can set when it uses the card. The context bar's **resolving with** cluster shows a small field named after each prop:
 
-1. Type `100` into the **count** field in the tab bar.
+1. Type `100` into the **count** field on the context bar.
 2. The canvas re-renders with the count starting at 100, at every breakpoint.
 3. Clear the field to return to the default of `0`.
 

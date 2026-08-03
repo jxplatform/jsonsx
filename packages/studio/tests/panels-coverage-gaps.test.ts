@@ -54,7 +54,7 @@ void mock.module("../src/panels/component-preview", () => ({
 
 const { buildStylebookDoc, hasTagStyle, transposeStylebookStyle } =
   await import("../src/panels/stylebook-doc");
-const tabBar = await import("../src/panels/tab-bar");
+const paneContext = await import("../src/panels/pane-context");
 const { renderLayersTemplate, startLayerTitleEdit } = await import("../src/panels/layers-panel");
 const dnd = await import("../src/panels/dnd");
 const { initShellRefs } = await import("../src/store");
@@ -138,10 +138,10 @@ describe("buildStylebookDoc component filtering", () => {
   });
 });
 
-// ─── Tab bar render catch ────────────────────────────────────────────────────
+// ─── Pane chrome render catch ────────────────────────────────────────────────
 
-describe("tab-bar interaction gaps", () => {
-  function makeTabBarCtx(overrides: Partial<Parameters<typeof tabBar.mount>[1]> = {}) {
+describe("pane-context interaction gaps", () => {
+  function makePaneCtx(overrides: Partial<Parameters<typeof paneContext.mount>[1]> = {}) {
     return {
       closeFormulaWorkspace: mock(() => {}),
       closeFunctionEditor: mock(() => {}),
@@ -150,12 +150,13 @@ describe("tab-bar interaction gaps", () => {
       navigateBack: mock(() => {}),
       navigateToLevel: mock((_level: number) => {}),
       parseMediaEntries: () => ({ baseWidth: 1280, featureQueries: [], sizeBreakpoints: [] }),
+      setCanvasMode: mock((_mode: string) => {}),
       ...overrides,
     };
   }
 
   afterEach(() => {
-    tabBar.unmount();
+    paneContext.unmount();
     closeAllTabs();
     document.body.innerHTML = "";
   });
@@ -166,22 +167,21 @@ describe("tab-bar interaction gaps", () => {
     ) as HTMLElement;
   }
 
-  test("design-mode zoom out / reset / Fit run their panzoom actions", async () => {
+  test("the pod's panzoom actions run without a panzoom surface", async () => {
     resetStudioState();
     const tab = resetWorkspaceWithTab();
     tab.session.ui.zoom = 2.4;
     view.panzoomWrap = null; // Canvas-utils actions guard on this and no-op cleanly.
     const root = document.createElement("div");
     document.body.append(root);
-    tabBar.mount(root, makeTabBarCtx() as never);
+    paneContext.mount(root, makePaneCtx() as never);
     await flush();
 
     btnByText(root, "−").click();
     await flush();
     expect(tab.session.ui.zoom).toBeCloseTo(2);
 
-    (root.querySelector(".tb-zoom-label") as HTMLElement).click();
-    btnByText(root, "Fit").click();
+    (root.querySelector(".pc-zoom-label") as HTMLElement).click();
     await flush();
     expect(tab.session.ui.zoom).toBeCloseTo(2); // Guarded no-ops without a panzoom surface.
   });
@@ -190,10 +190,10 @@ describe("tab-bar interaction gaps", () => {
     resetStudioState();
     const tab = resetWorkspaceWithTab(undefined, { documentPath: "components/card.json" });
     tab.session.documentStack = [{ documentPath: "pages/index.json" }] as never;
-    const ctx = makeTabBarCtx();
+    const ctx = makePaneCtx();
     const root = document.createElement("div");
     document.body.append(root);
-    tabBar.mount(root, ctx as never);
+    paneContext.mount(root, ctx as never);
     await flush();
 
     const crumb = root.querySelector(".breadcrumb-item.clickable") as HTMLElement;
@@ -204,19 +204,19 @@ describe("tab-bar interaction gaps", () => {
 
   test("render after unmount is a guarded no-op", () => {
     expect(() => {
-      tabBar.render();
+      paneContext.render();
     }).not.toThrow();
   });
 });
 
-describe("tab-bar render failure", () => {
+describe("pane-context render failure", () => {
   test("a throwing template is caught and does not break mount", async () => {
     resetStudioState();
     resetWorkspaceWithTab();
     const host = document.createElement("div");
     document.body.append(host);
     expect(() => {
-      tabBar.mount(host, {
+      paneContext.mount(host, {
         closeFormulaWorkspace: () => {},
         closeFunctionEditor: () => {},
         exportFile: () => {},
@@ -226,13 +226,14 @@ describe("tab-bar render failure", () => {
         navigateBack: () => {},
         navigateToLevel: () => {},
         parseMediaEntries: () => ({ baseWidth: 1280, featureQueries: [], sizeBreakpoints: [] }),
+        setCanvasMode: () => {},
       });
     }).not.toThrow();
     await flush();
     expect(() => {
-      tabBar.render();
+      paneContext.render();
     }).not.toThrow();
-    tabBar.unmount();
+    paneContext.unmount();
     host.remove();
   });
 });

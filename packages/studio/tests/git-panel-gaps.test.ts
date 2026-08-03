@@ -35,6 +35,9 @@ void mock.module("../src/workspace/workspace.js", () => ({
   closeTab: () => {},
   openTab: () => {},
   renameTab: () => {},
+  // `shell.ts` reads the project root from this store to load that project's named layouts, so
+  // The stand-in has to carry it — an absent export is a module-resolution error, not a null.
+  workspace: { projectRoot: null },
 }));
 
 void mock.module("../src/ui/layers.js", () => ({

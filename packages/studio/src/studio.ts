@@ -161,7 +161,7 @@ import * as chatPanelMod from "./panels/chat-panel";
 import { setProjectAdopter } from "./services/project-adoption";
 import * as leftPanelMod from "./panels/left-panel";
 import * as tabStrip from "./panels/tab-strip";
-import * as tabBar from "./panels/tab-bar";
+import * as paneContext from "./panels/pane-context";
 import { selectStylebookTag } from "./panels/stylebook-panel";
 import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from "./panels/dnd";
 import { registerCanvasDndBridge } from "./panels/canvas-dnd-bridge";
@@ -412,7 +412,7 @@ initQuickSearch({ openRecentProject: (root: string) => openRecentProject(root) }
 
 tabStrip.mount(document.querySelector("#tab-strip") as HTMLElement);
 
-tabBar.mount(document.querySelector("#tab-bar") as HTMLElement, {
+paneContext.mount(document.querySelector("#pane-chrome") as HTMLElement, {
   closeFormulaWorkspace: () => closeFormulaWorkspace(),
   closeFunctionEditor: () => closeFunctionEditor(),
   exportFile,
@@ -420,6 +420,7 @@ tabBar.mount(document.querySelector("#tab-bar") as HTMLElement, {
   navigateBack: () => navigateBack(),
   navigateToLevel: (i: number) => navigateToLevel(i),
   parseMediaEntries,
+  setCanvasMode,
 });
 
 overlaysPanel.mount({
@@ -603,7 +604,8 @@ rightPanelMod.mount({
   renderCanvas: () => renderCanvas(),
 });
 
-// The Document Header card — every document with frontmatter or `$head`, in every mode.
+// The Document Header card — every document with frontmatter or `$head`. It has no host of its own:
+// The stage hands one over (`canvas-render.ts`), and this only starts the reactive subscription.
 frontmatterPanelMod.mount();
 
 // The assistant's create_project tool adopts freshly scaffolded projects through the same

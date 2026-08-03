@@ -37,6 +37,7 @@ import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import { shell } from "../shell";
 import { openQuickSearch } from "./quick-search";
+import { showPromptDialog } from "../ui/layers";
 import { inspectorTab } from "./right-panel";
 import { canvasBaseOrigin } from "../canvas/canvas-origin";
 import { getPreviewNavigateHandler } from "../canvas/preview-navigate";
@@ -349,6 +350,86 @@ function commandCenterTpl(registry: CommandRegistry | null) {
   `;
 }
 
+// ─── ①b Layout tabs ──────────────────────────────────────────────────────────
+
+/**
+ * `Write · Design · Build · Ship · +` — named arrangements, as plain-text tabs.
+ *
+ * The 80% of a workspace switcher that costs a segmented control and none of the re-architecture
+ * (§3.2 ①b). Each tab RUNS `view.setLayout`, so the click, the palette row and an agent all take
+ * the same path; double-clicking one renames it, and `+` saves whatever is on screen now.
+ *
+ * **A layout reconfigures; it never removes.** Nothing here hides a panel: every one stays on the
+ * rail, on its chord and in the palette after any layout is applied — §13 is explicit that
+ * workspaces which gate features hand the non-technical user the affordance they are least likely
+ * to reach for.
+ */
+function layoutTabsTpl(registry: CommandRegistry) {
+  // `get` first, like {@link tbCmd}: a registry that has not been handed the shell's records yet
+  // (the skeleton the bar paints before the bootstrap composes them) has no verb to ask about.
+  if (!registry.get("view.setLayout") || !registry.isEnabled("view.setLayout")) {
+    return nothing;
+  }
+  return html`
+    <div class="tb-layouts" role="tablist" aria-label="Layouts">
+      ${shell.layouts.map(
+        (preset) => html`
+          <button
+            class=${preset.id === shell.layout ? "tb-layout active" : "tb-layout"}
+            type="button"
+            role="tab"
+            aria-selected=${preset.id === shell.layout ? "true" : "false"}
+            title=${`${preset.name} layout — double-click to rename`}
+            @click=${() => {
+              void registry.run("view.setLayout", { layout: preset.id });
+            }}
+            @dblclick=${() => {
+              void renameLayoutPrompt(registry, preset.id, preset.name);
+            }}
+          >
+            ${preset.name}
+          </button>
+        `,
+      )}
+      <button
+        class="tb-layout-add"
+        type="button"
+        title="Save the current arrangement as a layout"
+        aria-label="Save layout"
+        @click=${() => {
+          void saveLayoutPrompt(registry);
+        }}
+      >
+        +
+      </button>
+    </div>
+  `;
+}
+
+/** Ask for a name, then run the command. Exported for the same reason `runOpenInBrowser` is. */
+export async function saveLayoutPrompt(registry: CommandRegistry): Promise<void> {
+  const name = await showPromptDialog("Save layout", {
+    confirmLabel: "Save",
+    message: "Remembers this project's Navigator panel, dock widths and Inspector tab.",
+    placeholder: "Layout name",
+  });
+  if (name) {
+    await registry.run("view.saveLayout", { name });
+  }
+}
+
+/** The double-click gesture, routed through the command so the rename has one implementation. */
+export async function renameLayoutPrompt(
+  registry: CommandRegistry,
+  layout: string,
+  current: string,
+): Promise<void> {
+  const name = await showPromptDialog("Rename layout", { confirmLabel: "Rename", value: current });
+  if (name) {
+    await registry.run("view.renameLayout", { layout, name });
+  }
+}
+
 // ─── The ⬢ app menu (commandbar/overflow) ────────────────────────────────────
 
 /**
@@ -519,6 +600,10 @@ export function mount(rootEl: HTMLElement, _ctx: ToolbarCtx = {}) {
       void assistantShowing();
       void shell.git.status;
       void shell.layoutSelection;
+      // The layout tabs are a rendering of the project's own record (§3.2 ①b), so the band
+      // Repaints when a layout is saved, renamed or deleted from anywhere.
+      void shell.layout;
+      void shell.layouts;
       // The registry itself is reactive state: it is composed AFTER this mount runs, and reading it
       // Here is what repaints the band from a skeleton into the real bar.
       void activeRegistry();
@@ -570,6 +655,7 @@ function toolbarTemplate() {
   const tab = activeTab.value ?? null;
   return html`
     ${mac ? csd : nothing} ${registry ? appMenuTpl(registry) : nothing}
+    ${registry ? layoutTabsTpl(registry) : nothing}
     <div class="tb-spacer"></div>
     ${commandCenterTpl(registry)}
     <div class="tb-spacer"></div>

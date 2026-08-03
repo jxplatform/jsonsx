@@ -4,7 +4,7 @@ description: "Turn any selection into a reusable component in Jx Studio, wire it
 code:
   - packages/studio/src/editor/convert-to-component.ts
   - packages/studio/src/component-props.ts
-  - packages/studio/src/panels/tab-bar.ts
+  - packages/studio/src/panels/pane-context.ts
   - packages/studio/src/panels/properties-panel.ts
 ---
 
@@ -38,7 +38,7 @@ By default an instance renders exactly what the component defines. A **slot** is
 
 ## Preview with test props
 
-A component file open on its own renders with its defaults — but defaults are often empty. The tab bar shows one small field per prop; type a value to see the component render with it, live on the canvas at every breakpoint. Numbers, `true`/`false`, and lists in JSON form are understood as such; anything else counts as text.
+A component file open on its own renders with its defaults — but defaults are often empty. The context bar's **resolving with** cluster shows one small field per prop; type a value to see the component render with it, live on the canvas at every breakpoint. Numbers, `true`/`false`, and lists in JSON form are understood as such; anything else counts as text.
 
 Test values are a preview lens only — they're never saved into the component, and clearing a field returns the prop to its default. They pair with the **Preview** toggle described in **[Modes and preview](/docs/studio/interface/modes)**.
 

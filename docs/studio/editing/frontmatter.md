@@ -1,6 +1,6 @@
 ---
 title: "Frontmatter and page metadata"
-description: "Fill in page titles, descriptions, social cards, and content-type fields with Jx Studio's Document panel and Properties bar — no YAML required."
+description: "Fill in page titles, descriptions, social cards, and content-type fields with Jx Studio's Document panel and Document Header card — no YAML required."
 code:
   - packages/studio/src/panels/head-panel.ts
   - packages/studio/src/panels/frontmatter-panel.ts
@@ -11,7 +11,7 @@ code:
 
 Every page carries information that isn't part of its visible text: a title, a description for search engines, an image for social shares, and — for content like blog posts — fields such as a date, an author, or tags. This is the page's _frontmatter_, and Studio edits all of it as plain forms.
 
-Two surfaces show these fields: the **Document** activity in the left panel, and a **Properties** bar above the canvas for content that belongs to a collection.
+Two surfaces show these fields: the **Document** activity in the left panel, and the **Document Header** card on the page itself.
 
 ## The Document panel
 
@@ -52,11 +52,13 @@ The card shown when the page is shared on social platforms: **Title**, **Descrip
 
 The escape hatch for everything else that can live in a page's head — analytics, a verification token, a webfont. Pick a tag (`meta`, `link`, or `script`), type its attribute and value, and click the add button. Existing custom entries are listed with a remove button each; before you add the first one the section says what it's for, with the add form right beneath. Most sites never need this section.
 
-## The Properties bar
+## The Document Header card
 
-When a collection page is open in Edit mode, a **Properties** bar sits directly above the page — the same fields as the Document panel's Frontmatter section (title included), right where you're writing. Click its header to collapse it to a slim strip; every tab remembers whether you left it open or closed.
+Every page with frontmatter or head tags carries a **Document Header** card, and it sits on the page rather than in a panel: in Edit view it's the first block of the document itself, above your first paragraph, and it scrolls with the page. In Design view it's pinned above the artboards, at normal size, so the fields stay usable however far you've zoomed out.
 
-![The collapsible Properties bar above a post open in Edit mode](../../images/properties-bar.png)
+The card states the page's title and its route, offers the layout picker, and lists the collection's fields — the same set as the Document panel's Frontmatter section, title included. Two disclosures sit underneath: **SEO** (description, viewport, icon, and the OpenGraph card) and **Raw head tags**, which lists any head entries no form owns, read-only. There's no control to summon or dismiss the card; a page that has a header shows one.
+
+![The Document Header card above a post open in Edit view](../../images/properties-bar.png)
 
 :::doc-note
 On disk, all of this lives at the top of the page's own file, in a small labeled block above the content — the frontmatter. That's why metadata travels with the page: copy the file and everything comes along, and any text editor can read it.

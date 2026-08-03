@@ -209,10 +209,6 @@ export const ALLOWED_ORPHANS = new Set<string>([
   "statement-list",
   // Owner: panels/style-panel.ts
   "style-scheme-badge",
-  // Owner: panels/tab-bar.ts
-  "tab-bar-prop",
-  "tb-scheme",
-  "tb-zoom",
   // Owner: panels/welcome-screen.ts
   "welcome-catalogue",
   // Owner: publish/publish-panel.ts

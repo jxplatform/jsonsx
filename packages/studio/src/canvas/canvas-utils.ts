@@ -170,7 +170,7 @@ export function applyTransform() {
   const zoom = _ctx.getZoom();
   view.panzoomWrap.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${zoom})`;
   // Overlays live INSIDE the scaled panzoom-wrap (iframe hosts draw there), so no per-mode redraw
-  // Is needed here — the flush only re-anchors the fixed block-action-bar. The tab-bar zoom widget
+  // Is needed here — the flush only re-anchors the fixed block-action-bar. The floating zoom pod
   // Tracks `ui.zoom` reactively, so no explicit indicator refresh is needed either.
   renderOnly("overlays");
 }
@@ -271,9 +271,9 @@ export function setEditZoom(zoom: number) {
 let _editZoomRaf = 0;
 
 /**
- * Wheel-rate edit-zoom setter: the reactive `editZoom` write lands immediately (the tab-bar label
- * tracks it), but the DOM work — an iframe width resize, i.e. a real reflow — is coalesced to one
- * `applyEditZoom()` per animation frame so a fast ctrl+scroll burst doesn't thrash layout.
+ * Wheel-rate edit-zoom setter: the reactive `editZoom` write lands immediately (the zoom pod's
+ * label tracks it), but the DOM work — an iframe width resize, i.e. a real reflow — is coalesced to
+ * one `applyEditZoom()` per animation frame so a fast ctrl+scroll burst doesn't thrash layout.
  */
 export function requestEditZoom(zoom: number) {
   const tab = activeTab.value;
@@ -481,8 +481,12 @@ export function setUserZoom(zoom: number): void {
   if (!tab) {
     return;
   }
-  tab.session.ui.zoom = clampPanZoom(zoom);
-  declareFit(tab.session.ui.zoom);
+  // The fit is declared BEFORE the reactive write, not after: `ui.zoom` is tracked, effects run
+  // Synchronously on assignment, and the zoom pod reads `getFit()` while it renders — so declaring
+  // Second means the control repaints one interaction behind the state it is reporting.
+  const next = clampPanZoom(zoom);
+  declareFit(next);
+  tab.session.ui.zoom = next;
   applyTransform();
 }
 
@@ -605,8 +609,77 @@ export const CANVAS_MODES = [
 
 export type CanvasMode = (typeof CANVAS_MODES)[number];
 
-/** The base modes the preview flag composes with — the two the tab bar shows it beside. */
+/** The base modes the preview flag composes with — the two the Canvas view axis shows it beside. */
 const PREVIEWABLE_BASE_MODES = new Set(["edit", "design"]);
+
+// ─── §4.2 axis 2 — the Canvas view ───────────────────────────────────────────
+// `Edit │ Design │ Preview` is ONE control with three VALUES, not two base modes plus a toggle on a
+// Different bar. The composition rule below is the whole reason it can be: `preview` was never a
+// Base mode — it is a flag that composes with one — so a switcher that showed "Design" selected
+// While the pane was previewing was reporting a state the app was not in (§4.4).
+
+/** The three values of the Canvas view axis, in the order the segmented control lists them. */
+export const CANVAS_VIEWS = ["edit", "design", "preview"] as const;
+
+export type CanvasView = (typeof CANVAS_VIEWS)[number];
+
+/** A tab's view state, as the axis reads it — its base mode and whether preview composes over it. */
+interface ViewableTab {
+  capabilities: { modes: string[] };
+  session: { ui: { canvasMode: string; preview?: boolean } };
+}
+
+/**
+ * The view this pane is in, or `null` when its editor is not the Canvas at all.
+ *
+ * The EFFECTIVE view, so the control can never disagree with the canvas: previewing over an `edit`
+ * base reads `"preview"`, not `"edit"`.
+ */
+export function canvasViewOf(tab: ViewableTab): CanvasView | null {
+  const base = tab.session.ui.canvasMode;
+  if (!PREVIEWABLE_BASE_MODES.has(base)) {
+    return null;
+  }
+  return tab.session.ui.preview === true ? "preview" : (base as CanvasView);
+}
+
+/**
+ * The views this document supports, in axis order — the control's entries.
+ *
+ * Filtered by `capabilities.modes` for the same reason the editor-kind dropdown is (§4.2): a
+ * permanently dead segment is a question the app refuses to answer.
+ */
+export function canvasViewsFor(tab: ViewableTab): CanvasView[] {
+  return CANVAS_VIEWS.filter((value) => tab.capabilities.modes.includes(value));
+}
+
+/**
+ * Move a pane onto one of the three views. The one writer the segmented control routes through.
+ *
+ * Idempotent in both directions, which is what `canvas.togglePreview` could not be: arriving at
+ * Edit or Design clears the preview flag, so "Design" means Design from any starting state.
+ *
+ * @param tab The pane's tab.
+ * @param value The view to land on.
+ * @param setCanvasMode Writes the BASE mode — `studio.ts`'s own, injected because this module does
+ *   not own the canvas render loop.
+ */
+export function setCanvasView(
+  tab: ViewableTab,
+  value: CanvasView,
+  setCanvasMode: (mode: string) => void,
+): void {
+  if (value === "preview") {
+    if (PREVIEWABLE_BASE_MODES.has(tab.session.ui.canvasMode)) {
+      tab.session.ui.preview = true;
+    }
+    return;
+  }
+  tab.session.ui.preview = false;
+  if (tab.session.ui.canvasMode !== value) {
+    setCanvasMode(value);
+  }
+}
 
 /** What the canvas view verbs need that this module does not own. */
 export interface CanvasCommandDeps {

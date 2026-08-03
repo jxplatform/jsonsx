@@ -70,7 +70,7 @@ document.body.innerHTML = `
 // ─── Captured wiring contexts ─────────────────────────────────────────────────
 
 let toolbarCtx: any = null;
-let tabBarCtx: any = null;
+let paneCtx: any = null;
 let welcomeCtx: any = null;
 let blockBarCtx: any = null;
 let canvasRenderCtx: any = null;
@@ -129,9 +129,9 @@ void mock.module("../src/panels/toolbar.ts", () => ({
   unmount: mock(() => {}),
 }));
 
-void mock.module("../src/panels/tab-bar.ts", () => ({
+void mock.module("../src/panels/pane-context.ts", () => ({
   mount: (_el: HTMLElement, ctx: unknown) => {
-    tabBarCtx = ctx;
+    paneCtx = ctx;
   },
   render: mock(() => {}),
   unmount: mock(() => {}),
@@ -305,7 +305,7 @@ beforeEach(() => {
 describe("bootstrap", () => {
   test("captures wiring contexts for every mocked panel module", () => {
     expect(toolbarCtx).not.toBeNull();
-    expect(tabBarCtx).not.toBeNull();
+    expect(paneCtx).not.toBeNull();
     expect(welcomeCtx).not.toBeNull();
     expect(blockBarCtx).not.toBeNull();
     expect(canvasRenderCtx).not.toBeNull();
@@ -475,7 +475,7 @@ describe("navigateBack", () => {
 
   test("no-op when the document stack is empty", async () => {
     openShellTab();
-    await tabBarCtx.navigateBack();
+    await paneCtx.navigateBack();
     expect(statusMessages).toHaveLength(0);
   });
 
@@ -486,7 +486,7 @@ describe("navigateBack", () => {
     tab.doc.dirty = false;
     const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
     const before = writes();
-    await tabBarCtx.navigateBack();
+    await paneCtx.navigateBack();
     expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).toBeNull();
     expect(writes()).toBe(before);
     expect((tab.doc.document as any).tagName).toBe("section");
@@ -499,7 +499,7 @@ describe("navigateBack", () => {
     tab.session.documentStack = [frameFor("section")] as any;
     tab.documentPath = "components/card-save.json";
     tab.doc.dirty = true;
-    const nav = tabBarCtx.navigateBack();
+    const nav = paneCtx.navigateBack();
     await flush();
     answerDrillPrompt("confirm");
     await nav;
@@ -517,7 +517,7 @@ describe("navigateBack", () => {
     tab.doc.dirty = true;
     const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
     const before = writes();
-    const nav = tabBarCtx.navigateBack();
+    const nav = paneCtx.navigateBack();
     await flush();
     answerDrillPrompt("secondary");
     await nav;
@@ -533,7 +533,7 @@ describe("navigateBack", () => {
     tab.doc.dirty = true;
     const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
     const before = writes();
-    const nav = tabBarCtx.navigateBack();
+    const nav = paneCtx.navigateBack();
     await flush();
     answerDrillPrompt("cancel");
     await nav;
@@ -552,7 +552,7 @@ describe("navigateBack", () => {
       throw new Error("disk full");
     };
     try {
-      const nav = tabBarCtx.navigateBack();
+      const nav = paneCtx.navigateBack();
       await flush();
       answerDrillPrompt("confirm");
       await nav;
@@ -580,7 +580,7 @@ describe("navigateBack", () => {
     tab.session.ui.activeSelector = "::before";
     tab.session.ui.rightTab = "properties";
     tab.session.ui.zoom = 2;
-    await tabBarCtx.navigateBack();
+    await paneCtx.navigateBack();
     expect(tab.session.ui.activeMedia).toBe("@md");
     expect(tab.session.ui.activeSelector).toBe(":hover");
     expect(tab.session.ui.rightTab).toBe("style");
@@ -604,22 +604,22 @@ describe("navigateToLevel", () => {
   test("ignores out-of-range indexes", async () => {
     const tab = openShellTab();
     tab.session.documentStack = [frame("one")] as any;
-    await tabBarCtx.navigateToLevel(-1);
-    await tabBarCtx.navigateToLevel(5);
+    await paneCtx.navigateToLevel(-1);
+    await paneCtx.navigateToLevel(5);
     expect(tab.session.documentStack).toHaveLength(1);
     expect(statusMessages).toHaveLength(0);
   });
 
   test("ignores calls when there is no stack at all", async () => {
     openShellTab();
-    await tabBarCtx.navigateToLevel(0);
+    await paneCtx.navigateToLevel(0);
     expect(statusMessages).toHaveLength(0);
   });
 
   test("jumps to an ancestor level, truncating the stack", async () => {
     const tab = openShellTab();
     tab.session.documentStack = [frame("root"), frame("mid")] as any;
-    await tabBarCtx.navigateToLevel(0);
+    await paneCtx.navigateToLevel(0);
     expect((tab.doc.document as any).tagName).toBe("root");
     expect(tab.documentPath).toBe("pages/root.json");
     expect(tab.session.documentStack).toHaveLength(0);
@@ -631,7 +631,7 @@ describe("navigateToLevel", () => {
     tab.session.documentStack = [frame("root")] as any;
     tab.documentPath = "pages/deep-save.json";
     tab.doc.dirty = true;
-    const nav = tabBarCtx.navigateToLevel(0);
+    const nav = paneCtx.navigateToLevel(0);
     await flush();
     answerDrillPrompt("confirm");
     await nav;
@@ -646,7 +646,7 @@ describe("navigateToLevel", () => {
     tab.doc.dirty = true;
     const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
     const before = writes();
-    const nav = tabBarCtx.navigateToLevel(0);
+    const nav = paneCtx.navigateToLevel(0);
     await flush();
     answerDrillPrompt("secondary");
     await nav;
@@ -664,7 +664,7 @@ describe("navigateToLevel", () => {
       throw new Error("readonly fs");
     };
     try {
-      const nav = tabBarCtx.navigateToLevel(0);
+      const nav = paneCtx.navigateToLevel(0);
       await flush();
       answerDrillPrompt("confirm");
       await nav;
@@ -952,8 +952,8 @@ describe("wiring arrows", () => {
   });
 
   test("tab bar exposes parseMediaEntries from canvas-media utils", () => {
-    expect(typeof tabBarCtx.parseMediaEntries).toBe("function");
-    expect(tabBarCtx.parseMediaEntries(null)).toEqual({
+    expect(typeof paneCtx.parseMediaEntries).toBe("function");
+    expect(paneCtx.parseMediaEntries(null)).toEqual({
       baseWidth: 320,
       featureQueries: [],
       sizeBreakpoints: [],
@@ -967,7 +967,7 @@ describe("wiring arrows", () => {
   });
 
   test("tab bar exposes exportFile; canvas render ctx exposes the git-diff hooks", () => {
-    expect(typeof tabBarCtx.exportFile).toBe("function");
+    expect(typeof paneCtx.exportFile).toBe("function");
     expect(typeof canvasRenderCtx.setCanvasMode).toBe("function");
     canvasRenderCtx.setGitDiffState({ path: "x" });
     expect(canvasRenderCtx.gitDiffState).toEqual({ path: "x" });
@@ -1212,7 +1212,7 @@ describe("remaining wiring arrows", () => {
   test("tab bar closeFunctionEditor shares the toolbar delegate (no-op path)", async () => {
     const tab = openShellTab();
     tab.session.ui.editingFunction = null;
-    await tabBarCtx.closeFunctionEditor();
+    await paneCtx.closeFunctionEditor();
     expect(tab.session.ui.editingFunction).toBeNull();
   });
 

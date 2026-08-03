@@ -39,9 +39,9 @@ Breakpoints belong to the whole site. To edit them, click the **Settings** gear 
 
 A single file can also carry breakpoints of its own: select the page root in [Layers](/docs/studio/design/layers) and open the **Media** section of the [Properties panel](/docs/studio/design/properties). There you set the file's **Base width** — how wide the Base canvas panel renders — and add breakpoints with a friendly name (Studio derives the stored name, "Tablet" becomes `--tablet`). File-level breakpoints add to the site's list for that file. More site-wide options live in **[Project settings](/docs/studio/projects/settings)**.
 
-Only width conditions get a canvas panel. A breakpoint with a different kind of condition — reduced motion, for example — appears instead as a toggle in the tab bar.
+Only width conditions get a canvas panel. A breakpoint with a different kind of condition — reduced motion, for example — appears instead as a toggle in the context bar's **Context** popover.
 
-A `prefers-color-scheme` breakpoint is special: it surfaces as an **Auto / Light / Dark** control in the tab bar instead of a generic toggle. Auto follows your OS preference; Light and Dark force that scheme on the canvas — exactly what a visitor's [color-scheme switcher](/docs/framework/concepts/color-schemes) does on the published site. The control appears only when the project declares a scheme breakpoint.
+A `prefers-color-scheme` breakpoint is special: it surfaces as an **Auto / Light / Dark** control in the context bar's **Context** popover instead of a generic toggle. Auto follows your OS preference; Light and Dark force that scheme on the canvas — exactly what a visitor's [color-scheme switcher](/docs/framework/concepts/color-schemes) does on the published site. The control appears only when the project declares a scheme breakpoint.
 
 :::doc-note
 Breakpoints are stored as a `$media` map — in `project.json` for the site, or at the top of a file for file-level ones. Per-breakpoint styles nest under the breakpoint's name inside each element's `style`, as described in **[Styling](/docs/framework/concepts/styling)**.

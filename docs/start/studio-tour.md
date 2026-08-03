@@ -19,7 +19,7 @@ The top row holds project-wide actions: **Open Project** (with a dropdown of rec
 
 ## The mode switcher
 
-On the right side of the toolbar, five buttons switch how the canvas presents the open file: **Edit**, **Design**, **Grid**, **Code**, and **Stylebook**. Only the modes that make sense for the current file are enabled — see **[Modes and the preview toggle](/docs/studio/interface/modes)**.
+The context bar under the tab strip says which **Editor** is open on the file and, for the Canvas, which **View** of it — **Edit**, **Design** or **Preview**. Each control offers only what the current file supports — see **[Modes and views](/docs/studio/interface/modes)**.
 
 ## The activity bar
 

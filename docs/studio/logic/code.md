@@ -21,7 +21,7 @@ There are two distinct code surfaces, for two different jobs.
 
 ## The function editor
 
-A function body in **Code** mode (the **Statements**/**Code** toggle) is JavaScript. The small text field in the panel is fine for one line; for anything more, click the code icon — **Open in code editor** on a State-panel function, **Open in editor** on an inline event handler. The editor takes over the canvas, and the tab bar shows a breadcrumb — the file's name, then _ƒ_ and the function's name — with a **Back** button to return.
+A function body in **Code** mode (the **Statements**/**Code** toggle) is JavaScript. The small text field in the panel is fine for one line; for anything more, click the code icon — **Open in code editor** on a State-panel function, **Open in editor** on an inline event handler. The editor takes over the canvas, and the context bar shows a breadcrumb — the file's name, then _ƒ_ and the function's name — with a **Back** button to return.
 
 What you get:
 
@@ -38,11 +38,11 @@ A function body normally lives inside the component's JSON. When one grows large
 
 ## Code mode: the whole file as source
 
-The **Code** entry in the toolbar's mode switcher shows the open file itself as raw source — JSON for pages and components, Markdown for content — as introduced in **[Modes and the preview toggle](/docs/studio/interface/modes)**. It's the same document the visual surfaces edit, from the other side:
+The **Code** entry in the context bar's **Editor** control shows the open file itself as raw source — JSON for pages and components, Markdown for content — as introduced in **[Modes and views](/docs/studio/interface/modes)**. It's the same document the visual surfaces edit, from the other side:
 
 - Edits parse back into the document as you type, so switching back to **Edit** or **Design** shows your changes. While the source is momentarily unparseable mid-edit, Studio simply waits — it never replaces your document with a broken parse.
 - JSON files are checked against your project's own schema as you type — mistyped keys, wrong value types and missing required properties are underlined, and :kbd[Ctrl+Space] completes property names. Studio uses the `project.schema.json` and `document.schema.json` that [`jx schema`](/docs/framework/build/cli) generates from your enabled extensions, so the editor enforces exactly what `jx validate` does, including extension-contributed sections. It reads them directly, with no network access — an offline project still gets full validation.
-- **Export** in the tab bar saves a copy of the file elsewhere.
+- **Export**, at the right of the context bar, saves a copy of the file elsewhere.
 
 :::doc-note
 You never have to generate those files yourself: Studio refreshes them whenever they are missing or out of date, so a project you have never run `jx schema` on still validates, and turning an extension on or off updates the rules without a restart. In the browser at [studio.jxsuite.com](https://studio.jxsuite.com) the rules are composed for you on the server and nothing is written to your repository at all.

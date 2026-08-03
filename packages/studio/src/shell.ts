@@ -24,12 +24,15 @@
 import { effect, effectScope, reactive } from "./reactivity";
 import { applyStartupProfile } from "./services/profile";
 import { stampShellRegions } from "./ui/regions";
+import { workspace } from "./workspace/workspace";
 import {
   argsSchema,
   booleanArg,
   booleanProperty,
   enumArg,
   enumProperty,
+  stringArg,
+  stringProperty,
 } from "./commands/command-args";
 import type { EffectScope } from "@vue/reactivity";
 import type { LayoutHit } from "./canvas/iframe-protocol";
@@ -194,6 +197,39 @@ export interface ShellStylebook {
   customizedOnly: boolean;
 }
 
+/**
+ * A named arrangement of the shell — plan §3.2 ①b.
+ *
+ * A layout is a TUPLE, not a mode: which Navigator panel is showing, whether each dock is open and
+ * how wide, and which Inspector tab is selected. Picking one reconfigures; it never removes. Every
+ * panel stays reachable by rail, chord and palette afterwards, because §13 rejects workspaces that
+ * gate features — telling a copy editor the Style panel "is in ⌘K" hands the non-technical user the
+ * one affordance they are least likely to reach for.
+ *
+ * The field this replaces (`shell.layout`, a string with a declared default and NO writer) was the
+ * exact failure `layoutSelection` had already been through: a record nothing sets, read by chrome
+ * that therefore cannot change. Wiring it was the alternative to deleting it, and these are the
+ * writers.
+ *
+ * **Editor kind is deliberately not in the tuple.** §3.2 ①b names it, but nothing in the shell can
+ * apply it: switching a pane's editor is `studio.ts`'s `setCanvasMode`, which this module does not
+ * have and cannot be handed without changing a bootstrap it does not own. A fourth field no writer
+ * could honour would recreate the defect this type exists to close, so the tuple is three fields
+ * and the fourth arrives with the pane record that can carry it.
+ */
+export interface LayoutPreset {
+  /** Stable key. Built-ins use their own lowercase name; a saved layout gets a slug of its. */
+  id: string;
+  /** What the Command Bar tab reads. Renamed by double-clicking it. */
+  name: string;
+  /** Which Navigator panel this arrangement shows. */
+  navigatorPanel: NavigatorPanelId;
+  /** Which Inspector tab this arrangement selects. */
+  inspectorTab: InspectorTabId;
+  /** Dock visibility and widths. */
+  docks: Record<DockId, DockState>;
+}
+
 export interface ShellState {
   /** Which panel the Navigator dock shows. One of {@link NAVIGATOR_PANEL_IDS}. */
   leftTab: string;
@@ -201,8 +237,10 @@ export interface ShellState {
   theme: ChromeTheme;
   docks: Record<DockId, DockState>;
   focusRegion: FocusRegion;
-  /** Named layout preset (Write · Design · Build · Ship). */
+  /** The active {@link LayoutPreset}'s id — the Command Bar tab drawn as selected. */
   layout: string;
+  /** Every layout this project has, built-ins included. Persisted per project root. */
+  layouts: LayoutPreset[];
   layoutSelection: LayoutSelection | null;
   /** Which section Project Settings opens on. */
   settingsTab: string;
@@ -213,6 +251,20 @@ export interface ShellState {
 const DOCK_STORAGE_KEY = "jx-studio-panel-widths";
 
 const THEME_STORAGE_KEY = "jx-studio-theme";
+
+/**
+ * The per-project record's key prefix — one namespaced record per project root (§4.4).
+ *
+ * Namespaced because a layout is an arrangement of THIS project's panels: "Ship" over a repo with
+ * no git remote is not the same tuple as "Ship" over one that has one, and two projects sharing a
+ * key means opening the second silently rewrites the first.
+ *
+ * Dock geometry stays in {@link DOCK_STORAGE_KEY}, which is read at module scope, before any
+ * project root exists. It is workspace state — `resetProjectShell()` has always kept it across a
+ * project switch for that reason — and moving it here would mean the shell could not lay itself out
+ * until a project opened.
+ */
+const PROJECT_STORAGE_PREFIX = "jx-studio-project::";
 
 /**
  * The chrome theme Studio wakes up in.
@@ -306,6 +358,54 @@ function freshStylebook(): ShellStylebook {
 }
 
 /**
+ * The four layouts every project starts with — §3.2 ①b's `Write · Design · Build · Ship`.
+ *
+ * Each is a real arrangement of surfaces that already exist, not a mode: Write puts the file set
+ * beside the prose and the Inspector on Content; Design opens the Outline against the Style tab;
+ * Build pairs Data with Logic; Ship opens Source Control and gives the whole width to the diff by
+ * collapsing the Inspector — which stays one ⌘B away, because a layout never removes.
+ *
+ * Written as a factory so every project gets its own objects: they are mutable records (a saved
+ * layout overwrites the one with its name) and a shared array literal would leak one project's
+ * edits into the next.
+ */
+function builtInLayouts(): LayoutPreset[] {
+  return [
+    {
+      docks: { left: { collapsed: false, width: 240 }, right: { collapsed: false, width: 280 } },
+      id: "write",
+      inspectorTab: "properties",
+      name: "Write",
+      navigatorPanel: "files",
+    },
+    {
+      docks: { left: { collapsed: false, width: 240 }, right: { collapsed: false, width: 320 } },
+      id: "design",
+      inspectorTab: "style",
+      name: "Design",
+      navigatorPanel: "layers",
+    },
+    {
+      docks: { left: { collapsed: false, width: 280 }, right: { collapsed: false, width: 300 } },
+      id: "build",
+      inspectorTab: "events",
+      name: "Build",
+      navigatorPanel: "data",
+    },
+    {
+      docks: { left: { collapsed: false, width: 300 }, right: { collapsed: true, width: 280 } },
+      id: "ship",
+      inspectorTab: "properties",
+      name: "Ship",
+      navigatorPanel: "git",
+    },
+  ];
+}
+
+/** The layout a project wakes up on, and the fallback when a stored id names nothing. */
+export const DEFAULT_LAYOUT_ID = "design";
+
+/**
  * Build the whole record — nested collections complete — before it is handed to `reactive()`.
  *
  * Assembling it this way is not style: writing into a nested plain object AFTER the proxy exists
@@ -329,8 +429,9 @@ function createShellState(): ShellState {
     docks,
     focusRegion: "pane",
     git: freshGit(),
-    layout: "design",
+    layout: DEFAULT_LAYOUT_ID,
     layoutSelection: null,
+    layouts: builtInLayouts(),
     leftTab: migratePanelId(saved.leftTab) ?? DEFAULT_PANEL_ID,
     settingsTab: "stylebook",
     stylebook: freshStylebook(),
@@ -382,6 +483,226 @@ export function persistDocks(): void {
   }
 }
 
+// ─── Named layouts (§3.2 ①b) ──────────────────────────────────────────────────
+
+/** What a project's namespaced record holds today. Session state (§4.4) grows into this shape. */
+interface PersistedProject {
+  layouts?: unknown;
+  activeLayout?: unknown;
+}
+
+/** The project whose layouts are loaded, or `undefined` before the first sync. */
+let _layoutRoot: string | null | undefined;
+
+/** Whether a parsed value is a usable {@link LayoutPreset} — a stored record is untrusted input. */
+function isLayoutPreset(value: unknown): value is LayoutPreset {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const preset = value as Partial<LayoutPreset>;
+  return (
+    typeof preset.id === "string" &&
+    preset.id !== "" &&
+    typeof preset.name === "string" &&
+    isNavigatorPanelId(preset.navigatorPanel) &&
+    isInspectorTabId(preset.inspectorTab) &&
+    DOCK_IDS.every((dock) => typeof preset.docks?.[dock]?.width === "number")
+  );
+}
+
+/** Read a project's namespaced record, tolerating absent, corrupt and hand-edited storage. */
+function readPersistedProject(root: string | null): {
+  layouts: LayoutPreset[];
+  activeLayout: string | null;
+} {
+  const fresh = { activeLayout: null, layouts: builtInLayouts() };
+  if (!root) {
+    return fresh;
+  }
+  let parsed: PersistedProject;
+  try {
+    parsed = JSON.parse(
+      localStorage.getItem(`${PROJECT_STORAGE_PREFIX}${root}`) || "{}",
+    ) as PersistedProject;
+  } catch {
+    return fresh;
+  }
+  const layouts = Array.isArray(parsed.layouts) ? parsed.layouts.filter(isLayoutPreset) : [];
+  if (layouts.length === 0) {
+    return fresh;
+  }
+  return {
+    activeLayout: typeof parsed.activeLayout === "string" ? parsed.activeLayout : null,
+    layouts,
+  };
+}
+
+/**
+ * Write the project's namespaced record. One key, one writer, one shape.
+ *
+ * The dock record's two-writer bug (`persistWidths` vs `applyPanelCollapse`, both on
+ * {@link DOCK_STORAGE_KEY}) is the reason this is a single function that serialises the whole
+ * record rather than a merge at each call site.
+ */
+export function persistProjectShell(): void {
+  const root = workspace.projectRoot;
+  if (!root) {
+    return;
+  }
+  try {
+    localStorage.setItem(
+      `${PROJECT_STORAGE_PREFIX}${root}`,
+      JSON.stringify({
+        activeLayout: shell.layout,
+        layouts: shell.layouts,
+      } satisfies PersistedProject),
+    );
+  } catch {
+    // Storage full or unavailable — the arrangement is applied, just not remembered.
+  }
+}
+
+/**
+ * Load the layouts belonging to `root`. Idempotent per root, so the effect can call it freely.
+ *
+ * Loading does NOT apply the active layout: a boot that re-applied it would overwrite the dock
+ * widths the user dragged since, which are persisted separately and are the more recent statement.
+ * The stored id says which tab is drawn as selected; clicking it is what re-applies the tuple.
+ */
+export function syncProjectLayouts(root: string | null): void {
+  if (root === _layoutRoot) {
+    return;
+  }
+  _layoutRoot = root;
+  const { activeLayout, layouts } = readPersistedProject(root);
+  shell.layouts = layouts;
+  const has = (id: string | null) => id !== null && layouts.some((preset) => preset.id === id);
+  // The stored active layout wins, then the one already selected, then the default, then whatever
+  // The project actually has — a bar drawn with nothing selected says the app has lost your place.
+  shell.layout = has(activeLayout)
+    ? activeLayout!
+    : has(shell.layout)
+      ? shell.layout
+      : has(DEFAULT_LAYOUT_ID)
+        ? DEFAULT_LAYOUT_ID
+        : (layouts[0]?.id ?? DEFAULT_LAYOUT_ID);
+}
+
+/** The layout with this id, or `undefined`. */
+export function layoutById(id: string): LayoutPreset | undefined {
+  return shell.layouts.find((preset) => preset.id === id);
+}
+
+/** A stable id for a saved layout's name: `My Layout` → `my-layout`. */
+export function layoutIdFor(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-|-$/g, "");
+  return slug || "layout";
+}
+
+/** What applying or capturing a layout needs from the Inspector, which lives on the active tab. */
+export interface LayoutDeps {
+  setInspectorTab: (tab: InspectorTabId) => void;
+  inspectorTab: () => InspectorTabId;
+}
+
+/**
+ * Adopt a layout: its panel, its docks, its Inspector tab — and remember that it is the active one.
+ *
+ * Throws on an unknown id rather than silently doing nothing, because the id space is the user's
+ * own (their saved layouts) and a typo in a command argument has to be reportable.
+ */
+export function applyLayout(id: string, deps: LayoutDeps): void {
+  const preset = layoutById(id);
+  if (!preset) {
+    throw new RangeError(
+      `no layout named "${id}" — this project has: ${shell.layouts.map((p) => p.id).join(", ")}`,
+    );
+  }
+  shell.layout = preset.id;
+  shell.leftTab = preset.navigatorPanel;
+  for (const dock of DOCK_IDS) {
+    shell.docks[dock].collapsed = preset.docks[dock].collapsed;
+    shell.docks[dock].width = preset.docks[dock].width;
+  }
+  deps.setInspectorTab(preset.inspectorTab);
+  persistDocks();
+  persistProjectShell();
+}
+
+/**
+ * Save the current arrangement under `name`, and make it the active layout.
+ *
+ * Saving over an existing name overwrites it — that is what `+` on a layout you have just adjusted
+ * means, and it keeps the operation idempotent for a caller that cannot see the list.
+ */
+export function saveLayout(name: string, deps: LayoutDeps): LayoutPreset {
+  const trimmed = name.trim();
+  const id = layoutIdFor(trimmed);
+  const preset: LayoutPreset = {
+    docks: {
+      left: { collapsed: shell.docks.left.collapsed, width: shell.docks.left.width },
+      right: { collapsed: shell.docks.right.collapsed, width: shell.docks.right.width },
+    },
+    id,
+    inspectorTab: deps.inspectorTab(),
+    name: trimmed || id,
+    navigatorPanel: migratePanelId(shell.leftTab) ?? DEFAULT_PANEL_ID,
+  };
+  const existing = shell.layouts.findIndex((entry) => entry.id === id);
+  if (existing === -1) {
+    shell.layouts.push(preset);
+  } else {
+    shell.layouts.splice(existing, 1, preset);
+  }
+  shell.layout = id;
+  persistProjectShell();
+  return preset;
+}
+
+/** Rename a layout in place. The id — and therefore every reference to it — is unchanged. */
+export function renameLayout(id: string, name: string): void {
+  const preset = layoutById(id);
+  const trimmed = name.trim();
+  if (!preset || !trimmed) {
+    return;
+  }
+  preset.name = trimmed;
+  persistProjectShell();
+}
+
+/**
+ * Forget a layout. The last one cannot be deleted: an empty Command Bar with a `+` and no way to
+ * know what it does is worse than a layout you do not use.
+ */
+export function deleteLayout(id: string): void {
+  if (shell.layouts.length < 2) {
+    return;
+  }
+  const index = shell.layouts.findIndex((preset) => preset.id === id);
+  if (index === -1) {
+    return;
+  }
+  shell.layouts.splice(index, 1);
+  if (shell.layout === id) {
+    shell.layout = shell.layouts[0]!.id;
+  }
+  persistProjectShell();
+}
+
+/**
+ * Re-apply the active layout as declared — `View: Reset Layout`, always one action away (§3.2 ①b).
+ *
+ * This is the escape hatch that makes a layout safe to drift from: drag a dock, collapse the
+ * Inspector, open a different panel, and one command puts the arrangement back.
+ */
+export function resetLayout(deps: LayoutDeps): void {
+  applyLayout(shell.layout, deps);
+}
+
 /**
  * Project the theme record onto `<sp-theme>`.
  *
@@ -430,6 +751,12 @@ export function mountShell(): void {
     });
     effect(() => {
       applyChromeTheme();
+    });
+    // Layouts belong to a project, and the project root is reactive: opening one loads its record
+    // With no boot-order hook to forget. `resetProjectShell()` runs while the OLD root is still
+    // Set — it is the closing half of a switch — which is why the load cannot live there.
+    effect(() => {
+      syncProjectLayouts(workspace.projectRoot);
     });
   });
 }
@@ -530,6 +857,10 @@ export function resetProjectShell(): void {
   Object.assign(shell.stylebook, freshStylebook());
   shell.settingsTab = "stylebook";
   shell.layoutSelection = null;
+  // Forget which project's layouts are loaded, so the next `syncProjectLayouts()` reloads even if
+  // The same root is opened again. The docks and the active rail panel stay: they describe the
+  // Workspace, and re-applying a layout on project open would discard the widths you just dragged.
+  _layoutRoot = undefined;
 }
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
@@ -668,6 +999,99 @@ export function shellViewCommands(deps: ShellCommandDeps): AnyCommand[] {
         }
       },
       title: "Show Assistant",
+    },
+    // ── Named layouts ────────────────────────────────────────────────────────
+    // Five verbs, because a named arrangement you can create but not rename, delete or restore is
+    // A trap. All five are SETTERS: `view.setLayout { layout: "ship" }` means the same thing twice
+    // In a row, and `view.resetLayout` is the one action that puts a drifted arrangement back.
+    {
+      args: argsSchema({
+        layout: stringProperty("The layout's id — one of this project's saved layouts."),
+      }),
+      category: "View",
+      id: "view.setLayout",
+      level: "application",
+      menus: ["palette"],
+      group: "4_layouts",
+      requires: "an open project",
+      when: projectOpen,
+      aiTool: {
+        description:
+          "Adopt one of the project's named layouts (Write, Design, Build, Ship, or one the user " +
+          "saved): its Navigator panel, its dock widths and visibility, and its Inspector tab.",
+        name: "set_layout",
+      },
+      run: (_ctx, args) => {
+        applyLayout(stringArg("view.setLayout", args, "layout"), deps);
+      },
+      title: "Switch Layout",
+    },
+    {
+      args: argsSchema({
+        name: stringProperty("What to call this arrangement. An existing name is overwritten."),
+      }),
+      category: "View",
+      id: "view.saveLayout",
+      level: "application",
+      menus: ["palette"],
+      group: "4_layouts",
+      requires: "an open project",
+      when: projectOpen,
+      run: (_ctx, args) => {
+        saveLayout(stringArg("view.saveLayout", args, "name"), deps);
+      },
+      title: "Save Layout",
+    },
+    {
+      args: argsSchema({
+        layout: stringProperty("The layout's id."),
+        name: stringProperty("Its new name. The id, and every reference to it, is unchanged."),
+      }),
+      category: "View",
+      id: "view.renameLayout",
+      level: "application",
+      menus: ["palette"],
+      group: "4_layouts",
+      requires: "an open project",
+      when: projectOpen,
+      run: (_ctx, args) => {
+        renameLayout(
+          stringArg("view.renameLayout", args, "layout"),
+          stringArg("view.renameLayout", args, "name"),
+        );
+      },
+      title: "Rename Layout",
+    },
+    {
+      args: argsSchema({
+        layout: stringProperty("The layout's id. The last remaining layout is kept."),
+      }),
+      category: "View",
+      id: "view.deleteLayout",
+      level: "application",
+      menus: ["palette"],
+      group: "4_layouts",
+      requires: "an open project",
+      when: projectOpen,
+      run: (_ctx, args) => {
+        deleteLayout(stringArg("view.deleteLayout", args, "layout"));
+      },
+      title: "Delete Layout",
+    },
+    {
+      // No `args`: this verb takes none. An empty schema would be a promise of parameters the
+      // Palette would then prompt for and the record would ignore.
+      category: "View",
+      id: "view.resetLayout",
+      level: "application",
+      menus: ["palette"],
+      group: "4_layouts",
+      requires: "an open project",
+      when: projectOpen,
+      run: () => {
+        resetLayout(deps);
+      },
+      title: "Reset Layout",
     },
     {
       args: argsSchema({

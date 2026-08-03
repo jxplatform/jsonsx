@@ -1,10 +1,10 @@
 /* Jx Studio — app shell.
    Load after tokens.css.
 
-   Owns the #app grid and the regions it lays out: toolbar/tab-strip/
-   frontmatter slots, the Navigator and Inspector docks, the statusbar, the
-   collapsed-sidebar variants, the AI chat panel UI, the tab strip and the
-   drag-to-resize handles. */
+   Owns the #app grid and the regions it lays out: the Command Bar, the pane's
+   tab strip and chrome layer, the Navigator and Inspector docks, the statusbar,
+   the collapsed-sidebar variants, the tab strip and the drag-to-resize
+   handles. */
 
 /* ─── Layout ─────────────────────────────────── */
 /* Four columns: rail | navigator | pane | inspector. The assistant's fifth column is gone —
@@ -12,7 +12,7 @@
    region ⑨). The rail is 56px, not 48px, because every button now carries a text label. */
 #app {
   display: grid;
-  grid-template-rows: 36px auto auto auto minmax(0, 1fr) 24px;
+  grid-template-rows: 36px auto minmax(0, 1fr) 24px;
   grid-template-columns: 56px var(--panel-w-left) 1fr var(--panel-w-right);
   height: 100%;
 }
@@ -49,6 +49,41 @@
 .window-controls {
   margin-left: auto;
   flex-shrink: 0;
+}
+
+/* ─── ①b Layout tabs ─────────────────────────── */
+/* Plain text, not a segmented control: a layout is a place you are, and the Command Bar says which
+   one the same way the tab strip says which document. Every panel stays reachable from every
+   layout — these tabs reconfigure, they never remove. */
+.tb-layouts {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.tb-layout,
+.tb-layout-add {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--spectrum-font-size-75, 12px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tb-layout:hover,
+.tb-layout-add:hover {
+  background: var(--hover-bg);
+  color: var(--fg);
+}
+.tb-layout.active {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+.tb-layout-add {
+  padding: 2px 6px;
 }
 .window-controls .csd-close:hover {
   background: var(--spectrum-negative-background-color-default, #e34850);
@@ -178,43 +213,26 @@
 #tab-strip:empty {
   display: none;
 }
-#tab-bar {
+/* The pane's chrome layer — regions ⑦ and ⑩. It shares the pane's grid cell with
+   `#canvas-wrap` rather than owning a row of the application grid, because a PER-PANE surface
+   cannot be an application-level track: the second pane would have nowhere to put one. The layer
+   itself is inert; only its two children take the pointer. `canvas.css` owns their looks. */
+#pane-chrome {
   grid-row: 3;
   grid-column: 3;
+  position: relative;
+  z-index: 2;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
 }
-#tab-bar:empty {
-  display: none;
-}
-/* Above-canvas frontmatter Properties panel (content-collection docs, edit mode) */
-#frontmatter-panel {
-  grid-row: 4;
-  grid-column: 3;
-  overflow-y: auto;
-  max-height: 40vh;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-}
-#frontmatter-panel sp-accordion {
-  border: none;
-}
-#frontmatter-panel sp-accordion-item {
-  --spectrum-accordion-item-header-font-size: var(--spectrum-font-size-50, 11px);
-}
-#frontmatter-panel[hidden] {
-  display: none;
-}
-.fm-panel-body {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 2px 12px 8px;
-}
-.fm-panel-body .style-row > sp-textfield,
-.fm-panel-body .style-row > .media-picker {
-  width: 100%;
+#pane-chrome > * {
+  pointer-events: auto;
 }
 #activity-bar {
-  grid-row: 2 / 6;
+  grid-row: 2 / 4;
   grid-column: 1;
   display: flex;
   flex-direction: column;
@@ -222,15 +240,19 @@
   border-right: 1px solid var(--border);
 }
 #left-panel {
-  grid-row: 2 / 6;
+  grid-row: 2 / 4;
   grid-column: 2;
   overflow-y: auto;
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
 }
+/* The stage. Offset by `--pane-context-h` (written by `panels/pane-context.ts`) so the context bar
+   stacked over this cell never covers the document — and by zero when no tab is open, so the
+   welcome screen does not sit under a band nothing explains. */
 #canvas-wrap {
-  grid-row: 5;
+  grid-row: 3;
   grid-column: 3;
+  margin-top: var(--pane-context-h, 0px);
   position: relative;
   overflow: auto;
   background: var(--bg-panel);
@@ -239,7 +261,7 @@
    fixed, and the selected tab's body is the only thing that scrolls — which is what lets the
    Assistant tab (whose chat owns its own scrolling) share the dock at zero extra width. */
 #right-panel {
-  grid-row: 2 / 6;
+  grid-row: 2 / 4;
   grid-column: 4;
   display: flex;
   flex-direction: column;
@@ -642,7 +664,7 @@
   gap: 8px;
 }
 #statusbar {
-  grid-row: 6;
+  grid-row: 4;
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
@@ -777,7 +799,7 @@
 
 /* ─── Resize handles ─────────────────────────── */
 .resize-handle {
-  grid-row: 5;
+  grid-row: 3;
   width: 5px;
   margin-left: -3px;
   margin-right: -2px;
