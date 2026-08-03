@@ -39,7 +39,7 @@ Every open file gets a tab above the canvas, with a dot marking unsaved changes 
 
 ## The right panel
 
-Three tabs inspect whatever is selected on the canvas: **Properties** (the element's settings), **Events** (what happens on click, input, and so on), and **Style** (the visual inspector). See **[Design mode](/docs/studio/design)** for Style and **[Script & logic](/docs/studio/logic)** for Events.
+Four tabs inspect whatever is selected on the canvas: **Content** (the element's settings), **Style** (the visual inspector), **Logic** (what happens on click, input, and so on), and **Assistant** (the AI chat). See **[Design mode](/docs/studio/design)** for Style and **[Script & logic](/docs/studio/logic)** for Logic.
 
 ## The status bar
 

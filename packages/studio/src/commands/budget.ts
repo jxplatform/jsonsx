@@ -10,10 +10,15 @@
  * an unlabelled icon is a control the user has to hover to identify. A hard number is what makes
  * "retire this control, keep its name and its chord" the cheap option.
  *
- * {@link DOCK_TABS} is a declaration, not an observation: `registerPanel()` (plan P3) does not
- * exist yet, so the tab sets are written out here from §3.2 and checked. When the panel registry
- * lands, this constant is replaced by a query over it — the check and its threshold do not change.
+ * The dock/tab sets used to be a flat declaration — written out from §3.2 because `registerPanel()`
+ * did not exist. It does now, so the two `rail/*` rows are a QUERY over `railDeclarations()`
+ * ({@link dockTabs}) and adding a ninth rail panel fails this check without anyone remembering to
+ * update a list. The two rows that remain declared are the docks that have no registry yet: the
+ * Inspector's four tabs come from `commands/defaults.ts`'s `INSPECTOR_TABS`, and the bottom dock
+ * does not exist at all. Each becomes a query the same way, in the phase that builds it.
  */
+
+import { INSPECTOR_TABS } from "./defaults";
 
 /** The caps. Raising either one is a design decision, so it happens here, in one place. */
 export const CHROME_BUDGET = {
@@ -31,17 +36,36 @@ export interface DockDeclaration {
 }
 
 /**
- * The tabbed regions of the shell, at the documented cap.
+ * The tabbed regions that are still WRITTEN DOWN rather than observed.
  *
- * The Bottom dock folds Deploy into Activity precisely to stay inside it; the Navigator rail's two
- * level groups are four each with a divider between them.
+ * The Inspector's row is a query in all but name — `INSPECTOR_TABS` is the list `right-panel.ts`
+ * renders and `⌘⇧1–4` address, so a fifth inspector tab fails this check in the commit that adds
+ * it. The Bottom dock has nothing to observe: it does not exist, and it is here so that the phase
+ * that builds it inherits the cap instead of discovering it (Deploy folds into Activity precisely
+ * to stay inside four).
+ *
+ * The rail's two groups are NOT here. They come from `panels/panel-registry.ts`'s
+ * `railDeclarations()` and are joined on by {@link dockTabs} — the registry is the single source of
+ * what a panel is called and which group it sits in, and a duplicate list here was the last place
+ * those could disagree.
  */
-export const DOCK_TABS: readonly DockDeclaration[] = [
-  { dock: "inspector", tabs: ["Content", "Style", "Logic", "Assistant"] },
+export const DECLARED_DOCK_TABS: readonly DockDeclaration[] = [
+  { dock: "inspector", tabs: INSPECTOR_TABS.map((tab) => tab.title) },
   { dock: "bottom", tabs: ["Problems", "Diff", "Logic", "Activity"] },
-  { dock: "rail/project", tabs: ["Files", "Search", "Source Control", "Problems"] },
-  { dock: "rail/document", tabs: ["Outline", "Page", "Data", "Packages"] },
 ];
+
+/**
+ * Every tabbed region: the declared ones plus the rail groups the panel registry observes.
+ *
+ * The rails arrive as an ARGUMENT rather than by import so this module keeps the property that lets
+ * three CI checks load it in a bare Bun process — `panel-registry.ts` reaches the DOM, the shell
+ * record and the workspace. `scripts/check-chrome-budget.ts` is the one place that joins them.
+ *
+ * @param rails `railDeclarations()`, or `[]` where no registry has been populated.
+ */
+export function dockTabs(rails: readonly DockDeclaration[] = []): DockDeclaration[] {
+  return [...DECLARED_DOCK_TABS, ...rails];
+}
 
 /** The subset of a command record the budget check reads. */
 export interface BudgetableRecord {
@@ -69,7 +93,7 @@ export function primaryCommandIds(commands: readonly BudgetableRecord[]): string
  * Check both caps.
  *
  * @param input.commands Every registered command record.
- * @param input.docks The shell's tabbed regions. Defaults to {@link DOCK_TABS}.
+ * @param input.docks The shell's tabbed regions. Defaults to {@link dockTabs} with no rails.
  */
 export function checkChromeBudget(input: {
   commands: readonly BudgetableRecord[];
@@ -88,7 +112,7 @@ export function checkChromeBudget(input: {
         `"commandbar/overflow": it keeps its name, its chord and its palette row.`,
     });
   }
-  for (const dock of input.docks ?? DOCK_TABS) {
+  for (const dock of input.docks ?? dockTabs()) {
     if (dock.tabs.length > CHROME_BUDGET.dockTabs) {
       violations.push({
         subject: dock.dock,

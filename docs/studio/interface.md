@@ -35,7 +35,7 @@ On the right:
 
 - The **mode switcher** — **Edit**, **Design**, **Grid**, **Code**, **Stylebook** — changes how the canvas presents the open file. See [Modes and the preview toggle](/docs/studio/interface/modes).
 - A toggle collapses and restores the right panel.
-- A chat icon toggles the [Assistant sidebar](/docs/studio/ai), which starts closed and stays however you last left it.
+- A chat icon shows the [Assistant](/docs/studio/ai), which is the right panel's fourth tab.
 
 In the desktop app, the window's minimize, maximize, and close controls also live in this row.
 
@@ -60,13 +60,16 @@ The left panel shows the selected activity. Drag its inner edge to resize it —
 
 ## Right panel
 
-The right panel inspects whatever is selected on the canvas, in three tabs:
+The right panel inspects whatever is selected on the canvas, in four tabs:
 
-- **Properties** — the selected element's settings: its text, links, images, and component options.
-- **Events** — what the element does on click, input, submit, and other interactions. See [Script & logic](/docs/studio/logic).
+- **Content** — the selected element's settings: its text, links, images, and component options.
 - **Style** — the visual inspector: spacing, typography, color, layout, and more. See [Design mode](/docs/studio/design).
+- **Logic** — what the element does on click, input, submit, and other interactions. See [Script & logic](/docs/studio/logic).
+- **Assistant** — the [AI assistant](/docs/studio/ai), in the same panel rather than a column of its own.
 
-Resize it by dragging its inner edge, or collapse it entirely with the toggle at the right end of the toolbar.
+A header above the tabs names the tab you're in and what it's pointed at — the selected element, or the open document when nothing is selected.
+
+Resize it by dragging its inner edge, or collapse it entirely with the toggle at the right end of the toolbar. The Assistant shares that width, so showing it never narrows the canvas.
 
 :::doc-note
 Studio remembers your layout — panel widths and which panels are collapsed carry over to your next session.

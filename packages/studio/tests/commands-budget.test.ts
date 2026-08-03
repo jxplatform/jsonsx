@@ -3,7 +3,8 @@ import { describe, expect, test } from "bun:test";
 import {
   checkChromeBudget,
   CHROME_BUDGET,
-  DOCK_TABS,
+  DECLARED_DOCK_TABS,
+  dockTabs,
   primaryCommandIds,
 } from "../src/commands/budget";
 import type { BudgetableRecord } from "../src/commands/budget";
@@ -29,9 +30,36 @@ describe("primaryCommandIds", () => {
 describe("checkChromeBudget", () => {
   test("the declared shell is inside both caps", () => {
     expect(checkChromeBudget({ commands: [] })).toEqual([]);
-    for (const dock of DOCK_TABS) {
+    for (const dock of DECLARED_DOCK_TABS) {
       expect(dock.tabs.length).toBeLessThanOrEqual(CHROME_BUDGET.dockTabs);
     }
+  });
+
+  test("the Inspector's row is the tab list itself, not a copy of it", () => {
+    // Wave A wrote the four tab titles out by hand. They now come from `commands/defaults.ts`'s
+    // `INSPECTOR_TABS` — the list the dock renders and ⌘⇧1–4 address — so a fifth tab fails this
+    // Check in the commit that adds it.
+    const inspector = DECLARED_DOCK_TABS.find((dock) => dock.dock === "inspector");
+    expect(inspector?.tabs).toEqual(["Content", "Style", "Logic", "Assistant"]);
+  });
+
+  test("dockTabs joins the observed rail groups onto the declared docks", () => {
+    // The rails arrive as an argument, because `budget.ts` must stay loadable in a bare Bun
+    // Process and `panel-registry.ts` reaches the DOM. `check-chrome-budget.ts` is the one joiner.
+    expect(dockTabs().map((dock) => dock.dock)).toEqual(["inspector", "bottom"]);
+    expect(dockTabs([{ dock: "rail/project", tabs: ["Files"] }]).map((dock) => dock.dock)).toEqual([
+      "inspector",
+      "bottom",
+      "rail/project",
+    ]);
+  });
+
+  test("an over-budget rail group fails through the same door", () => {
+    const violations = checkChromeBudget({
+      commands: [],
+      docks: dockTabs([{ dock: "rail/project", tabs: ["A", "B", "C", "D", "E"] }]),
+    });
+    expect(violations.map((violation) => violation.subject)).toEqual(["rail/project"]);
   });
 
   test("exactly at the cap passes; one over fails", () => {

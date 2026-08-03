@@ -127,11 +127,16 @@ describe("run() reaches the implementations", () => {
     expect(shell.docks.left.collapsed).toBe(false);
   });
 
-  test("view.setAssistant opens the chat dock", async () => {
+  test("view.setAssistant selects the Inspector's Assistant tab", async () => {
+    // Not a dock any more: the assistant is the Inspector's fourth tab, so "open" means selected
+    // With the dock that hosts it open, and "closed" means stepped off it.
+    shell.docks.right.collapsed = true;
     await api().run("view.setAssistant", { open: true });
-    expect(shell.docks.chat.collapsed).toBe(false);
+    expect(shell.docks.right.collapsed).toBe(false);
+    expect(activeTab.value?.session.ui.rightTab).toBe("assistant");
     await api().run("view.setAssistant", { open: false });
-    expect(shell.docks.chat.collapsed).toBe(true);
+    expect(activeTab.value?.session.ui.rightTab).toBe("properties");
+    expect(shell.docks.right.collapsed).toBe(false);
   });
 
   test("view.setRightTab writes the active tab's Inspector tab", async () => {

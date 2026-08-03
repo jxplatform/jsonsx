@@ -19,7 +19,6 @@ import {
   resetNavigatorPanels,
 } from "../src/panels/navigator-panels";
 import { emptyContext } from "../src/commands/context";
-import { DOCK_TABS } from "../src/commands/budget";
 import {
   checkPanelPlacement,
   checkPanelPlacements,
@@ -244,12 +243,15 @@ describe("railGroups", () => {
 });
 
 describe("railDeclarations", () => {
-  test("matches the chrome budget's declared rail rows", () => {
-    // `commands/budget.ts` wrote the rail out by hand because the registry did not exist. This is
-    // The assertion that keeps the two in step until `check-chrome-budget.ts` queries the registry.
+  test("names the two rail groups, in shell order", () => {
+    // `commands/budget.ts` used to write these rows out by hand and this test asserted the two
+    // Agreed. The duplication is gone — `check-chrome-budget.ts` queries this function — so what
+    // Is left to assert is the shape the budget check consumes.
     registerNavigatorPanels();
-    const declared = DOCK_TABS.filter((d) => d.dock.startsWith("rail/"));
-    expect(railDeclarations()).toEqual(declared.map((d) => ({ dock: d.dock, tabs: [...d.tabs] })));
+    expect(railDeclarations()).toEqual([
+      { dock: "rail/project", tabs: ["Files", "Search", "Source Control", "Problems"] },
+      { dock: "rail/document", tabs: ["Outline", "Page", "Data", "Packages"] },
+    ]);
   });
 
   test("counts hidden panels — a slot spent is a slot spent", () => {

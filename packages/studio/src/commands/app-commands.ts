@@ -29,7 +29,7 @@ import { defaultCommands, noopCommandDeps } from "./defaults";
 import { navigatorPanelSet } from "../panels/navigator-panels";
 import { createCommandRegistry } from "./registry";
 import { emptyContext } from "./context";
-import { shellViewCommands } from "../shell";
+import { DEFAULT_INSPECTOR_TAB, shellViewCommands } from "../shell";
 import { canvasViewCommands } from "../canvas/canvas-utils";
 import { selectionCommands } from "../canvas/canvas-render";
 import { inspectorCommands } from "../panels/properties-panel";
@@ -39,6 +39,7 @@ import { formulaEditorCommands } from "../panels/formula-workspace";
 import { styleCommands } from "../panels/style-panel";
 import { gridCommands } from "../grid/grid-open";
 import { settingsCommands } from "../settings/settings-modal";
+import { preferencesCommands } from "../settings/preferences-dialog";
 import { browseCommands } from "../browse/browse-modal";
 import { newProjectCommands } from "../new-project/new-project-modal";
 import { registerSelectionCommands } from "../panels/block-action-bar";
@@ -75,7 +76,7 @@ export function appCommandSet(): AnyCommand[] {
     // Level check, the chrome budget and the generated keyboard sheet alike.
     ...defaultCommands({ ...noopCommandDeps(), navigatorPanels: navigatorPanelSet() }),
     ...viaRegistration(),
-    ...shellViewCommands({ setInspectorTab: NO_OP }),
+    ...shellViewCommands({ inspectorTab: () => DEFAULT_INSPECTOR_TAB, setInspectorTab: NO_OP }),
     ...canvasViewCommands({ getCanvasMode: () => "design", setCanvasMode: NO_OP }),
     ...selectionCommands(),
     ...inspectorCommands(),
@@ -84,6 +85,7 @@ export function appCommandSet(): AnyCommand[] {
     ...formulaEditorCommands({ renderCanvas: NO_OP }),
     ...gridCommands(),
     ...settingsCommands(),
+    ...preferencesCommands(),
     ...browseCommands(),
     ...newProjectCommands(),
     ...styleCommands(),

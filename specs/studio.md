@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.4.1-draft
+**Version:** 0.4.2-draft
 **Status:** Partial
-**Updated:** 2026-08-02
+**Updated:** 2026-08-03
 **License:** MIT
 
 ---
@@ -33,21 +33,27 @@ At the component level, Studio is a visual builder for individual Jx files. At t
 
 Four-column layout:
 
-| Column    | Content                                                                                     |
-| --------- | ------------------------------------------------------------------------------------------- |
-| Left      | Activity bar + panel (layers, files, etc.)                                                  |
-| Center    | Canvas (live preview) + Toolbar                                                             |
-| Right     | Inspector (properties, style, state, code)                                                  |
-| Assistant | AI chat sidebar — **collapsed by default**, toggled from the toolbar, remembered per window |
+| Column    | Content                                                 |
+| --------- | ------------------------------------------------------- |
+| Rail      | Navigator rail — panel buttons, grouped by level        |
+| Navigator | One panel at a time (Files, Outline, Source Control, …) |
+| Center    | Canvas (live preview) + Command Bar                     |
+| Inspector | Four tabs: Content · Style · Logic · Assistant          |
 
-Each column's collapsed state persists to `localStorage` and is adopted at boot in both directions,
-so a remembered "open" reopens the assistant against its closed default.
+**There is no assistant column.** The AI chat is the Inspector dock's fourth tab, so it shares that
+dock's cell and its width: showing it costs zero additional pixels, and the two docks are the only
+things that carry a width, a collapse flag and a resize handle. Two states that a separate column
+made expressible — "assistant open over a collapsed inspector", and "assistant open at 0px" — are
+unreachable by construction rather than by a rule.
 
-An AI provider key is an application-level setting configured once, not a state of the assistant
-column: it is edited in the `Assistant: Settings…` dialog (opened from the composer's gear, or from
-the setup notice the panel shows when nothing is connected) over the overlay contract in
-`studio-ui-guidelines.md` §8.7. With no provider connected, the panel still renders a chat inviting
-a conversation with that one action beneath it — it is never replaced by a credentials form.
+Each dock's collapsed state and width persist to `localStorage` under one record, written by one
+writer, and are adopted at boot in both directions, so a remembered "open" reopens a dock against a
+closed default. A stale `chat` entry from an older build is ignored, not resurrected.
+
+An AI provider key is an application-level setting configured once, so it is not edited from the
+assistant at all: it lives in **Preferences › Assistant** (§15). With no provider connected, the tab
+still renders a chat inviting a conversation, with one line and the action that fixes it beneath —
+it is never replaced by a credentials form.
 
 ### 3.2 Data Flow
 
@@ -388,6 +394,21 @@ All git operations are exposed as PAL methods (`gitStatus()`, `gitCommit(message
 ---
 
 ## 6. Inspector (Right Panel)
+
+Four **text-labelled** tabs, in this order: **Content · Style · Logic · Assistant**. The tab ids
+(`properties`, `style`, `events`, `assistant`) are the values `view.setRightTab` accepts and the
+values `⌘⇧1`–`⌘⇧4` address, so the strip, the keymap and the automation surface cannot disagree
+about which tabs exist. Icon-only tabs are gone: a dock the author reads all day states its own
+names.
+
+Every tab renders under a header naming the tab and **what it is pointed at** — the selected node,
+or the document when nothing is selected, or "no document" when nothing is open.
+
+The tab selection is per-document (`session.ui.rightTab`), so the tab you were on returns with the
+file. With no document open there is nowhere per-document to keep it, and the Assistant is usable in
+exactly that state (the New Project hand-off sends a brief before any document exists), so the
+selection falls back to a single window-level value rather than being refused. An undeclared stored
+id coerces to Content.
 
 ### 6.1 Property Panel
 
@@ -1178,8 +1199,47 @@ and re-reads the file. A virtual tab with no path is not recorded — there is n
 offering to reopen it would be a lie. The command renders disabled, with its reason, until something
 has been closed.
 
+## 15. Application Preferences
+
+**Status:** Partial — Appearance, Assistant, Accounts and a read-only Keyboard sheet ship; Editor
+behaviour, rebinding and Updates/About are pending.
+
+`project.json` configures a **project** and is edited as a project document. **Preferences** (`⌘,`,
+command id `app.preferences`) configures the **application** and follows the author between
+projects. The two are different surfaces because they have different lifetimes; conflating them is
+why Studio had nowhere to put the chrome theme, the provider key, or the credentials it holds.
+
+Preferences is a focus-managed dialog over the overlay contract in `studio-ui-guidelines.md` §8.7.
+It does not suspend the app, and it is reachable with **no project open** — a first run needs it
+exactly there. Re-opening it while it is up selects the named section rather than stacking a second
+sheet.
+
+| Section    | Contents                                                                                                   |
+| ---------- | ---------------------------------------------------------------------------------------------------------- |
+| Appearance | The chrome theme (`shell.theme`, also settable by `view.setTheme`)                                         |
+| Assistant  | The AI provider key, model and endpoint, plus the keyless managed-connect path where a platform offers one |
+| Accounts   | Every credential Studio holds — GitHub, the AI provider, Cloudflare — listed with a Disconnect each        |
+| Keyboard   | Read-only, **generated** from the command registry                                                         |
+
+Two rules the sections must keep:
+
+1.  **An account row never prints the secret it describes.** It reports that something is stored and
+    what it is for. Disconnecting is idempotent, and revoking one account never touches another.
+2.  **The Keyboard sheet is generated, never authored.** It is the same projection
+    (`shortcutReference()`) that produces `docs/studio/interface/shortcuts.md`, so the in-app sheet
+    cannot drift from the app or from the documentation, and a command contributed by an extension
+    appears in it without anyone editing a list. One row per **binding**, not per command; a
+    chordless command is not listed, because there is nothing to press. Per the screenshot contract
+    there is deliberately **no screenshot** of it.
+
+Saving or revoking a credential announces itself, so surfaces that gate on one (the Assistant tab's
+setup notice) repaint without Preferences having to know they exist.
+
+---
+
 ## Changelog
 
+- **0.4.2-draft** (2026-08-03) — The Inspector's fourth tab (§3.1, §6): the assistant is Content · Style · Logic · Assistant, not a fifth column; two docks, one persisted record. Application Preferences (§15) — Appearance, Assistant, Accounts (listed and revocable) and a registry-generated Keyboard sheet.
 - **0.4.1-draft** (2026-08-02) — Automation surface is a projection of the command registry (§13.5): the projection, idempotence and Remote rules; probe.idle() as a failing predicate; pointAt in top-document coordinates.
 - **0.4.0-draft** (2026-08-02) — Command Registry and Context Keys (§13); Tabs and Document Identity (§14) — drill-in opens a real tab, labels disambiguate by route.
 - **0.3.8-draft** (2026-08-02) — Layout chrome is selectable and inert to the caret; Preview gates editing and scrolls for real; Design opens fitted; caret.active is a bridge fact; Open in Browser (Cmd+Shift+O); assistant column defaults closed.
@@ -1225,4 +1285,4 @@ has been closed.
 
 ---
 
-_`@jxsuite/studio` Specification v0.4.1-draft_
+_`@jxsuite/studio` Specification v0.4.2-draft_

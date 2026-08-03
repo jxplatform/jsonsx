@@ -13,11 +13,11 @@ code:
 
 # AI assistant
 
-Studio has a built-in AI assistant: a chat sidebar that doesn't just talk about your project but works on it — it creates pages and components, edits the page on the canvas while you watch, and answers questions about what it finds in your files. It runs against an AI provider **you** connect; Studio ships no account, no hosted AI, and sends nothing anywhere until you do.
+Studio has a built-in AI assistant: a chat panel that doesn't just talk about your project but works on it — it creates pages and components, edits the page on the canvas while you watch, and answers questions about what it finds in your files. It runs against an AI provider **you** connect; Studio ships no account, no hosted AI, and sends nothing anywhere until you do.
 
-![The assistant sidebar open beside a page on the canvas, mid-conversation](../images/ai-sidebar.png)
+![The assistant open beside a page on the canvas, mid-conversation](../images/ai-sidebar.png)
 
-Open it with the **Toggle Assistant** chat-bubble button at the right end of the toolbar. The sidebar starts closed — it's a ~300px column, and an editor shouldn't spend a third of your window on a conversation you didn't ask for — and stays however you last left it. It's available in every state: before you open a project, with a project open, and with a page on the canvas. What the assistant can do grows with each of those.
+The assistant is the **fourth tab of the right panel**, beside Content, Style and Logic. Show it with :kbd[Cmd+Shift+4], with the chat-bubble button at the right end of the toolbar, or by clicking the tab. Because it shares the right panel's width, showing it costs the canvas nothing. It's available in every state: before you open a project, with a project open, and with a page on the canvas. What the assistant can do grows with each of those.
 
 ## What it can do
 
@@ -33,11 +33,11 @@ Each request gets five working rounds — five turns of thinking and calling too
 
 ## Connect a provider
 
-Until AI is connected, the sidebar shows the chat as usual with one line beneath it — _No AI provider is connected yet_ — and an **Assistant: Settings…** button. That button opens a dialog offering whichever routes your Studio supports. A provider key is something you set once for the whole app, so it lives in a dialog rather than occupying the sidebar.
+Until AI is connected, the tab shows the chat as usual with one line beneath it — _No AI provider is connected yet_ — and an **Open Preferences…** button. A provider key is something you set once for the whole app, so it lives in **[Preferences](/docs/studio/interface/preferences)** › **Assistant** (:kbd[Cmd+,]) rather than occupying the panel — which is also where you can see it listed and disconnect it later.
 
 ### Connect Cloudflare (Jx Cloud)
 
-On Jx Cloud the dialog leads with **Connect Cloudflare**: Studio brokers **Workers AI** on your own Cloudflare account, so you need no API key and no third-party provider account. Click **Connect Cloudflare**, approve the authorization in the Cloudflare window that opens, and you land back in Studio with the assistant connected. Inference runs on — and bills to — your own Cloudflare account; Jx only brokers the request.
+On Jx Cloud that section leads with **Connect Cloudflare**: Studio brokers **Workers AI** on your own Cloudflare account, so you need no API key and no third-party provider account. Click **Connect Cloudflare**, approve the authorization in the Cloudflare window that opens, and you land back in Studio with the assistant connected. Inference runs on — and bills to — your own Cloudflare account; Jx only brokers the request.
 
 This option appears only where a platform can run that hosted flow. The desktop app and the dev server show the key form alone.
 

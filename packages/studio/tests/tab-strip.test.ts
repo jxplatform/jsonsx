@@ -6,7 +6,13 @@ import { flush } from "./harness";
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mount, unmount } from "../src/panels/tab-strip";
 import { collabState } from "../src/collab/collab-state";
-import { closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
+import {
+  closeAllTabs,
+  closePane,
+  openTab,
+  splitRight,
+  workspace,
+} from "../src/workspace/workspace";
 import { initLayers } from "../src/ui/layers";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -323,5 +329,144 @@ describe("active tab reveal", () => {
     await flush();
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+describe("pin, reorder and preview", () => {
+  test("the pin button moves a tab to the head and marks the chip", async () => {
+    open("a");
+    open("b");
+    await flush();
+    tabs()[1]!
+      .querySelector(".tab-strip-pin")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+    const els = tabs();
+    expect(els[0]!.querySelector(".tab-strip-label")!.textContent).toBe("b.json");
+    expect(els[0]!.classList.contains("pinned")).toBe(true);
+    expect(els[0]!.querySelector(".tab-strip-pin")!.getAttribute("title")).toBe("Unpin");
+  });
+
+  test("clicking the pin does not also activate the tab", async () => {
+    open("a");
+    open("b");
+    await flush();
+    expect(workspace.activeTabId).toBe("b");
+    tabs()[0]!
+      .querySelector(".tab-strip-pin")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+    expect(workspace.activeTabId).toBe("b");
+  });
+
+  test("a preview chip renders italic-classed and double-clicking commits to it", async () => {
+    openTab({
+      document: { children: [], tagName: "div" } as JxMutableNode,
+      documentPath: "/project/p.json",
+      id: "p",
+      preview: true,
+    });
+    await flush();
+    expect(tabs()[0]!.classList.contains("preview")).toBe(true);
+    expect(tabs()[0]!.getAttribute("title")).toContain("Preview — double-click to keep open");
+    tabs()[0]!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    await flush();
+    expect(tabs()[0]!.classList.contains("preview")).toBe(false);
+  });
+
+  test("an edit promotes a preview tab without a click", async () => {
+    const p = openTab({
+      document: { children: [], tagName: "div" } as JxMutableNode,
+      documentPath: "/project/p.json",
+      id: "p",
+      preview: true,
+    });
+    await flush();
+    p.doc.dirty = true;
+    await flush();
+    expect(workspace.tabs.get("p")!.preview).toBe(false);
+  });
+
+  test("dragging a chip onto another reorders the pane", async () => {
+    open("a");
+    open("b");
+    open("c");
+    await flush();
+    const [first, , third] = tabs();
+    first!.dispatchEvent(new Event("dragstart", { bubbles: true }));
+    await flush();
+    expect(tabs()[0]!.classList.contains("dragging")).toBe(true);
+    third!.dispatchEvent(new Event("drop", { bubbles: true, cancelable: true }));
+    await flush();
+    expect(tabs().map((el) => el.querySelector(".tab-strip-label")!.textContent)).toEqual([
+      "b.json",
+      "c.json",
+      "a.json",
+    ]);
+  });
+
+  test("a drop with no drag in flight changes nothing, and dragend clears the ghost", async () => {
+    open("a");
+    open("b");
+    await flush();
+    tabs()[0]!.dispatchEvent(new Event("drop", { bubbles: true, cancelable: true }));
+    await flush();
+    expect(tabs().map((el) => el.querySelector(".tab-strip-label")!.textContent)).toEqual([
+      "a.json",
+      "b.json",
+    ]);
+    tabs()[0]!.dispatchEvent(new Event("dragstart", { bubbles: true }));
+    tabs()[0]!.dispatchEvent(new Event("dragend", { bubbles: true }));
+    await flush();
+    expect(host.querySelector(".tab-strip-tab.dragging")).toBeNull();
+  });
+});
+
+describe("per-pane strips", () => {
+  test("the strip renders only its own pane's tabs, and the focused pane is marked", async () => {
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      '<div id="tab-strip-2" data-jx-region="pane.secondary/tabs"></div>',
+    );
+    open("a");
+    open("b", "/project/b.json");
+    await flush();
+    splitRight();
+    await flush();
+
+    const second = document.querySelector("#tab-strip-2") as HTMLElement;
+    expect([...host.querySelectorAll(".tab-strip-label")].map((e) => e.textContent)).toEqual([
+      "a.json",
+    ]);
+    expect([...second.querySelectorAll(".tab-strip-label")].map((e) => e.textContent)).toEqual([
+      "b.json",
+    ]);
+    expect(second.querySelector(".tab-strip-row")!.classList.contains("focused")).toBe(true);
+    expect(host.querySelector(".tab-strip-row")!.classList.contains("focused")).toBe(false);
+
+    // Collapsing the pane blanks the host it left behind.
+    closePane("secondary");
+    await flush();
+    expect(second.querySelector(".tab-strip-tab")).toBeNull();
+    expect([...host.querySelectorAll(".tab-strip-label")].map((e) => e.textContent)).toEqual([
+      "a.json",
+      "b.json",
+    ]);
+  });
+
+  test("mousedown inside a strip focuses its pane", async () => {
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      '<div id="tab-strip-2" data-jx-region="pane.secondary/tabs"></div>',
+    );
+    open("a");
+    open("b", "/project/b.json");
+    await flush();
+    splitRight();
+    await flush();
+    host
+      .querySelector(".tab-strip-row")!
+      .dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(workspace.activePaneId).toBe("primary");
   });
 });

@@ -152,17 +152,22 @@ describe("navigator/panel:<id>", () => {
 // ─── inspector/tab:<value>, stamped from the tab records ──────────────────────
 
 describe("inspector/tab:<value>", () => {
-  test("all three tab bodies are addressable, and only the active one is shown", async () => {
-    const tab = resetWorkspaceWithTab();
-    tab.session.ui.rightTab = "style";
+  function mountInspector() {
     rightPanelModule.mount({
       getCanvasMode: mock(() => "design"),
+      mountAssistant: mock(() => {}),
       navigateToComponent: mock(() => {}),
       renderCanvas: mock(() => {}),
     } as never);
+  }
+
+  test("all four tab bodies are addressable, and only the active one is shown", async () => {
+    const tab = resetWorkspaceWithTab();
+    tab.session.ui.rightTab = "style";
+    mountInspector();
     await flush(3);
 
-    for (const key of ["properties", "events", "style"]) {
+    for (const key of ["properties", "style", "events", "assistant"]) {
       const body = resolveRegion(`inspector/tab:${key}`);
       expect(body).not.toBeNull();
       expect(rightPanel.contains(body)).toBe(true);
@@ -173,15 +178,11 @@ describe("inspector/tab:<value>", () => {
 
   test("an unknown stored tab falls back to the first record, not to a dead region", async () => {
     const tab = resetWorkspaceWithTab();
-    tab.session.ui.rightTab = "assistant";
-    rightPanelModule.mount({
-      getCanvasMode: mock(() => "design"),
-      navigateToComponent: mock(() => {}),
-      renderCanvas: mock(() => {}),
-    } as never);
+    tab.session.ui.rightTab = "content";
+    mountInspector();
     await flush(3);
     expect(resolveRegion("inspector/tab:properties")!.style.display).toBe("");
-    expect(resolveRegion("inspector/tab:assistant")).toBeNull();
+    expect(resolveRegion("inspector/tab:content")).toBeNull();
   });
 });
 

@@ -54,6 +54,7 @@ async function loadLayoutEntries() {
     layoutEntries = [];
   }
   renderOnly("leftPanel");
+  renderOnly("frontmatterPanel");
 }
 
 export function invalidateLayoutPickerCache() {
@@ -62,12 +63,12 @@ export function invalidateLayoutPickerCache() {
 
 // ─── Field definitions ───────────────────────────────────────────────────
 
-const PAGE_FIELDS: MetaField[] = [
+export const PAGE_FIELDS: MetaField[] = [
   { attr: "name", key: "description", label: "Description" },
   { attr: "name", key: "viewport", label: "Viewport" },
 ];
 
-const OG_FIELDS: MetaField[] = [
+export const OG_FIELDS: MetaField[] = [
   { attr: "property", key: "og:title", label: "Title" },
   {
     attr: "property",
@@ -82,8 +83,17 @@ const OG_FIELDS: MetaField[] = [
 /** Set of `name`/`property` values managed by the structured forms. */
 const MANAGED_META_KEYS = new Set([...PAGE_FIELDS, ...OG_FIELDS].map((f) => f.key));
 
-/** Frontmatter keys managed by the PAGE dedicated controls (others live inside $head). */
-const RESERVED_FM_KEYS = new Set(["title"]);
+/**
+ * Frontmatter keys the Document Header card owns with a dedicated control, so the generic field
+ * list must not print them a second time.
+ *
+ * **The one policy.** `frontmatter-panel.ts` used to pass an EMPTY reserved set while this module
+ * passed `{title}`, so the same key rendered as a bare Obsidian-style property above the canvas and
+ * as the Page panel's Title field at the same time, with two different commit paths. Merging the
+ * two field sets was only safe once one of the two policies won, and it is this one: a document has
+ * ONE title, and the surface that gives it a named row is the one that owns the key.
+ */
+export const RESERVED_FM_KEYS = new Set(["title"]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -109,7 +119,7 @@ function findMetaEntry(head: JxHeadEntry[], attr: "name" | "property", key: stri
  * @param {string} rel
  * @returns {JxHeadEntry | undefined}
  */
-function findLinkEntry(head: JxHeadEntry[], rel: string) {
+export function findLinkEntry(head: JxHeadEntry[], rel: string) {
   if (!head) {
     return;
   }
@@ -122,7 +132,7 @@ function findLinkEntry(head: JxHeadEntry[], rel: string) {
  * @param {JxHeadEntry} entry
  * @returns {boolean}
  */
-function isManagedEntry(entry: JxHeadEntry) {
+export function isManagedEntry(entry: JxHeadEntry) {
   if (!entry?.tagName) {
     return false;
   }
@@ -175,7 +185,7 @@ function upsertMeta(doc: JxMutableNode, attr: "name" | "property", key: string, 
  * @param {string} rel
  * @param {string} href
  */
-function upsertLink(doc: JxMutableNode, rel: string, href: string) {
+export function upsertLink(doc: JxMutableNode, rel: string, href: string) {
   if (!doc.$head) {
     doc.$head = [];
   }
@@ -200,7 +210,7 @@ function upsertLink(doc: JxMutableNode, rel: string, href: string) {
  * @param {JxHeadEntry} entry
  * @returns {string}
  */
-function entryLabel(entry: JxHeadEntry) {
+export function entryLabel(entry: JxHeadEntry) {
   if (!entry?.tagName) {
     return "unknown";
   }
@@ -229,7 +239,7 @@ function entryLabel(entry: JxHeadEntry) {
  * @param {JxHeadEntry} entry
  * @returns {string}
  */
-function entryValue(entry: JxHeadEntry) {
+export function entryValue(entry: JxHeadEntry) {
   const a = entry?.attributes ?? {};
   return String(a.content ?? a.href ?? a.src ?? entry?.textContent ?? "");
 }
@@ -244,7 +254,7 @@ function entryValue(entry: JxHeadEntry) {
  * @param {(fn: (doc: JxMutableNode) => void) => void} applyMutation
  * @returns {import("lit-html").TemplateResult}
  */
-function renderMetaFieldRow(
+export function renderMetaFieldRow(
   field: MetaField,
   head: JxHeadEntry[],
   applyMutation: (fn: (doc: JxMutableNode) => void) => void,
@@ -319,77 +329,7 @@ export function renderHeadTemplate({
   const isContent = tab?.doc.mode === "content";
   const frontmatterSection = isContent ? renderFrontmatterSection() : nothing;
 
-  // Layout field
-  const isPage =
-    tab?.documentPath &&
-    projectState?.isSiteProject &&
-    (tab.documentPath.startsWith("pages/") || tab.documentPath.startsWith("./pages/"));
-
-  let layoutSection: TemplateResult | symbol = nothing;
-  if (isPage) {
-    if (layoutEntries === null) {
-      void loadLayoutEntries();
-    } else {
-      const currentLayout = doc.$layout;
-      const defaultLayout = projectState?.projectConfig?.defaults?.layout;
-      const displayValue = currentLayout === false ? "__none__" : currentLayout || "__default__";
-      const defaultLabel = defaultLayout
-        ? defaultLayout
-            .replace(/^\.\/layouts\//, "")
-            .replace(/\.json$/, "")
-            .replaceAll(/[-_]+/g, " ")
-            .replaceAll(/\b\w/g, (c: string) => c.toUpperCase())
-        : "";
-
-      layoutSection = html`
-        <div class="imports-section">
-          <div class="imports-section-header">
-            <span class="imports-section-title">Layout</span>
-          </div>
-          <div class="head-section-body">
-            ${renderFieldRow({
-              hasValue: currentLayout !== undefined,
-              label: "Layout",
-              onClear: () =>
-                applyMutation((d: JxMutableNode) => {
-                  delete d.$layout;
-                }),
-              prop: "layout",
-              widget: html`
-                <sp-picker
-                  size="s"
-                  value=${displayValue}
-                  @change=${(e: Event) => {
-                    const val = (e.target as HTMLInputElement).value;
-                    applyMutation((d: JxMutableNode) => {
-                      if (val === "__default__") {
-                        delete d.$layout;
-                      } else if (val === "__none__") {
-                        d.$layout = false;
-                      } else {
-                        d.$layout = val;
-                      }
-                    });
-                    invalidateLayoutCache();
-                  }}
-                >
-                  <sp-menu-item value="__default__"
-                    >Default${defaultLabel ? ` (${defaultLabel})` : ""}</sp-menu-item
-                  >
-                  <sp-menu-item value="__none__">None</sp-menu-item>
-                  <sp-menu-divider></sp-menu-divider>
-                  ${layoutEntries.map(
-                    (l: { name: string; path: string }) =>
-                      html`<sp-menu-item value=${l.path}>${l.name}</sp-menu-item>`,
-                  )}
-                </sp-picker>
-              `,
-            })}
-          </div>
-        </div>
-      `;
-    }
-  }
+  const layoutSection = renderLayoutSection(doc, applyMutation);
 
   return html`
     <div class="imports-panel">
@@ -557,6 +497,114 @@ export function renderHeadTemplate({
   `;
 }
 
+// ─── Layout picker ───────────────────────────────────────────────────────
+
+/**
+ * Whether the open document is a page of a site project — the only documents a layout applies to.
+ *
+ * @returns {boolean}
+ */
+export function isPageDocument(): boolean {
+  const path = activeTab.value?.documentPath;
+  return Boolean(
+    path &&
+    projectState?.isSiteProject &&
+    (path.startsWith("pages/") || path.startsWith("./pages/")),
+  );
+}
+
+/**
+ * The layout picker as ONE field row, so the Page panel and the Document Header card render the
+ * same control rather than two that drift.
+ *
+ * Returns `nothing` while the layouts directory is still being listed; the listing schedules a
+ * re-render of both surfaces when it lands.
+ *
+ * @param {JxMutableNode} doc
+ * @param {(fn: (doc: JxMutableNode) => void) => void} applyMutation
+ * @returns {TemplateResult | typeof nothing}
+ */
+export function renderLayoutPickerRow(
+  doc: JxMutableNode,
+  applyMutation: (fn: (doc: JxMutableNode) => void) => void,
+): TemplateResult | typeof nothing {
+  if (layoutEntries === null) {
+    void loadLayoutEntries();
+    return nothing;
+  }
+  const currentLayout = doc.$layout;
+  const defaultLayout = projectState?.projectConfig?.defaults?.layout;
+  const displayValue = currentLayout === false ? "__none__" : currentLayout || "__default__";
+  const defaultLabel = defaultLayout
+    ? defaultLayout
+        .replace(/^\.\/layouts\//, "")
+        .replace(/\.json$/, "")
+        .replaceAll(/[-_]+/g, " ")
+        .replaceAll(/\b\w/g, (c: string) => c.toUpperCase())
+    : "";
+  const entries = layoutEntries;
+  return renderFieldRow({
+    hasValue: currentLayout !== undefined,
+    label: "Layout",
+    onClear: () =>
+      applyMutation((d: JxMutableNode) => {
+        delete d.$layout;
+      }),
+    prop: "layout",
+    widget: html`
+      <sp-picker
+        size="s"
+        value=${displayValue}
+        @change=${(e: Event) => {
+          const val = (e.target as HTMLInputElement).value;
+          applyMutation((d: JxMutableNode) => {
+            if (val === "__default__") {
+              delete d.$layout;
+            } else if (val === "__none__") {
+              d.$layout = false;
+            } else {
+              d.$layout = val;
+            }
+          });
+          invalidateLayoutCache();
+        }}
+      >
+        <sp-menu-item value="__default__"
+          >Default${defaultLabel ? ` (${defaultLabel})` : ""}</sp-menu-item
+        >
+        <sp-menu-item value="__none__">None</sp-menu-item>
+        <sp-menu-divider></sp-menu-divider>
+        ${entries.map(
+          (l: { name: string; path: string }) =>
+            html`<sp-menu-item value=${l.path}>${l.name}</sp-menu-item>`,
+        )}
+      </sp-picker>
+    `,
+  });
+}
+
+/** The Page panel's boxed wrapper around {@link renderLayoutPickerRow}. */
+function renderLayoutSection(
+  doc: JxMutableNode,
+  applyMutation: (fn: (doc: JxMutableNode) => void) => void,
+): TemplateResult | typeof nothing {
+  if (!isPageDocument()) {
+    return nothing;
+  }
+  const row = renderLayoutPickerRow(doc, applyMutation);
+  if (row === nothing) {
+    return nothing;
+  }
+  return html`
+    <div class="imports-section">
+      <div class="imports-section-header">
+        <span class="imports-section-title">Layout</span>
+      </div>
+      <div class="head-section-body">${row}</div>
+    </div>
+  `;
+}
+
 // ─── Frontmatter section ────────────────────────────────────────────────
 
 function renderFrontmatterSection() {
@@ -590,7 +638,7 @@ function renderFrontmatterSection() {
 }
 
 /** Overlay content-mode frontmatter title/`$head` onto the document the panel edits. */
-function buildHeadDoc(doc: JxMutableNode, fm: Record<string, unknown>): JxMutableNode {
+export function buildHeadDoc(doc: JxMutableNode, fm: Record<string, unknown>): JxMutableNode {
   const title = fm.title as string | undefined;
   const $head = fm.$head as JxHeadEntry[] | undefined;
   return {
@@ -607,7 +655,7 @@ function buildHeadDoc(doc: JxMutableNode, fm: Record<string, unknown>): JxMutabl
  * adapts one to the other in the module that owns both, instead of in the Navigator orchestrator
  * that owns neither.
  */
-function applyContentMutation(rerender: () => void, fn: (doc: JxMutableNode) => void): void {
+export function applyContentMutation(rerender: () => void, fn: (doc: JxMutableNode) => void): void {
   const tabNow = activeTab.value;
   if (!tabNow) {
     return;

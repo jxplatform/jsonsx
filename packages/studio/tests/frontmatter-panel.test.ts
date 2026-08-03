@@ -1,18 +1,19 @@
 /**
- * Above-canvas frontmatter Properties panel — eligibility gating (content mode + edit canvas mode +
- * content-collection schema match), accordion collapse persistence per tab, field rendering without
- * reserved keys (title shows, unlike the Document-tab section), commit paths through transactDoc,
- * and reactive re-render on frontmatter changes.
+ * The Document Header card — the three deleted gates (collection, canvas mode, document mode), the
+ * ONE reserved-key policy (`title` has a named row and never doubles as a generic property), the
+ * Route line, the SEO and Raw-head disclosures, the commit paths, and reactive re-render.
  */
 import { flush, installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { frontmatterPanelEl, initShellRefs, registerRenderer } from "../src/store";
 import { invalidateMediaCache } from "../src/ui/media-picker";
-import { activateTab, closeAllTabs, openTab } from "../src/workspace/workspace";
+import { closeAllTabs } from "../src/workspace/workspace";
 import { mutateUpdateFrontmatter, transactDoc } from "../src/tabs/transact";
 import { collectFmFields } from "../src/panels/frontmatter-fields";
+import { RESERVED_FM_KEYS } from "../src/panels/head-panel";
 
-const { mount, render, unmount } = await import("../src/panels/frontmatter-panel");
+const { hasDocumentHeader, mount, render, unmount } =
+  await import("../src/panels/frontmatter-panel");
 
 // Panel scheduler coalesces via requestAnimationFrame; make it synchronous-ish.
 (globalThis as unknown as Record<string, unknown>).requestAnimationFrame = (
@@ -30,8 +31,6 @@ const FM_SCHEMA = {
   required: ["title"],
 };
 
-let canvasMode = "edit";
-
 function setShell(withPanelHost = true) {
   document.body.innerHTML = `<div id="app">
     <div id="toolbar"></div><div id="tab-bar"></div>
@@ -45,9 +44,10 @@ function setShell(withPanelHost = true) {
 
 function setupContentTab(
   frontmatter: Record<string, unknown>,
-  opts: { withSchema?: boolean; documentPath?: string; id?: string } = {},
+  opts: { withSchema?: boolean; documentPath?: string; id?: string; isSite?: boolean } = {},
 ) {
   resetStudioState({
+    isSiteProject: opts.isSite ?? false,
     projectConfig:
       opts.withSchema === false
         ? {}
@@ -75,10 +75,13 @@ function row(prop: string): HTMLElement {
   return el as HTMLElement;
 }
 
+function summaries(): string[] {
+  return [...frontmatterPanelEl.querySelectorAll("summary")].map((s) => s.textContent!.trim());
+}
+
 beforeEach(() => {
   setShell();
   installMockPlatform();
-  canvasMode = "edit";
 });
 
 afterEach(() => {
@@ -87,47 +90,38 @@ afterEach(() => {
 });
 
 async function mountAndFlush() {
-  mount({ getCanvasMode: () => canvasMode });
+  mount();
   render();
   await flush(4);
 }
 
-describe("eligibility gating", () => {
-  test("visible with accordion + collection label for an eligible content tab", async () => {
-    setupContentTab({ title: "Hello" });
-    await mountAndFlush();
-    expect(frontmatterPanelEl.hidden).toBe(false);
-    const item = frontmatterPanelEl.querySelector("sp-accordion-item")!;
-    expect(item).toBeTruthy();
-    expect(item.getAttribute("label")).toBe("Properties · posts");
-  });
-
-  test("hidden in component mode", async () => {
-    const tab = setupContentTab({ title: "Hello" });
-    tab.doc.mode = "component";
-    await mountAndFlush();
-    expect(frontmatterPanelEl.hidden).toBe(true);
-    expect(frontmatterPanelEl.querySelector("sp-accordion")).toBeNull();
-  });
-
-  test("hidden when the canvas mode is not edit (design, preview)", async () => {
-    setupContentTab({ title: "Hello" });
-    for (const mode of ["design", "preview", "source"]) {
-      canvasMode = mode;
-      await mountAndFlush();
-      expect(frontmatterPanelEl.hidden).toBe(true);
-      unmount();
-    }
-  });
-
-  test("hidden when the document matches no content collection", async () => {
+describe("the three deleted gates", () => {
+  test("appears for a document that matches NO content collection", async () => {
     setupContentTab({ title: "Hello" }, { withSchema: false });
     await mountAndFlush();
-    expect(frontmatterPanelEl.hidden).toBe(true);
+    expect(frontmatterPanelEl.hidden).toBe(false);
+    expect((row("title").querySelector("sp-textfield") as any).value).toBe("Hello");
   });
 
-  test("hidden when the path is outside the collection source", async () => {
-    setupContentTab({ title: "Hello" }, { documentPath: "pages/about.json" });
+  test("appears in every canvas mode — it is part of the document, not a view of it", async () => {
+    setupContentTab({ title: "Hello" });
+    await mountAndFlush();
+    // The card takes no canvas mode at all; there is no predicate left to fail.
+    expect(frontmatterPanelEl.hidden).toBe(false);
+    expect(mount.length).toBe(0);
+  });
+
+  test("appears for a component-mode document that carries head material", async () => {
+    const tab = setupContentTab({}, { withSchema: false });
+    tab.doc.mode = "component";
+    tab.doc.document.title = "A JSON page";
+    await mountAndFlush();
+    expect(frontmatterPanelEl.hidden).toBe(false);
+    expect((row("title").querySelector("sp-textfield") as any).value).toBe("A JSON page");
+  });
+
+  test("hidden only when the document genuinely has no header", async () => {
+    setupContentTab({}, { withSchema: false });
     await mountAndFlush();
     expect(frontmatterPanelEl.hidden).toBe(true);
   });
@@ -140,18 +134,45 @@ describe("eligibility gating", () => {
     unmount();
 
     setShell(false);
-    mount({ getCanvasMode: () => "edit" });
+    mount();
     render(); // Must not throw with no host bound
   });
 });
 
-describe("field rendering", () => {
-  test("title is NOT reserved here (unlike the Document tab) and required fields are marked", async () => {
+describe("hasDocumentHeader", () => {
+  test("frontmatter, a title or a $head entry each qualify; nothing does not", () => {
+    const tab = setupContentTab({}, { withSchema: false });
+    expect(hasDocumentHeader(tab)).toBe(false);
+    tab.doc.document.$head = [{ attributes: { content: "x", name: "author" }, tagName: "meta" }];
+    expect(hasDocumentHeader(tab)).toBe(true);
+    delete tab.doc.document.$head;
+    tab.doc.content.frontmatter = { draft: true };
+    expect(hasDocumentHeader(tab)).toBe(true);
+  });
+});
+
+describe("one reserved-key policy", () => {
+  test("title renders ONCE, as the card's named row, not also as a generic property", async () => {
     setupContentTab({ title: "My Post" });
     await mountAndFlush();
-    const titleRow = row("title");
-    expect((titleRow.querySelector("sp-textfield") as any).value).toBe("My Post");
-    expect(titleRow.querySelector("sp-field-label")?.textContent).toBe("Title *");
+    expect(frontmatterPanelEl.querySelectorAll('[data-prop="title"]').length).toBe(1);
+    // The named row has no required-marker suffix: it is the card's own control, not a schema field.
+    expect(row("title").querySelector("sp-field-label")?.textContent).toBe("Title");
+  });
+
+  test("the policy is head-panel's, imported rather than restated", () => {
+    expect([...RESERVED_FM_KEYS]).toEqual(["title"]);
+    const tab = setupContentTab({ $paths: ["x"], title: "T" });
+    const { fields, hasSchema, requiredFields } = collectFmFields(
+      tab,
+      { content: { posts: { format: "json", schema: FM_SCHEMA, source: "./posts" } } } as any,
+      RESERVED_FM_KEYS,
+    );
+    expect(hasSchema).toBe(true);
+    const names = fields.map((f) => f.field);
+    expect(names).not.toContain("title");
+    expect(names).not.toContain("$paths");
+    expect(requiredFields.has("title")).toBe(true);
   });
 
   test("schema fields render typed widgets; extra keys render as inferred fields", async () => {
@@ -165,10 +186,93 @@ describe("field rendering", () => {
     );
     expect((row("extra").querySelector("sp-textfield") as any).value).toBe("loose");
   });
+});
+
+describe("route and disclosures", () => {
+  test("a page states its route; a non-page states none", async () => {
+    setupContentTab({ title: "Home" }, { documentPath: "pages/index.md", isSite: true });
+    await mountAndFlush();
+    expect(frontmatterPanelEl.querySelector(".doc-header-route")?.textContent).toBe("/");
+
+    setupContentTab({ title: "Post" }, { documentPath: "posts/hello.json" });
+    render();
+    await flush(4);
+    expect(frontmatterPanelEl.querySelector(".doc-header-route")).toBeNull();
+  });
+
+  test("SEO and Raw head tags are both disclosed, closed by default", async () => {
+    setupContentTab({ title: "Hello" });
+    await mountAndFlush();
+    expect(summaries()).toEqual(["SEO", "Raw head tags"]);
+    for (const d of frontmatterPanelEl.querySelectorAll("details")) {
+      expect((d as HTMLDetailsElement).open).toBe(false);
+    }
+  });
+
+  test("the SEO block edits $head meta through the frontmatter round-trip", async () => {
+    const tab = setupContentTab({ title: "Hello" });
+    await mountAndFlush();
+    fireChange(row("description").querySelector("sp-textfield")!, "A summary");
+    const head = tab.doc.content.frontmatter.$head as any[];
+    expect(head).toEqual([
+      { attributes: { content: "A summary", name: "description" }, tagName: "meta" },
+    ]);
+  });
+
+  test("Raw head tags lists what no structured control owns, and says so when empty", async () => {
+    const tab = setupContentTab({ title: "Hello" });
+    await mountAndFlush();
+    expect(frontmatterPanelEl.querySelector(".doc-header-empty")).toBeTruthy();
+
+    tab.doc.content.frontmatter = {
+      $head: [{ attributes: { content: "me", name: "author" }, tagName: "meta" }],
+      title: "Hello",
+    };
+    render();
+    await flush(4);
+    const items = [...frontmatterPanelEl.querySelectorAll(".doc-header-raw li code")];
+    expect(items.map((i) => i.textContent)).toEqual(['<meta name="author">']);
+  });
+});
+
+describe("commits and reactivity", () => {
+  test("the Title row commits to frontmatter and marks the tab dirty", async () => {
+    const tab = setupContentTab({ title: "Old" });
+    await mountAndFlush();
+    expect(tab.doc.dirty).toBe(false);
+    fireChange(row("title").querySelector("sp-textfield")!, "New");
+    expect(tab.doc.content.frontmatter.title).toBe("New");
+    expect(tab.doc.dirty).toBe(true);
+  });
+
+  test("checkbox commit sets a boolean; clear dot deletes the key", async () => {
+    const tab = setupContentTab({ draft: true });
+    await mountAndFlush();
+    const dot = row("draft").querySelector(".set-dot")!;
+    dot.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect("draft" in tab.doc.content.frontmatter).toBe(false);
+  });
+
+  test("external frontmatter change re-renders the card reactively", async () => {
+    const tab = setupContentTab({ subtitle: "Before" });
+    await mountAndFlush();
+    transactDoc(tab, (t: any) => mutateUpdateFrontmatter(t, "subtitle", "After"));
+    await flush(4);
+    expect((row("subtitle").querySelector("sp-textfield") as any).value).toBe("After");
+  });
+
+  test("unmount stops reactive re-rendering", async () => {
+    const tab = setupContentTab({ subtitle: "Before" });
+    await mountAndFlush();
+    unmount();
+    transactDoc(tab, (t: any) => mutateUpdateFrontmatter(t, "subtitle", "After"));
+    await flush(4);
+    expect((row("subtitle").querySelector("sp-textfield") as any).value).toBe("Before");
+  });
 
   test("image field's Browse button appears once the async media cache resolves", async () => {
     // The Browse button is gated on the async-loaded media cache; when the listing resolves,
-    // Media-picker repaints host panels via renderOnly — the frontmatter panel must be included.
+    // Media-picker repaints host panels via renderOnly — the Document Header must be included.
     invalidateMediaCache();
     installMockPlatform({}, { "public/hero.jpg": "img-bytes" });
     resetStudioState({
@@ -195,90 +299,82 @@ describe("field rendering", () => {
     expect(row("hero").querySelector(".media-picker")).toBeTruthy();
     expect(row("hero").querySelector('sp-action-button[title="Browse media"]')).toBeTruthy();
   });
-
-  test("collectFmFields with an empty reserved set includes title; $-keys always skipped", () => {
-    const tab = setupContentTab({ $paths: ["x"], title: "T" });
-    const { fields, hasSchema, requiredFields } = collectFmFields(
-      tab,
-      { content: { posts: { format: "json", schema: FM_SCHEMA, source: "./posts" } } } as any,
-      new Set<string>(),
-    );
-    expect(hasSchema).toBe(true);
-    const names = fields.map((f) => f.field);
-    expect(names).toContain("title");
-    expect(names).not.toContain("$paths");
-    expect(requiredFields.has("title")).toBe(true);
-  });
 });
 
-describe("commits and reactivity", () => {
-  test("text field commit updates frontmatter and marks the tab dirty", async () => {
+describe("the other commit path and the disclosure state", () => {
+  test("a non-content document commits straight onto the document root", async () => {
+    const tab = setupContentTab({}, { withSchema: false });
+    tab.doc.mode = "component";
+    tab.doc.document.title = "Old";
+    await mountAndFlush();
+    fireChange(row("title").querySelector("sp-textfield")!, "New");
+    expect(tab.doc.document.title).toBe("New");
+    expect("title" in tab.doc.content.frontmatter).toBe(false);
+  });
+
+  test("an empty Title deletes the key rather than storing a blank one", async () => {
     const tab = setupContentTab({ title: "Old" });
     await mountAndFlush();
-    expect(tab.doc.dirty).toBe(false);
-    fireChange(row("title").querySelector("sp-textfield")!, "New");
-    expect(tab.doc.content.frontmatter.title).toBe("New");
-    expect(tab.doc.dirty).toBe(true);
+    fireChange(row("title").querySelector("sp-textfield")!, "   ");
+    expect(tab.doc.content.frontmatter.title).toBeUndefined();
   });
 
-  test("checkbox commit sets a boolean; clear dot deletes the key", async () => {
-    const tab = setupContentTab({ draft: true });
+  test("the Title clear dot deletes the key", async () => {
+    const tab = setupContentTab({ title: "Old" });
     await mountAndFlush();
-    const dot = row("draft").querySelector(".set-dot")!;
-    dot.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect("draft" in tab.doc.content.frontmatter).toBe(false);
+    row("title")
+      .querySelector(".set-dot")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(tab.doc.content.frontmatter.title).toBeUndefined();
   });
 
-  test("external frontmatter change re-renders the panel reactively", async () => {
-    const tab = setupContentTab({ title: "Before" });
+  test("a disclosure remembers that it was opened, per tab", async () => {
+    setupContentTab({ title: "Hello" }, { id: "fm-a" });
     await mountAndFlush();
-    transactDoc(tab, (t: any) => mutateUpdateFrontmatter(t, "title", "After"));
+    const seo = frontmatterPanelEl.querySelector("details") as HTMLDetailsElement;
+    seo.open = true;
+    seo.dispatchEvent(new Event("toggle"));
+    render();
     await flush(4);
-    expect((row("title").querySelector("sp-textfield") as any).value).toBe("After");
+    expect((frontmatterPanelEl.querySelector("details") as HTMLDetailsElement).open).toBe(true);
+
+    (frontmatterPanelEl.querySelector("details") as HTMLDetailsElement).open = false;
+    frontmatterPanelEl.querySelector("details")!.dispatchEvent(new Event("toggle"));
+    render();
+    await flush(4);
+    expect((frontmatterPanelEl.querySelector("details") as HTMLDetailsElement).open).toBe(false);
   });
 
-  test("unmount stops reactive re-rendering", async () => {
-    const tab = setupContentTab({ title: "Before" });
+  test("a render after the host has gone is a no-op, not a throw", async () => {
+    setupContentTab({ title: "Hello" });
     await mountAndFlush();
-    unmount();
-    transactDoc(tab, (t: any) => mutateUpdateFrontmatter(t, "title", "After"));
+    setShell(false); // Re-inits the store refs; the host is now null
+    render();
     await flush(4);
-    expect((row("title").querySelector("sp-textfield") as any).value).toBe("Before");
   });
 });
 
-describe("accordion collapse persistence", () => {
-  test("toggle writes tab.session.ui.frontmatterOpen and it is per-tab", async () => {
-    const tabA = setupContentTab({ title: "A" });
+describe("the SEO block's favicon row", () => {
+  test("committing a path writes a link entry; the clear dot removes it", async () => {
+    const tab = setupContentTab({ title: "Hello" });
     await mountAndFlush();
-    expect(tabA.session.ui.frontmatterOpen).toBe(true);
-
-    const item = frontmatterPanelEl.querySelector("sp-accordion-item") as HTMLElement & {
-      open: boolean;
-    };
-    item.open = false;
-    item.dispatchEvent(new Event("sp-accordion-item-toggle"));
-    expect(tabA.session.ui.frontmatterOpen).toBe(false);
-
-    // A second tab starts with its own default-open state.
-    const tabB = openTab({
-      document: { tagName: "div" },
-      documentPath: "posts/second.json",
-      id: "fm-tab-b",
-    }) as any;
-    tabB.doc.mode = "content";
-    tabB.doc.content.frontmatter = { title: "B" };
+    const field = row("icon").querySelector("sp-textfield")!;
+    (field as any).value = "/favicon.png";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    // The media field commits on a debounce.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 450);
+    });
     await flush(4);
-    expect(tabB.session.ui.frontmatterOpen).toBe(true);
-    const itemB = frontmatterPanelEl.querySelector("sp-accordion-item");
-    expect(itemB?.hasAttribute("open")).toBe(true);
+    expect(tab.doc.content.frontmatter.$head).toEqual([
+      { attributes: { href: "/favicon.png", rel: "icon" }, tagName: "link" },
+    ]);
 
-    // Switching back re-renders with tab A's collapsed state intact.
-    activateTab(tabA.id);
     render();
     await flush(4);
-    expect(tabA.session.ui.frontmatterOpen).toBe(false);
-    const itemA = frontmatterPanelEl.querySelector("sp-accordion-item");
-    expect(itemA?.hasAttribute("open")).toBe(false);
+    row("icon")
+      .querySelector(".set-dot")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(tab.doc.content.frontmatter.$head).toBeUndefined();
   });
 });

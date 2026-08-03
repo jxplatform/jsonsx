@@ -1,19 +1,16 @@
 /// <reference lib="dom" />
 /**
- * Chat-panel.ts — the assistant, hosted by the Inspector dock (`inspector.assistant` region).
+ * Chat-panel.ts — the assistant, as the Inspector dock's fourth tab.
  *
- * **It is no longer a column.** `#chat-panel` used to be a fifth permanent grid column ~300px wide;
- * it now shares `#right-panel`'s cell, one of the two visible at a time, which is what an inspector
- * TAB is (plan §3.2 ⑨ — folding the assistant in costs zero additional width). `shell.ts` enforces
- * the two states that implies: opening the assistant opens the dock, and collapsing the dock closes
- * the assistant.
+ * **It is not a column and it is not a dock.** `#chat-panel` was a fifth permanent grid column
+ * ~300px wide; then it was a node sharing the Inspector's cell; it is now the body of one tab
+ * beside Content, Style and Logic. Nothing about the chat UI changed for any of those moves, which
+ * is what {@link mount} taking a host rather than finding one has bought: `right-panel.ts` builds
+ * the four tab containers and hands this module the fourth.
  *
- * **The seam.** What is missing is the tab STRIP — the four labelled tabs (Content · Style · Logic ·
- * Assistant) that select between them. Until it lands, the selector is `view.setAssistant {open}`
- * and the Command Bar's assistant toggle, and `right-panel.ts` is untouched: it still owns
- * `#right-panel` and its own three-tab strip, and this module still owns `#chat-panel`. Nothing
- * here needs to move again when the strip arrives; the container it renders into becomes the fourth
- * tab's body.
+ * The `inspector.assistant` region is stamped HERE, on the container this module owns, rather than
+ * in `ui/regions.ts`'s shell table — the assistant no longer has a shell host to name. Three
+ * screenshot shots address that id and none of them changed.
  *
  * Hosts the assistant UI from ai-panel.ts unconditionally: with no project (welcome screen), with a
  * project but no open document, and with a document open. The panel is mounted once at studio boot
@@ -33,6 +30,8 @@ import { effect, effectScope } from "../reactivity";
 import { setDockCollapsed } from "../shell";
 import { workspace } from "../workspace/workspace";
 import { consumePendingAgentPrompt, hasPendingAgentPrompt } from "../services/agent-seed";
+import { setInspectorTab } from "./right-panel";
+import { REGION_ATTR } from "../ui/regions";
 import {
   bindAiPanelHost,
   mountAiPanel,
@@ -42,15 +41,18 @@ import {
 
 import type { EffectScope } from "@vue/reactivity";
 
+/** The region id every assistant screenshot crops to. Stamped on the container, not on a div. */
+const ASSISTANT_REGION = "inspector.assistant";
+
 let _host: HTMLElement | null = null;
 let _container: HTMLElement | null = null;
 let _scope: EffectScope | null = null;
 
 /**
- * Mount the chat sidebar into its shell region. Idempotent per host: the persistent `.panel-body`
- * container is created once and bound as the ai-panel render host (lit needs a single render target
- * for its part cache). A missing host (shell without a #chat-panel region, e.g. reduced test
- * fixtures) is a no-op.
+ * Mount the assistant into the host the Inspector hands it. Idempotent per host: the persistent
+ * `.ai-panel-host` container is created once and bound as the ai-panel render host (lit needs a
+ * single render target for its part cache). A missing host (a reduced test fixture with no
+ * inspector) is a no-op.
  *
  * @param {HTMLElement | null} host
  */
@@ -60,7 +62,8 @@ export function mount(host: HTMLElement | null) {
   }
   _host = host;
   _container = document.createElement("div");
-  _container.className = "panel-body";
+  _container.className = "ai-panel-host";
+  _container.setAttribute(REGION_ATTR, ASSISTANT_REGION);
   host.textContent = "";
   host.append(_container);
 
@@ -80,7 +83,10 @@ export function mount(host: HTMLElement | null) {
       if (!root || !hasPendingAgentPrompt(root)) {
         return;
       }
-      setDockCollapsed("chat", false);
+      // Reveal the assistant the way any other inspector tab is revealed: open the dock it lives
+      // In, then select it. There is no assistant dock left to open.
+      setDockCollapsed("right", false);
+      setInspectorTab("assistant");
       const prompt = consumePendingAgentPrompt(root);
       if (prompt) {
         // Defer past the current render so the assistant machinery is in place before the send.

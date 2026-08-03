@@ -280,7 +280,8 @@ export interface PanelDockDeclaration {
 }
 
 /**
- * The rail's two groups as budget declarations — `commands/budget.ts`'s `DOCK_TABS` rows, observed.
+ * The rail's two groups as budget declarations — the `rail/*` rows `scripts/check-chrome-budget.ts`
+ * counts, observed rather than written down. `commands/budget.ts` no longer carries a copy.
  *
  * `when` is deliberately NOT applied: the budget caps what the shell may GROW to, not what happens
  * to be visible in one context. Search and Problems are registered and hidden today, and they still

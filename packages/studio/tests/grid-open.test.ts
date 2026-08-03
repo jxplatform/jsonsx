@@ -1,6 +1,6 @@
 import { installMockPlatform, resetStudioState } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { closeAllTabs, workspace } from "../src/workspace/workspace";
+import { activePane, closeAllTabs, workspace } from "../src/workspace/workspace";
 
 void mock.module("tabulator-tables", () => ({}));
 void mock.module("tabulator-tables/dist/css/tabulator.min.css", () => ({}));
@@ -58,7 +58,7 @@ describe("openCsvGridTab", () => {
   test("re-opening the same path activates the existing tab", async () => {
     installMockPlatform({}, { "a.csv": "x\n1\n" });
     const first = await openCsvGridTab("a.csv");
-    workspace.activeTabId = null;
+    activePane().activeTabId = null;
     const second = await openCsvGridTab("a.csv");
     // Workspace hands back the reactive proxy of the same tab — compare identity via ids.
     expect(second.id).toBe(first.id);
@@ -80,7 +80,7 @@ describe("openCsvGridTab", () => {
     expect(tab.session.ui.canvasMode).toBe("grid");
     expect(getGridController(tab)).not.toBeNull();
 
-    workspace.activeTabId = null;
+    activePane().activeTabId = null;
     const again = openCollectionGrid("posts");
     expect(again.id).toBe(tab.id);
     expect(workspace.tabs.size).toBe(1);

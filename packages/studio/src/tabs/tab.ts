@@ -9,6 +9,7 @@ import type {
   InlineEditDef,
   JsonValue,
 } from "../types";
+import type { EditorKind } from "../commands/context";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxDocOp, JxFmOp } from "./patch-ops";
 
@@ -19,8 +20,6 @@ export interface TabUi {
   preview: boolean;
   /** Show elements inherited from the page's layout (pages with an effective layout only). */
   showLayout: boolean;
-  /** Above-canvas frontmatter Properties accordion expanded (content-collection docs, edit mode). */
-  frontmatterOpen: boolean;
   /** Chosen literal values for dynamic route params (e.g. { sku: "mini-trencher" }). */
   previewParams: Record<string, string>;
   /**
@@ -132,6 +131,14 @@ export interface Tab {
   documentPath: string | null;
   fileHandle: FileSystemFileHandle | null;
   capabilities: { modes: string[] };
+  /** Pinned tabs hold the head of their pane's strip, and a preview open never takes their slot. */
+  pinned: boolean;
+  /**
+   * A PREVIEW tab is disposable: the next preview open in the same pane replaces it, and it renders
+   * italic to say so. It stops being one the moment the author commits to it — an edit, a pin, a
+   * double-click. The palette's `@`/`#` modes make browsing cheap, and browsing must not litter.
+   */
+  preview: boolean;
   scope: {
     stop: () => void;
     run: <T>(fn: () => T) => T | undefined;
@@ -190,7 +197,6 @@ function createDefaultUi(canvasMode: string, preview = false) {
     editingFormula: null,
     editingFunction: null,
     featureToggles: {},
-    frontmatterOpen: true,
     inspectorSections: {},
     pendingInlineEdit: null,
     preview,
@@ -221,6 +227,7 @@ const ALL_MODES = ["edit", "design", "preview", "source", "stylebook"];
  *   sourceFormat?: string | null;
  *   capabilities?: { modes?: string[] };
  *   openedFrom?: TabOrigin | null;
+ *   preview?: boolean;
  * }} opts
  * @returns {Tab}
  */
@@ -233,6 +240,7 @@ export function createTab({
   sourceFormat = null,
   capabilities,
   openedFrom = null,
+  preview: previewTab = false,
 }: {
   id: string;
   documentPath?: string | null;
@@ -242,6 +250,7 @@ export function createTab({
   sourceFormat?: string | null;
   capabilities?: { modes?: string[] };
   openedFrom?: TabOrigin | null;
+  preview?: boolean;
 }) {
   const scope = effectScope();
 
@@ -274,6 +283,8 @@ export function createTab({
       snapshots: [{ document: structuredClone(document), selection: null }],
     }),
     id,
+    pinned: false,
+    preview: previewTab,
     scope,
     session: reactive({
       canvas: {
@@ -328,6 +339,86 @@ function inferDocumentMode(documentPath: string | null | undefined, sourceFormat
     return format.studio?.documentMode?.default ?? "content";
   }
   return "component";
+}
+
+// ─── Editor kinds ─────────────────────────────────────────────────────────────
+// §4.2's first axis. `canvasMode` conflates two orthogonal questions — WHICH EDITOR is open, and
+// (for the Canvas editor only) WHICH VIEW of it. The pane context bar labels them separately, and
+// The pane model needs the first one on its own: the second pane is capped to non-Canvas kinds
+// Until P8's `canvas-patcher` fan-out lands, because a second live `@jxsuite/runtime` host is the
+// Expensive part.
+
+/** The `canvasMode` strings, mapped onto the editor they actually name. */
+const EDITOR_KIND_BY_MODE: Readonly<Record<string, EditorKind>> = {
+  design: "canvas",
+  edit: "canvas",
+  "git-diff": "diff",
+  grid: "grid",
+  manage: "library",
+  preview: "canvas",
+  source: "code",
+  stylebook: "config",
+};
+
+/**
+ * The editor kind a mode string names. Unknown modes read as Canvas, which is what every
+ * format-declared mode that is not one of the eight above turns out to be.
+ *
+ * @param {string} mode
+ * @returns {EditorKind}
+ */
+export function editorKindForMode(mode: string): EditorKind {
+  return EDITOR_KIND_BY_MODE[mode] ?? "canvas";
+}
+
+/**
+ * The editor kind a tab is currently showing. Reads the BASE mode: the preview toggle is a value on
+ * the Canvas view axis, not a different editor.
+ *
+ * @param {Tab} tab
+ * @returns {EditorKind}
+ */
+export function editorKindOf(tab: Tab): EditorKind {
+  return editorKindForMode(tab.session.ui.canvasMode);
+}
+
+/**
+ * Every editor kind this document supports, in the format's own mode order and deduplicated — the
+ * dropdown's entries, so it can never contain a permanently dead one (§4.2).
+ *
+ * `preview` contributes nothing: it is a Canvas VIEW, and the kind it would add is already there.
+ *
+ * @param {Tab} tab
+ * @returns {EditorKind[]}
+ */
+export function editorKindsOf(tab: Tab): EditorKind[] {
+  const kinds: EditorKind[] = [];
+  for (const mode of tab.capabilities.modes) {
+    if (mode === "preview") {
+      continue;
+    }
+    const kind = editorKindForMode(mode);
+    if (!kinds.includes(kind)) {
+      kinds.push(kind);
+    }
+  }
+  return kinds;
+}
+
+/**
+ * The first mode this tab supports that renders `kind`, or `undefined` when it supports none.
+ *
+ * The inverse of {@link editorKindOf}: choosing an editor kind has to land on a real `canvasMode`,
+ * because that string is what the canvas render message carries.
+ *
+ * @param {Tab} tab
+ * @param {EditorKind} kind
+ * @returns {string | undefined}
+ */
+export function modeForEditorKind(tab: Tab, kind: EditorKind): string | undefined {
+  return tab.capabilities.modes.find(
+    (mode) => mode !== "preview" && editorKindForMode(mode) === kind,
+  );
 }
 
 // ─── Sub-documents ────────────────────────────────────────────────────────────

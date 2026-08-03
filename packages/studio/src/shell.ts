@@ -44,8 +44,15 @@ import type { AnyCommand, CommandRegistry } from "./commands/registry";
  */
 export type LayoutSelection = LayoutHit;
 
-/** The three resizable docks flanking the pane grid. */
-export type DockId = "left" | "right" | "chat";
+/**
+ * The two resizable docks flanking the pane grid.
+ *
+ * There were three. `"chat"` is gone: the assistant is the Inspector's fourth TAB, not a dock, so
+ * it has no column, no width, no collapse flag and no resize handle of its own — which is the whole
+ * claim of plan §3.2 ⑨, that folding it in costs zero additional width. What selects it is
+ * {@link INSPECTOR_TAB_IDS}, the same mechanism that selects Content, Style and Logic.
+ */
+export type DockId = "left" | "right";
 
 /**
  * The Navigator's panel ids, in rail order, then the two that have no rail button.
@@ -119,14 +126,27 @@ export function migratePanelId(stored: unknown): NavigatorPanelId | null {
 /**
  * The Inspector's tab ids, in strip order — the `value`s `panels/right-panel.ts` renders.
  *
- * `"assistant"` is deliberately NOT here. It used to be, and `automation.ts` carried an `if (tab
- * === "assistant")` redirect to keep a screenshot verb working after the chat sidebar moved out of
- * this dock. The redirect is deleted; a caller that wants the assistant runs `view.setAssistant`,
- * which is a different dock and therefore a different command.
+ * Four now, and `"assistant"` is one of them: the chat is a tab of this dock, so the id space that
+ * addresses Content, Style and Logic addresses it too. The old arrangement needed a fourth verb
+ * (`view.setAssistant`) precisely because the assistant was somewhere else; it survives as the
+ * dock-toggle spelling of "show me the assistant", but it now writes the same field as the others.
+ *
+ * The ORDER is §3.2 ⑨'s — Content · Style · Logic · Assistant — which is the order ⌘⇧1–4 follow.
+ * The human titles live in `commands/defaults.ts`'s `INSPECTOR_TABS` (a module with no state and no
+ * DOM, so the CI checks can load it); `tests/right-panel.test.ts` asserts the two agree, the same
+ * way `tests/navigator-panels.test.ts` does for the rail.
  */
-export const INSPECTOR_TAB_IDS = ["properties", "events", "style"] as const;
+export const INSPECTOR_TAB_IDS = ["properties", "style", "events", "assistant"] as const;
 
 export type InspectorTabId = (typeof INSPECTOR_TAB_IDS)[number];
+
+/** The tab the Inspector falls back to — the leftmost, Content. */
+export const DEFAULT_INSPECTOR_TAB: InspectorTabId = "properties";
+
+/** Whether a string is a declared Inspector tab id. */
+export function isInspectorTabId(value: unknown): value is InspectorTabId {
+  return typeof value === "string" && (INSPECTOR_TAB_IDS as readonly string[]).includes(value);
+}
 
 /** The Studio chrome's Spectrum theme — the `color` attribute on `<sp-theme>`. */
 export const CHROME_THEMES = ["light", "dark"] as const;
@@ -217,34 +237,26 @@ function readPersistedTheme(): ChromeTheme {
   }
 }
 
-export const DOCK_IDS: DockId[] = ["left", "right", "chat"];
+export const DOCK_IDS: DockId[] = ["left", "right"];
 
-/**
- * First-run docks. The assistant starts CLOSED: it is a ~300px fifth grid column, and an editor
- * that opens with a third of the window spent on a chat nobody asked for is the single most
- * consistently wasted space in the product. It opens on demand and is then remembered.
- */
+/** First-run docks. Both open: the shell's whole point is that it says where you are. */
 const DOCK_DEFAULTS: Record<DockId, DockState> = {
-  chat: { collapsed: true, width: 320 },
   left: { collapsed: false, width: 240 },
   right: { collapsed: false, width: 280 },
 };
 
 /** The width a dock returns to when its handle is double-clicked. */
 export const DOCK_DEFAULT_WIDTHS: Record<DockId, number> = {
-  chat: DOCK_DEFAULTS.chat.width,
   left: DOCK_DEFAULTS.left.width,
   right: DOCK_DEFAULTS.right.width,
 };
 
 const DOCK_CSS_VAR: Record<DockId, string> = {
-  chat: "--panel-w-chat",
   left: "--panel-w-left",
   right: "--panel-w-right",
 };
 
 const DOCK_CLASS: Record<DockId, string> = {
-  chat: "chat-collapsed",
   left: "left-collapsed",
   right: "right-collapsed",
 };
@@ -260,10 +272,8 @@ const DOCK_CLASS: Record<DockId, string> = {
 interface PersistedDocks {
   left?: number;
   right?: number;
-  chat?: number;
   leftCollapsed?: boolean;
   rightCollapsed?: boolean;
-  chatCollapsed?: boolean;
   /** The Navigator panel last shown. Migrated through {@link migratePanelId} on read. */
   leftTab?: string;
 }
@@ -308,9 +318,9 @@ function createShellState(): ShellState {
     const width = saved[id];
     const collapsed = saved[`${id}Collapsed` as const];
     docks[id] = {
-      // A stored `false` has to REOPEN a dock that defaults closed, so this cannot be the usual
-      // `if (saved.x) { collapse() }` shape — that silently pins the assistant shut forever for
-      // Everyone who ever opened it.
+      // A stored `false` has to REOPEN a dock, so this cannot be the usual
+      // `if (saved.x) { collapse() }` shape — that silently pins a dock shut forever for
+      // Everyone who ever closed it once.
       collapsed: typeof collapsed === "boolean" ? collapsed : DOCK_DEFAULTS[id].collapsed,
       width: typeof width === "number" && width > 0 ? width : DOCK_DEFAULTS[id].width,
     };
@@ -351,17 +361,15 @@ export const shell: ShellState = reactive(
 /**
  * Write the whole dock record in one shot.
  *
- * One writer, one shape. The predecessor had two: `persistWidths()` wrote a fresh
- * `{chat,left,right}` to this key while `applyPanelCollapse()` read-merge-wrote the three collapse
- * booleans into it, so dragging any handle wiped all three flags.
+ * One writer, one shape. The predecessor had two: `persistWidths()` wrote a fresh `{left,right,…}`
+ * to this key while `applyPanelCollapse()` read-merge-wrote the collapse booleans into it, so
+ * dragging any handle wiped all of them.
  */
 export function persistDocks(): void {
   try {
     localStorage.setItem(
       DOCK_STORAGE_KEY,
       JSON.stringify({
-        chat: shell.docks.chat.width,
-        chatCollapsed: shell.docks.chat.collapsed,
         left: shell.docks.left.width,
         leftCollapsed: shell.docks.left.collapsed,
         leftTab: shell.leftTab,
@@ -434,23 +442,12 @@ export function unmountShell(): void {
 /**
  * Open or close a dock, and remember it.
  *
- * **The assistant is a tab of the Inspector dock, not a dock of its own.** It lost its fifth grid
- * column: `#chat-panel` now shares `#right-panel`'s cell, one visible at a time. Two states are
- * therefore unreachable, and this is where that is enforced rather than in CSS — opening the
- * assistant opens the dock that hosts it, and closing that dock closes the assistant with it.
- * Without the coupling, "assistant open, inspector collapsed" renders a 0px-wide chat.
- *
- * `"chat"` survives as a `DockId` because the collapse flag is exactly the state an inspector tab
- * selection will be, and because `editor/shortcuts.ts` and `ui/panel-resize.ts` name it. What it no
- * longer has is a width of its own: `docks.chat.width` drives nothing now that the column is gone.
+ * There is no cross-dock coupling left to write here. The predecessor had to keep "assistant open,
+ * inspector collapsed" unreachable by hand, because the assistant was a fifth column sharing the
+ * inspector's cell; a TAB cannot be in that state by construction — collapsing the Inspector dock
+ * hides whichever of its four tabs was selected, assistant included.
  */
 export function setDockCollapsed(dock: DockId, collapsed: boolean): void {
-  if (dock === "chat" && !collapsed && shell.docks.right.collapsed) {
-    shell.docks.right.collapsed = false;
-  }
-  if (dock === "right" && collapsed && !shell.docks.chat.collapsed) {
-    shell.docks.chat.collapsed = true;
-  }
   if (shell.docks[dock].collapsed === collapsed) {
     persistDocks();
     return;
@@ -545,6 +542,15 @@ export interface ShellCommandDeps {
    * split is the whole point of the file).
    */
   setInspectorTab: (tab: InspectorTabId) => void;
+  /**
+   * Which Inspector tab is showing right now.
+   *
+   * Only `view.setAssistant { open: false }` needs it, and it needs it to stay idempotent: "the
+   * assistant is not showing" is a state, not a delta, so the verb steps off the Assistant tab and
+   * leaves any OTHER tab exactly where it was. Without the read it would have to guess, and a
+   * screenshot that closed the assistant would silently also lose your Style tab.
+   */
+  inspectorTab: () => InspectorTabId;
 }
 
 /** The Navigator dock hosts a panel — the precondition its own verbs share. */
@@ -640,15 +646,26 @@ export function shellViewCommands(deps: ShellCommandDeps): AnyCommand[] {
     },
     {
       args: argsSchema({
-        open: booleanProperty("True to show the assistant sidebar, false to collapse it."),
+        open: booleanProperty("True to show the Assistant tab, false to step off it."),
       }),
       category: "View",
+      // Kept as a verb of its own even though the assistant is now an ordinary Inspector tab: it
+      // Is the one tab with a dock toggle's meaning ("show me the assistant, wherever it lives"),
+      // Three screenshot shots address it by this name, and `open` reads as a STATE where
+      // `view.setRightTab { tab: "assistant" }` can only ever select.
       id: "view.setAssistant",
       level: "application",
       menus: ["palette"],
       group: "4_docks",
       run: (_ctx, args) => {
-        setDockCollapsed("chat", !booleanArg("view.setAssistant", args, "open"));
+        if (booleanArg("view.setAssistant", args, "open")) {
+          setDockCollapsed("right", false);
+          deps.setInspectorTab("assistant");
+          return;
+        }
+        if (deps.inspectorTab() === "assistant") {
+          deps.setInspectorTab(DEFAULT_INSPECTOR_TAB);
+        }
       },
       title: "Show Assistant",
     },

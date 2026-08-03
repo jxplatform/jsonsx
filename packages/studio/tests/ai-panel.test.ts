@@ -1,7 +1,8 @@
 /**
  * Tests for src/panels/ai-panel.ts — the assistant tab orchestrator: the chat ↔ sessions view
- * machine, the `Assistant: Settings…` credentials dialog, the rAF render loop driven by the
- * reactive chat-state watcher, stick-to-bottom auto-scroll, and the seedAssistantPrompt hand-off.
+ * machine, the hand-off to Preferences › Assistant where the provider key now lives, the rAF render
+ * loop driven by the reactive chat-state watcher, stick-to-bottom auto-scroll, and the
+ * seedAssistantPrompt hand-off.
  *
  * The document assistant is mocked (reactive chat-state, recorded session API); the panel module
  * holds singleton state, so these tests run as one ordered scenario.
@@ -86,11 +87,11 @@ void mock.module("../src/services/document-assistant", () => ({
 const {
   bindAiPanelHost,
   mountAiPanel,
-  openAssistantSettings,
   renderAiPanelTemplate,
   seedAssistantMessages,
   seedAssistantPrompt,
 } = await import("../src/panels/ai-panel");
+const { closePreferences } = await import("../src/settings/preferences-dialog");
 const { initLayers } = await import("../src/ui/layers");
 
 // The panel renders into its bound host via the rAF loop, exactly as in the app.
@@ -100,7 +101,7 @@ bindAiPanelHost(host);
 mountAiPanel();
 mountAiPanel(); // Idempotent
 
-// The credentials form left the panel for a dialog, so these tests need the overlay layers.
+// The credentials form left the panel for Preferences, so these tests need the overlay layers.
 for (const id of ["layer-popover", "layer-modal", "layer-dialog"]) {
   if (!document.querySelector(`#${id}`)) {
     const el = document.createElement("div");
@@ -114,7 +115,7 @@ function q<T extends Element = HTMLElement>(sel: string) {
   return host.querySelector(sel) as T | null;
 }
 
-/** Query inside the dialog layer — where `Assistant: Settings…` renders. */
+/** Query inside the dialog layer — where Preferences renders. */
 function d<T extends Element = HTMLElement>(sel: string) {
   return document.querySelector(`#layer-dialog ${sel}`) as T | null;
 }
@@ -126,9 +127,15 @@ function dialogButton(label: string) {
   ) as HTMLElement | undefined;
 }
 
-/** Open `Assistant: Settings…` from the in-panel notice and settle its first render. */
+/** Open Preferences › Assistant from the in-panel notice and settle its first render. */
 async function openSettingsFromNotice() {
   pointer(q(".ai-setup-notice sp-button")!, "click");
+  await flush(3);
+}
+
+/** Dismiss whatever Preferences sheet is up, and let the panel repaint. */
+async function closeSettings() {
+  closePreferences();
   await flush(3);
 }
 
@@ -149,17 +156,19 @@ describe("ai-panel", () => {
     expect(q(".ai-creds-form")).toBeNull();
     // …with one line and the action that fixes it.
     expect(q(".ai-setup-notice")!.textContent).toContain("No AI provider is connected yet.");
-    expect(q(".ai-setup-notice sp-button")!.textContent).toContain("Assistant: Settings…");
+    // The action is Preferences, not a dialog of the panel's own: a provider key is an
+    // Application setting, and the surface that owns those can also list and revoke it.
+    expect(q(".ai-setup-notice sp-button")!.textContent).toContain("Open Preferences…");
     chatState.messages.length = 0;
   });
 
-  test("Assistant: Settings… opens the credentials dialog and Close dismisses it", async () => {
+  test("the notice opens Preferences on the Assistant section; Close dismisses it", async () => {
     globalThis.localStorage.clear();
     await flush(3);
     await openSettingsFromNotice();
     expect(d(".ai-creds-form")).not.toBeNull();
-    expect(d("sp-dialog-wrapper")!.getAttribute("headline")).toBe("Assistant settings");
-    // The form is Spectrum controls now, not raw inputs with inline styles.
+    expect(d("sp-dialog-wrapper")!.getAttribute("headline")).toBe("Preferences");
+    // The form is Spectrum controls, not raw inputs with inline styles.
     expect(document.querySelectorAll("#layer-dialog sp-textfield").length).toBeGreaterThan(0);
     expect(d(".ai-creds-form input")).toBeNull();
 
@@ -169,7 +178,7 @@ describe("ai-panel", () => {
     expect(q(".ai-setup-notice")).not.toBeNull();
   });
 
-  test("saving a key in the dialog closes it and retires the notice", async () => {
+  test("saving a key retires the notice — and leaves Preferences open", async () => {
     globalThis.localStorage.clear();
     await flush(3);
     await openSettingsFromNotice();
@@ -179,8 +188,11 @@ describe("ai-panel", () => {
     pointer(dialogButton("Save")!, "click");
     await flush(3);
     expect(globalThis.localStorage.getItem("jx.ai.openaiKey")).toBe("sk-from-dialog");
-    expect(d(".ai-creds-form")).toBeNull();
+    // Preferences is a PLACE, not a wizard step: it stays up, and the panel behind it has
+    // Already dropped the notice because the save announced itself.
+    expect(d(".ai-creds-form")).not.toBeNull();
     expect(q(".ai-setup-notice")).toBeNull();
+    await closeSettings();
     globalThis.localStorage.clear();
     await flush(3);
   });
@@ -214,7 +226,7 @@ describe("ai-panel", () => {
     expect(q(".ai-setup-notice")).toBeNull();
     expect(q(".ai-composer textarea")).not.toBeNull();
 
-    d("sp-dialog-wrapper")!.dispatchEvent(new Event("close", { bubbles: true }));
+    await closeSettings();
     chatState.messages.length = 0;
     delete mockPlatform.cfConnect;
     invalidateModelCache();
@@ -336,27 +348,20 @@ describe("ai-panel", () => {
     expect(q(".ai-chat-title")!.textContent).toBe("New chat");
   });
 
-  test("the composer gear opens the settings dialog; Cancel closes it, chat untouched", async () => {
+  test("the composer gear opens Preferences; the chat behind it is untouched", async () => {
     pointer(q("sp-action-button[title='API key & endpoint']")!, "click");
     await flush(3);
     expect(d(".ai-creds-form")).not.toBeNull();
-    // The chat behind the dialog never went anywhere — that is the whole point of the move.
+    // The chat behind the sheet never went anywhere — that is the whole point of the move.
     expect(q(".ai-chat-messages")).not.toBeNull();
-    // Cancel is offered because a key exists at this point in the scenario.
+    // Cancel is offered because a key exists at this point in the scenario; it clears the drafts
+    // And leaves the sheet up.
     pointer(dialogButton("Cancel")!, "click");
     await flush(3);
+    expect(d(".ai-creds-form")).not.toBeNull();
+    await closeSettings();
     expect(d(".ai-creds-form")).toBeNull();
     expect(q(".ai-chat-messages")).not.toBeNull();
-  });
-
-  test("openAssistantSettings resolves when the dialog is dismissed", async () => {
-    const closed = openAssistantSettings();
-    await flush(3);
-    expect(d(".ai-creds-form")).not.toBeNull();
-    d("sp-dialog-wrapper")!.dispatchEvent(new Event("cancel", { bubbles: true }));
-    expect(await closed).toBeNull();
-    await flush(3);
-    expect(d(".ai-creds-form")).toBeNull();
   });
 
   test("seedAssistantPrompt ignores blank prompts and sends real ones", async () => {

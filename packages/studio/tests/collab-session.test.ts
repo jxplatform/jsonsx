@@ -2,7 +2,7 @@ import { installMockPlatform } from "./harness";
 import { createMockCollabHub, settleCollab } from "./collab-mock";
 import { toRaw } from "../src/reactivity";
 import { jsonClone } from "../src/utils/studio-utils";
-import { closeAllTabs, closeTab, openTab, workspace } from "../src/workspace/workspace";
+import { activateTab, closeAllTabs, closeTab, openTab } from "../src/workspace/workspace";
 import {
   collabSave,
   configureCollabSerializer,
@@ -195,7 +195,7 @@ describe("file plumbing guards", () => {
     const hub = createMockCollabHub();
     const { state } = installMockPlatform({ collab: hub.capability });
     const tab = openTab({ document: structuredClone(DOC), documentPath: PATH, id: PATH });
-    workspace.activeTabId = tab.id;
+    activateTab(tab.id);
     await settleCollab();
 
     state.calls.length = 0;

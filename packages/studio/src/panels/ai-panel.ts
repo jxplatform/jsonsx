@@ -6,10 +6,12 @@
  * session: a view-state machine (sessions list ↔ chat), a message list with
  * stick-to-bottom scrolling, and the sticky composer.
  *
- * Credentials are NOT a state of this panel. A provider key is a roaming application setting
- * configured once, so it lives in the `Assistant: Settings…` dialog ({@link openAssistantSettings});
- * the panel with no key configured still opens on an invitation to talk, with the settings action
- * offered beneath it.
+ * Credentials are NOT a state of this panel. A provider key is a roaming APPLICATION setting
+ * configured once, so it lives in Preferences › Assistant (⌘,) — not in a dialog reachable only
+ * from the panel that is broken for want of one. The panel with no key configured still opens on an
+ * invitation to talk, with the way to fix it offered beneath. It repaints when a credential is
+ * saved or revoked by subscribing to `settings/preferences-accounts.ts`, which is a LEAF both
+ * modules depend on rather than an import back into the sheet.
  *
  * Rendering: this panel owns a private rAF-coalesced render loop into the assistant
  * `.panel-body` container (bound once via {@link bindAiPanelHost}). It deliberately
@@ -22,15 +24,13 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { ref } from "lit-html/directives/ref.js";
 import type { TemplateResult } from "lit-html";
 import { effect, effectScope } from "../reactivity";
 import { createDocumentAssistant } from "../services/document-assistant";
 import { setOpenAiKey } from "../services/ai-settings";
 import { hasAiCredentials } from "../services/ai-models";
-import { showDialog } from "../ui/layers";
-import { createAiCredentialsForm } from "../ui/ai-credentials-form";
-import { createManagedConnect } from "../ui/ai-managed-connect";
+import { openPreferences } from "../settings/preferences-dialog";
+import { onCredentialsChanged } from "../settings/preferences-accounts";
 import { clearMarkdownCache } from "./ai-chat/chat-markdown";
 import { renderChatHeader, renderMessageList } from "./ai-chat/chat-view";
 import { createComposer } from "./ai-chat/composer";
@@ -111,6 +111,9 @@ export function mountAiPanel() {
     return;
   }
   mounted = true;
+  // A key saved (or revoked) in Preferences changes what this panel shows — the setup notice, and
+  // Whether the composer can send. One subscription, and no import back into the sheet.
+  onCredentialsChanged(scheduleAiRender);
 }
 
 // ─── Auto-scroll (stick to bottom unless the user scrolled up) ──────────────
@@ -137,99 +140,22 @@ function maintainScroll() {
   }
 }
 
-// ─── Assistant settings (the provider credentials, in a dialog) ──────────────
+// ─── The credentials gate's in-panel residue ─────────────────────────────────
 
 /**
- * Repaint the open settings dialog, if one is up. The dialog outlives a single {@link showDialog}
- * render — the credentials form and the Cloudflare connect flow both re-render themselves on every
- * keystroke and every probe — so it re-renders in place the same way `showPromptDialog` does.
- */
-let settingsRerender: (() => void) | null = null;
-
-/** Dismiss the open settings dialog, if one is up. */
-let settingsClose: (() => void) | null = null;
-
-/** Repaint whichever surfaces are currently showing credential state. */
-function refreshCredentialSurfaces() {
-  settingsRerender?.();
-  scheduleAiRender();
-}
-
-/** The shared credentials form (draft/model state lives inside the form's closure). */
-const credsForm = createAiCredentialsForm({
-  onCancel: () => settingsClose?.(),
-  onSaved: () => settingsClose?.(),
-  requestRender: refreshCredentialSurfaces,
-});
-
-/** Shared with the New Project modal's gates — see ui/ai-managed-connect.ts. */
-const managedConnect = createManagedConnect({ requestRender: refreshCredentialSurfaces });
-
-/**
- * `Assistant: Settings…` — the provider credentials, as an ephemeral dialog rather than a column.
+ * One line and the action that fixes it, under a chat that still invites a conversation.
  *
- * On managed platforms a keyless "Connect Cloudflare" (Workers AI) option sits above the
- * OpenAI-compatible key form; both are real, working paths. Resolves when the dialog closes.
- */
-export function openAssistantSettings(): Promise<null> {
-  managedConnect.ensureProbe();
-  credsForm.startEdit();
-  return showDialog<null>((done) => {
-    let wrapperEl: HTMLElement | null = null;
-
-    function finish() {
-      settingsRerender = null;
-      settingsClose = null;
-      done(null);
-      scheduleAiRender();
-    }
-
-    function build(): TemplateResult {
-      return html`
-        <sp-dialog-wrapper
-          open
-          underlay
-          headline="Assistant settings"
-          cancel-label="Close"
-          size="s"
-          @cancel=${finish}
-          @close=${finish}
-          ${ref((el?: Element) => {
-            if (el) {
-              wrapperEl = el as HTMLElement;
-            }
-          })}
-        >
-          <div class="ai-settings-dialog">${managedConnect.render()} ${credsForm.render()}</div>
-        </sp-dialog-wrapper>
-      `;
-    }
-
-    settingsClose = finish;
-    settingsRerender = () => {
-      // Resolved lazily: lit commits element refs before inserting the fragment, so the slot the
-      // Dialog was rendered into is only reachable once the first render has landed.
-      const host = wrapperEl?.parentElement;
-      if (host) {
-        litRender(build(), host);
-      }
-    };
-    return build();
-  });
-}
-
-/**
- * The in-panel residue of the credentials gate: one line and the action that fixes it, under a chat
- * that still invites a conversation. The probe fires here for the same reason the old gate fired it
- * — a managed platform or an env-keyed dev server is already configured, and only `/models` knows.
+ * The action is `Preferences › Assistant`, not a dialog of this panel's own: a provider key is an
+ * application setting, and the surface that owns application settings is the one that can also list
+ * and revoke it. The probe fires here for the same reason the old gate fired it — a managed
+ * platform or an env-keyed dev server may already be configured, and only `/models` knows.
  */
 function renderSetupNotice(): TemplateResult {
-  managedConnect.ensureProbe();
   return html`
     <div class="ai-setup-notice">
       <span>No AI provider is connected yet.</span>
-      <sp-button size="s" variant="secondary" @click=${() => void openAssistantSettings()}>
-        Assistant: Settings…
+      <sp-button size="s" variant="secondary" @click=${() => void openPreferences("assistant")}>
+        Open Preferences…
       </sp-button>
     </div>
   `;
@@ -360,7 +286,7 @@ function activeSessionTitle(): string | null {
 
 const composer = createComposer({
   isStreaming: () => assistant.chatState.status === "streaming",
-  onOpenSettings: () => void openAssistantSettings(),
+  onOpenSettings: () => void openPreferences("assistant"),
   onSend: (text) => {
     void handleAssistantSend(text);
   },

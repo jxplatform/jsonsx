@@ -6,6 +6,40 @@
    grid Size panel, the signals tab, the data explorer, the binding toggle
    and the events section. */
 
+/* ─── The Inspector dock: header, four tabs, one scrolling body ──────────────
+   #right-panel is a flex column (shell.css). The header and the tab strip are
+   fixed; exactly one tab body is displayed and it is the only scroller. The
+   Assistant's body is the exception — the chat owns its own scrolling, so its
+   container is a nested flex column with overflow hidden. */
+#right-panel > .panel-header,
+#right-panel > .panel-tabs {
+  flex: 0 0 auto;
+}
+#right-panel > .panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+#right-panel > .panel-body[data-jx-region="inspector/tab:assistant"] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ai-panel-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Text labels, not icons: four words in a 280px dock, allowed to compress rather
+   than to become anonymous. */
+.inspector-tabs sp-tabs {
+  --mod-tabs-font-size: var(--spectrum-font-size-50, 11px);
+
+  width: 100%;
+}
+
 /* ─── Inspector ──────────────────────────────── */
 .inspector-fields {
   padding: 4px 8px 8px;

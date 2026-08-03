@@ -1,11 +1,13 @@
 /// <reference lib="dom" />
 /**
- * Tab strip — renders open tabs above the canvas area.
+ * Tab strip — one strip PER PANE, above each pane's editor.
  *
- * Uses the reactive workspace model: reads from workspace.tabOrder, workspace.tabs,
- * workspace.activeTabId. Clicks call activateTab/closeTab from workspace.js.
+ * A tab belongs to a pane and the pane is what splits (§4.3), so the strip is a rendering of
+ * `Pane.tabOrder` / `Pane.activeTabId`, not of a workspace-wide list. The host for each pane is
+ * addressed by REGION id — `pane.primary/tabs`, `pane.secondary/tabs` — rather than by element id,
+ * so the shell can move or rename the divs without touching this file.
  *
- * Two things the strip owes the author, both of which it used to withhold:
+ * Five things the strip owes the author:
  *
  * - **A label that identifies the document.** A realistic Jx session has four tabs whose basename is
  *   `index.md`, so the label is the shortest unique path suffix — and for a page, its ROUTE, which
@@ -13,50 +15,103 @@
  * - **A way to reach a tab that is off-screen.** The horizontal scrollbar is hidden by design and the
  *   wheel handler below is a mouse affordance, so a trackpad user with fifteen files open had no
  *   way at all. The overflow chevron lists every tab currently out of view.
+ * - **A pin**, so the four documents you keep coming back to hold the head of the strip and no
+ *   preview open can take their slot.
+ * - **Drag reorder**, clamped so a drag can never interleave a pinned tab with an unpinned one.
+ * - **Preview tabs.** A single click from the tree or the palette opens ITALIC and replaceable. This
+ *   is worth more in Jx than in VS Code, because the palette's `@`/`#` modes make browsing cheap
+ *   and browsing must not litter. Committing — an edit, a pin, a double-click — makes the tab
+ *   permanent.
  */
 
 import { html, render as litRender, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { effect, effectScope } from "../reactivity";
-import { activateTab, closeTab, workspace } from "../workspace/workspace";
+import {
+  activateTab,
+  closeTab,
+  focusPane,
+  moveTab,
+  promoteDirtyPreviewTabs,
+  promoteTab,
+  setTabPinned,
+  workspace,
+} from "../workspace/workspace";
 import { gridTabLabel } from "../grid/grid-source";
+import type { Pane } from "../workspace/workspace";
 import type { Tab } from "../tabs/tab";
 import { renderPopover, showConfirmDialog } from "../ui/layers";
 import { collabState } from "../collab/collab-state";
 import { rectOf } from "../utils/geometry";
+import { resolveRegion } from "../ui/regions";
 import type { EffectScope } from "@vue/reactivity";
 
-let _host: HTMLElement | null = null;
+/**
+ * The primary pane's host, as handed over by the shell's bootstrap.
+ *
+ * Every OTHER pane's host is resolved by region id at render time, because a pane can appear and
+ * disappear between renders and there is nothing to hand over when it does.
+ */
+let _primaryHost: HTMLElement | null = null;
 
 let _scope: EffectScope | null = null;
 
-let _lastActiveId: string | null = null;
+/** Last-rendered active tab per pane — decides when to scroll a chip into view. */
+const _lastActive = new Map<string, string | null>();
 
-/** Whether the strip currently overflows — decides the chevron. Measured after each render. */
-let _overflowing = false;
+/** Whether each pane's strip overflows — decides its chevron. Measured after each render. */
+const _overflowing = new Map<string, boolean>();
 
 let _overflowHandle: { dismiss: () => void } | null = null;
 
+/** The tab id currently being dragged, or null. */
+let _dragging: string | null = null;
+
+/** Region id of a pane's tab strip. `ui/regions.ts` owns the grammar; this is one call site. */
+export function paneStripRegion(paneId: string): string {
+  return `pane.${paneId}/tabs`;
+}
+
 /**
- * Mount the tab strip into the given host element.
+ * Where a pane's strip renders.
+ *
+ * The primary falls back to the host the shell passed in, because that div is stamped
+ * `pane.primary/tabs` by `stampShellRegions()` only once the DOM is up — and the tests mount a
+ * detached node.
+ */
+function hostFor(pane: Pane): HTMLElement | null {
+  return resolveRegion(paneStripRegion(pane.id)) ?? (pane.id === "primary" ? _primaryHost : null);
+}
+
+/**
+ * Mount the tab strips. `host` is the PRIMARY pane's strip host.
  *
  * @param {HTMLElement} host
  */
 export function mount(host: HTMLElement) {
-  _host = host;
-  _lastActiveId = null;
-  _overflowing = false;
+  _primaryHost = host;
+  _lastActive.clear();
+  _overflowing.clear();
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
-      void workspace.tabOrder;
-      void workspace.activeTabId;
+      void workspace.activePaneId;
+      for (const pane of workspace.panes) {
+        void pane.id;
+        void pane.tabOrder;
+        void pane.activeTabId;
+      }
       for (const tab of workspace.tabs.values()) {
         void tab.doc.dirty;
         void tab.documentPath;
+        void tab.pinned;
+        void tab.preview;
         void tab.session.openedFrom;
       }
+      // An edit is a commitment: a preview tab with unsaved changes is no longer disposable, and
+      // The dirty flags this effect already tracks are exactly the signal.
+      promoteDirtyPreviewTabs();
       render();
     });
   });
@@ -66,80 +121,68 @@ export function unmount() {
   dismissOverflowMenu();
   _scope?.stop();
   _scope = null;
-  _host = null;
+  _primaryHost = null;
+  _dragging = null;
+  _lastActive.clear();
+  _overflowing.clear();
 }
 
 function render() {
-  if (!_host) {
+  const seen = new Set<string>();
+  for (const pane of workspace.panes) {
+    seen.add(pane.id);
+    renderPane(pane);
+  }
+  // A pane that has gone away leaves a host behind only when the shell keeps the div; blank it so
+  // No strip outlives its pane.
+  const stalePanes = [..._lastActive.keys()].filter((paneId) => !seen.has(paneId));
+  for (const paneId of stalePanes) {
+    _lastActive.delete(paneId);
+    _overflowing.delete(paneId);
+    const stale = resolveRegion(paneStripRegion(paneId));
+    if (stale) {
+      litRender(nothing, stale);
+    }
+  }
+}
+
+function renderPane(pane: Pane) {
+  const host = hostFor(pane);
+  if (!host) {
     return;
   }
 
-  if (workspace.tabOrder.length === 0) {
-    _lastActiveId = null;
-    _overflowing = false;
-    litRender(nothing, _host);
+  if (pane.tabOrder.length === 0) {
+    _lastActive.set(pane.id, null);
+    _overflowing.set(pane.id, false);
+    litRender(nothing, host);
     return;
   }
 
-  const labels = tabLabels();
+  const labels = tabLabels(pane);
+  const focused = pane.id === workspace.activePaneId;
 
   litRender(
     html`
-      <div class="tab-strip-row">
+      <div
+        class=${classMap({ focused, "tab-strip-row": true })}
+        @mousedown=${() => focusPane(pane.id)}
+      >
         <div class="tab-strip" @wheel=${onWheel}>
           ${repeat(
-            workspace.tabOrder,
+            pane.tabOrder,
             (id) => id,
-            (id) => {
-              const tab = workspace.tabs.get(id);
-              if (!tab) {
-                return nothing;
-              }
-              const isActive = id === workspace.activeTabId;
-              const isDirty = tab.doc.dirty;
-              const label = labels.get(id) ?? "Untitled";
-              const origin = tab.session.openedFrom;
-              return html`
-                <div
-                  class=${classMap({ active: isActive, "tab-strip-tab": true })}
-                  @click=${() => activateTab(id)}
-                  @auxclick=${(e: MouseEvent) => {
-                    if (e.button === 1) {
-                      e.preventDefault();
-                      void requestClose(id);
-                    }
-                  }}
-                  title=${tabTooltip(tab)}
-                >
-                  ${
-                    origin
-                      ? html`<span class="tab-strip-origin" aria-hidden="true">↳</span>`
-                      : nothing
-                  }
-                  <span class="tab-strip-label">${label}</span>
-                  ${isDirty ? html`<span class="tab-strip-dirty">●</span>` : nothing}
-                  <button
-                    class="tab-strip-close"
-                    @click=${(e: Event) => {
-                      e.stopPropagation();
-                      void requestClose(id);
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              `;
-            },
+            (id, index) => tabChip(pane, id, index, labels),
           )}
         </div>
         ${
-          _overflowing
+          _overflowing.get(pane.id) === true
             ? // ONE accessible name (§10): the glyph is hidden, so `title` is both the tooltip and
               // The name — `title` + a matching `aria-label` would announce it twice.
               html`<button
                 class="tab-strip-overflow"
                 title="Show hidden tabs"
-                @click=${(e: MouseEvent) => openOverflowMenu(e, labels)}
+                @click=${(e: MouseEvent) => openOverflowMenu(e, pane, labels)}
               >
                 <span aria-hidden="true">⌄</span>
               </button>`
@@ -147,34 +190,134 @@ function render() {
         }
       </div>
     `,
-    _host,
+    host,
   );
 
-  if (workspace.activeTabId !== _lastActiveId) {
-    _lastActiveId = workspace.activeTabId;
-    _host
-      .querySelector(".tab-strip-tab.active")
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  if (pane.activeTabId !== _lastActive.get(pane.id)) {
+    _lastActive.set(pane.id, pane.activeTabId);
+    host.querySelector(".tab-strip-tab.active")?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+    });
   }
 
-  syncOverflow();
+  syncOverflow(pane, host);
 }
 
 /**
- * Re-measure the strip and re-render once if the chevron's presence changed.
+ * One chip.
  *
- * Measurement can only happen after lit has written the DOM, so this runs at the tail of `render()`
- * and guards its own re-entry on the boolean actually flipping — the chevron cannot oscillate.
+ * @param {Pane} pane
+ * @param {string} id
+ * @param {number} index — the chip's slot in the pane's order, which is the drop target index
+ * @param {Map<string, string>} labels
  */
-function syncOverflow() {
-  const strip = _host?.querySelector(".tab-strip") as HTMLElement | null;
+function tabChip(pane: Pane, id: string, index: number, labels: Map<string, string>) {
+  const tab = workspace.tabs.get(id);
+  if (!tab) {
+    return nothing;
+  }
+  const isActive = id === pane.activeTabId;
+  const label = labels.get(id) ?? "Untitled";
+  const origin = tab.session.openedFrom;
+  return html`
+    <div
+      class=${classMap({
+        active: isActive,
+        dragging: _dragging === id,
+        pinned: tab.pinned,
+        preview: tab.preview,
+        "tab-strip-tab": true,
+      })}
+      draggable="true"
+      @click=${() => activateTab(id)}
+      @dblclick=${() => promoteTab(id)}
+      @dragstart=${(e: DragEvent) => onDragStart(e, id)}
+      @dragend=${() => onDragEnd()}
+      @dragover=${(e: DragEvent) => e.preventDefault()}
+      @drop=${(e: DragEvent) => onDrop(e, pane, index)}
+      @auxclick=${(e: MouseEvent) => {
+        if (e.button === 1) {
+          e.preventDefault();
+          void requestClose(id);
+        }
+      }}
+      title=${tabTooltip(tab)}
+    >
+      ${origin ? html`<span class="tab-strip-origin" aria-hidden="true">↳</span>` : nothing}
+      <span class="tab-strip-label">${label}</span>
+      ${tab.doc.dirty ? html`<span class="tab-strip-dirty">●</span>` : nothing}
+      <button
+        class="tab-strip-pin"
+        title=${tab.pinned ? "Unpin" : "Pin"}
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          setTabPinned(id, !tab.pinned);
+        }}
+      >
+        <span aria-hidden="true">${tab.pinned ? "◉" : "◎"}</span>
+      </button>
+      <button
+        class="tab-strip-close"
+        title="Close"
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          void requestClose(id);
+        }}
+      >
+        ×
+      </button>
+    </div>
+  `;
+}
+
+// ─── Drag reorder ─────────────────────────────────────────────────────────────
+
+function onDragStart(e: DragEvent, id: string) {
+  _dragging = id;
+  e.dataTransfer?.setData("text/plain", id);
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move";
+  }
+  // The ghost is chrome state, not model state, so no effect fires for it.
+  render();
+}
+
+function onDragEnd() {
+  _dragging = null;
+  render();
+}
+
+/**
+ * Drop onto the chip at `index`. The model clamps the destination into the region the dragged tab's
+ * pinned state allows, so this only has to say where the pointer was.
+ */
+function onDrop(e: DragEvent, pane: Pane, index: number) {
+  e.preventDefault();
+  const id = _dragging ?? e.dataTransfer?.getData("text/plain") ?? null;
+  _dragging = null;
+  if (!id || !pane.tabOrder.includes(id)) {
+    return;
+  }
+  moveTab(id, index);
+}
+
+/**
+ * Re-measure a pane's strip and re-render once if the chevron's presence changed.
+ *
+ * Measurement can only happen after lit has written the DOM, so this runs at the tail of
+ * `renderPane()` and guards its own re-entry on the boolean actually flipping — the chevron cannot
+ * oscillate.
+ */
+function syncOverflow(pane: Pane, host: HTMLElement) {
+  const strip = host.querySelector(".tab-strip") as HTMLElement | null;
   if (!strip) {
     return;
   }
   const overflowing = strip.scrollWidth > strip.clientWidth;
-  if (overflowing !== _overflowing) {
-    _overflowing = overflowing;
-    render();
+  if (overflowing !== (_overflowing.get(pane.id) === true)) {
+    _overflowing.set(pane.id, overflowing);
+    renderPane(pane);
   }
 }
 
@@ -203,10 +346,16 @@ function onWheel(e: WheelEvent) {
 
 // ─── Overflow menu ────────────────────────────────────────────────────────────
 
-/** Tab ids whose chip is wholly or partly outside the strip's scroll viewport. */
-export function hiddenTabIds(): string[] {
-  const strip = _host?.querySelector(".tab-strip") as HTMLElement | null;
-  if (!strip) {
+/**
+ * Tab ids whose chip is wholly or partly outside a pane strip's scroll viewport.
+ *
+ * @param {string} [paneId] — defaults to the focused pane
+ */
+export function hiddenTabIds(paneId: string = workspace.activePaneId): string[] {
+  const pane = workspace.panes.find((candidate) => candidate.id === paneId);
+  const host = pane ? hostFor(pane) : null;
+  const strip = host?.querySelector(".tab-strip") as HTMLElement | null;
+  if (!pane || !strip) {
     return [];
   }
   const left = strip.scrollLeft;
@@ -214,7 +363,7 @@ export function hiddenTabIds(): string[] {
   const hidden: string[] = [];
   const chips = [...strip.querySelectorAll(".tab-strip-tab")] as HTMLElement[];
   for (const [index, chip] of chips.entries()) {
-    const id = workspace.tabOrder[index];
+    const id = pane.tabOrder[index];
     if (id && (chip.offsetLeft < left || chip.offsetLeft + chip.offsetWidth > right)) {
       hidden.push(id);
     }
@@ -233,13 +382,14 @@ export function dismissOverflowMenu() {
  * 0.
  *
  * @param {MouseEvent} e
+ * @param {Pane} pane
  * @param {Map<string, string>} labels
  */
-function openOverflowMenu(e: MouseEvent, labels: Map<string, string>) {
+function openOverflowMenu(e: MouseEvent, pane: Pane, labels: Map<string, string>) {
   e.stopPropagation();
   dismissOverflowMenu();
-  const hidden = hiddenTabIds();
-  const ids = hidden.length > 0 ? hidden : [...workspace.tabOrder];
+  const hidden = hiddenTabIds(pane.id);
+  const ids = hidden.length > 0 ? hidden : [...pane.tabOrder];
   const anchor = rectOf(e.currentTarget as HTMLElement);
   _overflowHandle = renderPopover(
     html`<sp-popover
@@ -252,7 +402,7 @@ function openOverflowMenu(e: MouseEvent, labels: Map<string, string>) {
       <sp-menu>
         ${ids.map(
           (id) => html`<sp-menu-item
-            ?selected=${id === workspace.activeTabId}
+            ?selected=${id === pane.activeTabId}
             @click=${() => {
               dismissOverflowMenu();
               activateTab(id);
@@ -376,10 +526,18 @@ export function computeTabLabels(inputs: LabelInput[]): Map<string, string> {
   return new Map(entries.map((entry) => [entry.id, entry.label]));
 }
 
-/** Labels for the tabs currently open, keyed by tab id. */
-function tabLabels(): Map<string, string> {
+/**
+ * Labels for the tabs in one pane, keyed by tab id.
+ *
+ * Disambiguation is per-pane on purpose: the strip is what has to be readable, and widening a label
+ * because a tab in the OTHER pane collides with it would make one strip harder to read to solve a
+ * problem nobody can see.
+ *
+ * @param {Pane} pane
+ */
+function tabLabels(pane: Pane): Map<string, string> {
   return computeTabLabels(
-    workspace.tabOrder.flatMap((id) => {
+    pane.tabOrder.flatMap((id) => {
       const tab = workspace.tabs.get(id);
       return tab
         ? [
@@ -403,7 +561,8 @@ function tabLabels(): Map<string, string> {
 function tabTooltip(tab: Tab): string {
   const base = tab.documentPath || gridTabLabel(tab.id) || "Untitled";
   const origin = tab.session.openedFrom;
-  return origin?.documentPath ? `${base}\nOpened from ${origin.documentPath}` : base;
+  const withOrigin = origin?.documentPath ? `${base}\nOpened from ${origin.documentPath}` : base;
+  return tab.preview ? `${withOrigin}\nPreview — double-click to keep open` : withOrigin;
 }
 
 /**

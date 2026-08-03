@@ -37,6 +37,7 @@ import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import { shell } from "../shell";
 import { openQuickSearch } from "./quick-search";
+import { inspectorTab } from "./right-panel";
 import { canvasBaseOrigin } from "../canvas/canvas-origin";
 import { getPreviewNavigateHandler } from "../canvas/preview-navigate";
 import { documentUrlPattern, dynamicRouteParams } from "../page-params";
@@ -456,6 +457,16 @@ const RAIL_LEFT_CLOSE = html`<sp-icon-rail-left-close slot="icon"></sp-icon-rail
 const CHAT_ICON = html`<sp-icon-chat slot="icon"></sp-icon-chat>`;
 
 /**
+ * Whether the assistant is on screen: its dock open, and its tab the one selected.
+ *
+ * Two reads, because a tab that is selected inside a collapsed dock is not showing. This is the
+ * state the third toggle reports and the state `view.setAssistant { open }` names.
+ */
+function assistantShowing(): boolean {
+  return !shell.docks.right.collapsed && inspectorTab() === "assistant";
+}
+
+/**
  * ▤▥▦ — the three docks, each rendered from its own record.
  *
  * The glyph flips with the dock's state and `?selected` reports it, so the control says which way
@@ -477,7 +488,7 @@ function dockTogglesTpl(registry: CommandRegistry) {
     ${tbCmd(registry, "view.toggleBottomDock", {
       compact: true,
       icon: CHAT_ICON,
-      selected: !shell.docks.chat.collapsed,
+      selected: assistantShowing(),
     })}
   `;
 }
@@ -503,7 +514,9 @@ export function mount(rootEl: HTMLElement, _ctx: ToolbarCtx = {}) {
       // The boot-time restore — not just this module's click handlers.
       void shell.docks.left.collapsed;
       void shell.docks.right.collapsed;
-      void shell.docks.chat.collapsed;
+      // The assistant is an Inspector TAB now, so "is the assistant showing" is a tab selection
+      // Rather than a dock flag — read through the accessor so the button follows either store.
+      void assistantShowing();
       void shell.git.status;
       void shell.layoutSelection;
       // The registry itself is reactive state: it is composed AFTER this mount runs, and reading it

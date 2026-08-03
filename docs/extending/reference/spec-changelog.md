@@ -280,6 +280,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.4.2-draft** (2026-08-03) — The Inspector's fourth tab (§3.1, §6): the assistant is Content · Style · Logic · Assistant, not a fifth column; two docks, one persisted record. Application Preferences (§15) — Appearance, Assistant, Accounts (listed and revocable) and a registry-generated Keyboard sheet.
 - **0.4.1-draft** (2026-08-02) — Automation surface is a projection of the command registry (§13.5): the projection, idempotence and Remote rules; probe.idle() as a failing predicate; pointAt in top-document coordinates.
 - **0.4.0-draft** (2026-08-02) — Command Registry and Context Keys (§13); Tabs and Document Identity (§14) — drill-in opens a real tab, labels disambiguate by route.
 - **0.3.8-draft** (2026-08-02) — Layout chrome is selectable and inert to the caret; Preview gates editing and scrolls for real; Design opens fitted; caret.active is a bridge fact; Open in Browser (Cmd+Shift+O); assistant column defaults closed.

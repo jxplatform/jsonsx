@@ -2,7 +2,7 @@
    Load after tokens.css.
 
    Owns the #app grid and the regions it lays out: toolbar/tab-strip/
-   frontmatter slots, the left, right and chat rails, the statusbar, the
+   frontmatter slots, the Navigator and Inspector docks, the statusbar, the
    collapsed-sidebar variants, the AI chat panel UI, the tab strip and the
    drag-to-resize handles. */
 
@@ -235,31 +235,17 @@
   overflow: auto;
   background: var(--bg-panel);
 }
+/* The Inspector dock. A flex COLUMN, not a scroll box: the header and the four-tab strip are
+   fixed, and the selected tab's body is the only thing that scrolls — which is what lets the
+   Assistant tab (whose chat owns its own scrolling) share the dock at zero extra width. */
 #right-panel {
   grid-row: 2 / 6;
   grid-column: 4;
-  overflow-y: auto;
-  background: var(--bg);
-  border-left: 1px solid var(--border);
-}
-/* The assistant, hosted by the Inspector dock: same cell, same width, one visible at a time —
-   which is what an inspector TAB is, ahead of the tab strip that will select it. Always a flex
-   column (the chat UI owns its own scrolling), unlike #right-panel which scrolls as a whole. */
-#chat-panel {
-  grid-row: 2 / 6;
-  grid-column: 4;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--bg);
   border-left: 1px solid var(--border);
-}
-#chat-panel .panel-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 /* ─── Collapsed sidebars ──────────────────────── */
@@ -275,14 +261,6 @@
 }
 #app.right-collapsed #right-panel,
 #app.right-collapsed #resize-right {
-  display: none;
-}
-/* The assistant and the inspector's own tabs share one cell, so opening one hides the other.
-   No width changes hands and no column appears — the dock is the same dock either way. */
-#app.chat-collapsed #chat-panel {
-  display: none;
-}
-#app:not(.chat-collapsed) #right-panel {
   display: none;
 }
 
@@ -619,7 +597,7 @@
 /* ─── Assistant settings (ui/ai-credentials-form.ts) ──────── */
 /* The provider credentials form. Hosted by the `Assistant: Settings…` dialog and by the New
    Project modal's Import/Agent gates, so it sizes itself and never assumes a column. */
-.ai-settings-dialog {
+.prefs-assistant {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -820,7 +798,127 @@
   grid-column: 4;
   justify-self: start;
 }
-#resize-chat {
-  grid-column: 5;
-  justify-self: start;
+
+/* ─── Preferences (⌘,) ──────────────────────────
+   The application-preferences sheet: a section list beside one section's body.
+   Distinct from Project Settings, which is a project document (spec §9.3). */
+.prefs-sheet {
+  display: flex;
+  gap: 16px;
+  min-height: 320px;
+}
+.prefs-nav {
+  flex: 0 0 148px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 1px solid var(--border);
+  padding-right: 8px;
+}
+.prefs-nav-item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.prefs-nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.prefs-nav-item.active {
+  background: var(--bg-selected);
+  color: var(--fg);
+}
+.prefs-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.prefs-title {
+  margin: 0;
+  font-size: var(--spectrum-font-size-100, 14px);
+  color: var(--fg);
+}
+.prefs-blurb {
+  margin: 0 0 4px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.prefs-empty {
+  margin: 0;
+  color: var(--fg-dim);
+}
+.prefs-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.prefs-field-label {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+.prefs-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.prefs-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.prefs-account-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.prefs-account-label {
+  color: var(--fg);
+}
+.prefs-account-detail {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.prefs-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.prefs-keys-scope {
+  margin: 10px 0 2px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.prefs-key {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 2px 0;
+}
+.prefs-key-chord {
+  flex: 0 0 96px;
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg);
+}
+.prefs-key-title {
+  color: var(--fg-dim);
+  min-width: 0;
 }

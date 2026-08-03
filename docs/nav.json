@@ -28,6 +28,8 @@
         { "path": "studio/interface/tabs", "label": "Tabs and files" },
         { "path": "studio/interface/quick-access", "label": "Quick Access" },
         { "path": "studio/interface/shortcuts", "label": "Keyboard shortcuts" },
+        { "path": "studio/interface/preferences", "label": "Preferences" },
+        { "path": "studio/interface/commands", "label": "Commands" },
         { "path": "studio/projects", "label": "Projects" },
         { "path": "studio/projects/create", "label": "Create a project" },
         {

@@ -291,9 +291,9 @@ describe("the registry-gap declaration", () => {
 describe("no shell state is written behind the app's back", () => {
   test("running a command leaves the dock record to the command", async () => {
     resetWorkspaceWithTab();
-    const before = shell.docks.chat.collapsed;
+    const before = shell.docks.right.collapsed;
     const { deps } = makeFixture();
     await createAutomationApi(deps).run("view.setColorScheme", { scheme: "light" });
-    expect(shell.docks.chat.collapsed).toBe(before);
+    expect(shell.docks.right.collapsed).toBe(before);
   });
 });

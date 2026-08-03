@@ -31,6 +31,7 @@ const origRaf = globalThis.requestAnimationFrame;
 function makeCtx() {
   return {
     getCanvasMode: mock(() => "design"),
+    mountAssistant: mock(() => {}),
     navigateToComponent: mock(() => {}),
     renderCanvas: mock(() => {}),
   };
@@ -39,7 +40,7 @@ function makeCtx() {
 beforeEach(() => {
   document.body.innerHTML = `<div id="app">
     <div id="toolbar"></div><div id="activity-bar"></div><div id="left-panel"></div>
-    <div id="canvas-wrap"></div><div id="right-panel"></div><div id="chat-panel"></div>
+    <div id="canvas-wrap"></div><div id="right-panel"></div>
     <div id="statusbar"></div>
   </div>`;
   initShellRefs();

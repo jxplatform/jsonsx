@@ -58,7 +58,6 @@ body {
 :root {
   --panel-w-left: 240px;
   --panel-w-right: 280px;
-  --panel-w-chat: 320px;
 }
 /* Studio semantic token layer.
    Declared on sp-theme — not :root — so each var(--spectrum-*) reference

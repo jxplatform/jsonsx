@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { effect, effectScope } from "../src/reactivity";
 import {
   DOCK_DEFAULT_WIDTHS,
+  DOCK_IDS,
   applyDockLayout,
   mountShell,
   persistDocks,
@@ -37,7 +38,6 @@ beforeEach(() => {
   shell.leftTab = "layers";
   shell.docks.left = { collapsed: false, width: DOCK_DEFAULT_WIDTHS.left };
   shell.docks.right = { collapsed: false, width: DOCK_DEFAULT_WIDTHS.right };
-  shell.docks.chat = { collapsed: true, width: DOCK_DEFAULT_WIDTHS.chat };
   resetProjectShell();
 });
 
@@ -50,7 +50,6 @@ describe("applyDockLayout", () => {
   test("writes widths as CSS custom properties and collapse flags as #app classes", () => {
     const app = mountApp();
     shell.docks.left.collapsed = true;
-    shell.docks.chat.collapsed = true;
     shell.docks.right.width = 333;
 
     applyDockLayout();
@@ -58,7 +57,6 @@ describe("applyDockLayout", () => {
     expect(document.documentElement.style.getPropertyValue("--panel-w-right")).toBe("333px");
     expect(app.classList.contains("left-collapsed")).toBe(true);
     expect(app.classList.contains("right-collapsed")).toBe(false);
-    expect(app.classList.contains("chat-collapsed")).toBe(true);
   });
 
   test("widths still apply when there is no #app to classify", () => {
@@ -84,8 +82,8 @@ describe("mountShell", () => {
   test("a width change follows the same path", () => {
     mountApp();
     mountShell();
-    setDockWidth("chat", 411);
-    expect(document.documentElement.style.getPropertyValue("--panel-w-chat")).toBe("411px");
+    setDockWidth("right", 411);
+    expect(document.documentElement.style.getPropertyValue("--panel-w-right")).toBe("411px");
   });
 
   test("is idempotent, and unmount stops tracking", () => {
@@ -106,20 +104,20 @@ describe("dock mutators", () => {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
     expect(saved.rightCollapsed).toBe(true);
     expect(saved.left).toBe(275);
-    expect(saved.chatCollapsed).toBe(true);
+    expect(saved.leftCollapsed).toBe(false);
   });
 
   test("a width drag no longer erases the collapse flags", () => {
-    // The predecessor had two writers of this key: persistWidths() wrote a fresh {chat,left,right}
-    // Over the three collapse booleans applyPanelCollapse() had merged in, so dragging any handle
+    // The predecessor had two writers of this key: persistWidths() wrote a fresh {left,right}
+    // Over the collapse booleans applyPanelCollapse() had merged in, so dragging any handle
     // Reset every dock to open on the next reload.
-    setDockCollapsed("chat", false);
-    setDockWidth("chat", 400);
+    setDockCollapsed("right", true);
+    setDockWidth("right", 400);
     persistDocks();
 
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
-    expect(saved.chat).toBe(400);
-    expect(saved.chatCollapsed).toBe(false);
+    expect(saved.right).toBe(400);
+    expect(saved.rightCollapsed).toBe(true);
   });
 
   test("setting a dock to the state it already has leaves the state alone", () => {
@@ -131,10 +129,10 @@ describe("dock mutators", () => {
   });
 
   test("toggleDock flips and remembers", () => {
-    toggleDock("chat");
-    expect(shell.docks.chat.collapsed).toBe(false);
-    toggleDock("chat");
-    expect(shell.docks.chat.collapsed).toBe(true);
+    toggleDock("right");
+    expect(shell.docks.right.collapsed).toBe(true);
+    toggleDock("right");
+    expect(shell.docks.right.collapsed).toBe(false);
   });
 
   test("unwritable storage is swallowed", () => {
@@ -181,26 +179,24 @@ describe("the Navigator tab", () => {
   });
 });
 
-describe("the assistant is a tab of the Inspector dock", () => {
-  test("opening it opens the dock that hosts it", () => {
-    setDockCollapsed("right", true);
-    setDockCollapsed("chat", false);
-    expect(shell.docks.right.collapsed).toBe(false);
-    expect(shell.docks.chat.collapsed).toBe(false);
+describe("the assistant is not a dock", () => {
+  test("there are exactly two docks, and neither of them is the chat", () => {
+    // The fifth grid column is gone: the assistant is the Inspector's fourth TAB, so it has no
+    // Collapse flag, no width and no resize handle to keep in step with anything.
+    expect(Object.keys(shell.docks).toSorted()).toEqual(["left", "right"]);
+    expect(DOCK_IDS).toEqual(["left", "right"]);
   });
 
-  test("collapsing the Inspector dock takes the assistant with it", () => {
-    setDockCollapsed("chat", false);
-    setDockCollapsed("right", true);
-    expect(shell.docks.chat.collapsed).toBe(true);
-  });
-
-  test("the unreachable state — assistant open over a 0px column — cannot be produced", () => {
-    // The assistant shares the inspector's cell now; there is no fifth column and no width of its
-    // Own, so "open" with the host dock collapsed would render nothing at all.
-    setDockCollapsed("chat", false);
-    toggleDock("right");
-    expect(shell.docks.chat.collapsed || !shell.docks.right.collapsed).toBe(true);
+  test("the persisted record carries no chat keys", () => {
+    persistDocks();
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+    expect(Object.keys(saved).toSorted()).toEqual([
+      "left",
+      "leftCollapsed",
+      "leftTab",
+      "right",
+      "rightCollapsed",
+    ]);
   });
 
   test("a rail selection is observable by an effect, with no renderer wiring", () => {

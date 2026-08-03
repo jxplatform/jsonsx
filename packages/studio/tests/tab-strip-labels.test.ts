@@ -15,7 +15,7 @@ import {
   tabLabel,
   unmount,
 } from "../src/panels/tab-strip";
-import { closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
+import { activePane, closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
 import { initLayers } from "../src/ui/layers";
 import type { Tab } from "../src/tabs/tab";
 
@@ -162,7 +162,7 @@ describe("rendered labels", () => {
     open("b");
     await flush();
     workspace.tabs.delete("a");
-    workspace.tabOrder = [...workspace.tabOrder];
+    activePane().tabOrder = [...activePane().tabOrder];
     await flush();
     expect(labels()).toEqual(["/b"]);
   });

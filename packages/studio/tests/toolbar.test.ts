@@ -25,6 +25,8 @@ void mock.module("../src/panels/statusbar.js", () => ({ statusMessage }));
 
 const toolbar = await import("../src/panels/toolbar");
 const { shell, resetProjectShell } = await import("../src/shell");
+// The assistant's toggle reports a TAB selection, so the bar reads it where the Inspector keeps it.
+const { setInspectorTab } = await import("../src/panels/right-panel");
 const { setProjectState } = await import("../src/state");
 const { setPreviewNavigateHandler } = await import("../src/canvas/preview-navigate");
 const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
@@ -135,7 +137,7 @@ beforeEach(() => {
   localStorage.clear();
   shell.docks.left.collapsed = false;
   shell.docks.right.collapsed = false;
-  shell.docks.chat.collapsed = true;
+  setInspectorTab("properties");
   resetProjectShell();
   ctx = makeContext();
   ran = [];
@@ -358,18 +360,24 @@ describe("dock toggles", () => {
     await flush();
     expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(false);
 
-    // A bare state write, with no repaint call beside it: the band's effect tracks the dock record.
-    shell.docks.chat.collapsed = false;
-    shell.docks.right.collapsed = true;
+    // A bare state write, with no repaint call beside it: the band's effect tracks the dock record
+    // And, for the assistant, the Inspector's tab selection — which is where the assistant lives
+    // Now that it is a tab rather than a fifth column.
+    setInspectorTab("assistant");
     await flush();
     expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(true);
+
+    shell.docks.right.collapsed = true;
+    await flush();
+    // A tab selected inside a COLLAPSED dock is not showing, so the toggle reports it off.
+    expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(false);
     expect(root.querySelector("sp-icon-rail-right-open")).not.toBeNull();
     expect(root.querySelector("sp-icon-rail-left-close")).not.toBeNull();
 
     toolbar.unmount();
-    shell.docks.chat.collapsed = true;
+    setInspectorTab("properties");
     await flush();
-    expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(true);
+    expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(false);
   });
 
   test("the navigator glyph flips when the dock closes", async () => {

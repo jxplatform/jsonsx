@@ -9,8 +9,6 @@ const root = document.documentElement;
 localStorage.setItem(
   STORAGE_KEY,
   JSON.stringify({
-    chat: 360,
-    chatCollapsed: true,
     left: 300,
     leftCollapsed: true,
     right: 320,
@@ -21,7 +19,6 @@ document.body.innerHTML = `
   <div id="app"></div>
   <div id="resize-left"></div>
   <div id="resize-right"></div>
-  <div id="resize-chat"></div>
 `;
 
 const { mountShell, shell } = await import("../src/shell");
@@ -31,7 +28,6 @@ mountShell();
 
 const leftHandle = document.querySelector("#resize-left") as HTMLElement;
 const rightHandle = document.querySelector("#resize-right") as HTMLElement;
-const chatHandle = document.querySelector("#resize-chat") as HTMLElement;
 
 function drag(handle: HTMLElement, type: string, clientX: number) {
   handle.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX }));
@@ -42,7 +38,7 @@ function widthOf(cssVar: string): string {
 }
 
 /** The width a drag will start from, read where the handler reads it. */
-function startWidth(dock: "left" | "right" | "chat"): number {
+function startWidth(dock: "left" | "right"): number {
   return shell.docks[dock].width;
 }
 
@@ -50,17 +46,14 @@ describe("import-time restore", () => {
   test("saved widths are applied to the root custom properties", () => {
     expect(widthOf("--panel-w-left")).toBe("300px");
     expect(widthOf("--panel-w-right")).toBe("320px");
-    expect(widthOf("--panel-w-chat")).toBe("360px");
   });
 
   test("saved collapse flags restore shell state and #app classes", () => {
     expect(shell.docks.left.collapsed).toBe(true);
     expect(shell.docks.right.collapsed).toBe(true);
-    expect(shell.docks.chat.collapsed).toBe(true);
     const app = document.querySelector("#app") as HTMLElement;
     expect(app.classList.contains("left-collapsed")).toBe(true);
     expect(app.classList.contains("right-collapsed")).toBe(true);
-    expect(app.classList.contains("chat-collapsed")).toBe(true);
   });
 });
 
@@ -139,19 +132,13 @@ describe("right handle drag", () => {
   });
 });
 
-describe("chat handle drag", () => {
-  test("dragging left grows the chat sidebar (inverted delta) and persists it", () => {
-    const start = startWidth("chat");
-    drag(chatHandle, "pointerdown", 800);
-    drag(chatHandle, "pointermove", 770);
-    expect(widthOf("--panel-w-chat")).toBe(`${start + 30}px`);
-    drag(chatHandle, "pointerup", 770);
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    expect(typeof saved.chat).toBe("number");
-  });
-
-  test("double-click resets the chat sidebar to its default width", () => {
-    chatHandle.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
-    expect(widthOf("--panel-w-chat")).toBe("320px");
+describe("the assistant has no handle", () => {
+  test("only two handles are wired, and #resize-chat is not one of them", () => {
+    // The assistant is an Inspector tab: it is resized by resizing the Inspector, so there is no
+    // Third handle and no `--panel-w-chat` for one to drive.
+    expect(document.querySelector("#resize-chat")).toBeNull();
+    expect(widthOf("--panel-w-chat")).toBe("");
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as Record<string, unknown>;
+    expect(Object.keys(saved)).not.toContain("chat");
   });
 });

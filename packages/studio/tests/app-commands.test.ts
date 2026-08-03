@@ -12,7 +12,8 @@
 import { describe, expect, test } from "bun:test";
 import { appCommandSet, defaultCommandSet } from "../src/commands/app-commands";
 import { checkPlacements } from "../src/commands/levels";
-import { checkChromeBudget, DOCK_TABS } from "../src/commands/budget";
+import { checkChromeBudget, dockTabs } from "../src/commands/budget";
+import { railDeclarations } from "../src/panels/panel-registry";
 import { emptyContext } from "../src/commands/context";
 
 const COMMANDS = appCommandSet();
@@ -21,6 +22,10 @@ describe("the set", () => {
   test("covers every contribution point the bootstrap composes", () => {
     const namespaces = new Set(COMMANDS.map((c) => c.id.split(".")[0]));
     expect([...namespaces].toSorted()).toEqual([
+      // `app.preferences` — ⌘, the application-preferences sheet (Appearance · Assistant ·
+      // Accounts · Keyboard). Application configuration, as distinct from `settings.*`, which
+      // Configures a project.
+      "app",
       "canvas",
       "collection",
       "data",
@@ -30,6 +35,8 @@ describe("the set", () => {
       "formula",
       "inspector",
       "palette",
+      // `pane.toggleZoom` — the pane model (a parallel workstream).
+      "pane",
       // One `panel.focus.<id>` per Navigator panel, generated from the panel registry's own roster.
       "panel",
       "project",
@@ -54,7 +61,10 @@ describe("the set", () => {
   });
 
   test("stays inside the chrome budget", () => {
-    expect(checkChromeBudget({ commands: COMMANDS, docks: DOCK_TABS })).toEqual([]);
+    // The rail rows are OBSERVED from the panel registry, which `appCommandSet()` has already
+    // Populated by generating the ⌘1–8 records from it.
+    const docks = dockTabs(railDeclarations());
+    expect(checkChromeBudget({ commands: COMMANDS, docks })).toEqual([]);
   });
 
   test("every toggle that survives is a CHORD, and has an idempotent counterpart", () => {
@@ -67,10 +77,16 @@ describe("the set", () => {
       "view.toggleNavigator",
       "view.toggleInspector",
       "view.toggleBottomDock",
+      "document.togglePinned",
+      "pane.toggleZoom",
     ]);
     const ids = new Set(COMMANDS.map((c) => c.id));
     expect(ids.has("view.setNavigator")).toBe(true);
     expect(ids.has("view.setRightPanel")).toBe(true);
+    // Pin and pane-zoom are the same bargain: ⌘-chords a human presses while looking at the tab or
+    // The grid, each paired with the setter a script uses because a script cannot see that state.
+    expect(ids.has("document.setPinned")).toBe(true);
+    expect(ids.has("pane.setZoomed")).toBe(true);
     // HANDOFF: `view.toggleBottomDock` has no setter because the bottom dock is not on the `shell`
     // Record yet (`DOCK_IDS` is left/right/chat). P4.2 puts it there; the setter lands with it.
     expect(ids.has("view.setBottomDock")).toBe(false);
@@ -80,6 +96,16 @@ describe("the set", () => {
     const namespaces = new Set(["canvas", "collection", "data", "formula", "inspector", "state"]);
     const added = COMMANDS.filter((c) => namespaces.has(c.id.split(".")[0] as string));
     expect(added.filter((c) => /\.toggle[A-Z]/.test(c.id))).toEqual([]);
+  });
+
+  test("the injected getters are real — closing the Assistant reads the tab it is closing", () => {
+    // `appCommandSet()` supplies stand-in deps so the CI checks can read DECLARATIONS in a bare Bun
+    // Process. They still have to be honest functions: `view.setAssistant {open:false}` only acts
+    // When the Assistant is the tab on screen, so it calls the getter rather than assuming.
+    const byId = new Map(COMMANDS.map((c) => [c.id, c]));
+    const setAssistant = byId.get("view.setAssistant")!;
+    expect(() => setAssistant.run(emptyContext(), { open: false } as never)).not.toThrow();
+    expect(() => setAssistant.run(emptyContext(), { open: true } as never)).not.toThrow();
   });
 
   test("every declared args schema is an object schema with named properties", () => {

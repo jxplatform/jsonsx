@@ -267,17 +267,16 @@ export function focusRegionOf(el: Element | null): FocusRegion | null {
  * the only place a surface id is written down by hand.
  *
  * `#tab-strip` is addressed as `pane.primary/tabs` deliberately: the region names the PANE's strip,
- * so the id survives the node. `#chat-panel` and `#frontmatter-panel` are named the same way, and
- * the assistant is the case that has now happened: `inspector.assistant` was minted while the chat
- * was still a fifth grid column, and it needed no edit when the column was deleted and the node
- * moved into the Inspector dock's cell — which is the whole argument for naming the role rather
- * than the div. The frontmatter bar is the primary pane's document header, and the same will be
- * true of it when the Document Header card replaces the node.
+ * so the id survives the node. The assistant is the case that has now happened twice over:
+ * `inspector.assistant` was minted while the chat was a fifth grid column, survived the column
+ * being deleted, and survives the `#chat-panel` DIV being deleted too — it is stamped by
+ * `panels/chat-panel.ts` on whatever container hosts the assistant, which is now the Inspector's
+ * fourth tab body. That is the whole argument for naming the role rather than the div, and the
+ * reason this table lost a row without any shot losing its subject.
  */
 export const SHELL_REGION_HOSTS: Readonly<Record<string, string>> = {
   "#activity-bar": "rail",
   "#canvas-wrap": "pane.primary",
-  "#chat-panel": "inspector.assistant",
   "#frontmatter-panel": "pane.primary/frontmatter",
   "#left-panel": "navigator",
   "#right-panel": "inspector",

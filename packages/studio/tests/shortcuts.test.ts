@@ -20,6 +20,7 @@ import {
   stubRect,
 } from "./harness";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import type { InspectorTabId } from "../src/shell";
 
 // ─── Module mocks (must precede the shortcuts import) ─────────────────────────
 
@@ -65,9 +66,27 @@ const { createLiveContext } = await import("../src/commands/live-context");
 const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
 const store = await import("../src/store");
 const { initShellRefs } = store;
-const { activeTab, openTab, workspace } = await import("../src/workspace/workspace");
+const { activeTab, closeAllTabs, openTab, workspace } = await import("../src/workspace/workspace");
 const { initLayers, isModalOpen } = await import("../src/ui/layers");
-const { shell, resetProjectShell, setDockCollapsed } = await import("../src/shell");
+const { registerShellViewCommands, shell, resetProjectShell, setDockCollapsed } =
+  await import("../src/shell");
+
+/**
+ * The Inspector tab, read and written where `right-panel.ts` reads and writes it.
+ *
+ * The fixture mirrors the real deps rather than holding its own copy: `shortcuts.ts` asks
+ * `right-panel.ts` whether the assistant is showing, so a second store here would let ⌘J read one
+ * value and write another and the test would still pass.
+ */
+function inspectorTab(): InspectorTabId {
+  return (activeTab.value?.session.ui.rightTab ?? "properties") as InspectorTabId;
+}
+
+function setInspectorTab(tab: InspectorTabId): void {
+  if (activeTab.value) {
+    activeTab.value.session.ui.rightTab = tab;
+  }
+}
 
 // ─── Environment setup ────────────────────────────────────────────────────────
 
@@ -157,6 +176,10 @@ beforeAll(() => {
     { openInBrowser, openProject, saveDocument: saveFile },
     pointerContext,
   );
+  // ⌘J and ⌘⇧4 both address the Assistant, which is an Inspector TAB and therefore
+  // `shell.ts`'s record rather than a dock flag. The app's bootstrap composes it in; so does this
+  // Fixture, because a registry without it makes those two chords silently inert.
+  registerShellViewCommands(registry, { inspectorTab, setInspectorTab });
   initShortcuts(registry, pointerContext);
 
   // The edit-zoom path (ctrl+wheel / Ctrl+0/+/- / resize in edit mode) runs the REAL canvas-utils
@@ -888,7 +911,7 @@ describe("deliberate divergences", () => {
     expect(openInBrowser).toHaveBeenCalledTimes(1);
   });
 
-  test("⌘B / ⌥⌘B / ⌘J toggle the three docks", () => {
+  test("⌘B / ⌥⌘B toggle the two docks; ⌘J toggles the Assistant TAB", () => {
     setDockCollapsed("left", false);
     pressDoc("b", { ctrlKey: true });
     expect(shell.docks.left.collapsed).toBe(true);
@@ -897,25 +920,25 @@ describe("deliberate divergences", () => {
     pressDoc("b", { altKey: true, ctrlKey: true });
     expect(shell.docks.right.collapsed).toBe(true);
 
-    setDockCollapsed("chat", true);
+    // ⌘J no longer flips a third dock — there isn't one. It selects the Assistant and opens the
+    // Dock that hosts it, and pressing it again steps back off.
+    setInspectorTab("properties");
     pressDoc("j", { ctrlKey: true });
-    expect(shell.docks.chat.collapsed).toBe(false);
+    expect(inspectorTab()).toBe("assistant");
+    expect(shell.docks.right.collapsed).toBe(false);
+    pressDoc("j", { ctrlKey: true });
+    expect(inspectorTab()).toBe("properties");
   });
 
   test("⌘. collapses every dock and the same chord puts them back", () => {
     setDockCollapsed("left", false);
-    setDockCollapsed("right", false);
-    setDockCollapsed("chat", true);
+    setDockCollapsed("right", true);
 
     pressDoc(".", { ctrlKey: true });
-    expect([shell.docks.left, shell.docks.right, shell.docks.chat].map((d) => d.collapsed)).toEqual(
-      [true, true, true],
-    );
+    expect([shell.docks.left, shell.docks.right].map((d) => d.collapsed)).toEqual([true, true]);
 
     pressDoc(".", { ctrlKey: true });
-    expect([shell.docks.left, shell.docks.right, shell.docks.chat].map((d) => d.collapsed)).toEqual(
-      [false, false, true],
-    );
+    expect([shell.docks.left, shell.docks.right].map((d) => d.collapsed)).toEqual([false, true]);
   });
 
   /* 8. Focus outside the pane grid takes the canvas scope off the stack entirely (plan §5.3's
@@ -944,10 +967,7 @@ describe("dispatcher", () => {
   test("an error from a command's run is not swallowed as a refusal", () => {
     // Undo with no history is the registry's own refusal path; anything else must propagate.
     // Closing every tab makes `document.open` false, so ⌘Z is not even visible.
-    while (workspace.tabOrder.length > 0) {
-      workspace.tabs.delete(workspace.tabOrder.pop()!);
-    }
-    workspace.activeTabId = null;
+    closeAllTabs();
     const e = pressDoc("z", { ctrlKey: true });
     expect(e.defaultPrevented).toBe(false);
   });
@@ -961,7 +981,7 @@ describe("direct keys", () => {
     shell.focusRegion = "pane";
     setDockCollapsed("left", false);
     setDockCollapsed("right", true);
-    setDockCollapsed("chat", true);
+    setInspectorTab("properties");
   });
 
   test("⌘1 reveals and focuses Files; ⌘1 again collapses and returns to the pane", () => {
@@ -985,14 +1005,16 @@ describe("direct keys", () => {
     expect(shell.docks.left.collapsed).toBe(false);
   });
 
-  test("⌘⇧2 opens the Inspector dock, ⌘⇧4 the assistant", () => {
+  test("⌘⇧2 opens the Inspector dock, ⌘⇧4 selects its Assistant tab", () => {
     // `key` is the SHIFTED glyph on every layout, so the digit row resolves by `code`.
     pressDoc("@", { code: "Digit2", ctrlKey: true, shiftKey: true });
     expect(shell.docks.right.collapsed).toBe(false);
     expect(shell.focusRegion).toBe("inspector");
+    expect(inspectorTab()).toBe("style");
 
     pressDoc("$", { code: "Digit4", ctrlKey: true, shiftKey: true });
-    expect(shell.docks.chat.collapsed).toBe(false);
+    expect(shell.docks.right.collapsed).toBe(false);
+    expect(inspectorTab()).toBe("assistant");
   });
 
   test("F6 walks the ring and ⇧F6 walks it back, skipping regions with no host", () => {

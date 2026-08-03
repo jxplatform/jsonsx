@@ -54,6 +54,7 @@ import {
   setEditZoom,
 } from "../canvas/canvas-utils";
 import { openQuickSearch } from "../panels/quick-search";
+import { inspectorTab } from "../panels/right-panel";
 import { shouldWarnOnClose, tabLabel } from "../panels/tab-strip";
 import { showConfirmDialog, showDialog } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
@@ -300,17 +301,47 @@ function zoomBy(ctx: CommandContext, factor: number, redraw: () => void): void {
 // ─── Shell verbs ──────────────────────────────────────────────────────────────
 
 /**
- * The Command Bar's three dock toggles, mapped onto the three docks that exist.
+ * The Command Bar's dock toggles, mapped onto the two docks that exist.
  *
- * `"bottom"` is the plan's Problems/Terminal dock (§3.1) and has no shell column yet, so ⌘J
- * addresses the assistant — the only third dock there is. When the bottom dock lands this row moves
- * and `"chat"` gets its own record.
+ * `"bottom"` is the plan's Problems/Terminal dock (§3.1) and has no shell row yet, so it is absent
+ * here and {@link toggleShellDock} routes ⌘J to the Assistant instead — which is no longer a dock at
+ * all but the Inspector's fourth tab, and is still the third thing that chord could mean. When the
+ * bottom dock lands it gets a row here and that branch goes away.
  */
-const DOCK_FOR_COMMAND: Readonly<Record<CommandDockId, DockId>> = {
-  bottom: "chat",
+const DOCK_FOR_COMMAND: Readonly<Record<Exclude<CommandDockId, "bottom">, DockId>> = {
   inspector: "right",
   navigator: "left",
 };
+
+/**
+ * Flip one of the Command Bar's three toggles.
+ *
+ * ⌘J is the odd one: the assistant it addresses is a TAB, so "toggle" means select it or step off
+ * it, and it runs through `view.setAssistant` rather than through a dock flag so the registry stays
+ * the one place that behaviour is written down.
+ */
+function toggleShellDock(registry: CommandRegistry, dock: CommandDockId): void {
+  if (dock === "bottom") {
+    const showing = !shell.docks.right.collapsed && inspectorTab() === "assistant";
+    runIfPresent(registry, "view.setAssistant", { open: !showing });
+    return;
+  }
+  const target = DOCK_FOR_COMMAND[dock];
+  setDockCollapsed(target, !shell.docks[target].collapsed);
+}
+
+/**
+ * Run a record from ANOTHER module's registration, if this registry has it.
+ *
+ * `view.setAssistant` and `view.setRightTab` are `shell.ts`'s, composed into the app's registry by
+ * the bootstrap — a reduced registry (a test, a future second window kind) may not carry them, and
+ * a missing id must be inert rather than an exception thrown out of a keydown handler.
+ */
+function runIfPresent(registry: CommandRegistry, id: string, args: Record<string, unknown>): void {
+  if (registry.get(id) && registry.isEnabled(id)) {
+    void registry.run(id, args);
+  }
+}
 
 /** The dock state Zen collapsed, or null when Zen is off. */
 let zenRestore: Partial<Record<DockId, boolean>> | null = null;
@@ -445,18 +476,16 @@ function focusPanel(panelId: string): void {
 /**
  * ⌘⇧1–4 — show an Inspector tab and focus the dock.
  *
- * `"assistant"` is a different dock until P3.6 folds the column in, so it routes to that dock's own
- * record; the other three go through `view.setRightTab`, whose `args` enum is the one declaration
- * of which tabs exist.
+ * All four are tabs of the same dock now. `"assistant"` still routes to its own record because that
+ * record is application-level and works with no document open — `view.setRightTab` is
+ * document-level and correctly refuses when there is nothing to inspect.
  */
 function focusInspectorTab(registry: CommandRegistry, tabId: string): void {
-  if (tabId === "assistant") {
-    setDockCollapsed("chat", false);
-    return;
-  }
   setDockCollapsed("right", false);
-  if (registry.get("view.setRightTab") && registry.isEnabled("view.setRightTab")) {
-    void registry.run("view.setRightTab", { tab: tabId });
+  if (tabId === "assistant") {
+    runIfPresent(registry, "view.setAssistant", { open: true });
+  } else {
+    runIfPresent(registry, "view.setRightTab", { tab: tabId });
   }
   focusShellRegion("inspector");
 }
@@ -710,8 +739,7 @@ export function registerStudioCommands(
       saveDocument: () => hooks.saveDocument(),
       selectParent,
       toggleDock: (dock) => {
-        const target = DOCK_FOR_COMMAND[dock];
-        setDockCollapsed(target, !shell.docks[target].collapsed);
+        toggleShellDock(registry, dock);
       },
       toggleZen,
       undo: undoDocument,

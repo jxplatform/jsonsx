@@ -229,21 +229,26 @@ describe("derived ids", () => {
   });
 });
 
-describe("the two hosts index.html leaves un-addressable", () => {
-  test("the assistant column and the frontmatter bar are named by ROLE, not by node", () => {
-    // Both are bare `<div id>`s in index.html with no panel host to stamp them, and both are nodes
-    // P3 deletes. Naming the role rather than the div is what makes `ai-sidebar-chat`'s crop and
-    // `properties-bar`'s survive the deletion — and makes a rename fail Lane 1 instead of
-    // Photographing the wrong box.
-    expect(SHELL_REGION_HOSTS["#chat-panel"]).toBe("inspector.assistant");
-    expect(SHELL_REGION_HOSTS["#frontmatter-panel"]).toBe("pane.primary/frontmatter");
-    const host = tree(`<div id="chat-panel"></div><div id="frontmatter-panel"></div>`);
-    stampShellRegions(host);
-    expect(resolveRegion("inspector.assistant", host)?.id).toBe("chat-panel");
-    expect(resolveRegion("pane.primary/frontmatter", host)?.id).toBe("frontmatter-panel");
+describe("a region named by ROLE outlives the node it was minted on", () => {
+  test("`inspector.assistant` no longer needs a shell host at all", () => {
+    // It was minted for `#chat-panel`, a fifth grid column. The column went; then the DIV went;
+    // The id did neither, because it names the assistant's PLACE in the inspector rather than a
+    // Node. `panels/chat-panel.ts` stamps it on whatever container hosts the chat, so this table
+    // Has one fewer row and `ai-sidebar-chat`'s crop still resolves.
+    expect(SHELL_REGION_HOSTS["#chat-panel"]).toBeUndefined();
+    expect(isRegionId("inspector.assistant")).toBe(true);
+    const host = tree(`<div id="assistant" data-jx-region="inspector.assistant"></div>`);
+    expect(resolveRegion("inspector.assistant", host)?.id).toBe("assistant");
     // `inspector.assistant` is an INSTANCE of the inspector surface, so focus lands in the dock it
     // Belongs to — which is the whole reason the surface axis exists.
-    expect(focusRegionOf(host.querySelector("#chat-panel"))).toBe("inspector");
+    expect(focusRegionOf(host.querySelector("#assistant"))).toBe("inspector");
+  });
+
+  test("the frontmatter bar is still named the same way", () => {
+    expect(SHELL_REGION_HOSTS["#frontmatter-panel"]).toBe("pane.primary/frontmatter");
+    const host = tree(`<div id="frontmatter-panel"></div>`);
+    stampShellRegions(host);
+    expect(resolveRegion("pane.primary/frontmatter", host)?.id).toBe("frontmatter-panel");
   });
 });
 

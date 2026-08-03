@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 /**
- * Panel-resize.js — Draggable resize handles for the left, right and assistant docks.
+ * Panel-resize.js — Draggable resize handles for the Navigator and Inspector docks.
  *
  * Self-initializing module. Import it and the resize handles become interactive.
  *
@@ -15,11 +15,15 @@ import type { DockId } from "../shell";
 const MIN_WIDTH = 160;
 const MAX_RATIO = 0.5; // Max 50% of viewport
 
-/** Which handle drives which dock, and which direction widens it. */
+/**
+ * Which handle drives which dock, and which direction widens it.
+ *
+ * Two rows, not three: the assistant is an Inspector TAB now, so it is resized by resizing the
+ * Inspector. `#resize-chat` and the fifth grid column it sat in are deleted.
+ */
 const HANDLES: { selector: string; dock: DockId; side: "left" | "right" }[] = [
   { dock: "left", selector: "#resize-left", side: "left" },
   { dock: "right", selector: "#resize-right", side: "right" },
-  { dock: "chat", selector: "#resize-chat", side: "right" },
 ];
 
 /**

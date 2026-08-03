@@ -30,18 +30,26 @@ import type { InspectorTabId } from "../src/shell";
 
 const setInspectorTab = mock((_tab: InspectorTabId) => {});
 
+/** What the Inspector currently shows, as `view.setAssistant { open: false }` reads it. */
+let currentTab: InspectorTabId = "properties";
+const deps = {
+  inspectorTab: () => currentTab,
+  setInspectorTab,
+};
+
 let ctx: CommandContext = makeContext();
 let registry: CommandRegistry;
 
 function build(patch: Parameters<typeof makeContext>[0] = {}): CommandRegistry {
   ctx = makeContext({ document: { open: true }, project: { open: true }, ...patch });
   const built = createCommandRegistry({ getContext: () => ctx });
-  registerShellViewCommands(built, { setInspectorTab });
+  registerShellViewCommands(built, deps);
   return built;
 }
 
 beforeEach(() => {
   setInspectorTab.mockClear();
+  currentTab = "properties";
   localStorage.clear();
   document.body.textContent = "";
   const app = document.createElement("div");
@@ -51,13 +59,12 @@ beforeEach(() => {
   shell.theme = "dark";
   shell.docks.left.collapsed = false;
   shell.docks.right.collapsed = false;
-  shell.docks.chat.collapsed = true;
   registry = build();
 });
 
 describe("the records themselves", () => {
   test("every one satisfies the level × placement matrix", () => {
-    expect(checkPlacements(shellViewCommands({ setInspectorTab }))).toEqual([]);
+    expect(checkPlacements(shellViewCommands(deps))).toEqual([]);
   });
 
   test("all five ids register, and none of them is a toggle", () => {
@@ -114,7 +121,7 @@ describe("view.setActivity", () => {
 
   test("needs an open project", () => {
     const closed = createCommandRegistry({ getContext: () => makeContext() });
-    registerShellViewCommands(closed, { setInspectorTab });
+    registerShellViewCommands(closed, deps);
     expect(closed.isVisible("view.setActivity")).toBe(false);
   });
 });
@@ -125,16 +132,21 @@ describe("view.setRightTab", () => {
     expect(setInspectorTab).toHaveBeenCalledWith("style");
   });
 
-  test('refuses "assistant" — the chat sidebar is a different dock, and the shim is deleted', () => {
-    expect(() => registry.run("view.setRightTab", { tab: "assistant" })).toThrow(
-      "declared: properties, events, style",
+  test('accepts "assistant" — it is the dock\'s fourth tab, not another dock', () => {
+    void registry.run("view.setRightTab", { tab: "assistant" });
+    expect(setInspectorTab).toHaveBeenCalledWith("assistant");
+  });
+
+  test("refuses an undeclared tab, naming the four that exist", () => {
+    expect(() => registry.run("view.setRightTab", { tab: "content" })).toThrow(
+      "declared: properties, style, events, assistant",
     );
     expect(setInspectorTab).not.toHaveBeenCalled();
   });
 
   test("is hidden with no document open", () => {
     const closed = createCommandRegistry({ getContext: () => makeContext({ project: {} }) });
-    registerShellViewCommands(closed, { setInspectorTab });
+    registerShellViewCommands(closed, deps);
     expect(closed.isVisible("view.setRightTab")).toBe(false);
   });
 });
@@ -158,11 +170,29 @@ describe("view.setNavigator / view.setRightPanel / view.setAssistant", () => {
     expect(shell.docks.right.collapsed).toBe(false);
   });
 
-  test("the assistant opens from its closed default and stays open", () => {
+  test("the assistant selects its tab and opens the dock that hosts it", () => {
+    shell.docks.right.collapsed = true;
     void registry.run("view.setAssistant", { open: true });
-    expect(shell.docks.chat.collapsed).toBe(false);
+    expect(setInspectorTab).toHaveBeenLastCalledWith("assistant");
+    expect(shell.docks.right.collapsed).toBe(false);
+    // Idempotent: saying it twice means what it meant once.
     void registry.run("view.setAssistant", { open: true });
-    expect(shell.docks.chat.collapsed).toBe(false);
+    expect(shell.docks.right.collapsed).toBe(false);
+  });
+
+  test("closing it steps off the Assistant tab and leaves the dock open", () => {
+    currentTab = "assistant";
+    void registry.run("view.setAssistant", { open: false });
+    expect(setInspectorTab).toHaveBeenLastCalledWith("properties");
+    expect(shell.docks.right.collapsed).toBe(false);
+  });
+
+  test("closing it does NOT disturb a tab that is not the assistant", () => {
+    // The whole reason the verb reads the current tab: a shot that closes the assistant must not
+    // Also lose the Style tab the next step was about to photograph.
+    currentTab = "style";
+    void registry.run("view.setAssistant", { open: false });
+    expect(setInspectorTab).not.toHaveBeenCalled();
   });
 
   test("a missing `open` is a refusal, not a toggle", () => {
@@ -232,9 +262,10 @@ describe("the enums do not drift from what the shell renders", () => {
   });
 
   test("the Inspector renders exactly INSPECTOR_TAB_IDS", () => {
-    expect(new Set(declaredValues("../src/panels/right-panel.ts"))).toEqual(
-      new Set(INSPECTOR_TAB_IDS),
-    );
+    // The Inspector no longer declares any ids either — it renders `commands/defaults.ts`'s
+    // `INSPECTOR_TABS`, and `tests/right-panel.test.ts` asserts that list and this enum agree.
+    expect(declaredValues("../src/panels/right-panel.ts")).toEqual([]);
+    expect(INSPECTOR_TAB_IDS).toEqual(["properties", "style", "events", "assistant"]);
   });
 });
 

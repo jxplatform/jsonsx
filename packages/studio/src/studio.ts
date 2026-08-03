@@ -15,13 +15,11 @@ import { errorMessage } from "@jxsuite/schema/parse";
 
 import {
   canvasWrap,
-  chatPanelEl,
   getNodeAtPath,
   initShellRefs,
   projectState,
   registerRenderer,
   render,
-  renderOnly,
   requireProjectState,
   setProjectState,
   toolbarEl,
@@ -192,6 +190,7 @@ import { registerInspectorCommands } from "./panels/properties-panel";
 import { registerStyleCommands } from "./panels/style-panel";
 import { registerGridCommands } from "./grid/grid-open";
 import { registerSettingsCommands } from "./settings/settings-modal";
+import { registerPreferencesCommands } from "./settings/preferences-dialog";
 import { registerBrowseCommands } from "./browse/browse-modal";
 import { convertToComponent } from "./editor/convert-to-component";
 import type { GitDiffState } from "./types";
@@ -596,15 +595,17 @@ effect(() => {
 
 rightPanelMod.mount({
   getCanvasMode,
+  // The Assistant tab's body is built by the Inspector and handed to the module that owns the
+  // Chat. Injected rather than imported so the dependency runs one way: chat-panel.ts calls back
+  // Into right-panel.ts to select its own tab, and this is what keeps that from being a cycle.
+  mountAssistant: (host) => chatPanelMod.mount(host),
   navigateToComponent,
   renderCanvas: () => renderCanvas(),
 });
 
-// Above-canvas frontmatter Properties panel (content-collection docs, edit mode).
-frontmatterPanelMod.mount({ getCanvasMode });
+// The Document Header card — every document with frontmatter or `$head`, in every mode.
+frontmatterPanelMod.mount();
 
-// The persistent AI chat sidebar — mounts once, available with or without a project/document.
-chatPanelMod.mount(chatPanelEl);
 // The assistant's create_project tool adopts freshly scaffolded projects through the same
 // Flow as the recent-projects list.
 setProjectAdopter(openRecentProject);
@@ -1061,10 +1062,8 @@ registerTabCommands(commandRegistry, { openFile: openFileInTab });
  * prevent (plan §2, principle 1).
  */
 registerShellViewCommands(commandRegistry, {
-  setInspectorTab: (tab) => {
-    updateUi("rightTab", tab);
-    renderOnly("rightPanel");
-  },
+  inspectorTab: () => rightPanelMod.inspectorTab(),
+  setInspectorTab: (tab) => rightPanelMod.setInspectorTab(tab),
 });
 registerCanvasViewCommands(commandRegistry, { getCanvasMode, setCanvasMode });
 registerSelectionSetCommand(commandRegistry);
@@ -1077,6 +1076,7 @@ registerSignalsCommands(commandRegistry, {
 registerFormulaEditorCommands(commandRegistry, { renderCanvas: () => renderCanvas() });
 registerGridCommands(commandRegistry);
 registerSettingsCommands(commandRegistry);
+registerPreferencesCommands(commandRegistry);
 registerBrowseCommands(commandRegistry);
 registerNewProjectCommands(commandRegistry);
 registerStyleCommands(commandRegistry);

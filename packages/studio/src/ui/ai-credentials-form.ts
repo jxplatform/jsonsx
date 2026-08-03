@@ -2,9 +2,14 @@
 /**
  * Ai-credentials-form.ts — reusable AI provider credentials form (key / model / endpoint).
  *
- * Embedded by every host that needs a provider configured — the `Assistant: Settings…` dialog and
- * the New Project modal's Import/Agent gates. All draft/model-list state lives inside the closure,
- * so multiple instances never share state. Persists via src/services/ai-settings.ts on Save.
+ * Embedded by every host that needs a provider configured — **Preferences › Assistant** (⌘,) and the
+ * New Project modal's Import/Agent gates. All draft/model-list state lives inside the closure, so
+ * multiple instances never share state. Persists via src/services/ai-settings.ts on Save.
+ *
+ * The interim `Assistant: Settings…` dialog that used to host it is deleted: a provider key is an
+ * application setting, and the surface that owns application settings is also the one that can list
+ * it and revoke it (plan §9.3). Nothing about this form changed for the move, which is the argument
+ * for it having been a reusable form rather than a section of a dialog.
  *
  * Built from Spectrum controls with its layout in `styles/shell.css`: a roaming credential the user
  * configures once does not get its own bespoke inputs, and it certainly does not get 200-character

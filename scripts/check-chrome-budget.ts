@@ -13,15 +13,17 @@
 // Against a fixture:         `bun scripts/check-chrome-budget.ts --source <module.ts>`
 //
 // The source module exports `defaultCommandSet(): Command[]` and MAY export `dockTabs` to override
-// The declared dock/tab sets. Those sets are a declaration today because `registerPanel()` (plan
-// P3) does not exist yet; when it does, `DOCK_TABS` becomes a query over the panel registry and
-// This script does not change.
+// The dock/tab sets.
+//
+// This is the one place the two halves are joined. `commands/budget.ts` stays free of DOM and state
+// So three CI checks can load it in a bare Bun process, so it takes the rail groups as an argument;
+// `panels/panel-registry.ts` is where the rail's names and groupings actually live, and
+// `navigatorPanelSet()` is what populates it. The rail is therefore OBSERVED — a ninth panel fails
+// This check in the commit that registers it, with nothing to remember to update.
 
-import {
-  checkChromeBudget,
-  CHROME_BUDGET,
-  DOCK_TABS,
-} from "../packages/studio/src/commands/budget";
+import { checkChromeBudget, CHROME_BUDGET, dockTabs } from "../packages/studio/src/commands/budget";
+import { railDeclarations } from "../packages/studio/src/panels/panel-registry";
+import { navigatorPanelSet } from "../packages/studio/src/panels/navigator-panels";
 import type { BudgetableRecord, DockDeclaration } from "../packages/studio/src/commands/budget";
 
 const DEFAULT_SOURCE = "../packages/studio/src/commands/app-commands.ts";
@@ -46,7 +48,9 @@ if (typeof source.defaultCommandSet !== "function") {
   process.exit(2);
 }
 
-const docks = source.dockTabs ?? DOCK_TABS;
+// Registers the Navigator's records if nothing else has; `railDeclarations()` reads them back.
+navigatorPanelSet();
+const docks = source.dockTabs ?? dockTabs(railDeclarations());
 const violations = checkChromeBudget({ commands: source.defaultCommandSet(), docks });
 
 if (violations.length > 0) {

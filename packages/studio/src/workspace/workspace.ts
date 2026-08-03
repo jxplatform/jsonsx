@@ -1,10 +1,12 @@
 import { computed, reactive, toRaw } from "../reactivity";
 import { ensureCollab, rekeyCollab } from "../collab/collab-session";
-import { createTab, disposeTab } from "../tabs/tab";
+import { createTab, disposeTab, editorKindOf, editorKindsOf, modeForEditorKind } from "../tabs/tab";
 import { projectState } from "../state";
+import { argsSchema, booleanArg, booleanProperty } from "../commands/command-args";
 import type { Tab, TabOrigin } from "../tabs/tab";
 
 import type { ComponentEntry } from "../files/components";
+import type { EditorKind } from "../commands/context";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 import type { ComputedRef } from "@vue/reactivity";
@@ -23,6 +25,47 @@ export interface ClosedTabRecord {
 /** How many closed tabs `⌘⇧T` can walk back through. */
 const CLOSED_TAB_LIMIT = 20;
 
+/**
+ * One editor pane — the unit of split, focus and zoom (§4.1).
+ *
+ * A tab BELONGS to a pane, and the pane is what splits; the tab strip is per-pane for the same
+ * reason. This is the minimal model P3 asks for: an ordered list and an active id, with no rules
+ * for derived panes and no follow behaviour (those are P8).
+ */
+export interface Pane {
+  id: string;
+  /** Left-to-right order in this pane's strip. Pinned tabs occupy the head of it. */
+  tabOrder: string[];
+  activeTabId: string | null;
+}
+
+export const PRIMARY_PANE = "primary";
+
+export const SECONDARY_PANE = "secondary";
+
+/**
+ * Two, and enforced.
+ *
+ * Not a UI preference: every additional Canvas pane is a real `@jxsuite/runtime` render plus an
+ * `iframe-channel` connection, and the risk P8 exists to manage is a performance cliff.
+ */
+export const MAX_PANES = 2;
+
+/**
+ * The editor kinds a pane OTHER than the primary may host.
+ *
+ * The cap is the whole reason the pane model can land before P8: a second live Canvas host is the
+ * expensive part, so the second pane gets the cheap kinds — Code, Diff, Config, Grid, Library — and
+ * `probe.idle()` already aggregates per-host state in anticipation of lifting it.
+ */
+export const SECONDARY_PANE_KINDS: ReadonlySet<EditorKind> = new Set<EditorKind>([
+  "code",
+  "diff",
+  "config",
+  "grid",
+  "library",
+]);
+
 export interface Workspace {
   projectRoot: string | null;
   projectConfig: object | null;
@@ -36,23 +79,37 @@ export interface Workspace {
     searchQuery: string;
   };
   tabs: Map<string, Tab>;
-  /** Left-to-right order in the strip. */
-  tabOrder: string[];
+  /** One or two panes, `panes[0]` always the primary. The pane grid, as data. */
+  panes: Pane[];
+  /** Which pane the keyboard and every "the active document" read resolve through. */
+  activePaneId: string;
+  /** The pane filling the grid on its own, or null. `pane.toggleZoom` writes it. */
+  zoomedPaneId: string | null;
   /**
-   * Most-recently-used order, newest first. `⌃Tab` walks this, NOT {@link Workspace.tabOrder} — "the
-   * tab I was just in" is the one people reach for, and it is rarely the one to the left.
+   * Most-recently-used order, newest first, ACROSS panes. `⌃Tab` walks this, NOT
+   * {@link Pane.tabOrder} — "the tab I was just in" is the one people reach for, and it is rarely
+   * the one to the left. Cycling onto a tab in the other pane focuses that pane too.
    */
   mruOrder: string[];
-  activeTabId: string | null;
   /** Newest first. `⌘⇧T` pops this. */
   closedTabs: ClosedTabRecord[];
   ui: { activityBar: string };
+  /**
+   * The focused pane's strip order.
+   *
+   * A derived read, not a second store: with panes, "the workspace's tab order" can only mean the
+   * order of the pane you are in. Assigning to it is a type error on purpose — every write goes
+   * through a pane.
+   */
+  readonly tabOrder: readonly string[];
+  /** The focused pane's active tab. Derived from {@link Workspace.panes} for the same reason. */
+  readonly activeTabId: string | null;
 }
 
 // Annotated as Workspace: Vue's UnwrapNestedRefs cannot terminate on the
 // Recursive document types, and reactive() does not unwrap refs we never use.
 export const workspace: Workspace = reactive({
-  activeTabId: null as string | null,
+  activePaneId: PRIMARY_PANE,
   clipboard: null as JxMutableNode | null,
   closedTabs: [] as ClosedTabRecord[],
   componentRegistry: [] as ComponentEntry[],
@@ -63,19 +120,250 @@ export const workspace: Workspace = reactive({
     searchQuery: "",
     selectedPath: null as string | null,
   },
+  panes: [{ activeTabId: null as string | null, id: PRIMARY_PANE, tabOrder: [] as string[] }],
   projectConfig: null as object | null,
   projectRoot: null as string | null,
   styleClipboard: null as JxStyle | null,
-  tabOrder: [] as string[],
   tabs: new Map<string, Tab>(),
   ui: {
     activityBar: "files",
+  },
+  zoomedPaneId: null as string | null,
+  // The two derived reads. Defined as getters on the object reactive() wraps, so a consumer that
+  // Reads `workspace.activeTabId` inside an effect tracks `panes` and `activePaneId` — the same
+  // Dependency it used to have on the field these replace, with no second source of truth.
+  get activeTabId(): string | null {
+    return activePane().activeTabId;
+  },
+  get tabOrder(): readonly string[] {
+    return activePane().tabOrder;
   },
 }) as unknown as Workspace;
 
 export const activeTab = computed(() =>
   workspace.activeTabId ? (workspace.tabs.get(workspace.activeTabId) ?? null) : null,
 ) as unknown as ComputedRef<Tab | null>;
+
+// ─── Panes ────────────────────────────────────────────────────────────────────
+
+/**
+ * The focused pane. Never null: `panes[0]` is created with the store and is never removed, so
+ * "where am I" always has an answer even with no project open.
+ *
+ * @returns {Pane}
+ */
+export function activePane(): Pane {
+  const { panes } = workspace;
+  return panes.find((pane) => pane.id === workspace.activePaneId) ?? panes[0]!;
+}
+
+/**
+ * @param {string} paneId
+ * @returns {Pane | undefined}
+ */
+export function paneById(paneId: string): Pane | undefined {
+  return workspace.panes.find((pane) => pane.id === paneId);
+}
+
+/**
+ * The pane holding `tabId`, or undefined when no pane does.
+ *
+ * @param {string} tabId
+ * @returns {Pane | undefined}
+ */
+export function paneOfTab(tabId: string): Pane | undefined {
+  return workspace.panes.find((pane) => pane.tabOrder.includes(tabId));
+}
+
+/**
+ * Move focus to a pane. A no-op for an id no pane carries, so a stale persisted layout cannot
+ * strand the keyboard in a pane that is not there.
+ *
+ * @param {string} paneId
+ */
+export function focusPane(paneId: string) {
+  const pane = paneById(paneId);
+  if (!pane) {
+    return;
+  }
+  workspace.activePaneId = pane.id;
+  resetTabCycle();
+  const { activeTabId } = pane;
+  if (activeTabId) {
+    promoteMru(activeTabId);
+    const tab = workspace.tabs.get(activeTabId);
+    if (tab) {
+      syncTreeSelection(tab);
+    }
+  }
+}
+
+/** Focus the pane that is not the focused one, when there is one. */
+export function focusOtherPane() {
+  const other = workspace.panes.find((pane) => pane.id !== workspace.activePaneId);
+  if (other) {
+    focusPane(other.id);
+  }
+}
+
+/**
+ * Whether `tab` can be hosted outside the primary pane — i.e. whether it supports any of
+ * {@link SECONDARY_PANE_KINDS}.
+ *
+ * @param {Tab} tab
+ * @returns {boolean}
+ */
+export function canOpenInSecondPane(tab: Tab): boolean {
+  return editorKindsOf(tab).some((kind) => SECONDARY_PANE_KINDS.has(kind));
+}
+
+/**
+ * Force a tab that has landed in a non-primary pane onto a kind that pane may host.
+ *
+ * The cap is enforced HERE rather than at the split, because a tab in the second pane can also be
+ * switched back to Canvas from the context bar. One rule, one place.
+ *
+ * @param {Tab} tab
+ * @returns {boolean} Whether the tab is (now) hostable there
+ */
+function capToSecondaryKind(tab: Tab): boolean {
+  if (SECONDARY_PANE_KINDS.has(editorKindOf(tab))) {
+    return true;
+  }
+  for (const kind of editorKindsOf(tab)) {
+    if (!SECONDARY_PANE_KINDS.has(kind)) {
+      continue;
+    }
+    const mode = modeForEditorKind(tab, kind);
+    if (mode) {
+      tab.session.ui.canvasMode = mode;
+      tab.session.ui.preview = false;
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Split the grid and move the focused tab into the new pane, which becomes focused.
+ *
+ * Moves rather than duplicates: one tab is one document with one undo history and one collab
+ * session, and two strips claiming the same id is the duplicate-`repeat`-key bug §4.3 describes.
+ *
+ * @returns {Pane | null} The pane the tab landed in, or null when the split was refused
+ */
+export function splitRight(): Pane | null {
+  const source = activePane();
+  const tabId = source.activeTabId;
+  const tab = tabId ? workspace.tabs.get(tabId) : null;
+  if (!tabId || !tab) {
+    return null;
+  }
+  const target =
+    workspace.panes.find((pane) => pane.id !== source.id) ??
+    (workspace.panes.length < MAX_PANES
+      ? { activeTabId: null as string | null, id: SECONDARY_PANE, tabOrder: [] as string[] }
+      : null);
+  if (!target) {
+    return null;
+  }
+  // The primary keeps the Canvas; whichever pane is NOT primary takes the capped kind.
+  const capped = target.id === PRIMARY_PANE ? tab : capToSecondaryKind(tab) ? tab : null;
+  if (!capped) {
+    return null;
+  }
+  if (!workspace.panes.includes(target)) {
+    workspace.panes.push(target);
+  }
+  detachTab(tabId);
+  insertIntoPane(target, tabId);
+  workspace.activePaneId = target.id;
+  target.activeTabId = tabId;
+  resetTabCycle();
+  promoteMru(tabId);
+  return target;
+}
+
+/**
+ * Collapse a pane, moving its tabs back into the one that remains.
+ *
+ * Closing a pane must never close documents — that is the difference between a layout action and a
+ * destructive one, and only the second is allowed to lose work.
+ *
+ * @param {string} paneId
+ */
+export function closePane(paneId: string) {
+  if (workspace.panes.length < 2) {
+    return;
+  }
+  const pane = paneById(paneId);
+  const survivor = workspace.panes.find((candidate) => candidate.id !== paneId);
+  if (!pane || !survivor) {
+    return;
+  }
+  for (const tabId of pane.tabOrder) {
+    insertIntoPane(survivor, tabId);
+  }
+  survivor.activeTabId = pane.activeTabId ?? survivor.activeTabId;
+  workspace.panes = workspace.panes.filter((candidate) => candidate.id !== paneId);
+  workspace.activePaneId = survivor.id;
+  if (workspace.zoomedPaneId === paneId) {
+    workspace.zoomedPaneId = null;
+  }
+  resetTabCycle();
+}
+
+/**
+ * Fill the grid with one pane, or restore both. Zooming is a VIEW of the pane grid — no tab moves
+ * and nothing closes, so the toggle is always safe.
+ *
+ * @param {string} [paneId] — defaults to the focused pane
+ */
+export function togglePaneZoom(paneId: string = workspace.activePaneId) {
+  workspace.zoomedPaneId = workspace.zoomedPaneId === paneId ? null : paneId;
+}
+
+/** Remove a tab id from whichever pane holds it, without touching the tab itself. */
+function detachTab(tabId: string) {
+  for (const pane of workspace.panes) {
+    if (!pane.tabOrder.includes(tabId)) {
+      continue;
+    }
+    pane.tabOrder = pane.tabOrder.filter((id) => id !== tabId);
+    if (pane.activeTabId === tabId) {
+      pane.activeTabId = pane.tabOrder.at(-1) ?? null;
+    }
+  }
+}
+
+/**
+ * Put a tab id into a pane at the right place: after the pinned prefix for an ordinary tab, at the
+ * end of it for a pinned one. Idempotent.
+ */
+function insertIntoPane(pane: Pane, tabId: string, index?: number) {
+  if (pane.tabOrder.includes(tabId)) {
+    return;
+  }
+  const at = index ?? defaultSlot(pane, tabId);
+  pane.tabOrder = [...pane.tabOrder.slice(0, at), tabId, ...pane.tabOrder.slice(at)];
+}
+
+/** How many tabs at the head of `pane` are pinned. */
+function pinnedCount(pane: Pane): number {
+  let count = 0;
+  for (const id of pane.tabOrder) {
+    if (workspace.tabs.get(id)?.pinned !== true) {
+      break;
+    }
+    count += 1;
+  }
+  return count;
+}
+
+/** The slot a newly-arriving tab takes: inside the pinned prefix if pinned, else at the end. */
+function defaultSlot(pane: Pane, tabId: string): number {
+  return workspace.tabs.get(tabId)?.pinned === true ? pinnedCount(pane) : pane.tabOrder.length;
+}
 
 /**
  * Record the open project on the reactive workspace. `root` must be the absolute project root (the
@@ -153,10 +441,12 @@ function syncTreeSelection(tab: Tab) {
  */
 function setActiveTab(tabId: string, opts: { cycling?: boolean } = {}) {
   const tab = workspace.tabs.get(tabId);
-  if (!tab) {
+  const pane = paneOfTab(tabId);
+  if (!tab || !pane) {
     return;
   }
-  workspace.activeTabId = tabId;
+  pane.activeTabId = tabId;
+  workspace.activePaneId = pane.id;
   if (!opts.cycling) {
     resetTabCycle();
     promoteMru(tabId);
@@ -173,6 +463,13 @@ function setActiveTab(tabId: string, opts: { cycling?: boolean } = {}) {
  * keys. Callers that mean "show me this file" should use `files/files.ts`'s `openFileInTab`, which
  * activates the existing tab instead.
  *
+ * `preview: true` opens a DISPOSABLE tab (§4.3): single-clicking through the tree or the palette is
+ * browsing, and browsing must not litter, so the next preview open in the same pane takes its slot.
+ * It is opt-in rather than the default because only the CALLER knows whether the author was
+ * browsing or committing — an author who typed a new file name has committed, and silently
+ * discarding that tab on their next click is the one failure a preview tab must never have.
+ * {@link promoteTab} records a commitment made after the fact.
+ *
  * @param {{
  *   id: string;
  *   documentPath?: string | null;
@@ -182,6 +479,7 @@ function setActiveTab(tabId: string, opts: { cycling?: boolean } = {}) {
  *   sourceFormat?: string | null;
  *   capabilities?: { modes?: string[] };
  *   openedFrom?: TabOrigin | null;
+ *   preview?: boolean;
  * }} opts
  * @returns {Tab}
  */
@@ -194,18 +492,104 @@ export function openTab(opts: {
   sourceFormat?: string | null;
   capabilities?: { modes?: string[] };
   openedFrom?: TabOrigin | null;
+  preview?: boolean;
 }) {
   const previous = workspace.tabs.get(opts.id);
-  const tab = createTab(opts);
+  const preview = opts.preview === true && previous?.pinned !== true;
+  const tab = createTab({ ...opts, preview });
+  const pane = activePane();
+  let slot: number | undefined;
   if (previous) {
+    tab.pinned = previous.pinned;
     disposeTab(previous);
   } else {
-    workspace.tabOrder.push(tab.id);
+    // A preview open takes the pane's existing preview slot rather than adding a chip beside it.
+    const replaced = preview ? previewTabIn(pane) : null;
+    if (replaced) {
+      slot = pane.tabOrder.indexOf(replaced);
+      closeTab(replaced);
+    }
+    insertIntoPane(pane, tab.id, slot);
   }
   workspace.tabs.set(tab.id, tab);
   setActiveTab(tab.id);
   ensureCollab(tab);
   return tab;
+}
+
+/** The pane's one preview tab, or null. */
+function previewTabIn(pane: Pane): string | null {
+  return pane.tabOrder.find((id) => workspace.tabs.get(id)?.preview === true) ?? null;
+}
+
+/**
+ * Commit to a tab: it stops being replaceable and starts rendering upright.
+ *
+ * @param {string} tabId
+ */
+export function promoteTab(tabId: string) {
+  const tab = workspace.tabs.get(tabId);
+  if (tab?.preview === true) {
+    tab.preview = false;
+  }
+}
+
+/**
+ * Promote every preview tab that now has unsaved changes.
+ *
+ * An edit is the least ambiguous commitment there is, and the alternative — silently discarding
+ * someone's typing because they clicked another file — is the one failure a preview tab must never
+ * have. Called from the strip's tracking effect, which already reads every tab's `dirty` flag.
+ */
+export function promoteDirtyPreviewTabs() {
+  for (const [id, tab] of workspace.tabs) {
+    if (tab.preview && tab.doc.dirty) {
+      promoteTab(id);
+    }
+  }
+}
+
+/**
+ * Pin or unpin a tab, moving it to the boundary of the pinned prefix so the head of the strip is
+ * always exactly the pinned set.
+ *
+ * @param {string} tabId
+ * @param {boolean} pinned
+ */
+export function setTabPinned(tabId: string, pinned: boolean) {
+  const tab = workspace.tabs.get(tabId);
+  const pane = paneOfTab(tabId);
+  if (!tab || !pane) {
+    return;
+  }
+  tab.pinned = pinned;
+  if (pinned) {
+    tab.preview = false;
+  }
+  const without = pane.tabOrder.filter((id) => id !== tabId);
+  const boundary = without.filter((id) => workspace.tabs.get(id)?.pinned === true).length;
+  pane.tabOrder = [...without.slice(0, boundary), tabId, ...without.slice(boundary)];
+}
+
+/**
+ * Drag-reorder within a pane. `toIndex` is clamped into the region the tab's pinned state allows,
+ * so a drag can never interleave a pinned tab with an unpinned one.
+ *
+ * @param {string} tabId
+ * @param {number} toIndex — the index in the pane's order the tab should end up at
+ */
+export function moveTab(tabId: string, toIndex: number) {
+  const tab = workspace.tabs.get(tabId);
+  const pane = paneOfTab(tabId);
+  if (!tab || !pane) {
+    return;
+  }
+  const without = pane.tabOrder.filter((id) => id !== tabId);
+  const boundary = without.filter((id) => workspace.tabs.get(id)?.pinned === true).length;
+  const lower = tab.pinned ? 0 : boundary;
+  const upper = tab.pinned ? boundary : without.length;
+  const at = Math.min(Math.max(toIndex, lower), upper);
+  pane.tabOrder = [...without.slice(0, at), tabId, ...without.slice(at)];
 }
 
 /**
@@ -218,20 +602,32 @@ export function closeTab(tabId: string) {
   if (!tab) {
     return;
   }
+  const pane = paneOfTab(tabId);
+  const wasActive = pane?.activeTabId === tabId;
   rememberClosedTab(tab);
   disposeTab(tab);
   workspace.tabs.delete(tabId);
-  workspace.tabOrder = workspace.tabOrder.filter((id) => id !== tabId);
+  detachTab(tabId);
   workspace.mruOrder = workspace.mruOrder.filter((id) => id !== tabId);
   resetTabCycle();
-  if (workspace.activeTabId === tabId) {
-    // The MRU list, not the strip order: closing a tab should land you on the one you were in
-    // Before it, which is almost never the rightmost tab in the strip.
-    const next = workspace.mruOrder[0] ?? workspace.tabOrder.at(-1) ?? null;
-    workspace.activeTabId = next;
-    if (next) {
-      setActiveTab(next);
-    }
+  // Emptying the second pane collapses it: a pane with nothing in it is a hole in the grid, and
+  // The author asked to close a document, not to keep a slot open for one.
+  if (pane && pane.id !== PRIMARY_PANE && pane.tabOrder.length === 0) {
+    closePane(pane.id);
+  }
+  if (!wasActive) {
+    return;
+  }
+  // The MRU list, not the strip order: closing a tab should land you on the one you were in before
+  // It, which is almost never the rightmost tab in the strip. `detachTab` has already put the
+  // Rightmost there as the safe default, so this only ever improves on it.
+  const survivor = activePane();
+  const next =
+    workspace.mruOrder.find((id) => survivor.tabOrder.includes(id)) ??
+    survivor.tabOrder.at(-1) ??
+    null;
+  if (next) {
+    setActiveTab(next);
   }
 }
 
@@ -239,13 +635,19 @@ export function closeTab(tabId: string) {
 export function closeAllTabs() {
   const tabs = [...workspace.tabs.values()];
   workspace.tabs.clear();
-  workspace.tabOrder = [];
+  resetPanes();
   workspace.mruOrder = [];
-  workspace.activeTabId = null;
   resetTabCycle();
   for (const tab of tabs) {
     disposeTab(tab);
   }
+}
+
+/** Back to one empty primary pane — the state the store boots in. */
+function resetPanes() {
+  workspace.panes = [{ activeTabId: null, id: PRIMARY_PANE, tabOrder: [] }];
+  workspace.activePaneId = PRIMARY_PANE;
+  workspace.zoomedPaneId = null;
 }
 
 // ─── Reopen closed ────────────────────────────────────────────────────────────
@@ -343,7 +745,8 @@ export function replaceAllTabs(newTabOpts: {
 
   const newTab = createTab(newTabOpts);
   workspace.tabs.set(newTab.id, newTab);
-  workspace.tabOrder = [newTab.id];
+  resetPanes();
+  workspace.panes[0]!.tabOrder = [newTab.id];
   workspace.mruOrder = [];
   resetTabCycle();
   setActiveTab(newTab.id);
@@ -391,12 +794,14 @@ export function renameTab(oldId: string, newId: string, newDocumentPath: string)
   tab.documentPath = newDocumentPath;
   workspace.tabs.delete(oldId);
   workspace.tabs.set(newId, tab);
-  workspace.tabOrder = workspace.tabOrder.map((id) => (id === oldId ? newId : id));
+  for (const pane of workspace.panes) {
+    pane.tabOrder = pane.tabOrder.map((id) => (id === oldId ? newId : id));
+    if (pane.activeTabId === oldId) {
+      pane.activeTabId = newId;
+    }
+  }
   workspace.mruOrder = workspace.mruOrder.map((id) => (id === oldId ? newId : id));
   resetTabCycle();
-  if (workspace.activeTabId === oldId) {
-    workspace.activeTabId = newId;
-  }
   rekeyCollab(tab);
 }
 
@@ -424,7 +829,7 @@ export interface TabCommandDeps {
  * @param {TabCommandDeps} deps
  */
 export function registerTabCommands(registry: CommandRegistry, deps: TabCommandDeps) {
-  registry.registerAll(tabCommands(deps));
+  registry.registerAll([...tabCommands(deps), ...paneCommands()]);
 }
 
 /**
@@ -434,7 +839,9 @@ export function registerTabCommands(registry: CommandRegistry, deps: TabCommandD
  * @returns {AnyCommand[]}
  */
 export function tabCommands(deps: TabCommandDeps): AnyCommand[] {
-  const twoOrMoreTabs = () => workspace.tabOrder.length > 1;
+  // The MRU list is workspace-wide, so cycling is available whenever a second document is open —
+  // In either pane, not just the focused one's strip.
+  const twoOrMoreTabs = () => workspace.tabs.size > 1;
   return [
     {
       id: "document.nextTab",
@@ -481,6 +888,189 @@ export function tabCommands(deps: TabCommandDeps): AnyCommand[] {
         if (path) {
           await deps.openFile(path);
         }
+      },
+    },
+    {
+      id: "document.togglePinned",
+      title: "Pin / Unpin Document",
+      category: "Document",
+      level: "document",
+      menus: ["context/tab", "palette"],
+      group: "1_file",
+      when: (ctx) => ctx.document.open,
+      requires: "an open document",
+      run: () => {
+        const id = workspace.activeTabId;
+        const tab = id ? workspace.tabs.get(id) : null;
+        if (id && tab) {
+          setTabPinned(id, !tab.pinned);
+        }
+      },
+    },
+    {
+      args: argsSchema({
+        pinned: booleanProperty("True to pin the active document's tab, false to unpin it."),
+      }),
+      id: "document.setPinned",
+      title: "Set Document Pinned",
+      category: "Document",
+      level: "document",
+      menus: ["palette"],
+      group: "1_file",
+      when: (ctx) => ctx.document.open,
+      requires: "an open document",
+      run: (_ctx, args) => {
+        const id = workspace.activeTabId;
+        if (id && workspace.tabs.get(id)) {
+          setTabPinned(id, booleanArg("document.setPinned", args, "pinned"));
+        }
+      },
+    },
+    {
+      id: "document.keepOpen",
+      title: "Keep Document Open",
+      category: "Document",
+      level: "document",
+      menus: ["context/tab", "palette"],
+      group: "1_file",
+      when: (ctx) => ctx.document.open,
+      enablement: () => {
+        const id = workspace.activeTabId;
+        return id !== null && workspace.tabs.get(id)?.preview === true;
+      },
+      requires: "a preview document — one opened by a single click",
+      run: () => {
+        const id = workspace.activeTabId;
+        if (id) {
+          promoteTab(id);
+        }
+      },
+    },
+  ];
+}
+
+/**
+ * The pane commands.
+ *
+ * They live beside the pane model for the same reason the tab commands do, and they are the whole
+ * user-facing surface of §4.1's Pane transport: split, focus, unsplit, zoom.
+ *
+ * **`⌘0` / `⌘⌥0` are not both bound yet.** `⌘0` is `canvas.zoomReset` (`editor/shortcuts.ts`),
+ * registered into the same registry, so claiming it here would throw at bootstrap on the chord
+ * conflict the keymap exists to catch. `⌘⌥0` is free and is bound. The plan puts the zoom cluster
+ * into the floating canvas chrome (§3.2 ⑩) and re-binds ⌘0 in P8 workstream 2; until then
+ * `pane.focusPrimary` is palette- and API-reachable and prints no chord it does not have.
+ *
+ * @returns {AnyCommand[]}
+ */
+export function paneCommands(): AnyCommand[] {
+  const twoPanes = () => workspace.panes.length > 1;
+  return [
+    {
+      id: "pane.splitRight",
+      title: "Split Right",
+      category: "View",
+      level: "document",
+      keybinding: "mod+\\",
+      menus: ["context/pane", "context/tab", "palette"],
+      group: "5_pane",
+      when: (ctx) => ctx.document.open,
+      enablement: () => {
+        const id = workspace.activeTabId;
+        const tab = id ? workspace.tabs.get(id) : null;
+        if (!tab) {
+          return false;
+        }
+        // Already split: moving the tab across is always allowed back into the primary.
+        if (workspace.panes.length > 1) {
+          return workspace.activePaneId === PRIMARY_PANE ? canOpenInSecondPane(tab) : true;
+        }
+        return canOpenInSecondPane(tab);
+      },
+      requires: "a document that can open as Code, Config, Diff, Grid or Library beside the canvas",
+      undo: "none",
+      run: () => {
+        splitRight();
+      },
+    },
+    {
+      id: "pane.focusPrimary",
+      title: "Focus Primary Pane",
+      category: "View",
+      level: "document",
+      menus: ["palette"],
+      group: "5_pane",
+      enablement: twoPanes,
+      requires: "a split pane grid",
+      undo: "none",
+      run: () => {
+        focusPane(PRIMARY_PANE);
+      },
+    },
+    {
+      id: "pane.focusSecondary",
+      title: "Focus Side Pane",
+      category: "View",
+      level: "document",
+      keybinding: "mod+alt+0",
+      menus: ["palette"],
+      group: "5_pane",
+      enablement: twoPanes,
+      requires: "a split pane grid",
+      undo: "none",
+      run: () => {
+        focusPane(SECONDARY_PANE);
+      },
+    },
+    {
+      id: "pane.toggleZoom",
+      title: "Toggle Pane Zoom",
+      category: "View",
+      level: "document",
+      menus: ["context/pane", "palette"],
+      group: "5_pane",
+      enablement: twoPanes,
+      requires: "a split pane grid",
+      undo: "none",
+      run: () => {
+        togglePaneZoom();
+      },
+    },
+    {
+      args: argsSchema({
+        zoomed: booleanProperty(
+          "True to fill the grid with the focused pane, false to restore both.",
+        ),
+      }),
+      id: "pane.setZoomed",
+      title: "Set Pane Zoom",
+      category: "View",
+      level: "document",
+      menus: ["palette"],
+      group: "5_pane",
+      enablement: twoPanes,
+      requires: "a split pane grid",
+      undo: "none",
+      run: (_ctx, args) => {
+        workspace.zoomedPaneId = booleanArg("pane.setZoomed", args, "zoomed")
+          ? workspace.activePaneId
+          : null;
+      },
+    },
+    {
+      id: "pane.unsplit",
+      title: "Unsplit",
+      category: "View",
+      level: "document",
+      menus: ["context/pane", "palette"],
+      group: "5_pane",
+      enablement: twoPanes,
+      requires: "a split pane grid",
+      undo: "none",
+      run: () => {
+        closePane(
+          workspace.activePaneId === PRIMARY_PANE ? SECONDARY_PANE : workspace.activePaneId,
+        );
       },
     },
   ];
