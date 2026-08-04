@@ -96,8 +96,9 @@ function capabilities(platform: StudioPlatform | null): CommandContext["capabili
   const has = (key: keyof StudioPlatform) => typeof platform?.[key] === "function";
   return {
     dataRows: has("dataRows"),
-    // The code-service route backs "find references"; cloud omits it despite the required type.
-    findReferences: has("codeService"),
+    // The real member now, not the `codeService` stand-in it was minted against: the usage query is
+    // Its own route over the rename refactor's walker, and cloud computes it server-side.
+    findReferences: has("findReferences"),
     gitClone: has("gitClone"),
     importSite: has("importSite"),
     openProjectInNewWindow: has("openProjectInNewWindow"),

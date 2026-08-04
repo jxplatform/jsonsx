@@ -13,7 +13,7 @@ import { errorMessage } from "@jxsuite/schema/parse";
 import { getPlatform } from "../platform";
 import { showConfirmDialog } from "../ui/layers";
 import { showProgressModal } from "../ui/progress-modal";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { applyJxsuiteUpdate, checkJxsuiteUpdate } from "./jxsuite-update";
 import type { GitStatusResult } from "../types";
 
@@ -241,7 +241,9 @@ async function discardPullAndSync(plan: PackagePullPlan): Promise<void> {
     await syncPackagesAfterPull();
     throw error;
   }
-  statusMessage("Local package updates were superseded by pulled changes");
+  notify.warn("Local package updates were superseded by pulled changes.", {
+    source: "Source Control",
+  });
   await syncPackagesAfterPull();
 }
 
@@ -349,10 +351,17 @@ export async function autoSyncProjectOnOpen(): Promise<void> {
   if (!status?.isRepo || (status.remotes?.length ?? 0) === 0) {
     return;
   }
-  statusMessage("Syncing project…");
+  notify.info("Syncing project…", { key: "project.sync", source: "Source Control" });
   try {
     await pullWithPackageSync();
   } catch (error) {
-    statusMessage(`Sync skipped: ${errorMessage(error)}`);
+    // A skipped sync leaves the project behind its remote, which is a state to FIX rather than
+    // A moment to read about — it stays listed until a pull succeeds.
+    notify.warn("The project could not be synced with its remote.", {
+      detail: errorMessage(error),
+      key: "project.sync",
+      source: "Source Control",
+      tier: "problem",
+    });
   }
 }

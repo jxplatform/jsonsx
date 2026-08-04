@@ -789,7 +789,9 @@ describe("delete flow", () => {
     requireProjectState().selectedPath = "beta.md";
 
     const wrapper = await openDeleteDialog(out, "beta.md");
-    expect(wrapper.textContent).toContain('Delete "beta.md"?');
+    // The name is now emphasised markup rather than a quoted string, and the dialog carries the
+    // Consequence line beneath it — see tests/destructive-confirmations.test.ts for the sentence.
+    expect(wrapper.textContent).toContain("Delete beta.md?");
     wrapper.dispatchEvent(new Event("confirm"));
     await flush();
 

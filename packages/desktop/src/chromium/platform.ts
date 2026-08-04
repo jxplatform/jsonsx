@@ -8,6 +8,7 @@ import type {
   ImportProgressEvent,
   ImportSiteOptions,
   RecentProjectEntry,
+  ReferencesResult,
   RenameResult,
   StarterInfo,
   StudioPlatform,
@@ -200,6 +201,10 @@ export function createDesktopPlatform() {
 
     async renameFile(from: string, to: string) {
       return request("renameFile", { from, to }) as Promise<RenameResult>;
+    },
+
+    async findReferences(target: { path?: string; tagName?: string }) {
+      return request("findReferences", target) as Promise<ReferencesResult>;
     },
 
     async createDirectory(path: string) {

@@ -70,6 +70,14 @@ function makeSession(initialRoot: string | null) {
     handleWriteFile: mock(async () => {}),
     handleDeleteFile: mock(async () => {}),
     handleRenameFile: mock(async () => {}),
+    findReferences: mock(async () => ({
+      errors: [],
+      files: [],
+      filesReferencing: 0,
+      path: null,
+      refsTotal: 0,
+      tagName: null,
+    })),
     handleCreateDirectory: mock(async () => {}),
     handleUploadFile: mock(async () => {}),
     handleResolveSiteContext: mock(async () => ({ sitePath: null })),
@@ -324,6 +332,7 @@ describe("per-window RPC", () => {
     // File / project handlers (each forwards to the window's session).
     await reqs.deleteFile({ path: "a.json" } as never);
     await reqs.renameFile({ from: "a", to: "b" } as never);
+    await reqs.findReferences({ path: "components/card.json" } as never);
     await reqs.createDirectory({ path: "d" } as never);
     await reqs.uploadFile({ data: "x", path: "p" } as never);
     await reqs.resolveSiteContext({ filePath: "pages/a.json" } as never);
@@ -339,6 +348,7 @@ describe("per-window RPC", () => {
     await reqs.jxServerFunction({ body: "{}" } as never);
     await reqs.listFormats();
     expect(session.handleDeleteFile).toHaveBeenCalledWith({ path: "a.json" });
+    expect(session.findReferences).toHaveBeenCalledWith({ path: "components/card.json" });
     expect(session.listDirectory).toHaveBeenCalledWith({ dir: "src" });
     expect(session.listFormats).toHaveBeenCalledTimes(1);
     // The format registry's extensions ride along; dropping them makes ⌘P .json-only.

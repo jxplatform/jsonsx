@@ -34,7 +34,7 @@ import {
   mutateWrapNode,
   transactDoc,
 } from "../tabs/transact";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { convertToComponent } from "./convert-to-component";
 import { convertToRepeater } from "./convert-to-repeater";
 import { componentRegistry } from "../files/components";
@@ -42,6 +42,8 @@ import { renderPopover } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
 import { createCommandRegistry } from "../commands/registry";
 import { defaultCommands, noopCommandDeps } from "../commands/defaults";
+import { inspectorCommands } from "../panels/properties-panel";
+import { usagesSupported } from "../services/references";
 import { makeContext } from "../commands/context";
 
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
@@ -179,7 +181,7 @@ export async function copyNode() {
   }
   const json = jsonClone(node);
   await writeToClipboard(json);
-  statusMessage("Copied");
+  notify.success("Copied", { key: "clipboard" });
 }
 
 export async function cutNode() {
@@ -195,7 +197,7 @@ export async function cutNode() {
   const json = jsonClone(node);
   await writeToClipboard(json);
   transactDoc(tab, (t) => mutateRemoveNode(t, sel));
-  statusMessage("Cut");
+  notify.success("Cut", { action: "edit.undo", key: "clipboard" });
 }
 
 export async function pasteNode() {
@@ -231,7 +233,7 @@ export async function pasteNode() {
       }
     });
   }
-  statusMessage("Pasted");
+  notify.success("Pasted", { action: "edit.undo", key: "clipboard" });
 }
 
 export function copyStyles() {
@@ -244,7 +246,7 @@ export function copyStyles() {
     return;
   }
   workspace.styleClipboard = jsonClone(node.style);
-  statusMessage("Styles copied");
+  notify.success("Styles copied", { key: "clipboard" });
 }
 
 export function pasteStyles() {
@@ -258,7 +260,7 @@ export function pasteStyles() {
   const style = jsonClone(workspace.styleClipboard);
   const sel = tab.session.selection as JxPath;
   transactDoc(tab, (t) => mutateReplaceStyle(t, sel, style));
-  statusMessage("Styles pasted");
+  notify.success("Styles pasted", { action: "edit.undo", key: "clipboard" });
 }
 
 // ─── The menu target ─────────────────────────────────────────────────────────
@@ -399,7 +401,7 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
             mutateInsertNode(t, parent, idx + 1 + offset, node);
           }
         });
-        statusMessage("Pasted");
+        notify.success("Pasted", { action: "edit.undo", key: "clipboard" });
       },
     },
     {
@@ -430,7 +432,7 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
             mutateInsertNode(t, target.path, idx + offset, node);
           }
         });
-        statusMessage("Pasted");
+        notify.success("Pasted", { action: "edit.undo", key: "clipboard" });
       },
     },
 
@@ -452,7 +454,7 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
           return;
         }
         workspace.styleClipboard = jsonClone(style);
-        statusMessage("Styles copied");
+        notify.success("Styles copied", { key: "clipboard" });
       },
     },
     {
@@ -474,7 +476,7 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
         }
         const clone = jsonClone(style);
         transactDoc(activeTab.value, (t) => mutateReplaceStyle(t, target.path, clone));
-        statusMessage("Styles pasted");
+        notify.success("Styles pasted", { action: "edit.undo", key: "clipboard" });
       },
     },
 
@@ -645,6 +647,9 @@ function liveContext(): CommandContext {
   const target = _target;
   const tab = activeTab.value;
   return makeContext({
+    // The menu's context has to carry capabilities too, now that it renders a record gated on one:
+    // `makeContext` defaults every capability to false, which would hide Find Usages on every host.
+    capability: { findReferences: usagesSupported() },
     document: { dirty: Boolean(tab?.doc.dirty), open: Boolean(tab) },
     selection: {
       count: target ? 1 : 0,
@@ -686,13 +691,20 @@ export function contextMenuRegistry(): CommandRegistry {
       // `enablement: (ctx) => !ctx.selection.isRoot`, exactly as `selection.delete` already has;
       // Until it does, this says so out loud rather than failing silently.
       if (!target || !isSpliceable(target.path)) {
-        statusMessage("Nothing to duplicate — this element has no sibling position");
+        notify.warn("Nothing to duplicate — this element has no sibling position.");
         return;
       }
       transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, target.path));
     },
   }).filter((command) => (command.menus ?? []).includes("context/element"));
   registry.registerAll(inherited);
+  // Find Usages has its one definition site in `panels/properties-panel.ts`, beside the section it
+  // Opens. Pulling its `context/element` records in here — the same move `defaultCommands` gets
+  // Above — is what keeps the menu row and the palette entry a single record rather than two that
+  // Drift.
+  registry.registerAll(
+    inspectorCommands().filter((command) => (command.menus ?? []).includes("context/element")),
+  );
   registerElementCommands(registry, liveDeps);
   _registry = registry;
   return registry;

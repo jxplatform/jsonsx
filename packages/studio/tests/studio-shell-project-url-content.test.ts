@@ -4,7 +4,7 @@
  */
 import "./harness";
 import { describe, expect, test } from "bun:test";
-import { bootStudio, statusMessages, waitFor } from "./studio-shell-fixture";
+import { bootStudio, waitFor } from "./studio-shell-fixture";
 import { activeTab } from "../src/workspace/workspace";
 
 const MARKDOWN_FORMAT = {
@@ -38,11 +38,10 @@ await bootStudio({
   url: "http://localhost/?project=/abs/mdsite&file=posts/hello.md",
 });
 
-await waitFor(() => statusMessages.includes("Opened posts/hello.md"));
+await waitFor(() => activeTab.value?.id === "posts/hello.md");
 
 describe("?project= with a format-parsed content file", () => {
   test("opens the parsed document in a tab with its source format", () => {
-    expect(statusMessages).toContain("Opened posts/hello.md");
     const tab = activeTab.value!;
     expect(tab.id).toBe("posts/hello.md");
     expect(tab.doc.sourceFormat).toBe("Markdown");

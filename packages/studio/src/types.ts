@@ -38,6 +38,7 @@ import type {
   ProjectListEntry,
   ProjectSchemasResponse,
   RecentProjectEntry,
+  ReferencesResult,
   RenameResult,
   SecretsSetRequest,
   SecretsSetResponse,
@@ -85,6 +86,9 @@ export type {
   ProjectSchemasResponse,
   PullRequestInfo,
   RecentProjectEntry,
+  ReferenceFile,
+  ReferenceHit,
+  ReferencesResult,
   RenameResult,
   SecretsListResponse,
   SecretsSetRequest,
@@ -167,6 +171,20 @@ export interface StudioPlatform {
   uploadFile: (path: string, data: string | File | Blob | ArrayBuffer) => Promise<unknown>;
   deleteFile: (path: string) => Promise<void>;
   renameFile: (from: string, to: string) => Promise<RenameResult>;
+  /**
+   * Where a file or a component tag is used across the project — the read side of the same walker
+   * `renameFile` writes through. Backs `capability.findReferences`, and with it the inspector's
+   * "Used on N pages", `Selection: Find Usages`, and the reference count inside every delete and
+   * rename confirmation.
+   *
+   * Optional so a backend without the route hides those three renderings rather than reporting a
+   * confident zero — the one answer a destructive dialog must never invent. Every shipped host
+   * implements it: the walker lives in `@jxsuite/server`, which desktop and cloud both run.
+   *
+   * At least one of `path` / `tagName` must be given. A `path` naming a component document
+   * contributes its own root tag, so one call answers "as a file AND as an element" together.
+   */
+  findReferences?: (target: { path?: string; tagName?: string }) => Promise<ReferencesResult>;
   createDirectory: (path: string) => Promise<void>;
   /**
    * Subscribe to backend filesystem change events for the active project. Returns an unsubscribe

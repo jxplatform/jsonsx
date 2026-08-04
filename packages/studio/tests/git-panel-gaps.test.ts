@@ -8,6 +8,7 @@
  */
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { render as litRender } from "lit-html";
 
 // ─── Controllable module state (captured by mock.module factories) ───────────
@@ -73,9 +74,9 @@ void mock.module("../src/ui/layers.js", () => ({
   },
 }));
 
-void mock.module("../src/panels/statusbar.js", () => ({
-  statusMessage: (msg: string) => statusMessages.push(msg),
-}));
+void mock.module("../src/services/notify.js", () =>
+  notifyModule((call) => statusMessages.push(call.message)),
+);
 
 void mock.module("../src/github/github-publish.js", () => ({
   publishToGithub: async (opts: unknown) => {
@@ -282,7 +283,7 @@ describe("cloneRepository", () => {
 
   test("reports unsupported platform when gitClone is missing", async () => {
     await cloneRepository(noopCtx);
-    expect(statusMessages).toContain("Clone not supported on this platform");
+    expect(statusMessages).toContain("Cloning is not supported on this platform.");
     expect(promptCalls).toEqual([]);
   });
 
@@ -309,8 +310,8 @@ describe("cloneRepository", () => {
     });
     expect(calls).toContainEqual(["gitClone", "https://github.com/u/r.git"]);
     expect(opened).toEqual(["/tmp/clone"]);
-    expect(statusMessages).toContain("Cloning repository...");
-    expect(statusMessages).toContain("Clone complete");
+    expect(statusMessages).toContain("Cloning repository…");
+    expect(statusMessages).toContain("Clone complete.");
   });
 
   test("a dismissed dialog clones nothing", async () => {
@@ -326,9 +327,7 @@ describe("cloneRepository", () => {
     });
     promptResult = "https://github.com/u/r.git";
     await cloneRepository(noopCtx);
-    expect(statusMessages.some((m) => m.includes("Clone failed") && m.includes("denied"))).toBe(
-      true,
-    );
+    expect(statusMessages.some((m) => m.includes("Could not clone the repository"))).toBe(true);
   });
 
   test("clone result without root does not open a project", async () => {
@@ -341,7 +340,7 @@ describe("cloneRepository", () => {
       },
     });
     expect(opened).toEqual([]);
-    expect(statusMessages).not.toContain("Clone complete");
+    expect(statusMessages).not.toContain("Clone complete.");
   });
 });
 
@@ -373,7 +372,7 @@ describe("panel bootstrap", () => {
     expect(callNames()).toContain("gitInit");
     expect(callNames()).toContain("gitStatus");
     expect(statusMessages).toContain("Initializing repository…");
-    expect(statusMessages).toContain("Repository initialized");
+    expect(statusMessages).toContain("Repository initialized.");
   });
 
   test("publish button in non-repo state calls publishToGithub with project name", async () => {

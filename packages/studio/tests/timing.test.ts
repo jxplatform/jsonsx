@@ -1,16 +1,9 @@
 import "./harness";
 import { afterEach, describe, expect, test } from "bun:test";
 import { html, render } from "lit-html";
-import {
-  CODE_DEBOUNCE,
-  INPUT_DEBOUNCE,
-  LIVE_PREVIEW,
-  POLL_GIT,
-  STATUS_MESSAGE,
-} from "../src/ui/timing";
+import { CODE_DEBOUNCE, INPUT_DEBOUNCE, LIVE_PREVIEW, POLL_GIT } from "../src/ui/timing";
 import { debouncedStyleCommit } from "../src/store";
 import { clearDraft, rawTextArea } from "../src/ui/field-input";
-import { statusMessage } from "../src/panels/statusbar";
 
 // ─── Local helpers ───────────────────────────────────────────────────────────
 
@@ -43,7 +36,6 @@ describe("timing constants", () => {
 
   test("the remaining constants hold their shipped values", () => {
     expect(LIVE_PREVIEW).toBe(350);
-    expect(STATUS_MESSAGE).toBe(3000);
     expect(POLL_GIT).toBe(30_000);
   });
 
@@ -51,9 +43,8 @@ describe("timing constants", () => {
     // A provisional draft commit fires before a committing input; code waits longest of the three.
     expect(LIVE_PREVIEW).toBeLessThan(INPUT_DEBOUNCE);
     expect(INPUT_DEBOUNCE).toBeLessThan(CODE_DEBOUNCE);
-    // A transient message must outlive every input debounce, and the poll must outlive the message.
-    expect(CODE_DEBOUNCE).toBeLessThan(STATUS_MESSAGE);
-    expect(STATUS_MESSAGE).toBeLessThan(POLL_GIT);
+    // The git poll must outlive every input debounce: a tick mid-edit buys nothing and costs I/O.
+    expect(CODE_DEBOUNCE).toBeLessThan(POLL_GIT);
   });
 });
 
@@ -95,17 +86,5 @@ describe("migrated consumers", () => {
     area.dispatchEvent(new Event("input"));
     expect(delays).toEqual([CODE_DEBOUNCE]);
     clearDraft("timing:code");
-  });
-
-  test("statusMessage clears itself after STATUS_MESSAGE by default", () => {
-    const delays = recordDelays();
-    statusMessage("hello");
-    expect(delays).toEqual([STATUS_MESSAGE]);
-  });
-
-  test("statusMessage still honours an explicit duration", () => {
-    const delays = recordDelays();
-    statusMessage("hello", 7);
-    expect(delays).toEqual([7]);
   });
 });

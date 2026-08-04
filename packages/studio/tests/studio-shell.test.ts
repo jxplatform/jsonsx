@@ -10,6 +10,8 @@
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { nothing } from "lit-html";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
+import { projectState } from "../src/state";
 import {
   activateTab,
   activeTab,
@@ -103,19 +105,18 @@ void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
 }));
 
 const renderStatusbarMock = mock(() => {});
-let statusbarRenderer: (() => void) | null = null;
 
 void mock.module("../src/panels/statusbar.ts", () => ({
+  forgetSavedTimes: mock(() => {}),
   mountStatusbar: mock(() => {}),
+  noteDocumentSaved: mock(() => {}),
   renderStatusbar: renderStatusbarMock,
-  setStatusbarRenderer: (fn: () => void) => {
-    statusbarRenderer = fn;
-  },
-  statusMessage: (msg: string) => {
-    statusMessages.push(msg);
-  },
   unmountStatusbar: mock(() => {}),
 }));
+
+void mock.module("../src/services/notify.ts", () =>
+  notifyModule((call) => statusMessages.push(call.message)),
+);
 
 /** What the toolbar's `openInBrowserTarget` resolves to for the `view.openInBrowser` hook. */
 let browserTarget: { url: string } | { reason: string } = { url: "https://example.test/page" };
@@ -269,6 +270,16 @@ await import("../src/studio");
 await flush();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Whether `openRecentProject` has run to completion.
+ *
+ * It used to be `statusMessages.includes("Opened project: …")` — the project's NAME is permanent
+ * state in the status bar's PROJECT field now, so the completion signal is the state itself.
+ */
+function recentProjectOpened(): boolean {
+  return projectState?.name === "Recent Project";
+}
 
 /** Poll until cond() is true (bounded), flushing microtasks between checks. */
 async function waitFor(cond: () => boolean, tries = 40): Promise<void> {
@@ -442,7 +453,7 @@ describe("navigateToComponent", () => {
   test("reports read errors via the statusbar", async () => {
     openShellTab();
     await blockBarCtx.navigateToComponent("components/missing.json");
-    expect(statusMessages.at(-1)).toStartWith("Error:");
+    expect(statusMessages.at(-1)).toStartWith("Could not open");
   });
 
   test("still opens the component when no tab was open to drill from", async () => {
@@ -491,7 +502,7 @@ describe("navigateBack", () => {
     expect(writes()).toBe(before);
     expect((tab.doc.document as any).tagName).toBe("section");
     expect(tab.session.documentStack).toHaveLength(0);
-    expect(statusMessages.at(-1)).toBe("Returned to parent document");
+    expect(statusMessages).toHaveLength(0);
   });
 
   test("Save on a dirty child writes it, then restores the parent frame", async () => {
@@ -507,7 +518,7 @@ describe("navigateBack", () => {
     expect((tab.doc.document as any).tagName).toBe("section");
     expect(tab.documentPath).toBe("pages/parent.json");
     expect(tab.session.documentStack).toHaveLength(0);
-    expect(statusMessages.at(-1)).toBe("Returned to parent document");
+    expect(statusMessages).toHaveLength(0);
   });
 
   test("Discard leaves the child unwritten and restores the parent frame", async () => {
@@ -523,7 +534,7 @@ describe("navigateBack", () => {
     await nav;
     expect(writes()).toBe(before);
     expect((tab.doc.document as any).tagName).toBe("section");
-    expect(statusMessages.at(-1)).toBe("Returned to parent document");
+    expect(statusMessages).toHaveLength(0);
   });
 
   test("Cancel aborts navigation and keeps the child open", async () => {
@@ -559,7 +570,7 @@ describe("navigateBack", () => {
     } finally {
       platform.writeFile = originalWrite;
     }
-    expect(statusMessages.at(-1)).toBe("Save error: disk full");
+    expect(statusMessages.at(-1)).toStartWith("Could not save");
     // The child is still open — its edits were not lost to a discard.
     expect(tab.documentPath).toBe("components/card-fail.json");
     expect(tab.session.documentStack).toHaveLength(1);
@@ -623,7 +634,7 @@ describe("navigateToLevel", () => {
     expect((tab.doc.document as any).tagName).toBe("root");
     expect(tab.documentPath).toBe("pages/root.json");
     expect(tab.session.documentStack).toHaveLength(0);
-    expect(statusMessages.at(-1)).toBe("Returned to parent document");
+    expect(statusMessages).toHaveLength(0);
   });
 
   test("Save on a dirty document writes it before jumping", async () => {
@@ -671,7 +682,7 @@ describe("navigateToLevel", () => {
     } finally {
       platform.writeFile = originalWrite;
     }
-    expect(statusMessages.at(-1)).toBe("Save error: readonly fs");
+    expect(statusMessages.at(-1)).toStartWith("Could not save");
     // The jump was aborted — the deep doc is still active.
     expect(tab.documentPath).toBe("pages/deep-fail.json");
     expect(tab.session.documentStack).toHaveLength(1);
@@ -781,7 +792,7 @@ describe("openRecentProject", () => {
     await toolbarCtx.openRecentProject("/recent/site");
     expect(platform.projectRoot).toBe("/recent/site");
     expect(shell.leftTab).toBe("files");
-    expect(statusMessages).toContain("Opened project: Recent Project");
+    expect(statusMessages).toHaveLength(0);
   });
 
   test("expands and loads conventional directories found at the project root", async () => {
@@ -805,7 +816,7 @@ describe("openRecentProject", () => {
     }
     expect(listed).toContain("pages");
     expect(listed).not.toContain("vendor");
-    expect(statusMessages).toContain("Opened project: Recent Project");
+    expect(statusMessages).toHaveLength(0);
   });
 
   test("switching projects refreshes the format registry (stale-cache regression)", async () => {
@@ -846,7 +857,7 @@ describe("openRecentProject", () => {
     } finally {
       state.files.set("project.json", saved);
     }
-    expect(statusMessages.at(-1)).toStartWith("Error:");
+    expect(statusMessages.at(-1)).toStartWith("Could not open");
   });
 });
 
@@ -864,14 +875,14 @@ describe("project open delegates", () => {
     const before = state.calls.filter((c) => c[0] === "openProject").length;
     try {
       await toolbarCtx.openProject();
-      await waitFor(() => statusMessages.includes("Opened project: Recent Project"));
+      await waitFor(() => recentProjectOpened());
     } finally {
       pickerEnabled = false;
       pickerResult = null;
     }
     expect(state.calls.filter((c) => c[0] === "openProject")).toHaveLength(before);
     expect(platform.projectRoot).toBe("/picked/repo");
-    expect(statusMessages).toContain("Opened project: Recent Project");
+    expect(statusMessages).toHaveLength(0);
   });
 
   test("a cancelled repo picker is a no-op", async () => {
@@ -898,12 +909,12 @@ describe("project open delegates", () => {
     try {
       // OpenNewProject fires openRecentProject without awaiting it; poll for completion.
       await welcomeCtx.openNewProject();
-      await waitFor(() => statusMessages.includes("Opened project: Recent Project"));
+      await waitFor(() => recentProjectOpened());
     } finally {
       newProjectResult = null;
     }
     expect(platform.projectRoot).toBe("/new/site");
-    expect(statusMessages).toContain("Opened project: Recent Project");
+    expect(statusMessages).toHaveLength(0);
   });
 
   test("welcome addExistingRepo does nothing when the modal is cancelled", async () => {
@@ -917,12 +928,12 @@ describe("project open delegates", () => {
     try {
       // AddExistingRepo fires openRecentProject without awaiting it; poll for completion.
       await welcomeCtx.addExistingRepo();
-      await waitFor(() => statusMessages.includes("Opened project: Recent Project"));
+      await waitFor(() => recentProjectOpened());
     } finally {
       addRepoResult = null;
     }
     expect(platform.projectRoot).toBe("/added/repo");
-    expect(statusMessages).toContain("Opened project: Recent Project");
+    expect(statusMessages).toHaveLength(0);
   });
 });
 
@@ -1123,10 +1134,10 @@ describe("left panel wiring", () => {
   test("clone-repository delegates report unsupported platforms", async () => {
     // The in-memory platform has no gitClone, so both delegates hit the unsupported guard.
     await leftPanelCtx.cloneRepository();
-    expect(statusMessages.at(-1)).toBe("Clone not supported on this platform");
+    expect(statusMessages.at(-1)).toBe("Cloning is not supported on this platform.");
     statusMessages.length = 0;
     await welcomeCtx.cloneRepository();
-    expect(statusMessages.at(-1)).toBe("Clone not supported on this platform");
+    expect(statusMessages.at(-1)).toBe("Cloning is not supported on this platform.");
   });
 });
 
@@ -1193,7 +1204,7 @@ describe("multi-window project routing", () => {
 
       deduped = false;
       await toolbarCtx.openRecentProject("/recent/site");
-      expect(statusMessages).toContain("Opened project: Recent Project");
+      expect(statusMessages).toHaveLength(0);
     } finally {
       delete (platform as any).setWindowProject;
     }
@@ -1218,13 +1229,34 @@ describe("remaining wiring arrows", () => {
 
   test("welcome openRecentProject opens the project directly", async () => {
     await welcomeCtx.openRecentProject("/recent/site");
-    expect(statusMessages).toContain("Opened project: Recent Project");
+    expect(statusMessages).toHaveLength(0);
   });
 
-  test("the statusbar renderer arrow delegates to the statusbar module", () => {
-    expect(statusbarRenderer).not.toBeNull();
-    renderStatusbarMock.mockClear();
-    statusbarRenderer!();
-    expect(renderStatusbarMock).toHaveBeenCalledTimes(1);
+  test("the bootstrap paints the statusbar once, directly", () => {
+    // `setStatusbarRenderer` is gone with `statusMessage`: it existed only so a transient message
+    // Could ask the bar to repaint. The bar's own effect owns that now.
+    expect(renderStatusbarMock).toHaveBeenCalled();
+  });
+
+  test("an upload refreshes all three caches that list project files", async () => {
+    // Every upload surface funnels through uploadAssets, and the three caches it has to invalidate
+    // Live in modules that all import media-upload — so the bootstrap injects the refresher rather
+    // Than media-upload importing them back. This is the only place that closure is exercised.
+    const { uploadAssets } = await import("../src/files/media-upload");
+    // The refresher re-reads a directory into `projectState.dirs`, so a project has to be open —
+    // Which is the real precondition too: there is nowhere to upload to without one.
+    await welcomeCtx.openRecentProject("/recent/site");
+    await waitFor(recentProjectOpened);
+    const before = state.calls.filter((c) => c[0] === "listDirectory").length;
+
+    const uploaded = await uploadAssets([
+      new File([new Uint8Array([1, 2, 3])], "hero.png", { type: "image/png" }),
+    ]);
+
+    expect(uploaded).toHaveLength(1);
+    expect(state.calls.some((c) => c[0] === "uploadFile")).toBe(true);
+    // The handler re-reads the upload directory after the write — one more listDirectory than the
+    // Pre-flight name check alone would make.
+    expect(state.calls.filter((c) => c[0] === "listDirectory").length).toBeGreaterThan(before + 1);
   });
 });

@@ -282,6 +282,11 @@ export function focusRegionOf(el: Element | null): FocusRegion | null {
 export const SHELL_REGION_HOSTS: Readonly<Record<string, string>> = {
   "#activity-bar": "rail",
   "#canvas-wrap": "pane.primary",
+  // The fourth overlay layer. It is here rather than stamped by `ui/layers.ts` for the same reason
+  // Every other row is: it is a bare `<div id>` in index.html, so it cannot stamp itself, and the
+  // Id has to resolve whether or not a toast has ever been raised — a region that only exists once
+  // Something has gone wrong is a region a shot cannot address and focus cannot be moved into.
+  "#layer-toast": "overlay.toasts",
   "#left-panel": "navigator",
   "#right-panel": "inspector",
   "#statusbar": "statusbar",
@@ -309,12 +314,20 @@ export function inspectorTabRegion(tabId: string): string {
   return `inspector/tab:${tabId}`;
 }
 
-/** The overlay instance each layer host contributes: a modal IS a dialog, a popover IS a menu. */
-export const OVERLAY_INSTANCE: Readonly<Record<"popover" | "modal" | "dialog", string>> = {
-  dialog: "dialog",
-  modal: "dialog",
-  popover: "menu",
-};
+/**
+ * The overlay instance each layer host contributes: a modal IS a dialog, a popover IS a menu.
+ *
+ * `toast` is plural because the host is the STACK, not one notification: `overlay.toasts` addresses
+ * the whole live region, which is what a shot crops and what a focus move lands in. An individual
+ * toast is a row inside it and is addressed by nothing — it is not a surface a user navigates to.
+ */
+export const OVERLAY_INSTANCE: Readonly<Record<"popover" | "modal" | "dialog" | "toast", string>> =
+  {
+    dialog: "dialog",
+    modal: "dialog",
+    popover: "menu",
+    toast: "toasts",
+  };
 
 /**
  * Region id for an overlay slot.
@@ -323,7 +336,10 @@ export const OVERLAY_INSTANCE: Readonly<Record<"popover" | "modal" | "dialog", s
  * builds, so naming a slot names its region. Without one it is the bare instance, which resolves to
  * the topmost open overlay of that kind.
  */
-export function overlayRegion(layer: "popover" | "modal" | "dialog", id?: string): string {
+export function overlayRegion(
+  layer: "popover" | "modal" | "dialog" | "toast",
+  id?: string,
+): string {
   const instance = OVERLAY_INSTANCE[layer];
   return id ? `overlay.${instance}:${id}` : `overlay.${instance}`;
 }

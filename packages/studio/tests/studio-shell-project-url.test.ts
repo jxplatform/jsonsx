@@ -6,7 +6,7 @@
  */
 import "./harness";
 import { describe, expect, test } from "bun:test";
-import { bootStudio, statusMessages, waitFor } from "./studio-shell-fixture";
+import { bootStudio, waitFor } from "./studio-shell-fixture";
 import { activeTab } from "../src/workspace/workspace";
 import { requireProjectState } from "../src/store";
 
@@ -45,7 +45,7 @@ const { platform, state } = await bootStudio({
   url: `http://localhost/?project=${SITE}`,
 });
 
-await waitFor(() => statusMessages.includes("Opened pages/index.json"));
+await waitFor(() => activeTab.value?.id === "pages/index.json");
 
 describe("?project= bootstrap (site project)", () => {
   test("activates the platform with the resolved site root", () => {
@@ -77,6 +77,5 @@ describe("?project= bootstrap (site project)", () => {
     expect((activeTab.value!.doc.document as any).tagName).toBe("main");
     // The redirect means the stylebook default for project.json must NOT kick in.
     expect(activeTab.value?.session.ui.canvasMode).not.toBe("stylebook");
-    expect(statusMessages).toContain("Opened pages/index.json");
   });
 });

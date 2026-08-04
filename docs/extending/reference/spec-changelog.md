@@ -55,6 +55,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.6-draft** (2026-08-03) — §3.1/§5.1: findReferences? PAL member and the GET /__studio/references route — the read side of the rename refactor's walker.
 - **0.3.5-draft** (2026-08-02) — searchFiles, gitShow and openExternal RPC handlers registered on both launchers; styles/ staged into the packaged app.
 - **0.3.4-draft** (2026-07-31) — List the cfConnect? PAL member in the Publish/identity family — it ships in StudioPlatform and backs the hosted Cloudflare OAuth flow, but the table omitted it.
 - **0.3.3-draft** (2026-07-29) — PAL: launcher-only capabilities (updater, windowControls) stay off the StudioPlatform interface; adapter factories infer their return type and assert conformance instead of annotating it away.
@@ -280,6 +281,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.4.3-draft** (2026-08-03) — §9.1.1: destructive confirmations state the reference count — what a delete breaks, what a rename rewrites, and the three states (counted / uncountable / unsupported) that are never collapsed.
 - **0.4.2-draft** (2026-08-03) — The Inspector's fourth tab (§3.1, §6): the assistant is Content · Style · Logic · Assistant, not a fifth column; two docks, one persisted record. Application Preferences (§15) — Appearance, Assistant, Accounts (listed and revocable) and a registry-generated Keyboard sheet.
 - **0.4.1-draft** (2026-08-02) — Automation surface is a projection of the command registry (§13.5): the projection, idempotence and Remote rules; probe.idle() as a failing predicate; pointAt in top-document coordinates.
 - **0.4.0-draft** (2026-08-02) — Command Registry and Context Keys (§13); Tabs and Document Identity (§14) — drill-in opens a real tab, labels disambiguate by route.

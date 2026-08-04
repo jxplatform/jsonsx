@@ -21,6 +21,7 @@ import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import { handleDataApi } from "./data-api.ts";
 import { containedPath } from "./net-guard.ts";
 import { applyRename } from "./refactor/apply.ts";
+import { findReferences } from "./refactor/find-refs.ts";
 import {
   bunExecutable,
   dependenciesNeedInstall,
@@ -1210,6 +1211,31 @@ export async function handleStudioApi(
         ok: true,
         to: fwd(relative(root, absTo)),
       });
+    }
+  }
+
+  // Where a file / component tag is used (the read side of the rename refactor's walker)
+  if (path === "/__studio/references" && req.method === "GET") {
+    const target = url.searchParams.get("path");
+    const tag = url.searchParams.get("tag");
+    if (!target && !tag) {
+      return new Response("Missing path or tag", { status: 400 });
+    }
+    const scanRoot = activeProjectRoot ?? root;
+    if (target) {
+      try {
+        assertAccessible(resolve(scanRoot, target), root, activeProjectRoot);
+      } catch (error) {
+        return new Response(errorMessage(error), { status: 400 });
+      }
+    }
+    try {
+      const registry = await getFormatRegistry(scanRoot);
+      return Response.json(
+        await findReferences({ path: target, registry, root: scanRoot, tagName: tag }),
+      );
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 

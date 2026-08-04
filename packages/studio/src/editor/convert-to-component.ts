@@ -9,7 +9,7 @@ import { transact } from "../tabs/transact";
 import { componentRegistry, computeRelativePath, loadComponentRegistry } from "../files/components";
 import { getPlatform } from "../platform";
 import { jsonClone } from "../utils/studio-utils";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { showDialog } from "../ui/layers";
 import { validateComponentSlots } from "../services/cem-export";
 
@@ -78,13 +78,22 @@ export async function convertToComponent() {
     await platform.writeFile(componentFile, JSON.stringify(componentDef, null, 2));
     await loadComponentRegistry();
     const warning = validateComponentSlots(componentDef);
+    notify.success(`Converted to <${name}>`);
     if (warning) {
-      statusMessage(`Converted to <${name}> — Warning: ${warning}`, 6000);
-    } else {
-      statusMessage(`Converted to <${name}>`);
+      // A slot warning is a thing to FIX, not a thing to read once: the component is written and
+      // Usable, and the defect stays listed until somebody edits it.
+      notify.warn(`<${name}> has a slot problem: ${warning}`, {
+        path: componentFile,
+        source: "Components",
+        tier: "problem",
+      });
     }
   } catch (error) {
-    statusMessage(`Error saving component: ${errorMessage(error)}`);
+    notify.error(`Could not save the <${name}> component.`, {
+      detail: errorMessage(error),
+      path: componentFile,
+      source: "Components",
+    });
   }
 }
 

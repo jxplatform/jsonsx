@@ -14,10 +14,10 @@ import { html, nothing } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ref } from "lit-html/directives/ref.js";
-import { renderPopover, showConfirmDialog, showPromptDialog } from "../ui/layers";
+import { renderPopover, showPromptDialog } from "../ui/layers";
 import { createState, projectState, requireProjectState, setProjectState } from "../store";
 import { getPlatform } from "../platform";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { loadComponentRegistry } from "./components";
 import { ensureDependenciesInstalled } from "../packages/ensure-deps";
 import { maybePromptJxsuiteUpdate } from "../packages/jxsuite-update";
@@ -42,7 +42,13 @@ import {
 } from "../workspace/workspace";
 import { openCollectionGrid, openCsvGridTab, openPagesGrid } from "../grid/grid-open";
 import { collectionDirs } from "../grid/sources/content-source";
-import { parseSourceForPath, serializeDocument } from "./file-ops";
+import {
+  confirmFileDelete,
+  parseSourceForPath,
+  renamePromptMessage,
+  serializeDocument,
+} from "./file-ops";
+import { invalidateUsages } from "../services/references";
 import {
   documentExtensions,
   formatForPath,
@@ -206,12 +212,15 @@ export async function openProject({ renderLeftPanel }: { renderLeftPanel: () => 
     setActivityTab("files");
     addRecentProject(requireProjectState().name, requireProjectState().projectRoot);
     renderLeftPanel();
-    statusMessage(`Opened project: ${requireProjectState().name}`);
+    // The project's name is permanent state in the status bar's PROJECT field now.
 
     await openHomePage();
     void maybePromptJxsuiteUpdate(requireProjectState().projectRoot);
   } catch (error) {
-    statusMessage(`Error: ${errorMessage(error)}`);
+    notify.error("Could not open the project.", {
+      detail: errorMessage(error),
+      source: "Open Project",
+    });
   }
 }
 
@@ -241,12 +250,15 @@ export async function initProjectRepo(root: string): Promise<boolean> {
       return false;
     }
     await platform.gitInit();
-    statusMessage("Initialized a git repository for this project");
+    notify.success("Initialized a git repository for this project.");
     return true;
   } catch (error) {
     // Version control is a safety net, not a precondition — a project that was written stays
     // Written. Say so rather than failing the create the user just completed.
-    statusMessage(`Could not initialize a git repository: ${errorMessage(error)}`);
+    notify.warn("Could not initialize a git repository — the project itself was written.", {
+      detail: errorMessage(error),
+      source: "Source Control",
+    });
     return false;
   }
 }
@@ -836,9 +848,13 @@ async function moveFileEntry(oldPath: string, newPath: string, renderLeftPanel: 
 
     reloadRewrittenTabs(report, newPath);
     renderLeftPanel();
-    statusMessage(`Moved to ${newPath}`);
+    notify.success(`Moved to ${newPath}`);
   } catch (error) {
-    statusMessage(`Error: ${errorMessage(error)}`);
+    notify.error(`Could not move ${oldPath}.`, {
+      detail: errorMessage(error),
+      path: oldPath,
+      source: "Files",
+    });
   }
 }
 
@@ -997,16 +1013,30 @@ async function createNewFile(dirPath: string, renderLeftPanel: () => void) {
     await platform.writeFile(path, content);
     await loadDirectory(dirPath);
     renderLeftPanel();
-    statusMessage(`Created ${path}`);
+    notify.success(`Created ${path}`);
   } catch (error) {
-    statusMessage(`Error: ${errorMessage(error)}`);
+    notify.error(`Could not create ${path}.`, {
+      detail: errorMessage(error),
+      path,
+      source: "Files",
+    });
   }
 }
 
-/** @param {string} currentName @returns {Promise<string | null>} */
-function showRenameFileDialog(currentName: string): Promise<string | null> {
+/**
+ * The rename dialog, carrying what moves with the file.
+ *
+ * `renamePromptMessage` is awaited before the field opens, so the count is on screen when the name
+ * is typed rather than after it is confirmed — the refactor pass is about to rewrite every one of
+ * those references, and silently doing that much work was the previous behaviour.
+ *
+ * @param {string} currentName @param {string} path @returns {Promise<string | null>}
+ */
+async function showRenameFileDialog(currentName: string, path: string): Promise<string | null> {
+  const message = await renamePromptMessage(path);
   return showPromptDialog("Rename", {
     confirmLabel: "Rename",
+    ...(message === undefined ? {} : { message }),
     select: "stem",
     validate: (v) => (v.trim() ? "" : "Enter a file name."),
     value: currentName,
@@ -1039,7 +1069,7 @@ async function renameFile(
   entry: { name: string; path: string; type: string },
   renderLeftPanel: () => void,
 ) {
-  const newName = await showRenameFileDialog(entry.name);
+  const newName = await showRenameFileDialog(entry.name, entry.path);
   if (!newName || newName === entry.name) {
     return;
   }
@@ -1052,6 +1082,9 @@ async function renameFile(
   try {
     const platform = getPlatform();
     const report = await platform.renameFile(entry.path, newPath);
+    // The refactor pass just rewrote references project-wide, and `markLocalMutation` suppresses
+    // The watcher echo that would otherwise say so — hence the explicit drop.
+    invalidateUsages();
     await loadDirectory(parentDirPath);
     if (requireProjectState().selectedPath === entry.path) {
       requireProjectState().selectedPath = newPath;
@@ -1061,9 +1094,13 @@ async function renameFile(
     }
     reloadRewrittenTabs(report, newPath);
     renderLeftPanel();
-    statusMessage(renameStatus(newName, report));
+    notify.success(renameStatus(newName, report));
   } catch (error) {
-    statusMessage(`Error: ${errorMessage(error)}`);
+    notify.error(`Could not rename ${entry.name}.`, {
+      detail: errorMessage(error),
+      path: entry.path,
+      source: "Files",
+    });
   }
 }
 
@@ -1071,10 +1108,7 @@ async function deleteFile(
   entry: { name: string; path: string; type: string },
   renderLeftPanel: () => void,
 ) {
-  const confirmed = await showConfirmDialog("Delete File", `Delete "${entry.name}"?`, {
-    confirmLabel: "Delete",
-    destructive: true,
-  });
+  const confirmed = await confirmFileDelete(entry);
   if (!confirmed) {
     return;
   }
@@ -1082,6 +1116,7 @@ async function deleteFile(
     const platform = getPlatform();
     markLocalMutation(entry.path);
     await platform.deleteFile(entry.path);
+    invalidateUsages();
     const delPath = entry.path.replaceAll("\\", "/");
     const parentDirPath = delPath.includes("/") ? delPath.slice(0, delPath.lastIndexOf("/")) : ".";
     await loadDirectory(parentDirPath);
@@ -1089,9 +1124,13 @@ async function deleteFile(
       requireProjectState().selectedPath = null;
     }
     renderLeftPanel();
-    statusMessage(`Deleted ${entry.name}`);
+    notify.success(`Deleted ${entry.name}`);
   } catch (error) {
-    statusMessage(`Error: ${errorMessage(error)}`);
+    notify.error(`Could not delete ${entry.name}.`, {
+      detail: errorMessage(error),
+      path: entry.path,
+      source: "Files",
+    });
   }
 }
 
@@ -1133,7 +1172,13 @@ export async function openFileFromTree(
       const output = await serializeDocument(tabLike);
       await platform.writeFile(ctx.S.documentPath, output);
     } catch (error) {
-      statusMessage(`Save error: ${errorMessage(error)}`);
+      notify.error(`Could not save ${ctx.S.documentPath}.`, {
+        action: "file.save",
+        detail: errorMessage(error),
+        key: `save:${ctx.S.documentPath}`,
+        path: ctx.S.documentPath,
+        source: "Save",
+      });
     }
   }
 
@@ -1163,9 +1208,12 @@ export async function openFileFromTree(
     requireProjectState().selectedPath = path;
 
     ctx.render();
-    statusMessage(`Opened ${path}`);
   } catch (error) {
-    statusMessage(`Error: ${errorMessage(error)}`);
+    notify.error(`Could not open ${path}.`, {
+      detail: errorMessage(error),
+      path,
+      source: "Open File",
+    });
   }
 }
 
@@ -1193,9 +1241,12 @@ export async function openFileInTab(path: string) {
         path,
         root: requireProjectState().projectRoot,
       });
-      statusMessage(`Opened ${path.split("/").pop()}`);
     } catch (error) {
-      statusMessage(`Error: ${errorMessage(error)}`);
+      notify.error(`Could not open ${path}.`, {
+        detail: errorMessage(error),
+        path,
+        source: "Open File",
+      });
     }
     return;
   }
@@ -1235,10 +1286,12 @@ export async function openFileInTab(path: string) {
       path,
       root: requireProjectState().projectRoot,
     });
-
-    statusMessage(`Opened ${path.split("/").pop()}`);
   } catch (error) {
-    statusMessage(`Error: ${errorMessage(error)}`);
+    notify.error(`Could not open ${path}.`, {
+      detail: errorMessage(error),
+      path,
+      source: "Open File",
+    });
   }
 }
 
@@ -1281,7 +1334,16 @@ export async function reloadFileInTab(path: string) {
           tab.doc.document = JSON.parse(content) as JxMutableNode;
         }
         tab.doc.dirty = false;
-      } catch {}
+      } catch (error) {
+        // A file that changed on disk and cannot be re-read leaves the open tab showing the OLD
+        // Document with no indication that it is stale — the most expensive silence in this file.
+        notify.error(`Could not reload ${path} after it changed on disk.`, {
+          detail: errorMessage(error),
+          key: `reload:${path}`,
+          path,
+          source: "Files",
+        });
+      }
       return;
     }
   }

@@ -12,7 +12,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import { effect, effectScope } from "../reactivity";
 import { renderPopover } from "../ui/layers";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { rectOf } from "../utils/geometry";
 import { createGridController, getGridController } from "./grid-controller";
 import { createCsvFileSource } from "./sources/csv-file-source";
@@ -172,11 +172,14 @@ function openReplacePopover(controller: GridController, anchor: HTMLElement) {
             variant="accent"
             @click=${() => {
               const changed = controller.replaceAll(find, replace);
-              statusMessage(
-                changed === 0
-                  ? "No matches"
-                  : `Replaced in ${changed} cell${changed === 1 ? "" : "s"} — save to apply`,
-              );
+              if (changed === 0) {
+                notify.info("No matches.", { key: "grid.replaceAll" });
+              } else {
+                notify.success(
+                  `Replaced in ${changed} cell${changed === 1 ? "" : "s"} — save to apply.`,
+                  { action: "file.save", key: "grid.replaceAll" },
+                );
+              }
               if (changed > 0) {
                 handle.dismiss();
               }

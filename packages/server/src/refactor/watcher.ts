@@ -8,6 +8,7 @@
 
 import { watch as chokidarWatch } from "chokidar";
 import { coalesceFsEvents, toFsEvent } from "./fs-events.ts";
+import { invalidateReferenceCache } from "./find-refs.ts";
 import type { FsEventPayload } from "./fs-events.ts";
 
 const IGNORE_SEGMENTS = ["node_modules", ".git", "dist", ".jx", ".direnv", ".devenv"];
@@ -45,6 +46,9 @@ export function createFsWatcher(
     if (!event) {
       return;
     }
+    // Any move under the root can change who references what, so the usage cache drops the whole
+    // Project rather than trying to derive which queries this one path could have affected.
+    invalidateReferenceCache(root);
     buffer = coalesceFsEvents(buffer, event);
     if (timer) {
       clearTimeout(timer);

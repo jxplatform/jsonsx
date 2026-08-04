@@ -34,6 +34,7 @@ export const { handleReadFile } = _default;
 export const { handleWriteFile } = _default;
 export const { handleDeleteFile } = _default;
 export const { handleRenameFile } = _default;
+export const { findReferences } = _default;
 export const { handleCreateDirectory } = _default;
 export const { handleUploadFile } = _default;
 export const { handleResolveSiteContext } = _default;

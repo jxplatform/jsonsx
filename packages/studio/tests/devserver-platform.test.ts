@@ -618,6 +618,59 @@ describe("file operations", () => {
     });
   });
 
+  test("findReferences prefixes the query and strips the root off every path it returns", async () => {
+    route("/__studio/activate", () => json({ ok: true }));
+    route("/__studio/references", (c) => {
+      expect(c.search.get("path")).toBe("site/components/card.json");
+      expect(c.search.get("tag")).toBe("my-card");
+      return json({
+        errors: [{ error: "x", path: "site/bad.json" }],
+        files: [{ count: 2, path: "site/pages/index.json", refs: [] }],
+        filesReferencing: 1,
+        path: "site/components/card.json",
+        refsTotal: 2,
+        tagName: "my-card",
+      });
+    });
+    const p = createDevServerPlatform();
+    p.projectRoot = "site";
+    const result = await p.findReferences!({
+      path: "components/card.json",
+      tagName: "my-card",
+    });
+    expect(result).toMatchObject({
+      errors: [{ path: "bad.json" }],
+      files: [{ count: 2, path: "pages/index.json" }],
+      path: "components/card.json",
+    });
+  });
+
+  test("findReferences omits an absent field rather than sending an empty one", async () => {
+    route("/__studio/references", (c) => {
+      expect(c.search.has("path")).toBe(false);
+      expect(c.search.get("tag")).toBe("solo");
+      return json({
+        errors: [],
+        files: [],
+        filesReferencing: 0,
+        path: null,
+        refsTotal: 0,
+        tagName: "solo",
+      });
+    });
+    const p = createDevServerPlatform();
+    const result = await p.findReferences!({ tagName: "solo" });
+    expect(result.path).toBeNull();
+  });
+
+  test("findReferences throws on failure — the caller renders unknown, never zero", () => {
+    route("/__studio/references", () => json({}, 500));
+    const p = createDevServerPlatform();
+    expect(p.findReferences!({ path: "a.json" })).rejects.toThrow(
+      "Failed to find references: a.json",
+    );
+  });
+
   test("subscribeFileEvents strips and filters fs events from the SSE stream", () => {
     const original = (globalThis as { EventSource?: unknown }).EventSource;
     (globalThis as { EventSource?: unknown }).EventSource = FakeEventSource;

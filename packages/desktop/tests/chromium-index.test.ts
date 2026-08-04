@@ -68,6 +68,16 @@ const handlerMocks = {
   setSecrets: mock(() => Promise.resolve({ names: ["SEEDED"], ok: true })),
   discoverComponents: mock(() => Promise.resolve([{ path: "btn.json", tagName: "my-btn" }])),
   fetchPluginSchema: mock(() => Promise.resolve({ type: "object" })),
+  findReferences: mock(() =>
+    Promise.resolve({
+      errors: [],
+      files: [{ count: 2, path: "pages/index.json", refs: [] }],
+      filesReferencing: 1,
+      path: "components/Card.json",
+      refsTotal: 2,
+      tagName: "my-card",
+    }),
+  ),
   formatAction: mock(() => Promise.resolve({ doc: { ok: true } })),
   getProjectRoot: mock(() => projectRootValue),
   handleCreateDirectory: mock(() => Promise.resolve()),

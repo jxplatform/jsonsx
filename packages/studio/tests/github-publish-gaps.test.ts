@@ -6,6 +6,7 @@
  */
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { render as litRender } from "lit-html";
 
 let statusMessages: string[] = [];
@@ -66,9 +67,19 @@ void mock.module("../src/panels/git-panel.js", () => ({
   renderGitPanel: () => null,
 }));
 
-void mock.module("../src/panels/statusbar.js", () => ({
-  statusMessage: (msg: string) => statusMessages.push(msg),
-}));
+// `notify` in place of the deleted `statusMessage`: the publish flow's three progress lines and
+// Its two failures are the same facts, now with a severity and a tier.
+const details: string[] = [];
+const record = (message: string, opts?: { detail?: string }) => {
+  statusMessages.push(message);
+  if (opts?.detail) {
+    details.push(opts.detail);
+  }
+  return { id: "n", message } as never;
+};
+void mock.module("../src/services/notify.js", () =>
+  notifyModule((call) => record(call.message, call.options)),
+);
 
 const { publishToGithub } = await import("../src/github/github-publish.js");
 
@@ -200,7 +211,8 @@ describe("publishToGithub dialog", () => {
     const { promise, wrapper } = await openPublishDialog();
     wrapper.dispatchEvent(new Event("confirm"));
     expect(await promise).toBe(false);
-    expect(statusMessages).toContain("Error: nope");
+    expect(statusMessages).toContain("Could not create the GitHub repository.");
+    expect(details).toContain("nope");
     expect(remoteCalls).toEqual([]);
   });
 
@@ -209,7 +221,8 @@ describe("publishToGithub dialog", () => {
     const { promise, wrapper } = await openPublishDialog();
     wrapper.dispatchEvent(new Event("confirm"));
     expect(await promise).toBe(false);
-    expect(statusMessages).toContain("Error: Failed to create repository");
+    expect(statusMessages).toContain("Could not create the GitHub repository.");
+    expect(details).toContain("Failed to create repository");
   });
 
   test("no token short-circuits before showing the dialog", async () => {

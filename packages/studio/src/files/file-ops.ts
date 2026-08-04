@@ -1,15 +1,26 @@
 /// <reference lib="dom" />
 /**
- * File Operations — open, save, export documents.
+ * File Operations — open, save, export documents, and confirm the destructive ones.
  *
  * All functions read/write directly from/to `activeTab.value` (the reactive tab). `.json` is the
  * native document format; every other extension dispatches through the project's format registry
  * (parse to open, serialize to save).
+ *
+ * {@link confirmFileDelete} and {@link renamePromptMessage} live here because a delete and a rename
+ * are the same question asked twice — "what does this break?" — and the answer was missing from
+ * both. Every surface that removes or moves a file routes its confirmation through them, so no
+ * caller can ship a destructive dialog that grades only by reversibility again.
+ *
+ * @docs studio/projects/pages-layouts-components
  */
 
+import { html, nothing } from "lit-html";
+import { loadUsages, usageWarning } from "../services/references";
+import { showConfirmDialog } from "../ui/layers";
 import { locateDocument } from "../services/code-services";
 import { errorMessage } from "@jxsuite/schema/parse";
-import { statusMessage } from "../panels/statusbar";
+import { noteDocumentSaved } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { validateComponentSlots } from "../services/cem-export";
 import { getPlatform } from "../platform";
 import { getGridController } from "../grid/grid-controller";
@@ -102,7 +113,8 @@ export async function openFile() {
       } else {
         throw noFormatError(name);
       }
-      statusMessage(`Opened ${name}`);
+      // Opening a file is stated permanently by the tab strip and the status bar's DOCUMENT
+      // Field; it does not need a message that erases itself.
     };
 
     if ("showOpenFilePicker" in window) {
@@ -128,29 +140,41 @@ export async function openFile() {
       input.click();
     }
   } catch (error) {
+    // A cancelled file picker is not a failure — the user withdrew the request.
     if (!(error instanceof Error && error.name === "AbortError")) {
-      statusMessage(`Error: ${errorMessage(error)}`);
+      notify.error("Could not open the file.", {
+        detail: errorMessage(error),
+        source: "Open File",
+      });
     }
   }
 }
 
 /**
- * Report a slot-validation warning for component documents (root tagName with a hyphen). The save
- * still proceeds — the warning replaces the plain success message.
+ * Record a successful write, and raise the slot-validation warning component documents can carry.
  *
- * @param {Tab} tab
- * @param {string} savedMsg
+ * The success half no longer notifies at ALL. "Saved" is ambient state: the status bar's DOCUMENT
+ * field says "Saved 2m ago" for as long as it is true, which is strictly more information than a
+ * message that said it once and erased itself — and it is the field a reader looks at to ask the
+ * question in the first place.
+ *
+ * The warning half became a PROBLEM. A component whose slots do not line up is a thing to fix, and
+ * it was previously shown for six seconds in the same grey as the word "Saved".
  */
-function savedMessage(tab: Tab, savedMsg: string) {
+function reportSaved(tab: Tab) {
+  noteDocumentSaved(tab.documentPath);
   const doc = tab.doc.document;
   const warning =
     typeof doc.tagName === "string" && doc.tagName.includes("-")
       ? validateComponentSlots(doc)
       : null;
   if (warning) {
-    statusMessage(`${savedMsg} — Warning: ${warning}`, 6000);
-  } else {
-    statusMessage(savedMsg);
+    notify.warn(warning, {
+      key: `slots:${tab.documentPath ?? tab.id}`,
+      ...(tab.documentPath === null ? {} : { path: tab.documentPath }),
+      source: "Components",
+      tier: "problem",
+    });
   }
 }
 
@@ -175,7 +199,7 @@ export async function saveFile() {
   try {
     // A co-edited tab persists through its provider (a direct file write would reset the room).
     if (await collabSave(tab)) {
-      savedMessage(tab, "Synced");
+      reportSaved(tab);
       return;
     }
     const output = await serializeDocument(tab);
@@ -184,7 +208,7 @@ export async function saveFile() {
       const platform = getPlatform();
       await platform.writeFile(tab.documentPath, output);
       tab.doc.dirty = false;
-      savedMessage(tab, "Saved");
+      reportSaved(tab);
     } else if (tab.fileHandle && "createWritable" in tab.fileHandle) {
       const writable =
         await /**
@@ -198,13 +222,19 @@ export async function saveFile() {
       await writable.write(output);
       await writable.close();
       tab.doc.dirty = false;
-      savedMessage(tab, "Saved");
+      reportSaved(tab);
     } else {
-      statusMessage("No save target — use Export");
+      notify.warn("This document has no save target — use Export.", { key: "save.noTarget" });
     }
   } catch (error) {
     if (!(error instanceof Error && error.name === "AbortError")) {
-      statusMessage(`Save error: ${errorMessage(error)}`);
+      notify.error(`Could not save ${tab.documentPath ?? tab.id}.`, {
+        action: "file.save",
+        detail: errorMessage(error),
+        key: `save:${tab.documentPath ?? tab.id}`,
+        ...(tab.documentPath === null ? {} : { path: tab.documentPath }),
+        source: "Save",
+      });
     }
   }
 }
@@ -246,7 +276,8 @@ export async function exportFile() {
       await writable.write(output);
       await writable.close();
       tab.doc.dirty = false;
-      savedMessage(tab, `Exported as ${handle.name}`);
+      reportSaved(tab);
+      notify.success(`Exported as ${handle.name}.`);
     } else {
       // Fallback: download
       const blob = new Blob([output], { type: mimeType });
@@ -257,11 +288,15 @@ export async function exportFile() {
       a.click();
       URL.revokeObjectURL(url);
       tab.doc.dirty = false;
-      savedMessage(tab, "Downloaded");
+      reportSaved(tab);
+      notify.success(`Downloaded ${fallbackName}.`);
     }
   } catch (error) {
     if (!(error instanceof Error && error.name === "AbortError")) {
-      statusMessage(`Export error: ${errorMessage(error)}`);
+      notify.error("Could not export the document.", {
+        detail: errorMessage(error),
+        source: "Export",
+      });
     }
   }
 }
@@ -302,4 +337,54 @@ export async function serializeDocument(tab: Tab): Promise<string> {
     }
   }
   return JSON.stringify(tab.doc.document, null, 2);
+}
+
+// ─── Destructive confirmations ───────────────────────────────────────────────
+
+/**
+ * The reference sentence a destructive dialog carries, or `nothing` when the host cannot count.
+ *
+ * The query is awaited BEFORE the dialog opens rather than rendered into it and filled in later: a
+ * confirm button that becomes truthful two frames after the user has already pressed it is the same
+ * defect as not counting at all.
+ *
+ * @param path — the file about to be deleted or renamed.
+ * @param verb — which way the references go. A rename repairs them; a delete breaks them.
+ */
+async function usageLine(path: string, verb: "delete" | "rename") {
+  const sentence = usageWarning(await loadUsages({ path }), verb);
+  return sentence === null ? nothing : html`<p class="dialog-consequence">${sentence}</p>`;
+}
+
+/**
+ * Confirm deleting a file, stating what it breaks and what survives.
+ *
+ * @param file — its display name and project-relative path.
+ * @returns Whether the user confirmed.
+ */
+export async function confirmFileDelete(file: { name: string; path: string }): Promise<boolean> {
+  const consequence = await usageLine(file.path, "delete");
+  // `showDialog`'s generic widens to unknown through the confirm wrapper; the dialog only ever
+  // Resolves true/false, and Boolean() is the narrowing that says so without a cast.
+  return Boolean(
+    await showConfirmDialog(
+      "Delete File",
+      html`<span>Delete <strong>${file.name}</strong>? This cannot be undone.</span>${consequence}`,
+      { confirmLabel: "Delete", destructive: true },
+    ),
+  );
+}
+
+/**
+ * The explanatory copy above a rename field — where the file's references go when it moves.
+ *
+ * A rename is not a delete and must not read like one: the refactor pass rewrites every reference
+ * it finds, so the honest sentence is "N references will be updated automatically", and the count
+ * is there to say how much work is silently being done on the user's behalf.
+ *
+ * @param path — the file about to be renamed.
+ */
+export async function renamePromptMessage(path: string) {
+  const consequence = await usageLine(path, "rename");
+  return consequence === nothing ? undefined : html`${consequence}`;
 }

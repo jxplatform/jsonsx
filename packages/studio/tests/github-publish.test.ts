@@ -1,5 +1,6 @@
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import type { StudioPlatform } from "../src/types";
 
 if (globalThis.localStorage === undefined) {
@@ -66,9 +67,19 @@ void mock.module("../src/panels/git-panel.js", () => ({
   renderGitPanel: () => null,
 }));
 
-void mock.module("../src/panels/statusbar.js", () => ({
-  statusMessage: (msg: string) => statusMessages.push(msg),
-}));
+// `notify` in place of the deleted `statusMessage`: the publish flow's three progress lines and
+// Its two failures are the same facts, now with a severity and a tier.
+const details: string[] = [];
+const record = (message: string, opts?: { detail?: string }) => {
+  statusMessages.push(message);
+  if (opts?.detail) {
+    details.push(opts.detail);
+  }
+  return { id: "n", message } as never;
+};
+void mock.module("../src/services/notify.js", () =>
+  notifyModule((call) => record(call.message, call.options)),
+);
 
 const { publishToGithub } = await import("../src/github/github-publish.js");
 
@@ -154,7 +165,10 @@ describe("publishToGithub", () => {
 
     const result = await publishToGithub({ projectName: "test" });
     expect(result).toBe(false);
-    expect(statusMessages.some((m) => m.includes("name already exists"))).toBe(true);
+    expect(statusMessages.some((m) => m.includes("Could not create the GitHub repository"))).toBe(
+      true,
+    );
+    expect(details).toContain("name already exists");
   });
 
   test("returns false when push fails", async () => {
@@ -178,7 +192,7 @@ describe("publishToGithub", () => {
 
     const result = await publishToGithub({ projectName: "test" });
     expect(result).toBe(false);
-    expect(statusMessages.some((m) => m.includes("Push failed"))).toBe(true);
+    expect(statusMessages.some((m) => m.includes("Could not push to GitHub"))).toBe(true);
   });
 
   test("sends correct Accept header to GitHub API", async () => {

@@ -23,7 +23,7 @@ import {
   testDataConnection,
   updateDataRow,
 } from "@jxsuite/server/data";
-import { applyRename, createFsWatcher } from "@jxsuite/server/refactor";
+import { applyRename, createFsWatcher, findReferences } from "@jxsuite/server/refactor";
 import {
   buildExtensionsPayload,
   buildProjectExtensionRegistry,
@@ -31,7 +31,12 @@ import {
 import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import type { ExtensionsPayloadEntry } from "@jxsuite/compiler/format-host";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
-import type { FsEventPayload, FsWatcherHandle, RenameReport } from "@jxsuite/server/refactor";
+import type {
+  FsEventPayload,
+  FsWatcherHandle,
+  ReferencesResult,
+  RenameReport,
+} from "@jxsuite/server/refactor";
 import { openExternal as handUrlToOs } from "./utils.ts";
 import type {
   ComponentSlotMeta,
@@ -698,6 +703,28 @@ export function createProjectSession(initialRoot: string | null) {
     }
   }
 
+  /**
+   * Where a file or a component tag is used, over the same walker `renameFile` writes through. The
+   * engine caches the sweep and drops it from this session's own fs watcher, so the inspector's
+   * count, Find Usages and a delete confirmation all read one answer about one moment on disk.
+   */
+  async function referencesTo(params: {
+    path?: string;
+    tagName?: string;
+  }): Promise<ReferencesResult> {
+    const root = requireRoot();
+    if (params.path) {
+      assertUnderRoot(resolve(root, params.path), root);
+    }
+    const registry = await getFormatRegistry();
+    return findReferences({
+      path: params.path ?? null,
+      registry,
+      root,
+      tagName: params.tagName ?? null,
+    });
+  }
+
   async function createDirectory(params: { path: string }): Promise<void> {
     const root = requireRoot();
     const abs = resolve(root, params.path);
@@ -1033,6 +1060,7 @@ export function createProjectSession(initialRoot: string | null) {
     handleWriteFile: writeFileHandler,
     handleDeleteFile: deleteFile,
     handleRenameFile: renameFile,
+    findReferences: referencesTo,
     handleCreateDirectory: createDirectory,
     handleUploadFile: uploadFile,
     handleResolveSiteContext: resolveSiteContext,

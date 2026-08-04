@@ -76,12 +76,8 @@ import { runInsertZoneAction } from "./editor/insert-zone-action";
 import { canvasSlashHandler } from "./editor/canvas-slash-bridge";
 import { makeCanvasContextMenuHandler } from "./editor/canvas-context-menu";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
-import {
-  mountStatusbar,
-  renderStatusbar,
-  setStatusbarRenderer,
-  statusMessage,
-} from "./panels/statusbar";
+import { mountStatusbar, renderStatusbar } from "./panels/statusbar";
+import { notify } from "./services/notify";
 import { exportFile, parseSourceForPath, saveFile, serializeDocument } from "./files/file-ops";
 import {
   formatForPath,
@@ -273,7 +269,13 @@ async function confirmLeaveDirtyChild(tab: Tab): Promise<boolean> {
     try {
       await getPlatform().writeFile(tab.documentPath, await serializeDocument(tab));
     } catch (error) {
-      statusMessage(`Save error: ${(error as Error).message}`);
+      notify.error(`Could not save ${tab.documentPath}.`, {
+        action: "file.save",
+        detail: (error as Error).message,
+        key: `save:${tab.documentPath}`,
+        path: tab.documentPath,
+        source: "Save",
+      });
       return false;
     }
   }
@@ -294,7 +296,8 @@ async function navigateBack() {
   setActivityTab("layers");
 
   render();
-  statusMessage("Returned to parent document");
+  // No notification: the pane jump bar and the tab strip both name the document you are now in,
+  // And an outcome a surface already states is not an outcome worth interrupting for.
 }
 
 /** @param {number} targetIndex */
@@ -311,7 +314,7 @@ async function navigateToLevel(targetIndex: number) {
   setActivityTab("layers");
 
   render();
-  statusMessage("Returned to parent document");
+  // As above — where you are is stated by the chrome, permanently, rather than for three seconds.
 }
 
 async function closeFunctionEditor() {
@@ -653,7 +656,7 @@ registerRenderer("rightPanel", () => rightPanelMod.render());
 registerRenderer("frontmatterPanel", () => frontmatterPanelMod.render());
 registerRenderer("chatPanel", () => chatPanelMod.render());
 registerRenderer("overlays", () => overlaysPanel.render());
-setStatusbarRenderer(() => renderStatusbar());
+renderStatusbar();
 mountStatusbar();
 mountActivityBar();
 
@@ -686,7 +689,11 @@ configureCollabParser(async (tab, text) => {
   }
   return { document: JSON.parse(text) as JxMutableNode };
 });
-configureCollabNotifier(statusMessage);
+// The source-canonical freeze is a STATE the author is being held in, not an error: a toast that
+// Says so, keyed so a run of freezes is one message rather than a stack of identical ones.
+configureCollabNotifier((message) => {
+  notify.warn(message, { key: "collab.freeze", source: "Collaboration" });
+});
 
 let fsUnsub: (() => void) | null = null;
 /** (Re)subscribe the sidebar to backend filesystem events for the active project. */
@@ -725,13 +732,19 @@ if (_projectParam) {
     _projectParam.startsWith("~") ||
     /^[A-Za-z]:[/\\]/.test(_projectParam);
   if (!isAbsPath) {
-    statusMessage(`Error: ?project= requires an absolute path (got "${_projectParam}")`);
+    notify.error(`?project= requires an absolute path (got "${_projectParam}").`, {
+      key: "startup.projectParam",
+      source: "Startup",
+    });
     render();
   } else {
     render();
     const platform = getPlatform();
     // oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: project probing must not block the initial render
     void (async () => {
+      // Hoisted out of the try so the failure can NAME what it failed to open. The catch used to
+      // Report a bare `Error: <message>` because the only identifying fact was still block-scoped.
+      let fileRelPath = _urlParams.get("file") || _projectParam;
       try {
         const siteCtx = platform.resolveSiteContext
           ? await platform.resolveSiteContext(_projectParam)
@@ -792,8 +805,7 @@ if (_projectParam) {
         }
 
         // Read and open the file
-        const _fileParam = _urlParams.get("file");
-        let fileRelPath = _fileParam || siteCtx.fileRelPath || _projectParam;
+        fileRelPath = _urlParams.get("file") || siteCtx.fileRelPath || _projectParam;
 
         // When opening project.json, default to home page instead (listing-based, no 404 probes).
         if (fileRelPath === "project.json" || fileRelPath.endsWith("/project.json")) {
@@ -833,10 +845,14 @@ if (_projectParam) {
           }
 
           render();
-          statusMessage(`Opened ${fileRelPath}`);
+          // Opening a file is stated by the tab strip and the status bar's DOCUMENT field.
         }
       } catch (error) {
-        statusMessage(`Error: ${errorMessage(error)}`);
+        notify.error(`Could not open ${fileRelPath || "the project"}.`, {
+          detail: errorMessage(error),
+          path: fileRelPath,
+          source: "Open File",
+        });
       }
     })();
   }
@@ -978,7 +994,7 @@ async function openRecentProject(root: string) {
     addRecentProject(requireProjectState().name, root);
     setActivityTab("files");
     renderLeftPanel();
-    statusMessage(`Opened project: ${requireProjectState().name}`);
+    // The project's name is now permanent state in the status bar's PROJECT field.
 
     await openHomePage();
     ensureFsSync();
@@ -989,7 +1005,11 @@ async function openRecentProject(root: string) {
     removeRecentProject(root);
     toolbarPanel.render();
     render();
-    statusMessage(`Error: ${errorMessage(error)}`);
+    notify.error(`Could not open the project at ${root}.`, {
+      detail: errorMessage(error),
+      path: root,
+      source: "Open Project",
+    });
   }
 }
 function renderFilesTemplate() {
@@ -1043,7 +1063,7 @@ registerStudioCommands(
         window.open(target.url, "_blank", "noopener,noreferrer");
         return;
       }
-      statusMessage(target.reason);
+      notify.warn(target.reason, { key: "view.openInBrowser", source: "Preview" });
     },
     openProject,
     saveDocument: saveFile,

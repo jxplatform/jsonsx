@@ -7,6 +7,7 @@
  */
 import { flush, installMockPlatform } from "./harness";
 import { expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { nothing } from "lit-html";
 import { hasPlatform, getPlatform } from "../src/platform";
 import { renderOnly, setProjectState } from "../src/store";
@@ -73,16 +74,15 @@ void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
 }));
 
 const renderStatusbarMock = mock(() => {});
-const statusbarRenderers: (() => void)[] = [];
 void mock.module("../src/panels/statusbar.ts", () => ({
+  forgetSavedTimes: mock(() => {}),
   mountStatusbar: mock(() => {}),
+  noteDocumentSaved: mock(() => {}),
   renderStatusbar: renderStatusbarMock,
-  setStatusbarRenderer: (fn: () => void) => {
-    statusbarRenderers.push(fn);
-  },
-  statusMessage: mock(() => {}),
   unmountStatusbar: mock(() => {}),
 }));
+
+void mock.module("../src/services/notify.ts", () => notifyModule(() => {}));
 
 void mock.module("../src/panels/toolbar.ts", () => ({
   mount: mock(() => {}),
@@ -189,10 +189,10 @@ test("the pane-context bar wires studio's navigation callbacks", async () => {
   await paneCtx!.navigateToLevel(0);
 });
 
-test("the statusbar renderer wiring delegates to renderStatusbar", () => {
-  expect(statusbarRenderers).toHaveLength(1);
-  statusbarRenderers[0]!();
-  expect(renderStatusbarMock).toHaveBeenCalledTimes(1);
+test("the bootstrap paints the statusbar once, directly", () => {
+  // `setStatusbarRenderer` went with `statusMessage`: it existed only so a transient message could
+  // Ask the bar to repaint, and the bar's own effect owns that now.
+  expect(renderStatusbarMock).toHaveBeenCalled();
 });
 
 test("the files tab renders through studio's renderFilesTemplate wiring", async () => {

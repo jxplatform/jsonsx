@@ -12,6 +12,7 @@
  */
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { FakeTabulator, tabulatorMockModule } from "./tabulator-mock";
 import { render } from "lit-html";
 import { mockFormatAction, seedMarkdownFormat } from "./format-fixture";
@@ -43,7 +44,7 @@ void mock.module("../src/ui/layers.js", () => ({
 void mock.module("../src/ui/progress-modal.js", () => ({
   showProgressModal: () => ({ done: () => {}, fail: () => {}, setStatus: () => {} }),
 }));
-void mock.module("../src/panels/statusbar.js", () => ({ statusMessage: () => {} }));
+void mock.module("../src/services/notify.js", () => notifyModule(() => {}));
 
 const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
 const { createCollectionSource, createPagesSource, PATH_FIELD } =

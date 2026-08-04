@@ -106,10 +106,10 @@ void mock.module("../src/panels/formula-workspace.js", () => ({
 }));
 
 void mock.module("../src/panels/statusbar.js", () => ({
+  forgetSavedTimes: () => {},
   mountStatusbar: () => {},
+  noteDocumentSaved: () => {},
   renderStatusbar: () => {},
-  setStatusbarRenderer: () => {},
-  statusMessage: () => {},
   unmountStatusbar: () => {},
 }));
 

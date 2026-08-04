@@ -9,15 +9,13 @@
  */
 
 import { basename, dirname, extname, relative, resolve } from "node:path";
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { stat, writeFile } from "node:fs/promises";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { isUnder } from "./paths.ts";
 import { rewriteDocRefs, rewriteTagName } from "./refs.ts";
+import { documentGlob, fwd, loadDoc, skipScanPath } from "./scan.ts";
 import type { RefChange } from "./refs.ts";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
-
-/** Normalise a path to forward slashes. */
-const fwd = (p: string) => p.replaceAll("\\", "/");
 
 export interface FileChange {
   path: string;
@@ -51,20 +49,6 @@ export interface ApplyRenameOptions {
   registry: FormatRegistry;
 }
 
-/** A parsed document plus the serializer that round-trips it back to disk. */
-interface LoadedDoc {
-  doc: unknown;
-  serialize: ((doc: unknown) => Promise<string>) | null;
-}
-
-const isJsonPath = (p: string) => p.endsWith(".json");
-
-/** Skip vendored / build / agent directories (mirrors the component-discovery filter). */
-function skip(match: string): boolean {
-  const f = fwd(match);
-  return match.includes("node_modules") || f.includes("dist/") || f.includes(".claude/");
-}
-
 /** Derive a custom-element tag from a component filename (strips `.class.json` or the extension). */
 export function deriveTag(absPath: string): string {
   const base = basename(absPath);
@@ -73,44 +57,6 @@ export function deriveTag(absPath: string): string {
   }
   const ext = extname(base);
   return ext ? base.slice(0, -ext.length) : base;
-}
-
-/** Read + parse a file, returning the doc and a matching serializer (null when none is available). */
-async function loadDoc(fp: string, registry: FormatRegistry): Promise<LoadedDoc> {
-  const raw = await readFile(fp, "utf8");
-  if (isJsonPath(fp)) {
-    const trailingNewline = raw.endsWith("\n");
-    return {
-      doc: JSON.parse(raw) as unknown,
-      serialize: (doc) =>
-        Promise.resolve(JSON.stringify(doc, null, 2) + (trailingNewline ? "\n" : "")),
-    };
-  }
-  const ext = extname(fp);
-  const parseEntry = registry.byExtension(ext, "parse");
-  if (!parseEntry) {
-    throw new Error(`No parser for "${ext}"`);
-  }
-  const doc = await parseEntry.call("parse", raw);
-  const serializeEntry = registry.byExtension(ext, "serialize");
-  return {
-    doc,
-    serialize: serializeEntry
-      ? async (d) => {
-          const out = await serializeEntry.call("serialize", d);
-          return typeof out === "string" ? out : String(out);
-        }
-      : null,
-  };
-}
-
-/** Build the recursive glob covering JSON plus every registered document/content extension. */
-function documentGlob(registry: FormatRegistry) {
-  const exts = new Set(["json"]);
-  for (const ext of registry.documentExtensions()) {
-    exts.add(ext.replace(/^\./, ""));
-  }
-  return new Bun.Glob(`**/*.{${[...exts].join(",")}}`);
 }
 
 /**
@@ -162,7 +108,7 @@ export async function applyRename(opts: ApplyRenameOptions): Promise<RenameRepor
   let tagRefsUpdated = 0;
 
   for await (const match of documentGlob(opts.registry).scan({ cwd: opts.root, dot: false })) {
-    if (skip(match)) {
+    if (skipScanPath(match)) {
       continue;
     }
     const fp = fwd(resolve(opts.root, match));

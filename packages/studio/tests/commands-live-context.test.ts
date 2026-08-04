@@ -260,13 +260,29 @@ describe("collab, ai and capabilities", () => {
     const ctx = createLiveContext(sources({ platform: () => platform as StudioPlatform }))();
     expect(ctx.capability).toEqual({
       dataRows: true,
-      // The harness's mock ships codeService, which is what backs Find References.
-      findReferences: true,
+      // Off: the harness's mock ships `codeService` but not `findReferences`, and the capability now
+      // Reads the member it is named after rather than a stand-in that every backend happens to have.
+      findReferences: false,
       gitClone: true,
       importSite: false,
       openProjectInNewWindow: false,
       windowControls: true,
     });
+  });
+
+  test("findReferences follows its own PAL member, not codeService", () => {
+    const { platform } = installMockPlatform({
+      findReferences: (async () => ({
+        errors: [],
+        files: [],
+        filesReferencing: 0,
+        path: null,
+        refsTotal: 0,
+        tagName: null,
+      })) as never,
+    });
+    const ctx = createLiveContext(sources({ platform: () => platform as StudioPlatform }))();
+    expect(ctx.capability.findReferences).toBe(true);
   });
 });
 

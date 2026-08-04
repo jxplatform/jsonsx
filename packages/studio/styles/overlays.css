@@ -2250,3 +2250,136 @@ sp-table-row:has(.browse-thumb) {
   padding: 3px 6px;
   font: inherit;
 }
+
+/* ─── ④ The toast host — the fourth overlay layer ─────────────────────────── */
+/* The stack is bottom-right and pinned to the layer, not to the app grid: a toast reports on an
+   operation, and operations are started from every region — pinning it to one of them would put it
+   furthest from wherever the reader was looking half the time. `pointer-events` is re-enabled per
+   toast rather than on the stack, so the empty area of the layer never eats a canvas click. */
+.toast-stack {
+  position: absolute;
+  right: 12px;
+  bottom: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  max-width: min(420px, calc(100vw - 24px));
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--fg-dim);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--fg);
+  font-size: var(--spectrum-font-size-75, 12px);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 35%);
+  animation: toast-in 180ms ease-out;
+}
+/* §13.3 clause 6: the app honours reduced motion itself, so the photograph shows what a
+   reduced-motion reader actually sees rather than what a runner-injected freeze produced. */
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.toast--success {
+  border-left-color: var(--success);
+}
+.toast--info {
+  border-left-color: var(--accent);
+}
+.toast--warn {
+  border-left-color: var(--warning);
+}
+.toast--error {
+  border-left-color: var(--danger);
+}
+.toast-icon {
+  flex: none;
+  width: 14px;
+  text-align: center;
+  font-weight: 700;
+}
+.toast--success .toast-icon {
+  color: var(--success);
+}
+.toast--info .toast-icon {
+  color: var(--accent);
+}
+.toast--warn .toast-icon {
+  color: var(--warning);
+}
+.toast--error .toast-icon {
+  color: var(--danger);
+}
+.toast-message {
+  flex: 1;
+  min-width: 0;
+  /* Four lines is a message that belongs in Problems, where it can be read at leisure. */
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+/* The recovery button IS a command: its label is the command's title, so it is never a bare
+   "Retry" that fails to say what would be retried. */
+.toast-action {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.toast-action:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+.toast-action:disabled {
+  color: var(--fg-dim);
+  cursor: default;
+}
+.toast-dismiss {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.toast-dismiss:hover {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+
+/* The consequence line inside a destructive confirmation — what this delete or rename breaks, and
+   what survives it. Set apart from the question above it, because the question is a sentence the
+   user already wrote in their head and this is the part they have not thought about. */
+.dialog-consequence {
+  margin-top: 8px;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1.5;
+}

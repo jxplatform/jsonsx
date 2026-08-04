@@ -1,5 +1,6 @@
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
 import { canRedo, canUndo, redo, undo } from "../src/tabs/transact";
 import type { CommitResult, GridEditBatch, GridSource } from "../src/grid/grid-source";
@@ -22,11 +23,11 @@ void mock.module("../src/ui/progress-modal.js", () => ({
     return { done: () => {}, fail: () => {}, setStatus: () => {} };
   },
 }));
-void mock.module("../src/panels/statusbar.js", () => ({
-  statusMessage: (msg: string) => {
-    statusCalls.push(msg);
-  },
-}));
+// `notify` is NOT mocked: it is a reactive store with no I/O, so the honest assertion is what the
+// Controller actually recorded, in the tier it recorded it in.
+void mock.module("../src/services/notify.js", () =>
+  notifyModule((call) => statusCalls.push(call.message)),
+);
 
 const { createGridController, getGridController, ROW_KEY_FIELD } =
   await import("../src/grid/grid-controller");
@@ -280,7 +281,7 @@ describe("save", () => {
     });
     await controller.save();
     expect(progressOpens).toBe(1);
-    expect(statusCalls.at(-1)).toContain("Save error");
+    expect(statusCalls.at(-1)).toContain("Could not save the grid");
     expect(controller.state.saving).toBeFalse();
   });
 });

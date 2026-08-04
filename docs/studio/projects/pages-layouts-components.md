@@ -5,6 +5,8 @@ spec:
   - site-architecture.md#2
 code:
   - packages/studio/src/browse/browse.ts
+  - packages/studio/src/services/references.ts
+  - packages/studio/src/files/file-ops.ts
 ---
 
 # Pages, layouts, and components
@@ -42,6 +44,25 @@ All three are created the same way, from the [Manage view](/docs/studio/projects
 :::doc-note
 Studio writes each new file into `pages/`, `layouts/`, or `components/` in your project folder — plain files you can rename, duplicate, or delete from Manage's right-click menu.
 :::
+
+## Where is it used?
+
+Once a component is placed on a few pages, the useful question stops being "what does this do?" and becomes "what depends on it?" Select any component instance on the canvas and the inspector answers, right under its settings: **Used on 3 pages and 1 other file**. Expand it for the list, and click any row to open that file.
+
+The same answer is reachable by name — **Find Usages** in the command palette, or in the right-click menu on a component.
+
+:::doc-tip
+The count separates **pages** from **other files** on purpose. A component used only inside another component has not been placed on your site yet; a component used on seven pages is load-bearing.
+:::
+
+### Before you delete or rename
+
+Every delete and rename confirmation now carries that same count, so you can see what an action breaks before you take it — not after.
+
+- **Deleting** a file tells you how many references stop resolving, and that the files holding them stay exactly where they are. Only the references break.
+- **Renaming** a file tells you how many references will be **updated automatically**. Studio rewrites every one of them across the project, and for a component it renames the element tag to match the new filename too.
+
+If Studio cannot count — a backend without project search — the confirmation says so rather than showing a zero. "We could not check" and "nothing uses this" are never displayed as the same thing.
 
 ## Which one do I want?
 

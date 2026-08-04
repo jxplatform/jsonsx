@@ -35,19 +35,20 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 ## Selection
 
-| Command                   | Id                             | Shortcut                | Level     | Requires                                           |
-| ------------------------- | ------------------------------ | ----------------------- | --------- | -------------------------------------------------- |
-| Convert to Component      | `selection.convertToComponent` | —                       | selection | an element that is not the document root           |
-| Delete (destructive)      | `selection.delete`             | `Delete` or `Backspace` | selection | an element selection that is not the document root |
-| Duplicate                 | `selection.duplicate`          | `⌘D`                    | selection | an element that has a sibling position             |
-| Edit Component            | `selection.editComponent`      | —                       | selection | a component instance                               |
-| Go to Symbol in Document… | `palette.openNodes`            | —                       | document  | an open document                                   |
-| Move Down                 | `selection.moveDown`           | —                       | selection | an element with a sibling below it                 |
-| Move Into Previous        | `selection.moveIn`             | —                       | selection | a container directly above the element             |
-| Move Out of Parent        | `selection.moveOut`            | —                       | selection | an element nested inside another                   |
-| Move Up                   | `selection.moveUp`             | —                       | selection | an element with a sibling above it                 |
-| Select Element            | `selection.set`                | —                       | document  | an open document                                   |
-| Select Parent             | `selection.selectParent`       | `Esc` or `←`            | selection | an element selection                               |
+| Command                   | Id                             | Shortcut                | Level     | Requires                                                       |
+| ------------------------- | ------------------------------ | ----------------------- | --------- | -------------------------------------------------------------- |
+| Convert to Component      | `selection.convertToComponent` | —                       | selection | an element that is not the document root                       |
+| Delete (destructive)      | `selection.delete`             | `Delete` or `Backspace` | selection | an element selection that is not the document root             |
+| Duplicate                 | `selection.duplicate`          | `⌘D`                    | selection | an element that has a sibling position                         |
+| Edit Component            | `selection.editComponent`      | —                       | selection | a component instance                                           |
+| Find Usages               | `selection.findUsages`         | —                       | selection | a component instance, on a backend that can search the project |
+| Go to Symbol in Document… | `palette.openNodes`            | —                       | document  | an open document                                               |
+| Move Down                 | `selection.moveDown`           | —                       | selection | an element with a sibling below it                             |
+| Move Into Previous        | `selection.moveIn`             | —                       | selection | a container directly above the element                         |
+| Move Out of Parent        | `selection.moveOut`            | —                       | selection | an element nested inside another                               |
+| Move Up                   | `selection.moveUp`             | —                       | selection | an element with a sibling above it                             |
+| Select Element            | `selection.set`                | —                       | document  | an open document                                               |
+| Select Parent             | `selection.selectParent`       | `Esc` or `←`            | selection | an element selection                                           |
 
 ## View
 

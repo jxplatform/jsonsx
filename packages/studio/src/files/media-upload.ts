@@ -18,7 +18,7 @@
 
 import { errorMessage } from "@jxsuite/schema/parse";
 import { getPlatform } from "../platform";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { activeTab } from "../workspace/workspace";
 
 // ─── File classification ─────────────────────────────────────────────────────
@@ -234,12 +234,16 @@ export async function uploadAssets(
       await platform.uploadFile(path, file);
       uploaded.push({ kind: mediaKind(file), name, path, ref: assetRef(path) });
     } catch (error) {
-      statusMessage(`Upload failed: ${file.name} — ${errorMessage(error)}`);
+      notify.error(`Could not upload ${file.name}.`, {
+        detail: errorMessage(error),
+        path,
+        source: "Media",
+      });
     }
   }
 
   if (uploaded.length > 0) {
-    statusMessage(
+    notify.success(
       uploaded.length === 1
         ? `Uploaded ${uploaded[0]!.name} to ${dir}/`
         : `Uploaded ${uploaded.length} files to ${dir}/`,

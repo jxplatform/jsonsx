@@ -1,27 +1,46 @@
 /// <reference lib="dom" />
 /**
- * The overlay layers — the only sanctioned way to open a popover, modal, or dialog in Studio.
+ * The overlay layers — the only sanctioned way to open a popover, modal, dialog or toast in Studio.
  *
- * Everything renders into one of the three fixed hosts declared in index.html (#layer-popover,
- * #layer-modal, #layer-dialog), bound once at boot by initLayers(). Native browser dialogs
- * (`prompt`, `confirm`, `alert`) are not permitted anywhere in Studio — use `showPromptDialog`,
- * `showConfirmDialog`, or `showSaveDiscardDialog`. See studio-ui-guidelines.md §8.7.
+ * Everything renders into one of the four fixed hosts declared in index.html (#layer-popover,
+ * #layer-modal, #layer-dialog, #layer-toast), bound once at boot by initLayers(). Native browser
+ * dialogs (`prompt`, `confirm`, `alert`) are not permitted anywhere in Studio — use
+ * `showPromptDialog`, `showConfirmDialog`, or `showSaveDiscardDialog`. See studio-ui-guidelines.md
+ * §8.7.
+ *
+ * The toast host is the fourth layer (plan §3.2 ④, §7.1). It is a rendering of
+ * `services/notify.ts`'s `toasts` array and owns exactly two things that array does not: the timer
+ * that retires a resting toast, and the transition account {@link overlayIdleBlockers} publishes.
  */
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
+import { repeat } from "lit-html/directives/repeat.js";
 import { overlayRegion, REGION_ATTR } from "./regions";
+import { dismiss, toasts } from "../services/notify";
+import { activeRegistry } from "../commands/active-registry";
+import { effect, effectScope } from "../reactivity";
+import type { Notification, Severity } from "../services/notify";
+import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
 
-/** The three fixed layer hosts, by name. Also the `kind` half of every overlay region id. */
-export type LayerKind = "popover" | "modal" | "dialog";
+/** The four fixed layer hosts, by name. Also the `kind` half of every overlay region id. */
+export type LayerKind = "popover" | "modal" | "dialog" | "toast";
 
 let _popoverLayer: HTMLElement;
 let _modalLayer: HTMLElement;
 let _dialogLayer: HTMLElement;
+let _toastLayer: HTMLElement;
 
 /** The host a layer kind renders into, falling back to `<body>` before `initLayers()` has run. */
 function layerHost(kind: LayerKind): HTMLElement {
-  const host = kind === "popover" ? _popoverLayer : kind === "modal" ? _modalLayer : _dialogLayer;
+  const host =
+    kind === "popover"
+      ? _popoverLayer
+      : kind === "modal"
+        ? _modalLayer
+        : kind === "toast"
+          ? _toastLayer
+          : _dialogLayer;
   return host || document.body;
 }
 
@@ -29,6 +48,8 @@ export function initLayers() {
   _popoverLayer = document.querySelector("#layer-popover") as HTMLElement;
   _modalLayer = document.querySelector("#layer-modal") as HTMLElement;
   _dialogLayer = document.querySelector("#layer-dialog") as HTMLElement;
+  _toastLayer = document.querySelector("#layer-toast") as HTMLElement;
+  mountToastHost();
 }
 
 /** Anything in the modal/dialog layers that paints a viewport-wide underlay over the app. */
@@ -624,5 +645,205 @@ export function clearLayerSlot(layer: LayerKind, id: string) {
     litRender(nothing, slot);
     slot.remove();
     _namedSlots.delete(key);
+  }
+}
+
+// ─── The toast host — the fourth layer ───────────────────────────────────────
+
+/**
+ * How long a toast is settling into place, in ms.
+ *
+ * Published to {@link overlayIdleBlockers} rather than kept private, because "the shell has stopped
+ * moving" is a question `services/idle.ts` answers on behalf of the screenshot runner and the
+ * verify skill, and a toast sliding in is exactly the half-painted frame a capture must not catch.
+ */
+export const TOAST_ENTER_MS = 180;
+
+/** The severity glyphs. One character each: the toast's job is a line of text, not an illustration. */
+const TOAST_ICON: Readonly<Record<Severity, string>> = {
+  error: "✕",
+  info: "ℹ",
+  success: "✓",
+  warn: "!",
+};
+
+let _toastScope: EffectScope | null = null;
+/** Toast id → its retirement timer, so a re-render never schedules a second one. */
+const _toastTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** Toast id → when it started settling in. Cleared by its own timer. */
+const _toastEntering = new Set<string>();
+
+/**
+ * Whether the reader has asked for less movement.
+ *
+ * Read per call rather than cached: §13.3 clause 6 says the app must HONOUR this rather than have
+ * the runner inject a freeze stylesheet, which means the answer has to be able to change.
+ */
+function reducedMotion(): boolean {
+  return globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+}
+
+/**
+ * **The one listed exception to §13.3 clause 6** — the only behaviour in Studio that differs under
+ * `?automation=1` beyond installing the hook, pinning the clock and selecting a profile.
+ *
+ * A toast is the single surface in the app whose lifetime is a TIMER rather than a state. Every
+ * other surface a shot can photograph is there because the app is in a state, and it stays there
+ * until a command changes it; a toast retires itself between the step that raised it and the frame
+ * that captures it, so a shot of one is a race the manifest has no way to express. Holding it open
+ * is the smaller lie: the picture then shows a toast that a human reader would also have seen, for
+ * as long as they cared to look, instead of showing the toast that happened to still be there.
+ *
+ * The gate is re-derived from `location.search` rather than imported from `services/automation.ts`
+ * deliberately: §13.3 requires the scripting surface to be absent from the desktop and cloud
+ * bundles (`check-bundle-budget.ts`'s next assertion), and importing it from a module every layer
+ * pulls in would ship it everywhere. One line of duplication, on purpose.
+ */
+export function toastsAreHeld(): boolean {
+  try {
+    return new URLSearchParams(globalThis.location?.search ?? "").get("automation") === "1";
+  } catch {
+    // Intentionally ignored: no location (a bare test realm) means no automation.
+    return false;
+  }
+}
+
+/**
+ * What is still moving in the overlay layers, as `services/idle.ts` phrases it.
+ *
+ * Empty when every toast has settled — a RESTING toast is not a blocker, which is the property that
+ * lets {@link toastsAreHeld} hold one open forever without `probeIdle()` waiting forever with it.
+ */
+export function overlayIdleBlockers(): readonly string[] {
+  return [..._toastEntering].map((id) => `overlay: toast ${id} settling in`);
+}
+
+/** Take a toast away, cancelling any timer it still owns. */
+function retireToast(id: string): void {
+  const timer = _toastTimers.get(id);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    _toastTimers.delete(id);
+  }
+  _toastEntering.delete(id);
+  dismiss(id);
+}
+
+/**
+ * Give a newly-arrived toast its timers: the settle window the idle account reads, and (unless
+ * held) the rest period after which it retires itself.
+ */
+function scheduleToast(record: Notification): void {
+  if (_toastTimers.has(record.id) || _toastEntering.has(record.id)) {
+    return;
+  }
+  const settle = reducedMotion() ? 0 : TOAST_ENTER_MS;
+  if (settle > 0) {
+    _toastEntering.add(record.id);
+    setTimeout(() => _toastEntering.delete(record.id), settle);
+  }
+  const rest = record.timeoutMs ?? 0;
+  if (rest <= 0 || toastsAreHeld()) {
+    return;
+  }
+  _toastTimers.set(
+    record.id,
+    setTimeout(() => retireToast(record.id), rest),
+  );
+}
+
+/** The recovery button, or `nothing` when the record named no command or the command is hidden. */
+function toastActionTpl(record: Notification) {
+  const registry = record.action === undefined ? null : activeRegistry();
+  const id = record.action;
+  if (!registry || id === undefined || !registry.get(id) || !registry.isVisible(id)) {
+    return nothing;
+  }
+  const command = registry.get(id)!;
+  const reason = registry.disabledReason(id);
+  return html`
+    <button
+      class="toast-action"
+      ?disabled=${reason !== undefined}
+      title=${reason === undefined ? command.title : `${command.title} — requires ${reason}`}
+      @click=${() => {
+        retireToast(record.id);
+        void registry.run(id, record.actionArgs);
+      }}
+    >
+      ${command.title}
+    </button>
+  `;
+}
+
+/** One toast. `role="status"` lives on the HOST, so a stack of them is announced as one region. */
+function toastTpl(record: Notification) {
+  return html`
+    <div class="toast toast--${record.severity}">
+      <span class="toast-icon" aria-hidden="true">${TOAST_ICON[record.severity]}</span>
+      <span class="toast-message">${record.message}</span>
+      ${toastActionTpl(record)}
+      <button
+        class="toast-dismiss"
+        title="Dismiss"
+        aria-label="Dismiss notification"
+        @click=${() => retireToast(record.id)}
+      >
+        <span aria-hidden="true">×</span>
+      </button>
+    </div>
+  `;
+}
+
+/** The whole stack, newest at the bottom — the reading order of a log, not of a menu. */
+export function toastStackTemplate() {
+  return html`
+    <div class="toast-stack">
+      ${repeat(
+        toasts,
+        (record) => record.id,
+        (record) => toastTpl(record),
+      )}
+    </div>
+  `;
+}
+
+/**
+ * Subscribe the toast layer to `notify`'s store.
+ *
+ * Called by {@link initLayers}, so no bootstrap has to remember it, and idempotent so a second call
+ * replaces the effect rather than stacking a second renderer on the same host.
+ */
+export function mountToastHost(): void {
+  unmountToastHost();
+  if (!_toastLayer) {
+    return;
+  }
+  _toastScope = effectScope();
+  _toastScope.run(() => {
+    effect(() => {
+      // Tracked: the array itself (arrivals and retirements) and the registry holder, so a toast
+      // Raised before the bootstrap composed the registry grows its Retry button when it lands.
+      void toasts.length;
+      void activeRegistry();
+      for (const record of toasts) {
+        scheduleToast(record);
+      }
+      litRender(toastStackTemplate(), _toastLayer);
+    });
+  });
+}
+
+/** Release the effect and every pending timer. Tests and a window teardown both need this. */
+export function unmountToastHost(): void {
+  _toastScope?.stop();
+  _toastScope = null;
+  for (const timer of _toastTimers.values()) {
+    clearTimeout(timer);
+  }
+  _toastTimers.clear();
+  _toastEntering.clear();
+  if (_toastLayer) {
+    litRender(nothing, _toastLayer);
   }
 }

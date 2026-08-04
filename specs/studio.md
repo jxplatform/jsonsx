@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.4.2-draft
+**Version:** 0.4.3-draft
 **Status:** Partial
 **Updated:** 2026-08-03
 **License:** MIT
@@ -765,6 +765,32 @@ studio-ui-guidelines.md — no native browser prompts:
 
 Blank input is rejected in place: the dialog stays open with negative help text rather than closing.
 
+#### Consequences, stated before the action
+
+> **Status: Implemented.** A destructive dialog states **what it breaks**, not only whether it can be undone. Deleting a component used on seven pages must not look like deleting an unused one.
+
+Every delete and rename confirmation carries the reference count from `findReferences` (§9.6 of
+UX-REDESIGN-PLAN; the PAL member in `desktop.md` §3.1), resolved **before** the dialog opens — a
+sentence that becomes true after the user has already confirmed is the same defect as no sentence.
+
+| Action     | The sentence states                                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------------------- |
+| **Delete** | How many references in how many files stop resolving, and that those files themselves survive unchanged |
+| **Rename** | How many references will be **rewritten automatically** by the refactor pass, so nothing else changes   |
+
+Three states, three different sentences, and they are never collapsed:
+
+- **Counted** — the number, with the wording above.
+- **Uncountable** (the query failed) — the dialog says the references could not be counted and that
+  this is not the same as "unused". It never renders 0.
+- **Unsupported** (`capability.findReferences` is false, i.e. the backend has no
+  `/__studio/references` route) — the dialog carries **no** consequence line at all, rather than one
+  that implies a count it does not have.
+
+The same query backs the inspector's **Used on N pages** line for a selected component instance and
+the `selection.findUsages` command; all three read one cache, invalidated by the filesystem rather
+than by a timer, so they cannot disagree.
+
 ### 9.2 Server Integration
 
 All file operations go through the Platform Abstraction Layer, which maps to `@jxsuite/server` Studio API endpoints:
@@ -1239,6 +1265,7 @@ setup notice) repaint without Preferences having to know they exist.
 
 ## Changelog
 
+- **0.4.3-draft** (2026-08-03) — §9.1.1: destructive confirmations state the reference count — what a delete breaks, what a rename rewrites, and the three states (counted / uncountable / unsupported) that are never collapsed.
 - **0.4.2-draft** (2026-08-03) — The Inspector's fourth tab (§3.1, §6): the assistant is Content · Style · Logic · Assistant, not a fifth column; two docks, one persisted record. Application Preferences (§15) — Appearance, Assistant, Accounts (listed and revocable) and a registry-generated Keyboard sheet.
 - **0.4.1-draft** (2026-08-02) — Automation surface is a projection of the command registry (§13.5): the projection, idempotence and Remote rules; probe.idle() as a failing predicate; pointAt in top-document coordinates.
 - **0.4.0-draft** (2026-08-02) — Command Registry and Context Keys (§13); Tabs and Document Identity (§14) — drill-in opens a real tab, labels disambiguate by route.
@@ -1285,4 +1312,4 @@ setup notice) repaint without Preferences having to know they exist.
 
 ---
 
-_`@jxsuite/studio` Specification v0.4.2-draft_
+_`@jxsuite/studio` Specification v0.4.3-draft_

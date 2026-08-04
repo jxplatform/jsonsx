@@ -373,6 +373,10 @@ export function createDesktopPlatform() {
       return rpc.request.renameFile({ from, to });
     },
 
+    async findReferences(target: { path?: string; tagName?: string }) {
+      return rpc.request.findReferences(target);
+    },
+
     subscribeFileEvents(handler: (events: FsEventPayload[]) => void) {
       fileEventHandler = handler;
       return () => {

@@ -1,5 +1,6 @@
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { fakeCell, fakeRange, fakeRow, FakeTabulator, tabulatorMockModule } from "./tabulator-mock";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
 import { undo } from "../src/tabs/transact";
@@ -13,7 +14,7 @@ void mock.module("../src/ui/layers.js", () => ({
 void mock.module("../src/ui/progress-modal.js", () => ({
   showProgressModal: () => ({ done: () => {}, fail: () => {}, setStatus: () => {} }),
 }));
-void mock.module("../src/panels/statusbar.js", () => ({ statusMessage: () => {} }));
+void mock.module("../src/services/notify.js", () => notifyModule(() => {}));
 
 const popoverCalls: { column: string; value: unknown; commit: (v: unknown) => void }[] = [];
 void mock.module("../src/grid/cell-popovers.js", () => ({

@@ -1,5 +1,6 @@
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { FakeTabulator, tabulatorMockModule } from "./tabulator-mock";
 import { render } from "lit-html";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
@@ -29,7 +30,7 @@ void mock.module("../src/ui/layers.js", () => ({
 void mock.module("../src/ui/progress-modal.js", () => ({
   showProgressModal: () => ({ done: () => {}, fail: () => {}, setStatus: () => {} }),
 }));
-void mock.module("../src/panels/statusbar.js", () => ({ statusMessage: () => {} }));
+void mock.module("../src/services/notify.js", () => notifyModule(() => {}));
 
 const { createGridController } = await import("../src/grid/grid-controller");
 const { detachGridPanel, gridPanelMounted, renderGridMode } =

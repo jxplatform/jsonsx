@@ -7,7 +7,7 @@ import { ref } from "lit-html/directives/ref.js";
 import { showDialog } from "../ui/layers";
 import { authenticateGithub } from "./github-auth";
 import { getPlatform } from "../platform";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 
 interface GithubErrorResponse {
   errors?: { message?: string }[];
@@ -97,7 +97,9 @@ export async function publishToGithub({ projectName }: { projectName: string }) 
     return false;
   }
 
-  statusMessage("Creating GitHub repository…");
+  // One key across the whole publish, so the three progress lines REPLACE each other instead of
+  // Stacking into a transcript. A long operation's log belongs in the Bottom dock's Activity tab.
+  notify.info("Creating GitHub repository…", { key: "github.publish", source: "Publish" });
 
   const createRes = await fetch("https://api.github.com/user/repos", {
     body: JSON.stringify({
@@ -117,28 +119,36 @@ export async function publishToGithub({ projectName }: { projectName: string }) 
   if (!createRes.ok) {
     const err = (await createRes.json()) as GithubErrorResponse;
     const msg = err.errors?.[0]?.message || err.message || "Failed to create repository";
-    statusMessage(`Error: ${msg}`);
+    notify.error("Could not create the GitHub repository.", {
+      detail: msg,
+      key: "github.publish",
+      source: "Publish",
+    });
     return false;
   }
 
   const repo = (await createRes.json()) as GithubRepoResponse;
   const platform = getPlatform();
 
-  statusMessage("Setting remote and pushing…");
+  notify.info("Setting remote and pushing…", { key: "github.publish", source: "Publish" });
 
   await platform.gitAddRemote("origin", repo.clone_url);
 
-  statusMessage("Pushing to GitHub…");
+  notify.info("Pushing to GitHub…", { key: "github.publish", source: "Publish" });
   try {
     await platform.gitPush({ setUpstream: true });
   } catch (error) {
-    statusMessage(`Push failed: ${errorMessage(error)}`);
+    notify.error("Could not push to GitHub.", {
+      detail: errorMessage(error),
+      key: "github.publish",
+      source: "Publish",
+    });
     return false;
   }
 
   // Lazy import breaks the github-publish ↔ git-panel module cycle
   const { refreshGitStatus } = await import("../panels/git-panel");
   await refreshGitStatus();
-  statusMessage(`Published to GitHub: ${repo.html_url}`);
+  notify.success(`Published to GitHub: ${repo.html_url}`, { key: "github.publish" });
   return true;
 }

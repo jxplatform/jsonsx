@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.5-draft
+**Version:** 0.3.6-draft
 **Status:** Pending
-**Updated:** 2026-08-02
+**Updated:** 2026-08-03
 **License:** MIT
 
 ---
@@ -80,7 +80,7 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | Family                   | Representative members                                                                                                                                                                                                         |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Session / project**    | `id`, `projectRoot`, `activate`, `openProject`, `openProjectPicker?`, `probeRootProject`, `createDestination`, `createProject`, `pickDirectory?`, `listStarters?`, `importSite?`, `listProjects?`, recent-projects persistence |
-| **Filesystem**           | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `createDirectory`, `locateFile`, `searchFiles`, `subscribeFileEvents?`                                                                     |
+| **Filesystem**           | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `findReferences?`, `createDirectory`, `locateFile`, `searchFiles`, `subscribeFileEvents?`                                                  |
 | **Documents / formats**  | `discoverComponents`, `listFormats?`, `listExtensions?`, `fetchProjectSchemas?`, `formatAction?`, `fetchPluginSchema`                                                                                                          |
 | **Packages**             | `listPackages`, `addPackage`, `removePackage`, `installDependencies?`, `outdatedPackages?`, `setPackageVersions?`                                                                                                              |
 | **Git**                  | `gitStatus`, `gitCommit`, `gitPush`, `gitPull`, `gitDiff`, `gitCheckout`, `gitClone?`, `createPullRequest?`, …                                                                                                                 |
@@ -317,6 +317,7 @@ A few illustrative rows (see the table for the rest):
 | Read file           | `GET /__studio/file?path=`      | `readFile(path)`           |
 | Write file          | `PUT /__studio/file?path=`      | `writeFile(path, content)` |
 | Rename file         | `POST /__studio/file/rename`    | `renameFile(from, to)`     |
+| Find references     | `GET /__studio/references`      | `findReferences(target)?`  |
 | Discover components | `GET /__studio/components?dir=` | `discoverComponents(dir)`  |
 | Realtime co-editing | `GET /__studio/collab` (WS)     | `collab(docPath)`          |
 
@@ -817,6 +818,7 @@ Ensure desktop app matches dev-mode capabilities:
 
 ## Changelog
 
+- **0.3.6-draft** (2026-08-03) — §3.1/§5.1: findReferences? PAL member and the GET /__studio/references route — the read side of the rename refactor's walker.
 - **0.3.5-draft** (2026-08-02) — searchFiles, gitShow and openExternal RPC handlers registered on both launchers; styles/ staged into the packaged app.
 - **0.3.4-draft** (2026-07-31) — List the cfConnect? PAL member in the Publish/identity family — it ships in StudioPlatform and backs the hosted Cloudflare OAuth flow, but the table omitted it.
 - **0.3.3-draft** (2026-07-29) — PAL: launcher-only capabilities (updater, windowControls) stay off the StudioPlatform interface; adapter factories infer their return type and assert conformance instead of annotating it away.
@@ -841,4 +843,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.5-draft_
+_Jx Studio Desktop Architecture Specification v0.3.6-draft_

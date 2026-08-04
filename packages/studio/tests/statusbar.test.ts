@@ -1,15 +1,35 @@
-import { flush, resetWorkspaceWithTab } from "./harness";
-import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import { initShellRefs, registerRenderer, statusbarEl } from "../src/store";
+/**
+ * ⑫ The status bar — three fields, in scope order, every interactive item a command.
+ *
+ * The bar's contract is what it CANNOT do as much as what it can: it holds no transient message, it
+ * has no click handler of its own, and it renders no item whose command the registry does not
+ * have.
+ */
+import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import { nothing, render as litRender } from "lit-html";
+import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { initShellRefs, setProjectState, statusbarEl } from "../src/store";
 import { closeAllTabs } from "../src/workspace/workspace";
 import {
+  aheadBehindLabel,
+  documentLabel,
+  forgetSavedTimes,
   mountStatusbar,
+  noteDocumentSaved,
   renderStatusbar,
-  setStatusbarRenderer,
-  statusMessage,
+  selectionCrumbs,
   unmountStatusbar,
+  viewLabel,
 } from "../src/panels/statusbar";
 import { resetProjectShell, shell } from "../src/shell";
+import { setActiveRegistry } from "../src/commands/active-registry";
+import { createCommandRegistry } from "../src/commands/registry";
+import { makeContext } from "../src/commands/context";
+import { notify, resetNotifications } from "../src/services/notify";
+import { pinClock, unpinClock } from "../src/services/clock";
+import { collabState } from "../src/collab/collab-state";
+import type { CommandContext } from "../src/commands/context";
+import type { AnyCommand } from "../src/commands/registry";
 
 beforeAll(() => {
   const bar = document.createElement("div");
@@ -18,277 +38,423 @@ beforeAll(() => {
   initShellRefs();
 });
 
+let ctx: CommandContext = makeContext();
+const ran: { id: string; args: unknown }[] = [];
+
+/** One command record, as bare as the registry allows: the bar must not care what it does. */
+function stub(id: string, title: string, level: AnyCommand["level"]): AnyCommand {
+  return {
+    category: "View",
+    id,
+    level,
+    run: (_c, args) => {
+      ran.push({ args, id });
+    },
+    title,
+  } as AnyCommand;
+}
+
+function buildRegistry(ids?: readonly string[]) {
+  const registry = createCommandRegistry({ getContext: () => ctx });
+  const all: AnyCommand[] = [
+    stub("project.open", "Open Project…", "project"),
+    stub("project.openRecent", "Open Recent…", "project"),
+    stub("panel.focus.git", "Show Source Control", "application"),
+    stub("panel.focus.problems", "Show Problems", "application"),
+    stub("palette.openFiles", "Go to File…", "application"),
+    stub("file.save", "Save", "document"),
+    stub("selection.set", "Select Element", "document"),
+  ];
+  registry.registerAll(ids ? all.filter((c) => ids.includes(c.id)) : all);
+  return registry;
+}
+
 beforeEach(() => {
   closeAllTabs();
+  // `projectState` is a module-level binding, not a per-test one: the bar's "No project" state has
+  // To be stated rather than inherited from whichever test ran last.
+  setProjectState(null as never);
   resetProjectShell();
-  statusbarEl.innerHTML = "";
-  setStatusbarRenderer(renderStatusbar);
+  resetNotifications();
+  forgetSavedTimes();
+  ran.length = 0;
+  ctx = makeContext();
+  // Cleared THROUGH lit: assigning innerHTML behind its back strands the part markers and the
+  // Next render walks a detached tree.
+  litRender(nothing, statusbarEl);
+  setActiveRegistry(buildRegistry());
 });
 
-afterEach(async () => {
+afterEach(() => {
   unmountStatusbar();
-  // Drain any pending statusMessage timeout so it can't leak into the next test.
-  statusMessage("", 1);
-  await flush();
-  setStatusbarRenderer(() => {});
+  setActiveRegistry(null);
+  resetNotifications();
+  unpinClock();
 });
 
-// ─── renderStatusbar ──────────────────────────────────────────────────────────
+const items = () => [...statusbarEl.querySelectorAll(".sb-item")].map((e) => e.textContent?.trim());
+const field = (name: string) => statusbarEl.querySelector(`[data-jx-region="statusbar/${name}"]`);
 
-describe("renderStatusbar", () => {
-  test("no tab renders the default label", () => {
-    renderStatusbar();
-    expect(statusbarEl.innerHTML).toBe("Jx Studio");
+// ─── Pure helpers ─────────────────────────────────────────────────────────────
+
+describe("aheadBehindLabel", () => {
+  test("says nothing when the branch is level with its upstream", () => {
+    expect(aheadBehindLabel(0, 0)).toBe("");
   });
 
-  test("content mode shows Content Mode", () => {
-    const tab = resetWorkspaceWithTab();
-    tab.doc.mode = "content";
-    renderStatusbar();
-    expect(statusbarEl.innerHTML).toContain("Content Mode");
+  test("names each direction only when it is non-zero", () => {
+    expect(aheadBehindLabel(2, 0)).toBe(" ↑2");
+    expect(aheadBehindLabel(0, 3)).toBe(" ↓3");
+    expect(aheadBehindLabel(2, 3)).toBe(" ↑2 ↓3");
+  });
+});
+
+describe("viewLabel", () => {
+  test("a canvas pane reports its EFFECTIVE view, not its mode string", () => {
+    expect(viewLabel("canvas", "edit")).toBe("Edit");
+    expect(viewLabel("canvas", "design")).toBe("Design");
+    expect(viewLabel("canvas", "preview")).toBe("Preview");
   });
 
-  test("selection shows node label and clickable path segments", () => {
-    const tab = resetWorkspaceWithTab({
-      children: [{ tagName: "p", textContent: "Hello" }],
+  test("every other editor kind is named by its kind", () => {
+    expect(viewLabel("code", "design")).toBe("Code");
+    expect(viewLabel("grid", "design")).toBe("Grid");
+    expect(viewLabel("diff", "design")).toBe("Diff");
+    expect(viewLabel("library", "design")).toBe("Library");
+    expect(viewLabel("config", "design")).toBe("Stylebook");
+  });
+
+  test("no editor means no label", () => {
+    expect(viewLabel("none", "design")).toBe("");
+  });
+});
+
+describe("documentLabel", () => {
+  test("strips the project root, which is already field one", () => {
+    resetStudioState({ name: "Site", projectRoot: "/home/k/site" });
+    expect(documentLabel("/home/k/site/pages/index.json")).toBe("pages/index.json");
+  });
+
+  test("leaves a path outside the root alone, and names an unsaved document", () => {
+    resetStudioState({ name: "Site", projectRoot: "/home/k/site" });
+    expect(documentLabel("/elsewhere/x.json")).toBe("/elsewhere/x.json");
+    expect(documentLabel(null)).toBe("Untitled");
+  });
+});
+
+describe("selectionCrumbs", () => {
+  test("one crumb per NODE, with the path that selects it", () => {
+    const doc = {
+      children: [{ children: [{ tagName: "li" }], tagName: "ul" }],
       tagName: "div",
-    });
-    tab.session.selection = ["children", 0];
-    renderStatusbar();
-    expect(statusbarEl.innerHTML).toContain("Selected: p — Hello");
-    const seg = statusbarEl.querySelector(".sb-path-seg") as HTMLElement;
-    expect(seg).not.toBeNull();
-    expect(seg.textContent).toBe("p");
-    expect(seg.dataset.path).toBe(JSON.stringify(["children", 0]));
+    };
+    expect(selectionCrumbs(doc, ["children", 0, "children", 0])).toEqual([
+      { label: "ul", path: ["children", 0] },
+      { label: "li", path: ["children", 0, "children", 0] },
+    ]);
   });
 
-  test("multi-level selection renders one segment per path pair", () => {
+  test("a repeater's lone `map` segment does not break the pairing", () => {
+    const doc = {
+      children: [{ $prototype: "Array", map: { tagName: "article" } }],
+      tagName: "div",
+    };
+    expect(selectionCrumbs(doc, ["children", 0, "map"]).map((c) => c.label)).toEqual([
+      "Repeater",
+      "article",
+    ]);
+  });
+
+  test("falls back to `tag`, then to a bracketed index", () => {
+    const doc = { children: [{ tag: "h2" }, {}], tagName: "div" };
+    expect(selectionCrumbs(doc, ["children", 0])[0]!.label).toBe("h2");
+    expect(selectionCrumbs(doc, ["children", 1])[0]!.label).toBe("[1]");
+  });
+
+  test("a `cases` step is named by its case key", () => {
+    const doc = { cases: { warm: {} }, tagName: "div" };
+    expect(selectionCrumbs(doc, ["cases", "warm"])[0]!.label).toBe("warm");
+  });
+});
+
+// ─── ⑫a PROJECT ──────────────────────────────────────────────────────────────
+
+describe("the PROJECT field", () => {
+  test("with no project it offers the one command that fixes that", () => {
+    renderStatusbar();
+    expect(field("project")?.textContent?.trim()).toBe("No project");
+  });
+
+  test("names the project, and the name is Open Recent…", () => {
+    resetStudioState({ name: "My Site", projectRoot: "/p" });
+    renderStatusbar();
+    const button = field("project")?.querySelector("button") as HTMLButtonElement;
+    expect(button.textContent?.trim()).toBe("My Site");
+    expect(button.title).toContain("Open Recent…");
+    button.click();
+    expect(ran).toEqual([{ args: {}, id: "project.openRecent" }]);
+  });
+
+  test("the branch item appears only for a repo, and carries ahead/behind", () => {
+    resetStudioState({ name: "My Site", projectRoot: "/p" });
+    renderStatusbar();
+    expect(items()).not.toContain("⑂ main");
+    shell.git.status = { ahead: 1, behind: 2, branch: "main", files: [], isRepo: true } as never;
+    renderStatusbar();
+    expect(items()).toContain("⑂ main ↑1 ↓2");
+  });
+
+  test("the problems item counts `notify`'s Problems store, and appears only when non-zero", () => {
+    resetStudioState({ name: "My Site", projectRoot: "/p" });
+    renderStatusbar();
+    expect(items().some((t) => t?.startsWith("⚠"))).toBe(false);
+    notify.error("Could not save.");
+    notify.warn("Slots", { tier: "problem" });
+    renderStatusbar();
+    expect(items()).toContain("⚠ 2");
+    (field("project")!.querySelectorAll("button")[1] as HTMLElement).click();
+    expect(ran.at(-1)!.id).toBe("panel.focus.problems");
+  });
+
+  test("the peers item is silent until a `Collaborate:` command exists to name", () => {
+    resetStudioState({ name: "My Site", projectRoot: "/p" });
+    const tab = resetWorkspaceWithTab();
+    collabState(tab).peers = [{ color: "#f00", name: "Ada" }] as never;
+    renderStatusbar();
+    // The registry has no `collab.share`, so the item renders nothing rather than a dead label.
+    expect(items().some((t) => t?.includes("peer"))).toBe(false);
+  });
+});
+
+// ─── ⑫b DOCUMENT ─────────────────────────────────────────────────────────────
+
+describe("the DOCUMENT field", () => {
+  test("does not exist with no document open", () => {
+    renderStatusbar();
+    expect(field("document")).toBeNull();
+  });
+
+  test("names the path, and the path is Go to File…", () => {
+    resetStudioState({ name: "Site", projectRoot: "/p" });
+    resetWorkspaceWithTab(undefined, { documentPath: "/p/pages/index.json" });
+    renderStatusbar();
+    const button = field("document")?.querySelector("button") as HTMLButtonElement;
+    expect(button.textContent?.trim()).toBe("pages/index.json");
+    button.click();
+    expect(ran.at(-1)!.id).toBe("palette.openFiles");
+  });
+
+  test("reports the EFFECTIVE view, so it cannot disagree with the Command Bar again", () => {
+    resetWorkspaceWithTab();
+    ctx = makeContext({ canvas: { view: "preview" }, editor: { kind: "canvas" } });
+    renderStatusbar();
+    expect(items()).toContain("Preview");
+    // The old bar printed "Content Mode" off `tab.doc.mode` while the toolbar printed "Design".
+    expect(items()).not.toContain("Content Mode");
+  });
+
+  test("the save state is worded, and while dirty it IS the save command", () => {
+    const tab = resetWorkspaceWithTab();
+    tab.doc.dirty = true;
+    renderStatusbar();
+    expect(items()).toContain("Unsaved changes");
+    const save = [...statusbarEl.querySelectorAll("button")].find(
+      (b) => b.textContent?.trim() === "Unsaved changes",
+    )!;
+    save.click();
+    expect(ran.at(-1)!.id).toBe("file.save");
+  });
+
+  test("a clean document with no recorded write says only Saved", () => {
+    resetWorkspaceWithTab();
+    renderStatusbar();
+    expect(items()).toContain("Saved");
+  });
+
+  test("a recorded write is worded relative to the clock seam", () => {
+    resetStudioState({ name: "Site", projectRoot: "/p" });
+    resetWorkspaceWithTab(undefined, { documentPath: "/p/index.json" });
+    pinClock(1_000_000);
+    noteDocumentSaved("/p/index.json");
+    pinClock(1_000_000 + 120_000);
+    renderStatusbar();
+    expect(items()).toContain("Saved 2m ago");
+  });
+
+  test("noteDocumentSaved ignores an absent path, and forgetSavedTimes clears the record", () => {
+    resetStudioState({ name: "Site", projectRoot: "/p" });
+    resetWorkspaceWithTab(undefined, { documentPath: "/p/index.json" });
+    noteDocumentSaved(null);
+    pinClock(2_000_000);
+    noteDocumentSaved("/p/index.json");
+    forgetSavedTimes();
+    renderStatusbar();
+    expect(items()).toContain("Saved");
+  });
+
+  test("a read-only collab guest is told so, in words", () => {
+    const tab = resetWorkspaceWithTab();
+    tab.doc.dirty = true;
+    collabState(tab).readOnly = true;
+    renderStatusbar();
+    expect(items()).toContain("Read-only");
+    expect(items()).not.toContain("Unsaved changes");
+  });
+});
+
+// ─── ⑫c SELECTION ────────────────────────────────────────────────────────────
+
+describe("the SELECTION field", () => {
+  test("is absent with nothing selected", () => {
+    resetWorkspaceWithTab();
+    renderStatusbar();
+    expect(field("selection")).toBeNull();
+  });
+
+  test("renders the node label and one command per ancestor crumb", () => {
     const tab = resetWorkspaceWithTab({
-      children: [
-        {
-          children: [{ tagName: "li", textContent: "Item" }],
-          tagName: "ul",
-        },
-      ],
+      children: [{ children: [{ tagName: "li", textContent: "Item" }], tagName: "ul" }],
       tagName: "div",
     });
     tab.session.selection = ["children", 0, "children", 0];
     renderStatusbar();
-    const segs = [...statusbarEl.querySelectorAll(".sb-path-seg")];
-    expect(segs.map((s) => s.textContent)).toEqual(["ul", "li"]);
-    expect(statusbarEl.querySelectorAll(".sb-path-sep").length).toBe(1);
+    const selection = field("selection")!;
+    expect(selection.querySelector(".sb-state")?.textContent).toContain("li");
+    expect([...selection.querySelectorAll("button")].map((b) => b.textContent?.trim())).toEqual([
+      "ul",
+      "li",
+    ]);
+    expect(selection.querySelectorAll(".sb-sep")).toHaveLength(1);
   });
 
-  test("repeater path shows a Repeater crumb instead of a bare [index]", () => {
+  test("a crumb click is `selection.set` with the crumb's path — no bespoke handler", () => {
     const tab = resetWorkspaceWithTab({
-      children: [
-        {
-          children: [
-            {
-              $prototype: "Array",
-              items: { $ref: "#/state/projects" },
-              map: { tagName: "article", textContent: "Card" },
-            },
-          ],
-          tagName: "section",
-        },
-      ],
+      children: [{ children: [{ tagName: "li" }], tagName: "ul" }],
       tagName: "div",
-    } as any);
-    // Selecting the repeater template: the lone "map" segment must not break the pairing.
-    tab.session.selection = ["children", 0, "children", 0, "map"];
+    });
+    ctx = makeContext({ document: { open: true } });
+    tab.session.selection = ["children", 0, "children", 0];
     renderStatusbar();
-    const segs = [...statusbarEl.querySelectorAll(".sb-path-seg")] as HTMLElement[];
-    expect(segs.map((s) => s.textContent)).toEqual(["section", "Repeater", "article"]);
-    // The Repeater crumb targets the array node's own path (clickable → selects the array).
-    expect(segs[1]!.dataset.path).toBe(JSON.stringify(["children", 0, "children", 0]));
-    expect(segs[2]!.dataset.path).toBe(JSON.stringify(["children", 0, "children", 0, "map"]));
+    (field("selection")!.querySelector("button") as HTMLElement).click();
+    expect(ran).toEqual([{ args: { path: ["children", 0] }, id: "selection.set" }]);
   });
 
-  test("segment label falls back to tag then [index]", () => {
-    const tab = resetWorkspaceWithTab({
-      children: [{ tag: "h2", textContent: "Styled" }, { textContent: "Anon" }],
-      tagName: "div",
-    } as any);
-    tab.session.selection = ["children", 0];
-    renderStatusbar();
-    expect(statusbarEl.querySelector(".sb-path-seg")?.textContent).toBe("h2");
-
-    tab.session.selection = ["children", 1];
-    renderStatusbar();
-    expect(statusbarEl.querySelector(".sb-path-seg")?.textContent).toBe("[1]");
-  });
-
-  test("escapes HTML in node labels", () => {
+  test("escaping is lit's job now, not a three-character escaper's", () => {
     const tab = resetWorkspaceWithTab({
       children: [{ tagName: "p", textContent: "<b>&hi" }],
       tagName: "div",
     });
     tab.session.selection = ["children", 0];
     renderStatusbar();
-    expect(statusbarEl.innerHTML).toContain("&lt;b&gt;&amp;hi");
     expect(statusbarEl.querySelector("b")).toBeNull();
+    expect(field("selection")?.textContent).toContain("<b>&hi");
   });
 
-  test("stylebook selection shows Style path when no node selection", () => {
+  test("the stylebook selector is the field's content when no node is picked", () => {
     resetWorkspaceWithTab();
     shell.stylebook.selection = "ul li";
     renderStatusbar();
-    expect(statusbarEl.innerHTML).toContain("Style: ul &gt; li");
-    expect(statusbarEl.textContent).toContain("Style: ul > li");
+    expect(field("selection")?.textContent?.trim()).toBe("ul › li");
   });
 
-  test("node selection wins over stylebook selection", () => {
-    const tab = resetWorkspaceWithTab({
-      children: [{ tagName: "p", textContent: "Hi" }],
-      tagName: "div",
-    });
+  test("a node selection wins over the stylebook selector", () => {
+    const tab = resetWorkspaceWithTab({ children: [{ tagName: "p" }], tagName: "div" });
     shell.stylebook.selection = "h1";
     tab.session.selection = ["children", 0];
     renderStatusbar();
-    expect(statusbarEl.innerHTML).toContain("Selected:");
-    expect(statusbarEl.innerHTML).not.toContain("Style: h1");
+    expect(field("selection")?.textContent).not.toContain("h1");
   });
+});
 
-  test("parts are joined with separators, with the selection field in its own region", () => {
-    const tab = resetWorkspaceWithTab();
-    tab.doc.mode = "content";
-    shell.stylebook.selection = "h1";
+// ─── The registry is the source of truth ─────────────────────────────────────
+
+describe("items are a rendering of the registry", () => {
+  test("no registry at all paints an empty bar rather than crashing", () => {
+    setActiveRegistry(null);
+    resetStudioState({ name: "Site", projectRoot: "/p" });
+    resetWorkspaceWithTab();
     renderStatusbar();
-    expect(statusbarEl.textContent).toContain("Content Mode  |  Style: h1");
-    // `statusbar/selection` is one of the bar's three declared placements — the only one it renders
-    // Today — so it is emitted as its own element rather than as a run of text in a joined string.
-    const field = statusbarEl.querySelector('[data-jx-region="statusbar/selection"]');
-    expect(field?.textContent).toBe("Style: h1");
+    expect(statusbarEl.querySelectorAll("button")).toHaveLength(0);
+  });
+
+  test("an item whose command is unregistered disappears; the field survives", () => {
+    setActiveRegistry(buildRegistry(["project.openRecent"]));
+    resetStudioState({ name: "Site", projectRoot: "/p" });
+    shell.git.status = { ahead: 0, behind: 0, branch: "main", files: [], isRepo: true } as never;
+    renderStatusbar();
+    expect(items()).toEqual(["Site"]);
+  });
+
+  test("a hidden command hides its item", () => {
+    const registry = createCommandRegistry({ getContext: () => ctx });
+    registry.register({
+      ...stub("project.openRecent", "Open Recent…", "project"),
+      when: () => false,
+    });
+    setActiveRegistry(registry);
+    resetStudioState({ name: "Site", projectRoot: "/p" });
+    renderStatusbar();
+    expect(field("project")).toBeNull();
+  });
+
+  test("a disabled command renders disabled, with its own requires sentence", () => {
+    const registry = createCommandRegistry({ getContext: () => ctx });
+    registry.register({
+      ...stub("file.save", "Save", "document"),
+      enablement: () => false,
+      requires: "a writable target",
+    });
+    setActiveRegistry(registry);
+    const tab = resetWorkspaceWithTab();
+    tab.doc.dirty = true;
+    renderStatusbar();
+    const save = statusbarEl.querySelector("button") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    expect(save.title).toContain("a writable target");
   });
 });
 
-// ─── statusMessage ────────────────────────────────────────────────────────────
-
-describe("statusMessage", () => {
-  test("shows the message, escaped, then clears after the duration", async () => {
-    closeAllTabs();
-    statusMessage("<saved> & done", 20);
-    expect(statusbarEl.innerHTML).toContain("&lt;saved&gt; &amp; done");
-    await new Promise((resolve) => {
-      setTimeout(resolve, 60);
-    });
-    expect(statusbarEl.innerHTML).toBe("Jx Studio");
-  });
-
-  test("a newer message resets the pending timeout", async () => {
-    statusMessage("first", 20);
-    statusMessage("second", 60);
-    await new Promise((resolve) => {
-      setTimeout(resolve, 40);
-    });
-    // First timeout was cleared; second message still visible.
-    expect(statusbarEl.innerHTML).toContain("second");
-    await new Promise((resolve) => {
-      setTimeout(resolve, 60);
-    });
-    expect(statusbarEl.innerHTML).toBe("Jx Studio");
-  });
-
-  test("invokes the registered renderer callback", () => {
-    const rerender = mock(() => {});
-    setStatusbarRenderer(rerender);
-    statusMessage("ping", 10);
-    expect(rerender).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ─── mountStatusbar / clicks / unmount ────────────────────────────────────────
+// ─── Mounting ────────────────────────────────────────────────────────────────
 
 describe("mountStatusbar", () => {
-  test("renders reactively when tab state changes", async () => {
+  test("repaints when the state it renders changes", async () => {
     const tab = resetWorkspaceWithTab();
     mountStatusbar();
     await flush();
-    expect(statusbarEl.innerHTML).toBe("Jx Studio");
-
+    expect(field("selection")).toBeNull();
     tab.session.selection = ["children", 0];
     await flush();
-    expect(statusbarEl.innerHTML).toContain("Selected:");
+    expect(field("selection")).not.toBeNull();
   });
 
-  test("clicking a path segment updates the selection and re-renders panels", async () => {
-    const canvasRenderer = mock(() => {});
-    registerRenderer("canvas", canvasRenderer);
-    const tab = resetWorkspaceWithTab({
-      children: [
-        {
-          children: [{ tagName: "li", textContent: "Item" }],
-          tagName: "ul",
-        },
-      ],
-      tagName: "div",
-    });
+  test("repaints when a problem arrives", async () => {
+    resetStudioState({ name: "Site", projectRoot: "/p" });
     mountStatusbar();
-    tab.session.selection = ["children", 0, "children", 0];
     await flush();
-
-    const seg = statusbarEl.querySelector(".sb-path-seg") as HTMLElement;
-    expect(seg.textContent).toBe("ul");
-    seg.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(tab.session.selection).toEqual(["children", 0]);
-    expect(canvasRenderer).toHaveBeenCalled();
+    expect(items()).not.toContain("⚠ 1");
+    notify.error("Broken");
+    await flush();
+    expect(items()).toContain("⚠ 1");
   });
 
-  test("clicks outside path segments are ignored", async () => {
+  test("is idempotent — a second mount replaces the effect rather than stacking one", async () => {
     const tab = resetWorkspaceWithTab();
     mountStatusbar();
-    tab.session.selection = ["children", 0];
-    await flush();
-
-    statusbarEl.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(tab.session.selection).toEqual(["children", 0]);
-  });
-
-  test("segment without data-path is ignored", async () => {
-    const tab = resetWorkspaceWithTab();
     mountStatusbar();
     await flush();
     tab.session.selection = ["children", 0];
-    const span = document.createElement("span");
-    span.className = "sb-path-seg";
-    statusbarEl.append(span);
-    span.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(tab.session.selection).toEqual(["children", 0]);
+    await flush();
+    expect(statusbarEl.querySelectorAll('[data-jx-region="statusbar/selection"]')).toHaveLength(1);
   });
 
-  test("invalid JSON in data-path is swallowed", async () => {
+  test("unmount stops the repaint", async () => {
     const tab = resetWorkspaceWithTab();
     mountStatusbar();
     await flush();
-    tab.session.selection = ["children", 0];
-    const span = document.createElement("span");
-    span.className = "sb-path-seg";
-    span.dataset.path = "{not json";
-    statusbarEl.append(span);
-    expect(() => {
-      span.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    }).not.toThrow();
-    expect(tab.session.selection).toEqual(["children", 0]);
-  });
-
-  test("unmount stops reactive re-rendering and click handling", async () => {
-    const tab = resetWorkspaceWithTab();
-    mountStatusbar();
-    await flush();
+    expect(field("selection")).toBeNull();
     unmountStatusbar();
-
-    statusbarEl.innerHTML = "frozen";
     tab.session.selection = ["children", 0];
     await flush();
-    expect(statusbarEl.innerHTML).toBe("frozen");
-
-    const span = document.createElement("span");
-    span.className = "sb-path-seg";
-    span.dataset.path = JSON.stringify(["children", 0]);
-    statusbarEl.append(span);
-    tab.session.selection = null;
-    span.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(tab.session.selection).toBeNull();
+    expect(field("selection")).toBeNull();
   });
 });

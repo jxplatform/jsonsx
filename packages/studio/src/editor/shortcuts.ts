@@ -61,7 +61,7 @@ import { rectOf } from "../utils/geometry";
 import { DOCK_IDS, setActivityTab, setDockCollapsed, shell } from "../shell";
 import { REGION_FOR_FOCUS, resolveRegion } from "../ui/regions";
 import { getPlatform, hasPlatform } from "../platform";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { navigatorPanelSet } from "../panels/navigator-panels";
 import { copyNode, cutNode, pasteNode } from "./context-menu";
 
@@ -531,8 +531,9 @@ export async function openProjectFlow(hooks: StudioCommandHooks): Promise<void> 
     return;
   }
   await hooks.openProject(choice);
-  statusMessage(
+  notify.info(
     choice === "newWindow" ? "Opening the project in a new window…" : "Opening the project…",
+    { key: "project.open", source: "Project" },
   );
 }
 

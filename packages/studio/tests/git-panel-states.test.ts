@@ -33,10 +33,6 @@ void mock.module("../src/ui/layers.js", () => ({
   showPromptDialog: async () => null,
 }));
 
-void mock.module("../src/panels/statusbar.js", () => ({
-  statusMessage: () => {},
-}));
-
 void mock.module("../src/packages/pull-package-sync.js", () => ({
   autoSyncProjectOnOpen: async () => {},
   isAutomatedPackageDiff: () => false,

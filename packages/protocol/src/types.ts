@@ -60,6 +60,48 @@ export interface RenameResult {
   error?: string;
 }
 
+/** One kind of reference in one file, with how many times it occurs there. */
+export interface ReferenceHit {
+  /**
+   * Which key carried it: `$ref`, `$layout`, `$src`, `attr`, `imports`, `$elements`, `url`,
+   * `tagName`.
+   */
+  refType: string;
+  /** The reference exactly as authored (`"./Card.json"`), or `"<my-card>"` for a tag instance. */
+  ref: string;
+  count: number;
+}
+
+/** Every reference to the queried target from one document. */
+export interface ReferenceFile {
+  /** Project-relative, forward-slashed. */
+  path: string;
+  /** Total references in this file (the sum of `refs[].count`). */
+  count: number;
+  refs: ReferenceHit[];
+}
+
+/**
+ * Where a file or a component tag is used — the answer behind "Used on N pages", Find Usages, and
+ * the reference count inside every delete and rename confirmation. Never includes the target file
+ * itself: a component's own definition declares the tag it is named by, and counting that would
+ * report an unused component as used once.
+ */
+export interface ReferencesResult {
+  /** The project-relative path queried, or null when only a tag was. */
+  path: string | null;
+  /** The tag queried — passed in, or derived from a component document at `path`. */
+  tagName: string | null;
+  /** Referencing files, sorted by path. */
+  files: ReferenceFile[];
+  /** `files.length`, carried on the wire so a caller can render a count without the list. */
+  filesReferencing: number;
+  /** Total references across every file. */
+  refsTotal: number;
+  /** Documents that could not be parsed. A non-empty list makes every count above a FLOOR. */
+  errors: { path: string; error: string }[];
+}
+
 // ─── Git ─────────────────────────────────────────────────────────────────────
 
 export interface GitFileStatus {

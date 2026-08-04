@@ -22,6 +22,21 @@
  * system — it is invariably being held together by inline `style=` attributes instead, which is how
  * half the app drifted away from the tokens in the first place. See ALLOWED_ORPHANS.
  *
+ * The third and fourth rules are about SILENCE rather than styling, and they live here because this
+ * file is the package's idiom for "a wide, shallow property with a ratcheting allow-list" — the
+ * shape UX-REDESIGN-PLAN §7.1 asks for by name:
+ *
+ * - **`statusMessage` is banned from `src/`.** It is deleted: 78 call sites — 26 failures and 52
+ *   successes — printed the same 11px grey line and erased it after three seconds. Outcomes go to
+ *   `services/notify.ts` (`notify.success/warn/error`), whose tier is chosen by the action the
+ *   outcome requires. Without a mechanical guard a wide, shallow change like that silently regrows,
+ *   one convenient call at a time; the rule has no allow-list because there is nothing to allow.
+ * - **A bare empty `catch` is banned from `src/`.** 158 of 240 catch blocks reached no surface at all
+ *   and 46 were entirely empty. A block with no statements AND no comment says nothing about
+ *   whether the silence was decided or forgotten — so it must either notify, or carry an explicit
+ *   `// intentionally ignored: <reason>`. SILENT_CATCH_BUDGET is the shrinking backlog, per file,
+ *   and it fails BOTH ways: a new one fails, and a stale count fails too.
+ *
  * Run: bun run scripts/check-styles.ts (also wired into `bun test` via package.json)
  */
 
@@ -273,6 +288,129 @@ export interface Finding {
   file: string;
   line: number;
   text: string;
+}
+
+/* --------------------------------------------------------------------------- silence rules --- */
+
+/**
+ * Identifiers `src/**` may not name. One entry, and it is meant to stay one.
+ *
+ * `statusMessage` was Studio's whole feedback system: a 24px strip, one line of 11px grey, gone in
+ * 3000 ms, identical for a failed save and a successful copy. Every one of its 78 call sites now
+ * names a severity and, where recovery exists, a COMMAND ID — so the toast's Retry button and the
+ * Problems row's Fix button come off the command record instead of being invented per call site.
+ */
+const BANNED_IDENTIFIERS: readonly { name: string; instead: string }[] = [
+  {
+    instead: "notify.success / notify.warn / notify.error from src/services/notify.ts",
+    name: "statusMessage",
+  },
+];
+
+/**
+ * Bare empty catches that predate the rule, per file — a shrinking backlog, not a knob.
+ *
+ * Each entry is a place the app decides to ignore a failure without saying so. The fix is one of
+ * two lines: a `notify.*` call, or `// intentionally ignored: <reason>` inside the block. Every
+ * entry names the owning module, and the check fails if a count is too HIGH or too LOW, so the list
+ * can only ratchet down.
+ */
+export const SILENT_CATCH_BUDGET: Readonly<Record<string, number>> = {
+  // Owner: platforms/devserver.ts — a probe whose failure means "no path", already returned below.
+  "src/platforms/devserver.ts": 1,
+  // Owner: panels/signals-panel.ts — a JSON default typed one character at a time.
+  "src/panels/signals-panel.ts": 1,
+  // Owner: ui/schema-form.ts — two debounced JSON fields, mid-keystroke parse failures.
+  "src/ui/schema-form.ts": 2,
+};
+
+/**
+ * A `catch` whose block contains NOTHING — not a statement, not even a comment.
+ *
+ * A comment is enough to pass, deliberately: the rule is not "handle every error", it is "say which
+ * silences you chose". `// intentionally ignored: the picker was dismissed` is a complete answer.
+ */
+const BARE_CATCH_RE = /catch\s*(?:\([^)]*\)\s*)?\{\s*\}/g;
+
+/**
+ * Blank out comments and string bodies, preserving every newline so line numbers survive.
+ *
+ * Needed because the banned identifier is legitimately NAMED in prose — `services/notify.ts` and
+ * `panels/statusbar.ts` both explain what they replaced, and a rule that could not tell code from
+ * commentary would force those two files to be coy about it.
+ */
+export function stripCommentsAndStrings(src: string): string {
+  let out = "";
+  let i = 0;
+  const blank = (text: string) => text.replaceAll(/[^\n]/g, " ");
+  while (i < src.length) {
+    const two = src.slice(i, i + 2);
+    if (two === "//") {
+      const end = src.indexOf("\n", i);
+      const stop = end === -1 ? src.length : end;
+      out += blank(src.slice(i, stop));
+      i = stop;
+      continue;
+    }
+    if (two === "/*") {
+      const end = src.indexOf("*/", i + 2);
+      const stop = end === -1 ? src.length : end + 2;
+      out += blank(src.slice(i, stop));
+      i = stop;
+      continue;
+    }
+    const quote = src[i];
+    if (quote === '"' || quote === "'" || quote === "`") {
+      let j = i + 1;
+      while (j < src.length) {
+        if (src[j] === "\\") {
+          j += 2;
+          continue;
+        }
+        if (src[j] === quote) {
+          j += 1;
+          break;
+        }
+        j += 1;
+      }
+      out += quote + blank(src.slice(i + 1, j - 1)) + (src[j - 1] ?? "");
+      i = j;
+      continue;
+    }
+    out += src[i];
+    i += 1;
+  }
+  return out;
+}
+
+/** Every banned-identifier mention in one file's CODE (comments and strings already blanked). */
+export function scanBannedIdentifiers(rel: string, code: string): Finding[] {
+  const findings: Finding[] = [];
+  const lines = code.split("\n");
+  for (const [idx, line] of lines.entries()) {
+    for (const banned of BANNED_IDENTIFIERS) {
+      if (new RegExp(`\\b${banned.name}\\b`).test(line)) {
+        findings.push({
+          file: rel,
+          line: idx + 1,
+          text: `${banned.name} — use ${banned.instead}`,
+        });
+      }
+    }
+  }
+  return findings;
+}
+
+/**
+ * How many bare empty catches one file contains.
+ *
+ * Runs on the RAW source, not on {@link stripCommentsAndStrings}'s output, and that is the whole
+ * point of the rule: a comment inside the block is the justification, so blanking comments first
+ * would flag exactly the files that had already answered.
+ */
+export function countBareCatches(code: string): number {
+  BARE_CATCH_RE.lastIndex = 0;
+  return (code.match(BARE_CATCH_RE) ?? []).length;
 }
 
 /* ------------------------------------------------------------------ hard-coded colour rule --- */
@@ -599,6 +737,10 @@ export interface StyleCheckResult {
   staleAllowed: string[];
   /** Every orphan including the allow-listed ones, for regenerating the list. */
   allOrphans: Finding[];
+  /** `src/` mentions of a BANNED_IDENTIFIERS name, in code (not prose). */
+  banned: Finding[];
+  /** Files whose bare-empty-catch count disagrees with SILENT_CATCH_BUDGET, either way. */
+  silentCatches: { file: string; found: number; allowed: number }[];
 }
 
 function isVendorClass(name: string): boolean {
@@ -648,11 +790,25 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     }
   }
 
+  const banned: Finding[] = [];
+  /** Path → bare empty catches actually present. Compared with the budget after the walk. */
+  const bareCatches = new Map<string, number>();
+
   for await (const rel of new Glob("src/**/*.ts").scan(root)) {
     const source = await read(rel);
     const { errors, warnings } = scanHex(rel, source);
     hexErrors.push(...errors);
     pxWarnings.push(...warnings);
+
+    // The identifier rule reads CODE only — `services/notify.ts` and `panels/statusbar.ts` both
+    // Explain in prose what they replaced, and a rule that could not tell code from commentary
+    // Would force those two files to be coy about it. The catch rule reads the RAW source, because
+    // There a comment is the answer rather than noise.
+    banned.push(...scanBannedIdentifiers(rel, stripCommentsAndStrings(source)));
+    const bare = countBareCatches(source);
+    if (bare > 0) {
+      bareCatches.set(rel, bare);
+    }
 
     for (const css of extractCssTemplates(source)) {
       for (const name of extractDefinedClasses(css)) {
@@ -678,18 +834,29 @@ export async function collect(root: string): Promise<StyleCheckResult> {
   const orphaned = new Set(allOrphans.map((o) => o.text));
   const staleAllowed = [...ALLOWED_ORPHANS].filter((name) => !orphaned.has(name)).toSorted();
 
+  const silentCatches: StyleCheckResult["silentCatches"] = [];
+  for (const file of new Set([...bareCatches.keys(), ...Object.keys(SILENT_CATCH_BUDGET)])) {
+    const found = bareCatches.get(file) ?? 0;
+    const allowed = SILENT_CATCH_BUDGET[file] ?? 0;
+    if (found !== allowed) {
+      silentCatches.push({ allowed, file, found });
+    }
+  }
+
   return {
     hexErrors,
     pxWarnings,
     orphans: allOrphans.filter((o) => !ALLOWED_ORPHANS.has(o.text)),
     staleAllowed,
     allOrphans,
+    banned,
+    silentCatches: silentCatches.toSorted((a, b) => a.file.localeCompare(b.file)),
   };
 }
 
 /** Print the findings and return the process exit code. */
 export function report(result: StyleCheckResult): number {
-  const { hexErrors, pxWarnings, orphans, staleAllowed } = result;
+  const { hexErrors, pxWarnings, orphans, staleAllowed, banned, silentCatches } = result;
 
   if (pxWarnings.length > 0) {
     console.warn(
@@ -739,14 +906,48 @@ export function report(result: StyleCheckResult): number {
     }
   }
 
-  if (hexErrors.length > 0 || orphans.length > 0 || staleAllowed.length > 0) {
+  if (banned.length > 0) {
+    console.error(
+      `\n❌ ${banned.length} use(s) of an identifier src/ may not name. An outcome is a ` +
+        `notification with a severity and (where recovery exists) a command id — not a line of ` +
+        `grey text that erases itself.`,
+    );
+    for (const b of banned) {
+      console.error(`   ${b.file}:${b.line}  ${b.text}`);
+    }
+  }
+
+  if (silentCatches.length > 0) {
+    console.error(
+      `\n❌ ${silentCatches.length} file(s) disagree with SILENT_CATCH_BUDGET. An empty catch ` +
+        `must either reach a surface (notify.*) or say out loud that it will not ` +
+        `(// intentionally ignored: <reason>).`,
+    );
+    for (const c of silentCatches) {
+      console.error(
+        c.found > c.allowed
+          ? `   ${c.file}  ${c.found} bare empty catch(es), ${c.allowed} allowed`
+          : `   ${c.file}  down to ${c.found} — lower its SILENT_CATCH_BUDGET entry from ${c.allowed}`,
+      );
+    }
+  }
+
+  if (
+    hexErrors.length > 0 ||
+    orphans.length > 0 ||
+    staleAllowed.length > 0 ||
+    banned.length > 0 ||
+    silentCatches.length > 0
+  ) {
     return 1;
   }
 
   const pxNote = pxWarnings.length > 0 ? ` (${pxWarnings.length} px token nudge(s) above)` : "";
+  const silentTotal = Object.values(SILENT_CATCH_BUDGET).reduce((a, b) => a + b, 0);
   console.log(
     `✓ check-styles: no hard-coded colours, no undefined classes ` +
-      `(${ALLOWED_ORPHANS.size} allow-listed orphan(s) remaining)${pxNote}.`,
+      `(${ALLOWED_ORPHANS.size} allow-listed orphan(s) remaining), no banned identifiers, ` +
+      `${silentTotal} allow-listed silent catch(es) remaining${pxNote}.`,
   );
   return 0;
 }

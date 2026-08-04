@@ -12,6 +12,7 @@
  */
 import { flush, installMockPlatform } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import type { Tab } from "../src/tabs/tab";
 import type { PaletteMode } from "../src/commands/defaults";
 
@@ -20,8 +21,8 @@ import type { PaletteMode } from "../src/commands/defaults";
 const openQuickSearch = mock((_mode?: PaletteMode) => {});
 void mock.module("../src/panels/quick-search.js", () => ({ openQuickSearch }));
 
-const statusMessage = mock((_text: string) => {});
-void mock.module("../src/panels/statusbar.js", () => ({ statusMessage }));
+const notified = mock((_message: string) => {});
+void mock.module("../src/services/notify.js", () => notifyModule((call) => notified(call.message)));
 
 const toolbar = await import("../src/panels/toolbar");
 const { shell, resetProjectShell } = await import("../src/shell");
@@ -142,7 +143,7 @@ beforeEach(() => {
   ctx = makeContext();
   ran = [];
   openQuickSearch.mockClear();
-  statusMessage.mockClear();
+  notified.mockClear();
   setProjectState(null);
   setPreviewNavigateHandler(null);
   installMockPlatform();
@@ -550,8 +551,8 @@ describe("runOpenInBrowser", () => {
   test("reports the blocking reason instead of opening nothing", () => {
     closeAllTabs();
     toolbar.runOpenInBrowser();
-    expect(statusMessage).toHaveBeenCalledTimes(1);
-    expect(statusMessage.mock.calls[0]![0]).toContain("Open a page to view it");
+    expect(notified).toHaveBeenCalledTimes(1);
+    expect(notified.mock.calls[0]![0]).toContain("Open a page to view it");
   });
 });
 

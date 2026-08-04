@@ -11,7 +11,7 @@ import { getPlatform } from "../platform";
 import { VERSION } from "../version";
 import { showConfirmDialog } from "../ui/layers";
 import { showProgressModal } from "../ui/progress-modal";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { isComparable, isUpgrade } from "./semver";
 import type { PackageInfo } from "../types";
 
@@ -91,7 +91,7 @@ export async function applyJxsuiteUpdate(outdated: JxsuiteUpdate[], target: stri
     );
     if (result.ok) {
       progress.done();
-      statusMessage(`Updated ${outdated.length} @jxsuite package(s) to ${target}`);
+      notify.success(`Updated ${outdated.length} @jxsuite package(s) to ${target}.`);
     } else {
       progress.fail(result.log ?? "Update failed");
     }

@@ -11,6 +11,7 @@
  */
 import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import type { SlashCommand } from "../src/editor/inline-edit";
 import type { Tab } from "../src/tabs/tab";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -21,7 +22,7 @@ void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   editor: { setModelMarkers: mock(() => {}) },
   languages: { registerCompletionItemProvider: mock(() => {}) },
 }));
-void mock.module("../src/panels/statusbar.js", () => ({ statusMessage: () => {} }));
+void mock.module("../src/services/notify.js", () => notifyModule(() => {}));
 
 const { applyInlineCommit, applyInlineInsert, applyInlineSplit } =
   await import("../src/editor/inline-edit-apply");

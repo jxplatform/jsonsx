@@ -12,9 +12,7 @@ const { state } = await bootStudio({
 
 describe("?open= with a relative path", () => {
   test("reports the path as invalid without probing the platform", () => {
-    expect(statusMessages).toContain(
-      'Error: ?project= requires an absolute path (got "relative/dir")',
-    );
+    expect(statusMessages).toContain('?project= requires an absolute path (got "relative/dir").');
     expect(state.calls.some((c) => c[0] === "resolveSiteContext")).toBe(false);
     expect(state.calls.some((c) => c[0] === "probeRootProject")).toBe(false);
     expect(state.calls.some((c) => c[0] === "readFile")).toBe(false);

@@ -25,6 +25,7 @@ import type {
   PackageInfo,
   ProjectListEntry,
   ProjectSchemasResponse,
+  ReferencesResult,
   RenameResult,
   RepoInfo,
   StarterInfo,
@@ -306,6 +307,25 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
       return okJson<RenameResult>(
         await postJson("/file/rename", { from, to }),
         `Failed to rename: ${from} → ${to}`,
+      );
+    },
+
+    /**
+     * Usage counts, computed SERVER-SIDE. The walker lives in `@jxsuite/server`, which the cloud
+     * target already runs against the ProjectSession's working tree, so cloud is not a host that
+     * degrades to "unknown" — it answers the same query the desktop does, over the same engine.
+     */
+    async findReferences(target: { path?: string; tagName?: string }): Promise<ReferencesResult> {
+      const params = new URLSearchParams();
+      if (target.path) {
+        params.set("path", target.path);
+      }
+      if (target.tagName) {
+        params.set("tag", target.tagName);
+      }
+      return okJson<ReferencesResult>(
+        await api(`/references?${params.toString()}`),
+        `Failed to find references: ${target.path ?? target.tagName ?? ""}`,
       );
     },
 

@@ -14,7 +14,7 @@
 import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { componentRegistry } from "../src/files/components";
-import { statusMessage } from "../src/panels/statusbar";
+import { resetNotifications } from "../src/services/notify";
 import { initLayers } from "../src/ui/layers";
 import { activeTab, closeAllTabs, workspace } from "../src/workspace/workspace";
 import { checkPlacements } from "../src/commands/levels";
@@ -122,7 +122,8 @@ afterAll(async () => {
     delete (navigator as unknown as Record<string, unknown>).clipboard;
   }
   (globalThis as Record<string, unknown>).ClipboardItem = originalClipboardItem;
-  statusMessage("", 1); // Drain the pending statusMessage timer
+  // The clipboard verbs report through `notify` now; nothing to drain, only a store to empty.
+  resetNotifications();
   await new Promise((resolve) => {
     setTimeout(resolve, 5);
   });

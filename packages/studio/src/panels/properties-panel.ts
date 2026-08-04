@@ -54,6 +54,13 @@ import { getCssInitialMap } from "./style-utils";
 import { renderMediaPicker } from "../ui/media-picker";
 import { renderColorSelector } from "../ui/color-selector";
 import { getEffectiveLayoutPath, invalidateLayoutCache } from "../site-context";
+import {
+  loadUsages,
+  peekUsages,
+  retryUsages,
+  usageFiles,
+  usageHeadline,
+} from "../services/references";
 import { getPlatform } from "../platform";
 import htmlMeta from "../../data/html-meta.json";
 
@@ -1182,6 +1189,108 @@ function renderLayoutSelectionPanel(ctx: {
  *
  * @param {{ navigateToComponent: (path: string) => void }} ctx
  */
+/**
+ * The Usage section's key, in the same per-tab `inspectorSections` record every other section uses,
+ * so `inspector.setSection` addresses it exactly like the rest and nothing needs a second store.
+ */
+const USAGES_SECTION = "__usages";
+
+/**
+ * The component instance's usage line — "Used on 7 pages →", expanding to the files.
+ *
+ * Three things this deliberately does NOT do. It does not render when the host cannot answer
+ * (`usagesSupported()` is `capability.findReferences`): a confident "0" for a component used
+ * everywhere is worse than no line at all. It does not ask on every paint — `peekUsages` is
+ * side-effect-free and only a cold target starts a request, which repaints once when it lands. And
+ * it does not swallow a failure: a failed count says so and offers Retry, because "we could not
+ * check" and "nothing uses this" are the two answers a user must never confuse.
+ *
+ * @param tagName — the instance's custom-element tag.
+ * @param componentPath — its definition file, when the registry knows one. Passing both asks the
+ *   one question that covers file references AND element instances.
+ */
+function renderUsagesSection(tagName: string, componentPath: string | null) {
+  const query = { tagName, ...(componentPath ? { path: componentPath } : {}) };
+  const state = peekUsages(query);
+  // ONE gate, and it is the peek itself: a host with no `findReferences` answers "unsupported"
+  // Synchronously, and the section does not exist. A separate `usagesSupported()` guard above this
+  // Would make the arm below unreachable, which is a branch nothing can ever test.
+  if (state?.status === "unsupported") {
+    return nothing;
+  }
+  if (state === null) {
+    // Cold: ask once, and repaint the inspector when the answer arrives.
+    void loadUsages(query).then(() => renderOnly("rightPanel"));
+  }
+
+  let body;
+  let heading = "Usage";
+  if (state === null || state.status === "pending") {
+    body = html`<div class="usage-note">Counting references…</div>`;
+  } else if (state.status === "failed") {
+    heading = "Usage · unknown";
+    body = html`
+      <div class="usage-note">
+        References could not be counted: ${state.message}. This is not the same as “unused”.
+      </div>
+      <sp-action-button
+        size="s"
+        quiet
+        @click=${() => {
+          void retryUsages(query).then(() => renderOnly("rightPanel"));
+        }}
+        >Retry</sp-action-button
+      >
+    `;
+  } else {
+    const files = usageFiles(state.result);
+    heading = usageHeadline(state.result);
+    body =
+      files.length === 0
+        ? html`<div class="usage-note">
+            Nothing else in this project places <code>&lt;${tagName}&gt;</code> yet.
+          </div>`
+        : html`${files.map(
+            (file) => html`
+              <button
+                class="usage-row"
+                type="button"
+                title=${file.refs.map((r) => `${r.refType} ${r.ref} ×${r.count}`).join(", ")}
+                @click=${() => openUsage(file.path)}
+              >
+                <span class="usage-row-path">${file.path}</span>
+                <span class="usage-row-count">${file.count}</span>
+              </button>
+            `,
+          )}`;
+  }
+
+  return html`
+    <sp-accordion-item
+      label=${heading}
+      ?open=${isUsagesOpen()}
+      @sp-accordion-item-toggle=${() => setInspectorSection(USAGES_SECTION, !isUsagesOpen())}
+    >
+      <div class="style-section-body">${body}</div>
+    </sp-accordion-item>
+  `;
+}
+
+/**
+ * Whether the Usage section is expanded for the active tab. Collapsed by default: the heading IS
+ * the answer.
+ */
+function isUsagesOpen(): boolean {
+  return activeTab.value?.session.ui.inspectorSections[USAGES_SECTION] === true;
+}
+
+/** Open a referencing file in a tab — the "→" half of "Used on N pages →". */
+function openUsage(path: string): void {
+  // Lazy import: `files/files.ts` imports this panel's siblings, and a static edge here would close
+  // The inspector → files → inspector cycle.
+  void import("../files/files").then((m) => m.openFileInTab(path));
+}
+
 export function renderPropertiesPanelTemplate(ctx: {
   navigateToComponent: (path: string) => void;
 }) {
@@ -1604,6 +1713,15 @@ export function renderPropertiesPanelTemplate(ctx: {
       `
     : nothing;
 
+  // "Used on N pages →". Only for a component instance: an ordinary <div> is not a thing that can
+  // Be reused, so the question does not arise.
+  const usagesT = isCustomInstance
+    ? renderUsagesSection(
+        tagName,
+        componentRegistry.find((c) => c.tagName === tagName)?.path ?? null,
+      )
+    : nothing;
+
   const attrSectionTemplates = htmlMeta.$sections
     .filter((sec) => attrSections[sec.key]!.length > 0)
     .map((sec) => {
@@ -1734,9 +1852,9 @@ export function renderPropertiesPanelTemplate(ctx: {
       <sp-accordion allow-multiple size="s">
         ${pageT} ${isMapNode ? repeaterT : elemT} ${isMapNode ? nothing : observedAttrsT}
         ${isMapNode ? nothing : switchT} ${isMapNode ? nothing : compPropsT}
-        ${isMapNode ? nothing : attrSectionTemplates} ${isMapNode ? nothing : customSectionT}
-        ${isMapNode ? nothing : mediaT} ${isMapNode ? nothing : cssPropsT}
-        ${isMapNode ? nothing : cssPartsT}
+        ${isMapNode ? nothing : usagesT} ${isMapNode ? nothing : attrSectionTemplates}
+        ${isMapNode ? nothing : customSectionT} ${isMapNode ? nothing : mediaT}
+        ${isMapNode ? nothing : cssPropsT} ${isMapNode ? nothing : cssPartsT}
       </sp-accordion>
     </div>
   `;
@@ -1758,6 +1876,7 @@ export function renderPropertiesPanelTemplate(ctx: {
 export const INSPECTOR_SECTION_KEYS = [
   "__element",
   "__observed",
+  "__usages",
   "__custom",
   "__media",
   "__cssprops",
@@ -1799,8 +1918,8 @@ export function inspectorCommands(): AnyCommand[] {
       args: argsSchema({
         open: booleanProperty("True to expand the section, false to collapse it."),
         section: stringProperty(
-          "The section key — one of the fixed rows (__element, __observed, __custom, " +
-            "__media, __cssprops, __cssparts) or an attribute schema's own $section.",
+          "The section key — one of the fixed rows (__element, __observed, __usages, " +
+            "__custom, __media, __cssprops, __cssparts) or an attribute schema's own $section.",
         ),
       }),
       category: "View",
@@ -1824,7 +1943,58 @@ export function inspectorCommands(): AnyCommand[] {
       },
       title: "Show Inspector Section",
     },
+    {
+      /**
+       * Find Usages. Defined ONCE, here, and rendered twice: the palette gets it from the app
+       * registry, and `editor/context-menu.ts` pulls the `context/element` records out of this same
+       * set into the menu it builds — so the row and the palette entry cannot drift in title, chord
+       * or availability. It reads `ctx.selection.kind`, which both contexts populate from the node
+       * under the cursor, so one `run` serves the menu's target and the canvas selection alike.
+       *
+       * `when` is the capability, not a `try`: a host with no `findReferences` route hides the
+       * command rather than offering a verb that answers "0 usages" for a component on every page.
+       */
+      category: "Selection",
+      id: "selection.findUsages",
+      level: "selection",
+      menus: ["context/element", "palette"],
+      group: "4_identity",
+      undo: "none",
+      when: (ctx) => ctx.capability.findReferences && ctx.selection.isComponentInstance,
+      requires: "a component instance, on a backend that can search the project",
+      run: () => {
+        const tagName = componentSelectionTag();
+        if (!tagName) {
+          return;
+        }
+        const componentPath = componentRegistry.find((c) => c.tagName === tagName)?.path ?? null;
+        setInspectorSection(USAGES_SECTION, true);
+        void loadUsages({ tagName, ...(componentPath ? { path: componentPath } : {}) }).then(() =>
+          renderOnly("rightPanel"),
+        );
+      },
+      title: "Find Usages",
+    },
   ];
+}
+
+/**
+ * The tag of the selected component instance, or null.
+ *
+ * Read from the document rather than from a menu target so the one record works in both registries:
+ * the context menu's own `getContext` reports the right-clicked node's tag as `selection.kind`, and
+ * the app's reports the canvas selection's. This is the fallback for the app registry, where the
+ * selection lives on the tab.
+ */
+function componentSelectionTag(): string | null {
+  const tab = activeTab.value;
+  const selection = tab?.session.selection;
+  if (!tab || !selection) {
+    return null;
+  }
+  const node = getNodeAtPath(tab.doc.document, selection);
+  const tagName = typeof node?.tagName === "string" ? node.tagName : "";
+  return tagName.includes("-") ? tagName : null;
 }
 
 /**

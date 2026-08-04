@@ -663,29 +663,70 @@
   align-self: flex-end;
   gap: 8px;
 }
+/* ─── ⑫ Status bar ────────────────────────────────
+   Three fields in the shell's own level order, separated by a rule rather than by a run of "|"
+   characters: the boundary between PROJECT, DOCUMENT and SELECTION is structural, and the eye
+   should be able to find it without reading. */
 #statusbar {
   grid-row: 4;
   grid-column: 1 / -1;
   display: flex;
-  align-items: center;
-  padding: 0 8px;
+  align-items: stretch;
+  overflow: hidden;
+  padding: 0 4px;
   font-size: var(--spectrum-font-size-50, 11px);
   color: var(--fg-dim);
   background: var(--bg);
   border-top: 1px solid var(--border);
 }
-#statusbar .sb-path-seg {
-  cursor: pointer;
-  border-radius: var(--spectrum-corner-radius-75, 2px);
-  padding: 0 2px;
+#statusbar .sb-field {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 0 6px;
 }
-#statusbar .sb-path-seg:hover {
+/* The SELECTION field is the one that grows without bound (a deep tree), so it is the one that
+   scrolls — the project name and the save state must never be pushed out of the window. */
+#statusbar .sb-field:last-child {
+  min-width: 0;
+  overflow: hidden;
+}
+#statusbar .sb-field + .sb-field {
+  border-left: 1px solid var(--border);
+}
+#statusbar .sb-item {
+  max-width: 32ch;
+  overflow: hidden;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+#statusbar button.sb-item {
+  cursor: pointer;
+}
+#statusbar button.sb-item:hover:not(:disabled) {
   color: var(--fg);
   background: var(--hover-bg);
-  text-decoration: underline;
 }
-#statusbar .sb-path-sep {
+#statusbar button.sb-item:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+/* A readout is state, not a control: no hover, no pointer, and no promise that clicking does
+   anything. The two are visually distinguishable only on hover, which is the correct amount. */
+#statusbar .sb-state {
+  cursor: default;
+}
+#statusbar .sb-sep {
   color: var(--fg-dim);
+  opacity: 0.6;
 }
 
 /* ─── Tab strip ───────────────────────────────── */

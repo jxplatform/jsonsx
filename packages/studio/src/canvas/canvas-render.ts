@@ -59,7 +59,7 @@ import { dismissSlashMenu } from "../editor/slash-menu";
 import { renderFunctionEditor } from "../panels/editors";
 import { renderFormulaWorkspace } from "../panels/formula-workspace";
 import { mediaDisplayName } from "../panels/shared";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import * as overlaysPanel from "../panels/overlays";
 
 import type { TemplateResult } from "lit-html";
@@ -983,11 +983,18 @@ function renderCanvasIntoPanel(
         // Panel needs no parent-side render scope.
         panel.ready = !docOverride;
         updateCanvas({ error: null, scope: null, status: "ready" });
-        statusMessage("Iframe render OK", 1500);
+        // A successful render used to announce itself as "Iframe render OK" — a debug string
+        // Shipped to end users and legible in a published docs screenshot. A render that worked is
+        // The canvas you are looking at; it says so itself.
       }
     })
     .catch((error: unknown) => {
-      console.warn("mountIframeCanvas failed:", error instanceof Error ? error.message : error);
+      const detail = error instanceof Error ? error.message : String(error);
+      notify.error("The canvas could not be mounted.", {
+        detail,
+        key: "canvas.mount",
+        source: "Canvas",
+      });
     });
 }
 

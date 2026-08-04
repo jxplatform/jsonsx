@@ -18,7 +18,7 @@ const { platform, state } = await bootStudio({
   url: "http://localhost/?project=/abs/standalone&file=docs/readme.weird",
 });
 
-await waitFor(() => statusMessages.some((m) => m.startsWith("Error:")));
+await waitFor(() => statusMessages.some((m) => m.startsWith("Could not open")));
 
 describe("?project= without a site context and an unparseable ?file=", () => {
   test("skips site activation when no sitePath is resolved", () => {
@@ -28,7 +28,7 @@ describe("?project= without a site context and an unparseable ?file=", () => {
 
   test("reads the explicit ?file= path and surfaces the parse failure", () => {
     expect(state.calls.some((c) => c[0] === "readFile" && c[1] === "docs/readme.weird")).toBe(true);
-    expect(statusMessages.some((m) => m.startsWith("Error:"))).toBe(true);
+    expect(statusMessages.some((m) => m.startsWith("Could not open"))).toBe(true);
     expect(activeTab.value).toBeNull();
   });
 });

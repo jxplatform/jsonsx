@@ -114,6 +114,15 @@ export const STUDIO_ROUTES = {
   fileDelete: route("DELETE", "/__studio/file", "Delete a file"),
   fileUpload: route("POST", "/__studio/file/upload", "Upload binary content to a path"),
   fileRename: route("POST", "/__studio/file/rename", "Rename/move (+ refactor report)"),
+  references: route(
+    "GET",
+    "/__studio/references",
+    "Where a file or a component tag is used (?path=&tag=, at least one) → ReferencesResult " +
+      "{files, filesReferencing, refsTotal} — the read side of the rename refactor's own walker, " +
+      "cached until the backend's watcher sees the tree move (backs findReferences)",
+    'Usage counts are hidden: no "Used on N pages" in the inspector, no Selection: Find Usages, ' +
+      "and delete/rename confirmations state no reference count.",
+  ),
   locate: route("POST", "/__studio/locate", "Find a file by name → {path | null}"),
   collab: route(
     "GET",

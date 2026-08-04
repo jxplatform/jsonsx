@@ -9,6 +9,7 @@ import type { MockPlatformState } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { convertToComponent } from "../src/editor/convert-to-component";
 import { componentRegistry } from "../src/files/components";
+import { problems, resetNotifications, toasts } from "../src/services/notify";
 import { initLayers } from "../src/ui/layers";
 import { activeTab } from "../src/workspace/workspace";
 import type { Tab } from "../src/tabs/tab";
@@ -178,6 +179,35 @@ describe("conversion", () => {
     expect(((doc.children as unknown[])[0] as Record<string, unknown>).tagName).toBe("section");
     expect(doc.$elements).toBeUndefined();
     expect(platformState.calls.some((c) => c[0] === "writeFile")).toBe(false);
+  });
+
+  test("a slot defect is filed as a Problem, not shouted once and lost", async () => {
+    // The component IS written and usable, so this is not an error — but two default slots is a
+    // Thing to FIX, so it persists in Problems until somebody does, rather than expiring as a toast.
+    resetNotifications();
+    tab.doc.document = {
+      children: [
+        {
+          $id: "Hero-Block",
+          children: [{ tagName: "slot" }, { tagName: "slot" }],
+          tagName: "section",
+        },
+      ],
+      tagName: "div",
+    } as never;
+    tab.session.selection = ["children", 0];
+    const done = convertToComponent();
+    await flush();
+    setName("slotty-block");
+    confirmDialog();
+    await done;
+
+    expect(toasts.some((n) => n.message === "Converted to <slotty-block>")).toBe(true);
+    const problem = problems.find((n) => n.message.includes("slotty-block"));
+    expect(problem?.severity).toBe("warn");
+    expect(problem?.message).toContain("slot problem");
+    expect(problem?.source).toBe("Components");
+    expect(problem?.path).toBe("components/slotty-block.json");
   });
 
   test("a failing write is caught and still leaves the document converted", async () => {

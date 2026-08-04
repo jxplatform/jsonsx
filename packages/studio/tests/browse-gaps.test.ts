@@ -57,8 +57,13 @@ async function openRenameDialogWithoutFlush(container: HTMLElement) {
   const items = [...dialogLayer().querySelectorAll("sp-menu-item")] as HTMLElement[];
   const rename = items.find((i) => (i.textContent ?? "").startsWith("Rename"));
   expect(rename).toBeDefined();
-  // No flush here: callers patch the freshly rendered dialog before the focus rAF fires.
+  // Microtasks only, no timer turn: the rename dialog now awaits the reference count before it
+  // Opens, so the dialog needs the promise chain to settle — but callers still have to patch the
+  // Freshly rendered textfield BEFORE the focus rAF (a timer in happy-dom) fires.
   pointer(rename as HTMLElement, "click");
+  for (let i = 0; i < 6; i++) {
+    await Promise.resolve();
+  }
 }
 
 beforeEach(() => {

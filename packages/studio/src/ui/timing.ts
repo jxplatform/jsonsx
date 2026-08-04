@@ -34,11 +34,12 @@ export const CODE_DEBOUNCE = 500;
  */
 export const LIVE_PREVIEW = 350;
 
-/**
- * Status-bar message lifetime — how long a transient message stays before the bar reverts to the
- * selection breadcrumb. Roughly the time to read a short sentence without the bar feeling sticky.
+/*
+ * `STATUS_MESSAGE = 3000` used to live here: how long a transient message stayed in the status bar
+ * before it erased itself. It had one reader, `statusMessage`, which is deleted — the bar carries
+ * ambient state now and outcomes go to `services/notify.ts`, whose `TOAST_LIFETIME_MS` is per
+ * SEVERITY (§7.1 caps the band at 4–8s) rather than one number for a failure and a save alike.
  */
-export const STATUS_MESSAGE = 3000;
 
 /**
  * Git status poll while the Git panel is open. Deliberately coarse: it exists to notice changes

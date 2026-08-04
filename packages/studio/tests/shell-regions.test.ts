@@ -200,16 +200,24 @@ describe("statusbar/selection", () => {
     renderStatusbar();
     const field = resolveRegion("statusbar/selection");
     expect(field).not.toBeNull();
-    expect(field!.textContent).toContain("Selected:");
+    expect(field!.textContent).toContain("p — Hello");
     expect(resolveRegion("statusbar")!.contains(field)).toBe(true);
   });
 
-  test("a transient status message is NOT inside the selection field", () => {
-    const tab = resetWorkspaceWithTab();
-    tab.session.selection = ["children", 0];
+  test("the three fields are separate regions, and PROJECT is not inside SELECTION", () => {
+    resetWorkspaceWithTab();
+    stampShellRegions();
     mountStatusbar();
     renderStatusbar();
-    expect(resolveRegion("statusbar/selection")!.textContent).not.toContain("Jx Studio");
+    // Transient messages left the bar entirely for the toast host, so the only thing that can
+    // Appear beside the selection is another FIELD — and each is addressable on its own. With no
+    // Registry composed, every COMMAND item is absent and only the readouts survive, which is the
+    // Honest skeleton the bar paints before the bootstrap runs.
+    const document_ = resolveRegion("statusbar/document");
+    expect(document_).not.toBeNull();
+    expect(document_!.textContent).toContain("Saved");
+    expect(resolveRegion("statusbar")!.contains(document_)).toBe(true);
+    expect(resolveRegion("statusbar/selection")).toBeNull();
   });
 });
 

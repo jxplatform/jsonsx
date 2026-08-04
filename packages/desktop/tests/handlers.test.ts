@@ -23,6 +23,7 @@ const {
   handleWriteFile,
   handleDeleteFile,
   handleRenameFile,
+  findReferences,
   handleCreateDirectory,
   handleUploadFile,
   handleResolveSiteContext,
@@ -313,6 +314,60 @@ describe("handleRenameFile", () => {
       expect(index.children[0]?.$ref).toBe("../components/my-button.json");
       expect(report.references.refsUpdated).toBe(1);
       expect(report.tag).toMatchObject({ from: "my-counter", to: "my-button" });
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+// ─── findReferences ─────────────────────────────────────────────────────────
+
+describe("findReferences", () => {
+  test("answers who refers to a component, as a file and as a tag", async () => {
+    setup();
+    try {
+      mkdirSync(join(FIXTURES, "pages"), { recursive: true });
+      mkdirSync(join(FIXTURES, "components"), { recursive: true });
+      writeFileSync(
+        join(FIXTURES, "components/card.json"),
+        JSON.stringify({ children: [], tagName: "desk-card" }),
+      );
+      writeFileSync(
+        join(FIXTURES, "pages/index.json"),
+        JSON.stringify({
+          children: [{ $ref: "../components/card.json" }, { tagName: "desk-card" }],
+        }),
+      );
+
+      const result = await findReferences({ path: "components/card.json" });
+      expect(result.tagName).toBe("desk-card");
+      expect(result.files.map((f) => f.path)).toEqual(["pages/index.json"]);
+      expect(result.refsTotal).toBe(2);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("a tag-only query needs no path", async () => {
+    setup();
+    try {
+      mkdirSync(join(FIXTURES, "pages"), { recursive: true });
+      writeFileSync(
+        join(FIXTURES, "pages/solo.json"),
+        JSON.stringify({ children: [{ tagName: "desk-solo" }] }),
+      );
+      const result = await findReferences({ tagName: "desk-solo" });
+      expect(result.path).toBeNull();
+      expect(result.files.map((f) => f.path)).toEqual(["pages/solo.json"]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("refuses a path outside the project root", async () => {
+    setup();
+    try {
+      await expect(findReferences({ path: "../../etc/passwd" })).rejects.toThrow();
     } finally {
       cleanup();
     }

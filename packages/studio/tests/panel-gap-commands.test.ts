@@ -109,6 +109,7 @@ describe("the records themselves", () => {
   test("register under the ids the manifest names, and none is a toggle", () => {
     expect(registry.list().map((c) => c.id)).toEqual([
       "inspector.setSection",
+      "selection.findUsages",
       "data.expandRow",
       "state.selectSignal",
       "formula.openWorkspace",
@@ -121,8 +122,11 @@ describe("the records themselves", () => {
   });
 
   test("every record that takes arguments declares a schema for them", () => {
+    // The two that take none act on what is already selected or already open, so there is nothing
+    // For a palette prompt or an AI tool call to supply.
+    const NO_ARGUMENTS = new Set(["style.openSelectorMenu", "selection.findUsages"]);
     for (const command of registry.list()) {
-      if (command.id !== "style.openSelectorMenu") {
+      if (!NO_ARGUMENTS.has(command.id)) {
         expect(command.args).toBeDefined();
       }
     }

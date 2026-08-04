@@ -53,10 +53,10 @@ void mock.module("../src/panels/formula-workspace.js", () => ({
   renderFormulaWorkspace: () => {},
 }));
 void mock.module("../src/panels/statusbar.js", () => ({
+  forgetSavedTimes: () => {},
   mountStatusbar: () => {},
+  noteDocumentSaved: () => {},
   renderStatusbar: () => {},
-  setStatusbarRenderer: () => {},
-  statusMessage: () => {},
   unmountStatusbar: () => {},
 }));
 void mock.module("../src/panels/overlays.js", () => ({

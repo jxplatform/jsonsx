@@ -19,8 +19,11 @@ import {
   extractEmittedClasses,
   extractSelectorPreludes,
   extractStyleBlocks,
+  countBareCatches,
   report,
+  scanBannedIdentifiers,
   scanHex,
+  stripCommentsAndStrings,
   templateLiterals,
 } from "../scripts/check-styles";
 import type { StyleCheckResult } from "../scripts/check-styles";
@@ -269,6 +272,8 @@ describe("report", () => {
     orphans: [],
     staleAllowed: [],
     allOrphans: [],
+    banned: [],
+    silentCatches: [],
   };
   const finding = (text: string): { file: string; line: number; text: string } => ({
     file: "src/a.ts",
@@ -329,5 +334,84 @@ describe("report", () => {
   test("fails on a stale allowlist entry", () => {
     expect(report({ ...empty, staleAllowed: ["already-styled"] })).toBe(1);
     expect(logs.join("\n")).toContain("stale ALLOWED_ORPHANS");
+  });
+
+  test("fails on a banned identifier, and says what to use instead", () => {
+    expect(report({ ...empty, banned: [finding("statusMessage — use notify.error")] })).toBe(1);
+    expect(logs.join("\n")).toContain("may not name");
+    expect(logs.join("\n")).toContain("notify.error");
+  });
+
+  test("fails when a file grows a bare empty catch", () => {
+    expect(report({ ...empty, silentCatches: [{ allowed: 0, file: "src/a.ts", found: 2 }] })).toBe(
+      1,
+    );
+    expect(logs.join("\n")).toContain("2 bare empty catch(es), 0 allowed");
+  });
+
+  test("fails when a budget entry is stale — the ratchet only turns one way", () => {
+    expect(report({ ...empty, silentCatches: [{ allowed: 3, file: "src/a.ts", found: 1 }] })).toBe(
+      1,
+    );
+    expect(logs.join("\n")).toContain("lower its SILENT_CATCH_BUDGET entry from 3");
+  });
+});
+
+// ─── The silence rules ────────────────────────────────────────────────────────
+
+describe("stripCommentsAndStrings", () => {
+  test("blanks a line comment, keeping the line count", () => {
+    const out = stripCommentsAndStrings("const a = 1; // statusMessage\nconst b = 2;");
+    expect(out).not.toContain("statusMessage");
+    expect(out.split("\n")).toHaveLength(2);
+  });
+
+  test("blanks a block comment across lines", () => {
+    const out = stripCommentsAndStrings("/**\n * statusMessage was here\n */\nx();");
+    expect(out).not.toContain("statusMessage");
+    expect(out.split("\n")).toHaveLength(4);
+  });
+
+  test("blanks string bodies but keeps the quotes", () => {
+    expect(stripCommentsAndStrings('const a = "statusMessage";')).not.toContain("statusMessage");
+    expect(stripCommentsAndStrings("const a = 'x';")).toContain("'");
+  });
+
+  test("leaves code alone", () => {
+    expect(stripCommentsAndStrings("statusMessage(1);")).toBe("statusMessage(1);");
+  });
+});
+
+describe("scanBannedIdentifiers", () => {
+  test("flags a call, naming the replacement", () => {
+    const [found] = scanBannedIdentifiers("src/a.ts", 'statusMessage("hi");');
+    expect(found).toMatchObject({ file: "src/a.ts", line: 1 });
+    expect(found!.text).toContain("notify.success");
+  });
+
+  test("does not flag a longer identifier that merely contains it", () => {
+    expect(scanBannedIdentifiers("src/a.ts", "setStatusMessageThing();")).toHaveLength(0);
+  });
+
+  test("reports the line the use is on", () => {
+    const found = scanBannedIdentifiers("src/a.ts", "a();\nb();\nstatusMessage();");
+    expect(found[0]!.line).toBe(3);
+  });
+});
+
+describe("countBareCatches", () => {
+  test("counts a catch with no body at all, bound or not", () => {
+    expect(countBareCatches("try { a(); } catch {}")).toBe(1);
+    expect(countBareCatches("try { a(); } catch (error) {}")).toBe(1);
+  });
+
+  test("a comment IS the answer — the rule asks which silences were chosen", () => {
+    expect(countBareCatches("try { a(); } catch {\n  // intentionally ignored: no path\n}")).toBe(
+      0,
+    );
+  });
+
+  test("a catch that does something is not counted", () => {
+    expect(countBareCatches("try { a(); } catch (error) { notify.error(String(error)); }")).toBe(0);
   });
 });

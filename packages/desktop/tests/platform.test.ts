@@ -392,6 +392,13 @@ describe("platform methods", () => {
     ["uploadFile", ["img.png", "ZGF0YQ=="], "uploadFile", { data: "ZGF0YQ==", path: "img.png" }],
     ["deleteFile", ["a.json"], "deleteFile", { path: "a.json" }],
     ["renameFile", ["old.json", "new.json"], "renameFile", { from: "old.json", to: "new.json" }],
+    // The usage query rides the same RPC as the rename it warns about.
+    [
+      "findReferences",
+      [{ path: "components/card.json", tagName: "my-card" }],
+      "findReferences",
+      { path: "components/card.json", tagName: "my-card" },
+    ],
     ["createDirectory", ["newdir"], "createDirectory", { path: "newdir" }],
     [
       "codeService",

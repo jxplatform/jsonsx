@@ -26,6 +26,7 @@ import { panToParentRect } from "./canvas-utils";
 import { clearDragGhost, moveDragGhost } from "../panels/drag-ghost";
 import { applyDropInstruction } from "../panels/dnd";
 import { rectOf } from "../utils/geometry";
+import { notify } from "../services/notify";
 import { effect, effectScope } from "../reactivity";
 import {
   canvasPanels,
@@ -1705,6 +1706,14 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
     case "renderError": {
       // The render never landed — its pending identity must not be adopted by a later ack.
       state.pendingTabIds.delete(msg.gen);
+      // …and the author is told. `msg.message` was read NOWHERE: the canvas would go blank or stale
+      // And the one string that said why was deleted with the pending id. Keyed on the host, so a
+      // Render loop that fails every generation is one problem rather than sixty.
+      notify.error("The page could not be rendered.", {
+        detail: msg.message,
+        key: `canvas.render:${hostLabel(state)}`,
+        source: "Canvas",
+      });
       return;
     }
     case "dataScope": {

@@ -1,6 +1,7 @@
 /** Tests for src/packages/pull-package-sync.ts — pull orchestration with package-conflict recovery. */
 import { flush, installMockPlatform } from "./harness";
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { initLayers } from "../src/ui/layers";
 import type { GitStatusResult, StudioPlatform } from "../src/types";
 
@@ -19,15 +20,9 @@ void mock.module("../src/packages/jxsuite-update", () => ({
 }));
 
 const statusMessages: string[] = [];
-void mock.module("../src/panels/statusbar", () => ({
-  mountStatusbar: () => {},
-  renderStatusbar: () => {},
-  setStatusbarRenderer: () => {},
-  statusMessage: (msg: string) => {
-    statusMessages.push(msg);
-  },
-  unmountStatusbar: () => {},
-}));
+void mock.module("../src/services/notify.js", () =>
+  notifyModule((call) => statusMessages.push(call.message)),
+);
 
 const { autoSyncProjectOnOpen, isAutomatedPackageDiff, planPackageDiscard, pullWithPackageSync } =
   await import("../src/packages/pull-package-sync");
@@ -199,7 +194,7 @@ describe("pullWithPackageSync — preemptive", () => {
     expect(discard?.[1]).toEqual(["package.json", "bun.lock"]);
     expect(applyCalls).toHaveLength(1);
     expect(dialog()).toBeNull();
-    expect(statusMessages).toContain("Local package updates were superseded by pulled changes");
+    expect(statusMessages).toContain("Local package updates were superseded by pulled changes.");
   });
 
   test("leaves files alone when upstream content matches HEAD", async () => {
@@ -538,6 +533,6 @@ describe("autoSyncProjectOnOpen", () => {
       gitStatus: async () => gitStatusOf(),
     });
     await autoSyncProjectOnOpen();
-    expect(statusMessages.some((m) => m.startsWith("Sync skipped:"))).toBe(true);
+    expect(statusMessages.some((m) => m.includes("could not be synced"))).toBe(true);
   });
 });

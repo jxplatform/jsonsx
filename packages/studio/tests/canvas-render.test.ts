@@ -11,6 +11,7 @@ import {
   stubRect,
 } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { canvasPanels, canvasWrap, initShellRefs, setProjectState } from "../src/store";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
@@ -57,7 +58,7 @@ const renderWelcome = mock((host: HTMLElement) => {
   host.textContent = "welcome";
 });
 const renderFunctionEditor = mock(() => {});
-const statusMessage = mock((_msg: string, _duration?: number) => {});
+const notified = mock((_message: string) => {});
 const overlaysRender = mock(() => {});
 const renderStylebookMode = mock((_helpers: unknown) => {});
 const parseSourceForPathMock = mock(async (_path: string, _source: string) => ({
@@ -175,13 +176,7 @@ void mock.module("../src/panels/formula-workspace.js", () => ({
   renderFormulaWorkspace,
 }));
 
-void mock.module("../src/panels/statusbar.js", () => ({
-  mountStatusbar: () => {},
-  renderStatusbar: () => {},
-  setStatusbarRenderer: () => {},
-  statusMessage,
-  unmountStatusbar: () => {},
-}));
+void mock.module("../src/services/notify.js", () => notifyModule((call) => notified(call.message)));
 
 void mock.module("../src/panels/overlays.js", () => ({
   mount: () => {},
@@ -332,7 +327,7 @@ beforeEach(() => {
   for (const m of [
     renderWelcome,
     renderFunctionEditor,
-    statusMessage,
+    notified,
     overlaysRender,
     renderStylebookMode,
     parseSourceForPathMock,
@@ -940,7 +935,9 @@ describe("edit mode", () => {
     expect(panel.canvas?.querySelector("p")?.textContent).toBe("Hello");
     // The real tab document mounted, so the panel is patchable.
     expect(panel.ready).toBe(true);
-    expect(statusMessage).toHaveBeenCalledWith("Iframe render OK", 1500);
+    // "Iframe render OK" is deleted: a debug string shipped to end users and legible in a published
+    // Docs screenshot. A render that worked is the canvas you are looking at.
+    expect(notified).not.toHaveBeenCalled();
   });
 
   test("uses the document base width for the content column", async () => {
@@ -1007,7 +1004,7 @@ describe("iframe render pipeline", () => {
     expect(tab.session.canvas.status).toBe("ready");
     expect(tab.session.canvas.scope).toBeNull();
     expect(tab.session.canvas.error).toBeNull();
-    expect(statusMessage).toHaveBeenCalledWith("Iframe render OK", 1500);
+    expect(notified).not.toHaveBeenCalled();
     expect((canvasPanels[0] as unknown as CanvasPanel).ready).toBe(true);
   });
 
@@ -1024,27 +1021,21 @@ describe("iframe render pipeline", () => {
     resolveMount();
     await flush();
     expect(tab.session.canvas.status).toBe("idle");
-    expect(statusMessage).not.toHaveBeenCalled();
+    expect(notified).not.toHaveBeenCalled();
     expect((canvasPanels[0] as unknown as CanvasPanel).ready).toBe(false);
   });
 
-  test("a rejected iframe mount warns and leaves the panel un-ready", async () => {
+  test("a rejected iframe mount REACHES A SURFACE and leaves the panel un-ready", async () => {
     openSyncedTab();
     iframeImpl = async () => {
       throw new Error("iframe exploded");
     };
-    const warn = spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      setMode("edit");
-      renderCanvas();
-      await flush();
-      expect(warn.mock.calls.some((c) => String(c[0]).includes("mountIframeCanvas failed"))).toBe(
-        true,
-      );
-      expect((canvasPanels[0] as unknown as CanvasPanel).ready).toBe(false);
-    } finally {
-      warn.mockRestore();
-    }
+    setMode("edit");
+    renderCanvas();
+    await flush();
+    // It used to be a `console.warn` — the author saw a blank canvas and nothing else.
+    expect(notified).toHaveBeenCalledWith("The canvas could not be mounted.");
+    expect((canvasPanels[0] as unknown as CanvasPanel).ready).toBe(false);
   });
 });
 

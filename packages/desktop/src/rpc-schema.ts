@@ -1,7 +1,7 @@
 // oxlint-disable typescript/no-invalid-void-type -- Electrobun RPCSchema uses `void` to mark no-payload params/responses
 import type { RPCSchema } from "electrobun/bun";
 import type { ProjectConfig } from "@jxsuite/schema/types";
-import type { FsEventPayload, RenameReport } from "@jxsuite/server/refactor";
+import type { FsEventPayload, ReferencesResult, RenameReport } from "@jxsuite/server/refactor";
 import type { StarterMeta } from "@jxsuite/starters";
 import type {
   ComponentMeta,
@@ -279,6 +279,14 @@ export interface StudioRPC {
       searchFiles: {
         params: { query: string; extensions?: string[] };
         response: DirEntry[];
+      };
+      /* Where a file / component tag is used. Declared AND handled in the same change: this is the
+         request that would otherwise repeat searchFiles' failure — a usage count that silently
+         answers "0" is indistinguishable from a component nobody has placed yet, and a delete
+         confirmation would then promise nothing breaks. The parity test is the guard. */
+      findReferences: {
+        params: { path?: string; tagName?: string };
+        response: ReferencesResult;
       };
       // Formats
       listFormats: {

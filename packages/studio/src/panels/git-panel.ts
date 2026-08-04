@@ -20,7 +20,7 @@ import { showConfirmDialog, showPromptDialog } from "../ui/layers";
 import { POLL_GIT } from "../ui/timing";
 import { renderEmptyState } from "./empty-state";
 import { registerPanel } from "./panel-registry";
-import { statusMessage } from "./statusbar";
+import { notify } from "../services/notify";
 import { publishToGithub } from "../github/github-publish";
 import { pullWithPackageSync } from "../packages/pull-package-sync";
 
@@ -73,7 +73,7 @@ export async function refreshGitStatus() {
 export async function cloneRepository(ctx: { openRecentProject: (root: string) => Promise<void> }) {
   const platform = getPlatform();
   if (!platform.gitClone) {
-    statusMessage("Clone not supported on this platform");
+    notify.warn("Cloning is not supported on this platform.", { source: "Source Control" });
     return;
   }
 
@@ -89,14 +89,18 @@ export async function cloneRepository(ctx: { openRecentProject: (root: string) =
   }
 
   try {
-    statusMessage("Cloning repository...");
+    notify.info("Cloning repository…", { key: "git.clone", source: "Source Control" });
     const result = await platform.gitClone(url);
     if (result?.root) {
-      statusMessage("Clone complete");
+      notify.success("Clone complete.", { key: "git.clone" });
       await ctx.openRecentProject(result.root);
     }
   } catch (error) {
-    statusMessage(`Clone failed: ${errorMessage(error)}`);
+    notify.error("Could not clone the repository.", {
+      detail: errorMessage(error),
+      key: "git.clone",
+      source: "Source Control",
+    });
   }
 }
 
@@ -209,9 +213,9 @@ export function renderGitPanel(ctx: {
             label: "Initialize Repository",
             run: () => {
               void (async () => {
-                statusMessage("Initializing repository…");
+                notify.info("Initializing repository…", { key: "git.init" });
                 await getPlatform().gitInit();
-                statusMessage("Repository initialized");
+                notify.success("Repository initialized.", { key: "git.init" });
                 await refreshGitStatus();
               })();
             },

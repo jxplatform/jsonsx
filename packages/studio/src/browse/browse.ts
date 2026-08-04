@@ -22,15 +22,16 @@ import {
   isImage,
   uploadAssets,
 } from "../files/media-upload";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { componentRegistry } from "../files/components";
 import { rectOf } from "../utils/geometry";
 
-import { renderPopover, showDialog, showPromptDialog } from "../ui/layers";
+import { renderPopover, showPromptDialog } from "../ui/layers";
 import { loopbackAssetSrc } from "../canvas/canvas-origin";
 import { renderComponentPreview } from "../panels/component-preview";
 import { buildScope, renderNode, setSkipServerFunctions } from "@jxsuite/runtime";
-import { parseSourceForPath } from "../files/file-ops";
+import { confirmFileDelete, parseSourceForPath, renamePromptMessage } from "../files/file-ops";
+import { invalidateUsages } from "../services/references";
 import {
   defaultContentFormat,
   documentExtensions,
@@ -454,7 +455,7 @@ async function browseRenameFile(
   container: HTMLElement,
   ctx: { openFile: (path: string) => void },
 ) {
-  const newName = await showRenameDialog(file.name);
+  const newName = await showRenameDialog(file.name, file.path);
   if (!newName || newName === file.name) {
     return;
   }
@@ -464,11 +465,16 @@ async function browseRenameFile(
   try {
     const platform = getPlatform();
     await platform.renameFile(file.path, newPath);
+    invalidateUsages();
     invalidateBrowseCache();
     void renderBrowse(container, ctx);
-    statusMessage(`Renamed to ${newName}`);
+    notify.success(`Renamed to ${newName}`);
   } catch (error) {
-    statusMessage(`Error: ${errorMessage(error)}`);
+    notify.error(`Could not rename ${file.name}.`, {
+      detail: errorMessage(error),
+      path: file.path,
+      source: "Library",
+    });
   }
 }
 
@@ -494,9 +500,13 @@ async function browseDuplicateFile(
     await platform.writeFile(copyPath, content);
     invalidateBrowseCache();
     void renderBrowse(container, ctx);
-    statusMessage(`Duplicated as ${copyName}`);
+    notify.success(`Duplicated as ${copyName}`);
   } catch (error) {
-    statusMessage(`Error: ${errorMessage(error)}`);
+    notify.error(`Could not duplicate ${file.name}.`, {
+      detail: errorMessage(error),
+      path: file.path,
+      source: "Library",
+    });
   }
 }
 
@@ -510,58 +520,46 @@ async function browseDeleteFile(
   container: HTMLElement,
   ctx: { openFile: (path: string) => void },
 ) {
-  const confirmed = await showDeleteDialog(file.name);
+  const confirmed = await confirmFileDelete(file);
   if (!confirmed) {
     return;
   }
   try {
     const platform = getPlatform();
     await platform.deleteFile(file.path);
+    invalidateUsages();
     invalidateBrowseCache();
     void renderBrowse(container, ctx);
-    statusMessage(`Deleted ${file.name}`);
+    notify.success(`Deleted ${file.name}`);
   } catch (error) {
-    statusMessage(`Error: ${errorMessage(error)}`);
+    notify.error(`Could not delete ${file.name}.`, {
+      detail: errorMessage(error),
+      path: file.path,
+      source: "Library",
+    });
   }
 }
 
 // ─── Spectrum dialogs ───────────────────────────────────────────────────────
 
 /**
+ * The Library's rename dialog. Same copy as the Files panel's, from the same helper: a rename in
+ * Manage rewrites references exactly as one in the sidebar does, and two dialogs that disagreed
+ * about that is the divergence the shared helper exists to prevent.
+ *
  * @param {string} currentName
+ * @param {string} path
  * @returns {Promise<string | null>}
  */
-function showRenameDialog(currentName: string): Promise<string | null> {
+async function showRenameDialog(currentName: string, path: string): Promise<string | null> {
+  const message = await renamePromptMessage(path);
   return showPromptDialog("Rename", {
     confirmLabel: "Rename",
+    ...(message === undefined ? {} : { message }),
     select: "stem",
     validate: (v) => (v.trim() ? "" : "Enter a file name."),
     value: currentName,
   });
-}
-
-/**
- * @param {string} fileName
- * @returns {Promise<boolean>}
- */
-function showDeleteDialog(fileName: string) {
-  return showDialog(
-    (done) => html`
-      <sp-dialog-wrapper
-        open
-        underlay
-        headline="Delete File"
-        confirm-label="Delete"
-        cancel-label="Cancel"
-        size="s"
-        @confirm=${() => done(true)}
-        @cancel=${() => done(false)}
-        @close=${() => done(false)}
-      >
-        <p>Are you sure you want to delete <strong>${fileName}</strong>? This cannot be undone.</p>
-      </sp-dialog-wrapper>
-    `,
-  );
 }
 
 // ─── Grid view helpers ──────────────────────────────────────────────────────

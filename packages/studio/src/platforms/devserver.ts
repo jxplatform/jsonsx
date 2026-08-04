@@ -28,6 +28,7 @@ import type {
   ImportProgressEvent,
   ImportSiteOptions,
   ProjectSchemasResponse,
+  ReferencesResult,
   RenameResult,
   SecretsSetRequest,
   SecretsSetResponse,
@@ -423,6 +424,39 @@ export function createDevServerPlatform() {
         e.path = stripRoot(e.path);
       }
       return report;
+    },
+
+    /**
+     * Where a file / component tag is used, over the same walker the rename above writes through.
+     * The engine caches the sweep server-side and drops it from the dev server's own file watcher,
+     * so the three renderings never disagree and never re-scan the project per keystroke.
+     *
+     * @param {{ path?: string; tagName?: string }} target
+     */
+    async findReferences(target: { path?: string; tagName?: string }): Promise<ReferencesResult> {
+      const params = new URLSearchParams();
+      if (target.path) {
+        params.set("path", serverPath(target.path));
+      }
+      if (target.tagName) {
+        params.set("tag", target.tagName);
+      }
+      const res = await fetch(`/__studio/references?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error(`Failed to find references: ${target.path ?? target.tagName ?? ""}`);
+      }
+      const result = await readJson<ReferencesResult>(res);
+      // Server-root-relative report paths → project-relative, as renameFile already does.
+      if (typeof result.path === "string") {
+        result.path = stripRoot(result.path);
+      }
+      for (const f of result.files ?? []) {
+        f.path = stripRoot(f.path);
+      }
+      for (const e of result.errors ?? []) {
+        e.path = stripRoot(e.path);
+      }
+      return result;
     },
 
     /**

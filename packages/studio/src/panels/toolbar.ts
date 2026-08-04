@@ -44,7 +44,7 @@ import { getPreviewNavigateHandler } from "../canvas/preview-navigate";
 import { documentUrlPattern, dynamicRouteParams } from "../page-params";
 import { getNodeAtPath, nodeLabel, projectState } from "../store";
 import { activeRegistry } from "../commands/active-registry";
-import { statusMessage } from "./statusbar";
+import { notify } from "../services/notify";
 import type { Tab } from "../tabs/tab";
 import type { CommandRegistry } from "../commands/registry";
 import type { EffectScope } from "@vue/reactivity";
@@ -252,7 +252,7 @@ export function runOpenInBrowser() {
     openUrlExternally(target.url);
     return;
   }
-  statusMessage(target.reason);
+  notify.warn(target.reason, { key: "view.openInBrowser", source: "Preview" });
 }
 
 // ─── ①a The Command Center pill ──────────────────────────────────────────────

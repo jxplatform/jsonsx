@@ -639,3 +639,45 @@ jx-styled-combobox sp-picker {
   flex: 1;
   font-size: var(--spectrum-font-size-50, 11px);
 }
+
+/* ── Usage ("Used on N pages →") ──────────────────────────────────────────────
+   The reference index rendered in the inspector. The heading carries the count, so the rows are
+   the answer's detail rather than its headline — collapsed by default, one row per referencing
+   file, each a button that opens it. */
+.usage-note {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1.5;
+  padding: 2px 0;
+}
+.usage-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  padding: 3px 4px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--spectrum-font-size-50, 11px);
+  text-align: left;
+  cursor: pointer;
+}
+.usage-row:hover,
+.usage-row:focus-visible {
+  background: var(--hover-bg);
+}
+.usage-row-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-row-count {
+  flex-shrink: 0;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}

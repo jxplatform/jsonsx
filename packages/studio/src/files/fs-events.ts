@@ -9,6 +9,7 @@
  */
 
 import { getPlatform } from "../platform";
+import { invalidateUsages } from "../services/references";
 import { projectState } from "../store";
 import type { DirEntry, FsEvent } from "../types";
 
@@ -153,6 +154,10 @@ export function startFsSync(ctx: FsSyncContext): () => void {
   };
 
   return platform.subscribeFileEvents((events) => {
+    // Before the echo filter, deliberately. `isRecentLocal` drops the events Studio caused, which
+    // Is right for the tree (it already repainted) and wrong for usage counts — Studio's own write
+    // Changes who references what exactly as much as anyone else's does.
+    invalidateUsages();
     pending.push(...events);
     if (timer) {
       clearTimeout(timer);

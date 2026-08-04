@@ -284,6 +284,7 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         listStarters: () => Promise.resolve(listStarters()),
         readFile: (params) => session.handleReadFile(params),
         renameFile: (params) => session.handleRenameFile(params),
+        findReferences: (params) => session.findReferences(params),
         resolveSiteContext: (params) => session.handleResolveSiteContext(params),
         uploadFile: (params) => session.handleUploadFile(params),
         writeFile: (params) => session.handleWriteFile(params),

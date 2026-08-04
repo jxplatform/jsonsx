@@ -13,9 +13,9 @@
  */
 import { effect, onScopeDispose, reactive, toRaw } from "../reactivity";
 import { getPlatform } from "../platform";
+import { notify } from "../services/notify";
 import { setHistoryDelegate } from "../tabs/transact";
 import { isRecentLocal } from "../files/fs-events";
-import { statusMessage } from "../panels/statusbar";
 import { showConfirmDialog } from "../ui/layers";
 import { showProgressModal } from "../ui/progress-modal";
 import { errorMessage } from "@jxsuite/schema/parse";
@@ -261,13 +261,17 @@ export function createGridController(tab: Tab, source: GridSource): GridControll
       const batch = buffer.buildBatch();
       const changeCount = batch.cells.length + batch.inserts.length + batch.deletes.length;
       if (changeCount === 0) {
-        statusMessage("No grid changes to save");
+        notify.info("No grid changes to save.", { key: "grid.save" });
         return;
       }
       const violations = requiredViolations(batch);
       if (violations) {
         buffer.applyCommitResult(violations);
-        statusMessage("Required cells are empty — fix the marked rows and save again", 5000);
+        notify.warn("Required cells are empty — fix the marked rows, then save again.", {
+          key: "grid.save",
+          source: "Data",
+          tier: "problem",
+        });
         return;
       }
       if (batch.deletes.length > 0) {
@@ -316,14 +320,22 @@ export function createGridController(tab: Tab, source: GridSource): GridControll
         const failed = changeCount - okCount;
         const staleCount =
           result.cells.filter((r) => r.stale).length + result.deletes.filter((r) => r.stale).length;
-        statusMessage(
-          failed === 0
-            ? `Saved ${okCount} change(s)`
-            : `Saved ${okCount} · ${failed} failed${staleCount ? ` (${staleCount} stale)` : ""} — kept pending`,
-          failed === 0 ? 3000 : 6000,
-        );
+        if (failed === 0) {
+          notify.success(`Saved ${okCount} change(s).`, { key: "grid.save" });
+        } else {
+          // A partial commit leaves rows pending on disk: a state to fix, not a line to read.
+          notify.error(
+            `Saved ${okCount} · ${failed} failed${staleCount ? ` (${staleCount} stale)` : ""} — kept pending.`,
+            { action: "file.save", key: "grid.save", source: "Data" },
+          );
+        }
       } catch (error) {
-        statusMessage(`Save error: ${errorMessage(error)}`, 6000);
+        notify.error("Could not save the grid.", {
+          action: "file.save",
+          detail: errorMessage(error),
+          key: "grid.save",
+          source: "Data",
+        });
       } finally {
         state.saving = false;
         progress?.done();
@@ -396,7 +408,10 @@ export function createGridController(tab: Tab, source: GridSource): GridControll
         if (buffer.isDirty()) {
           const keys = hitKeys.has("*") ? state.rows.map((row) => row.key) : [...hitKeys];
           buffer.markStale(keys);
-          statusMessage("Grid rows changed on disk — marked stale (refresh to reload)", 5000);
+          notify.warn("Grid rows changed on disk — marked stale; refresh to reload.", {
+            key: "grid.stale",
+            source: "Data",
+          });
           syncView();
         } else {
           void controller.refresh();

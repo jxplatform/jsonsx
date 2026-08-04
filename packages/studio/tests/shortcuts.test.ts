@@ -20,6 +20,7 @@ import {
   stubRect,
 } from "./harness";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import type { InspectorTabId } from "../src/shell";
 
 // ─── Module mocks (must precede the shortcuts import) ─────────────────────────
@@ -43,14 +44,8 @@ void mock.module("../src/editor/context-menu.js", () => ({
   showContextMenu,
 }));
 
-const statusMessage = mock((_text: string) => {});
-void mock.module("../src/panels/statusbar.js", () => ({
-  mountStatusbar: () => {},
-  renderStatusbar: () => {},
-  setStatusbarRenderer: () => {},
-  statusMessage,
-  unmountStatusbar: () => {},
-}));
+const notified = mock((_message: string) => {});
+void mock.module("../src/services/notify.js", () => notifyModule((call) => notified(call.message)));
 
 const {
   focusShellRegion,
@@ -210,7 +205,7 @@ beforeEach(() => {
     copyNode,
     cutNode,
     pasteNode,
-    statusMessage,
+    notified,
   ]) {
     m.mockClear();
   }
@@ -1114,8 +1109,8 @@ describe("openProjectFlow", () => {
     wrapper.dispatchEvent(new Event("confirm", { bubbles: true }));
     await pending;
     expect(openProject).toHaveBeenCalledWith("newWindow");
-    expect(statusMessage).toHaveBeenCalledTimes(1);
-    expect(statusMessage.mock.calls[0]![0]).toContain("new window");
+    expect(notified).toHaveBeenCalledTimes(1);
+    expect(notified.mock.calls[0]![0]).toContain("new window");
   });
 
   test("This Window is a real answer, not a dismissal", async () => {
@@ -1136,6 +1131,6 @@ describe("openProjectFlow", () => {
     dialogWrapper()!.dispatchEvent(new Event("cancel", { bubbles: true }));
     await pending;
     expect(openProject).not.toHaveBeenCalled();
-    expect(statusMessage).not.toHaveBeenCalled();
+    expect(notified).not.toHaveBeenCalled();
   });
 });

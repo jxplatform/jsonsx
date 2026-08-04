@@ -8,6 +8,7 @@
  */
 import { flush, installMockPlatform } from "./harness";
 import { mock } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { nothing } from "lit-html";
 import type { MockPlatformState } from "./harness";
 import type { StudioPlatform } from "../src/types";
@@ -109,14 +110,17 @@ export async function bootStudio(opts: {
   }));
 
   void mock.module("../src/panels/statusbar.ts", () => ({
+    forgetSavedTimes: mock(() => {}),
     mountStatusbar: mock(() => {}),
+    noteDocumentSaved: mock(() => {}),
     renderStatusbar: mock(() => {}),
-    setStatusbarRenderer: mock(() => {}),
-    statusMessage: (msg: string) => {
-      statusMessages.push(msg);
-    },
     unmountStatusbar: mock(() => {}),
   }));
+
+  // Outcomes reach `notify` now; the fixture collects the SENTENCE each one reports.
+  void mock.module("../src/services/notify.ts", () =>
+    notifyModule((call) => statusMessages.push(call.message)),
+  );
 
   void mock.module("../src/panels/toolbar.ts", () => ({
     mount: (_el: HTMLElement, ctx: unknown) => {
