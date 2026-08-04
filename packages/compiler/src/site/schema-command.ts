@@ -37,7 +37,7 @@ const CORE_DOCUMENT_SPECIFIER = "@jxsuite/schema/schema.json";
  * @param {string} projectRoot - Absolute path to the project directory
  * @returns {Promise<{ projectSchemaPath: string; documentSchemaPath: string }>} Written paths
  */
-export async function writeProjectSchemas(projectRoot: string) {
+export async function composeEntryDocuments(projectRoot: string) {
   const { config } = loadProjectConfig(projectRoot);
   const registry = await buildProjectExtensionRegistry(projectRoot, config);
 
@@ -58,6 +58,17 @@ export async function writeProjectSchemas(projectRoot: string) {
     loadJson: restrictedSchemaLoader(root),
   });
 
+  return { documentSchema, projectSchema };
+}
+
+/**
+ * Compose the entry documents and WRITE them to the project root.
+ *
+ * @param {string} projectRoot - Absolute path to the project directory
+ * @returns {Promise<{ projectSchemaPath: string; documentSchemaPath: string }>} Written paths
+ */
+export async function writeProjectSchemas(projectRoot: string) {
+  const { documentSchema, projectSchema } = await composeEntryDocuments(projectRoot);
   const projectSchemaPath = resolve(projectRoot, "project.schema.json");
   const documentSchemaPath = resolve(projectRoot, "document.schema.json");
   writeFileSync(projectSchemaPath, `${JSON.stringify(projectSchema, null, 2)}\n`, "utf8");
@@ -76,7 +87,11 @@ export async function writeProjectSchemas(projectRoot: string) {
  * @param {string} projectRoot - Absolute path to the project directory
  * @returns {Promise<{ project: Record<string, unknown>; document: Record<string, unknown> }>}
  */
-export async function readBundledProjectSchemas(projectRoot: string) {
+export async function readBundledProjectSchemas(
+  projectRoot: string,
+  options: { write?: boolean } = {},
+) {
+  const { write = true } = options;
   const root = resolve(projectRoot);
   const projectJsonPath = resolve(root, "project.json");
   const projectSchemaPath = resolve(root, "project.schema.json");
@@ -92,22 +107,73 @@ export async function readBundledProjectSchemas(projectRoot: string) {
       return false;
     }
   };
-  if (stale(projectSchemaPath) || stale(documentSchemaPath)) {
-    await writeProjectSchemas(root);
+  const isStale = stale(projectSchemaPath) || stale(documentSchemaPath);
+  // `write: false` is what a VALIDATOR passes. A stale entry document is regenerated in memory and
+  // The committed file is left exactly as it is: `jx validate` reports on the repository, and a
+  // Checker that edits what it is checking is not a checker. This mattered — running
+  // `schema:validate-all` on a machine with a shadowed core silently rewrote the committed
+  // Artifact with a narrower one, and it was green either way, because it validated against
+  // Whatever it had just written.
+  const composed = isStale ? await composeEntryDocuments(root) : null;
+  if (composed && write) {
+    writeFileSync(
+      projectSchemaPath,
+      `${JSON.stringify(composed.projectSchema, null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      documentSchemaPath,
+      `${JSON.stringify(composed.documentSchema, null, 2)}\n`,
+      "utf8",
+    );
   }
 
   const loadJson = restrictedSchemaLoader(root);
-  const projectFile = JSON.parse(readFileSync(projectSchemaPath, "utf8")) as Record<
-    string,
-    unknown
-  >;
-  const documentFile = JSON.parse(readFileSync(documentSchemaPath, "utf8")) as Record<
-    string,
-    unknown
-  >;
+  const projectFile =
+    composed?.projectSchema ??
+    (JSON.parse(readFileSync(projectSchemaPath, "utf8")) as Record<string, unknown>);
+  const documentFile =
+    composed?.documentSchema ??
+    (JSON.parse(readFileSync(documentSchemaPath, "utf8")) as Record<string, unknown>);
   const project = flattenSchema(await bundleSchema(projectFile, loadJson, root));
   const document = flattenSchema(await bundleSchema(documentFile, loadJson, root));
   return { document, project };
+}
+
+/** Packages whose schemas define the Jx document contract itself, never a project's own content. */
+const FIRST_PARTY_SCHEMA_SCOPE = "@jxsuite/";
+
+/**
+ * Is this specifier one of the shipped core schemas, as opposed to a project-local fragment?
+ *
+ * @param {string} specifier - Bare specifier, e.g. `@jxsuite/schema/schema.json`
+ * @returns {boolean}
+ */
+export function isFirstPartySchema(specifier: string): boolean {
+  return specifier.startsWith(FIRST_PARTY_SCHEMA_SCOPE) && specifier.endsWith(".json");
+}
+
+/**
+ * Resolve a first-party schema from the HOST — the workspace running the generator.
+ *
+ * Throws rather than falling back to the project, because a fallback is exactly the behaviour that
+ * let a stale published core answer for the workspace one. A generator that cannot find its own
+ * schema must stop, not improvise.
+ *
+ * @param {string} specifier
+ * @param {string} path - The original ref, for the error message
+ * @returns {string} Absolute path to the resolved schema file
+ */
+function hostResolve(specifier: string, path: string): string {
+  try {
+    return createRequire(import.meta.url).resolve(specifier);
+  } catch (error) {
+    throw new Error(
+      `Schema ref "${path}" names the first-party schema "${specifier}", which must resolve from ` +
+        `the host workspace and does not`,
+      { cause: error },
+    );
+  }
 }
 
 /**
@@ -125,16 +191,35 @@ function restrictedSchemaLoader(root: string): SchemaJsonLoader {
     if (rel.startsWith("..") || isAbsolute(rel)) {
       throw new Error(`Schema ref "${path}" escapes the project root ${root}`);
     }
-    if (existsSync(abs)) {
-      return JSON.parse(readFileSync(abs, "utf8")) as Record<string, unknown>;
-    }
     const posixRel = rel.split(sep).join("/");
     const marker = "node_modules/";
     const markerIndex = posixRel.lastIndexOf(marker);
-    if (markerIndex === -1) {
+    const specifier = markerIndex === -1 ? null : posixRel.slice(markerIndex + marker.length);
+    // A FIRST-PARTY core comes from the host, always — before the project-local file is even
+    // Looked at. A project may legitimately carry its own fragments, which is what the rest of this
+    // Loader is for; what it may not do is answer for `@jxsuite/schema` itself.
+    //
+    // This is not hypothetical. A stray `bun install` in packages/starters/sites/shop left a
+    // Gitignored node_modules holding @jxsuite/schema@0.35.0 beside a 1.5.0 workspace, and BOTH the
+    // `existsSync` shortcut below and the project-first `createRequire` resolved to it. The
+    // Generator then emitted a shop document schema missing Statement, StatementList, PathsValue
+    // And the three admission blocks, with ClassMethodDef.role down from 16 members to 6 and
+    // ChildrenValue.oneOf down from 3 to 2 — dropping the computed-children branch, which made
+    // Shop's own pages/products/[sku].json invalid against its own committed schema. Nothing
+    // Noticed for six weeks, because the artifact was only ever regenerated on the machine that
+    // Had the shadow.
+    if (specifier !== null && isFirstPartySchema(specifier)) {
+      return JSON.parse(readFileSync(hostResolve(specifier, path), "utf8")) as Record<
+        string,
+        unknown
+      >;
+    }
+    if (existsSync(abs)) {
+      return JSON.parse(readFileSync(abs, "utf8")) as Record<string, unknown>;
+    }
+    if (specifier === null) {
       throw new Error(`Schema ref "${path}" does not exist`);
     }
-    const specifier = posixRel.slice(markerIndex + marker.length);
     let resolved: string;
     try {
       const projRequire = createRequire(resolve(root, "package.json"));

@@ -54,7 +54,10 @@
             },
             "service": {
               "description": "How images are optimized: \"build\" runs Sharp at build time; \"cloudflare\" emits /cdn-cgi/image transform URLs served by Cloudflare Image Transformations (requires the feature to be enabled on the serving zone).",
-              "enum": ["build", "cloudflare"],
+              "enum": [
+                "build",
+                "cloudflare"
+              ],
               "type": "string"
             },
             "sizes": {
@@ -98,11 +101,20 @@
               "type": "array"
             },
             "type": {
-              "enum": ["string", "number", "integer", "boolean", "array", "object"],
+              "enum": [
+                "string",
+                "number",
+                "integer",
+                "boolean",
+                "array",
+                "object"
+              ],
               "type": "string"
             }
           },
-          "required": ["type"],
+          "required": [
+            "type"
+          ],
           "type": "object"
         },
         "RelationshipRef": {
@@ -116,7 +128,9 @@
               "type": "string"
             }
           },
-          "required": ["$ref"],
+          "required": [
+            "$ref"
+          ],
           "type": "object"
         },
         "StyleObject": {
@@ -156,7 +170,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["$ref"],
+                "required": [
+                  "$ref"
+                ],
                 "type": "object"
               },
               {
@@ -226,7 +242,13 @@
           "properties": {
             "adapter": {
               "description": "Platform adapter for deployment-specific output.",
-              "enum": ["static", "cloudflare-pages", "cloudflare-workers", "node", "bun"],
+              "enum": [
+                "static",
+                "cloudflare-pages",
+                "cloudflare-workers",
+                "node",
+                "bun"
+              ],
               "type": "string"
             },
             "deploy": {
@@ -248,17 +270,26 @@
                 },
                 "provider": {
                   "description": "Hosting provider the project is connected to.",
-                  "enum": ["cloudflare-pages"],
+                  "enum": [
+                    "cloudflare-pages"
+                  ],
                   "type": "string"
                 }
               },
-              "required": ["provider", "accountId", "projectName"],
+              "required": [
+                "provider",
+                "accountId",
+                "projectName"
+              ],
               "type": "object"
             },
             "format": {
               "default": "directory",
               "description": "Reserved; currently unused. Accepted for forward compatibility with single-file output (desktop single-file mode) — the build emits per-route directories regardless.",
-              "enum": ["directory", "single"],
+              "enum": [
+                "directory",
+                "single"
+              ],
               "type": "string"
             },
             "outDir": {
@@ -274,7 +305,11 @@
             "trailingSlash": {
               "default": "always",
               "description": "Trailing slash behavior for generated URLs.",
-              "enum": ["always", "never", "ignore"],
+              "enum": [
+                "always",
+                "never",
+                "ignore"
+              ],
               "type": "string"
             }
           },
@@ -303,7 +338,9 @@
             "layout": {
               "default": null,
               "description": "Default layout file path applied to all pages. Set to null to render pages without a layout.",
-              "examples": ["./layouts/base.json"],
+              "examples": [
+                "./layouts/base.json"
+              ],
               "oneOf": [
                 {
                   "type": "string"
@@ -318,7 +355,11 @@
         },
         "extensions": {
           "description": "Extension packages: bare package names (resolved project-first through the package exports map) or relative paths. Each must export jx-extension.json.",
-          "examples": [["@jxsuite/parser"]],
+          "examples": [
+            [
+              "@jxsuite/parser"
+            ]
+          ],
           "items": {
             "type": "string"
           },
@@ -329,12 +370,20 @@
           "properties": {
             "defaultLocale": {
               "description": "Default locale code.",
-              "examples": ["en"],
+              "examples": [
+                "en"
+              ],
               "type": "string"
             },
             "locales": {
               "description": "Available locale codes.",
-              "examples": [["en", "fr", "de"]],
+              "examples": [
+                [
+                  "en",
+                  "fr",
+                  "de"
+                ]
+              ],
               "items": {
                 "type": "string"
               },
@@ -342,7 +391,10 @@
             },
             "routing": {
               "description": "Locale routing strategy.",
-              "enum": ["prefix-except-default", "prefix-always"],
+              "enum": [
+                "prefix-except-default",
+                "prefix-always"
+              ],
               "type": "string"
             }
           },
@@ -367,7 +419,10 @@
         "name": {
           "default": "Jx Site",
           "description": "Human-readable project name.",
-          "examples": ["My Portfolio", "Jx Example Site"],
+          "examples": [
+            "My Portfolio",
+            "Jx Example Site"
+          ],
           "type": "string"
         },
         "redirects": {
@@ -405,7 +460,10 @@
         },
         "url": {
           "description": "Production URL of the deployed site.",
-          "examples": ["https://example.com", "https://jxsuite.com"],
+          "examples": [
+            "https://example.com",
+            "https://jxsuite.com"
+          ],
           "type": "string"
         }
       },
@@ -437,7 +495,9 @@
                           "type": "string"
                         }
                       },
-                      "required": ["$ref"]
+                      "required": [
+                        "$ref"
+                      ]
                     },
                     {
                       "type": "string"
@@ -474,7 +534,10 @@
               },
               "source": {
                 "description": "Path to the content directory relative to the project root.",
-                "examples": ["./content/blog/", "./content/docs/"],
+                "examples": [
+                  "./content/blog/",
+                  "./content/docs/"
+                ],
                 "type": "string"
               }
             }
@@ -494,7 +557,9 @@
           "properties": {
             "engine": {
               "type": "string",
-              "enum": ["minisearch"],
+              "enum": [
+                "minisearch"
+              ],
               "default": "minisearch",
               "description": "Client search engine the emitted index targets"
             },
@@ -519,7 +584,11 @@
                     "items": {
                       "type": "string"
                     },
-                    "default": ["title", "heading", "text"],
+                    "default": [
+                      "title",
+                      "heading",
+                      "text"
+                    ],
                     "description": "Document fields the index searches"
                   },
                   "boost": {
@@ -542,12 +611,16 @@
                     "description": "Deepest heading level that starts its own section document"
                   }
                 },
-                "required": ["basePath"],
+                "required": [
+                  "basePath"
+                ],
                 "additionalProperties": false
               }
             }
           },
-          "required": ["collections"],
+          "required": [
+            "collections"
+          ],
           "additionalProperties": false
         }
       }

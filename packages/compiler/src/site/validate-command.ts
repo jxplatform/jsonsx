@@ -133,7 +133,7 @@ export async function validateProjectTree(
   const { addFormats, Ajv } = await loadAjv();
 
   // 3. Documents against the bundled document schema (the same schema the studio consumes).
-  const { document: documentSchema } = await readBundledProjectSchemas(root);
+  const { document: documentSchema } = await readBundledProjectSchemas(root, { write: false });
   const docAjv = new Ajv({ allErrors: true, ownProperties: true, strict: false });
   addFormats(docAjv);
   const validateDoc = docAjv.compile(documentSchema);

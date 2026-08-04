@@ -21,7 +21,11 @@ import {
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { GENERATED_SCHEMA_COMMENT } from "@jxsuite/schema/project-schemas";
-import { readBundledProjectSchemas, writeProjectSchemas } from "../src/site/schema-command";
+import {
+  isFirstPartySchema,
+  readBundledProjectSchemas,
+  writeProjectSchemas,
+} from "../src/site/schema-command";
 
 const TMP = resolve(import.meta.dir, "__test-schema-command__");
 
@@ -333,6 +337,104 @@ describe("readBundledProjectSchemas", () => {
       expect(project.$comment).toBe("kept without project.json");
     } finally {
       writeFileSync(projectJsonPath, savedProjectJson, "utf8");
+    }
+  });
+});
+
+// ─── The shadow-core regression ──────────────────────────────────────────────
+
+describe("a project-local @jxsuite core never answers for the host's", () => {
+  /**
+   * A stray `bun install` inside a starter leaves a gitignored `node_modules` holding a PUBLISHED
+   * `@jxsuite/schema`. Both the `existsSync` shortcut and the project-first `createRequire` used to
+   * resolve to it, so the generator emitted a document schema built from whatever core that install
+   * happened to pin — on one machine, silently, for six weeks. The emitted schema was not merely
+   * older: it dropped `ChildrenValue`'s computed-children branch, which made the starter's own
+   * pages invalid against its own committed schema.
+   */
+  it("reads the host core even when the project ships its own, and never widens on it", async () => {
+    const root = mkdtempSync(resolve(tmpdir(), "jx-shadow-core-"));
+    try {
+      writeFileSync(
+        resolve(root, "package.json"),
+        JSON.stringify({ name: "shadowed", version: "0.0.0" }),
+      );
+      writeFileSync(
+        resolve(root, "project.json"),
+        JSON.stringify({ $schema: "./project.schema.json", name: "shadowed" }),
+      );
+
+      const clean = await writeProjectSchemas(root);
+      const withoutShadow = readFileSync(clean.documentSchemaPath, "utf8");
+
+      // Now plant a hostile core: a syntactically valid schema that defines almost nothing. If the
+      // Loader ever prefers it, the emitted document schema collapses and this test sees it.
+      const shadowDir = resolve(root, "node_modules/@jxsuite/schema");
+      mkdirSync(shadowDir, { recursive: true });
+      writeFileSync(
+        resolve(shadowDir, "package.json"),
+        JSON.stringify({ name: "@jxsuite/schema", version: "0.0.1", exports: { "./*": "./*" } }),
+      );
+      writeFileSync(
+        resolve(shadowDir, "schema.json"),
+        JSON.stringify({ $defs: {}, $id: "https://jxsuite.dev/impostor.json" }),
+      );
+
+      const shadowed = await writeProjectSchemas(root);
+      const withShadow = readFileSync(shadowed.documentSchemaPath, "utf8");
+
+      expect(withShadow).toBe(withoutShadow);
+      expect(withShadow).not.toContain("impostor");
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it("classifies first-party specifiers, and leaves project fragments alone", () => {
+    expect(isFirstPartySchema("@jxsuite/schema/schema.json")).toBe(true);
+    expect(isFirstPartySchema("@jxsuite/parser/fragment.schema.json")).toBe(true);
+    // A project's own fragments still resolve project-first — that is what the loader is FOR.
+    expect(isFirstPartySchema("my-extension/thing.schema.json")).toBe(false);
+    expect(isFirstPartySchema("@other/schema.json")).toBe(false);
+    // Not a schema file at all.
+    expect(isFirstPartySchema("@jxsuite/schema/index.js")).toBe(false);
+  });
+});
+
+describe("a validator does not edit what it is checking", () => {
+  it("regenerates a stale entry document in memory and leaves the committed bytes alone", async () => {
+    const root = mkdtempSync(resolve(tmpdir(), "jx-readonly-validate-"));
+    try {
+      writeFileSync(
+        resolve(root, "package.json"),
+        JSON.stringify({ name: "readonly", version: "0.0.0" }),
+      );
+      const projectJson = resolve(root, "project.json");
+      writeFileSync(
+        projectJson,
+        JSON.stringify({ $schema: "./project.schema.json", name: "readonly" }),
+      );
+      const { documentSchemaPath } = await writeProjectSchemas(root);
+
+      // A recognisable marker, then make project.json newer so the staleness check fires.
+      writeFileSync(documentSchemaPath, JSON.stringify({ marker: "committed-bytes" }), "utf8");
+      const future = Date.now() / 1000 + 60;
+      utimesSync(projectJson, future, future);
+
+      const readOnly = await readBundledProjectSchemas(root, { write: false });
+      // It returned a real composed schema, not the marker…
+      expect(readOnly.document).not.toHaveProperty("marker");
+      expect(Object.keys(readOnly.document).length).toBeGreaterThan(1);
+      // …and the file on disk is untouched.
+      expect(JSON.parse(readFileSync(documentSchemaPath, "utf8"))).toEqual({
+        marker: "committed-bytes",
+      });
+
+      // The default is still to write, because the studio's live PAL path wants fresh bytes.
+      await readBundledProjectSchemas(root);
+      expect(JSON.parse(readFileSync(documentSchemaPath, "utf8"))).not.toHaveProperty("marker");
+    } finally {
+      rmSync(root, { force: true, recursive: true });
     }
   });
 });

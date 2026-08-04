@@ -42,7 +42,7 @@
     "eval:headless": "bun run --cwd packages/studio eval:headless",
     "format": "oxfmt .",
     "generate:schema": "bun run --cwd packages/schema schema",
-    "schema:verify": "bun run generate:schema && git diff --exit-code -- packages/schema/schema.json",
+    "schema:verify": "bun run generate:schema && git diff --exit-code -- packages/schema/schema.json && bun run schema:generate-all && git diff --exit-code -- '**/project.schema.json' '**/document.schema.json'",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
     "lint:typecheck": "oxlint --type-aware -c .oxlintrc.typecheck.json .",
