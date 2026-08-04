@@ -4,7 +4,9 @@
     "**/_fixtures/*",
     "**/_studio_fixtures/*",
     "CHANGELOG.md",
-    "packages/schema/*.json"
+    "packages/schema/*.json",
+    "**/project.schema.json",
+    "**/document.schema.json"
   ],
   "indentStyle": "tab",
   "jsdoc": true
