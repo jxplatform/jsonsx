@@ -225,10 +225,10 @@ jobs:
       # fixtures) validates end-to-end — project.json, documents, classes, fragments, and
       # self-contained committed entry docs. See scripts/validate-schemas.ts.
       - run: bun run schema:validate-all
-      # …and the core schema is what its own generator produces. `schema:validate-all` checks that
-      # DOCUMENTS satisfy the committed schemas; it cannot see a committed schema that has fallen
-      # behind `packages/schema/src/schema.ts` or the pinned @webref data. That gap let 40 CSS
-      # properties sit un-regenerated while `deploy-site.yml` rebuilt the file on every deploy —
-      # so the published site and the copy every editor and `jx validate` reads locally were free
-      # to disagree, silently and indefinitely.
+      # …and every committed schema is what its own generator produces — the core, and all 50
+      # per-project entry documents. `schema:validate-all` checks that DOCUMENTS satisfy the
+      # committed schemas; it cannot see a committed schema that has fallen behind its generator.
+      # That gap hid two separate faults for six weeks: 40 CSS properties un-propagated from the
+      # core, and one starter whose entry document was composed against a published @jxsuite/schema
+      # left in a stray node_modules, so it was NARROWER than its own content required.
       - run: bun run schema:verify

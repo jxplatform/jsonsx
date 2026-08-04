@@ -108,6 +108,10 @@ Checks, in order: that both committed entry documents are self-contained (every 
 
 Prints `Project is valid (N files checked)` on success; otherwise lists each file's violations with their instance paths and exits `1`.
 
+:::doc-note
+`jx validate` never writes. If an entry document is older than `project.json` it composes a current one in memory for the duration of the run and leaves the committed file exactly as it is — run `jx schema` when you want the file itself updated. A checker that edits what it is checking can report green on bytes it just wrote.
+:::
+
 The output shape is meant to be read by whatever wrote the file — a person or a generator: one line naming the file, then one `- <instance path>: <message>` line per violation. Paired with the non-zero exit it drops straight into a write-check-fix loop. Because `jx schema` embeds every core and fragment resource under `$defs` keyed by its canonical `$id`, the document checks resolve from the committed entry documents alone — no network fetch and no module resolution — so an editor's inline squiggles and this command are looking at exactly the same schema.
 
 ## `jx db push`
