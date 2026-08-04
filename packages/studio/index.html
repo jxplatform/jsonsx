@@ -25,6 +25,12 @@
         <div id="left-panel"></div>
         <div id="resize-left" class="resize-handle"></div>
         <div id="canvas-wrap"></div>
+        <!-- ⑪ The Bottom dock (⌘J). It sits in the PANE's column, under the stage and above the
+             status bar, so opening it never narrows the Navigator or the Inspector (spec §12
+             region ⑪). Its handle resizes on the other axis; `panels/bottom-dock.ts` stamps
+             `dock.bottom` on this host while it is open, and nothing while it is closed. -->
+        <div id="resize-bottom" class="resize-handle resize-handle-row"></div>
+        <div id="bottom-dock"></div>
         <div id="resize-right" class="resize-handle"></div>
         <!-- The Inspector dock. Four tabs — Content · Style · Logic · Assistant (spec §12 region
              ⑨) — all inside this one host. The assistant's fifth grid column is gone. -->

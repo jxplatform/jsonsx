@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.4.3-draft
+**Version:** 0.4.4-draft
 **Status:** Partial
-**Updated:** 2026-08-03
+**Updated:** 2026-08-04
 **License:** MIT
 
 ---
@@ -1263,8 +1263,102 @@ setup notice) repaint without Preferences having to know they exist.
 
 ---
 
+## 16. Feedback, Problems and Progress
+
+**Status:** Partial — the notification substrate, the Bottom dock, Problems, Activity and the
+inline field slot ship; Diff and Logic are declared tabs that arrive with the pane takeover.
+
+Studio's predecessor had one feedback surface: a 24px status bar carrying 78 outcomes — successes
+and failures alike — in identical 11px grey text, destroyed after 3000ms. Nothing persisted, nothing
+could be acted on, and 158 of 240 `catch` blocks reached no surface at all. This section replaces
+that with **three lifetimes, chosen by the action the outcome requires.**
+
+### 16.1 The three tiers
+
+| Tier        | Lives                    | For                         | Where                              |
+| ----------- | ------------------------ | --------------------------- | ---------------------------------- |
+| **Toast**   | seconds, then retires    | reversible, needs no action | `overlay.toasts`, the fourth layer |
+| **Problem** | until it is fixed        | must be fixed               | Bottom dock ⑪, badge on the rail   |
+| **Inline**  | as long as the bad value | a value the user just typed | at its own control                 |
+
+`notify(severity, message, options)` is the only sanctioned entry point; `severity` is one of
+`success | info | warn | error`. The tier is **derived** from the severity — `error` defaults to a
+Problem, everything else to a toast — and `options.tier` overrides it, so a warning that must be
+fixed says so at its call site. A lint bans raw status writes outside `notify`, and bans bare empty
+`catch` blocks in `src/`, because a wide shallow change without a mechanical guard regrows.
+
+Three rules hold across all three tiers:
+
+1.  **Recovery is a command id, not a closure.** `options.action` names a registered command, so the
+    button is rendered from the registry — with the command's own title, its keyboard chord and its
+    `requires` sentence when it is disabled. An unregistered id renders **no button**, which is what
+    lets a call site name a capability that lands a phase later without shipping a dead control.
+2.  **A record carries where it came from.** `source` (the subsystem) and `path` (the file) are what
+    make a Problem clickable and what let `clearProblems(match)` retire a whole class of them when
+    the underlying file is fixed.
+3.  **A repeat is not a new row.** `options.key` dedupes, so a failing watcher does not produce a
+    thousand identical Problems.
+
+### 16.2 The status bar carries ambient state only
+
+Three fields in scope order — **project ‖ document ‖ selection** — every item a command, the save
+state worded rather than a coloured dot. It reports the _effective_ view, so it cannot say one thing
+while the pane context bar says another. **No transient message is ever written to it.** That
+separation is the point: state that is true until something changes it, and outcomes that happened
+at a moment, are different things and had been sharing one 24px strip.
+
+### 16.3 The Bottom dock
+
+`⌘J`, under the **pane grid** rather than the window, so it never steals width from the side docks —
+and never covers the canvas, which is the one region that must not disappear. Four tabs, at the
+documented cap: **Problems · Diff · Logic · Activity**. It opens **collapsed**: an empty Problems
+list must not spend 220px of canvas to say nothing.
+
+`view.setBottomDock {open}` and `view.setBottomTab {tab}` are the idempotent setters; the toggle is
+defined in terms of them. The region id `dock.bottom` resolves **only while the dock is open**, so
+keyboard region cycling never lands in a collapsed dock and a capture can never crop one.
+
+### 16.4 Activity, and what may still block
+
+Any long operation opens an Activity entry: a title, a status line, an ordered step list, a
+streaming log, and **Cancel** when the caller supplies one. An entry outlives the operation, so a
+failure is inspectable after the fact instead of only while a modal is up.
+
+`fail()` does not render an error view of its own — it raises a Problem carrying the log as detail.
+This is the inversion the section exists for: the progress modal used to be the **only** surface in
+Studio with a real error view, and it was reachable from four call sites.
+
+**Blocking is retained for dependency installation only**, and even there the modal offers _Run in
+the background_ and a real Cancel. Every blocking operation also leaves an Activity entry, so
+dismissing the modal never discards the account of what happened. Project open — which chained a
+blocking spinner, a transient status line and a confirm-plus-spinner, none cancellable — is one
+Activity entry with steps.
+
+Running activities are a quiescence source: `probe.idle()` (§13.5) counts an open entry as
+not-idle, so automation cannot photograph a half-finished operation.
+
+### 16.5 Inline errors, and the withheld render
+
+A field's own error is rendered by the shared field row, so every consumer inherits it from one
+edit. Host-supplied diagnostics (`jx-validate`, Monaco markers) **win over** the intrinsic schema
+check, and a form the user has not touched paints nothing — marking every required field red on
+first render is this section backwards.
+
+Two write policies coexist deliberately, and each surface states which it uses: a form that builds a
+**candidate** validates before applying, so a refusal leaves the old value standing; a form that
+mutates project state in place can only **report**, because a pre-write check there would delay
+persisting what the user can already see rather than prevent anything.
+
+Panels defer a render while one of their own fields has focus — finishing the author's sentence
+beats being current — and that deferral is now visible rather than silent. A panel showing state
+from before the last edit is correct; a panel showing it with no indication is indistinguishable
+from a panel that has stopped working.
+
+---
+
 ## Changelog
 
+- **0.4.4-draft** (2026-08-04) — §16 Feedback, Problems and Progress — the three notification tiers, the Bottom dock, Activity, and the status bar as ambient state only.
 - **0.4.3-draft** (2026-08-03) — §9.1.1: destructive confirmations state the reference count — what a delete breaks, what a rename rewrites, and the three states (counted / uncountable / unsupported) that are never collapsed.
 - **0.4.2-draft** (2026-08-03) — The Inspector's fourth tab (§3.1, §6): the assistant is Content · Style · Logic · Assistant, not a fifth column; two docks, one persisted record. Application Preferences (§15) — Appearance, Assistant, Accounts (listed and revocable) and a registry-generated Keyboard sheet.
 - **0.4.1-draft** (2026-08-02) — Automation surface is a projection of the command registry (§13.5): the projection, idempotence and Remote rules; probe.idle() as a failing predicate; pointAt in top-document coordinates.
@@ -1312,4 +1406,4 @@ setup notice) repaint without Preferences having to know they exist.
 
 ---
 
-_`@jxsuite/studio` Specification v0.4.3-draft_
+_`@jxsuite/studio` Specification v0.4.4-draft_

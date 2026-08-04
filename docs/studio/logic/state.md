@@ -7,9 +7,18 @@ code:
 
 # State panel
 
-State is where you declare everything the open page or component knows: the values it holds, the values it derives, the data it fetches, and the functions it can run. Open it by clicking **State** (the brackets icon) in the activity bar.
+State is where you declare everything the open page or component knows: the values it holds, the values it derives, the data it fetches, and the functions it can run.
 
 ![Jx Studio State panel listing a component's state and functions](../../images/state-panel.png)
+
+## Open it
+
+State sits beside the values it declares rather than on the Navigator rail. Two doors:
+
+- Press :kbd[⌘K] and run **Show State**.
+- In the **[Data](/docs/studio/logic/data-explorer)** panel of a page that declares nothing yet, click **Define data**.
+
+It opens in the Navigator, under a **STATE · document** header — declaring state writes the open file, so the panel is about the document in front of you. With nothing open it says so: "Open a page to give it data — values it can read, compute or fetch."
 
 Every entry belongs to the open file — each page or component carries its own state, saved inside its own JSON file.
 
@@ -69,7 +78,7 @@ A function stored in a separate file shows **Source** and **Export** fields inst
 When the open file is a component, its plain state entries double as the component's options — the values a page can set when it uses the component. Component files add a few fields:
 
 - On plain values: **Attribute** (the HTML attribute that sets this value), **Reflects**, and **Deprecated**.
-- On functions: an **Emits** list declaring the events the component can send, each with a name, type, and description. Declared events show up in the **[Events panel](/docs/studio/logic/events)** wherever the component is used.
+- On functions: an **Emits** list declaring the events the component can send, each with a name, type, and description. Declared events show up in the Inspector's **[Logic tab](/docs/studio/logic/events)** wherever the component is used.
 
 Name an entry with a leading `#` (like `#cache`) to keep it private: private entries never become component options and are left out of the component's published description.
 
@@ -81,4 +90,4 @@ Everything in this panel is written to the `state` object of the open file's JSO
 
 - Watch these entries carry real values in the **[Data explorer](/docs/studio/logic/data-explorer)**
 - Feed them from files, APIs, and the browser with **[Data sources](/docs/studio/logic/data-sources)**
-- Bind them to clicks and keystrokes in the **[Events panel](/docs/studio/logic/events)**
+- Bind them to clicks and keystrokes in the Inspector's **[Logic tab](/docs/studio/logic/events)**

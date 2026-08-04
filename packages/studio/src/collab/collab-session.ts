@@ -20,7 +20,7 @@
  * evaluation defers until a collab session actually attaches.
  */
 
-import { effect, onScopeDispose, toRaw } from "../reactivity";
+import { effect, onScopeDispose, reactive, toRaw } from "../reactivity";
 import { getPlatform } from "../platform";
 import { jsonClone } from "../utils/studio-utils";
 import {
@@ -40,6 +40,7 @@ import type { CollabHandle } from "@jxsuite/collab/provider";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type * as CollabNS from "@jxsuite/collab";
 import { collabState, registerCollabPath, unregisterCollabPath } from "./collab-state";
+import { notify } from "../services/notify";
 
 type CollabModule = typeof CollabNS;
 
@@ -132,6 +133,14 @@ interface TabRuntime {
   generation: number;
   session: ActiveSession | null;
   attaching: Promise<void> | null;
+  /**
+   * The user asked to leave this document's session.
+   *
+   * Reactive, because the watcher effect that owns attach/detach has to re-run when it changes —
+   * which is also why leaving is a STATE rather than a teardown verb: the effect stays the single
+   * owner of the session lifecycle, and `Collaborate: Stop sharing` sets a flag it reads.
+   */
+  optedOut: { value: boolean };
 }
 
 const runtimes = new WeakMap<Tab, TabRuntime>();
@@ -149,7 +158,13 @@ function runtimeFor(tab: Tab): TabRuntime {
   const key = rawTab(tab);
   let runtime = runtimes.get(key);
   if (!runtime) {
-    runtime = { attaching: null, generation: 0, session: null, watcherInstalled: false };
+    runtime = {
+      attaching: null,
+      generation: 0,
+      optedOut: reactive({ value: false }),
+      session: null,
+      watcherInstalled: false,
+    };
     runtimes.set(key, runtime);
   }
   return runtime;
@@ -531,7 +546,7 @@ export function ensureCollab(tab: Tab): void {
   tab.scope.run(() => {
     effect(() => {
       const drilled = (tab.session.documentStack?.length ?? 0) > 0;
-      if (drilled) {
+      if (drilled || runtime.optedOut.value) {
         detachSession(tab);
       } else {
         void attachSession(tab);
@@ -542,6 +557,33 @@ export function ensureCollab(tab: Tab): void {
       detachSession(tab);
     });
   });
+}
+
+/**
+ * Join or leave this document's collaboration session — the idempotent setter behind `Collaborate:
+ * Share this document` and `Collaborate: Stop sharing` (§7.4).
+ *
+ * Leaving sets a flag the watcher effect reads rather than calling `detachSession` directly, so the
+ * effect remains the one owner of the session lifecycle and re-joining is the same call with the
+ * other value. Calling it twice with the same value does nothing, which is the property the
+ * `app-commands` pairing test checks for.
+ *
+ * @param {Tab} tab @param {boolean} enabled
+ */
+export function setCollabEnabled(tab: Tab, enabled: boolean): void {
+  const runtime = runtimeFor(tab);
+  if (runtime.optedOut.value === !enabled) {
+    return;
+  }
+  runtime.optedOut.value = !enabled;
+  if (!runtime.watcherInstalled && enabled) {
+    ensureCollab(tab);
+  }
+}
+
+/** True while the user has not opted this tab out of collaboration. */
+export function isCollabEnabled(tab: Tab): boolean {
+  return runtimeOf(tab)?.optedOut.value !== true;
 }
 
 /** Re-key after a file rename: tear down and re-attach against the new path. */
@@ -563,15 +605,20 @@ async function attachSession(tab: Tab): Promise<void> {
   const { documentPath: path } = tab;
   const platform = maybePlatform();
   if (!path || !platform?.collab) {
+    /* Not a failure and not a session: this build/platform has no collaboration to offer. Saying
+       so is the difference between "nobody else is here" and "something broke" (§7.4). */
+    collabState(tab).status = "unavailable";
     return;
   }
   const { generation } = runtime;
   const state = collabState(tab);
   state.status = "connecting";
+  state.attachError = "";
   const attempt = (async () => {
     try {
       const [collab, handle] = await Promise.all([loadCollab(), platform.collab!(path)]);
       if (!handle) {
+        // The platform offers collaboration; this document is simply not shared. Solo, not broken.
         state.status = "detached";
         return;
       }
@@ -598,10 +645,20 @@ async function attachSession(tab: Tab): Promise<void> {
       state.active = true;
       state.status = "synced";
       state.readOnly = !runtime.session.canWrite;
+      state.attachError = "";
       registerCollabPath(path);
-    } catch {
-      state.status = "detached";
+    } catch (error) {
+      /* An attach that threw is a FAILURE, and it used to be reported as "detached" — the same
+         value a solo document carries. A relay that is down, a token that expired and a document
+         nobody shared were one indistinguishable state (§7.4). */
+      state.status = "failed";
       state.active = false;
+      state.attachError = error instanceof Error ? error.message : String(error);
+      notify.warn(`Live collaboration is not available for "${path}" — ${state.attachError}`, {
+        key: `collab:${path}`,
+        path,
+        source: "Collaboration",
+      });
     } finally {
       runtime.attaching = null;
     }
@@ -621,6 +678,7 @@ function detachSession(tab: Tab): void {
   const state = collabState(tab);
   state.active = false;
   state.status = "detached";
+  state.attachError = "";
   state.peers = [];
   if (!session) {
     return;

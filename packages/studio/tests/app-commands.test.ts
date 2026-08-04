@@ -27,12 +27,14 @@ describe("the set", () => {
       // Configures a project.
       "app",
       "canvas",
+      "collab",
       "collection",
       "data",
       "document",
       "edit",
       "file",
       "formula",
+      "help",
       "inspector",
       "palette",
       // `pane.toggleZoom` — the pane model (a parallel workstream).
@@ -73,12 +75,15 @@ describe("the set", () => {
     // What the rule forbids is a caller that cannot see the state naming a delta against it. So the
     // Obligation is a setter beside each one, and this asserts the pairing rather than the absence.
     const toggles = COMMANDS.filter((c) => /\.toggle[A-Z]/.test(c.id)).map((c) => c.id);
+    // `view.toggleBottomDock` sits last because it is `shell.ts`'s record now, composed after
+    // `commands/defaults.ts`'s: P4.2 put the Bottom dock on the shell record, so its verbs are
+    // Declared beside the state they write, like the other two docks' setters.
     expect(toggles).toEqual([
       "view.toggleNavigator",
       "view.toggleInspector",
-      "view.toggleBottomDock",
       "document.togglePinned",
       "pane.toggleZoom",
+      "view.toggleBottomDock",
     ]);
     const ids = new Set(COMMANDS.map((c) => c.id));
     expect(ids.has("view.setNavigator")).toBe(true);
@@ -87,9 +92,10 @@ describe("the set", () => {
     // The grid, each paired with the setter a script uses because a script cannot see that state.
     expect(ids.has("document.setPinned")).toBe(true);
     expect(ids.has("pane.setZoomed")).toBe(true);
-    // HANDOFF: `view.toggleBottomDock` has no setter because the bottom dock is not on the `shell`
-    // Record yet (`DOCK_IDS` is left/right/chat). P4.2 puts it there; the setter lands with it.
-    expect(ids.has("view.setBottomDock")).toBe(false);
+    // P4.2 discharged the handoff: the bottom dock is on the `shell` record, `DOCK_IDS` is
+    // Left/right/bottom, and ⌘J's setter landed with it.
+    expect(ids.has("view.setBottomDock")).toBe(true);
+    expect(ids.has("view.setBottomTab")).toBe(true);
   });
 
   test("this workstream's own records add no toggle", () => {

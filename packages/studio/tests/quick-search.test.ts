@@ -85,7 +85,7 @@ function installRegistry() {
   registry.registerAll(
     defaultCommands({
       ...noopCommandDeps(),
-      navigatorPanels: [],
+      panelRoster: [],
       saveDocument: () => void ran.push("save"),
       toggleZen: () => void ran.push("zen"),
     }),

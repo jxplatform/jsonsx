@@ -22,7 +22,7 @@ Your site's media — images, video, audio, PDFs, and fonts — lives in your pr
 
 Drag an image from your desktop onto the page:
 
-- **Onto empty space** — Studio uploads it and drops an image in at that spot. You'll see the same insertion line you get when dragging an element from the Elements panel.
+- **Onto empty space** — Studio uploads it and drops an image in at that spot. You'll see the same insertion line you get when dragging an element from the Insert palette.
 - **Onto an image that's already there** — the picture is highlighted, and dropping swaps it for the new one. Nothing else about the element changes: its size, alt text, and styling all stay put.
 
 Video, audio, and other files work too. A video becomes a `<video>` player, audio becomes an `<audio>` player, and anything else (a PDF, say) becomes a download link labelled with the filename. Drop several files at once and they land in order.
@@ -45,7 +45,7 @@ You can also right-click a folder and choose **Upload Files…** to pick from a 
 
 ## Drag into Manage
 
-Open Manage with the **Manage** button in the toolbar, then drag files anywhere onto it — or click **Upload**. Files land in the folder for whichever category filter is active: with **Media** selected they go to `public/`, with **Layouts** selected they go to `layouts/`, and so on.
+Open Manage by running **Manage Files** from the palette (:kbd[⌘K]), then drag files anywhere onto it — or click **Upload**. Files land in the folder for whichever category filter is active: with **Media** selected they go to `public/`, with **Layouts** selected they go to `layouts/`, and so on.
 
 ![The Manage view highlighted as a drop target while files are dragged onto it](../../images/media-upload.png)
 

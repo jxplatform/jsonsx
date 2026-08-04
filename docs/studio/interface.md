@@ -1,105 +1,125 @@
 ---
 title: "The workspace"
-description: "Every region of the Jx Studio window in detail — toolbar, activity bar, left and right panels, canvas, tab strip, and status bar."
+description: "Every region of the Jx Studio window: the Command Bar, the Navigator rail and dock, the pane grid, the Inspector, the Bottom dock, and the status bar."
+spec:
+  - studio.md#3.1
+  - studio.md#16
 code:
   - packages/studio/src/panels/toolbar.ts
   - packages/studio/src/panels/activity-bar.ts
+  - packages/studio/src/panels/left-panel.ts
   - packages/studio/src/panels/right-panel.ts
+  - packages/studio/src/panels/bottom-dock.ts
   - packages/studio/src/panels/statusbar.ts
   - packages/studio/src/ui/panel-resize.ts
-  - packages/studio/src/files/files.ts
 ---
 
 # The workspace
 
-The Jx Studio window is one workspace with a fixed set of regions: a toolbar on top, an activity bar and panel on the left, the canvas in the center with its tabs above, an inspector panel on the right, and a status bar along the bottom. This page walks through each one. For a quicker orientation, start with **[A tour of Jx Studio](/docs/start/studio-tour)**.
+The Jx Studio window is one workspace with a fixed set of regions: the **Command Bar** across the top, the **Navigator** (a labelled rail and the panel it opens) on the left, the **pane grid** in the middle with the canvas in it, the **Inspector** on the right, the **Bottom dock** under the panes, and the **status bar** along the bottom. This page walks through each one. For a quicker orientation, start with **[A tour of Jx Studio](/docs/start/studio-tour)**.
 
-![The Jx Studio workspace with the canvas in the center, panels on both sides, and the toolbar across the top](../images/hero.png)
+![The Jx Studio workspace with the canvas in the center, panels on both sides, and the Command Bar across the top](../images/hero.png)
 
-## Toolbar
+## Command Bar
 
-The toolbar runs across the top of the window.
+The bar across the top of the window. Everything in it is a command, so what you see here, what the [command palette](/docs/studio/interface/quick-access) offers and what a keyboard shortcut does can never disagree.
 
-On the left:
+From left to right:
 
-- **Open Project** opens a project folder. The chevron beside it drops down a menu with **New Project…**, your recent projects (each with a remove button), and **Clear recent projects**.
-- **Manage** opens the project browser — see [Browse your project](/docs/studio/projects/browse).
-- **Publish** opens the publish panel — see [Git & publish](/docs/studio/publish).
-- **Save** writes the active file to disk. It's only enabled when the file has unsaved changes — Studio never saves on its own. See [Tabs and files](/docs/studio/interface/tabs).
-- **Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the built version of the page you're editing, at its real route, in your own browser. It's the fastest way to check the actual page rather than the canvas's approximation of it. The button is always there: when the open file has no route it's disabled and its tooltip says why — a component isn't a page, a `[slug]` route needs a value picked on the context bar first, and a page you haven't built yet has nothing to serve.
-- **Undo** and **Redo** step through the active file's edit history.
+- The **⬢ menu** holds the commands that don't need a permanent button — **Open Project…**, **Open Recent…**, **New Project…**, **Manage Files**, **Preferences…**, **Zen Mode**, and the rest — each with its own keyboard shortcut printed beside it.
+- The **layout tabs** — **Write · Design · Build · Ship** — are named arrangements of the workspace. Clicking one sets the Navigator panel, the dock widths, the Inspector tab and the Bottom dock in a single step. Double-click a tab to rename it, and press **+** to save whatever is on screen now as a layout of your own. Layouts are remembered per project.
+- The **Command Center pill** sits in the middle: `◈ project › document › selection`, with :kbd[⌘K] at its right end. It is the app's address — it always names the project you're in, the document you're editing and the element you have selected — and each segment is a button that opens the palette already scoped to that level. Click the pill's empty space to open the palette with nothing pre-picked.
+- The **verb cluster** on the right holds the four actions worth a permanent button: **Save**, **Open in Browser**, **Undo** and **Redo**. A greyed-out one tells you in its tooltip what it is waiting for.
+- **Dock toggles** for the Navigator (:kbd[⌘B]), the Inspector (:kbd[⌘⌥B]) and the Bottom dock (:kbd[⌘J]).
 
-In the middle, the **Search files…** field opens [Quick Access](/docs/studio/interface/quick-access). When your project has new commits waiting on the remote, a **Sync Project** button appears here to pull them.
+In the desktop app, the window's minimize, maximize and close controls also live in this row.
 
-On the right:
+**Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the built version of the page you're editing, at its real route, in your own browser — the fastest way to check the actual page rather than the canvas's approximation of it. It is always there: when the open file has no route it's disabled and its tooltip says why — a component isn't a page, a `[slug]` route needs a value picked on the pane context bar first, and a project that doesn't build a site has nothing to serve.
 
-- A toggle collapses and restores the right panel.
-- A chat icon shows the [Assistant](/docs/studio/ai), which is the right panel's fourth tab.
-
-In the desktop app, the window's minimize, maximize, and close controls also live in this row.
-
-## Activity bar
-
-The vertical icon strip on the far left picks what the left panel shows. From top to bottom:
-
-- **Files** — the project file tree. Open, rename, and organize the files in your project folder. **New File…** — from the panel's toolbar, or from a folder's right-click menu — opens a dialog with `untitled.json` pre-filled and the extension left unselected, so typing replaces just the name. Studio picks the starting content from the extension you give it. Drag files in from your desktop and they upload into whichever folder you drop them on — see [Media](/docs/studio/projects/media).
-- **Layers** — the element structure of the open page or component, as a tree you can select and reorder. In **Stylebook** mode it lists the style targets instead.
-- **Imports** — the components and packages the open document (or project) pulls in.
-- **Elements** — the palette of elements and components you can insert, organized by category with a search filter.
-- **State** — the values, data sources, and functions the open component knows about. See [Script & logic](/docs/studio/logic).
-- **Data** — the live, resolved values of that state as the page runs.
-- **Document** — page-level settings: the title, the tags that go in the page head (description, social previews), and the layout the page uses.
-- **Source Control** — the built-in git client. A badge on the icon counts changed files. See [Git & publish](/docs/studio/publish).
-
-Clicking the icon of the activity that's already open collapses the left panel; clicking any icon brings it back. **About** and **Settings** buttons sit at the bottom of the strip.
-
-## Left panel
-
-The left panel shows the selected activity. Drag its inner edge to resize it — anywhere from a narrow strip to half the window — and double-click the same edge to snap back to the default width.
-
-## Right panel
-
-The right panel inspects whatever is selected on the canvas, in four tabs:
-
-- **Content** — the selected element's settings: its text, links, images, and component options.
-- **Style** — the visual inspector: spacing, typography, color, layout, and more. See [Design mode](/docs/studio/design).
-- **Logic** — what the element does on click, input, submit, and other interactions. See [Script & logic](/docs/studio/logic).
-- **Assistant** — the [AI assistant](/docs/studio/ai), in the same panel rather than a column of its own.
-
-A header above the tabs names the tab you're in and what it's pointed at — the selected element, or the open document when nothing is selected.
-
-Resize it by dragging its inner edge, or collapse it entirely with the toggle at the right end of the toolbar. The Assistant shares that width, so showing it never narrows the canvas.
-
-:::doc-note
-Studio remembers your layout — panel widths and which panels are collapsed carry over to your next session.
+:::doc-tip
+A layout reconfigures the workspace; it never takes anything away. Every panel stays on the rail, on its shortcut and in the palette after any layout is applied.
 :::
 
-## Canvas
+## Navigator rail
 
-The center region renders the open file live. How you interact with it depends on the current mode; panning, zooming, selection, and direct manipulation are covered in **[The canvas](/docs/studio/interface/canvas)**.
+The vertical strip on the far left. Every button carries a **text label under its icon**, and the buttons are split into two labelled groups, because a panel is either about your whole project or about the one document in front of you:
 
-## Tab strip and context bar
+**Project**
 
-Two rows sit between the toolbar and the canvas:
+- **Files** (:kbd[⌘1]) — the project file tree. Open, rename and organize the files in your project folder. **New File…** — from the panel's toolbar, or from a folder's right-click menu — opens a dialog with `untitled.json` pre-filled and the extension left unselected, so typing replaces just the name. Studio picks the starting content from the extension you give it. Drag files in from your desktop and they upload into whichever folder you drop them on — see [Media](/docs/studio/projects/media).
+- **Source Control** (:kbd[⌘3]) — the built-in git client. A badge counts changed files. See [Git & publish](/docs/studio/publish).
+- **Problems** (:kbd[⌘4]) — everything that needs fixing, with a badge counting it. The button is on the rail because "how many things need fixing" is a question you ask without opening anything; the list itself opens in the [Bottom dock](#bottom-dock).
 
-- The **tab strip** shows one tab per open file, with a dot marking unsaved changes.
-- The **context bar** below it states three things about the open file, each under its own label: which **Editor** is open on it, which **View** of the canvas, and the rendering **Context** it resolves in. Zoom is not among them — it floats over the canvas, bottom-right.
+**Document**
 
-Both are covered in **[Tabs and files](/docs/studio/interface/tabs)**.
+- **Outline** (:kbd[⌘5]) — the element structure of the open page or component, as a tree you can select and reorder. In **Project Styles** it lists the style targets instead.
+- **Page** (:kbd[⌘6]) — the page's title, description and social preview.
+- **Data** (:kbd[⌘7]) — the values, data sources and functions the document knows about, with what each one currently resolves to. See [Script & logic](/docs/studio/logic).
+- **Packages** (:kbd[⌘8]) — the components and packages the open document pulls in.
+
+Clicking the button of the panel that's already open collapses the Navigator; clicking any button brings it back. A document-level panel with no document open says what it needs rather than showing an empty box.
+
+**Insert** — the palette of elements and components you can add to a page — is not on the rail, because it is something you reach for at the moment you're placing something rather than a view you sit in. Run **Show Insert** from the palette (:kbd[⌘K]) to open it in the Navigator.
+
+At the foot of the rail sit **About** — the app version, its release channel and the update status — and **Settings**, which opens this project's settings: breakpoints and color schemes, data shapes, content types, dependencies. See [Project settings](/docs/studio/projects/settings). The settings that belong to Studio itself rather than to a project — the theme, the AI provider, your accounts, the keyboard sheet — are in **[Preferences](/docs/studio/interface/preferences)** (:kbd[⌘,]).
+
+## Navigator dock
+
+The dock to the right of the rail shows one panel at a time, under a header naming the panel and the level it works at — `FILES · project`, `OUTLINE · document`. That header is how you always know which panel you're looking at and whether closing the last document would empty it.
+
+Drag the dock's inner edge to resize it — up to half the window — and double-click that edge to snap back to the default width.
+
+## Panes and the canvas
+
+The middle of the window is the **pane grid**: one editor pane, or two side by side (:kbd[⌘\] splits, :kbd[⌘⌥0] focuses the second one). Each pane has its own strip of open documents along its top and its own context bar below that, and renders one document in one editor — Canvas, Code, Grid, Diff, Library or Project Styles. See **[Documents and panes](/docs/studio/interface/tabs)**.
+
+A Canvas pane renders the open file live. Panning, zooming, selection and direct manipulation are covered in **[The canvas](/docs/studio/interface/canvas)**. A page's **Document Header** — title, route, layout picker and the SEO block — is drawn at the top of the artefact itself, inside the stage, because it is part of the document rather than a view of it.
+
+## Inspector
+
+The dock on the right inspects whatever is selected, in four tabs:
+
+- **Content** (:kbd[⌘⇧1]) — the selected element's settings: its text, links, images and component options.
+- **Style** (:kbd[⌘⇧2]) — the visual inspector: spacing, typography, color, layout and more. See [Design mode](/docs/studio/design).
+- **Logic** (:kbd[⌘⇧3]) — what the element does on click, input, submit and other interactions. See [Script & logic](/docs/studio/logic).
+- **Assistant** (:kbd[⌘⇧4]) — the [AI assistant](/docs/studio/ai), as a tab in this dock rather than a column of its own, so showing it never narrows the canvas.
+
+Every tab renders under a header naming the tab and what it is pointed at — the selected element, or the open document when nothing is selected. Resize the dock by dragging its inner edge, or collapse it with :kbd[⌘⌥B].
+
+:::doc-note
+Studio remembers your layout — dock widths and which docks are collapsed carry over to your next session, per project.
+:::
+
+## Bottom dock
+
+Press :kbd[⌘J] for the dock under the pane grid. It sits in the panes' column only, so opening it never narrows the Navigator or the Inspector, and it opens **collapsed** — an empty list shouldn't spend canvas to say nothing.
+
+- **Problems** — everything Studio is waiting for you to fix, grouped by where it came from. A row can carry the file it happened in (click it to open the file) and a disclosure with the captured log. When there is something to do about it, the row shows the button for it — the real command, with its own name, its shortcut, and its reason when it isn't available yet. Dismiss a row you've dealt with, or clear the list.
+- **Activity** — one entry per long operation: a title, a status line, the steps it's working through, a streaming log, and **Cancel** when the operation can be cancelled. An entry outlives the run, so you can read what a publish or an import actually did after it finished — and a failure leaves both the entry and a Problem carrying its log.
+
+Drag the dock's top edge to resize it, or close it with the **×** in its tab strip.
+
+:::doc-note
+Almost nothing in Studio blocks the whole app any more. Installing dependencies is the exception, and even there the progress dialog offers **Run in the background** and leaves its Activity entry behind either way.
+:::
 
 ## Status bar
 
-The strip along the bottom of the window shows:
+The strip along the bottom carries **ambient state only** — things that are true until something changes them — in three fields, in the same order as the levels above them:
 
-- The selected element and its **path** — the chain of elements from the page root down to your selection. Each step in the path is clickable, so you can jump to any ancestor.
-- **Content Mode** when the open file is a content document.
-- In **Stylebook** mode, the style rule you're editing.
-- Short, temporary messages such as "Saved" after a save, or the reason an action couldn't run.
+- **Project** — the project name, the git branch with its ahead/behind counts, a count of open problems, and who else is in the document with you.
+- **Document** — the document's path, the pane's effective view (`Edit`, `Design`, `Preview`, `Code`, `Grid`…), and the save state in words: **Unsaved changes**, **Saved**, **Saved 2 minutes ago**, or **Read-only** when a collaborator holds the file.
+- **Selection** — the selected element and the chain of elements above it, each step clickable so you can jump to any ancestor.
 
-It's a live region, so a screen reader announces what lands in it without you having to go looking.
+Nearly every item is a button that runs the command behind it: the project name opens your recents, the branch reveals Source Control, the problem count opens the Bottom dock, **Unsaved changes** saves.
+
+:::doc-note
+Outcomes don't appear here. Something that happened at a moment and is reversible appears as a **toast** that retires itself; something that must be fixed becomes a **Problem** in the Bottom dock; something wrong with a value you just typed is shown at the field you typed it in.
+:::
 
 ## Next
 
+- Work with several documents at once in **[Documents and panes](/docs/studio/interface/tabs)**
 - Meet the editors and views in **[Modes and views](/docs/studio/interface/modes)**
 - Work directly on the page in **[The canvas](/docs/studio/interface/canvas)**
 - Learn the **[keyboard shortcuts](/docs/studio/interface/shortcuts)**

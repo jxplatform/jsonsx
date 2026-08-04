@@ -8,7 +8,7 @@ code:
 
 # Design mode
 
-Design is the visual canvas — the mode for shaping structure and style. Switch to it with the **Design** button in the mode switcher on the right side of the toolbar, and Studio renders the open page or component with the real runtime, exactly as it will render in production, while you edit it directly.
+Design is the visual canvas — the view for shaping structure and style. Switch to it with **Design** in the **View** control on the pane's context bar, and Studio renders the open page or component with the real runtime, exactly as it will render in production, while you edit it directly.
 
 ![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](../images/mode-design.png)
 
@@ -22,9 +22,9 @@ Breakpoints themselves — where they come from and how overrides cascade — ar
 
 Design mode is the canvas plus a set of panels, each with its own page:
 
-- **[Layers panel](/docs/studio/design/layers)** — the page's structure as a tree: select, rename, reorder, and act on any element.
-- **[Elements panel](/docs/studio/design/elements)** — insert HTML elements and your components by click or drag.
-- **[Properties panel](/docs/studio/design/properties)** — attributes, link targets, component props, and page settings for the selection.
+- **[Outline panel](/docs/studio/design/layers)** — the page's structure as a tree: select, rename, reorder, and act on any element.
+- **[Insert palette](/docs/studio/design/elements)** — add HTML elements and your components by click or drag.
+- **[Content tab](/docs/studio/design/properties)** — attributes, link targets, component props, and page settings for the selection.
 - **[Style inspector](/docs/studio/design/style-inspector)** — visual CSS controls for the selection, section by section.
 - **[Hover states and selectors](/docs/studio/design/states-and-selectors)** — style `:hover`, `:focus`, and selectors of your own.
 - **[Design tokens](/docs/studio/design/tokens)** — name your colors, fonts, and sizes once and reuse them everywhere.

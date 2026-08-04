@@ -17,7 +17,7 @@ Studio has a built-in AI assistant: a chat panel that doesn't just talk about yo
 
 ![The assistant open beside a page on the canvas, mid-conversation](../images/ai-sidebar.png)
 
-The assistant is the **fourth tab of the right panel**, beside Content, Style and Logic. Show it with :kbd[Cmd+Shift+4], with the chat-bubble button at the right end of the toolbar, or by clicking the tab. Because it shares the right panel's width, showing it costs the canvas nothing. It's available in every state: before you open a project, with a project open, and with a page on the canvas. What the assistant can do grows with each of those.
+The assistant is the **fourth tab of the right panel**, beside Content, Style and Logic. Show it with :kbd[Cmd+Shift+4], or by clicking the tab. Because it shares the right panel's width, showing it costs the canvas nothing. It's available in every state: before you open a project, with a project open, and with a page on the canvas. What the assistant can do grows with each of those.
 
 ## What it can do
 
@@ -50,7 +50,7 @@ Below the Cloudflare option (or on its own, everywhere else) is the **AI provide
 3. Optionally set an **Endpoint** — leave it empty for OpenAI, or point it at a compatible server such as a local LLM (for example `http://localhost:11434/v1`).
 4. Click **Save**.
 
-To change any of this later, click the gear button (**API key & endpoint**) at the bottom of the sidebar — it reopens the same dialog. You can also switch models per conversation with the model picker next to the message box.
+To change any of this later, click the gear button (**API key & endpoint**) at the bottom of the tab — it reopens the same dialog. You can also switch models per conversation with the model picker next to the message box.
 
 :::doc-note
 The key, endpoint, and model choice are stored locally on your machine, per browser or app install. If the Studio backend you're running already holds credentials — a dev server started with an `OPENAI_API_KEY` environment variable, or a Cloudflare account you connected earlier — the assistant unlocks without asking for anything.
@@ -72,7 +72,7 @@ Requests travel through Studio's own local proxy straight to the endpoint you co
 
 ## Learn the two surfaces
 
-- **[The AI sidebar](/docs/studio/ai/chat)** — the chat itself: attaching context, watching edits land, chat history, and reviewing or undoing what the assistant changed.
+- **[The AI assistant](/docs/studio/ai/chat)** — the chat itself: attaching context, watching edits land, chat history, and reviewing or undoing what the assistant changed.
 - **[Document assistant](/docs/studio/ai/document-assistant)** — how the assistant works when a page is open on the canvas, and when to use that instead of project-wide edits.
 
 ## Next

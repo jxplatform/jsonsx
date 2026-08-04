@@ -76,6 +76,8 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Set Zoom               | `canvas.setZoom`             | —        | document    | a document on the pan-zoom surface                                                |
 | Show Assistant         | `inspector.focus.assistant`  | `⌘⇧4`    | application | —                                                                                 |
 | Show Assistant         | `view.setAssistant`          | —        | application | —                                                                                 |
+| Show Bottom Dock       | `view.setBottomDock`         | —        | application | —                                                                                 |
+| Show Bottom Dock Tab   | `view.setBottomTab`          | —        | application | —                                                                                 |
 | Show Content           | `inspector.focus.properties` | `⌘⇧1`    | application | —                                                                                 |
 | Show Data              | `panel.focus.data`           | `⌘7`     | application | an open project                                                                   |
 | Show Files             | `panel.focus.files`          | `⌘1`     | application | an open project                                                                   |
@@ -131,6 +133,16 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Open Project…           | `project.open`          | `⌘O`     | project     | —                                           |
 | Open Recent…            | `project.openRecent`    | —        | project     | —                                           |
 | Open Settings           | `settings.open`         | —        | project     | an open project                             |
+
+## Collaborate
+
+| Command                                          | Id                  | Shortcut | Level    | Requires                       |
+| ------------------------------------------------ | ------------------- | -------- | -------- | ------------------------------ |
+| Collaborate: Copy session link                   | `collab.copyLink`   | —        | document | a live collaboration session   |
+| Collaborate: Follow a collaborator               | `collab.follow`     | —        | document | another person in this session |
+| Collaborate: Share this document                 | `collab.setEnabled` | —        | document | an open document               |
+| Collaborate: Stop sharing                        | `collab.stop`       | —        | document | a live collaboration session   |
+| Collaborate: What is happening in this document? | `collab.showStatus` | —        | document | an open document               |
 
 ## Related
 

@@ -906,7 +906,7 @@ describe("deliberate divergences", () => {
     expect(openInBrowser).toHaveBeenCalledTimes(1);
   });
 
-  test("⌘B / ⌥⌘B toggle the two docks; ⌘J toggles the Assistant TAB", () => {
+  test("⌘B / ⌥⌘B / ⌘J toggle the three docks", () => {
     setDockCollapsed("left", false);
     pressDoc("b", { ctrlKey: true });
     expect(shell.docks.left.collapsed).toBe(true);
@@ -915,14 +915,16 @@ describe("deliberate divergences", () => {
     pressDoc("b", { altKey: true, ctrlKey: true });
     expect(shell.docks.right.collapsed).toBe(true);
 
-    // ⌘J no longer flips a third dock — there isn't one. It selects the Assistant and opens the
-    // Dock that hosts it, and pressing it again steps back off.
+    // ⌘J flips the third dock — there IS one now. It used to route to the Assistant, which was the
+    // Third thing that chord could mean while the Bottom dock was missing from the shell record;
+    // The Assistant keeps ⌘⇧4 and `view.setAssistant`, and this chord means what it says.
+    setDockCollapsed("bottom", true);
     setInspectorTab("properties");
     pressDoc("j", { ctrlKey: true });
-    expect(inspectorTab()).toBe("assistant");
-    expect(shell.docks.right.collapsed).toBe(false);
-    pressDoc("j", { ctrlKey: true });
+    expect(shell.docks.bottom.collapsed).toBe(false);
     expect(inspectorTab()).toBe("properties");
+    pressDoc("j", { ctrlKey: true });
+    expect(shell.docks.bottom.collapsed).toBe(true);
   });
 
   test("⌘. collapses every dock and the same chord puts them back", () => {
@@ -998,6 +1000,39 @@ describe("direct keys", () => {
     pressDoc("1", { ctrlKey: true });
     expect(shell.leftTab).toBe("files");
     expect(shell.docks.left.collapsed).toBe(false);
+  });
+
+  test("⌘4 reveals Problems in the BOTTOM dock, because that is where its body lives (§7.2)", () => {
+    shell.leftTab = "layers";
+    shell.bottomTab = "activity";
+    setDockCollapsed("bottom", true);
+    pressDoc("4", { ctrlKey: true });
+    expect(shell.bottomTab).toBe("problems");
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    // The Navigator is not repurposed for it — the whole point of moving the panel.
+    expect(shell.leftTab).toBe("layers");
+  });
+
+  test("⌘4 again collapses the Bottom dock and returns to the pane", () => {
+    // Read through a helper: a literal assignment narrows `shell.focusRegion` for the rest of the
+    // Test, and the point of the case is that the press CHANGES it.
+    const focused = (): string => shell.focusRegion;
+    setDockCollapsed("bottom", true);
+    pressDoc("4", { ctrlKey: true });
+    // Toggle-FOCUS: the second press only closes because focus is already in the dock.
+    shell.focusRegion = "dock";
+    pressDoc("4", { ctrlKey: true });
+    expect(shell.docks.bottom.collapsed).toBe(true);
+    expect(focused()).toBe("pane");
+  });
+
+  test("⌘4 from elsewhere re-reveals rather than closing", () => {
+    setDockCollapsed("bottom", false);
+    shell.bottomTab = "problems";
+    shell.focusRegion = "navigator";
+    pressDoc("4", { ctrlKey: true });
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    expect(shell.bottomTab).toBe("problems");
   });
 
   test("⌘⇧2 opens the Inspector dock, ⌘⇧4 selects its Assistant tab", () => {

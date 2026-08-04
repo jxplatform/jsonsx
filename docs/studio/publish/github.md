@@ -30,7 +30,7 @@ Studio remembers the authorization on this device, so you won't be asked again o
 3. Choose the visibility. **Private repository** is on by default — turn it off to make the code public.
 4. Click **Create Repository**.
 
-Studio creates the repository on GitHub, connects your project to it, and pushes everything up. The status bar reports each step, and when it finishes, the Source Control panel switches from **Local only (no remote)** to live sync status — you're one **Commit and sync** away from publishing changes from now on.
+Studio creates the repository on GitHub, connects your project to it, and pushes everything up. Each step announces itself in the corner as it happens, and when it finishes, the Source Control panel switches from **Local only (no remote)** to live sync status — you're one **Commit and sync** away from publishing changes from now on.
 
 :::doc-note
 Publishing uploads your project's files to GitHub. With **Private repository** on, only you (and people you invite on GitHub) can see them; public repositories are visible to anyone.

@@ -16,7 +16,7 @@ import {
 } from "../src/commands/defaults";
 import type { CommandDeps, DockId, PaletteMode, RailPanel } from "../src/commands/defaults";
 import { appCommandSet } from "../src/commands/app-commands";
-import { navigatorPanelSet } from "../src/panels/navigator-panels";
+import { navigatorPanelSet, panelFocusRoster } from "../src/panels/navigator-panels";
 import { createCommandRegistry } from "../src/commands/registry";
 import { checkPlacements } from "../src/commands/levels";
 import { checkChromeBudget } from "../src/commands/budget";
@@ -51,7 +51,7 @@ function recordingDeps() {
     toggleZen: () => void calls.push("toggleZen"),
     openPalette: (mode: PaletteMode) => void calls.push(`openPalette:${mode}`),
     openProject: () => void calls.push("openProject"),
-    navigatorPanels: RAIL_PANELS,
+    panelRoster: RAIL_PANELS,
     focusPanel: (panelId: string) => void calls.push(`focusPanel:${panelId}`),
     focusInspectorTab: (tabId: string) => void calls.push(`focusInspectorTab:${tabId}`),
     cycleRegion: (direction: 1 | -1) => void calls.push(`cycleRegion:${direction}`),
@@ -223,7 +223,6 @@ describe("the implementations", () => {
       "selectParent",
       "toggleDock:navigator",
       "toggleDock:inspector",
-      "toggleDock:bottom",
       "toggleZen",
       "openPalette:picker",
       "openPalette:files",
@@ -274,7 +273,7 @@ describe("the direct keys (plan §5.3)", () => {
   /** The default set built over the stand-in rail, in a context where everything is live. */
   function registryWithRail() {
     const registry = createCommandRegistry({ getContext: everythingContext, mac: true });
-    registry.registerAll(defaultCommands({ ...noopCommandDeps(), navigatorPanels: RAIL_PANELS }));
+    registry.registerAll(defaultCommands({ ...noopCommandDeps(), panelRoster: RAIL_PANELS }));
     return registry;
   }
 
@@ -305,7 +304,7 @@ describe("the direct keys (plan §5.3)", () => {
       id: `p${index}`,
       title: `P${index}`,
     }));
-    const deps = { ...noopCommandDeps(), navigatorPanels: many };
+    const deps = { ...noopCommandDeps(), panelRoster: many };
     const bound = panelFocusCommands(deps).filter((command) => command.keybinding !== undefined);
     expect(bound).toHaveLength(RAIL_CHORD_LIMIT);
     expect(bound.at(-1)?.keybinding).toBe("mod+8");
@@ -314,7 +313,7 @@ describe("the direct keys (plan §5.3)", () => {
   test("the running app binds ⌘1–8 to the panel registry's own rail order", () => {
     const registry = createCommandRegistry({ getContext: everythingContext, mac: true });
     registry.registerAll(appCommandSet());
-    const rail = navigatorPanelSet().filter((panel) => panel.rail !== false);
+    const rail = panelFocusRoster().filter((panel) => panel.rail !== false);
     for (const [index, panel] of rail.slice(0, RAIL_CHORD_LIMIT).entries()) {
       expect(registry.keymap.resolveChord(`mod+${index + 1}`, ["global"])?.commandId).toBe(
         `panel.focus.${panel.id}`,
@@ -322,9 +321,31 @@ describe("the direct keys (plan §5.3)", () => {
     }
   });
 
+  test("⌘4 is Problems, whose body is the Bottom dock's — the rail groups by level, not by dock", () => {
+    const registry = createCommandRegistry({ getContext: everythingContext, mac: true });
+    registry.registerAll(appCommandSet());
+    expect(registry.keymap.resolveChord("mod+4", ["global"])?.commandId).toBe(
+      "panel.focus.problems",
+    );
+    expect(panelFocusRoster().find((panel) => panel.id === "problems")?.dock).toBe("bottom");
+    // The Navigator's own set no longer contains it, so it cannot be opened in the left dock.
+    expect(navigatorPanelSet().map((panel) => panel.id)).not.toContain("problems");
+  });
+
+  test("the Bottom dock's rail-less tabs get no panel.focus command of their own", () => {
+    const registry = createCommandRegistry({ getContext: everythingContext, mac: true });
+    registry.registerAll(appCommandSet());
+    for (const id of ["diff", "logic", "activity"]) {
+      expect(registry.get(`panel.focus.${id}`)).toBeUndefined();
+    }
+    // …and the two rail-less NAVIGATOR panels still do, because that is what `rail: false` buys.
+    expect(registry.get("panel.focus.insert")?.title).toBe("Show Insert");
+    expect(registry.get("panel.focus.state")?.title).toBe("Show State");
+  });
+
   test("panel focus hides with no project, and says what it needs", () => {
     const registry = createCommandRegistry({ getContext: emptyContext, mac: true });
-    registry.registerAll(defaultCommands({ ...noopCommandDeps(), navigatorPanels: RAIL_PANELS }));
+    registry.registerAll(defaultCommands({ ...noopCommandDeps(), panelRoster: RAIL_PANELS }));
     expect(registry.isVisible("panel.focus.files")).toBe(false);
     expect(registry.get("panel.focus.files")?.requires).toBe("an open project");
   });

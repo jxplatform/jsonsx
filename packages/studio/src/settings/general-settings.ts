@@ -1,5 +1,12 @@
 /// <reference lib="dom" />
-/** General settings section — site identity, favicon, platform adapter, breakpoints, styles. */
+/**
+ * General settings section — site identity, favicon, platform adapter, global styles.
+ *
+ * Breakpoints used to live here too. They were one of **four** places `$media` could be defined
+ * (plan §4.2), and this was the only one that named them; they now live in Settings › Contexts
+ * beside the colour schemes and feature queries they share a map with, because §2 principle 5 says
+ * a definition site is a level, not a field on some other level's form.
+ */
 
 import { html, render as litRender, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
@@ -169,39 +176,6 @@ export function renderGeneralSettings(container: HTMLElement) {
     void openFileInTab("project.json");
   };
 
-  // ─── Breakpoints ($media) ───────────────────────────────────────────────────
-
-  const media = (config.$media || {}) as Record<string, string>;
-  const mediaEntries = Object.entries(media);
-
-  const onMediaValueChange = (key: string) => (e: Event) => {
-    const updated = { ...media, [key]: (e.target as HTMLInputElement).value };
-    void persist({ $media: updated });
-  };
-
-  const onMediaNameChange = (oldKey: string) => (e: Event) => {
-    const rawName = (e.target as HTMLInputElement).value.trim();
-    const newKey = rawName.startsWith("--") ? rawName : `--${rawName}`;
-    if (newKey === oldKey) {
-      return;
-    }
-    const updated = {} as Record<string, string>;
-    for (const [k, v] of Object.entries(media)) {
-      updated[k === oldKey ? newKey : k] = v;
-    }
-    void persist({ $media: updated });
-  };
-
-  const onRemoveBreakpoint = (key: string) => () => {
-    const updated = { ...media };
-    delete updated[key];
-    void persist({ $media: updated });
-  };
-
-  const onAddBreakpoint = () => {
-    void persist({ $media: { ...media, "--new": "(max-width: 480px)" } });
-  };
-
   const currentFavicon = config.favicon;
 
   const tpl = html`
@@ -301,55 +275,6 @@ export function renderGeneralSettings(container: HTMLElement) {
           <sp-menu-item value="cloudflare-workers">Cloudflare Workers</sp-menu-item>
           <sp-menu-item value="cloudflare-pages">Cloudflare Pages</sp-menu-item>
         </sp-picker>
-      </div>
-
-      <div class="settings-field">
-        <label class="settings-field-label">Breakpoints</label>
-        <p class="settings-field-desc">
-          Responsive breakpoints for canvas panels and media query styles.
-        </p>
-        <div class="settings-media-list">
-          ${mediaEntries.map(([key, value]) => {
-            const isBase = key === "--";
-            return html`
-              <div class="settings-media-row">
-                ${
-                  isBase
-                    ? html`<span class="settings-media-name-fixed">Base</span>`
-                    : html`<sp-textfield
-                        size="s"
-                        class="settings-media-name"
-                        .value=${key.replace(/^--/, "")}
-                        placeholder="name"
-                        @change=${onMediaNameChange(key)}
-                      ></sp-textfield>`
-                }
-                <sp-textfield
-                  size="s"
-                  class="settings-media-value"
-                  .value=${value}
-                  placeholder=${isBase ? "1280px" : "(max-width: 768px)"}
-                  @change=${onMediaValueChange(key)}
-                ></sp-textfield>
-                ${
-                  isBase
-                    ? nothing
-                    : html`<sp-action-button
-                        size="s"
-                        quiet
-                        title="Remove breakpoint"
-                        @click=${onRemoveBreakpoint(key)}
-                      >
-                        ×
-                      </sp-action-button>`
-                }
-              </div>
-            `;
-          })}
-        </div>
-        <sp-action-button size="s" style="margin-top:8px" @click=${onAddBreakpoint}>
-          + Add Breakpoint
-        </sp-action-button>
       </div>
 
       <div class="settings-field">

@@ -9,10 +9,24 @@
 /* ─── Layout ─────────────────────────────────── */
 /* Four columns: rail | navigator | pane | inspector. The assistant's fifth column is gone —
    it shares the inspector's cell, because folding it in costs zero additional width (spec §12
-   region ⑨). The rail is 56px, not 48px, because every button now carries a text label. */
+   region ⑨). The rail is 56px, not 48px, because every button now carries a text label.
+
+   Five rows: command bar | pane tabs | stage | BOTTOM DOCK | status bar. The dock's row is a
+   full-width track but the dock occupies only the pane's COLUMN, which is the whole of §12
+   region ⑪'s claim — it sits under the pane grid, not under the window, so opening it never
+   narrows the Navigator or the Inspector. The two side docks span rows 2–4 across it. */
+/* The Bottom dock's track, declared on :root for the reason tokens.css gives for the two panel
+   widths: `src/shell.ts`'s applyDockLayout() writes it as an inline style on
+   document.documentElement, and a definition on any closer ancestor of #app would shadow that
+   override and freeze the dock. It must also be declared SOMEWHERE — an unset custom property
+   inside the grid-template-rows shorthand invalidates the whole declaration at computed-value
+   time, and the shell would paint one frame with no grid at all. */
+:root {
+  --dock-h-bottom: 220px;
+}
 #app {
   display: grid;
-  grid-template-rows: 36px auto minmax(0, 1fr) 24px;
+  grid-template-rows: 36px auto minmax(0, 1fr) var(--dock-h-bottom) 24px;
   grid-template-columns: 56px var(--panel-w-left) 1fr var(--panel-w-right);
   height: 100%;
 }
@@ -232,7 +246,7 @@
   pointer-events: auto;
 }
 #activity-bar {
-  grid-row: 2 / 4;
+  grid-row: 2 / 5;
   grid-column: 1;
   display: flex;
   flex-direction: column;
@@ -240,7 +254,7 @@
   border-right: 1px solid var(--border);
 }
 #left-panel {
-  grid-row: 2 / 4;
+  grid-row: 2 / 5;
   grid-column: 2;
   overflow-y: auto;
   background: var(--bg-panel);
@@ -261,13 +275,66 @@
    fixed, and the selected tab's body is the only thing that scrolls — which is what lets the
    Assistant tab (whose chat owns its own scrolling) share the dock at zero extra width. */
 #right-panel {
-  grid-row: 2 / 4;
+  grid-row: 2 / 5;
   grid-column: 4;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--bg);
   border-left: 1px solid var(--border);
+}
+
+/* ─── ⑪ Bottom dock ───────────────────────────── */
+/* A flex COLUMN in the pane's own grid column: the tab strip is fixed and the selected tab's body
+   is the only thing that scrolls. It borders on the top only — the sides are the pane's, and a
+   box drawn inside the stage's column would read as a second panel rather than as the floor. */
+#bottom-dock {
+  grid-row: 4;
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+}
+#bottom-dock:empty {
+  display: none;
+}
+.bd-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--border);
+}
+.bd-tabs {
+  flex: 1;
+  min-width: 0;
+}
+.bd-close {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: none;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.bd-close:hover {
+  background: var(--hover-bg);
+  color: var(--fg);
+}
+/* The one scrolling region. `min-height: 0` because a flex item's auto minimum is its content,
+   which would push the dock past its own track instead of scrolling inside it. */
+.bd-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* ─── Collapsed sidebars ──────────────────────── */
@@ -283,6 +350,13 @@
 }
 #app.right-collapsed #right-panel,
 #app.right-collapsed #resize-right {
+  display: none;
+}
+#app.bottom-collapsed {
+  --dock-h-bottom: 0px;
+}
+#app.bottom-collapsed #bottom-dock,
+#app.bottom-collapsed #resize-bottom {
   display: none;
 }
 
@@ -668,7 +742,10 @@
    characters: the boundary between PROJECT, DOCUMENT and SELECTION is structural, and the eye
    should be able to find it without reading. */
 #statusbar {
-  grid-row: 4;
+  /* Row 5, not 4: row 4 is the Bottom dock, which collapses to 0px. Sharing that row put the whole
+     bar in a zero-height cell — it rendered its three fields into nothing while row 5's 24px stood
+     empty, so the app looked like it had lost its status bar the day it gained a dock. */
+  grid-row: 5;
   grid-column: 1 / -1;
   display: flex;
   align-items: stretch;
@@ -839,8 +916,10 @@
 }
 
 /* ─── Resize handles ─────────────────────────── */
+/* The two column handles span the stage AND the bottom dock, so the grab target is the dock's
+   full height rather than stopping at the floor of the canvas. */
 .resize-handle {
-  grid-row: 3;
+  grid-row: 3 / 5;
   width: 5px;
   margin-left: -3px;
   margin-right: -2px;
@@ -860,6 +939,17 @@
 #resize-right {
   grid-column: 4;
   justify-self: start;
+}
+/* The Bottom dock's handle resizes on the other axis, so every dimension flips: it is a row in
+   the pane's column, full width, five px tall, and it drags up and down. */
+.resize-handle-row {
+  grid-row: 4;
+  grid-column: 3;
+  align-self: start;
+  width: auto;
+  height: 5px;
+  margin: -3px 0 -2px;
+  cursor: row-resize;
 }
 
 /* ─── Preferences (⌘,) ──────────────────────────
@@ -984,4 +1074,139 @@
 .prefs-key-title {
   color: var(--fg-dim);
   min-width: 0;
+}
+
+/* ─── Assistant honesty (§7.4) ──────────────────────────────────────────────
+   A tool chip renders its OUTCOME, a turn renders what it CHANGED, and an error
+   offers Retry. `ToolCallRecord.result` was populated by the loop and ignored by
+   the renderer, so a chip said exactly as much when the edit had been refused as
+   when it had landed. */
+.ai-tool-chip-name {
+  flex: 0 0 auto;
+}
+.ai-tool-chip-outcome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font);
+}
+.ai-tool-chip[data-outcome="ok"] {
+  border-left-color: var(--success, var(--accent));
+}
+.ai-tool-chip[data-outcome="failed"] {
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+/* The changed-files summary. Collapsed by default because the headline —
+   "Changed 4 files · 2 written to disk — undo cannot reach them" — is the part
+   that must never be missed; the list is for when it is. */
+.ai-msg-changes {
+  margin-top: 6px;
+  border-left: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--hover-bg);
+  padding: 4px 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.ai-msg-changes > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.ai-msg-changes-list {
+  margin: 6px 0 2px;
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ai-msg-changes-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+}
+.ai-msg-changes-list li[data-ok="false"] {
+  color: var(--danger);
+}
+/* The undo caveat, rendered to the person holding ⌘Z rather than appended to the
+   model-facing tool summary. */
+.ai-msg-changes-list li[data-disk="true"] em {
+  color: var(--warning);
+  font-style: normal;
+}
+.ai-msg-retry {
+  margin-top: 6px;
+}
+
+/* ─── Collaboration presence (§7.4) ─────────────────────────────────────────
+   `.jx-presence*` matched no stylesheet in the repo — the flagship affordance
+   shipped unstyled. The flags are the two states co-editing could not announce:
+   a read-only guest whose edits were dropped at the publish gate, and the
+   source-canonical freeze whose whole rendering was a three-second grey line,
+   which is exactly what a bug looks like. */
+.jx-presence {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.jx-presence-status {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.jx-presence-status[data-status="synced"] {
+  color: var(--success, var(--accent));
+}
+.jx-presence-status[data-status="connecting"] {
+  color: var(--fg-dim);
+}
+.jx-presence-status[data-status="offline"] {
+  color: var(--warning);
+}
+.jx-presence-status[data-status="failed"] {
+  color: var(--danger);
+}
+.jx-presence-flag {
+  border-radius: var(--radius);
+  padding: 1px 6px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  white-space: nowrap;
+  border: 1px solid currentcolor;
+}
+.jx-presence-flag[data-flag="read-only"] {
+  color: var(--fg-dim);
+}
+.jx-presence-flag[data-flag="frozen"] {
+  color: var(--warning);
+}
+.jx-presence-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  overflow: hidden;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 600;
+  color: var(--spectrum-gray-50, #fff);
+  flex: none;
+}
+.jx-presence-chip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* A standing statement, not an after-the-fact refusal: a guest without write
+   access used to watch their edits apply locally and vanish at the publish gate. */
+.jx-collab-banner {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--hover-bg);
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
 }

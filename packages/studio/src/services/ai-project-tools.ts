@@ -24,6 +24,7 @@ import type { Tab } from "../tabs/tab";
 import { beginBatch, endBatch, isBatching } from "../tabs/transact";
 import { translateValidationError } from "./ai-tools";
 import { validateDoc, validateProjectConfig } from "./jx-validate";
+import { recordWrite } from "./ai-writes";
 import { flagHardcodedTokens, formatTokenHints } from "./token-lint";
 
 /** Directories the file tools never descend into or report. */
@@ -362,10 +363,16 @@ export function registerProjectTools(
 
         try {
           await getPlatform().writeFile(relPath, content);
+          /* Disk, not transaction: there is no undo behind this and there never was. Recorded as
+             `disk: true` so the panel can say so to the person holding ⌘Z — the caveat used to be
+             appended to the model-facing summary only (§7.4). */
+          recordWrite({ disk: true, ok: true, path: relPath, tool: "write_file" });
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          recordWrite({ disk: true, error: message, ok: false, path: relPath, tool: "write_file" });
           return {
             success: false,
-            error: `Failed to write "${relPath}": ${error instanceof Error ? error.message : String(error)}`,
+            error: `Failed to write "${relPath}": ${message}`,
           };
         }
 

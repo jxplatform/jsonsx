@@ -35,12 +35,12 @@ describe("shell boot restore (persisted record)", () => {
   });
 
   test("adopts persisted widths, rejecting a non-positive one", () => {
-    expect(shell.docks.left.width).toBe(300);
+    expect(shell.docks.left.size).toBe(300);
     // A zero width would collapse the column with no way back; the default wins.
-    expect(shell.docks.right.width).toBe(280);
+    expect(shell.docks.right.size).toBe(280);
   });
 
   test("a stale chat dock in storage does not come back", () => {
-    expect(Object.keys(shell.docks).toSorted()).toEqual(["left", "right"]);
+    expect(Object.keys(shell.docks).toSorted()).toEqual(["bottom", "left", "right"]);
   });
 });

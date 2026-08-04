@@ -126,7 +126,14 @@ describe("open", () => {
     const navLabels = [...modal()!.querySelectorAll(".settings-nav-item")].map((b) =>
       b.textContent?.trim(),
     );
-    expect(navLabels).toEqual(["General", "Head", "CSS Variables", "Data Shapes", "Dependencies"]);
+    expect(navLabels).toEqual([
+      "General",
+      "Contexts",
+      "Head",
+      "CSS Variables",
+      "Data Shapes",
+      "Dependencies",
+    ]);
     expect(navButton("General").classList.contains("active")).toBe(true);
 
     // The deferred rAF render filled the content area with the General section
@@ -194,6 +201,7 @@ describe("section navigation", () => {
     // Order 50 lands between Data Shapes (40) and Dependencies (60) — the historical position.
     expect(navLabels).toEqual([
       "General",
+      "Contexts",
       "Head",
       "CSS Variables",
       "Data Shapes",

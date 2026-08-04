@@ -27,6 +27,10 @@ import { html, render as litRender, nothing } from "lit-html";
 import type { TemplateResult } from "lit-html";
 import { effect, effectScope } from "../reactivity";
 import { createDocumentAssistant } from "../services/document-assistant";
+import { writesForTurn } from "../services/ai-writes";
+import { notify } from "../services/notify";
+import { undo } from "../tabs/transact";
+import { activeTab } from "../workspace/workspace";
 import { setOpenAiKey } from "../services/ai-settings";
 import { hasAiCredentials } from "../services/ai-models";
 import { openPreferences } from "../settings/preferences-dialog";
@@ -181,6 +185,64 @@ async function handleAssistantSend(text: string) {
 }
 
 /**
+ * Re-send the last user message — §7.4's Retry.
+ *
+ * `chatState.retryLast()` pops the failed assistant turn AND the user message that caused it, on
+ * the contract that the caller re-sends. It has been exported with zero callers since it was
+ * written, so a failed turn's only recovery was retyping the prompt. Read the text before popping;
+ * there is nowhere else it survives.
+ */
+async function handleRetry(): Promise<void> {
+  const cs = assistant.chatState;
+  const lastUser = cs.messages.toReversed().find((m) => m.role === "user");
+  if (!lastUser) {
+    return;
+  }
+  const { content } = lastUser;
+  cs.retryLast();
+  scheduleAiRender();
+  await handleAssistantSend(content);
+}
+
+/**
+ * Undo everything one assistant turn changed — §7.4's "Restore to here".
+ *
+ * The loop opens one batch per turn per document, so undoing the turn is undoing that batch. The
+ * button is offered by the renderer only when every recorded change was transactional; this guard
+ * is the second half of the same promise, because a ledger can be trimmed (MAX_TURNS) between the
+ * render and the click and a Restore that silently restored SOME of a turn would be worse than one
+ * that refused.
+ *
+ * @param {string} messageId
+ */
+/* Exported so the guard can be exercised directly: the button is not RENDERED for a turn that
+   touched disk, which would otherwise make the refusal path unreachable from the panel. */
+export function handleRestore(messageId: string): void {
+  const writes = writesForTurn(messageId);
+  if (writes.length === 0) {
+    notify.warn("There is no longer a record of what that turn changed.", { source: "Assistant" });
+    return;
+  }
+  const disk = writes.filter((w) => w.disk).map((w) => w.path);
+  if (disk.length > 0) {
+    notify.warn(
+      `Cannot restore: ${disk.join(", ")} ${disk.length === 1 ? "was" : "were"} written straight ` +
+        "to disk, which undo cannot reach.",
+      { source: "Assistant" },
+    );
+    return;
+  }
+  const tab = activeTab.value;
+  if (!tab) {
+    notify.warn("Open the document that turn edited to restore it.", { source: "Assistant" });
+    return;
+  }
+  undo(tab);
+  notify.success("Restored to before that turn.", { action: "edit.redo", source: "Assistant" });
+  scheduleAiRender();
+}
+
+/**
  * Seed the assistant with a prompt programmatically (e.g. the New Project flow handing off a
  * project brief). Delegates to the same send path as the composer. Safe to call right after the
  * Assistant tab renders — the reactive watcher paints chat-state into the panel whenever it
@@ -324,6 +386,8 @@ export function renderAiPanelTemplate(): TemplateResult {
         error: cs.error,
         listRef: onMessagesListRef,
         messages: cs.messages,
+        onRestore: handleRestore,
+        onRetry: () => void handleRetry(),
         onScroll: onMessagesScroll,
         status: cs.status,
       })}

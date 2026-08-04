@@ -315,6 +315,21 @@ export function inspectorTabRegion(tabId: string): string {
 }
 
 /**
+ * Region id for a Bottom dock tab, derived from the panel's own id.
+ *
+ * The third member of the derived-region family, and the one that shows the grammar was worth
+ * specifying before the surface existed: `dock.bottom` has parsed since P3 (it is the only surface
+ * whose NAME contains the instance separator, which is why {@link DOTTED_SURFACES} exists) and
+ * resolved to nothing, because nothing hosted it. `panels/bottom-dock.ts` stamps this once, from
+ * the same id `view.setBottomTab` accepts, so the dock's four tabs are addressable without anyone
+ * authoring an id — and the host itself carries the bare `dock.bottom` only while it is open, so a
+ * closed dock resolves to nothing rather than to an invisible box.
+ */
+export function bottomPanelRegion(panelId: string): string {
+  return `dock.bottom/panel:${panelId}`;
+}
+
+/**
  * The overlay instance each layer host contributes: a modal IS a dialog, a popover IS a menu.
  *
  * `toast` is plural because the host is the STACK, not one notification: `overlay.toasts` addresses

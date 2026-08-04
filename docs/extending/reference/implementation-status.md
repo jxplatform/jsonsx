@@ -14,8 +14,8 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 | Spec                      | Version      | Status      | Updated    |
 | ------------------------- | ------------ | ----------- | ---------- |
-| `ai.md`                   | 0.1.2-draft  | Partial     | 2026-07-25 |
-| `collab.md`               | 0.2.0-draft  | Partial     | 2026-07-28 |
+| `ai.md`                   | 0.1.3-draft  | Partial     | 2026-08-04 |
+| `collab.md`               | 0.2.1-draft  | Partial     | 2026-08-04 |
 | `compiler.md`             | 0.1.25-draft | Partial     | 2026-07-30 |
 | `desktop.md`              | 0.3.6-draft  | Pending     | 2026-08-03 |
 | `extensions.md`           | 0.3.3-draft  | Partial     | 2026-07-25 |
@@ -27,8 +27,8 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `server.md`               | 0.2.1        | Implemented | 2026-07-25 |
 | `site-architecture.md`    | 0.1.40-draft | Pending     | 2026-07-30 |
 | `spec.md`                 | 0.4.27-draft | Partial     | 2026-07-30 |
-| `studio-ui-guidelines.md` | 0.3.0        | Implemented | 2026-08-02 |
-| `studio.md`               | 0.4.3-draft  | Partial     | 2026-08-03 |
+| `studio-ui-guidelines.md` | 0.3.1        | Implemented | 2026-08-04 |
+| `studio.md`               | 0.4.4-draft  | Partial     | 2026-08-04 |
 
 ## Sections not yet implemented
 

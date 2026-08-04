@@ -6,18 +6,22 @@ import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { effect, effectScope } from "../src/reactivity";
 import {
-  DOCK_DEFAULT_WIDTHS,
+  DOCK_DEFAULT_SIZES,
   DOCK_IDS,
   applyDockLayout,
   mountShell,
   persistDocks,
   resetProjectShell,
+  registerShellSurface,
+  resetShellSurfaces,
   setActivityTab,
+  setBottomTab,
   setDockCollapsed,
-  setDockWidth,
+  setDockSize,
   setLayoutSelection,
   shell,
   toggleActivityTab,
+  toggleBottomTab,
   toggleDock,
   unmountShell,
 } from "../src/shell";
@@ -36,8 +40,10 @@ beforeEach(() => {
   localStorage.removeItem(STORAGE_KEY);
   unmountShell();
   shell.leftTab = "layers";
-  shell.docks.left = { collapsed: false, width: DOCK_DEFAULT_WIDTHS.left };
-  shell.docks.right = { collapsed: false, width: DOCK_DEFAULT_WIDTHS.right };
+  shell.docks.left = { collapsed: false, size: DOCK_DEFAULT_SIZES.left };
+  shell.docks.right = { collapsed: false, size: DOCK_DEFAULT_SIZES.right };
+  shell.docks.bottom = { collapsed: true, size: DOCK_DEFAULT_SIZES.bottom };
+  shell.bottomTab = "problems";
   resetProjectShell();
 });
 
@@ -50,7 +56,7 @@ describe("applyDockLayout", () => {
   test("writes widths as CSS custom properties and collapse flags as #app classes", () => {
     const app = mountApp();
     shell.docks.left.collapsed = true;
-    shell.docks.right.width = 333;
+    shell.docks.right.size = 333;
 
     applyDockLayout();
 
@@ -61,7 +67,7 @@ describe("applyDockLayout", () => {
 
   test("widths still apply when there is no #app to classify", () => {
     expect(document.querySelector("#app")).toBeNull();
-    shell.docks.left.width = 199;
+    shell.docks.left.size = 199;
     expect(() => applyDockLayout()).not.toThrow();
     expect(document.documentElement.style.getPropertyValue("--panel-w-left")).toBe("199px");
   });
@@ -82,7 +88,7 @@ describe("mountShell", () => {
   test("a width change follows the same path", () => {
     mountApp();
     mountShell();
-    setDockWidth("right", 411);
+    setDockSize("right", 411);
     expect(document.documentElement.style.getPropertyValue("--panel-w-right")).toBe("411px");
   });
 
@@ -98,7 +104,7 @@ describe("mountShell", () => {
 
 describe("dock mutators", () => {
   test("setDockCollapsed persists the whole record, widths included", () => {
-    setDockWidth("left", 275);
+    setDockSize("left", 275);
     setDockCollapsed("right", true);
 
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
@@ -112,7 +118,7 @@ describe("dock mutators", () => {
     // Over the collapse booleans applyPanelCollapse() had merged in, so dragging any handle
     // Reset every dock to open on the next reload.
     setDockCollapsed("right", true);
-    setDockWidth("right", 400);
+    setDockSize("right", 400);
     persistDocks();
 
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
@@ -179,18 +185,83 @@ describe("the Navigator tab", () => {
   });
 });
 
+describe("shell surfaces", () => {
+  test("a registered surface mounts and unmounts with the shell, and registers once", () => {
+    resetShellSurfaces();
+    const calls: string[] = [];
+    const surface = {
+      mount: () => void calls.push("mount"),
+      unmount: () => void calls.push("unmount"),
+    };
+    registerShellSurface(surface);
+    registerShellSurface(surface);
+    mountApp();
+    mountShell();
+    unmountShell();
+    // Once each, not twice: the dependency points from the surface to the shell, and a surface
+    // That registered itself on two import paths must not be drawn twice.
+    expect(calls).toEqual(["mount", "unmount"]);
+    resetShellSurfaces();
+  });
+});
+
+describe("the Bottom dock is a dock", () => {
+  test("setBottomTab selects a tab, opens the dock and remembers both", () => {
+    setDockCollapsed("bottom", true);
+    setBottomTab("activity");
+    expect(shell.bottomTab).toBe("activity");
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+    expect(saved.bottomTab).toBe("activity");
+    expect(saved.bottomCollapsed).toBe(false);
+  });
+
+  test("toggleBottomTab closes the dock when the showing tab is re-picked", () => {
+    setBottomTab("problems");
+    toggleBottomTab("problems");
+    expect(shell.docks.bottom.collapsed).toBe(true);
+    expect(shell.bottomTab).toBe("problems");
+  });
+
+  test("toggleBottomTab reopens the dock when the showing tab is re-picked while closed", () => {
+    setBottomTab("problems");
+    setDockCollapsed("bottom", true);
+    toggleBottomTab("problems");
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    expect(shell.bottomTab).toBe("problems");
+  });
+
+  test("toggleBottomTab switching tabs opens the dock rather than closing it", () => {
+    setBottomTab("problems");
+    toggleBottomTab("activity");
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    expect(shell.bottomTab).toBe("activity");
+  });
+
+  test("its size is projected onto the row track, not onto a column", () => {
+    mountApp();
+    shell.docks.bottom.size = 314;
+    applyDockLayout();
+    expect(document.documentElement.style.getPropertyValue("--dock-h-bottom")).toBe("314px");
+  });
+});
+
 describe("the assistant is not a dock", () => {
-  test("there are exactly two docks, and neither of them is the chat", () => {
+  test("there are three docks, and none of them is the chat", () => {
     // The fifth grid column is gone: the assistant is the Inspector's fourth TAB, so it has no
-    // Collapse flag, no width and no resize handle to keep in step with anything.
-    expect(Object.keys(shell.docks).toSorted()).toEqual(["left", "right"]);
-    expect(DOCK_IDS).toEqual(["left", "right"]);
+    // Collapse flag, no size and no resize handle to keep in step with anything. The third dock
+    // Is the BOTTOM one (P4.2) — a real dock, with all three of those.
+    expect(Object.keys(shell.docks).toSorted()).toEqual(["bottom", "left", "right"]);
+    expect(DOCK_IDS).toEqual(["left", "right", "bottom"]);
   });
 
   test("the persisted record carries no chat keys", () => {
     persistDocks();
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
     expect(Object.keys(saved).toSorted()).toEqual([
+      "bottom",
+      "bottomCollapsed",
+      "bottomTab",
       "left",
       "leftCollapsed",
       "leftTab",

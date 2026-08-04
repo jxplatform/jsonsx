@@ -444,6 +444,19 @@ export function isBatching(): boolean {
   return _batchTab !== null;
 }
 
+/**
+ * Which tab the open batch belongs to, or `null` when none is open.
+ *
+ * The agent loop needs this to keep a batch honest across a tab change. A batch is opened against
+ * one tab and closed against the same one — {@link endBatch} pushes ITS history snapshot and fires
+ * the collab notifier for IT — so a loop whose tools moved to a second document has to close the
+ * first batch and open a second, or the second document's edits get neither a history entry nor a
+ * collab publish. Reading the batched tab is how the loop can tell.
+ */
+export function batchTab(): Tab | null {
+  return _batchTab;
+}
+
 // ─── Undo / Redo ─────────────────────────────────────────────────────────────
 
 /**

@@ -8,6 +8,7 @@ import {
   panelContext,
   railDeclarations,
   railGroups,
+  railPanelSet,
   registerPanel,
   resetPanels,
   unregisterPanel,
@@ -145,12 +146,11 @@ describe("panel placement matrix", () => {
 // ─── the composed set ─────────────────────────────────────────────────────────
 
 describe("the Navigator's panel set", () => {
-  test("registers ten records, in rail order", () => {
+  test("registers nine records, in rail order — and Problems is not one of them", () => {
     expect(navigatorPanelSet().map((p) => p.id)).toEqual([
       "files",
       "search",
       "git",
-      "problems",
       "layers",
       "page",
       "data",
@@ -169,7 +169,14 @@ describe("the Navigator's panel set", () => {
   test("registerNavigatorPanels is idempotent — the app mounts once, a suite mounts per case", () => {
     registerNavigatorPanels();
     registerNavigatorPanels();
-    expect(listPanels("navigator")).toHaveLength(10);
+    expect(listPanels("navigator")).toHaveLength(9);
+    // …and it composes the Bottom dock's four in the same pass, still exactly once each.
+    expect(listPanels("bottom").map((p) => p.id)).toEqual([
+      "problems",
+      "diff",
+      "logic",
+      "activity",
+    ]);
   });
 
   test("the three renamed ids are gone", () => {
@@ -180,13 +187,23 @@ describe("the Navigator's panel set", () => {
   });
 
   test("a declared-but-unbuilt panel refuses to render, rather than drawing a stub", () => {
-    // `when` is the guard; this is the second one, so deleting the predicate without building the
-    // Surface fails loudly instead of shipping an empty panel with a real header.
-    for (const id of ["search", "problems"]) {
-      const panel = navigatorPanelSet().find((p) => p.id === id);
-      expect(panel?.when?.(emptyContext())).toBe(false);
-      expect(() => panel!.render({} as never)).toThrow(/declared but not built/);
-    }
+    // `when` is the guard, so deleting the predicate without building the surface fails loudly
+    // Instead of shipping an empty panel with a real header. Search is the one left: Problems was
+    // The other, and P4.2 deleted its predicate in the same commit that gave it a body.
+    const panel = navigatorPanelSet().find((p) => p.id === "search");
+    expect(panel?.when?.(emptyContext())).toBe(false);
+    expect(() => panel!.render({} as never)).toThrow(/declared but not built/);
+  });
+
+  test("Problems is built, and it is the Bottom dock's — one record, one host (§7.2)", () => {
+    registerNavigatorPanels();
+    const panel = getPanel("problems");
+    expect(panel?.dock).toBe("bottom");
+    expect(panel?.level).toBe("project");
+    expect(panel?.when).toBeUndefined();
+    expect(panel?.badge).toBeDefined();
+    expect(() => panel!.render({ deps: {} as never, doc: null, rerender: () => {} })).not.toThrow();
+    expect(navigatorPanelSet().map((p) => p.id)).not.toContain("problems");
   });
 
   test("resetNavigatorPanels empties the registry so a suite can compose it again", () => {
@@ -215,8 +232,8 @@ describe("railGroups", () => {
     registerNavigatorPanels();
     const groups = railGroups(emptyContext());
     expect(groups.map((g) => g.label)).toEqual(["Project", "Document"]);
-    // Search and Problems declare `when: () => false` — registered, budgeted, not drawn.
-    expect(groups[0]?.panels.map((p) => p.id)).toEqual(["files", "git"]);
+    // Search declares `when: () => false` — registered, budgeted, not drawn.
+    expect(groups[0]?.panels.map((p) => p.id)).toEqual(["files", "git", "problems"]);
     expect(groups[1]?.panels.map((p) => p.id)).toEqual(["layers", "page", "data", "packages"]);
   });
 
@@ -239,6 +256,62 @@ describe("railGroups", () => {
     const ctx = emptyContext();
     expect(isPanelVisible(record(), ctx)).toBe(true);
     expect(isPanelVisible(record({ when: () => false }), ctx)).toBe(false);
+  });
+
+  test("the rail spans docks: a rail-able bottom panel gets a button, a rail-less one does not", () => {
+    registerPanel(record({ id: "shouted", title: "Shouted", dock: "bottom" }));
+    registerPanel(record({ id: "silent", title: "Silent", dock: "bottom", rail: false }));
+    const project = railGroups(emptyContext())[0]?.panels.map((p) => p.id);
+    expect(project).toContain("shouted");
+    expect(project).not.toContain("silent");
+    // The same basis `panelPlacements()` has always used — the dock is a separate placement.
+    expect(panelPlacements({ id: "shouted", level: "project", dock: "bottom" })).toEqual([
+      "dock.bottom",
+      "rail/project",
+    ]);
+  });
+});
+
+describe("railPanelSet", () => {
+  test("is the rail flattened in group order — PROJECT then DOCUMENT, ⌘1–8's order", () => {
+    registerNavigatorPanels();
+    expect(railPanelSet().map((p) => p.id)).toEqual([
+      "files",
+      "search",
+      "git",
+      "problems",
+      "layers",
+      "page",
+      "data",
+      "packages",
+    ]);
+  });
+
+  test("ignores `when`, so a hidden panel does not shuffle the chords after it", () => {
+    registerNavigatorPanels();
+    expect(railPanelSet().map((p) => p.id)).toContain("search");
+    expect(railGroups(emptyContext()).flatMap((g) => g.panels.map((p) => p.id))).not.toContain(
+      "search",
+    );
+  });
+
+  test("orders by level group, not by registration order", () => {
+    // Problems registers LAST (its module is the Bottom dock's), and still lands in slot four.
+    registerNavigatorPanels();
+    expect(
+      listPanels()
+        .map((p) => p.id)
+        .indexOf("problems"),
+    ).toBeGreaterThan(
+      listPanels()
+        .map((p) => p.id)
+        .indexOf("packages"),
+    );
+    expect(
+      railPanelSet()
+        .map((p) => p.id)
+        .indexOf("problems"),
+    ).toBe(3);
   });
 });
 
@@ -297,5 +370,14 @@ describe("migratePanelId", () => {
     expect(migratePanelId("bogus")).toBeNull();
     expect(migratePanelId(null)).toBeNull();
     expect(migratePanelId(7)).toBeNull();
+  });
+
+  test('a persisted leftTab of "problems" lands on the default, not in a wedged shell', () => {
+    // §7.2 moved Problems to the Bottom dock, so a build from before it could have persisted an id
+    // The Navigator can no longer show. There is no alias to add — it is not a Navigator panel
+    // Under any name — so it migrates to nothing and the boot path's `?? DEFAULT_PANEL_ID` runs.
+    expect(migratePanelId("problems")).toBeNull();
+    expect(migratePanelId("problems") ?? DEFAULT_PANEL_ID).toBe(DEFAULT_PANEL_ID);
+    expect(NAVIGATOR_PANEL_IDS as readonly string[]).not.toContain("problems");
   });
 });

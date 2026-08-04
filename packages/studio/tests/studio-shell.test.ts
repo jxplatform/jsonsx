@@ -795,6 +795,51 @@ describe("openRecentProject", () => {
     expect(statusMessages).toHaveLength(0);
   });
 
+  test("the whole open is ONE Activity entry with steps, not three surfaces", async () => {
+    // Opening a project used to chain a blocking spinner (dependencies), a transient status line
+    // (git sync) and a confirm-plus-spinner (@jxsuite update): three surfaces for three phases of
+    // One operation, none of them cancellable, none surviving the frame they were drawn in. Spec
+    // Studio.md §16.4.
+    const { activities, resetActivities } = await import("../src/panels/activity-panel");
+    resetActivities();
+    await toolbarCtx.openRecentProject("/recent/site");
+
+    expect(activities).toHaveLength(1);
+    const entry = activities[0]!;
+    expect(entry.title).toBe("Opening site");
+    expect(entry.source).toBe("Open Project");
+    expect(entry.state).toBe("done");
+    expect(entry.steps.map((step) => step.label)).toEqual([
+      "Sync with the remote",
+      "Install dependencies",
+      "Read the project",
+      "Open the home page",
+    ]);
+    // Every step ran, so none is left claiming to be in flight after the entry finished.
+    expect(entry.steps.every((step) => step.state === "done")).toBe(true);
+  });
+
+  test("a failed open raises ONE Problem — the entry reports, the catch does not also notify", async () => {
+    const { activities, resetActivities } = await import("../src/panels/activity-panel");
+    resetActivities();
+    const originalRead = platform.readFile;
+    platform.readFile = (async () => {
+      throw new Error("project.json is not there");
+    }) as never;
+    try {
+      await toolbarCtx.openRecentProject("/gone/site");
+    } finally {
+      platform.readFile = originalRead;
+    }
+
+    expect(activities[0]?.state).toBe("failed");
+    // ONE notification, not two: `fail()` raises the Problem, so the catch does not also call
+    // `notify.error` — §13.3 rule 3. The success cases above assert the other half, zero.
+    expect(statusMessages).toEqual(["Could not open the project at /gone/site."]);
+    // The reason is on the entry's log, which `fail()` hands to the Problem as its detail.
+    expect(activities[0]?.log.join("\n")).toContain("project.json is not there");
+  });
+
   test("expands and loads conventional directories found at the project root", async () => {
     const originalList = platform.listDirectory;
     const listed: string[] = [];

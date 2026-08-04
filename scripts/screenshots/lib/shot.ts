@@ -45,7 +45,33 @@ import type {
  * checked-in screenshots don't churn in git on every run. Per §13.4 this is for REVIEW PRESENTATION
  * and is no longer load-bearing for identity — the capture lock's `sha256` is.
  */
-const DIFF_THRESHOLD = 0.01;
+const DIFF_THRESHOLD = 0.0001;
+
+/**
+ * How far one channel may move before a pixel counts as different.
+ *
+ * The predecessor compared 32x32 THUMBNAILS of both images and averaged the absolute channel
+ * difference. At that size a 3840x2400 capture's entire status bar is a fraction of one pixel row,
+ * so the metric could not see text at all: the rail losing two buttons and the status bar being
+ * rewritten together scored 0.07 %, the stale bytes were kept, and the lock then certified a
+ * picture of an app that no longer existed as current. A screenshot pipeline that reports
+ * "unchanged" for a changed app is worse than no pipeline, because it converts a stale picture into
+ * an attested one.
+ *
+ * The metric is now a COUNT of pixels that moved more than this tolerance, at native resolution.
+ * Anti-aliasing and font-hinting jitter move edge pixels a little and few of them; a control that
+ * appeared, moved or changed its words moves many pixels a lot. `DIFF_THRESHOLD` is the fraction of
+ * the frame that may do so and still count as noise.
+ *
+ * That fraction is deliberately TINY — 0.0001 is ~920 px of a 3840x2400 frame. The surfaces this
+ * pipeline exists to keep honest are thin: the whole 24px status bar is 2 % of the frame and its
+ * glyphs cover a tenth of that, so a bar that went from empty to three fields scores about 0.1 %. A
+ * threshold generous enough to absorb "noise" at that scale is generous enough to absorb the status
+ * bar, which is how a stale picture got attested twice. Churn is the cheaper failure: a re-captured
+ * image that did not need re-capturing costs a diff, and a kept image that did costs a
+ * documentation page that lies.
+ */
+const CHANNEL_TOLERANCE = 16;
 
 /** A measured box in top-document CSS pixels. */
 interface Rect {
@@ -655,9 +681,8 @@ export interface ShotContext {
  */
 async function visualDiff(page: Page, a: Buffer, b: Buffer): Promise<number> {
   return page.evaluate(
-    async (aB64, bB64) => {
-      const N = 32;
-      const thumb = async (b64: string): Promise<Uint8ClampedArray> => {
+    async (aB64, bB64, tolerance) => {
+      const pixels = async (b64: string) => {
         const img = new Image();
         await new Promise<void>((res, rej) => {
           img.addEventListener("load", () => res());
@@ -665,24 +690,39 @@ async function visualDiff(page: Page, a: Buffer, b: Buffer): Promise<number> {
           img.src = `data:image/png;base64,${b64}`;
         });
         const canvas = document.createElement("canvas");
-        canvas.width = N;
-        canvas.height = N;
-        const c2d = canvas.getContext("2d");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const c2d = canvas.getContext("2d", { willReadFrequently: true });
         if (!c2d) {
           throw new Error("no 2d context");
         }
-        c2d.drawImage(img, 0, 0, N, N);
-        return c2d.getImageData(0, 0, N, N).data;
+        c2d.drawImage(img, 0, 0);
+        return {
+          data: c2d.getImageData(0, 0, canvas.width, canvas.height).data,
+          height: canvas.height,
+          width: canvas.width,
+        };
       };
-      const [pa, pb] = await Promise.all([thumb(aB64), thumb(bB64)]);
-      let sum = 0;
-      for (let i = 0; i < pa.length; i += 1) {
-        sum += Math.abs((pa[i] ?? 0) - (pb[i] ?? 0));
+      const [pa, pb] = await Promise.all([pixels(aB64), pixels(bB64)]);
+      // A resize is a change, full stop — and comparing two different geometries pixel-by-pixel
+      // Would answer nonsense.
+      if (pa.width !== pb.width || pa.height !== pb.height) {
+        return 1;
       }
-      return sum / (pa.length * 255);
+      let differing = 0;
+      for (let i = 0; i < pa.data.length; i += 4) {
+        const dr = Math.abs((pa.data[i] ?? 0) - (pb.data[i] ?? 0));
+        const dg = Math.abs((pa.data[i + 1] ?? 0) - (pb.data[i + 1] ?? 0));
+        const db = Math.abs((pa.data[i + 2] ?? 0) - (pb.data[i + 2] ?? 0));
+        if (Math.max(dr, dg, db) > tolerance) {
+          differing += 1;
+        }
+      }
+      return differing / (pa.width * pa.height);
     },
     a.toString("base64"),
     b.toString("base64"),
+    CHANNEL_TOLERANCE,
   );
 }
 

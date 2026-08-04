@@ -45,8 +45,6 @@ interface ViewState {
   _currentDropTargetRow: HTMLElement | null;
   layerDragSourceHeight: number;
   _completionRegistered: boolean;
-  showAddBreakpointForm: boolean;
-  addBreakpointPreview: string;
   _layersCollapsed: Set<string> | null;
   [key: string]: unknown;
 }
@@ -92,10 +90,6 @@ export const view: ViewState = {
   _completionRegistered: false,
 
   // Canvas / stylebook
-
-  // Responsive breakpoints UI
-  showAddBreakpointForm: false,
-  addBreakpointPreview: "",
 
   // Layers panel collapsed state
   _layersCollapsed: null,

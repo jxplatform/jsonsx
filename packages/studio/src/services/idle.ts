@@ -2,7 +2,7 @@
 /**
  * Idle.ts — "settled" is a predicate, and it can fail.
  *
- * One question — _has Studio finished reacting?_ — asked of the four subsystems that can still be
+ * One question — _has Studio finished reacting?_ — asked of the five subsystems that can still be
  * mid-flight, over two consecutive animation frames (spec studio.md §13.5, plan §13.4).
  *
  * **The rejection is the point.** The thing this replaces is 115 `wait: {ms}` steps totalling 73
@@ -20,6 +20,9 @@
  *    own cross-realm report of fonts, running animations and pending image retries.
  * 4. `platform.platformInFlight()` — unsettled PAL calls, counted at the one seam every adapter and
  *    all thirty-odd `git*`/fs/fetch methods pass through.
+ * 5. `layers.overlayIdleBlockers()` — overlays still in transition. Only the SETTLING window counts: a
+ *    resting toast is not a blocker, which is what lets `toastsAreHeld()` hold one open for a
+ *    capture without `probeIdle()` waiting forever alongside it (plan §13.7's named exception).
  *
  * The consumers are the `packages/studio:verify` skill, the screenshot runner and P4.2's Activity
  * tracker (this is a read-only projection of the same in-flight set that dock renders).
@@ -29,10 +32,11 @@ import { rendersInFlight } from "../store";
 import { pendingSchedulers } from "../panels/panel-scheduler";
 import { canvasIdleBlockers } from "../canvas/iframe-host";
 import { platformInFlight } from "../platform";
+import { overlayIdleBlockers } from "../ui/layers";
 
 /** One subsystem that can be outstanding, and its account of why. */
 export interface IdleSource {
-  /** Stable name — `render`, `panels`, `canvas`, `platform`. */
+  /** Stable name — `render`, `panels`, `canvas`, `platform`, `overlay`. */
   readonly name: string;
   /** Empty when quiet; otherwise one human-readable line per outstanding item. */
   blockers: () => readonly string[];
@@ -60,7 +64,7 @@ export class NotIdleError extends Error {
 }
 
 /**
- * The four live sources.
+ * The five live sources.
  *
  * Built per call rather than held in a module constant so a test can substitute one without
  * unpicking the others, and so a second window's hosts are never read through the first window's
@@ -90,6 +94,7 @@ export function defaultIdleSources(): IdleSource[] {
       },
       name: "platform",
     },
+    { blockers: overlayIdleBlockers, name: "overlay" },
   ];
 }
 

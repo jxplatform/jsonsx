@@ -48,17 +48,23 @@ import type { AnyCommand, CommandRegistry } from "./commands/registry";
 export type LayoutSelection = LayoutHit;
 
 /**
- * The two resizable docks flanking the pane grid.
+ * The three resizable docks around the pane grid: two flanking it, one under it.
  *
- * There were three. `"chat"` is gone: the assistant is the Inspector's fourth TAB, not a dock, so
- * it has no column, no width, no collapse flag and no resize handle of its own — which is the whole
- * claim of plan §3.2 ⑨, that folding it in costs zero additional width. What selects it is
+ * `"chat"` is not among them: the assistant is the Inspector's fourth TAB, not a dock, so it has no
+ * column, no size, no collapse flag and no resize handle of its own — which is the whole claim of
+ * plan §3.2 ⑨, that folding it in costs zero additional width. What selects it is
  * {@link INSPECTOR_TAB_IDS}, the same mechanism that selects Content, Style and Logic.
+ *
+ * `"bottom"` is the one that arrives with P4.2. It is a dock like the other two — a collapse flag,
+ * a remembered size, a resize handle, a place in every {@link LayoutPreset} — and the reason
+ * `view.toggleBottomDock` had no idempotent setter for two phases is that it was not on this
+ * record. It sits under the PANE GRID rather than under the window (plan §3.2 ⑪), so opening it
+ * never narrows the Navigator or the Inspector.
  */
-export type DockId = "left" | "right";
+export type DockId = "left" | "right" | "bottom";
 
 /**
- * The Navigator's panel ids, in rail order, then the two that have no rail button.
+ * The ids of the panels the NAVIGATOR DOCK draws, in rail order, then the two with no rail button.
  *
  * This is the DECLARATION `view.setActivity`'s `args` enum is built from, and it is the reason a
  * panel rename fails `scripts/check-shot-contract.ts` in the renaming PR naming both ids instead of
@@ -66,6 +72,11 @@ export type DockId = "left" | "right";
  * is also read from persisted state written by an older build — the COMMAND is what refuses an
  * undeclared id, at the one door a caller comes through, and {@link migratePanelId} is what turns a
  * stale stored id into a current one before it gets there.
+ *
+ * **`"problems"` is not here, and its rail button still is.** §7.2's table hosts Problems in the
+ * Bottom dock with a badge on the rail, so `view.setBottomTab { tab: "problems" }` is the verb that
+ * shows it and this enum would be a second, wrong door. The rail groups by LEVEL rather than by
+ * dock, which is why ⌘4 and the status bar's `panel.focus.problems` item are unaffected.
  *
  * The records themselves live in `panels/navigator-panels.ts`, one per owning module. This list is
  * the same set written down in a module that imports no DOM, because `commands/app-commands.ts`
@@ -76,7 +87,6 @@ export const NAVIGATOR_PANEL_IDS = [
   "files",
   "search",
   "git",
-  "problems",
   "layers",
   "page",
   "data",
@@ -114,6 +124,12 @@ export function isNavigatorPanelId(value: unknown): value is NavigatorPanelId {
  *
  * `null` rather than a default, so the caller decides: the boot path falls back to
  * {@link DEFAULT_PANEL_ID}, and a test can tell "I stored junk" from "I stored `layers`".
+ *
+ * `"problems"` is the one id that returns `null` because it MOVED rather than because it was junk:
+ * a build before §7.2's correction could persist `leftTab: "problems"`, and the Navigator can no
+ * longer show it. There is no alias to add — Problems is not a Navigator panel under any name — so
+ * the shell boots into {@link DEFAULT_PANEL_ID} and the Bottom dock keeps its own `bottomTab`,
+ * which already defaults to Problems. This is exactly the wedge this function exists to prevent.
  */
 export function migratePanelId(stored: unknown): NavigatorPanelId | null {
   if (typeof stored !== "string") {
@@ -151,6 +167,32 @@ export function isInspectorTabId(value: unknown): value is InspectorTabId {
   return typeof value === "string" && (INSPECTOR_TAB_IDS as readonly string[]).includes(value);
 }
 
+/**
+ * The Bottom dock's tab ids, in strip order — plan §3.2 ⑪, at the documented cap of four.
+ *
+ * **Four, not five.** `scripts/check-chrome-budget.ts` caps a dock at four tabs, and §12's P4 entry
+ * resolves the fifth candidate explicitly: **Deploy folds into Activity**, because a deploy IS a
+ * long operation with a log, and giving it its own tab would have bought a fifth strip item to say
+ * what the fourth already says.
+ *
+ * Declared here, beside {@link NAVIGATOR_PANEL_IDS} and {@link INSPECTOR_TAB_IDS} and for the same
+ * reason: `view.setBottomTab`'s `args` enum is built from it, and `commands/app-commands.ts` must
+ * load that enum in a bare Bun process, which it could not do from a module that renders lit
+ * templates. `panels/bottom-dock.ts` builds its strip from this list and
+ * `tests/bottom-dock.test.ts` asserts the two agree, exactly as the rail's do.
+ */
+export const BOTTOM_TAB_IDS = ["problems", "diff", "logic", "activity"] as const;
+
+export type BottomTabId = (typeof BOTTOM_TAB_IDS)[number];
+
+/** The tab the Bottom dock opens on. Problems, because that is the one it opens itself for. */
+export const DEFAULT_BOTTOM_TAB: BottomTabId = "problems";
+
+/** Whether a string is a declared Bottom dock tab id. */
+export function isBottomTabId(value: unknown): value is BottomTabId {
+  return typeof value === "string" && (BOTTOM_TAB_IDS as readonly string[]).includes(value);
+}
+
 /** The Studio chrome's Spectrum theme — the `color` attribute on `<sp-theme>`. */
 export const CHROME_THEMES = ["light", "dark"] as const;
 
@@ -159,10 +201,17 @@ export type ChromeTheme = (typeof CHROME_THEMES)[number];
 /** Which shell region currently owns keyboard focus (`focus.region` in the command context). */
 export type FocusRegion = "rail" | "navigator" | "pane" | "inspector" | "dock" | "status";
 
-/** Open/closed plus width, per dock. Persisted together under one storage key. */
+/**
+ * Open/closed plus size, per dock. Persisted together under one storage key.
+ *
+ * `size` and not `width`: the Bottom dock resizes on the other axis, so the field is measured along
+ * whichever axis its dock's handle drags — px across for the two side docks, px tall for the bottom
+ * one. {@link DOCK_CSS_VAR} names the custom property each one is projected onto, and that is where
+ * the axis is stated in a place CSS can read.
+ */
 export interface DockState {
   collapsed: boolean;
-  width: number;
+  size: number;
 }
 
 /** One row of `git log`, as the Source Control panel's History tab renders it. */
@@ -226,13 +275,22 @@ export interface LayoutPreset {
   navigatorPanel: NavigatorPanelId;
   /** Which Inspector tab this arrangement selects. */
   inspectorTab: InspectorTabId;
-  /** Dock visibility and widths. */
+  /** Which Bottom dock tab this arrangement selects — read whether or not the dock is open. */
+  bottomTab: BottomTabId;
+  /** Dock visibility and sizes, all three of them. */
   docks: Record<DockId, DockState>;
 }
 
 export interface ShellState {
   /** Which panel the Navigator dock shows. One of {@link NAVIGATOR_PANEL_IDS}. */
   leftTab: string;
+  /**
+   * Which tab the Bottom dock shows. One of {@link BOTTOM_TAB_IDS}.
+   *
+   * A `string` for the same reason `leftTab` is: it is also read back from persisted state, and the
+   * COMMAND (`view.setBottomTab`) is what refuses an undeclared id, at the one door callers use.
+   */
+  bottomTab: string;
   /** The Studio chrome's Spectrum theme. One of {@link CHROME_THEMES}. */
   theme: ChromeTheme;
   docks: Record<DockId, DockState>;
@@ -289,26 +347,46 @@ function readPersistedTheme(): ChromeTheme {
   }
 }
 
-export const DOCK_IDS: DockId[] = ["left", "right"];
+export const DOCK_IDS: DockId[] = ["left", "right", "bottom"];
 
-/** First-run docks. Both open: the shell's whole point is that it says where you are. */
+/**
+ * First-run docks.
+ *
+ * The two side docks open, because the shell's whole point is that it says where you are. The
+ * Bottom dock CLOSED, because it is the one dock whose contents are usually empty: a Problems list
+ * with nothing in it and an Activity log with nothing running would spend 220px of the canvas — the
+ * one region §3.2 says must never disappear — to say "nothing has gone wrong". ⌘J opens it, the
+ * rail badge and the status bar say when it has something to show, and nothing opens it for you.
+ */
 const DOCK_DEFAULTS: Record<DockId, DockState> = {
-  left: { collapsed: false, width: 240 },
-  right: { collapsed: false, width: 280 },
+  bottom: { collapsed: true, size: 220 },
+  left: { collapsed: false, size: 240 },
+  right: { collapsed: false, size: 280 },
 };
 
-/** The width a dock returns to when its handle is double-clicked. */
-export const DOCK_DEFAULT_WIDTHS: Record<DockId, number> = {
-  left: DOCK_DEFAULTS.left.width,
-  right: DOCK_DEFAULTS.right.width,
+/** The size a dock returns to when its handle is double-clicked. */
+export const DOCK_DEFAULT_SIZES: Record<DockId, number> = {
+  bottom: DOCK_DEFAULTS.bottom.size,
+  left: DOCK_DEFAULTS.left.size,
+  right: DOCK_DEFAULTS.right.size,
 };
 
+/**
+ * The custom property each dock's size is projected onto — and where its axis is written down.
+ *
+ * `--panel-w-*` feeds `grid-template-columns`, `--dock-h-bottom` feeds `grid-template-rows`. Both
+ * carry a declared fallback in `styles/tokens.css`, because an unset custom property inside a
+ * `grid-template-*` shorthand invalidates the WHOLE declaration at computed-value time and the
+ * shell would paint with no grid at all for the frame before the effect first runs.
+ */
 const DOCK_CSS_VAR: Record<DockId, string> = {
+  bottom: "--dock-h-bottom",
   left: "--panel-w-left",
   right: "--panel-w-right",
 };
 
 const DOCK_CLASS: Record<DockId, string> = {
+  bottom: "bottom-collapsed",
   left: "left-collapsed",
   right: "right-collapsed",
 };
@@ -324,10 +402,14 @@ const DOCK_CLASS: Record<DockId, string> = {
 interface PersistedDocks {
   left?: number;
   right?: number;
+  bottom?: number;
   leftCollapsed?: boolean;
   rightCollapsed?: boolean;
+  bottomCollapsed?: boolean;
   /** The Navigator panel last shown. Migrated through {@link migratePanelId} on read. */
   leftTab?: string;
+  /** The Bottom dock tab last shown. Checked by {@link isBottomTabId} on read. */
+  bottomTab?: string;
 }
 
 /** Read the persisted dock record, tolerating absent/corrupt storage. */
@@ -372,28 +454,50 @@ function freshStylebook(): ShellStylebook {
 function builtInLayouts(): LayoutPreset[] {
   return [
     {
-      docks: { left: { collapsed: false, width: 240 }, right: { collapsed: false, width: 280 } },
+      bottomTab: "problems",
+      docks: {
+        bottom: { collapsed: true, size: 220 },
+        left: { collapsed: false, size: 240 },
+        right: { collapsed: false, size: 280 },
+      },
       id: "write",
       inspectorTab: "properties",
       name: "Write",
       navigatorPanel: "files",
     },
     {
-      docks: { left: { collapsed: false, width: 240 }, right: { collapsed: false, width: 320 } },
+      bottomTab: "problems",
+      docks: {
+        bottom: { collapsed: true, size: 220 },
+        left: { collapsed: false, size: 240 },
+        right: { collapsed: false, size: 320 },
+      },
       id: "design",
       inspectorTab: "style",
       name: "Design",
       navigatorPanel: "layers",
     },
     {
-      docks: { left: { collapsed: false, width: 280 }, right: { collapsed: false, width: 300 } },
+      bottomTab: "logic",
+      docks: {
+        bottom: { collapsed: true, size: 260 },
+        left: { collapsed: false, size: 280 },
+        right: { collapsed: false, size: 300 },
+      },
       id: "build",
       inspectorTab: "events",
       name: "Build",
       navigatorPanel: "data",
     },
     {
-      docks: { left: { collapsed: false, width: 300 }, right: { collapsed: true, width: 280 } },
+      // The one built-in that OPENS the Bottom dock, on Activity: shipping is a long operation
+      // With a log, which is exactly what that tab is (§12 P4 — Deploy folds into Activity).
+      bottomTab: "activity",
+      docks: {
+        bottom: { collapsed: false, size: 240 },
+        left: { collapsed: false, size: 300 },
+        right: { collapsed: true, size: 280 },
+      },
       id: "ship",
       inspectorTab: "properties",
       name: "Ship",
@@ -422,10 +526,11 @@ function createShellState(): ShellState {
       // `if (saved.x) { collapse() }` shape — that silently pins a dock shut forever for
       // Everyone who ever closed it once.
       collapsed: typeof collapsed === "boolean" ? collapsed : DOCK_DEFAULTS[id].collapsed,
-      width: typeof width === "number" && width > 0 ? width : DOCK_DEFAULTS[id].width,
+      size: typeof width === "number" && width > 0 ? width : DOCK_DEFAULTS[id].size,
     };
   }
   return {
+    bottomTab: isBottomTabId(saved.bottomTab) ? saved.bottomTab : DEFAULT_BOTTOM_TAB,
     docks,
     focusRegion: "pane",
     git: freshGit(),
@@ -471,10 +576,13 @@ export function persistDocks(): void {
     localStorage.setItem(
       DOCK_STORAGE_KEY,
       JSON.stringify({
-        left: shell.docks.left.width,
+        bottom: shell.docks.bottom.size,
+        bottomCollapsed: shell.docks.bottom.collapsed,
+        bottomTab: shell.bottomTab,
+        left: shell.docks.left.size,
         leftCollapsed: shell.docks.left.collapsed,
         leftTab: shell.leftTab,
-        right: shell.docks.right.width,
+        right: shell.docks.right.size,
         rightCollapsed: shell.docks.right.collapsed,
       } satisfies PersistedDocks),
     );
@@ -506,7 +614,8 @@ function isLayoutPreset(value: unknown): value is LayoutPreset {
     typeof preset.name === "string" &&
     isNavigatorPanelId(preset.navigatorPanel) &&
     isInspectorTabId(preset.inspectorTab) &&
-    DOCK_IDS.every((dock) => typeof preset.docks?.[dock]?.width === "number")
+    isBottomTabId(preset.bottomTab) &&
+    DOCK_IDS.every((dock) => typeof preset.docks?.[dock]?.size === "number")
   );
 }
 
@@ -624,9 +733,10 @@ export function applyLayout(id: string, deps: LayoutDeps): void {
   }
   shell.layout = preset.id;
   shell.leftTab = preset.navigatorPanel;
+  shell.bottomTab = preset.bottomTab;
   for (const dock of DOCK_IDS) {
     shell.docks[dock].collapsed = preset.docks[dock].collapsed;
-    shell.docks[dock].width = preset.docks[dock].width;
+    shell.docks[dock].size = preset.docks[dock].size;
   }
   deps.setInspectorTab(preset.inspectorTab);
   persistDocks();
@@ -642,11 +752,13 @@ export function applyLayout(id: string, deps: LayoutDeps): void {
 export function saveLayout(name: string, deps: LayoutDeps): LayoutPreset {
   const trimmed = name.trim();
   const id = layoutIdFor(trimmed);
+  const docks = {} as Record<DockId, DockState>;
+  for (const dock of DOCK_IDS) {
+    docks[dock] = { collapsed: shell.docks[dock].collapsed, size: shell.docks[dock].size };
+  }
   const preset: LayoutPreset = {
-    docks: {
-      left: { collapsed: shell.docks.left.collapsed, width: shell.docks.left.width },
-      right: { collapsed: shell.docks.right.collapsed, width: shell.docks.right.width },
-    },
+    bottomTab: isBottomTabId(shell.bottomTab) ? shell.bottomTab : DEFAULT_BOTTOM_TAB,
+    docks,
     id,
     inspectorTab: deps.inspectorTab(),
     name: trimmed || id,
@@ -714,11 +826,11 @@ export function applyChromeTheme(): void {
   document.querySelector("sp-theme")?.setAttribute("color", shell.theme);
 }
 
-/** Project the dock record onto the shell grid: collapse classes on #app, widths as CSS vars. */
+/** Project the dock record onto the shell grid: collapse classes on #app, sizes as CSS vars. */
 export function applyDockLayout(): void {
   const root = document.documentElement;
   for (const id of DOCK_IDS) {
-    root.style.setProperty(DOCK_CSS_VAR[id], `${shell.docks[id].width}px`);
+    root.style.setProperty(DOCK_CSS_VAR[id], `${shell.docks[id].size}px`);
   }
   const app = document.querySelector("#app");
   if (!app) {
@@ -730,6 +842,41 @@ export function applyDockLayout(): void {
 }
 
 let _scope: EffectScope | null = null;
+
+/**
+ * A surface that lives and dies with the shell but is drawn somewhere else.
+ *
+ * The Bottom dock is the first: it is a DOCK — projected onto the grid by this module's own record
+ * and effect — but it renders lit templates over the panel registry, and a direct import here would
+ * be a cycle (`shell → bottom-dock → shell`) that `oxlint`'s `import/no-cycle` refuses and that
+ * would drag the panel registry into every bare-Bun process that reads the command enums.
+ *
+ * So the dependency points one way: the surface's own module registers itself, and this module
+ * knows only that something wants to be mounted when the shell is.
+ */
+export interface ShellSurface {
+  mount: () => void;
+  unmount: () => void;
+}
+
+const _surfaces: ShellSurface[] = [];
+
+/**
+ * Attach a surface to the shell's lifecycle. Idempotent per object.
+ *
+ * Called at module scope by the surface itself, so importing it is enough — the same bargain
+ * `ui/panel-resize.ts` makes, minus its unguarded `document` read at import time.
+ */
+export function registerShellSurface(surface: ShellSurface): void {
+  if (!_surfaces.includes(surface)) {
+    _surfaces.push(surface);
+  }
+}
+
+/** Forget every registered surface. Tests only. */
+export function resetShellSurfaces(): void {
+  _surfaces.length = 0;
+}
 
 /**
  * Start the one effect that keeps the DOM in step with the dock record. Idempotent.
@@ -744,6 +891,14 @@ export function mountShell(): void {
   // The six shell hosts are bare `<div id>`s in index.html, so they cannot stamp their own region
   // The way a panel or an overlay slot does. One table, applied once the tree exists.
   stampShellRegions();
+  // The Bottom dock mounts from here rather than from the bootstrap because it is a DOCK: it is
+  // Projected onto the grid by the same record and the same effect as the other two, and a second
+  // Mounting site would be a second place the shell's own layout is decided. Every surface's own
+  // Mount is idempotent and inert when its host is absent — the desktop shell and the tests both
+  // Boot partial trees.
+  for (const surface of _surfaces) {
+    surface.mount();
+  }
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -764,6 +919,9 @@ export function mountShell(): void {
 export function unmountShell(): void {
   _scope?.stop();
   _scope = null;
+  for (const surface of _surfaces) {
+    surface.unmount();
+  }
 }
 
 /**
@@ -789,8 +947,8 @@ export function toggleDock(dock: DockId): void {
 }
 
 /** Resize a dock. Persisting is the caller's call — a drag persists once, on release. */
-export function setDockWidth(dock: DockId, width: number): void {
-  shell.docks[dock].width = width;
+export function setDockSize(dock: DockId, size: number): void {
+  shell.docks[dock].size = size;
 }
 
 /**
@@ -803,6 +961,18 @@ export function setDockWidth(dock: DockId, width: number): void {
 export function setActivityTab(tab: string): void {
   shell.leftTab = tab;
   setDockCollapsed("left", false);
+  persistDocks();
+}
+
+/**
+ * Reveal a Bottom dock tab: select it, make sure the dock is open, and remember both.
+ *
+ * The Navigator's {@link setActivityTab} shape, for the same reason — "show me the Activity log"
+ * means the log is on screen when it returns, not that a tab is selected inside a closed dock.
+ */
+export function setBottomTab(tab: string): void {
+  shell.bottomTab = tab;
+  setDockCollapsed("bottom", false);
   persistDocks();
 }
 
@@ -829,6 +999,21 @@ export function toggleActivityTab(tab: string): void {
     return;
   }
   setActivityTab(tab);
+}
+
+/**
+ * {@link toggleActivityTab}'s Bottom dock counterpart, for the rail buttons whose panel lives there.
+ *
+ * The rail spans both docks now (§7.2 gives Problems a rail badge and a Bottom-dock body), and a
+ * button that opened its dock but could not close it again would be the only one-way control on the
+ * rail. `panels/activity-bar.ts` picks between the two by the record's `dock`.
+ */
+export function toggleBottomTab(tab: string): void {
+  if (tab === shell.bottomTab && !shell.docks.bottom.collapsed) {
+    setDockCollapsed("bottom", true);
+    return;
+  }
+  setBottomTab(tab);
 }
 
 /**
@@ -919,8 +1104,9 @@ export function shellViewCommands(deps: ShellCommandDeps): AnyCommand[] {
       when: projectOpen,
       aiTool: {
         description:
-          "Show one of the Navigator panels (Files, Search, Source Control, Problems, Outline, " +
-          "Page, Data, Packages, Insert, State) and open the Navigator dock if it is closed.",
+          "Show one of the Navigator panels (Files, Search, Source Control, Outline, Page, Data, " +
+          "Packages, Insert, State) and open the Navigator dock if it is closed. Problems is a " +
+          "Bottom dock tab — use show_bottom_tab for it.",
         name: "show_navigator_panel",
       },
       run: (_ctx, args) => {
@@ -974,6 +1160,59 @@ export function shellViewCommands(deps: ShellCommandDeps): AnyCommand[] {
         setDockCollapsed("right", !booleanArg("view.setRightPanel", args, "open"));
       },
       title: "Show Inspector Dock",
+    },
+    {
+      args: argsSchema({
+        open: booleanProperty("True to show the Bottom dock, false to collapse it."),
+      }),
+      category: "View",
+      // The idempotent half of `view.toggleBottomDock`, and the reason the toggle can exist at all:
+      // `tests/app-commands.test.ts` fails any `toggle*` id with no `set*` beside it, and this one
+      // Has been listed as HANDOFF debt since P2 because the dock was not on the `shell` record.
+      // It is now, so this is a two-line `run` rather than the special case ⌘J used to need.
+      id: "view.setBottomDock",
+      level: "application",
+      menus: ["palette"],
+      group: "4_docks",
+      run: (_ctx, args) => {
+        setDockCollapsed("bottom", !booleanArg("view.setBottomDock", args, "open"));
+      },
+      title: "Show Bottom Dock",
+    },
+    {
+      // ⌘J. A gesture, not an API: a human presses it while looking at the dock, which is the
+      // Exemption §13.3 clause 3 grants a toggle whose state the presser can SEE. A script says
+      // `view.setBottomDock { open }` instead, and the test beside the registry enforces the pair.
+      category: "View",
+      id: "view.toggleBottomDock",
+      keybinding: "mod+j",
+      level: "application",
+      menus: ["commandbar/overflow", "palette"],
+      group: "4_docks",
+      run: () => {
+        toggleDock("bottom");
+      },
+      title: "Toggle Bottom Dock",
+    },
+    {
+      args: argsSchema({
+        tab: enumProperty(BOTTOM_TAB_IDS, "Which Bottom dock tab to show."),
+      }),
+      category: "View",
+      id: "view.setBottomTab",
+      level: "application",
+      menus: ["palette"],
+      group: "4_docks",
+      aiTool: {
+        description:
+          "Show one of the Bottom dock's tabs (Problems, Diff, Logic, Activity) and open the " +
+          "Bottom dock if it is closed.",
+        name: "show_bottom_tab",
+      },
+      run: (_ctx, args) => {
+        setBottomTab(enumArg("view.setBottomTab", args, "tab", BOTTOM_TAB_IDS));
+      },
+      title: "Show Bottom Dock Tab",
     },
     {
       args: argsSchema({

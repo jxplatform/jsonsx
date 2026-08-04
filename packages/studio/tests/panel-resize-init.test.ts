@@ -11,8 +11,8 @@ const { shell } = await import("../src/shell");
 await import("../src/ui/panel-resize");
 
 test("corrupt saved state is ignored and the docks stay at their defaults", () => {
-  expect(shell.docks.left.width).toBe(240);
-  expect(shell.docks.right.width).toBe(280);
+  expect(shell.docks.left.size).toBe(240);
+  expect(shell.docks.right.size).toBe(280);
   expect(shell.docks.left.collapsed).toBe(false);
   expect(shell.docks.right.collapsed).toBe(false);
 });

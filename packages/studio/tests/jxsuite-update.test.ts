@@ -2,6 +2,8 @@
 import { flush, installMockPlatform } from "./harness";
 import { afterEach, beforeAll, describe, expect, mock, test } from "bun:test";
 import { initLayers } from "../src/ui/layers";
+import { problems, resetNotifications } from "../src/services/notify";
+import { resetActivities } from "../src/panels/activity-panel";
 
 // Build-time VERSION is "dev" under test; pin it so the comparison logic is exercised.
 void mock.module("../src/version", () => ({
@@ -30,14 +32,12 @@ function dialog(): HTMLElement | null {
   return document.querySelector("#layer-dialog sp-dialog-wrapper");
 }
 
-function progressCard(): Element | null {
-  return (document.querySelector("#layer-modal") as HTMLElement).querySelector(".progress-modal");
-}
-
 afterEach(() => {
   localStorage.clear();
   (document.querySelector("#layer-dialog") as HTMLElement).innerHTML = "";
   (document.querySelector("#layer-modal") as HTMLElement).innerHTML = "";
+  resetNotifications();
+  resetActivities();
 });
 
 describe("checkJxsuiteUpdate", () => {
@@ -120,7 +120,7 @@ describe("maybePromptJxsuiteUpdate", () => {
 });
 
 describe("applyJxsuiteUpdate", () => {
-  test("surfaces the failure log when the bump fails", async () => {
+  test("surfaces the failure log as a Problem when the bump fails", async () => {
     installMockPlatform({
       setPackageVersions: async () => ({ log: "version conflict", ok: false }),
     });
@@ -129,6 +129,6 @@ describe("applyJxsuiteUpdate", () => {
       "0.30.1",
     );
     await flush();
-    expect(progressCard()?.textContent).toContain("version conflict");
+    expect(problems[0]?.message).toContain("version conflict");
   });
 });

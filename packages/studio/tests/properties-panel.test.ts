@@ -1320,99 +1320,6 @@ describe("custom element document sections", () => {
     expect(section(c, "Observed Attributes")).toBeNull();
     expect(section(c, "CSS Properties")).toBeNull();
     expect(section(c, "CSS Parts")).toBeNull();
-    expect(section(c, "Media")).toBeNull();
-  });
-});
-
-// ─── Media breakpoints ────────────────────────────────────────────────────────
-
-describe("media section", () => {
-  test("renders base width and breakpoint rows with friendly names", async () => {
-    openDoc(
-      { $media: { "--": "320px", "--tablet": "(min-width: 768px)" }, children: [], tagName: "div" },
-      [],
-    );
-    const c = await renderPanel();
-    const media = section(c, "Media")!;
-    expect(media).not.toBeNull();
-    const base = media.querySelector(".kv-row input.field-input") as HTMLInputElement;
-    expect(base.value).toBe("320px");
-    // The friendly name lives in the breakpoint name input's value (live directive)
-    const rawLabel = media.querySelector(".bp-raw-label")!;
-    const nameInput = rawLabel.parentElement!.querySelector(
-      "input.field-input",
-    ) as HTMLInputElement;
-    expect(nameInput.value).toBe("Tablet");
-    expect(media.querySelector(".bp-raw-label")!.textContent).toBe("--tablet");
-    expect((media.querySelector(".bp-query-input") as HTMLInputElement).value).toBe(
-      "(min-width: 768px)",
-    );
-  });
-
-  test("✕ deletes the base width and breakpoints", async () => {
-    openDoc(
-      { $media: { "--": "320px", "--tablet": "(min-width: 768px)" }, children: [], tagName: "div" },
-      [],
-    );
-    let c = await renderPanel();
-    const dels = [...section(c, "Media")!.querySelectorAll(".kv-del")];
-    pointer(dels[0]!, "click"); // Base width delete
-    expect((docNow() as any).$media["--"]).toBeUndefined();
-
-    c = await renderPanel();
-    pointer(section(c, "Media")!.querySelector(".kv-del")!, "click"); // Breakpoint delete
-    expect((docNow() as any).$media).toBeUndefined();
-  });
-
-  test("add breakpoint flow: preview, add, and state reset", async () => {
-    openDoc({ children: [], tagName: "div" }, []);
-    let c = await renderPanel();
-    pointer(kvAdd(section(c, "Media")!, "+ Add breakpoint")!, "click");
-    expect(view.showAddBreakpointForm).toBe(true);
-
-    c = await renderPanel();
-    const media = section(c, "Media")!;
-    const nameInput = media.querySelector(
-      'input[placeholder="Name (e.g. Tablet)"]',
-    ) as HTMLInputElement | null;
-    expect(nameInput).not.toBeNull();
-    nameInput!.value = "Wide Screen";
-    nameInput!.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(view.addBreakpointPreview).toBe("--wide-screen");
-
-    const addBtn = [...media.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("Add"),
-    )!;
-    pointer(addBtn, "click");
-    expect((docNow() as any).$media["--wide-screen"]).toBe("(min-width: 768px)");
-    expect(view.showAddBreakpointForm).toBe(false);
-    expect(view.addBreakpointPreview).toBe("");
-  });
-
-  test("add with an empty name is a no-op and keeps the form open", async () => {
-    openDoc({ children: [], tagName: "div" }, []);
-    view.showAddBreakpointForm = true;
-    const c = await renderPanel();
-    const addBtn = [...section(c, "Media")!.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("Add"),
-    )!;
-    pointer(addBtn, "click");
-    expect((docNow() as any).$media).toBeUndefined();
-    expect(view.showAddBreakpointForm).toBe(true);
-  });
-
-  test("cancel hides the form without touching the doc", async () => {
-    openDoc({ children: [], tagName: "div" }, []);
-    view.showAddBreakpointForm = true;
-    view.addBreakpointPreview = "--x";
-    const c = await renderPanel();
-    const cancelBtn = [...section(c, "Media")!.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("Cancel"),
-    )!;
-    pointer(cancelBtn, "click");
-    expect(view.showAddBreakpointForm).toBe(false);
-    expect(view.addBreakpointPreview).toBe("");
-    expect((docNow() as any).$media).toBeUndefined();
   });
 });
 
@@ -1554,14 +1461,9 @@ describe("page section", () => {
 // ─── Debounced edits (real timers, consolidated) ──────────────────────────────
 
 describe("debounced edits", () => {
-  test("tag rename, custom attr rename, and media edits commit after their debounce", async () => {
+  test("tag rename and custom attr rename commit after their debounce", async () => {
     openDoc(
       {
-        $media: {
-          "--": "320px",
-          "--desktop": "(min-width: 1200px)",
-          "--tablet": "(min-width: 768px)",
-        },
         attributes: { "data-keep": "old", "data-x": "1" },
         children: [],
         tagName: "div",
@@ -1591,26 +1493,6 @@ describe("debounced edits", () => {
     keepVal.value = "new";
     keepVal.dispatchEvent(new Event("input", { bubbles: true }));
 
-    // Base width (400ms)
-    const media = section(c, "Media")!;
-    const base = media.querySelector(".kv-row input.field-input") as HTMLInputElement;
-    base.value = "375px";
-    base.dispatchEvent(new Event("input", { bubbles: true }));
-
-    // Breakpoint query edit on --desktop (400ms)
-    const queryInputs = [...media.querySelectorAll(".bp-query-input")] as HTMLInputElement[];
-    const desktopQuery = queryInputs.find((q) => q.value.includes("1200"))!;
-    desktopQuery.value = "(min-width: 1440px)";
-    desktopQuery.dispatchEvent(new Event("input", { bubbles: true }));
-
-    // Breakpoint rename Tablet → Phablet (600ms); raw label updates synchronously
-    const rawLabels = [...media.querySelectorAll(".bp-raw-label")];
-    const tabletRow = rawLabels.find((l) => l.textContent === "--tablet")!.parentElement!;
-    const nameInput = tabletRow.querySelector("input.field-input") as HTMLInputElement;
-    nameInput.value = "Phablet";
-    nameInput.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(tabletRow.querySelector(".bp-raw-label")!.textContent).toBe("--phablet");
-
     await sleep(700);
 
     const doc = docNow() as any;
@@ -1618,10 +1500,6 @@ describe("debounced edits", () => {
     expect(doc.attributes["data-x"]).toBeUndefined();
     expect(doc.attributes["data-y"]).toBe("2");
     expect(doc.attributes["data-keep"]).toBe("new");
-    expect(doc.$media["--"]).toBe("375px");
-    expect(doc.$media["--desktop"]).toBe("(min-width: 1440px)");
-    expect(doc.$media["--tablet"]).toBeUndefined();
-    expect(doc.$media["--phablet"]).toBe("(min-width: 768px)");
   });
 
   test("switch case rename commits after its 500ms debounce", async () => {

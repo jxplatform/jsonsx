@@ -7,6 +7,8 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
+import { errorMessage } from "@jxsuite/schema/parse";
+import { notify } from "../services/notify";
 import { projectState } from "../store";
 import { getEffectiveMedia, updateSiteConfig } from "../site-context";
 import { postSiteStyleToLiveHosts } from "../canvas/iframe-host";
@@ -100,13 +102,23 @@ export function renderCssVarsEditor(container: HTMLElement) {
     renderCssVarsEditor(container);
   };
 
-  // Without a declared scheme query nothing ever shows the scheme UI (here or in the tab bar) —
-  // This is the opt-in affordance for existing projects. Re-render after the async config update
-  // Lands (unlike style edits, $media is not mutated in place).
-  const enableDarkScheme = () => {
-    void updateSiteConfig({
-      $media: { ...config.$media, "--dark": "(prefers-color-scheme: dark)" },
-    }).then(() => renderCssVarsEditor(container));
+  /*
+   * Without a declared scheme query there is nothing to override, so this section can only point
+   * at the place a scheme is DEFINED. It used to define one itself — a button here appended
+   * `'--dark': '(prefers-color-scheme: dark)'` to `$media` without ever using the word breakpoint,
+   * which made the CSS-variables form the fourth and least discoverable definition site for a map
+   * whose other three lived in the wizard, General and Properties › Media. §2 principle 5: this
+   * level selects and overrides; Settings › Contexts defines. The lazy import breaks the
+   * css-vars-editor ↔ settings-modal cycle.
+   */
+  const manageContexts = () => {
+    void import("./settings-modal")
+      .then(({ openSettingsModal }) => openSettingsModal("contexts"))
+      .catch((error: unknown) => {
+        notify.error(`Could not open Settings › Contexts — ${errorMessage(error)}`, {
+          source: "Settings",
+        });
+      });
   };
 
   const deleteVar = (name: string) => {
@@ -137,7 +149,7 @@ export function renderCssVarsEditor(container: HTMLElement) {
         rootStyle,
         schemeEntries,
         updateSchemeVar,
-        enableDarkScheme,
+        manageContexts,
       )}
       ${renderFontSection(groups.font, updateVar, deleteVar, addVar)}
       ${renderSizeSection(groups.size, updateVar, deleteVar, addVar, rootStyle, mediaNames)}
@@ -166,7 +178,7 @@ function renderColorSection(
   rootStyle: JxStyle,
   schemeEntries: SchemeEntry[],
   updateSchemeVar: (schemeName: string, varName: string, val: string) => void,
-  enableDarkScheme: () => void,
+  manageContexts: () => void,
 ) {
   return html`
     <div class="css-vars-group">
@@ -201,14 +213,17 @@ function renderColorSection(
       ${
         schemeEntries.length === 0
           ? html`
-              <sp-action-button
-                size="s"
-                class="css-vars-enable-dark"
-                title="Add a dark color scheme: declares --dark in $media so every color token can carry a dark value"
-                @click=${enableDarkScheme}
-              >
-                Enable dark scheme
-              </sp-action-button>
+              <p class="settings-field-desc">
+                No colour scheme is defined yet, so these tokens have one value each.
+                <sp-action-button
+                  size="s"
+                  quiet
+                  title="Define a colour scheme in Project Settings › Contexts"
+                  @click=${manageContexts}
+                >
+                  Manage contexts…
+                </sp-action-button>
+              </p>
             `
           : nothing
       }

@@ -307,7 +307,7 @@ describe("pullWithPackageSync — post-pull sync", () => {
     expect(progressCard()).toBeNull();
   });
 
-  test("shows the install log in the progress modal when bun install fails", async () => {
+  test("shows the install log in Problems when bun install fails", async () => {
     const { state } = installMockPlatform(
       {
         gitPull: async () => {
@@ -322,7 +322,9 @@ describe("pullWithPackageSync — post-pull sync", () => {
     await pullWithPackageSync();
     await flush();
 
-    expect(progressCard()?.textContent).toContain("lockfile corrupt");
+    // `notify` is mocked in this file, so the failure is observed where it is reported rather
+    // Than in the store: a one-line install log becomes the Problem's own headline.
+    expect(statusMessages).toContain("lockfile corrupt");
   });
 
   test("falls back to reading all package files when the root listing fails", async () => {

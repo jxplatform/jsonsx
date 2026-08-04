@@ -6,7 +6,19 @@
  * blocks become chips), assistant messages render sanitized markdown plus tool-call
  * chips, tool messages surface failures only (ADR §11.3), the streaming tail renders
  * as plain text with a cursor (markdown parses once on finalize), and chat errors get
- * a danger row with recovery advice. Pure templates — state lives in ai-panel.
+ * a danger row with recovery advice and a Retry. Pure templates — state lives in ai-panel.
+ *
+ * §7.4 (AI honesty) is why three things here are not what they were:
+ *
+ * - **A chip renders its OUTCOME.** `ToolCallRecord.result` has always been populated by the loop
+ *   and ignored by this renderer, so a chip that said `update_style: ["children",0]` said exactly
+ *   as much when the edit had been refused as when it had landed.
+ * - **A turn renders what it CHANGED.** The changed-files summary comes off the write ledger
+ *   (`services/ai-writes.ts`), which records whether each change went through a transaction or
+ *   straight to disk — so the undo caveat is rendered to the human holding ⌘Z instead of being
+ *   appended to the model-facing tool summary.
+ * - **An error offers Retry.** `chatState.retryLast()` has been implemented, exported and called by
+ *   nobody; the error row is where it belongs.
  *
  * @license MIT
  */
@@ -17,6 +29,7 @@ import { ref } from "lit-html/directives/ref.js";
 import type { Message, ToolCallRecord } from "@jxsuite/ai/chat-state";
 import { splitAttachedContext } from "./attached-context";
 import { renderMarkdown } from "./chat-markdown";
+import { summarizeWrites, writesForTurn } from "../../services/ai-writes";
 
 // ─── Helpers (moved from ai-panel.ts) ────────────────────────────────────────
 
@@ -140,25 +153,125 @@ function renderUserMessage(msg: Message): TemplateResult {
   `;
 }
 
+/**
+ * What became of one tool call: `"pending"` while the loop has not reported, else ok/failed.
+ *
+ * @param {ToolCallRecord} tc
+ * @returns {"pending" | "ok" | "failed"}
+ */
+export function toolOutcome(tc: ToolCallRecord): "pending" | "ok" | "failed" {
+  if (!tc.result) {
+    return "pending";
+  }
+  return tc.result.success ? "ok" : "failed";
+}
+
+/**
+ * The one line a chip says about its outcome — the tool's own words where it has any.
+ *
+ * A tool that succeeded already writes a human sentence into `summary` for the model to read; there
+ * is no reason the human could not have been reading it all along. A tool that failed writes
+ * `error`, which was surfaced only through the separate tool-message row and only after the fact.
+ *
+ * @param {ToolCallRecord} tc
+ * @returns {string}
+ */
+export function toolOutcomeText(tc: ToolCallRecord): string {
+  const { result } = tc;
+  if (!result) {
+    return "";
+  }
+  return (result.success ? result.summary : result.error) ?? "";
+}
+
 function renderToolChips(toolCalls: ToolCallRecord[]): TemplateResult | typeof nothing {
   if (toolCalls.length === 0) {
     return nothing;
   }
   return html`
     <div class="ai-msg-tools">
-      ${toolCalls.map(
-        (tc) => html`
-          <span class="ai-tool-chip">
+      ${toolCalls.map((tc) => {
+        const outcome = toolOutcome(tc);
+        const text = toolOutcomeText(tc);
+        return html`
+          <span class="ai-tool-chip" data-outcome=${outcome} title=${text || formatToolLabel(tc)}>
             <sp-icon-gears size="xs"></sp-icon-gears>
-            ${formatToolLabel(tc)}
+            <span class="ai-tool-chip-name">${formatToolLabel(tc)}</span>
+            ${
+              outcome === "pending"
+                ? nothing
+                : html`<span class="ai-tool-chip-outcome"
+                    >${outcome === "ok" ? "✓" : "✗"} ${text}</span
+                  >`
+            }
           </span>
-        `,
-      )}
+        `;
+      })}
     </div>
   `;
 }
 
-function renderAssistantMessage(msg: Message): TemplateResult | typeof nothing {
+/**
+ * The turn's changed-files summary, with the two things it can honestly offer.
+ *
+ * Rendered only for a turn that changed something — "Changed 0 files" is noise, and a turn that
+ * only read is the common case. **Restore to here** is offered only when every recorded change went
+ * through a transaction: a disk write has no history behind it, so a button that claimed to restore
+ * one would be the same lie the model-facing caveat used to be.
+ */
+function renderChangedFiles(
+  msg: Message,
+  onRestore?: (messageId: string) => void,
+): TemplateResult | typeof nothing {
+  const writes = writesForTurn(msg.id);
+  if (writes.length === 0) {
+    return nothing;
+  }
+  const summary = summarizeWrites(writes);
+  if (!summary) {
+    return nothing;
+  }
+  const restorable = writes.every((w) => !w.disk);
+  return html`
+    <details class="ai-msg-changes">
+      <summary>
+        ${summary}
+        ${
+          onRestore && restorable
+            ? html`<sp-action-button
+                size="xs"
+                quiet
+                title="Undo everything this turn changed"
+                @click=${(e: Event) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRestore(msg.id);
+                }}
+              >
+                Restore to here
+              </sp-action-button>`
+            : nothing
+        }
+      </summary>
+      <ul class="ai-msg-changes-list">
+        ${writes.map(
+          (w) => html`
+            <li data-disk=${String(w.disk)} data-ok=${String(w.ok)}>
+              <code>${w.path}</code>
+              <span>${w.ok ? w.tool : `failed — ${w.error ?? w.tool}`}</span>
+              ${w.disk ? html`<em>written to disk — undo cannot reach it</em>` : nothing}
+            </li>
+          `,
+        )}
+      </ul>
+    </details>
+  `;
+}
+
+function renderAssistantMessage(
+  msg: Message,
+  onRestore?: (messageId: string) => void,
+): TemplateResult | typeof nothing {
   const toolCalls = msg.toolCalls ?? [];
   if (!msg.content && toolCalls.length === 0) {
     return nothing;
@@ -166,6 +279,7 @@ function renderAssistantMessage(msg: Message): TemplateResult | typeof nothing {
   return html`
     <div class="ai-msg-assistant">
       ${msg.content ? renderMarkdown(msg.id, msg.content) : nothing} ${renderToolChips(toolCalls)}
+      ${renderChangedFiles(msg, onRestore)}
     </div>
   `;
 }
@@ -208,6 +322,13 @@ export interface MessageListOptions {
   onScroll: (e: Event) => void;
   /** Ref to the scrolling element, for stick-to-bottom maintenance. */
   listRef: (el: Element | undefined) => void;
+  /**
+   * Re-send the last user message. Wires `chatState.retryLast()`, which has been implemented,
+   * exported and called by nobody — so a failed turn's only recovery was retyping the prompt.
+   */
+  onRetry?: (() => void) | undefined;
+  /** Undo everything one turn changed. Offered only for turns whose changes are all transactional. */
+  onRestore?: ((messageId: string) => void) | undefined;
 }
 
 /** The scrollable message list — THE scroller of the chat view. */
@@ -237,7 +358,7 @@ export function renderMessageList(opts: MessageListOptions): TemplateResult {
           if (status === "streaming" && i === lastIdx) {
             return renderStreamingTail(msg);
           }
-          return renderAssistantMessage(msg);
+          return renderAssistantMessage(msg, opts.onRestore);
         }
         return nothing;
       })}
@@ -249,6 +370,18 @@ export function renderMessageList(opts: MessageListOptions): TemplateResult {
                 ${
                   formatErrorAdvice(opts.error)
                     ? html`<div class="ai-msg-error-advice">${formatErrorAdvice(opts.error)}</div>`
+                    : nothing
+                }
+                ${
+                  opts.onRetry
+                    ? html`<sp-action-button
+                        size="s"
+                        class="ai-msg-retry"
+                        title="Send the last message again"
+                        @click=${opts.onRetry}
+                      >
+                        Retry
+                      </sp-action-button>`
                     : nothing
                 }
               </div>

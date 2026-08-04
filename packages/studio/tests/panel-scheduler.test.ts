@@ -69,6 +69,55 @@ describe("panel scheduler", () => {
   });
 });
 
+describe("the withheld render is visible to the author", () => {
+  // A panel showing state from before your last edit is correct behaviour; a panel showing it
+  // Silently is indistinguishable from one that has stopped working. `data-jx-stale` is the whole
+  // Mechanism — every panel already routed through this scheduler inherits the hint.
+  //
+  // Asserted on the VALUE, not `Object.hasOwn`: happy-dom's DOMStringMap is a proxy without a
+  // `getOwnPropertyDescriptor` trap, so `hasOwn` answers false for a key that is demonstrably set.
+  test("data-jx-stale is set while a render is withheld and cleared when it lands", async () => {
+    const root = document.createElement("div");
+    const input = document.createElement("input");
+    root.append(input);
+    document.body.append(root);
+    const scheduler = createPanelScheduler({ render: () => {}, root });
+    scheduler.bindFocus();
+
+    scheduler.flushNow();
+    expect(root.dataset.jxStale).toBeUndefined();
+
+    input.dispatchEvent(new Event("focusin", { bubbles: true }));
+    scheduler.flushNow();
+    expect(root.dataset.jxStale).toBe("");
+
+    input.dispatchEvent(new Event("focusout", { bubbles: true }));
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    expect(root.dataset.jxStale).toBeUndefined();
+
+    scheduler.unbind();
+    root.remove();
+  });
+
+  test("unbinding takes the hint with it, so a torn-down panel never keeps the banner", () => {
+    const root = document.createElement("div");
+    const input = document.createElement("input");
+    root.append(input);
+    document.body.append(root);
+    const scheduler = createPanelScheduler({ render: () => {}, root });
+    scheduler.bindFocus();
+    input.dispatchEvent(new Event("focusin", { bubbles: true }));
+    scheduler.flushNow();
+    expect(root.dataset.jxStale).toBe("");
+
+    scheduler.unbind();
+    expect(root.dataset.jxStale).toBeUndefined();
+    root.remove();
+  });
+});
+
 // ─── Quiescence (probe.idle() condition 2) ──────────────────────────────────
 
 describe("pendingSchedulers", () => {

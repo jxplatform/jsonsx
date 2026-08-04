@@ -39,14 +39,15 @@ When the selection is a component instance, a **Component Settings** section lis
 
 ## Make any value dynamic
 
-Most fields carry a small mode button beside their label showing the current mode's glyph. Clicking it steps to the field's next mode — **abc** is a plain value; **$ref** points the field at a state value; **${}** builds the value from a template that mixes text and data — and wraps back around, swapping the field's editor in place. Studio remembers each mode's value for the session, so cycling back restores what you had there. The state values on offer come from the document's **State** panel — see **[Script & logic](/docs/studio/logic)**.
+Most fields carry a small mode button beside their label showing the current mode's glyph. Clicking it steps to the field's next mode — **abc** is a plain value; **$ref** points the field at a state value; **${}** builds the value from a template that mixes text and data — and wraps back around, swapping the field's editor in place. Studio remembers each mode's value for the session, so cycling back restores what you had there. The state values on offer come from the document's **Data** panel — see **[Script & logic](/docs/studio/logic)**.
 
 ## Page and root settings
 
-Select the page root — the topmost row in Layers — and extra sections appear:
+Select the page root — the topmost row in Outline — and an extra section appears:
 
 - **Page** (site pages only) — pick the page's **Layout**: the site default, none, or any layout in the project. See **[Pages, layouts, components](/docs/studio/projects/pages-layouts-components)**.
-- **Media** — the file's breakpoints. Covered in **[Breakpoints](/docs/studio/design/breakpoints)**.
+
+Breakpoints and colour schemes are not edited here: they are defined once, for the whole project, in _Project Settings > Contexts_ — see **[Breakpoints](/docs/studio/design/breakpoints)**. Selecting a context to work in is the pane context bar's job, so adding a breakpoint never costs you your element selection.
 
 Special elements swap in their own sections too: a repeater shows a **Repeating list** section (see **[Repeaters](/docs/studio/design/repeaters)**), and a **Condition** element lists its cases with an expression field.
 

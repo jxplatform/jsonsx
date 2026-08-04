@@ -67,13 +67,16 @@ describe("the records themselves", () => {
     expect(checkPlacements(shellViewCommands(deps))).toEqual([]);
   });
 
-  test("every id registers, and none of them is a toggle", () => {
+  test("every id registers, and the only toggle is the one with a setter beside it", () => {
     const ids = registry.list().map((c) => c.id);
     expect(ids).toEqual([
       "view.setActivity",
       "view.setRightTab",
       "view.setNavigator",
       "view.setRightPanel",
+      "view.setBottomDock",
+      "view.toggleBottomDock",
+      "view.setBottomTab",
       "view.setAssistant",
       "view.setLayout",
       "view.saveLayout",
@@ -82,7 +85,10 @@ describe("the records themselves", () => {
       "view.resetLayout",
       "view.setTheme",
     ]);
-    expect(ids.filter((id) => /\.toggle[A-Z]/.test(id))).toEqual([]);
+    // ⌘J is the one toggle this module declares, and it is here rather than in
+    // `commands/defaults.ts` because the dock it flips is on THIS record. §13.3 clause 3's bargain
+    // Is a setter beside it, which is `view.setBottomDock` two rows up.
+    expect(ids.filter((id) => /\.toggle[A-Z]/.test(id))).toEqual(["view.toggleBottomDock"]);
   });
 
   test("every record that takes arguments declares a schema for them", () => {
@@ -93,7 +99,7 @@ describe("the records themselves", () => {
       .list()
       .filter((command) => !command.args)
       .map((command) => command.id);
-    expect(undeclared).toEqual(["view.resetLayout"]);
+    expect(undeclared).toEqual(["view.toggleBottomDock", "view.resetLayout"]);
   });
 });
 
@@ -117,7 +123,16 @@ describe("view.setActivity", () => {
     // Stale script or an older session still carries.
     expect(() => registry.run("view.setActivity", { tab: "head" })).toThrow(
       'command "view.setActivity" argument "tab": "head" is not declared — declared: ' +
-        "files, search, git, problems, layers, page, data, packages, insert, state",
+        "files, search, git, layers, page, data, packages, insert, state",
+    );
+    expect(shell.leftTab).toBe("layers");
+  });
+
+  test('refuses "problems", which is a Bottom dock tab and not a Navigator panel (§7.2)', () => {
+    // Not a rename — a MOVE. `view.setBottomTab { tab: "problems" }` is the verb that shows it,
+    // And this enum naming it too would be a second door onto a surface with one host.
+    expect(() => registry.run("view.setActivity", { tab: "problems" })).toThrow(
+      'argument "tab": "problems" is not declared',
     );
     expect(shell.leftTab).toBe("layers");
   });
@@ -158,6 +173,39 @@ describe("view.setRightTab", () => {
     const closed = createCommandRegistry({ getContext: () => makeContext({ project: {} }) });
     registerShellViewCommands(closed, deps);
     expect(closed.isVisible("view.setRightTab")).toBe(false);
+  });
+});
+
+describe("the Bottom dock's three verbs", () => {
+  test("setBottomDock means the same thing twice, from either starting state", () => {
+    void registry.run("view.setBottomDock", { open: true });
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    void registry.run("view.setBottomDock", { open: true });
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    void registry.run("view.setBottomDock", { open: false });
+    expect(shell.docks.bottom.collapsed).toBe(true);
+  });
+
+  test("⌘J's toggle flips it, and the setter is what a script uses instead", () => {
+    shell.docks.bottom.collapsed = true;
+    void registry.run("view.toggleBottomDock", {});
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    void registry.run("view.toggleBottomDock", {});
+    expect(shell.docks.bottom.collapsed).toBe(true);
+  });
+
+  test("setBottomTab selects a tab and opens the dock that hosts it", () => {
+    shell.docks.bottom.collapsed = true;
+    void registry.run("view.setBottomTab", { tab: "activity" });
+    expect(shell.bottomTab).toBe("activity");
+    expect(shell.docks.bottom.collapsed).toBe(false);
+  });
+
+  test("an undeclared tab is a refusal naming the declared set", () => {
+    expect(() => registry.get("view.setBottomTab")!.run(ctx, { tab: "deploy" } as never)).toThrow(
+      /problems/,
+    );
+    expect(shell.bottomTab).not.toBe("deploy");
   });
 });
 
@@ -268,7 +316,7 @@ describe("the enums do not drift from what the shell renders", () => {
     // Registry and this enum agree, which is asserted in `tests/panel-registry.test.ts`; here we
     // Only check that the rail really has stopped keeping its own list.
     expect(declaredValues("../src/panels/activity-bar.ts")).toEqual([]);
-    expect(NAVIGATOR_PANEL_IDS.length).toBe(10);
+    expect(NAVIGATOR_PANEL_IDS.length).toBe(9);
   });
 
   test("the Inspector renders exactly INSPECTOR_TAB_IDS", () => {

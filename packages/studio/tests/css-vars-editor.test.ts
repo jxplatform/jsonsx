@@ -364,24 +364,28 @@ describe("color scheme overrides", () => {
     expect(labels).not.toContain("@--dark");
   });
 
-  test("Enable dark scheme writes the scheme query into $media", async () => {
+  test("with no scheme declared the section points at Contexts and defines nothing", () => {
+    /* This button used to APPEND `--dark: (prefers-color-scheme: dark)` to $media — the fourth and
+       least discoverable of the four places a $media entry could be created, filed under
+       "variables" and never using the word breakpoint. §2 principle 5: this level overrides, the
+       Contexts section defines. What replaced it can only NAVIGATE. */
     const { container } = setup(baseStyle(), { "--sm": "(max-width: 600px)" });
     const colors = groupByTitle(container, "Colors");
     expect(colors.querySelectorAll(".css-var-scheme-row")).toHaveLength(0);
-    pointer(colors.querySelector(".css-vars-enable-dark")!, "click");
-    await flush();
-    expect((projectState as AnyConfig).projectConfig.$media["--dark"]).toBe(
-      "(prefers-color-scheme: dark)",
+    const link = [...colors.querySelectorAll("sp-action-button")].find((b) =>
+      b.textContent?.includes("Manage contexts"),
     );
-    // The editor re-rendered with the scheme rows now visible.
-    expect(
-      groupByTitle(container, "Colors").querySelectorAll(".css-var-scheme-row").length,
-    ).toBeGreaterThan(0);
+    expect(link).toBeDefined();
+    expect(link!.getAttribute("title")).toContain("Project Settings");
   });
 
   test("no scheme UI without a declared scheme query", () => {
     const { container } = setup(baseStyle(), { "--sm": "(max-width: 600px)" });
     expect(container.querySelectorAll(".css-var-scheme-row")).toHaveLength(0);
-    expect(container.querySelector(".css-vars-enable-dark")).not.toBeNull();
+    expect(
+      [...container.querySelectorAll("sp-action-button")].some((b) =>
+        b.textContent?.includes("Manage contexts"),
+      ),
+    ).toBe(true);
   });
 });

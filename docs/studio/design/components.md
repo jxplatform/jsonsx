@@ -17,12 +17,12 @@ A component is a piece of design you build once and use everywhere — a card, a
 The natural way to make a component is to design it in place first, then promote it:
 
 1. Build the element on the canvas — structure, styles, content.
-2. Right-click it (on the canvas or in [Layers](/docs/studio/design/layers)) and choose **Convert to Component**.
+2. Right-click it (on the canvas or in [Outline](/docs/studio/design/layers)) and choose **Convert to Component**.
 3. Give it a tag name — lowercase, with a hyphen, like `pricing-card` — and click **Convert**. Studio validates the name as you type and won't let you collide with an existing component.
 
 ![The Convert to Component dialog with a tag name filled in](../../images/convert-to-component.png)
 
-Studio saves the component as its own file in the project's `components/` folder, swaps your selection for an instance of it, and adds it to the [Elements panel](/docs/studio/design/elements) — drop more instances anywhere from there. If the component's slots need attention, Studio says so in the status bar.
+Studio saves the component as its own file in the project's `components/` folder, swaps your selection for an instance of it, and adds it to the [Insert palette](/docs/studio/design/elements) — drop more instances anywhere from there. If the component's slots need attention, Studio files it on **[Problems](/docs/studio/interface/problems-and-progress)** naming the component file, so it stays listed until you fix it.
 
 To open a component from an instance, right-click the instance and choose **Edit Component**, or click **→ Edit definition** under **Component Settings** in the Properties panel.
 
@@ -34,7 +34,7 @@ On an instance, the [Properties panel](/docs/studio/design/properties) shows a *
 
 ## Slots: openings for content
 
-By default an instance renders exactly what the component defines. A **slot** is a deliberate opening — add a `slot` element inside the component definition, and whatever an instance holds as children flows into that opening. Give slots names to offer several openings (a card with an icon slot and a body slot). In [Layers](/docs/studio/design/layers), slots show a **▣** badge; hover it for the slot's name. Layouts distribute page content the same way.
+By default an instance renders exactly what the component defines. A **slot** is a deliberate opening — add a `slot` element inside the component definition, and whatever an instance holds as children flows into that opening. Give slots names to offer several openings (a card with an icon slot and a body slot). In [Outline](/docs/studio/design/layers), slots show a **▣** badge; hover it for the slot's name. Layouts distribute page content the same way.
 
 ## Preview with test props
 
@@ -49,4 +49,4 @@ A component is a plain file — `components/pricing-card.json` — and convertin
 ## Next
 
 - Repeat a component per item of a list — **[Repeaters](/docs/studio/design/repeaters)**
-- Insert instances from the **[Elements panel](/docs/studio/design/elements)**
+- Insert instances from the **[Insert palette](/docs/studio/design/elements)**

@@ -124,6 +124,23 @@ export function createPanelScheduler(opts: {
 
   const blocked = () => editing || (blockWhile ? blockWhile() : false);
 
+  /**
+   * Publish the withheld render to the person looking at the panel.
+   *
+   * A deferred render is the panel deciding, correctly, that finishing your sentence matters more
+   * than being current — but until P4 it made that trade in silence, so a panel showing state from
+   * before your last edit was indistinguishable from a panel that had stopped working. The
+   * attribute is the whole mechanism: `styles/overlays.css` hangs the hint off it, so every panel
+   * that already routes through this scheduler inherits it without a line of its own.
+   */
+  function markStale(stale: boolean) {
+    if (stale) {
+      root.dataset.jxStale = "";
+    } else {
+      delete root.dataset.jxStale;
+    }
+  }
+
   function flush() {
     scheduled = false;
     rafId = 0;
@@ -133,9 +150,11 @@ export function createPanelScheduler(opts: {
     // Defer while a field is focused — flushed later by focusout (or the next schedule()).
     if (blocked()) {
       pending = true;
+      markStale(true);
       return;
     }
     pending = false;
+    markStale(false);
     rendering = true;
     try {
       render();
@@ -198,6 +217,7 @@ export function createPanelScheduler(opts: {
       scheduled = false;
       pending = false;
       editing = false;
+      markStale(false);
       rendering = false;
     },
   };

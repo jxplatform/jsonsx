@@ -10,6 +10,9 @@
  * - **The rendering context only selects.** Its popover ends in "Manage contexts…", which runs
  *   `settings.open` — the definition site — rather than defining anything itself.
  * - **The pod floats.** Zoom left the band; the fit picker writes the declared {@link FitMode}.
+ * - **The band is where a standing statement goes.** `collab/presence-chips.ts` wrote the read-only
+ *   banner (§7.4) and nothing rendered it; this is the surface that owes it a home, because it is
+ *   the per-document chrome directly above the editing surface.
  */
 import {
   flush,
@@ -28,6 +31,7 @@ const { getFit, hasDeclaredFit, initCanvasUtils, resetFits } =
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { makeContext } = await import("../src/commands/context");
 const { setActiveRegistry } = await import("../src/commands/active-registry");
+const { collabState } = await import("../src/collab/collab-state");
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -162,6 +166,57 @@ describe("the bar", () => {
     paneContext.unmount();
     paneContext.render();
     expect(root.querySelector(".pane-context")).not.toBeNull();
+  });
+
+  test("no read-only banner while the document has no collaboration to report", async () => {
+    openTestTab();
+    paneContext.mount(root, makeCtx());
+    await flush();
+    expect(root.querySelector(".jx-collab-banner")).toBeNull();
+  });
+
+  test("a read-only collaborator gets the banner, above the stage, before the first keystroke", async () => {
+    const tab = openTestTab();
+    paneContext.mount(root, makeCtx());
+    const state = collabState(tab);
+    state.active = true;
+    state.readOnly = true;
+    await flush();
+    const banner = root.querySelector<HTMLElement>('.jx-collab-banner[data-kind="read-only"]');
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain("not published to the other people");
+    expect(banner?.getAttribute("role")).toBe("status");
+    // Inside the band the stage is offset by, so it pushes the document down rather than over it.
+    expect(root.querySelector(".pc-band")?.contains(banner!)).toBe(true);
+  });
+
+  test("the banner appears and disappears with the permission, without another edit", async () => {
+    const tab = openTestTab();
+    paneContext.mount(root, makeCtx());
+    const state = collabState(tab);
+    state.active = true;
+    await flush();
+    expect(root.querySelector(".jx-collab-banner")).toBeNull();
+
+    state.readOnly = true;
+    await flush();
+    expect(root.querySelector(".jx-collab-banner")).not.toBeNull();
+
+    state.readOnly = false;
+    await flush();
+    expect(root.querySelector(".jx-collab-banner")).toBeNull();
+  });
+
+  test("a takeover editor keeps the banner — a frozen guest is still a guest", async () => {
+    const tab = openTestTab();
+    paneContext.mount(root, makeCtx());
+    const state = collabState(tab);
+    state.active = true;
+    state.readOnly = true;
+    tab.session.ui.editingFunction = { defName: "greet", type: "def" };
+    await flush();
+    expect(axes()).toEqual([]);
+    expect(root.querySelector(".jx-collab-banner")).not.toBeNull();
   });
 
   test("a takeover editor suppresses the axes and the pod, keeping only the way out", async () => {
@@ -427,7 +482,7 @@ describe("rendering context", () => {
 
     pointer(root.querySelector(".pc-ctx-manage") as HTMLElement, "click");
     await flush();
-    expect(ran).toEqual(["settings.open:general"]);
+    expect(ran).toEqual(["settings.open:contexts"]);
   });
 
   test("Manage contexts… is inert, not fatal, before a registry is published", async () => {

@@ -23,7 +23,7 @@ Download the installer for macOS, Windows, or Linux from the **[install page](/d
 
 Once installed, updates take care of themselves. The app checks for a new release shortly after launch and every few hours after that, downloads it in the background, and then shows a small notice — **Version x.y.z is ready** — with a **Restart to update** button. Update whenever suits you; nothing is applied until you restart.
 
-To see where you stand, click the info button at the bottom of the activity bar. The About dialog shows the app version, its release channel, and the current update status.
+To see where you stand, click **About** at the foot of the Navigator rail. The dialog shows the app version, its release channel, and the current update status.
 
 ## Open a project
 

@@ -14,12 +14,12 @@ A repeater renders one element once per item of a list — design a single card,
 ## Turn an element into a repeater
 
 1. Design one instance of the repeating thing — one card, one row, one gallery tile.
-2. Right-click it (on the canvas or in [Layers](/docs/studio/design/layers)) and choose **Repeat…**.
+2. Right-click it (on the canvas or in [Outline](/docs/studio/design/layers)) and choose **Repeat…**.
 3. In the dialog, pick the **Items source** — a list from the document's state, or **Create new…** to declare a fresh one by name.
 4. Optionally pick a **Filter** or **Sort** function, if the document defines any.
 5. Click **Create Repeater**.
 
-Your element is now the template of a repeater, marked **↻** in Layers. The repeated items render directly where the element stood — no wrapper is added around them.
+Your element is now the template of a repeater, marked **↻** in Outline. The repeated items render directly where the element stood — no wrapper is added around them.
 
 ## Bind the list
 

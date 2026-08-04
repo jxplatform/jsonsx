@@ -8,7 +8,7 @@ code:
 
 # Source control
 
-Source Control is Studio's built-in git client — a sidebar panel that records your work as commits and keeps your copy of the project in sync with its repository. Open it by clicking **Source Control** (the branch icon) in the activity bar; a badge on the icon shows how many files have changed.
+Source Control is Studio's built-in git client — a Navigator panel that records your work as commits and keeps your copy of the project in sync with its repository. Open it by clicking **Source Control** in the **Project** group of the Navigator rail, or with :kbd[⌘3]; a badge on the button counts the files that have changed. It is a project-level panel — its header reads **SOURCE CONTROL · project**, and the badge stands whether or not a document is open.
 
 ![The Source Control panel with sync status, branch selector, commit box, and changed files](../../images/git-panel.png)
 
@@ -20,7 +20,7 @@ With no project open at all, the panel says what source control is for and offer
 
 The **Local Changes** tab lists every changed file, grouped by the part of the project it belongs to. Each row shows the file's name and a status badge — **M** for modified, **A** for added, **U** for a brand-new untracked file.
 
-- Click a changed file to open a diff in the canvas — what changed since your last commit.
+- Click a changed file to open a diff in the editor pane — what changed since your last commit.
 - Click **+** on a row to stage it (mark it for the next commit), or the header's stage-all button to stage everything. Staged files move to a **Staged Changes** section, where **−** unstages them.
 - Click the undo icon on a row to discard its changes. Studio asks for confirmation first.
 

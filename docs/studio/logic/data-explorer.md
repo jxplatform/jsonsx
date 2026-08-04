@@ -1,6 +1,6 @@
 ---
 title: "Data explorer"
-description: "See the live values behind the open page in the Data activity — expand real data, refresh it, and try test values for component options."
+description: "See the live values behind the open page in the Data panel — expand real data, refresh it, and try test values for component options."
 code:
   - packages/studio/src/panels/data-explorer.ts
   - packages/studio/src/component-props.ts
@@ -8,9 +8,9 @@ code:
 
 # Data explorer
 
-Data is the read side of the **[State panel](/docs/studio/logic/state)**: the same entries, but showing what each one is worth **right now**, as the canvas runs the page — the actual list your fetch returned, the current count, the parsed form. Open it by clicking **Data** in the activity bar. When something on the page looks wrong, this is where you find out what the page actually sees.
+Data is the read side of the **[State panel](/docs/studio/logic/state)**: the same entries, but showing what each one is worth **right now**, as the canvas runs the page — the actual list your fetch returned, the current count, the parsed form. Open it by clicking **Data** in the **Document** group of the Navigator rail, or with :kbd[⌘7]. When something on the page looks wrong, this is where you find out what the page actually sees.
 
-![The Data activity with state entries expanded into live data trees](../../images/data-explorer.png)
+![The Data panel with state entries expanded into live data trees](../../images/data-explorer.png)
 
 ## Read the values
 
@@ -23,7 +23,7 @@ Each state entry gets a row: its kind badge, its name, and a value summary —
 
 Click a row to expand the value as a tree. Nested objects and lists unfold a few levels deep, long lists show their first items with a "… N more" tail, and long strings are shortened — enough to verify shape and content without drowning in data.
 
-A page that declares nothing yet has nothing to show here, so the panel says what it is for and offers **Define data**, which takes you straight to the **[State panel](/docs/studio/logic/state)**.
+A page that declares nothing yet has nothing to show here, so the panel says what it is for and offers **Define data**, which takes you straight to the **[State panel](/docs/studio/logic/state)**. With no document open at all, the panel says what it needs — "Open a page to watch its data resolve while you edit."
 
 ## Refresh
 
@@ -39,7 +39,7 @@ A component file renders on the canvas with its options at their defaults. To se
 
 1. Open a component file. The context bar shows a field named after each option.
 2. Type a test value. Values that read as JSON are treated that way — `42` is a number, `true` a flag, `["a","b"]` a list — and anything else is text.
-3. The canvas re-renders with the value, and the Data activity, template previews, and formula badges all see it.
+3. The canvas re-renders with the value, and the Data panel, template previews, and formula badges all see it.
 4. Clear the field to return that option to its authored default.
 
 Test values are a preview aid — they live with your editing session, not in the component file.

@@ -174,9 +174,16 @@ describe("lifetime", () => {
     notify.info("brief", { timeoutMs: 10 });
     await flush();
     expect(host().querySelectorAll(".toast")).toHaveLength(1);
-    await new Promise((resolve) => {
-      setTimeout(resolve, 40);
-    });
+    // Polled, not slept. The retirement runs on a REAL timer — that is the property under test —
+    // And a fixed 40ms wait is a bet on the scheduler that loses whenever the full suite is running
+    // Files concurrently. The deadline still fails a toast that never retires, which is the only
+    // Failure this test exists to catch.
+    const deadline = Date.now() + 2000;
+    while (toasts.length > 0 && Date.now() < deadline) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10);
+      });
+    }
     await flush();
     expect(toasts).toHaveLength(0);
   });

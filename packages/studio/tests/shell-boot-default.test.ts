@@ -15,15 +15,18 @@ localStorage.removeItem("jx-studio-panel-widths");
 const { DEFAULT_INSPECTOR_TAB, shell } = await import("../src/shell");
 
 describe("shell boot defaults (no persisted record)", () => {
-  test("both side docks start open, and there is no third one", () => {
+  test("both side docks start open and the bottom one starts closed", () => {
     expect(shell.docks.left.collapsed).toBe(false);
     expect(shell.docks.right.collapsed).toBe(false);
-    expect(Object.keys(shell.docks).toSorted()).toEqual(["left", "right"]);
+    // The Bottom dock is the one that does NOT open itself: an empty Problems list and an empty
+    // Activity log would spend 220px of the canvas to say nothing has gone wrong.
+    expect(shell.docks.bottom.collapsed).toBe(true);
+    expect(Object.keys(shell.docks).toSorted()).toEqual(["bottom", "left", "right"]);
   });
 
   test("widths fall back to the declared defaults", () => {
-    expect(shell.docks.left.width).toBe(240);
-    expect(shell.docks.right.width).toBe(280);
+    expect(shell.docks.left.size).toBe(240);
+    expect(shell.docks.right.size).toBe(280);
   });
 
   test("the Inspector wakes up on Content, not on the assistant", () => {

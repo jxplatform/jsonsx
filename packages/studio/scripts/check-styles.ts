@@ -116,10 +116,8 @@ export const ALLOWED_ORPHANS = new Set<string>([
   "overlay-presence",
   "overlay-presence-group",
   "overlay-presence-tag",
-  // Owner: collab/presence-chips.ts
-  "jx-presence",
-  "jx-presence-chip",
-  "jx-presence-status",
+  /* Owner: collab/presence-chips.ts — jx-presence, -chip, -status and the two new flags now have
+     rules in styles/shell.css. The flagship co-editing affordance shipped unstyled (§7.4). */
   // Owner: editor/slash-menu.ts
   "slash-filter",
   // Owner: grid/grid-open.ts
@@ -192,10 +190,8 @@ export const ALLOWED_ORPHANS = new Set<string>([
   // Owner: panels/layers-panel.ts
   "layers-container",
   "layers-tree",
-  // Owner: panels/properties-panel.ts
-  "add-bp-query",
-  "bp-query-input",
-  "bp-raw-label",
+  /* Owner: panels/properties-panel.ts — the breakpoint form these three belonged to is gone.
+     $media is defined in Project Settings › Contexts and nowhere else (plan §4.2). */
   "link-target-field",
   "link-target-kind",
   "link-target-value",
@@ -239,7 +235,8 @@ export const ALLOWED_ORPHANS = new Set<string>([
   "settings-section",
   // Owner: settings/css-vars-editor.ts
   "css-var-scheme-row",
-  "css-vars-enable-dark",
+  /* "css-vars-enable-dark" retired with the button: this section overrides tokens per scheme, it
+     no longer DEFINES a scheme — that is Settings › Contexts (§2 principle 5). */
   // Owner: settings/head-editor.ts
   "head-add-actions",
   "head-entries",
@@ -275,8 +272,6 @@ export const ALLOWED_ORPHANS = new Set<string>([
   "media-picker-browse",
   "media-picker-filter",
   "media-picker-upload",
-  // Owner: ui/progress-modal.ts
-  "progress-modal",
   // Owner: ui/schema-form.ts
   "schema-param-editor",
   // Owner: ui/value-selector.ts

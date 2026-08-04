@@ -1,16 +1,18 @@
 ---
-title: "Layers panel"
-description: "The Layers panel in Jx Studio: read your page's structure as a tree, select, rename, reorder by drag and drop, and act on any element."
+title: "Outline panel"
+description: "The Outline panel in Jx Studio: read your page's structure as a tree, select, rename, reorder by drag and drop, and act on any element."
 code:
   - packages/studio/src/panels/layers-panel.ts
   - packages/studio/src/panels/dnd.ts
 ---
 
-# Layers panel
+# Outline panel
 
-Layers is the page's structure as a tree — every element in the open file, nested the way it nests on the page. Open it by clicking **Layers** in the activity bar on the left. Use it whenever the thing you want to grab is hard to click on the canvas: a wrapper with no visible edges, an element hidden behind another, or the exact parent in a deep stack.
+Outline is the page's structure as a tree — every element in the open file, nested the way it nests on the page. Open it by clicking **Outline** in the **Document** group of the Navigator rail, or with :kbd[⌘5]. Use it whenever the thing you want to grab is hard to click on the canvas: a wrapper with no visible edges, an element hidden behind another, or the exact parent in a deep stack.
 
-![The Layers panel showing a nested element tree with a selected row](../../images/layers-panel.png)
+![The Outline panel showing a nested element tree with a selected row](../../images/layers-panel.png)
+
+The panel's header names it and the level it works at — **OUTLINE · document** — because the tree is always the tree of the file in front of you. Open a different document and the panel follows.
 
 ## Read the tree
 
@@ -25,11 +27,11 @@ Hover any badge for the plain-English version of what it marks.
 
 Text sits in its own dimmed, italic rows, and rows with children get a chevron — click it to collapse or expand that branch without changing the selection.
 
-An empty page has no tree to show, so the panel says so and offers **Add an element**, which switches the activity bar to **[Elements](/docs/studio/design/elements)**.
+An empty page has no tree to show, so the panel says so and offers **Add an element**, which opens the **[Insert palette](/docs/studio/design/elements)**. With no document open at all, the panel says what it needs — "Open a page to see the elements it is built from."
 
 ## Select and navigate
 
-Click a row to select that element. The canvas pans to bring it into view, and the [Properties panel](/docs/studio/design/properties) and [Style inspector](/docs/studio/design/style-inspector) switch to it. Selection works in both directions: click something on the canvas and its row highlights and scrolls into view in Layers.
+Click a row to select that element. The canvas pans to bring it into view, and the Inspector's [Content](/docs/studio/design/properties) and [Style](/docs/studio/design/style-inspector) tabs switch to it. Selection works in both directions: click something on the canvas and its row highlights and scrolls into view in Outline.
 
 ## Rename an element
 
@@ -60,9 +62,9 @@ For bigger moves, drag the **⠿** handle — which appears on any row you hover
 
 Right-clicking a row opens the same context menu as the canvas — **Copy**, **Duplicate**, **Copy styles**, **Wrap in Div**, **Repeat…**, **Convert to Component**, **Delete**, and more. The full list is in **[The canvas](/docs/studio/interface/canvas)**. **Set Title** in that menu starts the same rename as double-clicking.
 
-In **Stylebook** mode the Layers activity switches to the element catalog instead of the document tree — see **[Stylebook](/docs/studio/design/stylebook)**.
+In **Stylebook** the Outline panel switches to the element catalog instead of the document tree — see **[Stylebook](/docs/studio/design/stylebook)**.
 
 ## Next
 
-- Add new elements from the **[Elements panel](/docs/studio/design/elements)**
-- Inspect what you selected in the **[Properties panel](/docs/studio/design/properties)**
+- Add new elements from the **[Insert palette](/docs/studio/design/elements)**
+- Inspect what you selected in the Inspector's **[Content tab](/docs/studio/design/properties)**

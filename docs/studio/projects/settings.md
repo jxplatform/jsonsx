@@ -1,9 +1,10 @@
 ---
 title: "Project settings"
-description: "A tour of the Settings modal in Jx Studio: general options, head tags, CSS variables, data shapes, dependencies, and extension-added sections."
+description: "A tour of the Settings modal in Jx Studio: general options, contexts, head tags, CSS variables, data shapes, dependencies, and extension sections."
 code:
   - packages/studio/src/settings/settings-modal.ts
   - packages/studio/src/settings/general-settings.ts
+  - packages/studio/src/settings/contexts-section.ts
   - packages/studio/src/settings/head-editor.ts
   - packages/studio/src/settings/css-vars-editor.ts
   - packages/studio/src/settings/defs-editor.ts
@@ -17,7 +18,7 @@ The Settings modal holds everything that applies to your whole site rather than 
 
 ![The Settings modal open on the General section, with the section list on the left](../../images/settings-modal.png)
 
-Changes save as you make them — there is no separate save button. If a save can't be written, the General section says so under the field you were editing rather than quietly reverting it.
+Changes save as you make them — there is no separate save button. If a save can't be written, the section says so under the field you were editing rather than quietly reverting it.
 
 ## General
 
@@ -28,8 +29,20 @@ The basics of the site:
 - **Production URL** — where the published site lives, as a full address starting with `http://` or `https://`. Sitemap generation is switched on by having one, and absolute links are built from it. Clearing the field turns the sitemap back off.
 - **Favicon** — click **Upload Favicon** and pick an image; Studio copies it into your project and shows the current one beside the button.
 - **Platform Adapter** — how the build packages the site for your host: **Static**, **Bun**, **Node**, **Cloudflare Workers**, or **Cloudflare Pages**. This is where the choice is made; [creating a project](/docs/studio/projects/create) doesn't ask. **Static** emits plain files for any host that serves them; the other four additionally package the site's server tier, which is what answers a database, sign-ins, or server functions. One of them becomes _required_ once the project has a database or sign-ins — the build stops with an error on **Static**. Server functions still build on **Static**, but only these four actually serve them. See [Build output and adapters](/docs/framework/site/deployment) for what each one writes into `dist/`.
-- **Breakpoints** — the screen sizes your design responds to, as name/value rows. The **Base** row is your default canvas width; **+ Add Breakpoint** adds another, and the × button removes one.
 - **Global Styles** — a shortcut that opens the project file where site-wide default styles live.
+
+## Contexts
+
+The conditions your pages are rendered under — and the only place they are defined. Breakpoints used to be a field in **General**; they now sit here beside the two other things that share the same `$media` map on disk.
+
+- **Base width** — how wide the Base canvas renders when no other context applies.
+- **Size breakpoints** — width conditions like `(max-width: 768px)`. Each one gets its own canvas panel in Design view. See **[Breakpoints](/docs/studio/design/breakpoints)**.
+- **Colour schemes** — a Light/Dark picker that writes the `prefers-color-scheme` query for you. Declaring one turns on the **Auto / Light / Dark** control in the context bar.
+- **Feature queries** — anything else a media query can ask: reduced motion, print, hover, orientation. These become toggles in the context bar rather than canvas panels.
+
+Name a context in plain language; Studio derives the stored name ("Wide screen" becomes `--wide-screen`). Each change is schema-checked before it is written, and a refusal — a duplicate name, an empty query, a `project.json` write that fails — appears under the control that caused it while the old value stays put.
+
+The context bar's **Context** popover only _chooses_ among what is defined here; its **Manage contexts…** footer opens this section, so you can add a breakpoint without losing your element selection.
 
 ## Head
 

@@ -1,8 +1,8 @@
 {
   "images": {
     "docs/images/ai-document-assistant.png": {
-      "bytes": 1222842,
-      "capturedAt": "2026-08-03T13:03:27Z",
+      "bytes": 1231927,
+      "capturedAt": "2026-08-04T02:37:39Z",
       "capturedBy": "screenshots@local",
       "definition": "4b0d73c8135e295a1a7165b049715857d19c79bd0f2f178c0fd4f85e347232c4",
       "height": 2000,
@@ -11,13 +11,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "1d7a2f5031d24b01b8991c20f013157f562c7d183999627f82f837acc0fc32ff",
+      "sha256": "b1ec372aec49c27843e8460490dd39a3615d767887a19be413081e46ae368ea7",
       "shot": "ai-document-assistant",
       "width": 3840
     },
     "docs/images/ai-sidebar-chat.png": {
-      "bytes": 91345,
-      "capturedAt": "2026-08-03T13:03:22Z",
+      "bytes": 95193,
+      "capturedAt": "2026-08-04T02:23:34Z",
       "capturedBy": "screenshots@local",
       "definition": "f07204ecf5e90eedcacd3fd2ee7492adeffa675daa20070024df4344a12f4950",
       "height": 1106,
@@ -26,13 +26,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "342263a077a1971e6069c52d7f171c307d716ae3876c0dd5deea23e21ae1d3cc",
+      "sha256": "0746adca35a5ad7480bf010dc57655f897f1ece73f822e9e00ca29d5a0bdf553",
       "shot": "ai-sidebar-chat",
       "width": 558
     },
     "docs/images/ai-sidebar.png": {
-      "bytes": 1193928,
-      "capturedAt": "2026-08-03T13:03:19Z",
+      "bytes": 1202004,
+      "capturedAt": "2026-08-04T02:37:34Z",
       "capturedBy": "screenshots@local",
       "definition": "c9d3ee13b948f81e82589ce99d8fc58ee478551fecc70426bbaa8e6cc991374e",
       "height": 2000,
@@ -41,7 +41,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "4bfa27ae3498367e224efb3e21f68a65a2026c022bd96197878207949d2f2b09",
+      "sha256": "1bdec63056f9466f1a2064ac32109cb74e1e5df751838894412c1cbbbfe1ccad",
       "shot": "ai-sidebar",
       "width": 3840
     },
@@ -61,8 +61,8 @@
       "width": 2214
     },
     "docs/images/blog-card.png": {
-      "bytes": 179956,
-      "capturedAt": "2026-08-03T13:03:00Z",
+      "bytes": 189491,
+      "capturedAt": "2026-08-04T02:37:15Z",
       "capturedBy": "screenshots@local",
       "definition": "293a131979d053be2b890b007c9dbd93552395c9d80f353517cc891db80d897f",
       "height": 2000,
@@ -71,7 +71,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "f16d9ef2b68fa35afd5ab0dadc80b0ce499f8d04fc577157f6bd70acc8ba93ae",
+      "sha256": "240a0d30e18b1b72f2d8dd479340c5ad08595aff9bec13076db536cf8175e764",
       "shot": "blog-card",
       "width": 3840
     },
@@ -91,8 +91,8 @@
       "width": 480
     },
     "docs/images/blog-content-type.png": {
-      "bytes": 75490,
-      "capturedAt": "2026-08-02T18:56:24Z",
+      "bytes": 83274,
+      "capturedAt": "2026-08-04T02:23:00Z",
       "capturedBy": "screenshots@local",
       "definition": "bc805b6fb9f2a7a18439e06348d83a9a60f7c601a159bbfccb452f39d0265d58",
       "height": 1280,
@@ -101,13 +101,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "79804c2733a2000ab51164dacacc77fa7d7cd8919bf5fabe747e2025fc95cfca",
+      "sha256": "71f1c11cf04fe569a89725670e4075cad15fc6fae6e5b7180c58f47d5b9e9092",
       "shot": "blog-content-type",
       "width": 3680
     },
     "docs/images/blog-finished.png": {
-      "bytes": 188166,
-      "capturedAt": "2026-08-02T18:56:42Z",
+      "bytes": 230470,
+      "capturedAt": "2026-08-04T02:37:26Z",
       "capturedBy": "screenshots@local",
       "definition": "175a4ccf1574114159cdf57ecf2c1f8d42302184059f227764cf0f659609e37b",
       "height": 2400,
@@ -116,13 +116,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "a6838896c41f54ff349ff5ae43ec7476109788d59c8fbe93539cf3780770333e",
+      "sha256": "da646d554791607000dfa2e615bacdcd7ff2dedefd56a2b70d5941a6e9cfe50a",
       "shot": "blog-finished",
       "width": 3840
     },
     "docs/images/blog-grid.png": {
-      "bytes": 195882,
-      "capturedAt": "2026-08-02T18:56:29Z",
+      "bytes": 228266,
+      "capturedAt": "2026-08-04T02:37:12Z",
       "capturedBy": "screenshots@local",
       "definition": "0e8a0d9df9c3c6cc71eff7f71406b315871323a5e311e73d87d4d3b8a00c4e0f",
       "height": 2000,
@@ -131,13 +131,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "c2308f1b22af7a901c404c15dafbcc4be7ee8316881f00e3ea0f46fe914038e8",
+      "sha256": "5cd1c954e44d0c75e0d99fe58bd6ee7191ddc48388356957c1239b289e851e53",
       "shot": "blog-grid",
       "width": 3840
     },
     "docs/images/blog-insert-data.png": {
-      "bytes": 230006,
-      "capturedAt": "2026-08-03T13:23:33Z",
+      "bytes": 237537,
+      "capturedAt": "2026-08-04T02:37:21Z",
       "capturedBy": "screenshots@local",
       "definition": "d777957e03576a22ab03130a6b7fc9cb737c0c6ac1530675a8580a525e537504",
       "height": 2000,
@@ -146,13 +146,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "b3aecbfbf65f0e9d4c75c5c3b6345ae1cb8a79bc5e1dfd448e4d720cb924be84",
+      "sha256": "9fb5c55c15ce6eb6a541261de7e0cc86b6869e3b5b7bf0f5e7b95de9fcf0fca8",
       "shot": "blog-insert-data",
       "width": 3840
     },
     "docs/images/blog-preview.png": {
-      "bytes": 163568,
-      "capturedAt": "2026-08-02T18:56:39Z",
+      "bytes": 206159,
+      "capturedAt": "2026-08-04T02:37:23Z",
       "capturedBy": "screenshots@local",
       "definition": "cb80e6ca63fc6a95f7dbdbd461010a92342b1be859e5e6ac69eb775bc0ff790d",
       "height": 2000,
@@ -161,13 +161,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "1a456fdf06fe9aa0c2d13d907ca79d738d21126fb7a13207b90b08e64c976618",
+      "sha256": "ca815d4b66014453befbb552322050eedfc12931738b4f2914e22d5f80281898",
       "shot": "blog-preview",
       "width": 3840
     },
     "docs/images/blog-schema-fields.png": {
-      "bytes": 108626,
-      "capturedAt": "2026-08-02T18:56:27Z",
+      "bytes": 116482,
+      "capturedAt": "2026-08-04T02:23:03Z",
       "capturedBy": "screenshots@local",
       "definition": "33062765500050756c5e4980bd7980ba7dc8a0ce2a9234d22286e4ea9b732dc4",
       "height": 1280,
@@ -176,13 +176,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "fc89edcdf51f0c28db0b349b366a7c8563eb4592183b008c044ef46599aa7405",
+      "sha256": "a56a8a3dd22e9ef8c7b09164e42f313419e73dbacc6aef8a8d667316b9357b72",
       "shot": "blog-schema-fields",
       "width": 3680
     },
     "docs/images/collab-presence.png": {
-      "bytes": 1720873,
-      "capturedAt": "2026-08-03T13:03:46Z",
+      "bytes": 1731409,
+      "capturedAt": "2026-08-04T02:37:59Z",
       "capturedBy": "screenshots@local",
       "definition": "235b5a109ece94836c64d186714eea89ad82bf91252dea8856d51878bcb9d5c2",
       "height": 2400,
@@ -191,13 +191,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "82eb48b5301720c50654eaa7bbef8eaf975b17d40572fb22b16efbd0bca6e4b2",
+      "sha256": "8fa2b9ed93fce20afe6ccaec07d082bec3fac3445cfa2d4e137b28eb86688c85",
       "shot": "collab-presence",
       "width": 3840
     },
     "docs/images/connections-section.png": {
-      "bytes": 95821,
-      "capturedAt": "2026-08-02T18:57:01Z",
+      "bytes": 103696,
+      "capturedAt": "2026-08-04T02:23:45Z",
       "capturedBy": "screenshots@local",
       "definition": "8b063e44a8d66449158fd25c5bc5b559aa5360663cff3de1d1e6f7c69b16bbb0",
       "height": 1280,
@@ -206,13 +206,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "c021f41f2d2dd3dc74b16f4afa8c35977c46433c9bfa6b46e12ee33a35cdc781",
+      "sha256": "b276c9945e5ea0fc2bb99c3a9ded8afa735a132af96d82c1df13467523b6fd3d",
       "shot": "connections-section",
       "width": 3680
     },
     "docs/images/content-type-builder.png": {
-      "bytes": 155072,
-      "capturedAt": "2026-08-02T18:56:46Z",
+      "bytes": 163089,
+      "capturedAt": "2026-08-04T02:23:26Z",
       "capturedBy": "screenshots@local",
       "definition": "4d8368dcd6c07486aac0d3c4404ae6d6fdab150f34964da2e8b01e72568a1417",
       "height": 1840,
@@ -221,13 +221,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "4f4816fb24d91fa6460bf2aa62e0a137dc7b26562b447cadc264c7b1898285ae",
+      "sha256": "66767255e5ea7aa1f329db354b5af87692cba5bc68d81e6de8398b8a22552d7f",
       "shot": "content-type-builder-shot",
       "width": 3680
     },
     "docs/images/convert-to-component.png": {
-      "bytes": 327854,
-      "capturedAt": "2026-08-02T18:55:57Z",
+      "bytes": 366417,
+      "capturedAt": "2026-08-04T02:36:34Z",
       "capturedBy": "screenshots@local",
       "definition": "7decf0421e9b321071889d2975c88d621b4de5a1a43bc5db5eb7f26751870af8",
       "height": 2000,
@@ -236,13 +236,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "b8da9e1c470c67845bff772489559a5af643a8b6d75be52d64597cad95fb4103",
+      "sha256": "c0cab3c79ba2a3ed283f1823f8a57d9b91d8d74113216399e993694bdf158307",
       "shot": "convert-to-component",
       "width": 3840
     },
     "docs/images/counter-data-explorer.png": {
-      "bytes": 10178,
-      "capturedAt": "2026-08-02T18:56:19Z",
+      "bytes": 13399,
+      "capturedAt": "2026-08-04T02:22:53Z",
       "capturedBy": "screenshots@local",
       "definition": "6199b0611a4e8b9e1be48741d5fc7d96a7d052874abd5f73e6462172c13e95e1",
       "height": 840,
@@ -251,13 +251,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "6096517e2a81968bda44dcdb98ea79666631a28e4df6bf20dc5fad7e5c19d43b",
+      "sha256": "7c030704c9598ae061fc01c03d7bc0d612a54d3b021ebf718966ea924727348f",
       "shot": "counter-data-explorer",
       "width": 480
     },
     "docs/images/counter-elements.png": {
-      "bytes": 190525,
-      "capturedAt": "2026-08-02T22:25:43Z",
+      "bytes": 228122,
+      "capturedAt": "2026-08-04T02:36:46Z",
       "capturedBy": "screenshots@local",
       "definition": "804b520463cbfdab27f70cbced9c53392d33336761b354fe03853a92d506885b",
       "height": 2000,
@@ -266,13 +266,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "cd31003f686a136747c53ac0da9b2e50b987e907469f7c5969b7412c18e1066e",
+      "sha256": "6f4d031b54ad51bac9106405a54365c63a0e34c2d56e4644401d7c39772f5a16",
       "shot": "counter-elements",
       "width": 3840
     },
     "docs/images/counter-finished.png": {
-      "bytes": 116414,
-      "capturedAt": "2026-08-02T18:56:16Z",
+      "bytes": 164559,
+      "capturedAt": "2026-08-04T02:36:56Z",
       "capturedBy": "screenshots@local",
       "definition": "924c47b00983ec63af954d7e1d093842d572b747a8f355f12503fadf3affedfc",
       "height": 2400,
@@ -281,13 +281,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "c23464c25b57b6612048e9892d9c258264b2ff7a94d9e003b7ab1bcea40dca3c",
+      "sha256": "9c8ca96ebc4965e28d63883878a5f39e3e761b8869e7fd774112f79568e83d71",
       "shot": "counter-finished",
       "width": 3840
     },
     "docs/images/counter-onclick.png": {
-      "bytes": 41252,
-      "capturedAt": "2026-08-03T13:02:40Z",
+      "bytes": 46783,
+      "capturedAt": "2026-08-04T02:22:44Z",
       "capturedBy": "screenshots@local",
       "definition": "4a19af7a0c9389f30dfd3dba0c82640e42eb670176b13bac82c4f4e2f5dff401",
       "height": 1160,
@@ -296,13 +296,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "ed6701860160e6a78c8efc332cd8ee2646e6c98d32198b5903e68cadaed13ebc",
+      "sha256": "e069cf8a3a735dca4890e5104b200b2acc6e432158d6c859a5d75adc010544ae",
       "shot": "counter-onclick",
       "width": 560
     },
     "docs/images/counter-preview.png": {
-      "bytes": 106558,
-      "capturedAt": "2026-08-02T18:56:14Z",
+      "bytes": 154165,
+      "capturedAt": "2026-08-04T02:36:54Z",
       "capturedBy": "screenshots@local",
       "definition": "b386bb6bab7d2273d782c42a3e832dbb60d799b95786dede866d6209387e90d8",
       "height": 2000,
@@ -311,13 +311,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "004cba47b58dfa52fd228a4f6bff3b0b57b029409108a23ce48cf3da5852be6e",
+      "sha256": "9ea655e43fb20d19479b773ab59730a4802da36716be1602e9addb010f2f2405",
       "shot": "counter-preview",
       "width": 3840
     },
     "docs/images/counter-test-prop.png": {
-      "bytes": 110943,
-      "capturedAt": "2026-08-02T18:56:22Z",
+      "bytes": 158824,
+      "capturedAt": "2026-08-04T02:37:02Z",
       "capturedBy": "screenshots@local",
       "definition": "c10a87c0cfb553935df0129c9a44e41d884ae7d869e6d5084a7d75dda959f5f0",
       "height": 2000,
@@ -326,13 +326,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "9f3af301c602ba83dcd9d56988b181930801ceed37bca4f43461d5c98dca95b5",
+      "sha256": "63e028526979e35feb6e396b3529880b470d772cb5ea6ffdb4800d393988250a",
       "shot": "counter-test-prop",
       "width": 3840
     },
     "docs/images/counter-text-binding.png": {
-      "bytes": 37950,
-      "capturedAt": "2026-08-03T13:02:37Z",
+      "bytes": 43456,
+      "capturedAt": "2026-08-04T02:22:41Z",
       "capturedBy": "screenshots@local",
       "definition": "1829f23073bba22e1a045106937fe91688ff65f15755218ce7ed2d48f0b850a0",
       "height": 1000,
@@ -341,13 +341,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "ca6854bfc773361c05610c25bfef806e4e10d0d27b632adbd71cd174bebc4f39",
+      "sha256": "aedbc0633940e7e9dd49b6ec020ebcd926a1aa37fc8f435bd57e96e3ba3c3e4a",
       "shot": "counter-text-binding",
       "width": 560
     },
     "docs/images/css-variables.png": {
-      "bytes": 215203,
-      "capturedAt": "2026-08-02T18:55:07Z",
+      "bytes": 233239,
+      "capturedAt": "2026-08-04T02:21:37Z",
       "capturedBy": "screenshots@local",
       "definition": "60f2276a97ce1ae8b20c9c0dde0c6d400bc369670a043eb8bc595ea6829ed307",
       "height": 1840,
@@ -356,7 +356,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "e7bc639a375d51629dfc6d243cb5be2f023c71e436757c7bc5257986e64edb70",
+      "sha256": "a9747490c062f55bc5d94184d8af2cbe5d093c688ec9a10d3c2663c1ffd0545d",
       "shot": "css-variables-shot",
       "width": 3680
     },
@@ -376,8 +376,8 @@
       "width": 480
     },
     "docs/images/data-grid.png": {
-      "bytes": 781570,
-      "capturedAt": "2026-08-03T13:03:36Z",
+      "bytes": 792129,
+      "capturedAt": "2026-08-04T02:37:49Z",
       "capturedBy": "screenshots@local",
       "definition": "7733baf1d19aff069527b88fefd317f30bb3a8b2ec780f65ed6f5dfbb25d08ea",
       "height": 2000,
@@ -386,7 +386,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "d5b74e5ec9f758d53781ef998ad09c7edd0dbfc7128aeda767bd1fcf506e4e86",
+      "sha256": "4ce30ae2d171ddce67c031f630009fd1c1a9c275a098039f512dad8ae1d17e45",
       "shot": "data-grid",
       "width": 3840
     },
@@ -406,8 +406,8 @@
       "width": 480
     },
     "docs/images/data-table-editor.png": {
-      "bytes": 83745,
-      "capturedAt": "2026-08-02T18:56:58Z",
+      "bytes": 84153,
+      "capturedAt": "2026-08-04T02:37:43Z",
       "capturedBy": "screenshots@local",
       "definition": "8532be20ab13aff8f1d63e11c6e50937abf1dc17c5f194dc6ee0e2eb0d0ada9c",
       "height": 1324,
@@ -416,13 +416,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "044f59a8cecc55c660bb9ad2e44ae8a626b4f1b6cdd83ecbbc3aa72556d28159",
+      "sha256": "161f4ab665805b1ceeac4da6d4c194ca841dcf9689903de22869bf9a42125c02",
       "shot": "data-tables-shot",
       "width": 2818
     },
     "docs/images/data-tables-section.png": {
-      "bytes": 142596,
-      "capturedAt": "2026-08-02T18:56:58Z",
+      "bytes": 150385,
+      "capturedAt": "2026-08-04T02:23:42Z",
       "capturedBy": "screenshots@local",
       "definition": "8532be20ab13aff8f1d63e11c6e50937abf1dc17c5f194dc6ee0e2eb0d0ada9c",
       "height": 1640,
@@ -431,13 +431,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "4d7a1f79e3a4d5ab58eaadc2480f072454cb3542bdc6c2caf0f68c4202c5cdf2",
+      "sha256": "c2149e68787ccda58434a142962aefc733e00fa9ea99043f322ed6deda8c2ebd",
       "shot": "data-tables-shot",
       "width": 3680
     },
     "docs/images/design-inspector.png": {
-      "bytes": 110517,
-      "capturedAt": "2026-08-03T13:01:22Z",
+      "bytes": 114953,
+      "capturedAt": "2026-08-04T02:21:21Z",
       "capturedBy": "screenshots@local",
       "definition": "45a0dbf5b8f4b1585bfa4d0a6cb4a75f60134d0233d4618b96f9a2dbf83a802e",
       "height": 1880,
@@ -446,7 +446,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "065a25a38f5cc57c7e3c8b1d687829cbcacb473ecc84758251b14525c6547279",
+      "sha256": "279ce2287b4801dd6c78382c7d02687be650f3c8c31413b883f8b47035e430be",
       "shot": "design-inspector",
       "width": 560
     },
@@ -481,8 +481,8 @@
       "width": 480
     },
     "docs/images/events-panel.png": {
-      "bytes": 41690,
-      "capturedAt": "2026-08-03T13:02:13Z",
+      "bytes": 47203,
+      "capturedAt": "2026-08-04T02:22:13Z",
       "capturedBy": "screenshots@local",
       "definition": "f3995e9ccff6c620f2f6408452f558d3beea6a4b668ae866c8447dc2e9f3962a",
       "height": 1160,
@@ -491,28 +491,28 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "f6de8aa54dc0ebec359de782433e8266e471385f08638b8ef5aa9119fa2c2e29",
+      "sha256": "c61882846300d6e913be92696bbc1c3f72273d2a866f844789a64b739b8f38c8",
       "shot": "events-panel-shot",
       "width": 560
     },
     "docs/images/field-mode-button.png": {
-      "bytes": 6812,
-      "capturedAt": "2026-08-02T18:55:40Z",
+      "bytes": 6816,
+      "capturedAt": "2026-08-04T02:22:10Z",
       "capturedBy": "screenshots@local",
       "definition": "c7b10b266a3e6b862f4de16c93f0fc27982520e42e148ed537d0524fa80975da",
-      "height": 134,
+      "height": 132,
       "runtime": {
         "chromium": "150",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "cb5fcfdd9dd84ac789876a61f11de42f0020a29bff5b4fad6a94f1d6a5f63020",
+      "sha256": "371695d60002d7f5bbb728aee9fdcbfab5b312bc67bf3899970a88adb82dfe8b",
       "shot": "properties-panel-shot",
       "width": 550
     },
     "docs/images/formula-workspace.png": {
-      "bytes": 222872,
-      "capturedAt": "2026-08-02T18:55:48Z",
+      "bytes": 252582,
+      "capturedAt": "2026-08-04T02:36:24Z",
       "capturedBy": "screenshots@local",
       "definition": "1da0fb646a8813c9f1a61aaeb66866582e4ce1cd48afc9674cfd159619950f48",
       "height": 2000,
@@ -521,13 +521,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "873fb1cfe36769881137bf9402a2ca0ab99d1801f2f0e5e6f4ac9a57ac458658",
+      "sha256": "c1ccaa997644f5f6c598ea916eb7e9617d33d9b480810f065ef33a196989f1a9",
       "shot": "formula-workspace",
       "width": 3840
     },
     "docs/images/git-commit.png": {
-      "bytes": 19174,
-      "capturedAt": "2026-08-02T18:54:44Z",
+      "bytes": 20013,
+      "capturedAt": "2026-08-04T02:21:07Z",
       "capturedBy": "screenshots@local",
       "definition": "d3185cbdc45ee73790b9b7c0cdc0800b2d864300143369748cd393cf19efb324",
       "height": 342,
@@ -536,7 +536,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "b168fdbb4d66652f93c0f2c516bf67035ecb5ba658bd8853b0a37c72ac17f9ed",
+      "sha256": "94b3eb0c821e720b0bdae4f9f1b9de85e0d392235cbd95f8b8590025ad75bfed",
       "shot": "git-panel",
       "width": 542
     },
@@ -556,8 +556,8 @@
       "width": 480
     },
     "docs/images/grid-mode.png": {
-      "bytes": 237415,
-      "capturedAt": "2026-08-02T18:55:31Z",
+      "bytes": 271725,
+      "capturedAt": "2026-08-04T02:36:13Z",
       "capturedBy": "screenshots@local",
       "definition": "fe8772d3e21af28d303c67f656233f511914d0b52ba84c5b4764ea72f6f006cb",
       "height": 2000,
@@ -566,13 +566,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "fb30476b1146427b99d4fa368220ac581223c6186144026a8ee10422d3e050a3",
+      "sha256": "0440a3b4832ee30d85f3fdd21aef5535720a10654ca81129075d6ab7efb484d8",
       "shot": "grid-mode",
       "width": 3840
     },
     "docs/images/hero.png": {
-      "bytes": 1901194,
-      "capturedAt": "2026-08-03T13:00:45Z",
+      "bytes": 1915833,
+      "capturedAt": "2026-08-04T02:40:19Z",
       "capturedBy": "screenshots@local",
       "definition": "75311be143cef0c4e06a09034e5ab502a33089c8e750825e5225fb4caafcf012",
       "height": 2400,
@@ -581,13 +581,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "bffe51de59fb41fe6425624b6e31197b3d8347026575d43ceaf89d4105646512",
+      "sha256": "f7c8afc1569f32dc7e44c719ebfd0d9f2a27d98f44d6e65a1ff27056e2f5e832",
       "shot": "hero",
       "width": 3840
     },
     "docs/images/imports-panel.png": {
-      "bytes": 27148,
-      "capturedAt": "2026-08-02T22:24:48Z",
+      "bytes": 31899,
+      "capturedAt": "2026-08-04T02:21:53Z",
       "capturedBy": "screenshots@local",
       "definition": "e411f30cc6f0534d247487dddb9dfc281ce36f81d78bd874293f9c8105f62289",
       "height": 1880,
@@ -596,13 +596,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "a9c1b58a1a98988505a046b8383a65dc125782699d7ce5dc9bfb43adb547a6cf",
+      "sha256": "487562a8ca7b2f8f4289ae36e67ee524645da890fa611787a69f88698d7a60bf",
       "shot": "imports-panel-shot",
       "width": 480
     },
     "docs/images/inline-editing.png": {
-      "bytes": 305007,
-      "capturedAt": "2026-08-03T13:02:07Z",
+      "bytes": 307339,
+      "capturedAt": "2026-08-04T02:28:40Z",
       "capturedBy": "screenshots@local",
       "definition": "e133f2616f1503742c0de4b112962d344704ea966a495f51684a8fc21429ab74",
       "height": 706,
@@ -611,7 +611,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "47670f158c22204111e390d0aefc5bcc37927a6090aa0e5e27180a5d67956ab6",
+      "sha256": "10094fb7c86cb96484f13dcd37d06bbf976a1342e0f349702608e47eb99eab26",
       "shot": "inline-editing-shot",
       "width": 2094
     },
@@ -631,8 +631,8 @@
       "width": 480
     },
     "docs/images/media-picker.png": {
-      "bytes": 250889,
-      "capturedAt": "2026-08-03T13:02:32Z",
+      "bytes": 250908,
+      "capturedAt": "2026-08-04T02:36:43Z",
       "capturedBy": "screenshots@local",
       "definition": "9ecb2262d50e2772e32381150e251dbed90c577ff5e60d8a7b7d1d72d870c8e5",
       "height": 1240,
@@ -641,13 +641,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "922414b2f7697398337901e9b8a9d1916e5ba7d2bb50e814ac65928aedbd9fb2",
+      "sha256": "035247004d1b6d4116182851010ca3fde30210f4112bcc2604505aa346251919",
       "shot": "media-picker-shot",
       "width": 836
     },
     "docs/images/media-upload.png": {
-      "bytes": 1252103,
-      "capturedAt": "2026-08-02T18:57:16Z",
+      "bytes": 1256905,
+      "capturedAt": "2026-08-04T02:38:03Z",
       "capturedBy": "screenshots@local",
       "definition": "fea2b26fb83946ca63b17145393a8a994b99cd68fe5a6e3aa374c459551645aa",
       "height": 1738,
@@ -656,13 +656,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "07942a99e00fc0395f0ac00d1dd59739f3b53061136428270205a2bdce4b9db1",
+      "sha256": "94294251f8af4e1d716953144b1a46801cae3b8a07ab778a2989d6b19be6950a",
       "shot": "media-upload",
       "width": 3676
     },
     "docs/images/mode-design.png": {
-      "bytes": 1022392,
-      "capturedAt": "2026-08-02T18:54:30Z",
+      "bytes": 1056240,
+      "capturedAt": "2026-08-04T02:40:36Z",
       "capturedBy": "screenshots@local",
       "definition": "51eaafbafa8f6ffbd4f7c91f468f277429a27c85a0dc250b02b3b1b43e841780",
       "height": 2000,
@@ -671,13 +671,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "c22501c847a0004d10bd4482b90fffef054d48692df245cf7789717aea3abd6e",
+      "sha256": "5c15d59568591d6bfcd310398d018ae9eef493752c150d0818f29b825de40284",
       "shot": "mode-design",
       "width": 3840
     },
     "docs/images/mode-edit.png": {
-      "bytes": 2122653,
-      "capturedAt": "2026-08-03T13:00:55Z",
+      "bytes": 2131311,
+      "capturedAt": "2026-08-04T02:40:30Z",
       "capturedBy": "screenshots@local",
       "definition": "02636f74dd19a2cfa0e54c57cd92aa330f457be58516db4b1239d8d55496f580",
       "height": 2000,
@@ -686,13 +686,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "f4472f730b5f5f9249d49fcbf413e1cfa98501eabbde65d24de6afbdc6f2580a",
+      "sha256": "5d3ade56b37839ca13ad639d7909665d6a4ec29ec2c090f531752e2b5080f614",
       "shot": "mode-edit",
       "width": 3840
     },
     "docs/images/mode-manage.png": {
-      "bytes": 1334237,
-      "capturedAt": "2026-08-02T18:54:23Z",
+      "bytes": 1351181,
+      "capturedAt": "2026-08-04T02:40:25Z",
       "capturedBy": "screenshots@local",
       "definition": "0b929f9a9bf4bb5d375f2cd8325f589702b1bb42b4b449fc44c2848f2ac40ba7",
       "height": 2000,
@@ -701,13 +701,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "c3090b1c465ab6451e2b732f508cc0ab75354c34ea35dd48831429b39691a83e",
+      "sha256": "25e750d892791eae94c0aa24e294cacf09424ffd3c652b6d5343cc4fbb607e0d",
       "shot": "mode-manage",
       "width": 3840
     },
     "docs/images/mode-script.png": {
-      "bytes": 189489,
-      "capturedAt": "2026-08-02T18:54:37Z",
+      "bytes": 227131,
+      "capturedAt": "2026-08-04T02:35:19Z",
       "capturedBy": "screenshots@local",
       "definition": "15c08694d695fa2ca1e968563f6e352f5c7ac8acb6ce006aaa9f34fff95e7279",
       "height": 2000,
@@ -716,13 +716,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "68ecb58cbfb020caa1400c81290ddbc0a7a70ba5c33bdb426456e6199172a30b",
+      "sha256": "cc75614a059e7e621dc342c80713ef3fd1cb9652f6b30495fc6bfa1061fe0df0",
       "shot": "mode-script",
       "width": 3840
     },
     "docs/images/new-project-modal.png": {
-      "bytes": 1160726,
-      "capturedAt": "2026-08-02T18:54:41Z",
+      "bytes": 1163257,
+      "capturedAt": "2026-08-04T02:21:04Z",
       "capturedBy": "screenshots@local",
       "definition": "7f2ead4c8a2991fd60f7081224e089f04d7cf3d665e7c762b7bd78e5a0d59dae",
       "height": 1696,
@@ -731,7 +731,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "0ce84e07ca96b129e42cdf488817d6863650b3caaaad21cc7245e25c399d0f52",
+      "sha256": "37d4a9aea96900e1a9334f34e85c9c0815fe3bfea41ba551014a7776ff6695c9",
       "shot": "new-project",
       "width": 1536
     },
@@ -751,8 +751,8 @@
       "width": 2432
     },
     "docs/images/properties-panel.png": {
-      "bytes": 46760,
-      "capturedAt": "2026-08-03T13:02:10Z",
+      "bytes": 52323,
+      "capturedAt": "2026-08-04T02:22:10Z",
       "capturedBy": "screenshots@local",
       "definition": "c7b10b266a3e6b862f4de16c93f0fc27982520e42e148ed537d0524fa80975da",
       "height": 1480,
@@ -761,7 +761,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "7b646d3c80a845d2216c8e57bc884329ce583518ad53490d4668a84be63c24c4",
+      "sha256": "40505c0a6be18843d185a409a44c32154070c383733ec67ed29976adde123f9e",
       "shot": "properties-panel-shot",
       "width": 560
     },
@@ -781,8 +781,8 @@
       "width": 1536
     },
     "docs/images/quick-access.png": {
-      "bytes": 1460335,
-      "capturedAt": "2026-08-03T13:01:43Z",
+      "bytes": 1471200,
+      "capturedAt": "2026-08-04T02:35:53Z",
       "capturedBy": "screenshots@local",
       "definition": "73445d334cc350e7007cebab5e2da2e69cc6dde83cb8c8af0b78c2ad88776dd1",
       "height": 2000,
@@ -791,13 +791,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "644a34223ced65844d0187be0ae9c9e9eb8294fa9c37e9165cfff135885a2e47",
+      "sha256": "7831f63adedd03ab8c18fc0ae0c6011fa854c3fcbec7602ccebd674174f36f88",
       "shot": "quick-access",
       "width": 3840
     },
     "docs/images/selector-menu.png": {
-      "bytes": 105954,
-      "capturedAt": "2026-08-03T13:02:22Z",
+      "bytes": 111090,
+      "capturedAt": "2026-08-04T02:22:23Z",
       "capturedBy": "screenshots@local",
       "definition": "497edcd9122d203905a00b6811ff7990f78a6481fc93c2fd30d9a868c3efd96d",
       "height": 1480,
@@ -806,13 +806,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "6e360c112c4459ad7fd57c942e31b46ec38ec55dac0ed37beaec72cf8ad97f69",
+      "sha256": "0fbfc28514ab2fc6cc8fc014a33881168f4c033d3f0aa44f647bda6a2d78c106",
       "shot": "selector-menu-shot",
       "width": 560
     },
     "docs/images/settings-modal.png": {
-      "bytes": 280873,
-      "capturedAt": "2026-08-02T18:55:04Z",
+      "bytes": 254413,
+      "capturedAt": "2026-08-04T02:35:46Z",
       "capturedBy": "screenshots@local",
       "definition": "97ddd751a0f4d70d1bcd089bbbad0284016d2babcef81298107e0bedd04fbc02",
       "height": 2000,
@@ -821,13 +821,13 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "bb040ceb60519788bbf01dcc17481f6ed5d5ee219a4462e2a3e1c6c506615701",
+      "sha256": "339d0919c683a3c153639e3ed8332b20eb09a57d4146c0c304ab73047e2dcf49",
       "shot": "settings-modal",
       "width": 3840
     },
     "docs/images/state-panel.png": {
-      "bytes": 337025,
-      "capturedAt": "2026-08-03T13:01:19Z",
+      "bytes": 352083,
+      "capturedAt": "2026-08-04T02:35:32Z",
       "capturedBy": "screenshots@local",
       "definition": "dd0e9273ca3bf62945eccfeef4749444038643f7b8f3b6a2a193d38d6d6c690e",
       "height": 2000,
@@ -836,28 +836,28 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "bc6a796068c24de1221fd347dd0c593acf4205a1f642b71f463817d07447a216",
+      "sha256": "096f3abf35673d582921b039aa3e5b7a1b5c647060895f82f212fdaa0e779a07",
       "shot": "state-panel",
       "width": 3840
     },
     "docs/images/statement-editor.png": {
-      "bytes": 114133,
-      "capturedAt": "2026-08-02T18:55:50Z",
+      "bytes": 118169,
+      "capturedAt": "2026-08-04T02:28:53Z",
       "capturedBy": "screenshots@local",
       "definition": "c10d0174b5f12b6d93fb56e74898075e2b6e817e6f36bdf17a0802b760540223",
-      "height": 2552,
+      "height": 2550,
       "runtime": {
         "chromium": "150",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "a32d0f94c1bb06f16fc2569f554b04b04f4c7d1addb573f037066212c6b6537e",
+      "sha256": "ddd2c613c5cb0fc4c1a4c2946df87a134d5feb111f54a700a9e57242d41619f8",
       "shot": "statement-editor-shot",
       "width": 498
     },
     "docs/images/stylebook.png": {
-      "bytes": 452770,
-      "capturedAt": "2026-08-03T13:01:27Z",
+      "bytes": 469556,
+      "capturedAt": "2026-08-04T02:35:40Z",
       "capturedBy": "screenshots@local",
       "definition": "5b6e375cdeacd320989a8c0ca98b57cd01a787783bd8a7e814c62d1784bc85f2",
       "height": 2000,
@@ -866,7 +866,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "bb075a358176eafc0fa13cc10a26b22087718bf4421653a38171266c3dfae6d8",
+      "sha256": "a6d2ea22a9ae399886ad23e5d30061f5cd4afbb99a420581a9361574326ccbae",
       "shot": "stylebook",
       "width": 3840
     },
@@ -886,8 +886,8 @@
       "width": 1420
     },
     "docs/images/welcome-screen.png": {
-      "bytes": 163125,
-      "capturedAt": "2026-08-02T18:55:00Z",
+      "bytes": 172834,
+      "capturedAt": "2026-08-04T02:35:43Z",
       "capturedBy": "screenshots@local",
       "definition": "7a5d2334a89ad907e173cfa84094b6c505ef97603bab247966093a99a027f988",
       "height": 2000,
@@ -896,7 +896,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "f64baf7bfe45edd0322dde56c9ff212cef62808a3ca3f6158508285169b6f1a2",
+      "sha256": "169175babbddb9455986f12d93aee292bfb1abd2e6ae3f16d4a1d5b15d8456e0",
       "shot": "welcome-screen",
       "width": 3840
     }

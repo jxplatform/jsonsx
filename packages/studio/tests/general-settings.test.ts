@@ -1,11 +1,14 @@
 /**
  * Tests for src/settings/general-settings.ts — site identity (name, description, production URL),
- * favicon, platform adapter, breakpoints, and the global-styles shortcut.
+ * favicon, platform adapter, and the global-styles shortcut.
  *
  * Mocks ../src/files/files so "Edit Global Styles" doesn't pull in the full tab-opening machinery.
  * Persistence flows through updateSiteConfig → platform.writeFile("project.json"), and every write
  * in this section surfaces its rejection instead of dropping it — that is what the "save failures"
  * block pins.
+ *
+ * Breakpoints are NOT tested here any more: they were one of four `$media` definition sites and now
+ * live in Settings › Contexts (tests/contexts-section.test.ts), which is the only one.
  */
 import { flush, installMockPlatform, pointer, resetStudioState } from "./harness";
 import { describe, expect, mock, test } from "bun:test";
@@ -61,10 +64,6 @@ function buttonByText(root: HTMLElement, text: string): HTMLElement {
 function setAndFire(el: Element, value: string, type = "change"): void {
   (el as HTMLInputElement).value = value;
   el.dispatchEvent(new Event(type, { bubbles: true }));
-}
-
-function mediaRows(container: HTMLElement): HTMLElement[] {
-  return [...container.querySelectorAll(".settings-media-row")] as HTMLElement[];
 }
 
 // ─── Site identity ───────────────────────────────────────────────────────────
@@ -208,8 +207,10 @@ describe("save failures", () => {
   });
 
   test("a failure on a field with no control of its own lands at the top of the section", async () => {
-    const { container } = setup({ $media: { "--": "1280px" } }, failing);
-    pointer(buttonByText(container, "+ Add Breakpoint"), "click");
+    const { container } = setup({ build: { adapter: "static" } }, failing);
+    const picker = container.querySelector("sp-picker")!;
+    (picker as unknown as { value: string }).value = "bun";
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
     await flush(4);
     const shown = container.querySelector(".settings-field-error")!;
     expect(shown.previousElementSibling?.tagName.toLowerCase()).toBe("h3");
@@ -353,80 +354,6 @@ describe("platform adapter", () => {
     expect(config().build).toEqual({ adapter: "bun", outDir: "dist" });
     const written = JSON.parse(state.files.get("project.json")!);
     expect(written.build.adapter).toBe("bun");
-  });
-});
-
-// ─── Breakpoints ─────────────────────────────────────────────────────────────
-
-describe("breakpoints", () => {
-  const media = { "--": "1280px", "--sm": "(max-width: 600px)" };
-
-  test("base row is fixed; named rows are editable with a remove button", () => {
-    const { container } = setup({ $media: { ...media } });
-    const rows = mediaRows(container);
-    expect(rows.length).toBe(2);
-    expect(rows[0]!.querySelector(".settings-media-name-fixed")?.textContent).toBe("Base");
-    expect(rows[0]!.querySelector("sp-action-button")).toBeNull();
-    expect(
-      (rows[1]!.querySelector(".settings-media-name") as HTMLInputElement).getAttribute("value"),
-    ).toBeNull(); // Bound via property
-    expect(rows[1]!.querySelector('[title="Remove breakpoint"]')).not.toBeNull();
-  });
-
-  test("changing a breakpoint value persists it", async () => {
-    const { container, state } = setup({ $media: { ...media } });
-    setAndFire(
-      mediaRows(container)[1]!.querySelector(".settings-media-value")!,
-      "(max-width: 700px)",
-    );
-    await flush();
-    expect(config().$media["--sm"]).toBe("(max-width: 700px)");
-    expect(JSON.parse(state.files.get("project.json")!).$media["--sm"]).toBe("(max-width: 700px)");
-  });
-
-  test("renaming a breakpoint prefixes -- and preserves order", async () => {
-    const { container } = setup({ $media: { ...media, "--lg": "(min-width: 1000px)" } });
-    setAndFire(mediaRows(container)[1]!.querySelector(".settings-media-name")!, "mobile");
-    await flush();
-    expect(Object.keys(config().$media)).toEqual(["--", "--mobile", "--lg"]);
-    expect(config().$media["--mobile"]).toBe("(max-width: 600px)");
-  });
-
-  test("renaming with an explicit -- prefix keeps it; same name is a no-op", async () => {
-    const { container, state } = setup({ $media: { ...media } });
-    setAndFire(mediaRows(container)[1]!.querySelector(".settings-media-name")!, "--tablet");
-    await flush();
-    expect(config().$media["--tablet"]).toBe("(max-width: 600px)");
-
-    const writes = state.calls.filter(([name]) => name === "writeFile").length;
-    const fresh = document.createElement("div");
-    renderGeneralSettings(fresh);
-    setAndFire(mediaRows(fresh)[1]!.querySelector(".settings-media-name")!, "tablet");
-    await flush();
-    expect(state.calls.filter(([name]) => name === "writeFile").length).toBe(writes);
-  });
-
-  test("remove deletes the breakpoint and re-renders", async () => {
-    const { container, state } = setup({ $media: { ...media } });
-    pointer(mediaRows(container)[1]!.querySelector('[title="Remove breakpoint"]')!, "click");
-    await flush();
-    expect(config().$media).toEqual({ "--": "1280px" });
-    expect(JSON.parse(state.files.get("project.json")!).$media["--sm"]).toBeUndefined();
-  });
-
-  test("add appends a --new breakpoint with a default query", async () => {
-    const { container } = setup({ $media: { ...media } });
-    pointer(buttonByText(container, "+ Add Breakpoint"), "click");
-    await flush();
-    expect(config().$media["--new"]).toBe("(max-width: 480px)");
-  });
-
-  test("missing $media renders an empty list and a usable add button", async () => {
-    const { container } = setup({});
-    expect(mediaRows(container).length).toBe(0);
-    pointer(buttonByText(container, "+ Add Breakpoint"), "click");
-    await flush();
-    expect(config().$media).toEqual({ "--new": "(max-width: 480px)" });
   });
 });
 

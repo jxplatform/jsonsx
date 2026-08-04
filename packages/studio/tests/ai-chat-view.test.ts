@@ -10,8 +10,11 @@ import {
   formatToolLabel,
   renderChatHeader,
   renderMessageList,
+  toolOutcome,
+  toolOutcomeText,
   tryParseToolResult,
 } from "../src/panels/ai-chat/chat-view";
+import { beginTurn, endTurn, recordWrite, resetAiWrites } from "../src/services/ai-writes";
 import { ATTACHED_CONTEXT_DELIMITER } from "../src/panels/ai-chat/attached-context";
 import type { Message } from "@jxsuite/ai/chat-state";
 
@@ -21,14 +24,33 @@ function msg(role: Message["role"], content: string, extra: Partial<Message> = {
   return { content, id: `t_${idCounter}`, role, timestamp: idCounter, ...extra };
 }
 
-function list(messages: Message[], opts: { status?: string; error?: string | null } = {}) {
+function list(
+  messages: Message[],
+  opts: {
+    status?: string;
+    error?: string | null;
+    onRetry?: () => void;
+    onRestore?: (id: string) => void;
+  } = {},
+) {
   return renderMessageList({
     error: opts.error ?? null,
     listRef: () => {},
     messages,
     onScroll: () => {},
     status: opts.status ?? "idle",
+    ...(opts.onRetry ? { onRetry: opts.onRetry } : {}),
+    ...(opts.onRestore ? { onRestore: opts.onRestore } : {}),
   });
+}
+
+/** File a ledger entry against a message id, the way the agent loop does. */
+function ledger(id: string, writes: { disk: boolean; ok: boolean; path: string }[]) {
+  beginTurn(`for:${id}`);
+  for (const w of writes) {
+    recordWrite({ ...w, tool: "write_file" });
+  }
+  endTurn(id);
 }
 
 describe("helpers", () => {
@@ -202,5 +224,134 @@ describe("renderMessageList", () => {
     expect(referenced).toBe(scroller);
     scroller.dispatchEvent(new Event("scroll"));
     expect(onScroll).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── §7.4: the three things the renderer would not say ───────────────────────
+
+describe("tool chips render outcomes", () => {
+  test("toolOutcome/toolOutcomeText read the result the loop has always populated", () => {
+    expect(toolOutcome({ arguments: "{}", id: "1", name: "x" })).toBe("pending");
+    expect(toolOutcomeText({ arguments: "{}", id: "1", name: "x" })).toBe("");
+    const ok = { arguments: "{}", id: "1", name: "x", result: { success: true, summary: "Done." } };
+    expect(toolOutcome(ok)).toBe("ok");
+    expect(toolOutcomeText(ok)).toBe("Done.");
+    const bad = { arguments: "{}", id: "1", name: "x", result: { error: "Nope.", success: false } };
+    expect(toolOutcome(bad)).toBe("failed");
+    expect(toolOutcomeText(bad)).toBe("Nope.");
+  });
+
+  test("a chip says what became of the call, not only what was called", async () => {
+    resetAiWrites();
+    const el = await renderInto(
+      list([
+        msg("assistant", "", {
+          toolCalls: [
+            {
+              arguments: "{}",
+              id: "a",
+              name: "update_style",
+              result: { success: true, summary: "Set padding." },
+            },
+            {
+              arguments: "{}",
+              id: "b",
+              name: "remove_node",
+              result: { error: "No such path.", success: false },
+            },
+            { arguments: "{}", id: "c", name: "read_file" },
+          ],
+        }),
+      ]),
+    );
+    const chips = [...el.querySelectorAll(".ai-tool-chip")];
+    expect(chips.map((c) => (c as HTMLElement).dataset.outcome)).toEqual([
+      "ok",
+      "failed",
+      "pending",
+    ]);
+    expect(chips[0]!.textContent).toContain("Set padding.");
+    expect(chips[1]!.textContent).toContain("No such path.");
+    // A call still in flight claims nothing.
+    expect(chips[2]!.querySelector(".ai-tool-chip-outcome")).toBeNull();
+  });
+});
+
+describe("changed-files summary", () => {
+  test('a turn that changed nothing renders no summary — never "Changed 0 files"', async () => {
+    resetAiWrites();
+    const m = msg("assistant", "I looked at the page.");
+    const el = await renderInto(list([m]));
+    expect(el.querySelector(".ai-msg-changes")).toBeNull();
+  });
+
+  test("the summary counts distinct files and names the disk writes undo cannot reach", async () => {
+    resetAiWrites();
+    const m = msg("assistant", "Done.");
+    ledger(m.id, [
+      { disk: false, ok: true, path: "pages/index.json" },
+      { disk: true, ok: true, path: "layouts/base.json" },
+    ]);
+    const el = await renderInto(list([m]));
+    const summary = el.querySelector(".ai-msg-changes > summary")!;
+    expect(summary.textContent).toContain("Changed 2 files");
+    expect(summary.textContent).toContain("undo cannot reach it");
+    const diskRow = el.querySelector('.ai-msg-changes-list li[data-disk="true"]')!;
+    expect(diskRow.textContent).toContain("layouts/base.json");
+    expect(diskRow.querySelector("em")?.textContent).toContain("undo cannot reach it");
+  });
+
+  test("Restore to here is offered only when every change was transactional", async () => {
+    resetAiWrites();
+    const transactional = msg("assistant", "A.");
+    ledger(transactional.id, [{ disk: false, ok: true, path: "pages/index.json" }]);
+    const withDisk = msg("assistant", "B.");
+    ledger(withDisk.id, [{ disk: true, ok: true, path: "pages/other.json" }]);
+
+    const restored: string[] = [];
+    const el = await renderInto(
+      list([transactional, withDisk], { onRestore: (id) => restored.push(id) }),
+    );
+    const buttons = [...el.querySelectorAll(".ai-msg-changes sp-action-button")];
+    expect(buttons).toHaveLength(1);
+    pointer(buttons[0]!, "click");
+    expect(restored).toEqual([transactional.id]);
+  });
+
+  test("no onRestore handler means no button, and the summary still renders", async () => {
+    resetAiWrites();
+    const m = msg("assistant", "A.");
+    ledger(m.id, [{ disk: false, ok: true, path: "pages/index.json" }]);
+    const el = await renderInto(list([m]));
+    expect(el.querySelector(".ai-msg-changes")).not.toBeNull();
+    expect(el.querySelector(".ai-msg-changes sp-action-button")).toBeNull();
+  });
+
+  test("a turn where every write failed says so instead of claiming files", async () => {
+    resetAiWrites();
+    const m = msg("assistant", "A.");
+    ledger(m.id, [{ disk: true, ok: false, path: "pages/index.json" }]);
+    const el = await renderInto(list([m]));
+    expect(el.querySelector(".ai-msg-changes > summary")!.textContent).toContain("1 change failed");
+  });
+});
+
+describe("the error row offers Retry", () => {
+  test("chatState.retryLast finally gets its button", async () => {
+    let retried = 0;
+    const el = await renderInto(
+      list([], { error: "429 rate limit", onRetry: () => (retried += 1) }),
+    );
+    const button = el.querySelector(".ai-msg-retry")!;
+    expect(button).not.toBeNull();
+    pointer(button, "click");
+    expect(retried).toBe(1);
+    // The existing advice is still there — Retry supplements it, it does not replace it.
+    expect(el.querySelector(".ai-msg-error-advice")?.textContent).toContain("rate limit");
+  });
+
+  test("no handler means no button", async () => {
+    const el = await renderInto(list([], { error: "boom" }));
+    expect(el.querySelector(".ai-msg-retry")).toBeNull();
   });
 });

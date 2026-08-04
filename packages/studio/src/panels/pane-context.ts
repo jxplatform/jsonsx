@@ -18,13 +18,20 @@
  *   feature queries and the layout show/hide switch into one popover, with the document data a
  *   render resolves against — route params, component test props — labelled "resolving with" beside
  *   it. Per §2 principle 5 this control **only selects**; its footer is "Manage contexts…", which
- *   routes to the definition site. P4 builds Project Settings › Contexts; until it does, the footer
- *   opens Settings › General, which is where breakpoints are defined today.
+ *   routes to the definition site — Project Settings › Contexts (`settings/contexts-section.ts`),
+ *   the one place a breakpoint, a colour scheme or a feature query is defined.
  *
  * **The bar is not a grid row.** It renders inside the pane's own cell (`#pane-chrome`, stacked
  * over `#canvas-wrap`), because a per-pane surface cannot be a row of the application grid — the
  * second pane would have no way to have one. The stage is offset by {@link PANE_CONTEXT_VAR} rather
  * than by a track, and the zoom pod floats bottom-right over the canvas exactly as §3.2 ⑩ asks.
+ *
+ * **The read-only banner rides with the bar.** `collab/presence-chips.ts` wrote the sentence a
+ * read-only guest needs before their first keystroke (§7.4); the surface that owes it a home is
+ * this one, because it is the per-pane, per-document chrome that sits directly above the editing
+ * surface. It is stacked under the bar inside `.pc-band` and the offset is MEASURED from that band
+ * ({@link applyPaneContextOffset}), so a two-line banner pushes the stage down instead of covering
+ * the document it is warning you about.
  *
  * Module shape follows `tab-strip.ts`: mount(host, ctx) → effectScope/effect → render().
  */
@@ -45,6 +52,8 @@ import {
   setUserZoom,
 } from "../canvas/canvas-utils";
 import { editorKindOf, editorKindsOf, modeForEditorKind } from "../tabs/tab";
+import { collabState } from "../collab/collab-state";
+import { readOnlyBannerTemplate } from "../collab/presence-chips";
 import { activeRegistry } from "../commands/active-registry";
 import { getEffectiveLayoutPath, getEffectiveMedia } from "../site-context";
 import { isSchemeQuery } from "../utils/canvas-media";
@@ -157,6 +166,11 @@ export function mount(host: HTMLElement, ctx: PaneContextCtx) {
         void tab.session.ui.previewProps;
         void tab.session.ui.showLayout;
         void tab.session.ui.zoom;
+        // The read-only banner (§7.4) is part of this chrome, so its two facts are tracked here
+        // Too: a peer downgrading you mid-session must make the sentence appear, not wait for the
+        // Next zoom.
+        void collabState(tab).active;
+        void collabState(tab).readOnly;
       }
       render();
     });
@@ -168,20 +182,33 @@ export function unmount() {
   _scope = null;
   _host = null;
   _ctx = null;
-  applyPaneContextOffset(false);
+  applyPaneContextOffset(0);
 }
 
 /**
- * Keep the stage clear of the bar.
+ * Keep the stage clear of the pane's top band.
  *
- * One projection, one variable — the canvas is offset only while a bar is actually rendered, so the
- * welcome screen (no tab, no bar) does not open under a 28px gap nothing explains.
+ * One projection, one variable — the canvas is offset only by what is actually rendered, so the
+ * welcome screen (no tab, no bar) does not open under a 28px gap nothing explains, and a read-only
+ * banner does not sit on top of the document it is warning you about.
+ *
+ * @param {number} height Band height in px. `0` when the pane has no chrome.
  */
-export function applyPaneContextOffset(present: boolean): void {
-  document.documentElement.style.setProperty(
-    PANE_CONTEXT_VAR,
-    present ? `${PANE_CONTEXT_HEIGHT}px` : "0px",
-  );
+export function applyPaneContextOffset(height: number): void {
+  document.documentElement.style.setProperty(PANE_CONTEXT_VAR, `${height}px`);
+}
+
+/**
+ * How tall the top band came out — the bar plus whatever banners rode with it.
+ *
+ * MEASURED rather than summed, because the banner's height is its wrapped text and only layout
+ * knows how many lines that is. `offsetHeight` is 0 in a DOM with no layout engine (every unit
+ * test), so the bar's declared height is the floor: the offset is then exactly what it was before
+ * banners existed, which is the honest answer when nothing has been laid out.
+ */
+function topBandHeight(): number {
+  const band = _host?.querySelector<HTMLElement>(".pc-band");
+  return Math.max(band?.offsetHeight ?? 0, PANE_CONTEXT_HEIGHT);
 }
 
 export function render() {
@@ -191,7 +218,7 @@ export function render() {
   try {
     const tab = activeTab.value;
     litRender(tab ? paneChromeTemplate(tab, _ctx) : nothing, _host);
-    applyPaneContextOffset(Boolean(tab));
+    applyPaneContextOffset(tab ? topBandHeight() : 0);
   } catch (error) {
     console.error("pane-context render error:", error);
   }
@@ -217,17 +244,20 @@ function paneChromeTemplate(tab: Tab, ctx: PaneContextCtx): TemplateResult {
   const kind = editorKindOf(tab);
 
   return html`
-    <div class="pane-context" data-jx-region="pane.primary/context">
-      ${navTpl(tab, ctx, editing, formulaEditing)}
-      <div class="pc-spacer"></div>
-      ${
-        takeover
-          ? nothing
-          : html`
-              ${editorKindTpl(tab, ctx)} ${kind === "canvas" ? viewTpl(tab, ctx) : nothing}
-              ${renderingContextTpl(tab, ctx)} ${exportTpl(ctx)}
-            `
-      }
+    <div class="pc-band">
+      <div class="pane-context" data-jx-region="pane.primary/context">
+        ${navTpl(tab, ctx, editing, formulaEditing)}
+        <div class="pc-spacer"></div>
+        ${
+          takeover
+            ? nothing
+            : html`
+                ${editorKindTpl(tab, ctx)} ${kind === "canvas" ? viewTpl(tab, ctx) : nothing}
+                ${renderingContextTpl(tab, ctx)} ${exportTpl(ctx)}
+              `
+        }
+      </div>
+      ${readOnlyBannerTemplate(tab)}
     </div>
     ${takeover ? nothing : zoomPodTpl(tab, ctx)}
   `;
@@ -485,9 +515,9 @@ function renderingContextTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult {
             <button
               class="pc-ctx-manage"
               type="button"
-              title="Breakpoints, schemes and feature queries are defined in Project Settings"
+              title="Breakpoints, schemes and feature queries are defined in Project Settings › Contexts"
               @click=${() => {
-                void activeRegistry()?.run("settings.open", { section: "general" });
+                void activeRegistry()?.run("settings.open", { section: "contexts" });
               }}
             >
               Manage contexts…

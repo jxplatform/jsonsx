@@ -458,3 +458,31 @@ describe("mountStatusbar", () => {
     expect(field("selection")).toBeNull();
   });
 });
+
+describe("the selection field does not say the same thing twice", () => {
+  test("an element whose $id matches its tag is named once, by its crumb", () => {
+    // The standalone label prefers `$id`; a crumb prints the TAG. Usually different, so both earn
+    // Their place — but `<re-hero $id="re-hero">` rendered "re-hero  re-hero" in every published
+    // Screenshot of the status bar until this dropped the duplicate.
+    const tab = resetWorkspaceWithTab({
+      children: [{ $id: "re-hero", children: [], tagName: "re-hero" }],
+      tagName: "div",
+    } as never);
+    tab.session.selection = ["children", 0];
+    renderStatusbar();
+    const text = field("selection")!.textContent!.replaceAll(/\s+/g, " ").trim();
+    expect(text).toBe("re-hero");
+  });
+
+  test("an $id that differs from the tag is still shown beside the crumb", () => {
+    const tab = resetWorkspaceWithTab({
+      children: [{ $id: "masthead", children: [], tagName: "header" }],
+      tagName: "div",
+    } as never);
+    tab.session.selection = ["children", 0];
+    renderStatusbar();
+    const text = field("selection")!.textContent!.replaceAll(/\s+/g, " ").trim();
+    expect(text).toContain("masthead");
+    expect(text).toContain("header");
+  });
+});

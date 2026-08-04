@@ -8,7 +8,22 @@ import { reactive, toRaw } from "../reactivity";
 import type { Tab } from "../tabs/tab";
 import type { CollabAwarenessState } from "@jxsuite/collab/awareness-types";
 
-export type CollabTabStatus = "detached" | "connecting" | "synced" | "offline";
+/**
+ * What co-editing is doing for this tab.
+ *
+ * `"detached"` used to mean three different things at once and say none of them: this build has no
+ * collaboration at all, this project has collaboration but this tab is solo, and the attach was
+ * tried and it FAILED. §7.4: a freeze is currently indistinguishable from a bug, and so was a
+ * broken connection. `"unavailable"` and `"failed"` split the third and first cases out, so the
+ * chip can say which one it is.
+ */
+export type CollabTabStatus =
+  | "unavailable"
+  | "detached"
+  | "connecting"
+  | "synced"
+  | "offline"
+  | "failed";
 
 export interface PeerPresence {
   clientId: number;
@@ -25,8 +40,18 @@ export interface TabCollabState {
   /**
    * True while source holds the canonical lock (someone is co-editing the code view): structural
    * surfaces soft-freeze and the canvas previews the source reconciler's parses.
+   *
+   * The freeze is real and it is brief, and until now its only rendering was a grey line for three
+   * seconds — which is exactly what a bug looks like. It gets an indicator (§7.4).
    */
   sourceCanonical: boolean;
+  /**
+   * Why the last attach failed, when it did. Empty while `status` is anything but `"failed"`.
+   *
+   * The attach used to swallow its own exception into `status = "detached"`, so a dead relay, an
+   * expired token and a project that simply is not shared all produced the same silence.
+   */
+  attachError: string;
 }
 
 const states = new WeakMap<Tab, TabCollabState>();
@@ -40,10 +65,11 @@ export function collabState(tab: Tab): TabCollabState {
   if (!state) {
     state = reactive({
       active: false,
+      attachError: "",
       peers: [],
       readOnly: false,
       sourceCanonical: false,
-      status: "detached",
+      status: "unavailable",
     }) as TabCollabState;
     states.set(key, state);
   }

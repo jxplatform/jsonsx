@@ -78,6 +78,7 @@ import { makeCanvasContextMenuHandler } from "./editor/canvas-context-menu";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import { mountStatusbar, renderStatusbar } from "./panels/statusbar";
 import { notify } from "./services/notify";
+import { beginActivity } from "./panels/activity-panel";
 import { exportFile, parseSourceForPath, saveFile, serializeDocument } from "./files/file-ops";
 import {
   formatForPath,
@@ -920,6 +921,21 @@ async function openProject() {
   return result;
 }
 async function openRecentProject(root: string) {
+  // One entry for the whole sequence, not three surfaces for its three phases. Opening a project
+  // Used to chain a blocking spinner (dependencies), a transient status line (git sync) and a
+  // Confirm-plus-spinner (@jxsuite update), none of them cancellable and none of them surviving
+  // The frame they were drawn in — so an open that took forty seconds was indistinguishable from
+  // One that had silently failed. Spec studio.md §16.4.
+  const activity = beginActivity({
+    title: `Opening ${root.split("/").pop() || root}`,
+    source: "Open Project",
+    steps: [
+      "Sync with the remote",
+      "Install dependencies",
+      "Read the project",
+      "Open the home page",
+    ],
+  });
   try {
     const platform = getPlatform();
 
@@ -927,6 +943,7 @@ async function openRecentProject(root: string) {
     // Window (focusing an existing window if it's already open) rather than replacing this project.
     if (projectState && platform.openProjectInNewWindow) {
       await platform.openProjectInNewWindow(root);
+      activity.done("Opened in another window");
       return;
     }
 
@@ -935,6 +952,7 @@ async function openRecentProject(root: string) {
     if (platform.setWindowProject) {
       const res = await platform.setWindowProject(root);
       if (res.deduped) {
+        activity.done("Already open in another window");
         return;
       }
     }
@@ -969,8 +987,11 @@ async function openRecentProject(root: string) {
     });
     setWorkspaceProject(root, config);
 
+    activity.step("Sync with the remote");
     await autoSyncProjectOnOpen();
+    activity.step("Install dependencies");
     await ensureDependenciesInstalled();
+    activity.step("Read the project");
     await loadDirectory(".");
     await loadComponentRegistry();
 
@@ -996,8 +1017,10 @@ async function openRecentProject(root: string) {
     renderLeftPanel();
     // The project's name is now permanent state in the status bar's PROJECT field.
 
+    activity.step("Open the home page");
     await openHomePage();
     ensureFsSync();
+    activity.done(`Opened ${requireProjectState().name}`);
     void maybePromptJxsuiteUpdate(root);
   } catch (error) {
     // The project likely moved or was deleted — drop the stale entry so it stops cluttering the
@@ -1005,11 +1028,10 @@ async function openRecentProject(root: string) {
     removeRecentProject(root);
     toolbarPanel.render();
     render();
-    notify.error(`Could not open the project at ${root}.`, {
-      detail: errorMessage(error),
-      path: root,
-      source: "Open Project",
-    });
+    // `fail` raises the Problem, so this path does NOT also notify: an operation with an Activity
+    // Entry reports once (`studio-ui-guidelines.md` §13.3 rule 3).
+    activity.log(errorMessage(error));
+    activity.fail(`Could not open the project at ${root}.`, { path: root });
   }
 }
 function renderFilesTemplate() {

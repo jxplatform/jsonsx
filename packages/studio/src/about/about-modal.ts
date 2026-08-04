@@ -14,6 +14,7 @@ import { openModal } from "../ui/layers";
 import { getPlatform } from "../platform";
 import { APP_NAME, BUILD_DATE, GIT_COMMIT, LINKS, VERSION } from "../version";
 import type { AppInfo, PackageInfo } from "../types";
+import type { Command } from "../commands/registry";
 
 let _handle: ReturnType<typeof openModal> | null = null;
 
@@ -144,4 +145,28 @@ function renderModal() {
   } else {
     _handle = openModal(tpl, { label: `About ${APP_NAME}`, onDismiss: closeAboutModal });
   }
+}
+
+/**
+ * `Help: About` — the record the rail footer's hand-authored button used to be.
+ *
+ * The rail foot carries **Preferences** and nothing else (plan §3.2 ②). About is not a view you
+ * switch to and it is opened roughly once in an app's lifetime, so it costs a rail slot it cannot
+ * repay; as a record it stays reachable by name from the palette, which is where a thing you look
+ * for by name belongs.
+ */
+export function aboutCommands(): Command[] {
+  return [
+    {
+      id: "help.about",
+      title: `About ${APP_NAME}`,
+      category: "Help",
+      level: "application",
+      menus: ["palette"],
+      group: "9_help",
+      run: () => {
+        openAboutModal();
+      },
+    },
+  ];
 }

@@ -38,7 +38,6 @@ import { activeTab } from "../workspace/workspace";
 import { shell } from "../shell";
 import { openQuickSearch } from "./quick-search";
 import { showPromptDialog } from "../ui/layers";
-import { inspectorTab } from "./right-panel";
 import { canvasBaseOrigin } from "../canvas/canvas-origin";
 import { getPreviewNavigateHandler } from "../canvas/preview-navigate";
 import { documentUrlPattern, dynamicRouteParams } from "../page-params";
@@ -535,17 +534,7 @@ const RAIL_RIGHT_OPEN = html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail
 const RAIL_RIGHT_CLOSE = html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`;
 const RAIL_LEFT_OPEN = html`<sp-icon-rail-left-open slot="icon"></sp-icon-rail-left-open>`;
 const RAIL_LEFT_CLOSE = html`<sp-icon-rail-left-close slot="icon"></sp-icon-rail-left-close>`;
-const CHAT_ICON = html`<sp-icon-chat slot="icon"></sp-icon-chat>`;
-
-/**
- * Whether the assistant is on screen: its dock open, and its tab the one selected.
- *
- * Two reads, because a tab that is selected inside a collapsed dock is not showing. This is the
- * state the third toggle reports and the state `view.setAssistant { open }` names.
- */
-function assistantShowing(): boolean {
-  return !shell.docks.right.collapsed && inspectorTab() === "assistant";
-}
+const DOCK_BOTTOM = html`<sp-icon-align-bottom slot="icon"></sp-icon-align-bottom>`;
 
 /**
  * ▤▥▦ — the three docks, each rendered from its own record.
@@ -568,8 +557,8 @@ function dockTogglesTpl(registry: CommandRegistry) {
     })}
     ${tbCmd(registry, "view.toggleBottomDock", {
       compact: true,
-      icon: CHAT_ICON,
-      selected: assistantShowing(),
+      icon: DOCK_BOTTOM,
+      selected: !shell.docks.bottom.collapsed,
     })}
   `;
 }
@@ -595,9 +584,7 @@ export function mount(rootEl: HTMLElement, _ctx: ToolbarCtx = {}) {
       // The boot-time restore — not just this module's click handlers.
       void shell.docks.left.collapsed;
       void shell.docks.right.collapsed;
-      // The assistant is an Inspector TAB now, so "is the assistant showing" is a tab selection
-      // Rather than a dock flag — read through the accessor so the button follows either store.
-      void assistantShowing();
+      void shell.docks.bottom.collapsed;
       void shell.git.status;
       void shell.layoutSelection;
       // The layout tabs are a rendering of the project's own record (§3.2 ①b), so the band

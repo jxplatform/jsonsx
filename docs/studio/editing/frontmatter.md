@@ -1,6 +1,6 @@
 ---
 title: "Frontmatter and page metadata"
-description: "Fill in page titles, descriptions, social cards, and content-type fields with Jx Studio's Document panel and Document Header card — no YAML required."
+description: "Fill in page titles, descriptions, social cards, and content-type fields with Jx Studio's Page panel and Document Header card — no YAML required."
 code:
   - packages/studio/src/panels/head-panel.ts
   - packages/studio/src/panels/frontmatter-panel.ts
@@ -11,13 +11,13 @@ code:
 
 Every page carries information that isn't part of its visible text: a title, a description for search engines, an image for social shares, and — for content like blog posts — fields such as a date, an author, or tags. This is the page's _frontmatter_, and Studio edits all of it as plain forms.
 
-Two surfaces show these fields: the **Document** activity in the left panel, and the **Document Header** card on the page itself.
+Two surfaces show these fields: the **Page** panel in the Navigator, and the **Document Header** card on the page itself.
 
-## The Document panel
+## The Page panel
 
-Click **Document** in the activity bar to open it. Its sections, top to bottom, depend on the file you have open:
+Click **Page** in the **Document** group of the Navigator rail, or press :kbd[⌘6]. Its header reads **PAGE · document**, and its sections, top to bottom, depend on the file you have open:
 
-![The Document activity showing Frontmatter, Page, and OpenGraph sections for a blog post](../../images/document-panel.png)
+![The Page panel showing Frontmatter, Page, and OpenGraph sections for a blog post](../../images/document-panel.png)
 
 ### Frontmatter
 
@@ -56,7 +56,7 @@ The escape hatch for everything else that can live in a page's head — analytic
 
 Every page with frontmatter or head tags carries a **Document Header** card, and it sits on the page rather than in a panel: in Edit view it's the first block of the document itself, above your first paragraph, and it scrolls with the page. In Design view it's pinned above the artboards, at normal size, so the fields stay usable however far you've zoomed out.
 
-The card states the page's title and its route, offers the layout picker, and lists the collection's fields — the same set as the Document panel's Frontmatter section, title included. Two disclosures sit underneath: **SEO** (description, viewport, icon, and the OpenGraph card) and **Raw head tags**, which lists any head entries no form owns, read-only. There's no control to summon or dismiss the card; a page that has a header shows one.
+The card states the page's title and its route, offers the layout picker, and lists the collection's fields — the same set as the Page panel's Frontmatter section, title included. Two disclosures sit underneath: **SEO** (description, viewport, icon, and the OpenGraph card) and **Raw head tags**, which lists any head entries no form owns, read-only. There's no control to summon or dismiss the card; a page that has a header shows one.
 
 ![The Document Header card above a post open in Edit view](../../images/properties-bar.png)
 

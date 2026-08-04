@@ -19,11 +19,11 @@ Your project file opens in Stylebook automatically — that's the natural home f
 
 Like Design mode, Stylebook shows one panel per breakpoint, all rendering the same catalog — so an element default that changes at Tablet is visibly different in the Tablet panel. The catalog renders through the real runtime, exactly as the defaults will render on your pages.
 
-Two controls sit above the canvas: a **Filter** box to narrow the catalog by name, and a **Customized** toggle to show only the elements you've already styled. The **Layers** activity mirrors the catalog as a tree — elements with their nested parts (a table with its rows and cells), then your components — and marks customized entries with a dot.
+Two controls sit above the canvas: a **Filter** box to narrow the catalog by name, and a **Customized** toggle to show only the elements you've already styled. The **Outline** panel mirrors the catalog as a tree — elements with their nested parts (a table with its rows and cells), then your components — and marks customized entries with a dot.
 
 ## Style an element type
 
-1. Click a specimen card on the canvas, or its row in **Layers**. The right panel switches to the **Style** tab on its own, headed **Styling: &lt;h1&gt;** (or whatever you picked).
+1. Click a specimen card on the canvas, or its row in **Outline**. The Inspector switches to the **Style** tab on its own, headed **Styling: &lt;h1&gt;** (or whatever you picked).
 2. Edit styles with the full [Style inspector](/docs/studio/design/style-inspector) — sections, set-dots, and all.
 3. Watch every panel update: you're styling the element type, so every specimen of it changes at once — and so does every matching element in your project.
 

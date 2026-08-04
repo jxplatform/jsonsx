@@ -1,6 +1,6 @@
 ---
 title: "Dependencies and imports"
-description: "The Imports activity in Jx Studio: add npm packages, cherry-pick their components for the site or one document, and keep everything up to date."
+description: "The Packages panel in Jx Studio: add npm packages, cherry-pick their components for the site or one document, and keep everything up to date."
 code:
   - packages/studio/src/panels/imports-panel.ts
   - packages/studio/src/settings/dependencies-editor.ts
@@ -10,13 +10,13 @@ code:
 
 # Dependencies and imports
 
-Imports is where you decide which building blocks a document — or the whole site — can use: components from your own project, and components from npm packages (the web's public library of ready-made building blocks). Open it by clicking **Imports** (the box icon) in the activity bar.
+Packages is where you decide which building blocks a document — or the whole site — can use: components from your own project, and components from npm packages (the web's public library of ready-made building blocks). Open it by clicking **Packages** in the **Document** group of the Navigator rail, or with :kbd[⌘8].
 
-![The Imports activity showing a package section with per-component checkboxes](../../images/imports-panel.png)
+![The Packages panel showing a package section with per-component checkboxes](../../images/imports-panel.png)
 
 ## Two contexts
 
-The panel follows whatever tab is active:
+The panel follows whatever document is focused — its header says so, reading **PACKAGES · document**:
 
 - **A page, layout, or component open** — you're managing that document's imports: which components it can place.
 - **`project.json` open** — you're managing the whole site: packages, site-wide component availability, and imported modules.
@@ -25,7 +25,7 @@ The panel follows whatever tab is active:
 
 With a document open, the **Components** section lists what it already imports. Use the **Add component…** picker to import another component from your project — it becomes available to place in that document. The × beside an entry removes the import. A document that imports nothing yet says what the section is for, and tells you if the project has no components to offer at all.
 
-If you mostly build by placing blocks from the [Elements panel](/docs/studio/design/elements), you rarely open this list — it's the same wiring, made visible.
+If you mostly build by placing cards from the [Insert palette](/docs/studio/design/elements), you rarely open this list — it's the same wiring, made visible.
 
 ## Add an npm package
 

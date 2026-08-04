@@ -13,6 +13,7 @@ import { renderDefsEditor } from "./defs-editor";
 import { renderCssVarsEditor } from "./css-vars-editor";
 import { renderHeadEditor } from "./head-editor";
 import { renderGeneralSettings } from "./general-settings";
+import { renderContextsSection } from "./contexts-section";
 import { renderDependenciesEditor } from "./dependencies-editor";
 import { openModal } from "../ui/layers";
 import { optionalStringArg, stringProperty } from "../commands/command-args";
@@ -68,6 +69,19 @@ registerSettingsSection({
   label: "General",
   order: 10,
   render: renderGeneralSettings,
+});
+/*
+ * Contexts sits directly under General because it is the project's second identity: General says
+ * what the site IS, Contexts says what it is rendered UNDER. It is a definition site only — the
+ * pane context bar selects among what is defined here, and its "Manage contexts…" footer names
+ * this key (plan §4.2, §2 principle 5).
+ */
+registerSettingsSection({
+  icon: "sp-icon-device-desktop",
+  key: "contexts",
+  label: "Contexts",
+  order: 15,
+  render: renderContextsSection,
 });
 registerSettingsSection({
   icon: "sp-icon-file-single-web-page",

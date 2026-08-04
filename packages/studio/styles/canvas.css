@@ -35,6 +35,14 @@
    Three separately-LABELLED axes — Editor kind, Canvas view, Rendering context — where five
    unlabelled ones used to sit in a row styled identically to the tab strip above it. The label is
    load-bearing: it is what stops the band re-accreting into an anonymous strip of chips. */
+
+/* The pane's top band: the context bar, plus the standing statements that must be readable before
+   the first keystroke (today, collab's read-only banner). One element so `pane-context.ts` can
+   MEASURE what the stage has to clear — a banner's height is its wrapped text, which only layout
+   knows. `min-width: 0` so a long breadcrumb ellipses instead of widening the pane. */
+.pc-band {
+  min-width: 0;
+}
 .pane-context {
   display: flex;
   align-items: center;

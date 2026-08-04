@@ -300,7 +300,16 @@ function selectionFieldTpl(registry: CommandRegistry | null) {
     const node = getNodeAtPath(tab.doc.document, selection);
     const crumbs = selectionCrumbs(tab.doc.document, selection);
     return fieldTpl("statusbar/selection", [
-      itemTpl(registry, { command: null, label: nodeLabel(node), title: "The selected element" }),
+      // The last crumb IS the selected element, and its label is the TAG while this one prefers
+      // `$id` — so the two say different things and both earn their place, except when they say the
+      // Same thing. An element whose id matches its tag rendered "re-hero  re-hero".
+      nodeLabel(node) === crumbs.at(-1)?.label
+        ? nothing
+        : itemTpl(registry, {
+            command: null,
+            label: nodeLabel(node),
+            title: "The selected element",
+          }),
       ...crumbs.flatMap<ItemResult>((crumb, index) => [
         index === 0 ? nothing : html`<span class="sb-sep" aria-hidden="true">›</span>`,
         itemTpl(registry, {

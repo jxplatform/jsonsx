@@ -27,6 +27,7 @@ import {
 } from "../tabs/transact";
 import type { JxNodeValue } from "../tabs/transact";
 import { validateDoc } from "./jx-validate";
+import { recordWrite } from "./ai-writes";
 import { flagHardcodedTokens, formatTokenHints } from "./token-lint";
 
 const PATH_DESCRIPTION =
@@ -128,6 +129,10 @@ async function applyAndValidate(
   const renderOkBefore = renderCheck ? await renderCheck(rawBefore) : { ok: true };
 
   transactDoc(tab, mutationFn);
+  /* One ledger entry per mutation, so the panel's "Changed N files" counts documents the model
+     touched rather than sentences it wrote (§7.4). `disk: false` is the load-bearing half: this
+     went through transactDoc, so the tab's history — and "Restore to here" — can reach it. */
+  recordWrite({ disk: false, ok: true, path: tab.documentPath ?? "(untitled)", tool: summary });
 
   const rawAfter = toRaw(tab.doc.document);
   const after = await validate(rawAfter);
@@ -734,14 +739,23 @@ export function registerAiTools(
         }
         try {
           await saveFile(relPath, JSON.stringify(content, null, 2));
+          recordWrite({ disk: true, ok: true, path: relPath, tool: "create_component" });
           return {
             success: true,
             summary: await reconcileAfterWrite(relPath, `Created component at "${relPath}".`),
           };
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          recordWrite({
+            disk: true,
+            error: message,
+            ok: false,
+            path: relPath,
+            tool: "create_component",
+          });
           return {
             success: false,
-            error: `Failed to write file: ${error instanceof Error ? error.message : String(error)}`,
+            error: `Failed to write file: ${message}`,
           };
         }
       },
@@ -802,14 +816,23 @@ export function registerAiTools(
         }
         try {
           await saveFile(relPath, JSON.stringify(content, null, 2));
+          recordWrite({ disk: true, ok: true, path: relPath, tool: "create_page" });
           return {
             success: true,
             summary: await reconcileAfterWrite(relPath, `Created page at "${relPath}".`),
           };
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          recordWrite({
+            disk: true,
+            error: message,
+            ok: false,
+            path: relPath,
+            tool: "create_page",
+          });
           return {
             success: false,
-            error: `Failed to write file: ${error instanceof Error ? error.message : String(error)}`,
+            error: `Failed to write file: ${message}`,
           };
         }
       },

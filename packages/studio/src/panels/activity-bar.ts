@@ -1,12 +1,17 @@
 /// <reference lib="dom" />
 /**
- * Activity bar — the Navigator rail, rendered FROM the panel registry.
+ * Activity bar — the rail, rendered FROM the panel registry.
  *
- * There is no list of panels in this file. `railGroups()` returns the Navigator's records grouped
- * by level and filtered by their own `when`, and the rail draws whatever that says: two groups with
- * a divider between them, PROJECT above and DOCUMENT below (plan §3.2 ②). Adding a panel is a
+ * There is no list of panels in this file. `railGroups()` returns every rail-able record grouped by
+ * level and filtered by its own `when`, and the rail draws whatever that says: two groups with a
+ * divider between them, PROJECT above and DOCUMENT below (plan §3.2 ②). Adding a panel is a
  * `registerPanel()` call in the module that owns it, and it appears here; there is nothing to
  * update in step.
+ *
+ * **A rail button is not the same thing as a Navigator panel.** The grouping is by LEVEL, and the
+ * dock a record names is where its body is drawn — Problems is `dock: "bottom"` (plan §7.2), so its
+ * button reveals the Bottom dock's first tab while sitting in the rail's PROJECT group with its
+ * badge. {@link toggleRailPanel} is the one place that branch is written down.
  *
  * The predecessor was an eight-item array literal — `{icon, label, value}` — whose `label` reached
  * the screen only as a `title` attribute. Thirteen icons in this shell had no name but a hover
@@ -17,15 +22,14 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { activityBar } from "../store";
 import { effect, effectScope } from "../reactivity";
-import { shell, toggleActivityTab } from "../shell";
-import { openSettingsModal } from "../settings/settings-modal";
-import { openAboutModal } from "../about/about-modal";
+import { shell, toggleActivityTab, toggleBottomTab } from "../shell";
 import { refreshGitStatus } from "./git-panel";
 import { panelContext, railGroups } from "./panel-registry";
 import { registerNavigatorPanels } from "./navigator-panels";
 import type { PanelRecord } from "./panel-registry";
 import type { CommandContext } from "../commands/context";
 import type { EffectScope } from "@vue/reactivity";
+import { activeRegistry } from "../commands/active-registry";
 import type { TemplateResult } from "lit-html";
 
 let _scope: EffectScope | null = null;
@@ -107,11 +111,45 @@ export function tabIcon(tag: string, size?: string) {
 }
 
 /**
+ * Whether a rail button is showing what it names — its dock open, on its tab.
+ *
+ * The rail spans two docks (plan §7.2 puts Problems in the Bottom dock and its badge on the rail),
+ * so "selected" is a question about the panel's OWN host, not about `shell.leftTab`. Reading only
+ * the Navigator here is what would draw Problems as unselected while it is on screen.
+ *
+ * @param {PanelRecord} panel
+ */
+export function isRailPanelShowing(panel: PanelRecord): boolean {
+  if (panel.dock === "bottom") {
+    return !shell.docks.bottom.collapsed && shell.bottomTab === panel.id;
+  }
+  return !shell.docks.left.collapsed && shell.leftTab === panel.id;
+}
+
+/**
+ * Reveal (or collapse) what a rail button names, in whichever dock draws it.
+ *
+ * The branch is HERE and not on the record: a panel record says where its body is drawn, and which
+ * shell setter that implies is the rail's business. Both branches keep the same toggle-to-collapse
+ * gesture — re-picking the panel that is already showing closes its dock — so ⌘4's button behaves
+ * like ⌘1's even though one writes `shell.bottomTab` and the other `shell.leftTab`.
+ *
+ * @param {PanelRecord} panel
+ */
+export function toggleRailPanel(panel: PanelRecord): void {
+  if (panel.dock === "bottom") {
+    toggleBottomTab(panel.id);
+    return;
+  }
+  toggleActivityTab(panel.id);
+}
+
+/**
  * One rail button.
  *
  * The label is REAL TEXT, not a `title` attribute — so it is the accessible name, it is readable
  * without a pointer, and it survives a screenshot. `aria-pressed` states the toggle-focus semantics
- * honestly: re-picking the open panel collapses the dock (see {@link toggleActivityTab}), which is a
+ * honestly: re-picking the open panel collapses its dock (see {@link toggleRailPanel}), which is a
  * two-state control, not a one-way selection.
  *
  * `title` survives as a TOOLTIP only. Because the button has text content, that text is its
@@ -119,8 +157,9 @@ export function tabIcon(tag: string, size?: string) {
  * not carry both) — it exists to restore the full string for "Source Control", which 56px ellipses.
  * An icon whose only name is a tooltip is what principle 6 bans; a tooltip beside a label is not.
  */
-function railButton(panel: PanelRecord, ctx: CommandContext, selected: boolean): TemplateResult {
+function railButton(panel: PanelRecord, ctx: CommandContext): TemplateResult {
   const badge = panel.badge?.(ctx) ?? null;
+  const selected = isRailPanelShowing(panel);
   return html`
     <button
       type="button"
@@ -129,9 +168,9 @@ function railButton(panel: PanelRecord, ctx: CommandContext, selected: boolean):
       aria-pressed=${selected}
       title=${panel.title}
       @click=${() => {
-        // No repaint call: the rail and the Navigator both track `shell`, so selecting a panel is
-        // One state write.
-        toggleActivityTab(panel.id);
+        // No repaint call: the rail, the Navigator and the Bottom dock all track `shell`, so
+        // Selecting a panel is one state write.
+        toggleRailPanel(panel);
       }}
     >
       <span class="rail-icon">${tabIcon(panel.icon, "m")}</span>
@@ -141,31 +180,56 @@ function railButton(panel: PanelRecord, ctx: CommandContext, selected: boolean):
   `;
 }
 
+/**
+ * The rail foot: **Preferences**, and only Preferences (plan §3.2 ②).
+ *
+ * It was two hand-authored buttons calling two module functions directly — the exact shape §2
+ * principle 1 bans, and the reason the gear opened PROJECT configuration from an application-level
+ * slot. Preferences is the application's own settings and follows the author between projects, so
+ * it is the one that earns the pinned position; project configuration is `settings.open`, which
+ * lives in the ⬢ menu and the palette because it is scoped to a project; and About is `help.about`,
+ * reachable by name.
+ *
+ * Rendered FROM the record, so the label and the chord in its tooltip cannot drift from ⌘,.
+ */
+function railFooterTpl(): TemplateResult {
+  const registry = activeRegistry();
+  const command = registry?.get("app.preferences");
+  if (!registry || !command || !registry.isVisible("app.preferences")) {
+    return html`${nothing}`;
+  }
+  const chord = registry.keymap.formatBinding("app.preferences");
+  return html`
+    <button
+      type="button"
+      class="rail-item"
+      data-command="app.preferences"
+      title=${chord ? `${command.title} (${chord})` : command.title}
+      @click=${() => {
+        void registry.run("app.preferences");
+      }}
+    >
+      <span class="rail-icon"><sp-icon-settings size="m"></sp-icon-settings></span>
+      <span class="rail-label">Preferences</span>
+    </button>
+  `;
+}
+
 export function renderActivityBar() {
   const ctx = panelContext();
   const groups = railGroups(ctx);
-  const active = shell.docks.left.collapsed ? "" : shell.leftTab;
   const tpl = html`
     <nav class="rail-groups" aria-label="Navigator panels">
       ${groups.map(
         (group, index) => html`
           ${index === 0 ? nothing : html`<div class="rail-divider" role="separator"></div>`}
           <div class="rail-group" role="group" aria-label=${group.label}>
-            ${group.panels.map((panel) => railButton(panel, ctx, panel.id === active))}
+            ${group.panels.map((panel) => railButton(panel, ctx))}
           </div>
         `,
       )}
     </nav>
-    <div class="rail-footer">
-      <button type="button" class="rail-item" @click=${() => openAboutModal()}>
-        <span class="rail-icon"><sp-icon-info size="m"></sp-icon-info></span>
-        <span class="rail-label">About</span>
-      </button>
-      <button type="button" class="rail-item" @click=${() => openSettingsModal()}>
-        <span class="rail-icon"><sp-icon-settings size="m"></sp-icon-settings></span>
-        <span class="rail-label">Settings</span>
-      </button>
-    </div>
+    <div class="rail-footer">${railFooterTpl()}</div>
   `;
   litRender(tpl, activityBar);
 }

@@ -55,6 +55,31 @@ const footerButton = (label: string) =>
   ) as HTMLElement | undefined;
 const { mountShell, resetProjectShell, shell, unmountShell } = await import("../src/shell");
 const { closeAllTabs } = await import("../src/workspace/workspace");
+const { activeRegistry, setActiveRegistry } = await import("../src/commands/active-registry");
+const { createCommandRegistry } = await import("../src/commands/registry");
+const { emptyContext } = await import("../src/commands/context");
+
+/**
+ * The rail foot renders FROM the `app.preferences` record, so a rail with no registry has no foot.
+ *
+ * Only that one record: this file is about the rail, and pulling in the whole app command set would
+ * make every rail assertion depend on every other module's registration.
+ */
+function installPreferencesRegistry() {
+  const registry = createCommandRegistry({ getContext: () => emptyContext(), mac: true });
+  registry.register({
+    id: "app.preferences",
+    title: "Preferences…",
+    category: "View",
+    level: "application",
+    keybinding: "mod+,",
+    menus: ["commandbar/overflow", "palette"],
+    group: "7_settings",
+    run: () => {},
+  });
+  setActiveRegistry(registry);
+  return registry;
+}
 const { registerNavigatorPanels } = await import("../src/panels/navigator-panels");
 const { mount, renderActivityBar, tabIcon, unmount } = await import("../src/panels/activity-bar");
 
@@ -75,6 +100,10 @@ beforeEach(() => {
   closeAllTabs();
   shell.leftTab = "layers";
   shell.docks.left.collapsed = false;
+  // Problems is a Bottom dock panel with a rail button (§7.2), so its pressed state is a fact
+  // About THAT dock. Reset it here, or one case's open dock lights up the next case's rail.
+  shell.bottomTab = "problems";
+  shell.docks.bottom.collapsed = true;
   resetProjectShell();
   refreshGitStatus.mockClear();
   openSettingsModal.mockClear();
@@ -140,15 +169,21 @@ describe("tabIcon", () => {
 // ─── renderActivityBar ────────────────────────────────────────────────────────
 
 describe("renderActivityBar", () => {
-  test("renders the registry's visible panels, grouped by level", () => {
+  test("renders every rail-able panel, grouped by level and not by dock", () => {
     renderActivityBar();
-    expect(railIds()).toEqual(["files", "git", "layers", "page", "data", "packages"]);
+    // Problems is `dock: "bottom"` (§7.2) and still sits fourth in the PROJECT group: the rail
+    // Groups by LEVEL, so a panel's host has no say in whether it gets a button.
+    expect(railIds()).toEqual(["files", "git", "problems", "layers", "page", "data", "packages"]);
+    // …and the Bottom dock's three rail-less tabs stay off it.
+    for (const id of ["diff", "logic", "activity"]) {
+      expect(railIds()).not.toContain(id);
+    }
     // Elements/Insert left the rail entirely, and State gave up its slot to Data.
     expect(railIds()).not.toContain("insert");
     expect(railIds()).not.toContain("state");
-    // Declared-but-unbuilt surfaces are hidden by their own `when`, not faked with a stub button.
+    // Search is still declared-but-unbuilt, hidden by its own `when` rather than faked with a
+    // Stub button. Problems was the other one until P4.2 built it.
     expect(railIds()).not.toContain("search");
-    expect(railIds()).not.toContain("problems");
   });
 
   test("the two groups are named and separated by exactly one divider", () => {
@@ -159,6 +194,7 @@ describe("renderActivityBar", () => {
   });
 
   test("every rail button carries a visible text label, not just a tooltip", () => {
+    installPreferencesRegistry();
     renderActivityBar();
     const labels = [...bar().querySelectorAll(".rail-item .rail-label")].map((el) =>
       el.textContent?.trim(),
@@ -166,12 +202,12 @@ describe("renderActivityBar", () => {
     expect(labels).toEqual([
       "Files",
       "Source Control",
+      "Problems",
       "Outline",
       "Page",
       "Data",
       "Packages",
-      "About",
-      "Settings",
+      "Preferences",
     ]);
   });
 
@@ -252,16 +288,89 @@ describe("renderActivityBar", () => {
     expect(shell.leftTab).toBe("files");
   });
 
-  test("settings button opens the settings modal", () => {
+  // ── the dock branch (§7.2): a rail button reveals its panel where the panel lives ──
+
+  test("clicking Problems opens the BOTTOM dock on its tab, and leaves the Navigator alone", () => {
+    shell.leftTab = "files";
+    shell.docks.left.collapsed = false;
+    shell.docks.bottom.collapsed = true;
+    shell.bottomTab = "activity";
     renderActivityBar();
-    footerButton("Settings")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(openSettingsModal).toHaveBeenCalledTimes(1);
+    railButton("problems")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    expect(shell.bottomTab).toBe("problems");
+    // The Navigator is untouched — this is the whole reason the panel moved docks.
+    expect(shell.leftTab).toBe("files");
+    expect(shell.docks.left.collapsed).toBe(false);
   });
 
-  test("about button opens the about modal", () => {
+  test("clicking Problems again collapses the Bottom dock — the same gesture as ⌘1's", () => {
+    shell.docks.bottom.collapsed = false;
+    shell.bottomTab = "problems";
     renderActivityBar();
-    footerButton("About")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(openAboutModal).toHaveBeenCalledTimes(1);
+    railButton("problems")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(shell.docks.bottom.collapsed).toBe(true);
+  });
+
+  test("Problems reads pressed from the Bottom dock, not from shell.leftTab", () => {
+    shell.leftTab = "problems"; // A value the Navigator can no longer mean.
+    shell.docks.bottom.collapsed = true;
+    renderActivityBar();
+    expect(railButton("problems")?.getAttribute("aria-pressed")).toBe("false");
+
+    shell.docks.bottom.collapsed = false;
+    shell.bottomTab = "problems";
+    renderActivityBar();
+    expect(railButton("problems")?.getAttribute("aria-pressed")).toBe("true");
+    expect(railButton("problems")?.classList.contains("selected")).toBe(true);
+
+    shell.bottomTab = "activity";
+    renderActivityBar();
+    expect(railButton("problems")?.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  test("the Problems badge is the problem count, off the same record the dock tab uses", async () => {
+    const { notify, resetNotifications } = await import("../src/services/notify");
+    resetNotifications();
+    renderActivityBar();
+    expect(railButton("problems")?.querySelector(".activity-badge")).toBeNull();
+    notify.error("could not save");
+    renderActivityBar();
+    expect(railButton("problems")?.querySelector(".activity-badge")?.textContent).toBe("1");
+    resetNotifications();
+  });
+
+  test("the foot carries Preferences, rendered from its own record", () => {
+    // The rail is application- and project-scoped chrome, so the slot pinned to its foot is the
+    // APPLICATION's settings. Project configuration is `settings.open` — the ⬢ menu and the
+    // Palette — and About is `help.about`, because a thing opened once in an app's lifetime does
+    // Not earn a permanent slot. Both were hand-authored buttons calling a module function here.
+    installPreferencesRegistry();
+    renderActivityBar();
+    const preferences = footerButton("Preferences")!;
+    expect(preferences.dataset.command).toBe("app.preferences");
+    // Title and chord come from the record, so the tooltip cannot drift from the keymap.
+    expect(preferences.getAttribute("title")).toContain("Preferences…");
+
+    const ran: string[] = [];
+    const registry = activeRegistry()!;
+    const original = registry.run.bind(registry);
+    registry.run = ((id: string) => {
+      ran.push(id);
+      return Promise.resolve();
+    }) as typeof registry.run;
+    preferences.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    registry.run = original;
+    expect(ran).toEqual(["app.preferences"]);
+  });
+
+  test("neither Settings nor About holds a rail slot any more", () => {
+    installPreferencesRegistry();
+    renderActivityBar();
+    expect(footerButton("Settings")).toBeUndefined();
+    expect(footerButton("About")).toBeUndefined();
   });
 });
 

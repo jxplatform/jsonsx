@@ -11,13 +11,11 @@ import {
   mutateRemoveSwitchCase,
   mutateRenameSwitchCase,
   mutateUpdateAttribute,
-  mutateUpdateMedia,
   mutateUpdateProp,
   mutateUpdateProperty,
   transactDoc,
 } from "../tabs/transact";
 import { activeTab } from "../workspace/workspace";
-import { view } from "../view";
 import { setLayoutSelection, shell } from "../shell";
 import {
   argsSchema,
@@ -33,13 +31,7 @@ import { widgetForType } from "./style-inputs";
 import { renderFieldRow } from "../ui/field-row";
 import { renderDynamicSlot, slotMode } from "../ui/dynamic-slot";
 import { spTextArea, spTextField } from "../ui/field-input";
-import {
-  attrLabel,
-  camelToLabel,
-  friendlyNameToVar,
-  inferInputType,
-  parseCemType,
-} from "../utils/studio-utils";
+import { attrLabel, camelToLabel, inferInputType, parseCemType } from "../utils/studio-utils";
 import { classifyHref, composeHref } from "../utils/link-target";
 import type { LinkKind } from "../utils/link-target";
 import {
@@ -49,7 +41,6 @@ import {
   staleSelectionMessage,
 } from "./empty-state";
 import { collectCssParts, isCustomElementDoc } from "./signals-panel";
-import { mediaDisplayName } from "./shared";
 import { getCssInitialMap } from "./style-utils";
 import { renderMediaPicker } from "../ui/media-picker";
 import { renderColorSelector } from "../ui/color-selector";
@@ -90,15 +81,6 @@ interface HtmlMetaEntry {
   $shorthand?: boolean;
   type?: string;
   [key: string]: unknown;
-}
-
-/**
- * Convert a human-friendly name like "Tablet" to a $media key "--tablet"
- *
- * @param {string} name
- */
-function friendlyNameToMedia(name: string) {
-  return friendlyNameToVar(name, "--");
 }
 
 /** Check if a selection path is inside a $map template (contains [..., "children", "map", ...]). */
@@ -618,186 +600,6 @@ function renderCustomAttrsFieldsTemplate(
         transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, "data-", ""))}
       >+ Add attribute</span
     >
-  `;
-}
-
-// ─── Media breakpoints ──────────────────────────────────────────────────────
-
-/** Media breakpoint fields template */
-function renderMediaFieldsTemplate(node: JxMutableNode) {
-  const media = node.$media || {};
-  /** @type {ReturnType<typeof setTimeout> | undefined} */
-  let baseDebounce: ReturnType<typeof setTimeout> | undefined;
-  const breakpoints = Object.entries(media).filter(([k]) => k !== "--");
-
-  return html`
-    <div class="kv-row" style="align-items:center">
-      <span class="field-label" style="width:auto;margin-right:4px">Base width</span>
-      <input
-        class="field-input"
-        style="width:70px;flex:none"
-        placeholder="320px"
-        .value=${live(media["--"] || "")}
-        @input=${(e: Event) => {
-          clearTimeout(baseDebounce);
-          baseDebounce = setTimeout(() => {
-            const val = (e.target as HTMLInputElement).value.trim();
-            transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, "--", val || undefined));
-          }, 400);
-        }}
-      />
-      ${
-        media["--"]
-          ? html`<span
-              class="kv-del"
-              @click=${() => transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, "--"))}
-              >✕</span
-            >`
-          : nothing
-      }
-    </div>
-
-    ${breakpoints.map(([name, query]) => mediaBreakpointRowTemplate(name, query))}
-
-    <div>
-      <span
-        class="kv-add"
-        style=${view.showAddBreakpointForm ? "display:none" : ""}
-        @click=${(_e: Event) => {
-          view.showAddBreakpointForm = true;
-          renderOnly("rightPanel");
-        }}
-        >+ Add breakpoint</span
-      >
-      ${
-        view.showAddBreakpointForm
-          ? html`
-              <div style="margin-top:4px">
-                <div style="display:flex;gap:4px;margin-bottom:3px;align-items:center">
-                  <input
-                    class="field-input"
-                    placeholder="Name (e.g. Tablet)"
-                    style="flex:1"
-                    @input=${(e: Event) => {
-                      view.addBreakpointPreview =
-                        friendlyNameToMedia((e.target as HTMLInputElement).value) || "";
-                      renderOnly("rightPanel");
-                    }}
-                  />
-                  <span
-                    style="font-size:10px;color:var(--fg-dim);font-family:var(--font-mono);white-space:nowrap"
-                    >${view.addBreakpointPreview}</span
-                  >
-                </div>
-                <div style="display:flex;gap:4px;margin-bottom:3px;align-items:center">
-                  <input
-                    class="field-input add-bp-query"
-                    value="(min-width: 768px)"
-                    style="flex:1"
-                  />
-                </div>
-                <div style="display:flex;gap:4px">
-                  <button
-                    class="kv-add"
-                    style="padding:2px 10px;cursor:pointer"
-                    @click=${(e: Event) => {
-                      const wrap = (e.target as HTMLElement).closest("div")?.parentElement;
-                      const nameVal = wrap?.querySelector("input")?.value;
-                      const queryVal = (
-                        wrap?.querySelector(".add-bp-query") as HTMLInputElement | null
-                      )?.value?.trim();
-                      const key = friendlyNameToMedia(nameVal || "");
-                      if (key && queryVal) {
-                        view.showAddBreakpointForm = false;
-                        view.addBreakpointPreview = "";
-                        transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, key, queryVal));
-                      }
-                    }}
-                  >
-                    Add
-                  </button>
-                  <button
-                    class="kv-add"
-                    style="padding:2px 10px;cursor:pointer;color:var(--fg-dim)"
-                    @click=${() => {
-                      view.showAddBreakpointForm = false;
-                      view.addBreakpointPreview = "";
-                      renderOnly("rightPanel");
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            `
-          : nothing
-      }
-    </div>
-  `;
-}
-
-/** Single media breakpoint row template */
-function mediaBreakpointRowTemplate(name: string, query: string) {
-  /** @type {ReturnType<typeof setTimeout> | undefined} */
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  let currentRawLabel = name;
-  return html`
-    <div style="margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
-        <input
-          class="field-input"
-          .value=${live(mediaDisplayName(name))}
-          style="flex:1;font-weight:600;font-size:var(--spectrum-font-size-75, 12px)"
-          @input=${(e: Event) => {
-            const newKey = friendlyNameToMedia((e.target as HTMLInputElement).value);
-            currentRawLabel = newKey || "";
-            const rawEl = (e.target as HTMLElement).parentElement?.querySelector(".bp-raw-label");
-            if (rawEl) {
-              rawEl.textContent = currentRawLabel;
-            }
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-              if (newKey && newKey !== name) {
-                const queryEl = (e.target as HTMLElement)
-                  .closest("div[style]")
-                  ?.parentElement?.querySelector(".bp-query-input") as HTMLInputElement | null;
-                transactDoc(activeTab.value, (t) => {
-                  mutateUpdateMedia(t, name);
-                  mutateUpdateMedia(t, newKey, queryEl?.value || query);
-                });
-              }
-            }, 600);
-          }}
-        />
-        <span
-          class="bp-raw-label"
-          style="font-size:10px;color:var(--fg-dim);font-family:var(--font-mono);white-space:nowrap"
-          >${name}</span
-        >
-        <span
-          class="kv-del"
-          @click=${() => transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, name))}
-          >✕</span
-        >
-      </div>
-      <div style="display:flex;gap:4px;align-items:center">
-        <input
-          class="field-input bp-query-input"
-          .value=${live(query)}
-          style="flex:1"
-          @input=${(e: Event) => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(
-              () =>
-                transactDoc(activeTab.value, (t) =>
-                  mutateUpdateMedia(t, name, (e.target as HTMLInputElement).value),
-                ),
-              400,
-            );
-          }}
-        />
-      </div>
-    </div>
   `;
 }
 
@@ -1769,18 +1571,6 @@ export function renderPropertiesPanelTemplate(ctx: {
         `
       : nothing;
 
-  const mediaT = isRoot
-    ? html`
-        <sp-accordion-item
-          label="Media"
-          ?open=${isSectionOpen("__media")}
-          @sp-accordion-item-toggle=${() => toggleSection("__media")}
-        >
-          <div class="style-section-body">${renderMediaFieldsTemplate(node)}</div>
-        </sp-accordion-item>
-      `
-    : nothing;
-
   const cssPropsT =
     isCustomElementDoc({ document: tab.doc.document }) && isRoot
       ? (() => {
@@ -1853,8 +1643,8 @@ export function renderPropertiesPanelTemplate(ctx: {
         ${pageT} ${isMapNode ? repeaterT : elemT} ${isMapNode ? nothing : observedAttrsT}
         ${isMapNode ? nothing : switchT} ${isMapNode ? nothing : compPropsT}
         ${isMapNode ? nothing : usagesT} ${isMapNode ? nothing : attrSectionTemplates}
-        ${isMapNode ? nothing : customSectionT} ${isMapNode ? nothing : mediaT}
-        ${isMapNode ? nothing : cssPropsT} ${isMapNode ? nothing : cssPartsT}
+        ${isMapNode ? nothing : customSectionT} ${isMapNode ? nothing : cssPropsT}
+        ${isMapNode ? nothing : cssPartsT}
       </sp-accordion>
     </div>
   `;

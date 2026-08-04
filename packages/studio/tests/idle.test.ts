@@ -135,12 +135,13 @@ describe("probeIdle", () => {
 });
 
 describe("defaultIdleSources", () => {
-  test("names the four subsystems and is quiet in a bare page", () => {
+  test("names the five subsystems and is quiet in a bare page", () => {
     expect(defaultIdleSources().map((s) => s.name)).toEqual([
       "render",
       "panels",
       "canvas",
       "platform",
+      "overlay",
     ]);
     expect(idleBlockers()).toEqual([]);
   });

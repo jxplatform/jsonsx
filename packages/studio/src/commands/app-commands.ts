@@ -26,7 +26,7 @@
  */
 
 import { defaultCommands, noopCommandDeps } from "./defaults";
-import { navigatorPanelSet } from "../panels/navigator-panels";
+import { panelFocusRoster } from "../panels/navigator-panels";
 import { createCommandRegistry } from "./registry";
 import { emptyContext } from "./context";
 import { DEFAULT_INSPECTOR_TAB, shellViewCommands } from "../shell";
@@ -39,7 +39,9 @@ import { formulaEditorCommands } from "../panels/formula-workspace";
 import { styleCommands } from "../panels/style-panel";
 import { gridCommands } from "../grid/grid-open";
 import { settingsCommands } from "../settings/settings-modal";
+import { collabCommands } from "../collab/collab-commands";
 import { preferencesCommands } from "../settings/preferences-dialog";
+import { aboutCommands } from "../about/about-modal";
 import { browseCommands } from "../browse/browse-modal";
 import { newProjectCommands } from "../new-project/new-project-modal";
 import { registerSelectionCommands } from "../panels/block-action-bar";
@@ -74,7 +76,7 @@ export function appCommandSet(): AnyCommand[] {
     // The panel roster is the one dependency the checks must supply for real: the ⌘1–8 records are
     // Generated from it, so an empty one would hide eight commands (and their chords) from the
     // Level check, the chrome budget and the generated keyboard sheet alike.
-    ...defaultCommands({ ...noopCommandDeps(), navigatorPanels: navigatorPanelSet() }),
+    ...defaultCommands({ ...noopCommandDeps(), panelRoster: panelFocusRoster() }),
     ...viaRegistration(),
     ...shellViewCommands({ inspectorTab: () => DEFAULT_INSPECTOR_TAB, setInspectorTab: NO_OP }),
     ...canvasViewCommands({ getCanvasMode: () => "design", setCanvasMode: NO_OP }),
@@ -85,7 +87,9 @@ export function appCommandSet(): AnyCommand[] {
     ...formulaEditorCommands({ renderCanvas: NO_OP }),
     ...gridCommands(),
     ...settingsCommands(),
+    ...collabCommands(),
     ...preferencesCommands(),
+    ...aboutCommands(),
     ...browseCommands(),
     ...newProjectCommands(),
     ...styleCommands(),

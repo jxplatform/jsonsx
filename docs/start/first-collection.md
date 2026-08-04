@@ -18,7 +18,7 @@ In this tutorial you give your site a blog the structured way: a `posts` content
 
 A content type is your CMS schema: where a collection's entries live, and what fields each one carries.
 
-1. Click the **Settings** gear at the bottom of the activity bar, then go to _Settings > Content Types_.
+1. Press :kbd[⌘K], run **Open Settings**, and pick the **Content Types** section.
 2. Click **New Entry** at the bottom of the type list.
 3. Type `Posts` and click **Create**.
 
@@ -40,7 +40,7 @@ You should now see three field rows in the schema. These become the form every p
 
 ## 3. Create your first post
 
-1. Click **Manage** in the toolbar.
+1. Press :kbd[⌘K] and run **Manage Files**.
 2. Click **New** — the menu now lists an item for the type you just defined. Pick **Posts**.
 3. Name the entry `hello-world`.
 
@@ -50,7 +50,7 @@ Studio creates the file in `content/posts/` with every schema field pre-filled w
 
 ## 4. Fill it in
 
-The post opens in **Edit** mode with a **Properties** bar directly above the page — the same fields your schema defined:
+The post opens in **Edit** view with a **Document Header** card at the top of the page itself — the same fields your schema defined:
 
 1. Type `Hello World` into **title**.
 2. Pick today in the **date** field.
@@ -60,7 +60,7 @@ Then click into the page below and write a paragraph or two of body text.
 
 ![Jx Studio editing markdown content inline with a WYSIWYG editor](../images/mode-edit.png)
 
-You should see the frontmatter form filled in and your words on the page. The same fields also live in the **Document** activity — see **[Frontmatter and page metadata](/docs/studio/editing/frontmatter)**.
+You should see the frontmatter form filled in and your words on the page. The same fields also live in the **Page** panel, :kbd[⌘6] — see **[Frontmatter and page metadata](/docs/studio/editing/frontmatter)**.
 
 ## 5. Add two more posts
 
@@ -72,7 +72,7 @@ You should now have three entries under Manage's **Content** filter, two of them
 
 Editing entries one file at a time doesn't scale, so Studio can open the whole collection as a spreadsheet:
 
-1. Click **Files** in the activity bar.
+1. Click **Files** in the **Project** group of the Navigator rail, or press :kbd[⌘1].
 2. Right-click the `content/posts` folder and choose **Edit Collection in Grid**.
 
 ![The posts collection open in Grid mode, one row per entry with title, date, and description columns](../images/blog-grid.png)
@@ -93,8 +93,8 @@ Saving a collection row rewrites that file's frontmatter block — which is exac
 
 ## 8. Create the Blog page
 
-1. Click **Manage**, then **New** > **Page**, and name it `Blog`. Studio writes the page and opens it — this is your site's `/blog` address.
-2. In the mode switcher on the right side of the toolbar, click **Design**.
+1. Run **Manage Files** again, then **New** > **Page**, and name it `Blog`. Studio writes the page and opens it — this is your site's `/blog` address.
+2. In the **View** control on the pane's context bar, click **Design**.
 
 You should see the empty page on the design canvas, once per breakpoint.
 
@@ -102,9 +102,9 @@ You should see the empty page on the design canvas, once per breakpoint.
 
 Design a single card — the repeater will copy it per post:
 
-1. Open **Elements** in the activity bar. With nothing selected, click the **article** card.
+1. Press :kbd[⌘K] and run **Show Insert**. With nothing selected, click the **article** card.
 2. With the article selected, click the **h3** card, then the **p** card twice — each new element lands inside the selection.
-3. Select each of the three in turn and give it placeholder text via **Text Content** in the **Properties** tab: `Post title`, `A line about the post.`, and `2026-01-01`.
+3. Select each of the three in turn and give it placeholder text via **Text Content** in the Inspector's **Content** tab: `Post title`, `A line about the post.`, and `2026-01-01`.
 
 ![The design canvas with one article card holding a heading and two placeholder paragraphs](../images/blog-card.png)
 
@@ -114,22 +114,22 @@ You should see one plausible-looking post card on the canvas. Style it as much o
 
 The page needs the posts as data it can render:
 
-1. Click **State** in the activity bar, then the **+ Add…** picker.
+1. Press :kbd[⌘K], run **Show State**, then click the **+ Add…** picker.
 2. Pick **ContentCollection** — it's listed with the sources your project's imports and extensions provide.
 3. Rename the new entry to `posts` (type the name and press :kbd[Enter]).
 4. Set **contentType** to `posts`, and add a **sort** rule on the `date` field with order `desc`, so the newest post lists first.
 
 ![The State panel editing a ContentCollection entry with contentType posts and a date sort rule](../images/blog-collection-state.png)
 
-Open the **Data** activity and you should see `posts` worth `Array(3)` — your three entries, live. Filters, limits, and the other sources are covered in **[Data sources](/docs/studio/logic/data-sources)**.
+Open the **Data** panel (:kbd[⌘7]) and you should see `posts` worth `Array(3)` — your three entries, live. Filters, limits, and the other sources are covered in **[Data sources](/docs/studio/logic/data-sources)**.
 
 ## 11. Repeat the card for every post
 
-1. Right-click the article — on the canvas or in **Layers** — and choose **Repeat…**.
+1. Right-click the article — on the canvas or in **Outline** — and choose **Repeat…**.
 2. In the dialog, set **Items source** to `posts`.
 3. Click **Create Repeater**.
 
-Your card is now the repeater's _template_, marked **↻** in Layers. On the design canvas it still renders once — that's the template view. Everything about repeaters lives in **[Repeaters](/docs/studio/design/repeaters)**.
+Your card is now the repeater's _template_, marked **↻** in Outline. On the design canvas it still renders once — that's the template view. Everything about repeaters lives in **[Repeaters](/docs/studio/design/repeaters)**.
 
 ## 12. Bind the card to each post's fields
 
@@ -149,7 +149,7 @@ Pick **Preview** in the **View** control on the context bar.
 
 ![Preview on, the single card expanded into three post cards with real titles, dates, and descriptions](../images/blog-preview.png)
 
-You should see the single card expand into three, newest first, each filled in from its own post. Switch Preview off, then save your tabs with :kbd[⌘S] / :kbd[Ctrl+S]. When you're ready, commit the lot from **Source Control** — see **[Source control](/docs/studio/publish/source-control)**.
+You should see the single card expand into three, newest first, each filled in from its own post. Switch the **View** control back to **Design**, then save your open documents with :kbd[⌘S] / :kbd[Ctrl+S]. When you're ready, commit the lot from **Source Control** — see **[Source control](/docs/studio/publish/source-control)**.
 
 ![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](../images/git-commit.png)
 
@@ -162,7 +162,7 @@ The listing links nowhere yet, and that's deliberate: one page per post is the j
 A complete content pipeline, end to end:
 
 - A **content type** (`posts`) — schema-backed entries with one-click creation from Manage.
-- **Three entries**, edited both one at a time (the Properties bar) and in bulk (**Grid mode**).
+- **Three entries**, edited both one at a time (the Document Header card) and in bulk (**Grid mode**).
 - A **ContentCollection** state entry — the collection as live, sorted data on a page.
 - A **repeater** whose template binds `item.data` fields — one designed card, rendered per post.
 

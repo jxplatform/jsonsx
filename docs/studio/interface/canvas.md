@@ -32,9 +32,9 @@ In **Edit** mode the page scrolls like a normal browser page instead of panning,
 
 ## Selecting elements
 
-Click any element to select it. Studio outlines it, the right panel inspects it, and the status bar shows its position in the page structure — a clickable trail of its ancestors.
+Click any element to select it. Studio outlines it, the Inspector inspects it, and the status bar shows its position in the page structure — a clickable trail of its ancestors.
 
-That includes the parts of the page that come from its **[layout](/docs/studio/projects/pages-layouts-components)** — the header and footer render dimmed, under a `LAYOUT · layouts/base.json` chip, and clicking one selects it and offers **Open Layout →** in the right panel. They can't be typed into from here, because they belong to every page that uses that layout; see **[Layout elements](/docs/studio/design/properties#layout-elements)**.
+That includes the parts of the page that come from its **[layout](/docs/studio/projects/pages-layouts-components)** — the header and footer render dimmed, under a `LAYOUT · layouts/base.json` chip, and clicking one selects it and offers **Open Layout →** in the Inspector. They can't be typed into from here, because they belong to every page that uses that layout; see **[Layout elements](/docs/studio/design/properties#layout-elements)**.
 
 You can also move the selection from the keyboard: :kbd[↑] and :kbd[↓] step between siblings, :kbd[←] selects the parent, :kbd[→] steps into the first child, and :kbd[Esc] clears the selection. The full list is in the **[shortcut reference](/docs/studio/interface/shortcuts)**.
 
@@ -59,13 +59,13 @@ Three ways to add something to the page:
 
 - **The + affordance** — move the pointer between two elements and a **+** appears at the insertion point. Click it and pick an element from the menu; the new element lands right there, selected.
 - **The slash menu** — while editing text, type `/` at the start of a line to insert headings, lists, images, buttons, and more without leaving the keyboard. See [Edit mode](/docs/studio/editing).
-- **The Elements panel** — open the **Elements** activity and drag an element or component card onto the canvas.
+- **The Insert panel** — run **Show Insert** from the command palette (:kbd[⌘K] / :kbd[Ctrl+K]) and drag an element or component card onto the canvas.
 
 ## Drag and drop
 
-You can drag onto and around the canvas from almost anywhere: cards from the **Elements** panel, rows in the **Layers** panel, and the **⠿** handle on the block action bar. While you drag, an indicator line shows exactly where the element will land — before, after, or inside the element under the cursor. Drop to commit, or press :kbd[Esc] to cancel the drag with nothing changed.
+You can drag onto and around the canvas from almost anywhere: cards from the **Insert** panel, rows in the **Outline** panel, and the **⠿** handle on the block action bar. While you drag, an indicator line shows exactly where the element will land — before, after, or inside the element under the cursor. Drop to commit, or press :kbd[Esc] to cancel the drag with nothing changed.
 
-Files from your desktop work too. Drop an image on empty space and Studio uploads it and inserts it there; drop it on a picture that's already on the page and it swaps that picture's source instead — the target highlights so you can tell the two apart before you let go. See **[Media](/docs/studio/projects/media)**.
+Files from your desktop work too. Drop an image on empty space and Studio uploads it and inserts it there; drop it on a picture that's already on the page and it swaps that picture's source instead — the target highlights so you can tell the two apart before you let go. An upload that fails says so and stays said, on the **[Problems](/docs/studio/interface/problems-and-progress)** list, naming the file it couldn't write. See **[Media](/docs/studio/projects/media)**.
 
 ## The right-click context menu
 

@@ -46,7 +46,11 @@ Your page is also published for machines. After `jx build`, the site build runs 
 
 ## Canonical UI names
 
-Never invent synonyms for Studio surfaces. The activities are **Files, Layers, Imports, Elements, State, Data, Document, Source Control**; the canvas modes are **Edit, Design, Grid, Code, Stylebook** plus the **Preview** toggle; the right-panel tabs are **Properties, Events, Style**.
+Never invent synonyms for Studio surfaces. The shell regions are the **Command Bar**, the **Navigator rail** and its **Navigator** dock, the **pane** (with its **context bar**), the **Inspector**, the **Bottom dock** and the **status bar**.
+
+The Navigator panels are **Files, Source Control, Problems** (the rail's Project group), **Outline, Page, Data, Packages** (its Document group), plus **Insert** and **State**, which have no rail button and are opened by name from the palette. The Inspector tabs are **Content, Style, Logic, Assistant**; the Bottom dock's are **Problems, Diff, Logic, Activity**. A pane's **View** control offers **Edit, Design, Preview**, and its **Editor** control names the editor kind — **Canvas, Grid, Code, Diff, Library, Project Styles**.
+
+**Settings** is the project's (contexts, content types, connections, packages); **Preferences** is the application's (appearance, assistant, accounts, keyboard). Never use one word for the other.
 
 ## Callouts
 

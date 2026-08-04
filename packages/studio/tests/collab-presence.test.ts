@@ -4,7 +4,11 @@ import { createMockCollabHub, settleCollab } from "./collab-mock";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
 import { resetCollabForTests } from "../src/collab/collab-session";
 import { collabState } from "../src/collab/collab-state";
-import { presenceChipsTemplate } from "../src/collab/presence-chips";
+import {
+  presenceChipsTemplate,
+  readOnlyBannerTemplate,
+  statusTitle,
+} from "../src/collab/presence-chips";
 import { createOverlayLayer } from "../src/canvas/iframe-overlay";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import { afterEach, describe, expect, test } from "bun:test";
@@ -18,7 +22,7 @@ afterEach(() => {
 });
 
 describe("presence chips", () => {
-  test("render nothing for detached tabs", async () => {
+  test("render nothing while the platform offers no collaboration at all", async () => {
     installMockPlatform();
     const tab = openTab({ document: structuredClone(DOC), documentPath: PATH, id: PATH });
     const el = document.createElement("div");
@@ -122,5 +126,88 @@ describe("selection publishing", () => {
     }[];
     expect(cleared.some((s) => s.structuralSelection === null)).toBe(true);
     peer.destroy();
+  });
+});
+
+// ─── §7.4: the states co-editing could not announce ──────────────────────────
+/* `"detached"` used to mean three things at once and say none of them — this build has no
+   collaboration, this document is solo, and the attach was tried and FAILED. A freeze, meanwhile,
+   was a three-second grey line, which is exactly what a bug looks like. */
+
+describe("collab honesty", () => {
+  async function chips(patch: Record<string, unknown>): Promise<HTMLElement> {
+    installMockPlatform();
+    const tab = openTab({ document: structuredClone(DOC), documentPath: PATH, id: PATH });
+    Object.assign(collabState(tab), patch);
+    const el = document.createElement("div");
+    await renderInto(presenceChipsTemplate(tab) as TemplateResult, el);
+    return el;
+  }
+
+  test("solo says Solo — it is not the same word as broken", async () => {
+    const el = await chips({ active: false, status: "detached" });
+    expect(el.querySelector(".jx-presence-status")?.textContent?.trim()).toBe("Solo");
+  });
+
+  test("a failed attach says so, and carries the reason", async () => {
+    const el = await chips({ attachError: "relay unreachable", status: "failed" });
+    const pill = el.querySelector(".jx-presence-status")!;
+    expect(pill.textContent?.trim()).toBe("Not connected");
+    expect((pill as HTMLElement).dataset.status).toBe("failed");
+    expect(el.querySelector(".jx-presence")?.getAttribute("title")).toContain("relay unreachable");
+  });
+
+  test("the source-canonical freeze gets a standing indicator that denies being an error", async () => {
+    const el = await chips({ active: true, sourceCanonical: true, status: "synced" });
+    const flag = el.querySelector('[data-flag="frozen"]')!;
+    expect(flag.textContent?.trim()).toBe("Code view held");
+    expect(flag.getAttribute("title")).toContain("not an error");
+  });
+
+  test("a read-only guest is told before they type, not after", async () => {
+    const el = await chips({ active: true, readOnly: true, status: "synced" });
+    expect(el.querySelector('[data-flag="read-only"]')?.textContent?.trim()).toBe("Read-only");
+  });
+
+  test("statusTitle states the one undo fact nobody would guess", () => {
+    expect(statusTitle("synced", "")).toContain("never a collaborator's");
+    expect(statusTitle("offline", "")).toContain("never a collaborator's");
+    expect(statusTitle("failed", "boom")).toContain("boom");
+    expect(statusTitle("connecting", "")).toBe("Connecting…");
+  });
+});
+
+describe("read-only banner", () => {
+  function tabWith(patch: Record<string, unknown>) {
+    installMockPlatform();
+    const tab = openTab({ document: structuredClone(DOC), documentPath: PATH, id: PATH });
+    Object.assign(collabState(tab), patch);
+    return tab;
+  }
+
+  test("renders only for an ACTIVE read-only session", async () => {
+    const el = document.createElement("div");
+    await renderInto(
+      readOnlyBannerTemplate(tabWith({ active: true, readOnly: true })) as TemplateResult,
+      el,
+    );
+    expect(el.querySelector('.jx-collab-banner[data-kind="read-only"]')?.textContent).toContain(
+      "not published",
+    );
+  });
+
+  test("renders nothing when writable, inactive, or tabless", async () => {
+    for (const patch of [
+      { active: true, readOnly: false },
+      { active: false, readOnly: true },
+    ]) {
+      const el = document.createElement("div");
+      const tpl = readOnlyBannerTemplate(tabWith(patch));
+      if (tpl !== undefined && typeof tpl !== "symbol") {
+        await renderInto(tpl as TemplateResult, el);
+      }
+      expect(el.querySelector(".jx-collab-banner")).toBeNull();
+    }
+    expect(readOnlyBannerTemplate(null)).toBeDefined();
   });
 });

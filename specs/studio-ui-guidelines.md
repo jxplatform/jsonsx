@@ -1,8 +1,8 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 **Status:** Implemented
-**Updated:** 2026-08-02
+**Updated:** 2026-08-04
 **Applies to:** `packages/studio/`
 
 ---
@@ -718,8 +718,61 @@ surfaces disagree about one capability. `Cmd+W` refusing to close the last tab w
 `×` closed it happily is the canonical example, and it is exactly what one record with one chord and
 one `run` makes impossible.
 
+## 13. Notification Tiers
+
+**Status:** Partial — the three tiers and their surfaces ship; the Diff and Logic tabs of the Bottom
+dock are declared and empty.
+
+The normative contract is `specs/studio.md` §16. This section governs how those records are
+_rendered_ — what each tier looks like, and the rules a reviewer applies when someone proposes a
+fourth one.
+
+### 13.1 Choosing a tier
+
+The question is never "how bad is this?" — it is **what does the reader have to do?**
+
+| The reader…                         | Tier    | Because                                                 |
+| ----------------------------------- | ------- | ------------------------------------------------------- |
+| needs to know, and can carry on     | toast   | it retires itself; nothing is owed                      |
+| must fix something before moving on | Problem | it must outlive the frame the reader was not looking at |
+| typed a value the app cannot accept | inline  | the value is on screen; nothing else is the right place |
+
+Severity picks the default tier and the call site overrides it. Severity is not the tier: a warning
+that must be fixed is a Problem, and an error the user cannot act on is a toast with a `detail`.
+
+### 13.2 Rendering rules
+
+- **Four toasts at most, newest at the bottom.** Beyond that the oldest retires early — a stack that
+  grows without bound is a wall, and a wall is not read.
+- **Success and info rest for 4s, warnings and errors for 8s.** A reader who has to decide gets
+  twice as long as a reader who is being told.
+- **One line of text, one glyph.** A toast is a sentence, not an illustration; anything longer
+  belongs in `detail`, which is a Problem's second line.
+- **The recovery button prints the command's own title.** Never a bespoke verb — the button and the
+  palette row must be the same words, because they are the same command.
+- **A Problem row states its source and its path**, and clicking it goes there. A Problem nobody can
+  navigate from is a log line with better typography.
+- **An inline error renders after the control, with `role="alert"`, and takes precedence over a
+  warning state on the same row.** Where a row can carry several, it counts them from two up.
+
+### 13.3 The rules that keep this from becoming a fourth surface
+
+1.  **The status bar never carries an outcome.** It is ambient state. This is the single rule that
+    the 78-call-site predecessor broke, and every regression here starts by breaking it again.
+2.  **A modal is not a notification.** Blocking is reserved for an operation that cannot proceed
+    while the author edits — in practice, dependency installation — and even then it offers to run
+    in the background. Everything else reports and gets out of the way.
+3.  **Nothing is announced twice.** An operation with an Activity entry does not also toast its
+    completion; a failure raises exactly one Problem, deduped by `key`.
+4.  **Timed surfaces declare themselves to `probe.idle()`.** A toast settling in is not idle; a toast
+    at rest is. Without the second half of that sentence a screenshot run would wait forever on a
+    toast that is deliberately being held open.
+
+---
+
 ## Changelog
 
+- **0.3.1** (2026-08-04) — §13 Notification Tiers — choosing a tier by the action required, the rendering rules, and the four rules that keep feedback from becoming a fourth surface.
 - **0.3.0** (2026-08-02) — Empty States and Copy (§11); Command and Menu Rendering Rules incl. the level × placement matrix (§12).
 - **0.2.3** (2026-08-02) — One teaching empty-state pattern (new §11); focus-visible rings replace bare outline:none; settings writes surface failure at the control.
 - **0.2.2** (2026-08-02) — openModal shares showDialog's focus machinery: role/label at the wrapper, focus trap, focus restore, centralised Escape (§8.7).

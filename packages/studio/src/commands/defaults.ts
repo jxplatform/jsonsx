@@ -22,7 +22,15 @@
 import type { AnyCommand } from "./registry";
 import type { CommandContext } from "./context";
 
-/** Which dock a toggle addresses. Mirrors the three dock toggles in the Command Bar. */
+/**
+ * Which dock {@link CommandDeps.toggleDock} addresses.
+ *
+ * The Command Bar draws three toggles, but only two come through this verb: the Bottom dock's is
+ * `shell.ts`'s `view.toggleBottomDock`, which writes `shell.docks.bottom` directly now that the
+ * dock is on the shell record. `"bottom"` survives in the union only because
+ * `editor/shortcuts.ts`'s `toggleShellDock` still carries the branch that used to route ⌘J to the
+ * Assistant — HANDOFF: that branch is now unreachable, and it goes with this member.
+ */
 export type DockId = "navigator" | "inspector" | "bottom";
 
 /**
@@ -34,16 +42,16 @@ export type DockId = "navigator" | "inspector" | "bottom";
 export type PaletteMode = "picker" | "files" | "commands" | "nodes" | "projects";
 
 /**
- * One Navigator panel, as the ⌘1–8 direct keys address it.
+ * One panel, as the ⌘1–8 direct keys address it.
  *
  * Structurally the part of `panels/panel-registry.ts`'s `PanelRecord` a chord needs, declared here
  * rather than imported so this module keeps its one load-bearing property: it imports no state and
  * no DOM, which is what lets the three CI checks load the command set in a bare Bun process. The
- * ROSTER arrives by injection ({@link CommandDeps.navigatorPanels}) from the panel registry, so
- * there is still exactly one place a panel is named.
+ * ROSTER arrives by injection ({@link CommandDeps.panelRoster}) from the panel registry, so there
+ * is still exactly one place a panel is named.
  */
 export interface RailPanel {
-  /** The stored `shell.leftTab` value. */
+  /** The panel's registry id — what `deps.focusPanel` is handed. */
   id: string;
   /** The panel's human name, which is also the command's title after "Show ". */
   title: string;
@@ -96,16 +104,20 @@ export interface CommandDeps {
   openPalette: (mode: PaletteMode) => void;
   openProject: () => void | Promise<void>;
   /**
-   * The Navigator's panels, in rail order — the roster ⌘1–8 is generated from.
+   * The rail's panels in rail order, then the rail-less ones — the roster ⌘1–8 is generated from.
+   *
+   * Not "the Navigator's panels": the rail groups by LEVEL and spans two docks, so Problems (whose
+   * body is the Bottom dock's first tab, plan §7.2) is the fourth entry and keeps ⌘4.
+   * `panels/navigator-panels.ts`'s `panelFocusRoster()` builds it.
    *
    * Injected rather than declared here so the panel registry stays the one place a panel is named,
    * levelled and gated. An empty roster (the no-op deps) simply yields no `panel.focus.*` records.
    */
-  navigatorPanels: readonly RailPanel[];
+  panelRoster: readonly RailPanel[];
   /**
-   * Toggle-FOCUS a Navigator panel (plan §5.3): reveal it and take focus, or — when it already has
-   * focus — collapse the dock and hand focus back to the pane. Deliberately not toggle-visible: ⌘1
-   * pressed from the canvas must land you in Files, not close it.
+   * Toggle-FOCUS a panel (plan §5.3): reveal it and take focus, or — when it already has focus —
+   * collapse the dock hosting it and hand focus back to the pane. Deliberately not toggle-visible:
+   * ⌘1 pressed from the canvas must land you in Files, not close it.
    */
   focusPanel: (panelId: string) => void;
   /** Show an Inspector tab and focus the dock. `"assistant"` addresses the assistant dock. */
@@ -129,7 +141,7 @@ export function noopCommandDeps(): CommandDeps {
     toggleZen: () => {},
     openPalette: () => {},
     openProject: () => {},
-    navigatorPanels: [],
+    panelRoster: [],
     focusPanel: () => {},
     focusInspectorTab: () => {},
     cycleRegion: () => {},
@@ -307,16 +319,10 @@ export function defaultCommands(deps: CommandDeps): AnyCommand[] {
       group: "4_docks",
       run: () => deps.toggleDock("inspector"),
     },
-    {
-      id: "view.toggleBottomDock",
-      title: "Toggle Bottom Dock",
-      category: "View",
-      level: "application",
-      keybinding: "mod+j",
-      menus: ["commandbar/overflow", "palette"],
-      group: "4_docks",
-      run: () => deps.toggleDock("bottom"),
-    },
+    // `view.toggleBottomDock` (⌘J) is NOT here. It moved to `shell.ts`, beside `view.setBottomDock`
+    // And the `shell.docks.bottom` record both of them write: the Bottom dock is a dock now, so its
+    // Verbs are declared where the other two docks' are, and the toggle no longer needs a `deps`
+    // Hop through a dock id this module cannot resolve.
     {
       id: "view.zen",
       title: "Zen Mode",
@@ -423,7 +429,7 @@ export function defaultCommands(deps: CommandDeps): AnyCommand[] {
 }
 
 /**
- * ⌘1–8 — one record per rail panel, generated from {@link RAIL_PANELS}.
+ * ⌘1–8 — one record per panel, generated from {@link CommandDeps.panelRoster}.
  *
  * Generated rather than written out eight times for the reason the whole registry exists: the rail,
  * the chord, the palette row and the generated shortcut sheet are then four renderings of one list.
@@ -432,7 +438,7 @@ export function defaultCommands(deps: CommandDeps): AnyCommand[] {
  */
 export function panelFocusCommands(deps: CommandDeps): AnyCommand[] {
   let chordsSpent = 0;
-  return deps.navigatorPanels.map((panel) => {
+  return deps.panelRoster.map((panel) => {
     const command: AnyCommand = {
       id: `panel.focus.${panel.id}`,
       title: `Show ${panel.title}`,

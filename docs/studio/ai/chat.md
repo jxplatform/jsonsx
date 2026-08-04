@@ -1,6 +1,6 @@
 ---
-title: "The AI sidebar"
-description: "The persistent chat sidebar — open it, attach context, watch the assistant's edits land, manage chat history, and review or undo its changes."
+title: "The AI assistant"
+description: "The assistant's chat — open it, attach context, watch its edits land, manage chat history, and review or undo what it changed."
 code:
   - packages/studio/src/panels/ai-chat/composer.ts
   - packages/studio/src/panels/ai-chat/chat-view.ts
@@ -8,17 +8,17 @@ code:
   - packages/studio/src/services/ai-session-store.ts
 ---
 
-# The AI sidebar
+# The AI assistant
 
-The AI sidebar is the assistant's home: a chat column on the right edge of the workspace that stays put while you work. It survives tab switches — your draft message, scroll position, and conversation are all still there when you come back — and it works in every state of Studio, from the welcome screen to a page mid-edit.
+The assistant lives in the Inspector, as its fourth tab beside Content, Style and Logic. It survives tab switches — your draft message, scroll position, and conversation are all still there when you come back — and it works in every state of Studio, from the welcome screen to a page mid-edit. Because it shares the Inspector's width, showing it costs the canvas nothing.
 
-![A conversation in the sidebar: a user message with context chips, an assistant reply with a tool chip, and the composer below](../../images/ai-sidebar-chat.png)
+![A conversation with the assistant: a user message with context chips, an assistant reply with a tool chip, and the composer below](../../images/ai-sidebar-chat.png)
 
 ## Open it
 
-Click the **Toggle Assistant** chat-bubble button at the right end of the toolbar. It starts closed, so the column is yours until you ask for it. Click the button again to collapse the sidebar; drag its inner edge to resize it. Both the width and the open/closed state are remembered across sessions.
+Press :kbd[⌘⇧4] (macOS) / :kbd[Ctrl+Shift+4] (Windows/Linux), or click the **Assistant** tab at the top of the Inspector. Drag the Inspector's inner edge to resize it; the width and which tab you left selected are both remembered across sessions.
 
-If no AI provider is set up yet, the sidebar still opens on a chat, with one line under it — _No AI provider is connected yet_ — and an **Assistant: Settings…** button that opens the setup dialog. See **[Connect a provider](/docs/studio/ai#connect-a-provider)**.
+If no AI provider is set up yet, the tab still opens on a chat, with one line under it — _No AI provider is connected yet_ — and an **Assistant: Settings…** button that opens the setup dialog. See **[Connect a provider](/docs/studio/ai#connect-a-provider)**.
 
 ## Send a message
 
@@ -44,9 +44,13 @@ Even without attachments the assistant already knows a lot: each message carries
 
 ## Watch it work
 
-The assistant's reply streams in live. When it acts on your project, each action appears as a small labeled chip in the reply — one per edit or file operation — so the reply doubles as a log of what was done. Actions that fail show a warning row explaining why; successful ones stay quietly in their chips.
+The assistant's reply streams in live. When it acts on your project, each action appears as a small labeled chip in the reply — one per edit or file operation — and each chip says what **became** of that action: a tick and the change it made, or a cross and the reason it was refused. A chip with neither is still in flight.
 
-Document edits land on the canvas as they happen, so for canvas work you can literally watch the page change. If something goes wrong mid-request — a lost connection, a provider error — the sidebar shows the error with advice on how to recover.
+Under the chips, a reply that changed anything carries a one-line summary — "Changed 3 files", plus a count of any that were **written to disk, where undo cannot reach them**. Expand it for the list of paths. When every change in a reply went through the editor, the summary also offers **Restore to here**, which rolls that whole reply back in one step.
+
+Document edits land on the canvas as they happen, so for canvas work you can literally watch the page change. If something goes wrong mid-request — a lost connection, a provider error — the chat shows the error with advice on how to recover, and a **Retry** button that sends your last message again.
+
+A long request that reaches the assistant's per-message limit on tool calls is not an error: it finishes with a note saying it ran out of rounds and listing what it did apply, and everything it changed stays changed. Send another message to continue.
 
 ## Review and undo edits
 

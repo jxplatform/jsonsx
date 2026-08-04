@@ -335,6 +335,83 @@ describe("renderFieldRow", () => {
     expect(row.getAttribute("style")).toContain("grid-column: 1 / -1");
     expect(row.classList.contains("style-row--warning")).toBe(true);
   });
+
+  /* §7.1's third tier: the error slot. A bad value belongs AT its control. Before this slot the
+     only place to say so was a three-second grey line at the bottom of the window, hundreds of
+     pixels from the field that refused the value — by which time the field had snapped back and
+     the reason was gone. */
+
+  test("an error renders under the widget with role=alert and marks the row invalid", async () => {
+    const container = await renderInto(
+      renderFieldRow({
+        error: "Enter a length, like 16px.",
+        hasValue: false,
+        label: "Width",
+        prop: "width",
+        widget: html`<b class="the-widget"></b>`,
+      }),
+    );
+    const row = container.querySelector(".style-row") as HTMLElement;
+    expect(row.classList.contains("style-row--invalid")).toBe(true);
+    const error = row.querySelector(".style-row-error") as HTMLElement;
+    expect(error.getAttribute("role")).toBe("alert");
+    expect(error.textContent).toContain("Enter a length, like 16px.");
+    // The error follows the widget: the message is about the control above it.
+    expect(error.previousElementSibling?.classList.contains("the-widget")).toBe(true);
+  });
+
+  test("no error means no error line and no invalid class", async () => {
+    for (const error of [undefined, ""]) {
+      const container = await renderInto(
+        renderFieldRow({ error, hasValue: false, label: "W", prop: "w", widget: html`` }),
+      );
+      const row = container.querySelector(".style-row") as HTMLElement;
+      expect(row.classList.contains("style-row--invalid")).toBe(false);
+      expect(row.querySelector(".style-row-error")).toBeNull();
+    }
+  });
+
+  test("invalid wins over warning — refused is not the same as unusual", async () => {
+    const container = await renderInto(
+      renderFieldRow({
+        error: "Refused.",
+        hasValue: false,
+        label: "W",
+        prop: "w",
+        warning: true,
+        widget: html``,
+      }),
+    );
+    const row = container.querySelector(".style-row") as HTMLElement;
+    expect(row.classList.contains("style-row--invalid")).toBe(true);
+    expect(row.classList.contains("style-row--warning")).toBe(false);
+  });
+
+  test("the repeat counter renders from 2 up, never at 1", async () => {
+    const one = await renderInto(
+      renderFieldRow({
+        error: "Refused.",
+        errorCount: 1,
+        hasValue: false,
+        label: "W",
+        prop: "w",
+        widget: html``,
+      }),
+    );
+    expect(one.querySelector(".style-row-error-count")).toBeNull();
+
+    const three = await renderInto(
+      renderFieldRow({
+        error: "Refused.",
+        errorCount: 3,
+        hasValue: false,
+        label: "W",
+        prop: "w",
+        widget: html``,
+      }),
+    );
+    expect(three.querySelector(".style-row-error-count")?.textContent).toBe("×3");
+  });
 });
 
 // ─── icons map ───────────────────────────────────────────────────────────────

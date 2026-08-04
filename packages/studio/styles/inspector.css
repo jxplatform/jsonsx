@@ -206,6 +206,28 @@ textarea.field-input {
 .style-row--warning .style-row-label::before {
   content: "⚠ ";
 }
+/* §7.1's third notification tier: a bad value, said AT the control that refuses it, for exactly as
+   long as the value stays bad. A toast expires and a problem is a list entry somewhere else; this
+   one is a property of the field, so it is styled as part of the row rather than as a floating
+   surface. The left rule is what makes it read as belonging to the widget above it. */
+.style-row--invalid .style-row-label {
+  color: var(--danger);
+}
+.style-row-error {
+  margin: 2px 0 0;
+  padding-left: 6px;
+  border-left: 2px solid var(--danger);
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--danger);
+}
+/* The repeat counter — "it refused me AGAIN" is otherwise indistinguishable from "the field is
+   still red from last time" when the second attempt fails the same way. */
+.style-row-error-count {
+  margin-left: 4px;
+  font-family: var(--font-mono);
+  opacity: 0.75;
+}
 .style-row > sp-textfield,
 .style-row > sp-number-field,
 .style-row > sp-picker,

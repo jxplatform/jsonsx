@@ -14,6 +14,7 @@ import {
   renderForm,
   renderInlineField,
   resolveFormEnum,
+  validateFieldValue,
 } from "../src/ui/schema-form";
 import { resolveContextPointer } from "../src/services/context-resolver";
 import contentCollectionClass from "@jxsuite/parser/ContentCollection.class.json";
@@ -585,5 +586,119 @@ describe("ContentCollection enum refs render the same choices as before", () => 
       el.getAttribute("value"),
     );
     expect(values).toEqual(["__none__", "date", "slug", "title"]);
+  });
+});
+
+// ─── Inline validation (§7.1's third tier) ───────────────────────────────────
+/* The form is a REPORTER, not a second implementation of JSON Schema: it makes the checks a
+   property schema can make on its own at commit time, and renders anybody else's verdict — the
+   whole-document `jx-validate` run, a Monaco marker — through `errors`. */
+
+describe("validateFieldValue", () => {
+  test("an empty value is only refused when the host asks for required-ness", () => {
+    expect(validateFieldValue({ type: "string" }, "", false)).toBe("");
+    expect(validateFieldValue({ type: "string" }, undefined, false)).toBe("");
+    expect(validateFieldValue({ type: "string" }, "", true)).toBe("Required.");
+  });
+
+  test("a $ref binding is never judged — it resolves from state the form cannot see", () => {
+    expect(validateFieldValue({ type: "number" }, { $ref: "#/$context/x" }, true)).toBe("");
+  });
+
+  test("enum membership is checked and the choices are named", () => {
+    const schema = { enum: ["a", "b"], type: "string" };
+    expect(validateFieldValue(schema, "a", false)).toBe("");
+    expect(validateFieldValue(schema, "c", false)).toBe("Choose one of: a, b.");
+  });
+
+  test("numbers: non-numeric, non-integer, and the bounds", () => {
+    expect(validateFieldValue({ type: "number" }, "abc", false)).toBe("Enter a number.");
+    expect(validateFieldValue({ type: "integer" }, 1.5, false)).toBe("Enter a whole number.");
+    expect(validateFieldValue({ minimum: 2, type: "number" }, 1, false)).toBe("Must be 2 or more.");
+    expect(validateFieldValue({ maximum: 2, type: "number" }, 3, false)).toBe("Must be 2 or less.");
+    expect(validateFieldValue({ maximum: 9, minimum: 2, type: "number" }, "4", false)).toBe("");
+  });
+
+  test("boolean, array and object shapes", () => {
+    expect(validateFieldValue({ type: "boolean" }, "yes", false)).toBe("Must be true or false.");
+    expect(validateFieldValue({ type: "array" }, "x", false)).toBe("Must be a list.");
+    expect(validateFieldValue({ type: "object" }, [], false)).toBe("Must be an object.");
+    expect(validateFieldValue({ type: "object" }, {}, false)).toBe("");
+  });
+});
+
+describe("renderForm inline errors", () => {
+  test("a fresh form paints nothing red — required-ness is the label's asterisk", () => {
+    const m = mountForm({ properties: { title: { type: "string" } }, required: ["title"] }, {});
+    expect(m.container.querySelector(".style-row-error")).toBeNull();
+    expect(m.container.querySelector("sp-field-label")?.textContent).toContain("*");
+  });
+
+  test("showRequired turns the same form red — what a host does after a rejected submit", () => {
+    const container = document.createElement("div");
+    render(
+      html`${renderForm(
+        { properties: { title: { type: "string" } }, required: ["title"] },
+        {},
+        {
+          onChange: () => {},
+          showRequired: true,
+        },
+      )}`,
+      container,
+    );
+    expect(container.querySelector(".style-row-error")?.textContent).toContain("Required.");
+  });
+
+  test("an intrinsic refusal renders at the field that holds the value", () => {
+    const container = document.createElement("div");
+    render(
+      html`${renderForm(
+        { properties: { count: { type: "integer" } } },
+        { count: 1.5 },
+        {
+          onChange: () => {},
+        },
+      )}`,
+      container,
+    );
+    const row = container.querySelector('[data-prop="count"]') as HTMLElement;
+    expect(row.classList.contains("style-row--invalid")).toBe(true);
+    expect(row.querySelector(".style-row-error")?.textContent).toContain("whole number");
+  });
+
+  test("a host diagnostic wins over the intrinsic check", () => {
+    /* The jx-validate run saw the whole project.json; this form saw one property. The one that
+       saw more is the one that gets to speak. */
+    const container = document.createElement("div");
+    render(
+      html`${renderForm(
+        { properties: { count: { type: "integer" } } },
+        { count: 1.5 },
+        {
+          errors: { count: "must be <= 10" },
+          onChange: () => {},
+        },
+      )}`,
+      container,
+    );
+    expect(container.querySelector(".style-row-error")?.textContent).toContain("must be <= 10");
+  });
+
+  test("errorCounts reach the row's repeat counter", () => {
+    const container = document.createElement("div");
+    render(
+      html`${renderForm(
+        { properties: { count: { type: "integer" } } },
+        {},
+        {
+          errorCounts: { count: 4 },
+          errors: { count: "nope" },
+          onChange: () => {},
+        },
+      )}`,
+      container,
+    );
+    expect(container.querySelector(".style-row-error-count")?.textContent).toBe("×4");
   });
 });

@@ -5,16 +5,34 @@
  * projectState.projectConfig + platform.writeFile("project.json", …).
  */
 import { flush, installMockPlatform, key, pointer, resetStudioState } from "./harness";
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { html } from "lit-html";
-import {
-  renderContributedSection,
-  resetContributedSectionState,
-} from "../src/settings/contributed-section";
 import { registerFormControl } from "../src/ui/schema-form";
 import { projectState } from "../src/store";
 import type { MockPlatformState } from "./harness";
 import type { SettingsContribution } from "../src/settings/contributed-section";
+/** What the mocked project validator returns (or throws) on the next call. */
+let validatorResult: string[] | Error = [];
+void mock.module("../src/services/jx-validate.js", () => ({
+  applyProjectSchemas: () => {},
+  resetProjectSchemas: () => {},
+  validateDoc: async () => [],
+  validateProjectConfig: async () => {
+    if (validatorResult instanceof Error) {
+      // eslint-disable-next-line no-throw-literal -- validatorResult IS an Error on this branch
+      throw validatorResult as Error;
+    }
+    return validatorResult;
+  },
+}));
+
+const {
+  renderContributedSection,
+  resetContributedDiagnostics,
+  resetContributedSectionState,
+  routeDiagnostics,
+} = await import("../src/settings/contributed-section");
+const { problems, resetNotifications } = await import("../src/services/notify");
 
 type ValueEl = HTMLElement & { value: string };
 
@@ -53,6 +71,8 @@ let platformState: MockPlatformState;
 let container: HTMLElement;
 
 beforeEach(() => {
+  validatorResult = [];
+  resetContributedDiagnostics();
   resetContributedSectionState();
   ({ state: platformState } = installMockPlatform());
   resetStudioState({
@@ -289,5 +309,102 @@ describe("map layout", () => {
     renderContributedSection(container, mapContribution);
     expect(container.querySelector(".settings-empty-state")).not.toBeNull();
     expect(config().connections).toEqual({});
+  });
+});
+
+// ─── §7.1/§7.2: validation and write failures ────────────────────────────────
+/* `jx-validate` was wired to exactly one caller — the AI's `write_project_config` — so the model's
+   edits to project.json were schema-checked and a human's edits through this very form were not.
+   And the write itself was `void saveProjectConfig()`: a read-only file or a dead RPC was dropped
+   on the floor while the form kept showing the value it had failed to save. */
+
+describe("routeDiagnostics", () => {
+  test("routes a message to the field it names, one level under the base", () => {
+    expect(routeDiagnostics("/search", ["/search/index: must be string"])).toEqual({
+      fields: { index: "must be string" },
+      section: [],
+    });
+  });
+
+  test("a deeper pointer still belongs to the control that exists on this form", () => {
+    expect(routeDiagnostics("/search", ["/search/fields/0/kind: must be one of"]).fields).toEqual({
+      fields: "must be one of",
+    });
+  });
+
+  test("a message about the base itself has no field, and is returned for the section line", () => {
+    expect(routeDiagnostics("/search", ["/search: must have required property 'index'"])).toEqual({
+      fields: {},
+      section: ["must have required property 'index'"],
+    });
+  });
+
+  test("messages about other sections are not this form's business", () => {
+    expect(routeDiagnostics("/search", ["/connections/main: must be object"])).toEqual({
+      fields: {},
+      section: [],
+    });
+  });
+
+  test("the first message per field wins, and a message with no pointer is ignored", () => {
+    const routed = routeDiagnostics("/search", [
+      "/search/index: first",
+      "/search/index: second",
+      "no pointer here",
+    ]);
+    expect(routed.fields).toEqual({ index: "first" });
+    expect(routed.section).toEqual([]);
+  });
+});
+
+describe("persistence failures", () => {
+  beforeEach(() => {
+    resetContributedDiagnostics();
+    resetNotifications();
+  });
+
+  test("a rejected project.json write becomes a Problem, not a silence", async () => {
+    installMockPlatform({
+      writeFile: async () => {
+        throw new Error("EROFS: read-only file system");
+      },
+    } as never);
+    renderContributedSection(container, formContribution);
+    const check = container.querySelector('[data-prop="enabled"] sp-checkbox') as HTMLElement & {
+      checked: boolean;
+    };
+    check.checked = true;
+    check.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush(4);
+    const failure = problems.find((p) => p.message.includes("Could not save project.json"));
+    expect(failure?.source).toBe("Settings");
+    expect(failure?.path).toBe("project.json");
+    expect(failure?.message).toContain("EROFS");
+  });
+
+  test("schema errors reach the field they are about, on the next render", async () => {
+    validatorResult = ["/analytics/id: must be string"];
+    renderContributedSection(container, formContribution);
+    const check = container.querySelector('[data-prop="enabled"] sp-checkbox') as HTMLElement & {
+      checked: boolean;
+    };
+    check.checked = true;
+    check.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush(6);
+    const row = container.querySelector('[data-prop="id"]') as HTMLElement;
+    expect(row.querySelector(".style-row-error")?.textContent).toContain("must be string");
+  });
+
+  test("a validator that will not compile is a problem of its own, not the user's field", async () => {
+    validatorResult = new Error("ajv exploded");
+    renderContributedSection(container, formContribution);
+    const check = container.querySelector('[data-prop="enabled"] sp-checkbox') as HTMLElement & {
+      checked: boolean;
+    };
+    check.checked = true;
+    check.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush(6);
+    expect(problems.some((p) => p.message.includes("Could not validate project.json"))).toBe(true);
+    expect(container.querySelector(".style-row-error")).toBeNull();
   });
 });

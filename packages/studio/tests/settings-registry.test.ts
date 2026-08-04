@@ -49,7 +49,14 @@ function navButton(label: string): HTMLElement {
 }
 
 // Content Types is no longer built-in — @jxsuite/parser contributes it via $studio.settings.
-const BUILTIN_LABELS = ["General", "Head", "CSS Variables", "Data Shapes", "Dependencies"];
+const BUILTIN_LABELS = [
+  "General",
+  "Contexts",
+  "Head",
+  "CSS Variables",
+  "Data Shapes",
+  "Dependencies",
+];
 
 beforeEach(() => {
   installMockPlatform();
@@ -88,6 +95,7 @@ describe("registerSettingsSection", () => {
     // Order 35 lands between CSS Variables (30) and Data Shapes (40)
     expect(navLabels()).toEqual([
       "General",
+      "Contexts",
       "Head",
       "CSS Variables",
       "Custom",

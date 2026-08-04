@@ -24,7 +24,7 @@ You should now see your project open on the canvas.
 
 ## 2. Create the component
 
-1. Click **Manage** in the toolbar.
+1. Press :kbd[⌘K] and run **Manage Files**.
 2. Click **New** and choose **Component**.
 3. Type `counter-card` and confirm.
 
@@ -32,30 +32,30 @@ You should now see your project open on the canvas.
 
 Studio writes `components/counter-card.json` and opens it in a new tab — an empty canvas, ready to fill. (When to reach for a component versus a page or layout is covered in **[Pages, layouts, and components](/docs/studio/projects/pages-layouts-components)**.)
 
-## 3. Switch to Design mode
+## 3. Switch to Design
 
-Component files open in **Edit** mode. In the mode switcher on the right side of the toolbar, click **Design**.
+Component files open in **Edit**. In the **View** control on the pane's context bar, click **Design**.
 
 ![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](../images/mode-design.png)
 
-The canvas now shows your component once per breakpoint — empty for the moment — and the right panel offers the **Properties**, **Events**, and **Style** tabs. Views are just lenses on the same file; see **[Modes and views](/docs/studio/interface/modes)**.
+The canvas now shows your component once per breakpoint — empty for the moment — and the Inspector on the right offers the **Content**, **Style**, **Logic**, and **Assistant** tabs. Views are just lenses on the same file; see **[Modes and views](/docs/studio/interface/modes)**.
 
 ## 4. Add a button and a text line
 
-1. Click **Elements** in the activity bar to open the palette.
+1. Press :kbd[⌘K] and run **Show Insert** to open the palette.
 2. With nothing selected, click the **button** card. The button is added to the empty component.
 3. Press :kbd[Esc] to clear the selection — otherwise the next element would land _inside_ the button — then click the **p** card to add a paragraph.
-4. Select the button, open the **Properties** tab, and type `Add one` into **Text Content**.
+4. Select the button, open the Inspector's **Content** tab, and type `Add one` into **Text Content**.
 
 ![The design canvas with a button labeled Add one and an empty paragraph below it](../images/counter-elements.png)
 
-You should now see a button labeled **Add one** with an empty paragraph after it, at every breakpoint. The other ways to insert — dragging cards, the **+** affordance between elements — are covered in **[The canvas](/docs/studio/interface/canvas)** and the **[Elements panel](/docs/studio/design/elements)**.
+You should now see a button labeled **Add one** with an empty paragraph after it, at every breakpoint. The other ways to insert — dragging cards, the **+** affordance between elements — are covered in **[The canvas](/docs/studio/interface/canvas)** and the **[Insert palette](/docs/studio/design/elements)**.
 
 ## 5. Declare the count
 
 The component needs somewhere to keep its number. That's a state entry:
 
-1. Click **State** (the brackets icon) in the activity bar.
+1. Press :kbd[⌘K] and run **Show State**.
 2. Click the **+ Add…** picker at the bottom of the panel and choose **Value**. The new entry appears with a placeholder name and its editor open.
 3. Rename it first: type `count` into the **Name** field and press :kbd[Enter].
 4. Set **Type** to `integer` and leave **Default** at `0`.
@@ -69,7 +69,7 @@ The panel now shows a **State** section with one row: an **S** badge and the nam
 Now point the paragraph at the value instead of typing fixed text:
 
 1. Select the paragraph on the canvas.
-2. In the **Properties** tab, find the **Text Content** row. Beside its label sits a small mode button reading **abc** — the sign that the value is static.
+2. In the Inspector's **Content** tab, find the **Text Content** row. Beside its label sits a small mode button reading **abc** — the sign that the value is static.
 3. Click the button until it reads **${}** — the template mode. Each click steps to the next mode; the tooltip names the one a click will switch to.
 4. Studio pre-fills the field with your first state entry: `${state.count}`. Keep it, or mix in words: `Clicked ${state.count} times`.
 
@@ -79,14 +79,14 @@ The mode button takes on the accent color: this value is now dynamic, and the pa
 
 ## 7. Make the button count
 
-1. Select the button and click **Events** in the right panel.
+1. Select the button and click **Logic** in the Inspector.
 2. Click **Add Event**. A binding appears on `onclick` — and since the file has no functions yet, it starts as an inline handler.
 3. Switch the binding's mode to **Expression**, the mode for one-step reactions.
 4. In the formula editor, set the **Operator** to `+=`, point the **Target** at `count` (a **$ref**), and type `1` as the **Value**.
 
-![The Events tab with an onclick binding in expression mode incrementing count](../images/counter-onclick.png)
+![The Logic tab with an onclick binding in expression mode incrementing count](../images/counter-onclick.png)
 
-The formula reads `$count += 1` in the chip strip, and green badges beside the operands show live values evaluated against the running page. The three ways an event can respond — a named function, an expression, an inline handler — are covered in **[Events panel](/docs/studio/logic/events)**.
+The formula reads `$count += 1` in the chip strip, and green badges beside the operands show live values evaluated against the running page. The three ways an event can respond — a named function, an expression, an inline handler — are covered in **[Events](/docs/studio/logic/events)**.
 
 ## 8. Try it in Preview
 
@@ -98,9 +98,9 @@ You should see the number climb with every click. That's the whole reactive loop
 
 ## 9. Watch the value in the Data explorer
 
-Click **Data** in the activity bar. It lists the same entries as the State panel, but with what each one is worth _right now_ — your `count` row shows the current number. Keep Preview on, click **Add one**, and watch the row change; **Refresh** re-renders the canvas and reads the values again.
+Click **Data** in the **Document** group of the Navigator rail, or press :kbd[⌘7]. It lists the same entries as the State panel, but with what each one is worth _right now_ — your `count` row shows the current number. Stay in Preview, click **Add one**, and watch the row change; **Refresh** re-renders the canvas and reads the values again.
 
-![The Data activity with the count entry showing its live value](../images/counter-data-explorer.png)
+![The Data panel with the count entry showing its live value](../images/counter-data-explorer.png)
 
 When a page ever looks wrong, this panel is where you find out what it actually sees — see **[Data explorer](/docs/studio/logic/data-explorer)**.
 
@@ -112,13 +112,13 @@ Because `count` is a plain state value on a component, it's also one of the comp
 2. The canvas re-renders with the count starting at 100, at every breakpoint.
 3. Clear the field to return to the default of `0`.
 
-![The tab bar's count field holding a test value, the canvas rendering with it](../images/counter-test-prop.png)
+![The context bar's count field holding a test value, the canvas rendering with it](../images/counter-test-prop.png)
 
 Test values are a preview lens only — they're never saved into the component. Props and test values are covered in **[Working with components](/docs/studio/design/components)**.
 
 ## 11. Save your work
 
-The tab shows a **●** dot for unsaved changes. Press :kbd[⌘S] (macOS) / :kbd[Ctrl+S] (Windows/Linux) — or click the **Save** button in the toolbar — and the status bar confirms with "Saved".
+The document's tab shows a **●** dot for unsaved changes, and the status bar's document field reads **Unsaved changes**. Press :kbd[⌘S] (macOS) / :kbd[Ctrl+S] (Windows/Linux) — or click **Save** in the Command Bar — and the field turns to **Saved**.
 
 You should see the dot disappear. When you're ready to publish, **Source Control** takes it from here — see **[Source control](/docs/studio/publish/source-control)**.
 
@@ -137,7 +137,7 @@ Everything landed in one plain file, `components/counter-card.json`: the entry i
 
 ## Next steps
 
-- Drop the card onto any page from the **[Elements panel](/docs/studio/design/elements)** — your components appear at the top of the palette.
+- Drop the card onto any page from the **[Insert palette](/docs/studio/design/elements)** — your components appear at the top of it.
 - Style it — spacing, color, hover states — with the **[Style inspector](/docs/studio/design/style-inspector)**.
 - When one step isn't enough, build multi-step handlers as **[statements](/docs/studio/logic/statements)**.
 - Keep going: **[Tutorial: a blog with content collections](/docs/start/first-collection)**.

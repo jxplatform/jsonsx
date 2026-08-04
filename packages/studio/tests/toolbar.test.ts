@@ -33,6 +33,7 @@ const { setPreviewNavigateHandler } = await import("../src/canvas/preview-naviga
 const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { defaultCommands, noopCommandDeps } = await import("../src/commands/defaults");
+const { shellViewCommands } = await import("../src/shell");
 const { makeContext } = await import("../src/commands/context");
 const { setActiveRegistry } = await import("../src/commands/active-registry");
 
@@ -61,7 +62,7 @@ function installRegistry(): CommandRegistry {
   registry.registerAll(
     defaultCommands({
       ...noopCommandDeps(),
-      navigatorPanels: [{ id: "files", title: "Files" }],
+      panelRoster: [{ id: "files", title: "Files" }],
       saveDocument: () => void ran.push("save"),
       undo: () => void ran.push("undo"),
       redo: () => void ran.push("redo"),
@@ -70,6 +71,11 @@ function installRegistry(): CommandRegistry {
       toggleDock: (dock) => void ran.push(`toggleDock:${dock}`),
       focusPanel: (id) => void ran.push(`focusPanel:${id}`),
     }),
+  );
+  // The bar's third dock toggle is `shell.ts`'s record now — ⌘J flips `shell.docks.bottom`, which
+  // Is a dock the shell owns, so the verb is declared beside the state rather than injected.
+  registry.registerAll(
+    shellViewCommands({ inspectorTab: () => "properties", setInspectorTab: () => {} }),
   );
   // A gated overflow record, so the ⬢ menu's hide-vs-disable behaviour has something to show: every
   // Default overflow command is ungated, which is a fact about the defaults, not about the menu.
@@ -361,16 +367,24 @@ describe("dock toggles", () => {
     await flush();
     expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(false);
 
-    // A bare state write, with no repaint call beside it: the band's effect tracks the dock record
-    // And, for the assistant, the Inspector's tab selection — which is where the assistant lives
-    // Now that it is a tab rather than a fifth column.
+    // A bare state write, with no repaint call beside it: the band's effect tracks all three dock
+    // Records, so a flip made by the automation runner, a layout preset or the boot-time restore
+    // Reaches the icons the same way a click does. The third toggle reports the BOTTOM dock —
+    // Naming ⌘J while drawing a chat glyph and reporting the Assistant's tab selection was a
+    // Control that announced one surface and answered for another.
+    shell.docks.bottom.collapsed = false;
+    await flush();
+    expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(true);
+    expect(root.querySelector("sp-icon-align-bottom")).not.toBeNull();
+
+    // The Assistant is an Inspector tab now, and the Bottom dock does not answer for it.
     setInspectorTab("assistant");
     await flush();
     expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(true);
 
     shell.docks.right.collapsed = true;
+    shell.docks.bottom.collapsed = true;
     await flush();
-    // A tab selected inside a COLLAPSED dock is not showing, so the toggle reports it off.
     expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(false);
     expect(root.querySelector("sp-icon-rail-right-open")).not.toBeNull();
     expect(root.querySelector("sp-icon-rail-left-close")).not.toBeNull();

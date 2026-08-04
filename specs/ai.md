@@ -2,9 +2,9 @@
 
 ## AI Assistant for Jx Studio
 
-**Version:** 0.1.2-draft
+**Version:** 0.1.3-draft
 **Status:** Partial
-**Updated:** 2026-07-25
+**Updated:** 2026-08-04
 **License:** MIT
 
 ---
@@ -59,6 +59,32 @@ model can otherwise ship an extension section its own tool call called clean and
 the moment a human opens the file. The document-path convention the gate covers
 (`pages|layouts|components|elements`) tracks the editor's fileMatch globs for the same reason.
 
+### 3.2 The turn is accountable
+
+An assistant that edits documents must be able to say what it changed, and the author must be able
+to take it back. Three properties are normative.
+
+**Every write is recorded, with whether it reached disk.** A tool that mutates the open document
+goes through the transaction path and is therefore reachable by undo; a tool that writes a file
+directly is not. That difference is a **fact recorded per write**, not a caveat in the system
+prompt, and the turn's summary states it: _"Changed 2 files · 1 written to disk — undo cannot reach
+it."_ **Restore to here** is offered only when every recorded change was transactional, and it
+re-checks at the moment it is clicked, because the ledger is bounded and may have been trimmed.
+
+**A tool chip states its outcome, not just its name.** The loop already had each call's result; the
+renderer discarded it. A chip that cannot fail looks identical to one that did.
+
+**Partial success is not failure.** Exhausting the tool-call budget after applying changes ends the
+turn with an ordinary message describing what was applied. Rendering it as an error is wrong twice
+over: it misreports the turn, and the error path _deletes the streaming message_, destroying the
+only account of the edits that did land.
+
+### 3.3 The batch follows the document, not the tab
+
+A multi-tool turn may move between documents. The undo batch and the collaboration publish must be
+re-anchored to the document each tool actually wrote — anchoring once, to whichever tab happened to
+be active when the turn opened, silently files one document's edits under another's history.
+
 ## 4. Security & Trust
 
 The assistant executes only through the same file/RPC surfaces a human uses, behind the server's
@@ -67,10 +93,11 @@ filesystem access beyond the connected provider endpoint.
 
 ## Changelog
 
+- **0.1.3-draft** (2026-08-04) — §3.2 the turn is accountable (per-write disk marking, Restore to here, chip outcomes, partial success) and §3.3 the batch follows the document, not the tab.
 - **0.1.2-draft** (2026-07-25) — Schema gate (§3.1): tool-level validation against the active project's entry documents, before-write for disk writes and after-apply on canvas, project.json included.
 - **0.1.1-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.0-draft** (2026-07-22) — Reconcile spec with shipped behavior; document the eval surface (`c8d1d580`).
 
 ---
 
-_Jx `@jxsuite/ai` Specification v0.1.2-draft — a stub, subject to expansion._
+_Jx `@jxsuite/ai` Specification v0.1.3-draft — a stub, subject to expansion._

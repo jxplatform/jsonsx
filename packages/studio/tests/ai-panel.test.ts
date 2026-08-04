@@ -38,6 +38,17 @@ const chatState = reactive({
   error: null as string | null,
   messages: [] as Message[],
   status: "idle" as "idle" | "streaming" | "error",
+  /* The real one pops the failed assistant turn AND the user message that caused it, on the
+     contract that the caller re-sends. It has been exported with zero callers since it was
+     written (§7.4); the panel's Retry is the first. */
+  retryLast() {
+    while (chatState.messages.length > 0 && chatState.messages.at(-1)!.role !== "user") {
+      chatState.messages.pop();
+    }
+    chatState.messages.pop();
+    chatState.error = null;
+    chatState.status = "idle";
+  },
 });
 
 let msgCounter = 0;
@@ -86,6 +97,7 @@ void mock.module("../src/services/document-assistant", () => ({
 
 const {
   bindAiPanelHost,
+  handleRestore,
   mountAiPanel,
   renderAiPanelTemplate,
   seedAssistantMessages,
@@ -436,5 +448,110 @@ describe("ai-panel", () => {
     expect(q(".ai-context-chip")!.textContent).toContain("Page: pages/index.md");
     expect(q(".ai-msg-assistant")!.textContent).toContain("softened the headline");
     expect(q(".ai-tool-chip")!.textContent).toContain('set_text: ["children",0]');
+  });
+});
+
+// ─── §7.4: Retry and Restore to here ─────────────────────────────────────────
+
+const { beginTurn, endTurn, recordWrite, resetAiWrites } =
+  await import("../src/services/ai-writes");
+const { problems, resetNotifications, toasts } = await import("../src/services/notify");
+const { activeTab, closeAllTabs } = await import("../src/workspace/workspace");
+
+/** File a ledger entry against a message id, the way the agent loop does. */
+function ledger(id: string, writes: { disk: boolean; ok: boolean; path: string }[]) {
+  beginTurn(`for:${id}`);
+  for (const w of writes) {
+    recordWrite({ ...w, tool: "write_file" });
+  }
+  endTurn(id);
+}
+
+function notices(): string[] {
+  return [...toasts, ...problems].map((n) => n.message);
+}
+
+describe("retry", () => {
+  test("the error row's Retry re-sends the last user message", async () => {
+    chatState.messages.length = 0;
+    chatState.error = "429 rate limit";
+    chatState.status = "error";
+    pushMessage("user", "make it blue");
+    pushMessage("assistant", "");
+    await flush(3);
+
+    sendMessage.mockClear();
+    pointer(q(".ai-msg-retry")!, "click");
+    await flush(4);
+    expect(sendMessage).toHaveBeenCalledWith("make it blue");
+    chatState.error = null;
+    chatState.status = "idle";
+  });
+
+  test("Retry with nothing to re-send does nothing", async () => {
+    chatState.messages.length = 0;
+    chatState.error = "boom";
+    chatState.status = "error";
+    await flush(3);
+    sendMessage.mockClear();
+    pointer(q(".ai-msg-retry")!, "click");
+    await flush(4);
+    expect(sendMessage).not.toHaveBeenCalled();
+    chatState.error = null;
+    chatState.status = "idle";
+  });
+});
+
+describe("restore to here", () => {
+  beforeEach(() => {
+    resetAiWrites();
+    resetNotifications();
+    chatState.messages.length = 0;
+    chatState.error = null;
+    chatState.status = "idle";
+  });
+
+  test("a transactional turn restores through the tab's history", async () => {
+    pushMessage("assistant", "Done.");
+    const { id } = chatState.messages.at(-1)!;
+    ledger(id, [{ disk: false, ok: true, path: "pages/index.json" }]);
+    await flush(3);
+    expect(activeTab.value).not.toBeNull();
+    pointer(q(".ai-msg-changes sp-action-button")!, "click");
+    await flush(3);
+    expect(notices()).toContain("Restored to before that turn.");
+  });
+
+  test("a turn with no ledger left says so instead of restoring something else", async () => {
+    pushMessage("assistant", "Done.");
+    const { id } = chatState.messages.at(-1)!;
+    ledger(id, [{ disk: false, ok: true, path: "pages/index.json" }]);
+    await flush(3);
+    resetAiWrites();
+    pointer(q(".ai-msg-changes sp-action-button")!, "click");
+    await flush(3);
+    expect(notices()).toContain("There is no longer a record of what that turn changed.");
+  });
+
+  test("a turn that touched disk offers no button, and refuses if called anyway", async () => {
+    pushMessage("assistant", "Done.");
+    const { id } = chatState.messages.at(-1)!;
+    ledger(id, [{ disk: true, ok: true, path: "layouts/base.json" }]);
+    await flush(3);
+    /* Not rendered — but the ledger can be trimmed between a render and a click, so the handler
+       guards again rather than trusting the renderer. */
+    expect(q(".ai-msg-changes sp-action-button")).toBeNull();
+    handleRestore(id);
+    expect(notices().at(-1)).toContain("layouts/base.json");
+    expect(notices().at(-1)).toContain("undo cannot reach");
+  });
+
+  test("with no tab open it says where to go rather than restoring the wrong document", async () => {
+    pushMessage("assistant", "Done.");
+    const { id } = chatState.messages.at(-1)!;
+    ledger(id, [{ disk: false, ok: true, path: "pages/index.json" }]);
+    closeAllTabs();
+    handleRestore(id);
+    expect(notices().at(-1)).toBe("Open the document that turn edited to restore it.");
   });
 });

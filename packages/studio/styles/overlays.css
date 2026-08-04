@@ -2383,3 +2383,27 @@ sp-table-row:has(.browse-thumb) {
   font-size: var(--spectrum-font-size-75, 12px);
   line-height: 1.5;
 }
+
+/* A panel withholding a render because one of its own fields has focus (`panel-scheduler.ts`).
+   The panel is deliberately stale — finishing your sentence beats being current — but it used to
+   make that trade in silence, which is indistinguishable from a panel that has stopped working.
+   Pinned to the panel's top edge rather than the viewport's, because it is that panel that is
+   behind, and it retires itself on focusout when the withheld render finally lands. */
+[data-jx-stale] {
+  position: relative;
+}
+[data-jx-stale]::before {
+  content: "New changes — applied when you finish editing";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  left: 0;
+  padding: 3px 8px;
+  background: var(--spectrum-yellow-400, #d8b400);
+  color: var(--spectrum-gray-900, #000);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+}

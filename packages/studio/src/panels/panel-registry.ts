@@ -43,7 +43,13 @@ import type { renderHeadTemplate } from "./head-panel";
 import type { renderImportsTemplate } from "./imports-panel";
 import type { renderSignalsTemplate } from "./signals-panel";
 
-/** The three docks that host panels. Only the Navigator has records today. */
+/**
+ * The three docks that host panels.
+ *
+ * A panel's dock is where its BODY is drawn, and it is independent of whether the panel has a rail
+ * button: Problems is `dock: "bottom"` and rail-able, so the rail button reveals it in the Bottom
+ * dock (see {@link railGroups}). The Inspector has no records yet.
+ */
 export type PanelDock = "navigator" | "inspector" | "bottom";
 
 /**
@@ -258,19 +264,47 @@ const RAIL_GROUP_LEVELS: readonly { level: Level; label: string }[] = [
 ];
 
 /**
- * The rail, as data: the Navigator's panels that have a button, grouped by level, `when`-filtered.
+ * Every panel that has a rail button, whatever dock draws its body.
+ *
+ * The rail is NOT the Navigator's tab strip. `panelPlacements()` has always awarded `rail/<level>`
+ * on `rail !== false` alone — the dock is a separate placement — and Problems is the panel that
+ * proves it: its body is the Bottom dock's first tab (plan §7.2), and it still owns a rail slot and
+ * a badge, because "how many things need fixing" is a question you ask without opening anything.
+ * Filtering this by `dock === "navigator"` is what would put the same list in two hosts at once.
+ */
+function railablePanels(): readonly PanelRecord[] {
+  return listPanels().filter((panel) => panel.rail !== false);
+}
+
+/**
+ * The rail, as data: every rail-able panel, grouped by level, `when`-filtered.
  *
  * Empty groups are dropped, so the divider between them is never drawn against nothing.
  *
  * @param {CommandContext} ctx
  */
 export function railGroups(ctx: CommandContext): RailGroup[] {
-  const railable = listPanels("navigator").filter((panel) => panel.rail !== false);
+  const railable = railablePanels();
   return RAIL_GROUP_LEVELS.map(({ level, label }) => ({
     level,
     label,
     panels: railable.filter((panel) => panel.level === level && isPanelVisible(panel, ctx)),
   })).filter((group) => group.panels.length > 0);
+}
+
+/**
+ * The rail's panels flattened into rail order — PROJECT group, then DOCUMENT group.
+ *
+ * This is the order ⌘1–8 follow, and it is derived from the same two rows the rail draws rather
+ * than from registration order, so a panel registered by its dock's module (Problems, from
+ * `panels/bottom-dock.ts`) still lands in the slot its LEVEL gives it. `when` is not applied: a
+ * chord roster that changed length with context would move every chord after the hidden panel.
+ */
+export function railPanelSet(): PanelRecord[] {
+  const railable = railablePanels();
+  return RAIL_GROUP_LEVELS.flatMap(({ level }) =>
+    railable.filter((panel) => panel.level === level),
+  );
 }
 
 /** One tabbed region and what it declares, in `commands/budget.ts`'s shape. */
@@ -284,12 +318,11 @@ export interface PanelDockDeclaration {
  * counts, observed rather than written down. `commands/budget.ts` no longer carries a copy.
  *
  * `when` is deliberately NOT applied: the budget caps what the shell may GROW to, not what happens
- * to be visible in one context. Search and Problems are registered and hidden today, and they still
- * spend their rail slot — which is the point, because their arrival must not silently push the rail
- * to five.
+ * to be visible in one context. Search is registered and hidden today, and it still spends its rail
+ * slot — which is the point, because its arrival must not silently push the rail to five.
  */
 export function railDeclarations(): PanelDockDeclaration[] {
-  const railable = listPanels("navigator").filter((panel) => panel.rail !== false);
+  const railable = railablePanels();
   return RAIL_GROUP_LEVELS.map(({ level }) => ({
     dock: `rail/${level}`,
     tabs: railable.filter((panel) => panel.level === level).map((panel) => panel.title),

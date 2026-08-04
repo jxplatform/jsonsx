@@ -114,7 +114,7 @@ Any element may carry `$title` and `$description` — developer-facing labels th
 }
 ```
 
-Studio's [Layers panel](/docs/studio/design/layers) shows `$title` as the element's display name.
+Studio's [Outline panel](/docs/studio/design/layers) shows `$title` as the element's display name.
 
 ## How it works
 

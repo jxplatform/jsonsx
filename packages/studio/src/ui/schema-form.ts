@@ -73,6 +73,30 @@ export interface RenderFormOptions {
    */
   ui?: Record<string, { control?: string; enum?: unknown }> | undefined;
   rerender?: (() => void) | undefined;
+  /**
+   * Externally-produced diagnostics, keyed by property name — §7.1's inline tier, sourced.
+   *
+   * This is how a validator that runs over the WHOLE document reaches the one field it is about:
+   * `jx-validate`'s `project.json` errors (until now wired only to the AI's `write_project_config`,
+   * so a human editing the same file through Settings got no validation at all), Monaco's markers
+   * for the same file open in the code view, and a host's own commit-time rejection.
+   *
+   * A host message wins over {@link validateFieldValue}'s intrinsic check, because the host knows
+   * things the property schema alone does not — that this enum value names a connector that was
+   * just deleted, say. An empty string means "no error", so a host can pass a lookup result
+   * straight through.
+   */
+  errors?: Record<string, string> | undefined;
+  /** How many times each field has been refused in a row; drives the row's repeat counter. */
+  errorCounts?: Record<string, number> | undefined;
+  /**
+   * Report required-but-empty fields inline. Off by default, and that default is §7.1's rule
+   * literally applied: a form the user has not touched yet has not committed anything, so painting
+   * every required field red the moment it renders is telling them they got something wrong before
+   * they did anything. Required-ness is already shown — the label carries a `*`. A host that
+   * validates on submit turns this on for the render that follows the rejected submit.
+   */
+  showRequired?: boolean | undefined;
 }
 
 // ─── Control registry ────────────────────────────────────────────────────────
@@ -497,6 +521,67 @@ function renderPropertyControl(
   </div>`;
 }
 
+// ─── Field validation (§7.1, inline tier) ────────────────────────────────────
+
+/**
+ * Why this value is not acceptable for this property schema, or `""` when it is.
+ *
+ * Deliberately narrow: the checks a _property_ schema can make on its own, at the moment the value
+ * is committed. Anything cross-field, cross-document or extension-defined belongs to whoever ran
+ * the real validator and arrives through {@link RenderFormOptions.errors} — a form control is not a
+ * second implementation of JSON Schema, it is the place a verdict gets rendered.
+ *
+ * A `$ref` binding is never judged here. Its value is resolved at render time from state the form
+ * cannot see, so type-checking the reference itself would refuse every correct binding.
+ *
+ * @param {JsonSchema} schema
+ * @param {unknown} value
+ * @param {boolean} isRequired
+ * @returns {string}
+ */
+export function validateFieldValue(
+  schema: JsonSchema,
+  value: unknown,
+  isRequired: boolean,
+): string {
+  if (isRef(value)) {
+    return "";
+  }
+  const empty = value === undefined || value === null || value === "";
+  if (empty) {
+    return isRequired ? "Required." : "";
+  }
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
+    return `Choose one of: ${schema.enum.map(String).join(", ")}.`;
+  }
+  if (schema.type === "number" || schema.type === "integer") {
+    const n = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(n)) {
+      return "Enter a number.";
+    }
+    if (schema.type === "integer" && !Number.isInteger(n)) {
+      return "Enter a whole number.";
+    }
+    if (schema.minimum !== undefined && n < schema.minimum) {
+      return `Must be ${schema.minimum} or more.`;
+    }
+    if (schema.maximum !== undefined && n > schema.maximum) {
+      return `Must be ${schema.maximum} or less.`;
+    }
+    return "";
+  }
+  if (schema.type === "boolean" && typeof value !== "boolean") {
+    return "Must be true or false.";
+  }
+  if (schema.type === "array" && !Array.isArray(value)) {
+    return "Must be a list.";
+  }
+  if (schema.type === "object" && (typeof value !== "object" || Array.isArray(value))) {
+    return "Must be an object.";
+  }
+  return "";
+}
+
 // ─── Form rendering ──────────────────────────────────────────────────────────
 
 /**
@@ -518,11 +603,18 @@ export function renderForm(
 
   const propertyFields = Object.entries(schema.properties ?? {}).map(([prop, ps]) => {
     const labelText = prop + (required.has(prop) ? " *" : "");
+    // Host diagnostics win over the intrinsic check — see RenderFormOptions.errors.
+    const error =
+      opts.errors?.[prop] ||
+      validateFieldValue(ps, value[prop], Boolean(opts.showRequired) && required.has(prop));
+    const count = opts.errorCounts?.[prop];
     return renderFieldRow({
       hasValue: false,
       label: labelText,
       prop: ps.name || prop,
       widget: renderPropertyControl(prop, ps, value, required, opts, ctx),
+      ...(error ? { error } : {}),
+      ...(count === undefined ? {} : { errorCount: count }),
     });
   });
 

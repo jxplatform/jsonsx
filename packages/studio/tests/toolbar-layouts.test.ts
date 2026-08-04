@@ -75,8 +75,8 @@ beforeEach(() => {
   syncProjectLayouts(null);
   setInspectorTab("properties");
   shell.leftTab = "layers";
-  shell.docks.left = { collapsed: false, width: 240 };
-  shell.docks.right = { collapsed: false, width: 280 };
+  shell.docks.left = { collapsed: false, size: 240 };
+  shell.docks.right = { collapsed: false, size: 280 };
   installMockPlatform();
   installRegistry();
   root = document.createElement("div");
@@ -109,7 +109,12 @@ describe("the tabs", () => {
     toolbar.mount(root);
     await flush();
     shell.layouts.push({
-      docks: { left: { collapsed: false, width: 200 }, right: { collapsed: false, width: 200 } },
+      bottomTab: "problems",
+      docks: {
+        bottom: { collapsed: true, size: 220 },
+        left: { collapsed: false, size: 200 },
+        right: { collapsed: false, size: 200 },
+      },
       id: "proofread",
       inspectorTab: "properties",
       name: "Proofread",
@@ -149,7 +154,7 @@ describe("the tabs", () => {
 
 describe("+ saves the current arrangement", () => {
   test("prompts, then runs view.saveLayout with the answer", async () => {
-    shell.leftTab = "problems";
+    shell.leftTab = "git";
     promptResult = "Triage";
     toolbar.mount(root);
     await flush();
@@ -159,7 +164,7 @@ describe("+ saves the current arrangement", () => {
     await flush();
     expect(promptHeadlines).toEqual(["Save layout"]);
     expect(shell.layouts.at(-1)?.name).toBe("Triage");
-    expect(shell.layouts.at(-1)?.navigatorPanel).toBe("problems");
+    expect(shell.layouts.at(-1)?.navigatorPanel).toBe("git");
     expect(shell.layout).toBe("triage");
   });
 

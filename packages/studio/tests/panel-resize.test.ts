@@ -37,9 +37,9 @@ function widthOf(cssVar: string): string {
   return root.style.getPropertyValue(cssVar);
 }
 
-/** The width a drag will start from, read where the handler reads it. */
+/** The size a drag will start from, read where the handler reads it. */
 function startWidth(dock: "left" | "right"): number {
-  return shell.docks[dock].width;
+  return shell.docks[dock].size;
 }
 
 describe("import-time restore", () => {

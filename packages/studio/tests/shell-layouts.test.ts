@@ -74,8 +74,8 @@ beforeEach(() => {
   resetProjectShell();
   syncProjectLayouts(null);
   shell.leftTab = "layers";
-  shell.docks.left = { collapsed: false, width: 240 };
-  shell.docks.right = { collapsed: false, width: 280 };
+  shell.docks.left = { collapsed: false, size: 240 };
+  shell.docks.right = { collapsed: false, size: 280 };
 });
 
 afterEach(() => {
@@ -122,16 +122,16 @@ describe("applyLayout", () => {
     applyLayout("ship", deps);
     expect(shell.layout).toBe("ship");
     expect(shell.leftTab).toBe("git");
-    expect(shell.docks.left.width).toBe(300);
+    expect(shell.docks.left.size).toBe(300);
     expect(shell.docks.right.collapsed).toBe(true);
     expect(setInspectorTab).toHaveBeenCalledWith("properties");
   });
 
   test("is idempotent — the same call twice leaves the same arrangement", () => {
     applyLayout("build", deps);
-    shell.docks.left.width = 999;
+    shell.docks.left.size = 999;
     applyLayout("build", deps);
-    expect(shell.docks.left.width).toBe(280);
+    expect(shell.docks.left.size).toBe(280);
     expect(shell.leftTab).toBe("data");
   });
 
@@ -164,14 +164,14 @@ describe("applyLayout", () => {
 describe("saveLayout", () => {
   test("captures what is on screen now and makes it active", () => {
     shell.leftTab = "search";
-    shell.docks.left.width = 321;
+    shell.docks.left.size = 321;
     shell.docks.right.collapsed = true;
     currentTab = "events";
 
     const preset = saveLayout("My Layout", deps);
     expect(preset.id).toBe("my-layout");
     expect(preset.navigatorPanel).toBe("search");
-    expect(preset.docks.left.width).toBe(321);
+    expect(preset.docks.left.size).toBe(321);
     expect(preset.docks.right.collapsed).toBe(true);
     expect(preset.inspectorTab).toBe("events");
     expect(shell.layout).toBe("my-layout");
@@ -180,10 +180,10 @@ describe("saveLayout", () => {
 
   test("saving over a name overwrites it rather than adding a second tab", () => {
     saveLayout("Mine", deps);
-    shell.leftTab = "problems";
+    shell.leftTab = "git";
     saveLayout("Mine", deps);
     expect(shell.layouts.filter((preset) => preset.id === "mine")).toHaveLength(1);
-    expect(layoutById("mine")?.navigatorPanel).toBe("problems");
+    expect(layoutById("mine")?.navigatorPanel).toBe("git");
   });
 
   test("a stale panel id in the shell record is migrated on capture", () => {
@@ -282,9 +282,11 @@ describe("the per-project record", () => {
             docks: {},
           },
           {
+            bottomTab: "problems",
             docks: {
-              left: { collapsed: false, width: 200 },
-              right: { collapsed: true, width: 10 },
+              bottom: { collapsed: true, size: 220 },
+              left: { collapsed: false, size: 200 },
+              right: { collapsed: true, size: 10 },
             },
             id: "keeper",
             inspectorTab: "events",
@@ -316,9 +318,11 @@ describe("the per-project record", () => {
       JSON.stringify({
         layouts: [
           {
+            bottomTab: "problems",
             docks: {
-              left: { collapsed: false, width: 200 },
-              right: { collapsed: false, width: 200 },
+              bottom: { collapsed: true, size: 220 },
+              left: { collapsed: false, size: 200 },
+              right: { collapsed: false, size: 200 },
             },
             id: "only",
             inspectorTab: "style",
@@ -368,9 +372,11 @@ describe("the per-project record", () => {
         activeLayout: "loaded",
         layouts: [
           {
+            bottomTab: "problems",
             docks: {
-              left: { collapsed: false, width: 210 },
-              right: { collapsed: false, width: 220 },
+              bottom: { collapsed: true, size: 220 },
+              left: { collapsed: false, size: 210 },
+              right: { collapsed: false, size: 220 },
             },
             id: "loaded",
             inspectorTab: "style",
@@ -400,16 +406,16 @@ describe("the layout verbs", () => {
 
   test("view.saveLayout · renameLayout · deleteLayout · resetLayout are the rest of the loop", () => {
     const registry = build();
-    shell.leftTab = "problems";
+    shell.leftTab = "git";
     void registry.run("view.saveLayout", { name: "Triage" });
-    expect(layoutById("triage")?.navigatorPanel).toBe("problems");
+    expect(layoutById("triage")?.navigatorPanel).toBe("git");
 
     void registry.run("view.renameLayout", { layout: "triage", name: "Bug day" });
     expect(layoutById("triage")?.name).toBe("Bug day");
 
     shell.leftTab = "files";
     void registry.run("view.resetLayout");
-    expect(shell.leftTab).toBe("problems");
+    expect(shell.leftTab).toBe("git");
 
     void registry.run("view.deleteLayout", { layout: "triage" });
     expect(layoutById("triage")).toBeUndefined();

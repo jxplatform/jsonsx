@@ -11,7 +11,7 @@ code:
 
 # Connections
 
-A connection names a database your project talks to. Most sites need exactly one; you can add more if, say, orders and analytics live in different places. Open the **Settings** gear at the bottom of the activity bar, then _Settings > Connections_: your connections are listed on the left, and selecting one opens its form on the right.
+A connection names a database your project talks to. Most sites need exactly one; you can add more if, say, orders and analytics live in different places. Open **[Project settings](/docs/studio/projects/settings)** — press :kbd[⌘K] and run **Open Settings**, or pick it from the **⬢ menu** in the Command Bar — then choose _Connections_: your connections are listed on the left, and selecting one opens its form on the right.
 
 ![The Connections section with a connection selected and its provider form open](../../images/connections-section.png)
 

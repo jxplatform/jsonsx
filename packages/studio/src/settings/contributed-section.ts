@@ -9,11 +9,14 @@
  */
 
 import { html, nothing, render as litRender } from "lit-html";
+import { errorMessage } from "@jxsuite/schema/parse";
 import { getPlatform } from "../platform";
 import { projectState } from "../store";
 import { renderForm } from "../ui/schema-form";
 import { resolveContextPointer } from "../services/context-resolver";
 import { deriveSecretEnvName } from "../services/data-service";
+import { validateProjectConfig } from "../services/jx-validate";
+import { notify } from "../services/notify";
 
 import type { TemplateResult } from "lit-html";
 import type { JsonSchema, SchemaFormContext } from "../ui/schema-form";
@@ -77,12 +80,111 @@ export function resetContributedSectionState(): void {
   newEntryNames.clear();
 }
 
+// ─── Validation (§7.1 inline tier, §7.2 Problems) ─────────────────────────────
+
+/**
+ * The last validator run's messages, keyed by the JSON-pointer base they were rendered under.
+ *
+ * `jx-validate` validates the WHOLE `project.json` against the project's generated entry document,
+ * so its output has to be routed back to individual controls. Until now it was wired to exactly one
+ * caller — the AI's `write_project_config` — which meant the model's edits to this file were
+ * schema-checked and a human's edits through this very form were not.
+ */
+const diagnostics = new Map<string, Record<string, string>>();
+
+/** Drop every cached diagnostic (test hook, and the "project closed" path). */
+export function resetContributedDiagnostics(): void {
+  diagnostics.clear();
+}
+
+/**
+ * Route `jx-validate` messages ("/search/index: must be string") to the field they are about.
+ *
+ * Only the messages one level under `base` become field errors: `/search/index` belongs to the
+ * `index` control, and `/search/index/0/kind` belongs to it too — the deepest control that exists
+ * on this form is the one that can be corrected. A message ABOUT the base itself has no field to
+ * live at and is returned separately, for the section line.
+ *
+ * @param {string} base - JSON pointer of the record the form is editing, e.g. `/search`
+ * @param {string[]} messages
+ * @returns {{ fields: Record<string, string>; section: string[] }}
+ */
+export function routeDiagnostics(
+  base: string,
+  messages: string[],
+): { fields: Record<string, string>; section: string[] } {
+  const fields: Record<string, string> = {};
+  const section: string[] = [];
+  for (const message of messages) {
+    const at = message.indexOf(": ");
+    const pointer = at === -1 ? "" : message.slice(0, at);
+    const text = at === -1 ? message : message.slice(at + 2);
+    if (pointer === base) {
+      section.push(text);
+      continue;
+    }
+    if (!pointer.startsWith(`${base}/`)) {
+      continue;
+    }
+    const [prop] = pointer.slice(base.length + 1).split("/");
+    if (prop && fields[prop] === undefined) {
+      fields[prop] = text;
+    }
+  }
+  return { fields, section };
+}
+
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
-async function saveProjectConfig() {
+/**
+ * Write `project.json`, then say what is wrong with it.
+ *
+ * The predecessor was `void saveProjectConfig()` at five call sites: no validation, and a rejected
+ * write — a read-only file, a dead RPC — dropped on the floor while the form kept showing the value
+ * it had failed to save. §7.2 files a failed config write as a Problem, because it must be fixed
+ * and it is about a named file.
+ *
+ * **The write comes first, and the order is the honest one.** This form mutates
+ * `projectState.projectConfig` in place before calling here, so the value is already live in the
+ * editor and the canvas; a validator run in front of the write could not have prevented anything,
+ * it would only have delayed persisting what the user can already see. This surface REPORTS. The
+ * one that gates is `contexts-section.ts`, which builds a candidate map and validates it before
+ * anything is applied.
+ *
+ * @param {string} base - JSON pointer of the record being edited, for routing field errors
+ * @param {() => void} rerender
+ */
+async function saveProjectConfig(base: string, rerender: () => void) {
   const platform = getPlatform();
   const config = (projectState as { projectConfig: ProjectConfig }).projectConfig;
-  await platform.writeFile("project.json", JSON.stringify(config, null, "\t"));
+
+  try {
+    await platform.writeFile("project.json", JSON.stringify(config, null, "\t"));
+  } catch (error) {
+    notify.error(`Could not save project.json — ${errorMessage(error)}`, {
+      key: "settings:project.json",
+      path: "project.json",
+      source: "Settings",
+    });
+    return;
+  }
+
+  let messages: string[] = [];
+  try {
+    messages = await validateProjectConfig(config);
+  } catch (error) {
+    /* A validator that will not compile must not be silent about it — but it is not the edit's
+       fault, so it is a problem of its own rather than an error parked on the user's field. */
+    notify.warn(`Could not validate project.json — ${errorMessage(error)}`, {
+      key: "settings:validator",
+      path: "project.json",
+      source: "Settings",
+      tier: "problem",
+    });
+    return;
+  }
+  diagnostics.set(base, routeDiagnostics(base, messages).fields);
+  rerender();
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -225,11 +327,13 @@ function renderFormLayout(
 ): TemplateResult {
   const value = sectionValue(contribution.key) ?? {};
   const ui = contribution.settings.entry?.ui;
+  const base = `/${contribution.key}`;
 
   return html`
     <div class="settings-form-panel">
       ${renderForm(contribution.entrySchema, value, {
         context: buildContext(contribution.key, opts, null),
+        errors: diagnostics.get(base) ?? {},
         onChange: (patch) => {
           const target = sectionValue(contribution.key);
           if (!target) {
@@ -237,7 +341,7 @@ function renderFormLayout(
           }
           applyPatch(target, patch);
           rerender();
-          void saveProjectConfig();
+          void saveProjectConfig(base, rerender);
         },
         rerender,
         ...(ui !== undefined && { ui }),
@@ -269,7 +373,7 @@ function renderMapLayout(
     newEntryOpen.delete(sectionKey);
     newEntryNames.delete(sectionKey);
     rerender();
-    void saveProjectConfig();
+    void saveProjectConfig(`/${sectionKey}`, rerender);
   };
 
   const handleDelete = () => {
@@ -280,7 +384,7 @@ function renderMapLayout(
     delete target[selected];
     selectedEntries.set(sectionKey, null);
     rerender();
-    void saveProjectConfig();
+    void saveProjectConfig(`/${sectionKey}`, rerender);
   };
 
   const handleRename = (newName: string) => {
@@ -298,7 +402,7 @@ function renderMapLayout(
     Object.assign(target, next);
     selectedEntries.set(sectionKey, slug);
     rerender();
-    void saveProjectConfig();
+    void saveProjectConfig(`/${sectionKey}`, rerender);
   };
 
   // Left column — entry key list
@@ -393,10 +497,11 @@ function renderMapLayout(
             </div>
             ${renderForm(contribution.entrySchema, selectedEntry as Record<string, unknown>, {
               context: buildContext(sectionKey, opts, selected),
+              errors: diagnostics.get(`/${sectionKey}/${selected}`) ?? {},
               onChange: (patch) => {
                 applyPatch(selectedEntry as Record<string, unknown>, patch);
                 rerender();
-                void saveProjectConfig();
+                void saveProjectConfig(`/${sectionKey}/${selected}`, rerender);
               },
               rerender,
               ...(ui !== undefined && { ui }),

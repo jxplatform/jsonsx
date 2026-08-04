@@ -6,6 +6,7 @@ import type { Tab } from "../src/tabs/tab";
 import { beginBatch, endBatch, undo } from "../src/tabs/transact";
 import { registerAiTools } from "../src/services/ai-tools";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import { beginTurn, endTurn, resetAiWrites } from "../src/services/ai-writes";
 
 type AiToolsOptions = Parameters<typeof registerAiTools>[1];
 
@@ -623,5 +624,111 @@ describe("ai-tools — write reconciliation with open tabs", () => {
     const err = await execErr(registry, "read_document", {});
     expect(err).toContain("open_document");
     expect(err).toContain("write_file");
+  });
+});
+
+// ─── §7.4: disk writes are recorded, including the ones that fail ────────────
+/* `create_page`, `create_component` and `write_file` go straight to disk, where there is no undo
+   and never was. The ledger records that fact so the panel can say it to the person holding ⌘Z —
+   until now the caveat was appended to the MODEL-facing tool summary only. */
+
+describe("create_page's three refusals, and the write ledger", () => {
+  test("schema errors refuse before anything is written, and record nothing", async () => {
+    resetAiWrites();
+    beginTurn("t");
+    const { tab, registry } = harness(
+      { children: [], tagName: "div" },
+      { saveFile: async () => {}, validate: async () => ["/tagName: must be string"] },
+    );
+    expect(await execErr(registry, "create_page", { content: {}, path: "p.json" })).toContain(
+      "schema errors",
+    );
+    expect(endTurn("m1")).toEqual([]);
+    disposeTab(tab);
+  });
+
+  test("a page that will not render refuses, and records nothing", async () => {
+    resetAiWrites();
+    beginTurn("t");
+    const { tab, registry } = harness(
+      { children: [], tagName: "div" },
+      {
+        renderCheck: async () => ({ error: "boom", ok: false }),
+        saveFile: async () => {},
+        validate: async () => [],
+      },
+    );
+    expect(await execErr(registry, "create_page", { content: {}, path: "p.json" })).toContain(
+      "fails to render",
+    );
+    expect(endTurn("m1")).toEqual([]);
+    disposeTab(tab);
+  });
+
+  test("a write that lands is recorded as a disk write undo cannot reach", async () => {
+    resetAiWrites();
+    beginTurn("t");
+    const { tab, registry } = harness(
+      { children: [], tagName: "div" },
+      { saveFile: async () => {}, validate: async () => [] },
+    );
+    await registry.execute("create_page", { content: { tagName: "div" }, path: "p.json" });
+    expect(endTurn("m1")).toEqual([{ disk: true, ok: true, path: "p.json", tool: "create_page" }]);
+    disposeTab(tab);
+  });
+
+  test("a write that fails is recorded too — a listed attempt that changed nothing", async () => {
+    resetAiWrites();
+    beginTurn("t");
+    const { tab, registry } = harness(
+      { children: [], tagName: "div" },
+      {
+        saveFile: async () => {
+          throw new Error("EROFS");
+        },
+        validate: async () => [],
+      },
+    );
+    expect(await execErr(registry, "create_page", { content: {}, path: "p.json" })).toContain(
+      "EROFS",
+    );
+    expect(endTurn("m1")).toEqual([
+      { disk: true, error: "EROFS", ok: false, path: "p.json", tool: "create_page" },
+    ]);
+    disposeTab(tab);
+  });
+
+  test("a failed create_component is recorded under its own tool name", async () => {
+    resetAiWrites();
+    beginTurn("t");
+    const { tab, registry } = harness(
+      { children: [], tagName: "div" },
+      {
+        saveFile: async () => {
+          throw new Error("EROFS");
+        },
+        validate: async () => [],
+      },
+    );
+    await registry.execute("create_component", { content: { tagName: "x-y" }, path: "c.json" });
+    expect(endTurn("m1")[0]!.tool).toBe("create_component");
+    disposeTab(tab);
+  });
+
+  test("a document mutation is recorded as reachable by undo", async () => {
+    resetAiWrites();
+    beginTurn("t");
+    const tab = createTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "pages/a.json",
+      id: "t",
+    });
+    const registry = createToolRegistry();
+    registerAiTools(registry, { getTab: () => tab, validate: async () => [] });
+    await registry.execute("set_property", { key: "id", path: [], value: "x" });
+    const [write] = endTurn("m1");
+    expect(write!.disk).toBe(false);
+    expect(write!.path).toBe("pages/a.json");
+    disposeTab(tab);
   });
 });

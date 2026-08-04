@@ -39,7 +39,7 @@ If the assistant runs out of working rounds before everything is fixed, it stops
 
 Document edits follow Studio's normal editing rules:
 
-- They go into the page's undo history as **one step per request** — :kbd[⌘Z] (macOS) or :kbd[Ctrl+Z] (Windows/Linux) rolls back the assistant's whole last reply on that page. If a request switched between pages, each page gets its own single step.
+- They go into the page's undo history as **one step per request** — :kbd[⌘Z] (macOS) or :kbd[Ctrl+Z] (Windows/Linux) rolls back the assistant's whole last reply on that page. If a request switched between pages, each page gets its own single step, including the second page.
 - They live in the open editor, not on disk: the tab is marked unsaved until you save it, and closing without saving discards them.
 
 The full review workflow — including the file-level changes that _don't_ work this way — is covered in **[Review and undo edits](/docs/studio/ai/chat#review-and-undo-edits)**.
