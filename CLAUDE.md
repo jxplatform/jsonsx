@@ -17,6 +17,29 @@ Conventions:
 - `mock.module()` before importing the module under test; `await import()` afterwards for modules with import-time side effects. sharp and `electrobun/bun` must always be mocked (sharp is unloadable on NixOS).
 - Check per-file coverage with `bun test --isolate --coverage` from the workspace directory (`packages/<pkg>` or `extensions/<ext>`); the table prints to stderr.
 
+## Starter Roots and the Shadowed Core
+
+Iterating a starter inside Studio runs `bun install` in that starter's root, and a starter pins
+**published** `@jxsuite/*` versions because it is a template a user scaffolds from. The install
+therefore materialises a real `@jxsuite/schema` beside a workspace that is far ahead of it, and
+anything resolving from that root reads the published copy. This silently produced a starter entry
+schema narrower than the starter's own content for six weeks.
+
+- **`bun run schema:generate-all` cleans first** (`schema:clean-roots` →
+  `scripts/check-shadowed-core.ts --fix`). It removes only `node_modules/@jxsuite/*` and the stray
+  lockfile; third-party dependencies stay, because the install is what makes the starter preview.
+  A workspace **symlink** is never removed — that is `examples/`, a workspace member, and it is the
+  correct answer.
+- **Never put the cleanup in a starter's `package.json`.** `@jxsuite/starters` publishes `sites/`,
+  so those manifests ship to users; a `postinstall` there would delete the dependencies they just
+  installed. The monorepo has the workspace being shadowed, so the monorepo owns the cleanup.
+- `packages/compiler`'s schema loader is independently hermetic — a first-party `*.json` schema
+  resolves from the host or throws — so schema composition is safe regardless. The cleanup defends
+  everything else that resolves normally.
+- `bun run schema:verify` proves the committed core **and** all 50 per-project entry documents match
+  their generators. `schema:validate-all` answers a different question (documents against schemas)
+  and cannot see a stale schema.
+
 ## Specs & User-Documentation Policy
 
 Specs (`/specs`, §-numbered) are the source of truth; user docs (`/docs`, published at jxsuite.com/docs) must track shipped behavior. Every plan for a behavior-changing task MUST include a "Specs & docs" step, and the change set must land code, spec edits, and docs-page updates together.
