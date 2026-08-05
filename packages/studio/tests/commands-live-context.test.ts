@@ -9,7 +9,13 @@
 import { installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import { keyScopeStack, makeContext } from "../src/commands/context";
+import {
+  canvasViewForMode,
+  editorKindForMode,
+  keyScopeStack,
+  makeContext,
+} from "../src/commands/context";
+import { editorKindOf } from "../src/tabs/tab";
 import { createLiveContext, isTextEntryFocused } from "../src/commands/live-context";
 import { shell, resetProjectShell } from "../src/shell";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
@@ -369,5 +375,50 @@ describe("keyScopeStack", () => {
     canvasMode = "design";
     caretActive = true;
     expect(keyScopeStack(context())).toEqual(["caret", "global"]);
+  });
+
+  /*
+   * The `settings` mode is the entry both copies of the map were missing, and the live projection is
+   * where that mattered: the tab reported `editor.kind === "canvas"`, the stack came back as the
+   * canvas one, and ⌘V pasted an element node into `project.json`. `tests/settings-key-scope.test.ts`
+   * runs the whole reproduction; this asserts the projection itself, which is this file's subject.
+   */
+  test("a settings document projects as a config editor on the global stack", () => {
+    canvasMode = "settings";
+    const ctx = context();
+    expect(ctx.editor.kind).toBe("config");
+    expect(keyScopeStack(ctx)).toEqual(["global"]);
+  });
+});
+
+// ─── Modes → the two axes ─────────────────────────────────────────────────────
+
+describe("editorKindForMode / canvasViewForMode", () => {
+  test.each([
+    ["edit", "canvas", "edit"],
+    ["design", "canvas", "design"],
+    ["preview", "canvas", "preview"],
+    ["source", "code", "design"],
+    ["grid", "grid", "design"],
+    ["stylebook", "config", "design"],
+    ["settings", "config", "design"],
+    ["git-diff", "diff", "design"],
+    ["manage", "library", "design"],
+  ])("%s → kind %s / view %s", (mode, kind, view) => {
+    expect(editorKindForMode(mode)).toBe(kind as never);
+    expect(canvasViewForMode(mode)).toBe(view as never);
+  });
+
+  test("an unknown mode is a canvas view — the format-declared default", () => {
+    expect(editorKindForMode("gallery")).toBe("canvas");
+    expect(canvasViewForMode("gallery")).toBe("design");
+  });
+
+  test("the live context and the pane model read the same table", () => {
+    canvasMode = "stylebook";
+    expect(context().editor.kind).toBe(editorKindForMode("stylebook"));
+    expect(editorKindOf(activeTab.value!)).toBe(
+      editorKindForMode(activeTab.value!.session.ui.canvasMode),
+    );
   });
 });

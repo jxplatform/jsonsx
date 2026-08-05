@@ -10,7 +10,9 @@ code:
 
 # Content types
 
-Content types are your site's CMS schema. Each one describes a collection — blog posts, team members, projects — by naming the folder its entries live in, the file format they use, and the fields every entry carries. Once a type exists, creating an on-model entry is one click. The builder lives in **[Project settings](/docs/studio/projects/settings)** — press :kbd[⌘K] and run **Open Settings**, or pick it from the **⬢ menu** in the Command Bar — under _Content Types_: your types are listed on the left, and selecting one opens its editor on the right.
+Content types are your site's CMS schema. Each one describes a collection — blog posts, team members, projects — by naming the folder its entries live in, the file format they use, and the fields every entry carries. Once a type exists, creating an on-model entry is one click.
+
+The builder is a section of your project's configuration document. Press :kbd[⌘K] and run **Open Settings** — or pick it from the **⬢ menu** in the Command Bar — and choose **Content Types** from the section list: your types are listed on the left, and selecting one opens its editor on the right. Like every other section of that document, what you do here is recorded as a step you can take back with :kbd[⌘Z]; see **[Project settings](/docs/studio/projects/settings)**.
 
 ![The Content Types section with a type selected and its field schema open in the builder](../../images/content-type-builder.png)
 
@@ -57,4 +59,4 @@ Studio stores your types in the `content` section of `project.json` — one entr
 ## Next
 
 - **[Browse your project](/docs/studio/projects/browse)** — the Manage view where entries are created
-- **[Project settings](/docs/studio/projects/settings)** — the rest of the Settings modal
+- **[Project settings](/docs/studio/projects/settings)** — the rest of the configuration document

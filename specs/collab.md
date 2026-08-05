@@ -2,9 +2,9 @@
 
 ## Real-Time Co-Editing for Jx Projects
 
-**Version:** 0.2.1-draft
+**Version:** 0.2.2-draft
 **Status:** Partial
-**Updated:** 2026-08-04
+**Updated:** 2026-08-05
 **License:** MIT
 
 ---
@@ -97,6 +97,14 @@ unstated, which is worse than not scoping it: an author who does not know it can
 :kbd[⌘Z] will do, and the guess that it might take back a collaborator's work is the one that stops
 people using undo at all.
 
+`project.json` is **excluded from replication.** No session is attached to a tab whose
+`documentPath` is `project.json`, and therefore no history delegate is registered over it. Its edits
+arrive from surfaces that are not the canvas, and its value configures the local editor's formats,
+extensions, schemas and style cascade — so a shared configuration document would let a peer's edit
+reconfigure another author's editor mid-keystroke, and would let the source-canonical freeze pause
+configuration edits that contain no text at all. A collaborator therefore does not see configuration
+changes live; they arrive with the file.
+
 ## 5. Version Skew
 
 There is currently **no cross-version migration story** for the document format a room carries; a
@@ -105,6 +113,7 @@ tracked separately (see spec §3.2 on `$schema`).
 
 ## Changelog
 
+- **0.2.2-draft** (2026-08-05) — §4 project.json is excluded from replication, and why.
 - **0.2.1-draft** (2026-08-04) — §4 the four session states, with failed distinguished from detached; freeze and read-only made visible; undo scoping stated in the UI.
 - **0.2.0-draft** (2026-07-28) — Store prose as Y.Text and style/attributes/$props as nested Y.Maps so concurrent edits merge per character and per property; the op bridge diffs whole-value ops onto that structure.
 - **0.1.1-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -112,4 +121,4 @@ tracked separately (see spec §3.2 on `$schema`).
 
 ---
 
-_Jx `@jxsuite/collab` Specification v0.2.1-draft — a stub, subject to expansion._
+_Jx `@jxsuite/collab` Specification v0.2.2-draft — a stub, subject to expansion._

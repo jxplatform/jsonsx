@@ -6,6 +6,7 @@ spec:
 code:
   - packages/studio/src/panels/tab-strip.ts
   - packages/studio/src/tabs/tab.ts
+  - packages/studio/src/tabs/project-config.ts
   - packages/studio/src/panels/pane-context.ts
   - packages/studio/src/workspace/workspace.ts
 ---
@@ -64,6 +65,10 @@ A document keeps its own view state while it's open. Switch from a Markdown page
 
 New documents open in their natural editor — Markdown in **Edit**, spreadsheets in **Grid**, the project file in **Project Styles**.
 
+:::doc-note
+**Your project's configuration is one of these documents.** `project.json` opens in the strip like any file, and **Open Settings** shows it in its settings editor. That means the settings you change there are edits: an unsaved dot, :kbd[⌘Z] to take one back, :kbd[⌘S] to write it. Reaching it from the Files tree and reaching it from **Open Settings** land on the same document, so there is only ever one history and one unsaved state for it.
+:::
+
 ## Drilling into a component
 
 Opening a component from the canvas, the Outline tree or the Inspector's **Edit component** action gives it **its own place in the strip**. The page you came from stays open, still on the element you had selected, so you can flip between the two with a click or :kbd[⌃Tab].
@@ -93,6 +98,8 @@ Under each pane's strip, a labelled row states three things about the document i
 **Zoom floats over the canvas**, bottom-right, rather than sitting in the bar: the zoom buttons, the percentage (click it for 100%), and a **fit** picker — **Fit page**, **Fit width**, **Actual size**, **No fit** — which is remembered per document, so coming back to a file frames it the way you left it. There is no zoom in **Preview**, which shows the page at its real size in a frame that scrolls itself.
 
 Editor-specific actions sit at the right of the bar — **Export**, in the **Code** editor.
+
+The bar is there when it has something to say. The settings editor takes the whole pane instead: a form has no canvas view to pick and no rendering context to resolve against, and contexts are _defined_ in a section of the very document it is showing.
 
 ## Next
 

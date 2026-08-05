@@ -52,6 +52,82 @@ export type EditorKind = "canvas" | "grid" | "code" | "diff" | "library" | "conf
 /** The Canvas view axis — one control, three values (§4.2). */
 export type CanvasView = "edit" | "design" | "preview";
 
+/*
+ * ─── Modes → the two axes ────────────────────────────────────────────────────
+ *
+ * `canvasMode` is ONE string conflating two orthogonal questions: WHICH EDITOR is open, and (for
+ * the Canvas editor only) WHICH VIEW of it. Both maps live here, beside the types they produce and
+ * beside `keyScopeStack`, because they are the same fact and there must be exactly one place to add
+ * an entry to.
+ *
+ * They used to be two copies — one in `tabs/tab.ts` driving the pane model, one in
+ * `commands/live-context.ts` driving every `when` predicate and the keyboard — each falling through
+ * to its own `?? "canvas"` default. Neither learned about `settings` when Project Settings became a
+ * document, so a JSON configuration object resolved into the CANVAS key scope: ⌘V over Project
+ * Settings ran `edit.paste`, which inserted an element node at the root of `project.json`, through
+ * the transaction log, and saved it.
+ */
+
+/** The `canvasMode` strings, mapped onto the editor each one actually names. */
+const EDITOR_KIND_BY_MODE: Readonly<Record<string, EditorKind>> = {
+  design: "canvas",
+  edit: "canvas",
+  "git-diff": "diff",
+  grid: "grid",
+  manage: "library",
+  preview: "canvas",
+  /* Project Settings — `settings/settings-document.ts`'s SETTINGS_MODE. A form over `project.json`,
+     which is a configuration object and not a document tree; `stylebook` (Project Styles) is the
+     second editor over that same document and answers `config` for the same reason. */
+  settings: "config",
+  source: "code",
+  stylebook: "config",
+};
+
+/**
+ * The editor kind a mode string names.
+ *
+ * An unknown mode reads as Canvas, and that default is only for modes STUDIO DOES NOT OWN: a format
+ * declares its own list (`format.studio.modes`) and every mode declared that way is a view of the
+ * artboard. A mode Studio itself introduces is not covered by it and belongs in the map above —
+ * which is what `settings` was not.
+ */
+/**
+ * Human names for the editor kinds, so no surface prints an enum at a reader — and so two surfaces
+ * cannot print DIFFERENT words for the same kind. The status bar and the pane context bar each had
+ * their own copy, and they disagreed: one said "Stylebook", the wire value, where the other said
+ * "Project Styles". §16.2 exists to stop the shell contradicting itself about what is on screen.
+ */
+export const EDITOR_KIND_LABELS: Readonly<Record<EditorKind, string>> = {
+  canvas: "Canvas",
+  code: "Code",
+  config: "Project Styles",
+  diff: "Diff",
+  grid: "Grid",
+  library: "Library",
+  none: "None",
+};
+
+export function editorKindForMode(mode: string): EditorKind {
+  return EDITOR_KIND_BY_MODE[mode] ?? "canvas";
+}
+
+/** Only the three canvas modes carry a view. */
+const CANVAS_VIEW_BY_MODE: Readonly<Record<string, CanvasView>> = {
+  design: "design",
+  edit: "edit",
+  preview: "preview",
+};
+
+/**
+ * The Canvas view a mode names — the neutral "design" for a mode that has none.
+ *
+ * Meaningful only where {@link editorKindForMode} answers `"canvas"`; every reader pairs the two.
+ */
+export function canvasViewForMode(mode: string): CanvasView {
+  return CANVAS_VIEW_BY_MODE[mode] ?? "design";
+}
+
 /** Facts a command may be gated on. Every field is a plain value; predicates read, never write. */
 export interface CommandContext {
   project: {

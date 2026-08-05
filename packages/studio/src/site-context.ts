@@ -6,9 +6,9 @@
  * definitions merge on top (file wins on conflict).
  */
 
-import { projectState, requireProjectState, setProjectState } from "./store";
+import { projectState } from "./store";
 import { getPlatform } from "./platform";
-import { setWorkspaceProject, workspace } from "./workspace/workspace";
+import { commitProjectConfig } from "./tabs/project-config";
 
 import type {
   JxElement,
@@ -259,26 +259,26 @@ function fillSlots(
 }
 
 /**
- * Update the project's project.json with a partial patch and persist to disk. A patch touching
- * `extensions` invalidates the format/extensions caches and refreshes the editor's per-project
- * schemas plus the contributed settings sections — the enabled-extension surface just changed.
+ * Merge a partial patch into the project's configuration and persist it.
  *
- * @param {Partial<ProjectConfig>} patch - Fields to merge into the current projectConfig
+ * The patch-shaped door onto `tabs/project-config.ts` — the single chokepoint every configuration
+ * write goes through. It used to serialize and write `project.json` itself, which is how this file
+ * came to hold one of the two serializations in play, and how ten call sites came to change the
+ * file that defines the project with no history behind them.
+ *
+ * **It still rejects.** `settings/general-settings.ts` and `settings/contexts-section.ts` catch the
+ * rejection and park it on the control that caused it (§7.1's inline tier), and that is the right
+ * treatment for a field the author is looking at. The chokepoint ALSO files the failure as a
+ * Problem, because the eight other sites reach this through `void updateSiteConfig(...)` and used
+ * to drop it on the floor.
+ *
+ * @param {Partial<ProjectConfig>} patch - Fields to merge into the current projectConfig; a value
+ *   of `undefined` clears the key.
+ * @throws {unknown} The platform's rejection, when the write fails.
  */
 export async function updateSiteConfig(patch: Partial<ProjectConfig>) {
-  const platform = getPlatform();
-  const config = {
-    ...requireProjectState().projectConfig,
-    ...patch,
-  } as ProjectConfig;
-  await platform.writeFile("project.json", JSON.stringify(config, null, 2));
-  setProjectState({ ...requireProjectState(), projectConfig: config });
-  setWorkspaceProject(workspace.projectRoot, config);
-  if ("extensions" in patch) {
-    const { loadFormats, refreshExtensionUi, refreshFormats } =
-      await import("./format/format-host");
-    refreshFormats();
-    void loadFormats();
-    refreshExtensionUi(platform);
+  const result = await commitProjectConfig(patch);
+  if (!result.ok) {
+    throw result.error;
   }
 }

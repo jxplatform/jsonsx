@@ -45,7 +45,7 @@ import { createCommandRegistry } from "../commands/registry";
 import { defaultCommands, noopCommandDeps } from "../commands/defaults";
 import { inspectorCommands } from "../panels/properties-panel";
 import { usagesSupported } from "../services/references";
-import { makeContext } from "../commands/context";
+import { editorKindForMode, makeContext } from "../commands/context";
 
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import type { CommandContext } from "../commands/context";
@@ -644,6 +644,13 @@ function liveContext(): CommandContext {
     // `makeContext` defaults every capability to false, which would hide Find Usages on every host.
     capability: { findReferences: usagesSupported() },
     document: { dirty: Boolean(tab?.doc.dirty), open: Boolean(tab) },
+    /* The editor the menu was opened over. `makeContext` defaults this to "none", which was a
+       falsehood the records here got away with only because every one of them gates on the menu's
+       own target instead: a verb that reads `editor.kind` — as the canvas verbs in `shortcuts.ts`
+       now do — would have been dead in this menu and live over a settings document, which is
+       exactly backwards. The menu opens from the canvas AND from the Outline, so the kind comes
+       from the tab rather than being asserted. */
+    editor: { kind: tab ? editorKindForMode(tab.session.ui.canvasMode) : "none" },
     selection: {
       count: target ? 1 : 0,
       isComponentInstance: Boolean(target && liveDeps.componentPathFor(target.node.tagName ?? "")),

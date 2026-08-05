@@ -33,6 +33,7 @@ import {
   setTransactObserver,
   transactDoc,
 } from "../tabs/transact";
+import { PROJECT_CONFIG_PATH } from "../tabs/tab";
 import type { TransactOrigin } from "../tabs/transact";
 import type { TransactionRecord } from "../tabs/patch-ops";
 import type { Tab } from "../tabs/tab";
@@ -531,10 +532,19 @@ const liveTabs = new Set<Tab>();
  * Idempotently wire collaboration for a tab. Installs a per-tab watcher that attaches a session for
  * the tab's file while it is at the top of its document stack, detaches while drilled into a
  * component, and tears everything down when the tab's scope is disposed.
+ *
+ * **`project.json` is out of replication.** It is the one document whose edits arrive from surfaces
+ * that are not the canvas — every settings form, the imports panel, the deploy flow — and whose
+ * value the studio ITSELF reads to configure formats, extensions, schemas and the style cascade. A
+ * shared Y.Doc over it would mean a peer's extension list reconfiguring your editor mid-keystroke,
+ * and the source-canonical freeze would pause configuration edits that have nothing to do with
+ * text. Returning here is the whole gate: no session is attached, so `setHistoryDelegate` is never
+ * called for this tab and its history stays the local op log `tabs/project-config.ts` transacts
+ * on.
  */
 export function ensureCollab(tab: Tab): void {
   const platform = maybePlatform();
-  if (!platform?.collab || !tab.documentPath) {
+  if (!platform?.collab || !tab.documentPath || tab.documentPath === PROJECT_CONFIG_PATH) {
     return;
   }
   const runtime = runtimeFor(tab);

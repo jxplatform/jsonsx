@@ -171,14 +171,19 @@ describe("the recovery action", () => {
 
 describe("lifetime", () => {
   test("a resting toast retires itself after its own timeout", async () => {
-    notify.info("brief", { timeoutMs: 10 });
+    // 250ms, not 10: the lifetime has to outlast the RENDER, or the toast is created and retired
+    // Between the call and the flush and never appears at all — which is how this failed under
+    // `--coverage`, on the first assertion, in 78ms. The property under test is that a resting
+    // Toast retires itself on a real timer; how short that timer is was never part of it.
+    notify.info("brief", { timeoutMs: 250 });
     await flush();
     expect(host().querySelectorAll(".toast")).toHaveLength(1);
     // Polled, not slept. The retirement runs on a REAL timer — that is the property under test —
-    // And a fixed 40ms wait is a bet on the scheduler that loses whenever the full suite is running
-    // Files concurrently. The deadline still fails a toast that never retires, which is the only
-    // Failure this test exists to catch.
-    const deadline = Date.now() + 2000;
+    // And a fixed wait is a bet on the scheduler that loses whenever the suite runs files
+    // Concurrently, which `--coverage` instrumentation stretches further still. The deadline exists
+    // Only so a toast that NEVER retires fails instead of hanging; it is not a timing assertion, so
+    // It is deliberately far larger than any plausible scheduling delay.
+    const deadline = Date.now() + 30_000;
     while (toasts.length > 0 && Date.now() < deadline) {
       await new Promise((resolve) => {
         setTimeout(resolve, 10);

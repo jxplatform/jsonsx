@@ -12,9 +12,10 @@
 import { createChatState, createProxyStreamingClient, createToolRegistry } from "@jxsuite/ai";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import { getPlatform } from "../platform";
-import { activeTab, setWorkspaceProject, workspace } from "../workspace/workspace";
+import { activeTab, workspace } from "../workspace/workspace";
 import { toRaw } from "../reactivity";
-import { projectState, setProjectState } from "../store";
+import { projectState } from "../store";
+import { adoptProjectConfig } from "../tabs/project-config";
 import type { Tab } from "../tabs/tab";
 import { componentRegistry } from "../files/components";
 import { registerAiTools } from "./ai-tools";
@@ -104,11 +105,12 @@ export function createDocumentAssistant() {
         sessionStore.moveSession("", root, sessionId);
       }
     },
-    onProjectConfigWritten: (config: ProjectConfig) => {
-      setWorkspaceProject(workspace.projectRoot, config);
-      if (projectState) {
-        setProjectState({ ...projectState, projectConfig: config });
-      }
+    onProjectConfigWritten: async (config: ProjectConfig) => {
+      /* Into the configuration document, not beside it. This used to assign a fresh object to
+         `projectState.projectConfig`, leaving the document holding the previous configuration —
+         and the next settings commit wrote that stale document back over the assistant's file.
+         `adoptProjectConfig` is the one door for a config that reached disk another way. */
+      await adoptProjectConfig(config);
       /* An `extensions` edit changes what the generated entry documents compose, and the backends
          regenerate them from project.json on demand — so without this the editor and the assistant
          both keep judging by the PREVIOUS project's schemas until the window reopens. */

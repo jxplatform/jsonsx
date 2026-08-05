@@ -1186,3 +1186,71 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* ─── Project Settings, in the pane ───────────────────────────────────────────
+   The settings document (settings/settings-document.ts, panels/settings-pane.ts). Its section
+   internals are the .settings-* rules in overlays.css, unchanged: the modal's IA was never the
+   problem, its modality was, so only the SHELL is new. It fills the pane cell instead of an
+   inset:40px overlay, which is why there is no header row here — the tab strip already names the
+   document and the pane already has a frame. */
+.settings-doc {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+  text-align: initial;
+}
+.settings-doc-nav {
+  width: 180px;
+  min-width: 180px;
+  padding: 8px 0;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.settings-doc-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  min-width: 0;
+}
+/* One row of a simple key list — an extension package, and whatever else turns out to be a name
+   with one action beside it. */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+}
+.settings-row-name {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.settings-extension-name {
+  flex: 1;
+  min-width: 0;
+}
+.settings-build-adapter {
+  max-width: 320px;
+}
+/* project.json as it is saved. Scrolls in its own box: a 250-line file must not push the "Edit as
+   code" action off the bottom of the section. */
+.settings-raw-json {
+  margin: 0 0 12px;
+  padding: 12px;
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-dim, var(--bg));
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  white-space: pre;
+}
+.settings-edit-as-code {
+  align-self: flex-start;
+}

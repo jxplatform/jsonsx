@@ -61,6 +61,7 @@ import { dynamicRouteParams, loadParamValues, pagePathsDef } from "../page-param
 import { componentPropEntries, isComponentDoc } from "../component-props";
 import { mediaDisplayName } from "./shared";
 import type { CanvasView, FitMode } from "../canvas/canvas-utils";
+import { EDITOR_KIND_LABELS } from "../commands/context";
 import type { EditorKind } from "../commands/context";
 import type { ParamValues } from "../page-params";
 import type { Tab } from "../tabs/tab";
@@ -107,17 +108,6 @@ let _host: HTMLElement | null = null;
 let _ctx: PaneContextCtx | null = null;
 
 let _scope: EffectScope | null = null;
-
-/** Human names for the editor kinds, so the dropdown never prints an enum at a reader. */
-const EDITOR_KIND_LABELS: Readonly<Record<EditorKind, string>> = {
-  canvas: "Canvas",
-  code: "Code",
-  config: "Project Styles",
-  diff: "Diff",
-  grid: "Grid",
-  library: "Library",
-  none: "None",
-};
 
 /** Human names for the three Canvas views. */
 const CANVAS_VIEW_LABELS: Readonly<Record<CanvasView, string>> = {
@@ -211,14 +201,30 @@ function topBandHeight(): number {
   return Math.max(band?.offsetHeight ?? 0, PANE_CONTEXT_HEIGHT);
 }
 
+/**
+ * Whether this tab's editor has any of the bar's three axes to offer.
+ *
+ * Project Settings has none: it declares one editor kind, no canvas view, and no rendering context
+ * — and the one control the bar WOULD contribute, "Manage contexts…", routes to a section of the
+ * very document on screen. A bar of three inert controls above the definition site they point at is
+ * chrome that says nothing, so the stage takes the whole pane.
+ *
+ * @param {Tab} tab
+ * @returns {boolean}
+ */
+function wantsContextBar(tab: Tab): boolean {
+  return tab.session.ui.canvasMode !== "settings";
+}
+
 export function render() {
   if (!_host || !_ctx) {
     return;
   }
   try {
     const tab = activeTab.value;
-    litRender(tab ? paneChromeTemplate(tab, _ctx) : nothing, _host);
-    applyPaneContextOffset(tab ? topBandHeight() : 0);
+    const show = Boolean(tab) && wantsContextBar(tab as Tab);
+    litRender(show ? paneChromeTemplate(tab as Tab, _ctx) : nothing, _host);
+    applyPaneContextOffset(show ? topBandHeight() : 0);
   } catch (error) {
     console.error("pane-context render error:", error);
   }

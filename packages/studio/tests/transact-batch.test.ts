@@ -372,6 +372,9 @@ function commandTab(tab: ReturnType<typeof makeRepeaterTab>) {
   const registry = createCommandRegistry({
     getContext: () =>
       makeContext({
+        // These verbs exist on a canvas; a context that does not say so is under-specified, and
+        // Under-specification is what let them run over the project configuration document.
+        editor: { kind: "canvas" },
         document: { open: true },
         selection: {
           count: tab.session.selection.length,

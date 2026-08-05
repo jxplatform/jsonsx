@@ -59,7 +59,7 @@
         { "path": "studio/design/breakpoints", "label": "Breakpoints" },
         { "path": "studio/design/states-and-selectors", "label": "States and selectors" },
         { "path": "studio/design/tokens", "label": "Design tokens" },
-        { "path": "studio/design/stylebook", "label": "Stylebook" },
+        { "path": "studio/design/stylebook", "label": "Project Styles" },
         { "path": "studio/design/components", "label": "Working with components" },
         { "path": "studio/design/repeaters", "label": "Repeaters" },
         { "path": "studio/logic", "label": "Logic" },

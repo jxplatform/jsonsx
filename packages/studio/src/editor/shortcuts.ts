@@ -107,15 +107,26 @@ export interface StudioCommandHooks {
 
 // ─── Shared predicates ────────────────────────────────────────────────────────
 
-/** A document is open. */
-const inDocument = (ctx: CommandContext) => ctx.document.open;
+/**
+ * The artboard is the editor on screen — the precondition every predicate below shares.
+ *
+ * `keyScope: "canvas"` gates the KEYBOARD and nothing else: the palette, `__jxAutomation` and the
+ * assistant all reach a command through `when` / `enablement`, so a scope is not an availability
+ * rule. `edit.paste` declared only `ctx.document.open`, which is true of a Code pane, a Grid pane
+ * and Project Settings alike — and running it over Project Settings inserted an element node at the
+ * root of `project.json`. Every verb below addresses a NODE IN A DOCUMENT TREE, and the editor
+ * showing one is the Canvas.
+ */
+const inCanvas = (ctx: CommandContext) => ctx.editor.kind === "canvas";
+
+/** A document is open, on the canvas. */
+const inDocument = (ctx: CommandContext) => ctx.document.open && inCanvas(ctx);
 
 /** Something is selected — including the document root, which is a selection of one. */
-const hasSelection = (ctx: CommandContext) => ctx.selection.count > 0;
+const hasSelection = (ctx: CommandContext) => inCanvas(ctx) && ctx.selection.count > 0;
 
 /** A selection that is not the document element, i.e. a node with a parent to act relative to. */
-const hasElementSelection = (ctx: CommandContext) =>
-  ctx.selection.count > 0 && !ctx.selection.isRoot;
+const hasElementSelection = (ctx: CommandContext) => hasSelection(ctx) && !ctx.selection.isRoot;
 
 // ─── Selection verbs ──────────────────────────────────────────────────────────
 
@@ -575,6 +586,10 @@ export async function openProjectFlow(hooks: StudioCommandHooks): Promise<void> 
  * All nine are `keyScope: "canvas"`: they act on a node in the artboard, so they must not fire
  * while a caret owns the keyboard, while the grid engine does, or while Preview is showing a page
  * with no overlays to aim at. That is one field per record instead of two ad-hoc refusal sets.
+ *
+ * Each is ALSO gated on {@link inCanvas}, through the three shared predicates. The `keyScope`
+ * answers "may this chord fire here"; the `when` answers "does this verb exist here at all", which
+ * is the question the palette, `__jxAutomation` and the assistant ask instead.
  */
 function canvasCommands(pointer: () => ShortcutPointerContext): AnyCommand[] {
   const resetPan = () => {

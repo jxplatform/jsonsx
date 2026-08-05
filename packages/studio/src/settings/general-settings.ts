@@ -1,20 +1,20 @@
 /// <reference lib="dom" />
 /**
- * General settings section — site identity, favicon, platform adapter, global styles.
+ * Overview — the project's identity: name, description, production URL, favicon, global styles.
  *
- * Breakpoints used to live here too. They were one of **four** places `$media` could be defined
- * (plan §4.2), and this was the only one that named them; they now live in Settings › Contexts
- * beside the colour schemes and feature queries they share a map with, because §2 principle 5 says
- * a definition site is a level, not a field on some other level's form.
+ * It has lost a field twice for the same reason. Breakpoints were one of **four** places `$media`
+ * could be defined (plan §4.2) and this was the only one that named them; they live in Contexts
+ * now, beside the colour schemes and feature queries they share a map with. The platform adapter
+ * has moved to Deploy in P6.2, because §2 principle 5 says a definition site is a LEVEL, not a
+ * field on some other level's form — and "what this site is" and "where it ships" are two levels.
  */
 
 import { html, render as litRender, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { errorMessage } from "@jxsuite/schema/parse";
-import { projectState } from "../store";
+import { projectState, updateUi } from "../store";
 import { updateSiteConfig } from "../site-context";
 import { getPlatform } from "../platform";
-import { openFileInTab } from "../files/files";
 
 import type { JxHeadEntry, ProjectConfig } from "@jxsuite/schema/types";
 
@@ -163,24 +163,21 @@ export function renderGeneralSettings(container: HTMLElement) {
     input.click();
   };
 
-  const onAdapterChange = (e: Event) => {
-    void persist({
-      build: { ...config.build, adapter: (e.target as HTMLInputElement).value },
-    });
-  };
-
-  const onEditGlobalStyles = async () => {
-    // Lazy import breaks the general-settings ↔ settings-modal module cycle
-    const { closeSettingsModal } = await import("./settings-modal");
-    closeSettingsModal();
-    void openFileInTab("project.json");
+  /*
+   * Project Styles is the SAME document in a different editor, so this is a mode switch rather
+   * than a navigation. The predecessor closed the settings modal and opened `project.json` in a
+   * tab — the configuration IA jumping into the document IA, plan §9.3's own example of the split
+   * P6 removes. Nothing closes now, because nothing was covering anything.
+   */
+  const onEditGlobalStyles = () => {
+    updateUi("canvasMode", "stylebook");
   };
 
   const currentFavicon = config.favicon;
 
   const tpl = html`
     <div class="settings-section">
-      <h3 class="settings-section-title">General</h3>
+      <h3 class="settings-section-title">Overview</h3>
       ${errorFor("section")}
 
       <div class="settings-field">
@@ -261,25 +258,11 @@ export function renderGeneralSettings(container: HTMLElement) {
       </div>
 
       <div class="settings-field">
-        <label class="settings-field-label">Platform Adapter</label>
-        <p class="settings-field-desc">Build adapter for deployment target.</p>
-        <sp-picker
-          size="s"
-          label="Platform Adapter"
-          .value=${config.build?.adapter || "static"}
-          @change=${onAdapterChange}
-        >
-          <sp-menu-item value="static">Static</sp-menu-item>
-          <sp-menu-item value="bun">Bun</sp-menu-item>
-          <sp-menu-item value="node">Node</sp-menu-item>
-          <sp-menu-item value="cloudflare-workers">Cloudflare Workers</sp-menu-item>
-          <sp-menu-item value="cloudflare-pages">Cloudflare Pages</sp-menu-item>
-        </sp-picker>
-      </div>
-
-      <div class="settings-field">
         <label class="settings-field-label">Global Styles</label>
-        <p class="settings-field-desc">Edit default element styles that apply across all pages.</p>
+        <p class="settings-field-desc">
+          Design tokens and the default element styles that apply across every page. Opens Project
+          Styles over this same document.
+        </p>
         <sp-action-button size="s" @click=${onEditGlobalStyles}>
           Edit Global Styles
         </sp-action-button>

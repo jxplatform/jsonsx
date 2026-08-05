@@ -121,7 +121,9 @@ describe("viewLabel", () => {
     expect(viewLabel("grid", "design")).toBe("Grid");
     expect(viewLabel("diff", "design")).toBe("Diff");
     expect(viewLabel("library", "design")).toBe("Library");
-    expect(viewLabel("config", "design")).toBe("Stylebook");
+    // One label map in commands/context.ts: the status bar and the pane context bar cannot print
+    // Different words for the same editor kind. The wire value is still `stylebook`.
+    expect(viewLabel("config", "design")).toBe("Project Styles");
   });
 
   test("no editor means no label", () => {

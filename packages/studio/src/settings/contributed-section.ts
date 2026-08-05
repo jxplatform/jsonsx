@@ -11,6 +11,7 @@
 import { html, nothing, render as litRender } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { getPlatform } from "../platform";
+import { commitProjectConfig } from "../tabs/project-config";
 import { projectState } from "../store";
 import { renderForm } from "../ui/schema-form";
 import { resolveContextPointer } from "../services/context-resolver";
@@ -80,6 +81,34 @@ export function resetContributedSectionState(): void {
   newEntryNames.clear();
 }
 
+/**
+ * Select an entry of a map-layout section by key — the addressable form of clicking an entry row.
+ *
+ * Five screenshot steps used to reach these rows by typing an empty string into a hand-stamped
+ * region id, carrying `unstable: { reason: "\"settings.selectEntry\" has no command record", until:
+ * "P6.2" }`. This is P6.2 and the record is `settings.open {section, entry}`: an entry is a KEY in
+ * the section's own map, so naming it is naming state rather than reproducing a gesture.
+ *
+ * @param {string} sectionKey
+ * @param {string} entryKey
+ * @returns {string[] | null} `null` once selected; the section's actual entry keys when it has no
+ *   such entry, so the caller's refusal can name both sides.
+ */
+export function selectContributedEntry(sectionKey: string, entryKey: string): string[] | null {
+  const section = (projectState?.projectConfig as Record<string, unknown> | null | undefined)?.[
+    sectionKey
+  ];
+  const entries =
+    section && typeof section === "object" && !Array.isArray(section)
+      ? (section as Record<string, unknown>)
+      : {};
+  if (!Object.hasOwn(entries, entryKey)) {
+    return Object.keys(entries);
+  }
+  selectedEntries.set(sectionKey, entryKey);
+  return null;
+}
+
 // ─── Validation (§7.1 inline tier, §7.2 Problems) ─────────────────────────────
 
 /**
@@ -137,12 +166,14 @@ export function routeDiagnostics(
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
 /**
- * Write `project.json`, then say what is wrong with it.
+ * Commit `project.json`, then say what is wrong with it.
  *
- * The predecessor was `void saveProjectConfig()` at five call sites: no validation, and a rejected
- * write — a read-only file, a dead RPC — dropped on the floor while the form kept showing the value
- * it had failed to save. §7.2 files a failed config write as a Problem, because it must be fixed
- * and it is about a named file.
+ * The write itself now belongs to `tabs/project-config.ts` — one serialisation, one error path, and
+ * a transaction the author can undo. This module used to own a second writer, at
+ * `JSON.stringify(config, null, "\t")`, which re-indented the whole file on any edit; and before
+ * that it was `void saveProjectConfig()` at five call sites with no validation at all. §7.2 files a
+ * failed config write as a Problem, because it must be fixed and it is about a named file; the
+ * chokepoint files it, so a failure here only has to stop.
  *
  * **The write comes first, and the order is the honest one.** This form mutates
  * `projectState.projectConfig` in place before calling here, so the value is already live in the
@@ -155,17 +186,10 @@ export function routeDiagnostics(
  * @param {() => void} rerender
  */
 async function saveProjectConfig(base: string, rerender: () => void) {
-  const platform = getPlatform();
   const config = (projectState as { projectConfig: ProjectConfig }).projectConfig;
 
-  try {
-    await platform.writeFile("project.json", JSON.stringify(config, null, "\t"));
-  } catch (error) {
-    notify.error(`Could not save project.json — ${errorMessage(error)}`, {
-      key: "settings:project.json",
-      path: "project.json",
-      source: "Settings",
-    });
+  const commit = await commitProjectConfig();
+  if (!commit.ok) {
     return;
   }
 
@@ -284,7 +308,7 @@ function sectionValue(key: string): Record<string, unknown> | null {
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 /**
- * Render a contributed settings section into a settings-modal content container.
+ * Render a contributed settings section into the settings document's content area.
  *
  * @param {HTMLElement} container
  * @param {SettingsContribution} contribution
@@ -412,7 +436,7 @@ function renderMapLayout(
         (name) => html`
           <sp-action-button
             size="s"
-            data-jx-region=${`overlay.dialog:settings/entry:${name}`}
+            data-jx-region=${`pane.primary/entry:${name}`}
             ?selected=${selected === name}
             @click=${() => {
               selectedEntries.set(sectionKey, name);
@@ -468,7 +492,7 @@ function renderMapLayout(
   const editorTpl: TemplateResult =
     selected && selectedEntry && typeof selectedEntry === "object"
       ? html`
-          <div class="settings-editor-panel" data-jx-region="overlay.dialog:settings/editor">
+          <div class="settings-editor-panel" data-jx-region="pane.primary/editor">
             <div class="settings-editor-header">
               <sp-textfield
                 size="s"

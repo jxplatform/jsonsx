@@ -11,7 +11,7 @@
  * here instead: the rows come from the registry, and a record registered after this file was
  * written appears without this file knowing about it.
  */
-import { flush, installMockPlatform, pointer } from "./harness";
+import { flush, installMockPlatform, key, pointer } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 // Keep the credentials gate deterministic: no managed proxy, no probe fetch.
@@ -80,6 +80,75 @@ function registryWithChords() {
     },
   ]);
   return registry;
+}
+
+/** A registry with a conflict available in it, and one binding outside the global scope. */
+function editorRegistry() {
+  const registry = createCommandRegistry({ getContext: emptyContext, mac: true });
+  registry.registerAll([
+    {
+      id: "file.save",
+      title: "Save",
+      category: "File",
+      level: "document",
+      keybinding: "mod+s",
+      menus: ["palette"],
+      run: () => {},
+    },
+    {
+      id: "edit.redo",
+      title: "Redo",
+      category: "Edit",
+      level: "document",
+      keybinding: "mod+y",
+      menus: ["palette"],
+      run: () => {},
+    },
+    {
+      id: "selection.delete",
+      title: "Delete",
+      category: "Selection",
+      level: "selection",
+      keyScope: "canvas",
+      keybinding: "backspace",
+      menus: ["palette"],
+      run: () => {},
+    },
+  ]);
+  return registry;
+}
+
+/** The command ids the sheet is currently showing, in sheet order. */
+function boundIds(): string[] {
+  return dAll(".prefs-key").map((el) => el.dataset.command!);
+}
+
+function keyRow(id: string): HTMLElement {
+  return d(`.prefs-key[data-command="${id}"]`)!;
+}
+
+function rowButtons(id: string): string[] {
+  return [...keyRow(id).querySelectorAll("sp-action-button")].map(
+    (el) => el.textContent?.trim() ?? "",
+  );
+}
+
+function rowButton(id: string, label: string): HTMLElement {
+  return [...keyRow(id).querySelectorAll("sp-action-button")].find(
+    (el) => el.textContent?.trim() === label,
+  ) as HTMLElement;
+}
+
+/** The "search by keystroke" toggle — the only action button outside a row. */
+function keystrokeButton(): HTMLElement {
+  return d(".prefs-keys .prefs-field sp-action-button")!;
+}
+
+async function search(value: string): Promise<void> {
+  const field = d<HTMLInputElement>("sp-search")!;
+  field.value = value;
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  await flush(3);
 }
 
 beforeEach(() => {
@@ -267,6 +336,244 @@ describe("Keyboard", () => {
   });
 });
 
+describe("Keyboard — finding a shortcut", () => {
+  test("by name, over the title, the id and the printed chord alike", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    expect(dAll(".prefs-key")).toHaveLength(3);
+
+    await search("redo");
+    expect(boundIds()).toEqual(["edit.redo"]);
+    await search("selection.");
+    expect(boundIds()).toEqual(["selection.delete"]);
+    await search("⌘S");
+    expect(boundIds()).toEqual(["file.save"]);
+    await search("");
+    expect(dAll(".prefs-key")).toHaveLength(3);
+  });
+
+  test("by pressing it — the question a list cannot answer by being read", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    pointer(keystrokeButton(), "click");
+    await flush(3);
+    expect(keystrokeButton().hasAttribute("selected")).toBe(true);
+
+    key(keystrokeButton(), "s", { metaKey: true });
+    await flush(3);
+    expect(boundIds()).toEqual(["file.save"]);
+    // One press answers and stops listening: the sheet is not a keylogger.
+    expect(keystrokeButton().hasAttribute("selected")).toBe(false);
+    expect(d<HTMLInputElement>("sp-search")!.value).toBe("⌘S");
+  });
+
+  test("a chord nothing is bound to says so, which is the honest answer", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    pointer(keystrokeButton(), "click");
+    await flush(3);
+    key(keystrokeButton(), "j", { metaKey: true, altKey: true });
+    await flush(3);
+    expect(dAll(".prefs-key")).toHaveLength(0);
+    expect(d(".prefs-empty")!.textContent).toContain("Nothing is bound to ⌘⌥J");
+  });
+
+  test("a name that matches nothing does not pretend the keyboard is empty", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    await search("xyzzy");
+    expect(d(".prefs-empty")!.textContent).toContain("No shortcut matches that");
+  });
+});
+
+describe("Keyboard — rebinding", () => {
+  test("a rebinding is a LAYER: the live chord moves and the declared one does not", async () => {
+    const registry = editorRegistry();
+    setActiveRegistry(registry);
+    void openPreferences("keyboard");
+    await flush(3);
+    pointer(rowButton("file.save", "Change"), "click");
+    await flush(3);
+    expect(keyRow("file.save").textContent).toContain("Press a shortcut…");
+
+    key(rowButton("file.save", "Cancel"), "s", { metaKey: true, altKey: true });
+    await flush(3);
+    expect(registry.keymap.bindingsFor("file.save")).toEqual(["mod+alt+s"]);
+    expect(registry.keymap.declaredFor("file.save")).toEqual(["mod+s"]);
+    // The sheet is the projection, so it repainted from the same source the rest of the app reads.
+    expect(keyRow("file.save").textContent).toContain("⌘⌥S");
+    expect(keyRow("file.save").textContent).toContain("changed");
+    expect(localStorage.getItem("jx.keybindings")).toBe('{"file.save":["mod+alt+s"]}');
+  });
+
+  test("capturing a chord never RUNS it — Preferences does not suspend the app", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    const seen: string[] = [];
+    const listener = (event: Event) => seen.push((event as KeyboardEvent).key);
+    document.addEventListener("keydown", listener);
+    pointer(rowButton("file.save", "Change"), "click");
+    await flush(3);
+    const event = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "s",
+      metaKey: true,
+      altKey: true,
+    });
+    rowButton("file.save", "Cancel").dispatchEvent(event);
+    document.removeEventListener("keydown", listener);
+    // The app's dispatcher is a `document` keydown listener; ⌘S would have SAVED.
+    expect(seen).toEqual([]);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  test("a modifier on its own is not a chord and does not end the capture", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    pointer(rowButton("file.save", "Change"), "click");
+    await flush(3);
+    key(keyRow("file.save"), "Meta", { metaKey: true });
+    await flush(3);
+    expect(keyRow("file.save").textContent).toContain("Press a shortcut…");
+  });
+
+  test("a chord that is taken is refused, naming who has it and offering to show them", async () => {
+    const registry = editorRegistry();
+    setActiveRegistry(registry);
+    void openPreferences("keyboard");
+    await flush(3);
+    pointer(rowButton("file.save", "Change"), "click");
+    await flush(3);
+    key(keyRow("file.save"), "y", { metaKey: true });
+    await flush(3);
+    expect(d("sp-help-text")!.textContent).toContain("⌘Y is already Redo.");
+    // Neither silently winning nor silently losing: nothing moved.
+    expect(registry.keymap.bindingsFor("file.save")).toEqual(["mod+s"]);
+    expect(registry.keymap.bindingsFor("edit.redo")).toEqual(["mod+y"]);
+    expect(localStorage.getItem("jx.keybindings")).toBeNull();
+
+    pointer(
+      dAll("sp-button").find((el) => el.textContent?.includes("Show Redo"))!,
+      "click",
+    );
+    await flush(3);
+    expect(boundIds()).toEqual(["edit.redo"]);
+    expect(d("sp-help-text")).toBeNull();
+  });
+
+  test("a bare printable key is refused with what to do instead", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    pointer(rowButton("file.save", "Change"), "click");
+    await flush(3);
+    key(keyRow("file.save"), "k");
+    await flush(3);
+    expect(d("sp-help-text")!.textContent).toContain("would fire while you type");
+    // No conflict, so nothing to jump to.
+    expect(dAll("sp-button").some((el) => el.textContent?.includes("Show"))).toBe(false);
+  });
+
+  test("Reset is offered only where there is something to reset, and restores every chord", async () => {
+    const registry = editorRegistry();
+    setActiveRegistry(registry);
+    void openPreferences("keyboard");
+    await flush(3);
+    expect(rowButtons("edit.redo")).toEqual(["Change"]);
+
+    pointer(rowButton("edit.redo", "Change"), "click");
+    await flush(3);
+    key(keyRow("edit.redo"), "y", { metaKey: true, altKey: true });
+    await flush(3);
+    expect(rowButtons("edit.redo")).toEqual(["Change", "Reset"]);
+
+    pointer(rowButton("edit.redo", "Reset"), "click");
+    await flush(3);
+    expect(registry.keymap.bindingsFor("edit.redo")).toEqual(["mod+y"]);
+    expect(rowButtons("edit.redo")).toEqual(["Change"]);
+    expect(localStorage.getItem("jx.keybindings")).toBeNull();
+  });
+
+  test("Escape and the Cancel button both abandon a capture, and neither closes the sheet", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    pointer(rowButton("file.save", "Change"), "click");
+    await flush(3);
+    key(keyRow("file.save"), "Escape");
+    await flush(3);
+    expect(isPreferencesOpen()).toBe(true);
+    expect(rowButtons("file.save")).toEqual(["Change"]);
+
+    pointer(rowButton("file.save", "Change"), "click");
+    await flush(3);
+    pointer(rowButton("file.save", "Cancel"), "click");
+    await flush(3);
+    expect(keyRow("file.save").textContent).toContain("⌘S");
+  });
+
+  test("typing in the search box while a capture is armed disarms it", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    pointer(rowButton("file.save", "Change"), "click");
+    await flush(3);
+    await search("save");
+    expect(rowButtons("file.save")).toEqual(["Change"]);
+  });
+
+  test("a keystroke with no registry composed cannot rebind anything", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    pointer(rowButton("file.save", "Change"), "click");
+    await flush(3);
+    // The window's registry goes away under the open sheet — the rendered handler is still live.
+    setActiveRegistry(null);
+    key(keyRow("file.save"), "s", { metaKey: true, altKey: true });
+    await flush(3);
+    expect(localStorage.getItem("jx.keybindings")).toBeNull();
+    expect(d(".prefs-empty")!.textContent).toContain("No commands are registered");
+  });
+
+  test("leaving the section abandons the capture rather than arming the next visit", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    pointer(rowButton("file.save", "Change"), "click");
+    await search("save");
+    await flush(3);
+    pointer(navItem("Accounts"), "click");
+    await flush(3);
+    pointer(navItem("Keyboard"), "click");
+    await flush(3);
+    expect(d<HTMLInputElement>("sp-search")!.value).toBe("");
+    expect(rowButtons("file.save")).toEqual(["Change"]);
+  });
+
+  test("re-opening the sheet never resumes a capture", async () => {
+    setActiveRegistry(editorRegistry());
+    void openPreferences("keyboard");
+    await flush(3);
+    pointer(rowButton("file.save", "Change"), "click");
+    await search("save");
+    await flush(3);
+    closePreferences();
+    await flush(2);
+    void openPreferences("keyboard");
+    await flush(3);
+    expect(d<HTMLInputElement>("sp-search")!.value).toBe("");
+    expect(rowButtons("file.save")).toEqual(["Change"]);
+  });
+});
+
 describe("the app.preferences record", () => {
   test("is application level, ⌘,, and satisfies the placement matrix", () => {
     const [command] = preferencesCommands();
@@ -291,6 +598,18 @@ describe("the app.preferences record", () => {
     void registry.run("app.preferences", {});
     await flush(3);
     expect(preferencesSection()).toBe("appearance");
+  });
+
+  test("registering the verb also applies the keyboard this author already chose", () => {
+    // The bootstrap's one contact point with Preferences, and the reason a rebinding survives a
+    // Reload: the layer lives in the keymap, so records registered AFTER this call are indexed
+    // Against it too (`tests/preferences-keymap.test.ts` pins that half).
+    localStorage.setItem("jx.keybindings", JSON.stringify({ "app.preferences": ["mod+alt+,"] }));
+    const registry = createCommandRegistry({ getContext: emptyContext, mac: true });
+    registerPreferencesCommands(registry);
+    expect(registry.keymap.bindingsFor("app.preferences")).toEqual(["mod+alt+,"]);
+    expect(registry.keymap.declaredFor("app.preferences")).toEqual(["mod+,"]);
+    expect(registry.keymap.resolveChord("mod+,", ["global"])).toBeUndefined();
   });
 
   test("refuses a section it does not declare, naming the ones it does", () => {

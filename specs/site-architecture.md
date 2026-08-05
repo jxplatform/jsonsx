@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.40-draft
+**Version:** 0.1.41-draft
 **Status:** Pending
-**Updated:** 2026-07-30
+**Updated:** 2026-08-05
 **License:** MIT
 
 ---
@@ -240,6 +240,13 @@ Site-level declarations cascade to all pages:
 - `imports` entries cascade to all pages; page-level entries take precedence on collision
 
 Pages may override any inherited value. A page declaring its own `$head` entries appends to (does not replace) the site-level `$head`. A page may shadow a site-level `state` entry with its own.
+
+**The cascade is why editing this file is editing every page.** A bare tag key in `style` compiles
+to a global rule — `h1 { … }`, not a scoped one — and components render into light DOM, so it
+applies inside every component instance too. Studio states that blast radius before the first
+keystroke rather than after the fact (`studio.md` §6.2), and edits `project.json` as a document
+under undo (`studio.md` §17), because a file whose every property reaches every route is the last
+place a silent write belongs.
 
 ---
 
@@ -1766,6 +1773,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.1.41-draft** (2026-08-05) — §3.2 names the consequence of the cascade — every property reaches every route, which is why Studio states the blast radius and edits the file under undo.
 - **0.1.40-draft** (2026-07-30) — A page uses a component when its tag appears in the prerendered HTML or in one of the page's island modules (§12.4).
 - **0.1.39-draft** (2026-07-28) — §9.3: editors that open a collection entry standalone must apply the mount rewrite to their render representation only, with the browser-side existence-check divergence stated.
 - **0.1.38-draft** (2026-07-28) — Media browser (§9.4) is Partial: upload ships on four Studio surfaces with content-collection destinations and collision-safe naming; metadata and usage tracking still pending.

@@ -379,7 +379,7 @@
       ]
     },
     {
-      "name": "settings-modal",
+      "name": "settings-document",
       "docs": ["studio/projects/settings"],
       "open": {
         "project": "packages/starters/sites/real-estate",
@@ -393,12 +393,12 @@
       ],
       "expect": [
         {
-          "region": "overlay.dialog:settings"
+          "region": "pane.primary"
         }
       ],
       "capture": [
         {
-          "image": "settings-modal"
+          "image": "settings-document"
         }
       ]
     },
@@ -420,13 +420,13 @@
       ],
       "expect": [
         {
-          "region": "overlay.dialog:settings"
+          "region": "pane.primary"
         }
       ],
       "capture": [
         {
           "image": "css-variables",
-          "of": "overlay.dialog:settings"
+          "of": "pane.primary"
         }
       ]
     },
@@ -1475,24 +1475,22 @@
           "cmd": "settings.open"
         },
         {
-          "input": "type",
-          "region": "overlay.dialog:settings/entry:posts",
-          "text": "",
-          "unstable": {
-            "reason": "\"settings.selectEntry\" has no command record; P6.2 opens settings entries as tabs",
-            "until": "P6.2"
-          }
+          "args": {
+            "entry": "posts",
+            "section": "content"
+          },
+          "cmd": "settings.open"
         }
       ],
       "expect": [
         {
-          "region": "overlay.dialog:settings/entry:posts"
+          "region": "pane.primary/entry:posts"
         }
       ],
       "capture": [
         {
           "image": "blog-content-type",
-          "of": "overlay.dialog:settings"
+          "of": "pane.primary"
         }
       ]
     },
@@ -1516,24 +1514,22 @@
           "cmd": "settings.open"
         },
         {
-          "input": "type",
-          "region": "overlay.dialog:settings/entry:posts",
-          "text": "",
-          "unstable": {
-            "reason": "\"settings.selectEntry\" has no command record; P6.2 opens settings entries as tabs",
-            "until": "P6.2"
-          }
+          "args": {
+            "entry": "posts",
+            "section": "content"
+          },
+          "cmd": "settings.open"
         }
       ],
       "expect": [
         {
-          "region": "overlay.dialog:settings/entry:posts"
+          "region": "pane.primary/entry:posts"
         }
       ],
       "capture": [
         {
           "image": "blog-schema-fields",
-          "of": "overlay.dialog:settings"
+          "of": "pane.primary"
         }
       ]
     },
@@ -1806,24 +1802,22 @@
           "cmd": "settings.open"
         },
         {
-          "input": "type",
-          "region": "overlay.dialog:settings/entry:posts",
-          "text": "",
-          "unstable": {
-            "reason": "\"settings.selectEntry\" has no command record; P6.2 opens settings entries as tabs",
-            "until": "P6.2"
-          }
+          "args": {
+            "entry": "posts",
+            "section": "content"
+          },
+          "cmd": "settings.open"
         }
       ],
       "expect": [
         {
-          "region": "overlay.dialog:settings/entry:posts"
+          "region": "pane.primary/entry:posts"
         }
       ],
       "capture": [
         {
           "image": "content-type-builder",
-          "of": "overlay.dialog:settings"
+          "of": "pane.primary"
         }
       ]
     },
@@ -2036,28 +2030,26 @@
           "cmd": "settings.open"
         },
         {
-          "input": "type",
-          "region": "overlay.dialog:settings/entry:comments",
-          "text": "",
-          "unstable": {
-            "reason": "\"settings.selectEntry\" has no command record; P6.2 opens settings entries as tabs",
-            "until": "P6.2"
-          }
+          "args": {
+            "entry": "comments",
+            "section": "data"
+          },
+          "cmd": "settings.open"
         }
       ],
       "expect": [
         {
-          "region": "overlay.dialog:settings/entry:comments"
+          "region": "pane.primary/entry:comments"
         }
       ],
       "capture": [
         {
           "image": "data-tables-section",
-          "of": "overlay.dialog:settings"
+          "of": "pane.primary"
         },
         {
           "image": "data-table-editor",
-          "of": "overlay.dialog:settings/editor"
+          "of": "pane.primary/editor"
         }
       ]
     },
@@ -2081,24 +2073,22 @@
           "cmd": "settings.open"
         },
         {
-          "input": "type",
-          "region": "overlay.dialog:settings/entry:main",
-          "text": "",
-          "unstable": {
-            "reason": "\"settings.selectEntry\" has no command record; P6.2 opens settings entries as tabs",
-            "until": "P6.2"
-          }
+          "args": {
+            "entry": "main",
+            "section": "connections"
+          },
+          "cmd": "settings.open"
         }
       ],
       "expect": [
         {
-          "region": "overlay.dialog:settings/entry:main"
+          "region": "pane.primary/entry:main"
         }
       ],
       "capture": [
         {
           "image": "connections-section",
-          "of": "overlay.dialog:settings"
+          "of": "pane.primary"
         }
       ]
     },

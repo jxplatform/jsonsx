@@ -144,7 +144,6 @@ export const AUTOMATION_COMMANDS: Readonly<Record<string, ManifestId>> = {
     disposition: "refused",
     note: "cold start is a startup profile (?profile=fresh), not an action",
   },
-  "settings.selectEntry": { disposition: "command", note: "P6.2 — settings.selectEntry" },
   "settings.setSection": {
     disposition: "refused",
     note: 'mirrored the section registry\'s LABELS; say settings.open { section: "cssVars" }',

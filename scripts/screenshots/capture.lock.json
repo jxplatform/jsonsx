@@ -91,19 +91,19 @@
       "width": 480
     },
     "docs/images/blog-content-type.png": {
-      "bytes": 83274,
-      "capturedAt": "2026-08-04T02:23:00Z",
+      "bytes": 78327,
+      "capturedAt": "2026-08-05T12:36:42Z",
       "capturedBy": "screenshots@local",
-      "definition": "bc805b6fb9f2a7a18439e06348d83a9a60f7c601a159bbfccb452f39d0265d58",
-      "height": 1280,
+      "definition": "eeca0896e884b752bea1c159f0aa6852eb8533b9936c60b0c7321035c6bb20c0",
+      "height": 1264,
       "runtime": {
-        "chromium": "150",
+        "chromium": "151",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "71f1c11cf04fe569a89725670e4075cad15fc6fae6e5b7180c58f47d5b9e9092",
+      "sha256": "81eb564ca036658afa3c672c5b3f70be2be235c263402953f5bc8f2107c75fc4",
       "shot": "blog-content-type",
-      "width": 3680
+      "width": 2688
     },
     "docs/images/blog-finished.png": {
       "bytes": 229289,
@@ -181,19 +181,19 @@
       "width": 3840
     },
     "docs/images/blog-schema-fields.png": {
-      "bytes": 116482,
-      "capturedAt": "2026-08-04T02:23:03Z",
+      "bytes": 110521,
+      "capturedAt": "2026-08-05T12:36:44Z",
       "capturedBy": "screenshots@local",
-      "definition": "33062765500050756c5e4980bd7980ba7dc8a0ce2a9234d22286e4ea9b732dc4",
-      "height": 1280,
+      "definition": "a2b0db07ced1ccc831d61b8a7a1a37c5c71594ab0f58575878ecc04fa014c647",
+      "height": 1264,
       "runtime": {
-        "chromium": "150",
+        "chromium": "151",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "a56a8a3dd22e9ef8c7b09164e42f313419e73dbacc6aef8a8d667316b9357b72",
+      "sha256": "3442e1a5c16b835fa2de1faf3272267196e141a05ea3903851a5d2d14d7a1a7a",
       "shot": "blog-schema-fields",
-      "width": 3680
+      "width": 2688
     },
     "docs/images/collab-presence.png": {
       "bytes": 1736384,
@@ -211,34 +211,34 @@
       "width": 3840
     },
     "docs/images/connections-section.png": {
-      "bytes": 103696,
-      "capturedAt": "2026-08-04T02:23:45Z",
+      "bytes": 98023,
+      "capturedAt": "2026-08-05T12:37:26Z",
       "capturedBy": "screenshots@local",
-      "definition": "8b063e44a8d66449158fd25c5bc5b559aa5360663cff3de1d1e6f7c69b16bbb0",
-      "height": 1280,
+      "definition": "5cc2298d705cd81045e2e7c7fafc25bb0ae60503e68eef0239d04644e006f8d3",
+      "height": 1264,
       "runtime": {
-        "chromium": "150",
+        "chromium": "151",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "b276c9945e5ea0fc2bb99c3a9ded8afa735a132af96d82c1df13467523b6fd3d",
+      "sha256": "dcb267cbf9ad245cb56da8005628a73545af7100fa8cee7680be18b8bfc6df4c",
       "shot": "connections-section",
-      "width": 3680
+      "width": 2688
     },
     "docs/images/content-type-builder.png": {
-      "bytes": 163089,
-      "capturedAt": "2026-08-04T02:23:26Z",
+      "bytes": 153723,
+      "capturedAt": "2026-08-05T12:37:08Z",
       "capturedBy": "screenshots@local",
-      "definition": "4d8368dcd6c07486aac0d3c4404ae6d6fdab150f34964da2e8b01e72568a1417",
-      "height": 1840,
+      "definition": "212e0865cb8cff7e4202ecb00ce40357059b8119aacc89064a6f1ba014823f8a",
+      "height": 1824,
       "runtime": {
-        "chromium": "150",
+        "chromium": "151",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "66767255e5ea7aa1f329db354b5af87692cba5bc68d81e6de8398b8a22552d7f",
+      "sha256": "379f0282b7a7c77650463602cfd5cdd5310705445a87f7b846b74806ee5aa3e0",
       "shot": "content-type-builder-shot",
-      "width": 3680
+      "width": 2688
     },
     "docs/images/convert-to-component.png": {
       "bytes": 364668,
@@ -361,19 +361,19 @@
       "width": 560
     },
     "docs/images/css-variables.png": {
-      "bytes": 233239,
-      "capturedAt": "2026-08-04T02:21:37Z",
+      "bytes": 191336,
+      "capturedAt": "2026-08-05T12:35:17Z",
       "capturedBy": "screenshots@local",
-      "definition": "60f2276a97ce1ae8b20c9c0dde0c6d400bc369670a043eb8bc595ea6829ed307",
-      "height": 1840,
+      "definition": "f20e9d7b62aaf9f3d2818335e5a1ae886888bfcf92f36c9691d13ec823773959",
+      "height": 1824,
       "runtime": {
-        "chromium": "150",
+        "chromium": "151",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "a9747490c062f55bc5d94184d8af2cbe5d093c688ec9a10d3c2663c1ffd0545d",
+      "sha256": "5d62ea6b3582d0b695685fdb4af3afaf842c178945addf4785664194763242ba",
       "shot": "css-variables-shot",
-      "width": 3680
+      "width": 2688
     },
     "docs/images/data-explorer.png": {
       "bytes": 59627,
@@ -421,34 +421,34 @@
       "width": 480
     },
     "docs/images/data-table-editor.png": {
-      "bytes": 84153,
-      "capturedAt": "2026-08-04T02:37:43Z",
+      "bytes": 77174,
+      "capturedAt": "2026-08-05T12:37:23Z",
       "capturedBy": "screenshots@local",
-      "definition": "8532be20ab13aff8f1d63e11c6e50937abf1dc17c5f194dc6ee0e2eb0d0ada9c",
-      "height": 1324,
+      "definition": "549d8e6ef0fadbe1e64dfc563b1c3ae5b41b6b42df987180b7c005ec0c0cf2b2",
+      "height": 1322,
       "runtime": {
-        "chromium": "150",
+        "chromium": "151",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "161f4ab665805b1ceeac4da6d4c194ca841dcf9689903de22869bf9a42125c02",
+      "sha256": "278abd96fa2342614cf410ee0482021b86fb99f4e2149e7a717df8c6e3e98711",
       "shot": "data-tables-shot",
-      "width": 2818
+      "width": 1830
     },
     "docs/images/data-tables-section.png": {
-      "bytes": 150385,
-      "capturedAt": "2026-08-04T02:23:42Z",
+      "bytes": 142452,
+      "capturedAt": "2026-08-05T12:37:23Z",
       "capturedBy": "screenshots@local",
-      "definition": "8532be20ab13aff8f1d63e11c6e50937abf1dc17c5f194dc6ee0e2eb0d0ada9c",
-      "height": 1640,
+      "definition": "549d8e6ef0fadbe1e64dfc563b1c3ae5b41b6b42df987180b7c005ec0c0cf2b2",
+      "height": 1624,
       "runtime": {
-        "chromium": "150",
+        "chromium": "151",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "c2149e68787ccda58434a142962aefc733e00fa9ea99043f322ed6deda8c2ebd",
+      "sha256": "6146e2cad9d335b81a3dd4f0ab564cb08efaf3d268b44322d800878e21152796",
       "shot": "data-tables-shot",
-      "width": 3680
+      "width": 2688
     },
     "docs/images/design-inspector.png": {
       "bytes": 122532,
@@ -840,19 +840,19 @@
       "shot": "selector-menu-shot",
       "width": 560
     },
-    "docs/images/settings-modal.png": {
-      "bytes": 253096,
-      "capturedAt": "2026-08-05T03:18:19Z",
+    "docs/images/settings-document.png": {
+      "bytes": 281039,
+      "capturedAt": "2026-08-05T12:54:01Z",
       "capturedBy": "screenshots@local",
-      "definition": "97ddd751a0f4d70d1bcd089bbbad0284016d2babcef81298107e0bedd04fbc02",
+      "definition": "590d21c316ecb634d2eaa6e978a541fe15a4414c765de4595e5f0704de335fe6",
       "height": 2000,
       "runtime": {
         "chromium": "151",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "450e65c32b734cbb49f14cda945e6bcd089647bf029a89f5f8ead3c0fd5ef3a8",
-      "shot": "settings-modal",
+      "sha256": "f13c58b324d159198f6f15d304316f1de136d841100c6a0a3456ee510c5ee98b",
+      "shot": "settings-document",
       "width": 3840
     },
     "docs/images/state-panel.png": {
@@ -886,8 +886,8 @@
       "width": 498
     },
     "docs/images/stylebook.png": {
-      "bytes": 467910,
-      "capturedAt": "2026-08-05T03:18:12Z",
+      "bytes": 468180,
+      "capturedAt": "2026-08-05T12:53:54Z",
       "capturedBy": "screenshots@local",
       "definition": "5b6e375cdeacd320989a8c0ca98b57cd01a787783bd8a7e814c62d1784bc85f2",
       "height": 2000,
@@ -896,7 +896,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "b3aad4c920ec0d224550a98093cf20d368287d8440e6c8c0858937f85c717246",
+      "sha256": "7aabe383e06bf8928877daac81355d0a93c07b27539232ecb0a308511312930e",
       "shot": "stylebook",
       "width": 3840
     },

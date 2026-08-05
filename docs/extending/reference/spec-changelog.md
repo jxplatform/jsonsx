@@ -21,6 +21,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `collab.md`
 
+- **0.2.2-draft** (2026-08-05) — §4 project.json is excluded from replication, and why.
 - **0.2.1-draft** (2026-08-04) — §4 the four session states, with failed distinguished from detached; freeze and read-only made visible; undo scoping stated in the UI.
 - **0.2.0-draft** (2026-07-28) — Store prose as Y.Text and style/attributes/$props as nested Y.Maps so concurrent edits merge per character and per property; the op bridge diffs whole-value ops onto that structure.
 - **0.1.1-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -175,6 +176,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.1.41-draft** (2026-08-05) — §3.2 names the consequence of the cascade — every property reaches every route, which is why Studio states the blast radius and edits the file under undo.
 - **0.1.40-draft** (2026-07-30) — A page uses a component when its tag appears in the prerendered HTML or in one of the page's island modules (§12.4).
 - **0.1.39-draft** (2026-07-28) — §9.3: editors that open a collection entry standalone must apply the mount rewrite to their render representation only, with the browser-side existence-check divergence stated.
 - **0.1.38-draft** (2026-07-28) — Media browser (§9.4) is Partial: upload ships on four Studio surfaces with content-collection destinations and collision-safe naming; metadata and usage tracking still pending.
@@ -266,6 +268,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio-ui-guidelines.md`
 
+- **0.3.4** (2026-08-05) — §9.2 history covers project documents — a settings mistake undoes like a document mistake, and a failed write leaves no entry.
 - **0.3.3** (2026-08-05) — §8.1 corrects where accumulate is authored — the canvas toggles a node into the selection too; only the marquee is absent.
 - **0.3.2** (2026-08-04) — §4.2 the set dot is the provenance chip's set-here state, in four states with the donor named; §8.1 selection is a list, with the anchor/primary rule and the one-transaction requirement.
 - **0.3.1** (2026-08-04) — §13 Notification Tiers — choosing a tier by the action required, the rendering rules, and the four rules that keep feedback from becoming a fourth surface.
@@ -286,6 +289,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.6.0-draft** (2026-08-05) — §7 Stylebook becomes Project Styles (name only — "stylebook" stays the wire value) and §17 Project Documents: project.json as a Tab under the transaction log, one write chokepoint, a no-op edit that writes nothing, and the collab exclusion.
 - **0.5.2-draft** (2026-08-05) — §5.2 the move buttons follow the primary selection and stay single-target under a multiple selection.
 - **0.5.1-draft** (2026-08-05) — §6.2 corrects the Target Line illustration — the selector is the last segment and a scheme variant appears only at Base — and retires the breakpoint-tabs, inline-selector-picker and Active-toggle subsections the Target Line replaced.
 - **0.5.0-draft** (2026-08-04) — §6.2 the Target Line and its scope chip; §6.6 the one value-source ladder; §6.7 provenance chips naming the donor, and selection as a JxPath[] with Mixed values and one transaction per batch; §7.4 scheme declaration moves to Contexts.

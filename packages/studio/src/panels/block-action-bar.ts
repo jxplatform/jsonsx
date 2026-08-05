@@ -57,7 +57,7 @@ import { showSlashMenu } from "../editor/slash-menu";
 import { getConvertTargets } from "../editor/convert-targets";
 import { rectOf } from "../utils/geometry";
 import { createCommandRegistry } from "../commands/registry";
-import { makeContext } from "../commands/context";
+import { editorKindForMode, makeContext } from "../commands/context";
 import { defaultCommands, noopCommandDeps } from "../commands/defaults";
 
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
@@ -317,6 +317,9 @@ export function selectionCommandContext(): CommandContext {
   const path = commandTargetPath();
   const node = tab && path ? getNodeAtPath(tab.doc.document, path) : null;
   return makeContext({
+    // The editor kind is part of the answer, not a default: `makeContext` fills it with "none",
+    // Which now reads as "not a canvas" and would hide the bar's own verbs from itself.
+    editor: { kind: tab ? editorKindForMode(tab.session.ui.canvasMode) : "none" },
     document: { open: Boolean(tab) },
     selection: {
       count: path ? 1 : 0,

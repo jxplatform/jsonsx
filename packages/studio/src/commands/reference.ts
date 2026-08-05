@@ -19,6 +19,7 @@
 
 import { formatChord, normalizeChord } from "./keymap";
 import { CATEGORIES } from "./levels";
+import type { KeybindingOverrides } from "./keymap";
 import type { Category, KeyScope, Level, Placement } from "./levels";
 import type { AnyCommand } from "./registry";
 
@@ -54,6 +55,8 @@ export interface ShortcutRow {
   category: Category;
   /** Where the chord is live. The column that explains why ⌘D does nothing while you are typing. */
   scope: KeyScope;
+  /** Whether this chord came from the user's layer rather than the record. Always false in docs. */
+  overridden: boolean;
 }
 
 /** Human wording for each {@link KeyScope}, so the sheet does not print an enum at a reader. */
@@ -120,12 +123,24 @@ export function commandReference(commands: readonly AnyCommand[]): CommandRow[] 
  * `edit.redo` declares two chords and appears twice, because a reader looking up ⌘Y needs to find
  * it. Sorted by scope then chord so the sheet reads as "here is what this key does, and here is
  * where it is live".
+ *
+ * `overrides` is the user's layer (`specs/studio.md` §15) and is how ONE projection serves both
+ * readers: the generated page passes none and prints what the app ships with, while the in-app
+ * Keyboard sheet passes the live layer and prints what this author's keyboard actually does. A
+ * command the user unbound has an entry with no chords and contributes no row — the same rule as a
+ * command that never declared one, because in both cases there is nothing to press.
  */
-export function shortcutReference(commands: readonly AnyCommand[]): ShortcutRow[] {
+export function shortcutReference(
+  commands: readonly AnyCommand[],
+  overrides?: KeybindingOverrides,
+): ShortcutRow[] {
   const rows: ShortcutRow[] = [];
   for (const command of commands) {
     const scope: KeyScope = command.keyScope ?? "global";
-    for (const chord of chordsOf(command)) {
+    const override = overrides?.get(command.id);
+    const chords =
+      override === undefined ? chordsOf(command) : override.map((chord) => normalizeChord(chord));
+    for (const chord of chords) {
       rows.push({
         chord,
         mac: formatChord(chord, true),
@@ -134,6 +149,7 @@ export function shortcutReference(commands: readonly AnyCommand[]): ShortcutRow[
         title: command.title,
         category: command.category,
         scope,
+        overridden: override !== undefined,
       });
     }
   }

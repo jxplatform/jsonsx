@@ -19,7 +19,7 @@ Packages is where you decide which building blocks a document — or the whole s
 The panel follows whatever document is focused — its header says so, reading **PACKAGES · document**:
 
 - **A page, layout, or component open** — you're managing that document's imports: which components it can place.
-- **`project.json` open** — you're managing the whole site: packages, site-wide component availability, and imported modules.
+- **`project.json` open** — you're managing the whole site: packages, site-wide component availability, and imported modules. Running **Open Settings** puts you here too, because [Project settings](/docs/studio/projects/settings) opens that same `project.json` document.
 
 ## Import your own components
 
@@ -34,7 +34,7 @@ With `project.json` open:
 1. Type the package's name into **Add Dependency** and press :kbd[Enter].
 2. Studio installs it. If the package publishes a component catalog (a custom elements manifest), a new section appears for it, listing every component inside.
 
-Packages can also be added from _Settings > Dependencies_ — same result, different door. See **[Project settings](/docs/studio/projects/settings)**.
+Packages can also be added from the **Packages** section of [Project settings](/docs/studio/projects/settings) — same result, different door.
 
 ## Cherry-pick components
 
@@ -51,7 +51,7 @@ The site context also shows **Imported Modules** — modules that give the proje
 
 ## Stay up to date
 
-- _Settings > Dependencies_ shows each package's current and latest version, with per-row update buttons and **Update all**.
+- The **Packages** section of [Project settings](/docs/studio/projects/settings) shows each package's current and latest version, with per-row update buttons and **Update all**.
 - When you open a project built with an older version of Jx, Studio offers to update its Jx packages to match — accept, and it rewrites the versions and reinstalls for you. Decline, and it won't ask again for that version.
 - If a project's packages have never been installed on this machine (say, you just cloned it), Studio installs them automatically before the editor loads.
 
@@ -61,5 +61,5 @@ Packages are recorded in your project's `package.json`; the components you tick 
 
 ## Next
 
-- **[Project settings](/docs/studio/projects/settings)** — the Dependencies section of the Settings modal
+- **[Project settings](/docs/studio/projects/settings)** — the Packages section of the configuration document
 - **[Pages, layouts, and components](/docs/studio/projects/pages-layouts-components)** — what components are and when to make your own

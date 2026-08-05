@@ -9,6 +9,7 @@ import { html } from "lit-html";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { CanvasPanel } from "../src/types";
 import { shell } from "../src/shell";
+import { PROJECT_STYLES_TITLE, PROJECT_STYLES_VIEW } from "../src/style/project-styles";
 
 // ─── iframe-host mock (captures stylebook mounts + pans) ────────────────────────
 
@@ -159,6 +160,30 @@ describe("renderStylebookMode", () => {
     input.value = "table";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     expect(shell.stylebook.filter).toBe("table");
+  });
+
+  test("the chrome bar's two controls name themselves, and the toggle states which way it is", async () => {
+    /* §2 principle 6: no unlabelled control. Both names are spelled from PROJECT_STYLES_TITLE, so
+       the surface has one name and not one per control. The wire value must never surface here. */
+    makeTab();
+    shell.stylebook.customizedOnly = false;
+    renderStylebookMode(ctx);
+    const bar = document.querySelector(".sb-chrome [role='toolbar']") as HTMLElement;
+    expect(bar.getAttribute("aria-label")).toBe(PROJECT_STYLES_TITLE);
+
+    const input = document.querySelector(".sb-chrome input") as HTMLInputElement;
+    expect(input.getAttribute("aria-label")).toBe(`Filter the ${PROJECT_STYLES_TITLE} catalogue`);
+    expect(input.getAttribute("aria-label")).not.toContain(PROJECT_STYLES_VIEW);
+
+    const toggle = document.querySelector(".sb-chrome button") as HTMLButtonElement;
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(toggle.getAttribute("title")).toBeTruthy();
+    toggle.click();
+    await flush();
+    renderStylebookMode(ctx);
+    expect(
+      (document.querySelector(".sb-chrome button") as HTMLElement).getAttribute("aria-pressed"),
+    ).toBe("true");
   });
 });
 

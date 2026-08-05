@@ -67,6 +67,8 @@ const { getActiveSessionId, listSessions, loadSession } =
   await import("../src/services/ai-session-store");
 const { setProjectAdopter } = await import("../src/services/project-adoption");
 const { closeAllTabs, setWorkspaceProject, workspace } = await import("../src/workspace/workspace");
+const { commitProjectConfig, resetProjectConfigDocument } =
+  await import("../src/tabs/project-config");
 const store = await import("../src/store");
 
 /** The messages persisted for the assistant's active session (tests run with no project root). */
@@ -78,6 +80,7 @@ function persistedMessages() {
 beforeEach(() => {
   installMockPlatform();
   resetWorkspaceWithTab();
+  resetProjectConfigDocument();
   setWorkspaceProject(null);
   setProjectAdopter(async () => {});
   globalThis.localStorage.clear();
@@ -383,6 +386,43 @@ describe("document-assistant — cross-file wiring", () => {
     // The file inventory section rode along in the system prompt, files only (no directories).
     const filesSection = capturedSystemPrompts[0]!.split("## Project Files")[1]!;
     expect(filesSection.split("\n\n---\n\n")[0]!.trim()).toBe("pages/index.json");
+  });
+
+  /*
+   * The assistant's `project.json` write and the settings form used to end up holding two different
+   * configuration objects: the write assigned a fresh one to `projectState.projectConfig` while the
+   * configuration DOCUMENT kept the previous configuration, and the next settings commit serialised
+   * that stale document back over the file. It survived only because an open tab happened to be
+   * re-read from disk afterwards. The write now goes INTO the document, so there is nothing beside
+   * it to lose to.
+   */
+  test("a settings edit after the assistant's project.json write extends it, never reverts it", async () => {
+    const { state } = installMockPlatform(
+      {},
+      { "project.json": JSON.stringify({ name: "Old Name" }, null, 2) },
+    );
+    setWorkspaceProject("/proj", { name: "Old Name" });
+    resetStudioState({ dirs: new Map(), projectConfig: { name: "Old Name" } });
+    nextRounds = [
+      toolCallRound("c1", "write_file", {
+        content: JSON.stringify({ name: "New Name" }),
+        path: "project.json",
+      }),
+      [{ stopReason: "stop", type: "done" }],
+    ];
+
+    const a = createDocumentAssistant();
+    await a.sendMessage("rename the project");
+
+    // The settings form's shape: mutate the live configuration in place, then commit.
+    (store.projectState!.projectConfig as { description?: string }).description = "from Settings";
+    const result = await commitProjectConfig();
+
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(state.files.get("project.json")!)).toEqual({
+      description: "from Settings",
+      name: "New Name",
+    });
   });
 
   test("write_file over the open clean tab reloads the document from disk", async () => {

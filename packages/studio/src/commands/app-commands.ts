@@ -38,7 +38,7 @@ import { signalsCommands } from "../panels/signals-panel";
 import { formulaEditorCommands } from "../panels/formula-workspace";
 import { styleCommands } from "../panels/style-panel";
 import { gridCommands } from "../grid/grid-open";
-import { settingsCommands } from "../settings/settings-modal";
+import { settingsCommands } from "../settings/settings-document";
 import { collabCommands } from "../collab/collab-commands";
 import { preferencesCommands } from "../settings/preferences-dialog";
 import { aboutCommands } from "../about/about-modal";

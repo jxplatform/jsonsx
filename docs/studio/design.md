@@ -28,7 +28,7 @@ Design mode is the canvas plus a set of panels, each with its own page:
 - **[Style inspector](/docs/studio/design/style-inspector)** — visual CSS controls for the selection, under a Target Line that states exactly what an edit will change.
 - **[Hover states and selectors](/docs/studio/design/states-and-selectors)** — style `:hover`, `:focus`, and selectors of your own.
 - **[Design tokens](/docs/studio/design/tokens)** — name your colors, fonts, and sizes once and reuse them everywhere.
-- **[Stylebook](/docs/studio/design/stylebook)** — set the default look of every heading, button, and link in one catalog.
+- **[Project Styles](/docs/studio/design/stylebook)** — set the default look of every heading, button, and link in one catalog.
 - **[Working with components](/docs/studio/design/components)** — turn a selection into a reusable component, wire props and slots.
 - **[Repeaters](/docs/studio/design/repeaters)** — turn one element into a repeating, data-bound list.
 

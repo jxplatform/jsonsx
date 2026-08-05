@@ -8,6 +8,7 @@ code:
   - packages/studio/src/tabs/tab.ts
   - packages/studio/src/panels/pane-context.ts
   - packages/studio/src/canvas/canvas-render.ts
+  - packages/studio/src/settings/settings-document.ts
 ---
 
 # Modes and views
@@ -34,11 +35,19 @@ Grid is for tabular data. Files like CSV spreadsheets open as an editable table:
 
 Code shows the file as raw source in a full code editor with syntax highlighting — the same editor VS Code uses. It's the escape hatch when you want to see exactly what Studio wrote, and the **Export** button at the right of the context bar saves a copy of the file elsewhere. Everything you can do here you can also do visually; see **[Script & logic](/docs/studio/logic)** for where code fits in Studio.
 
-## Stylebook
+## Project Styles
 
 Project Styles is the catalog of your project's element defaults — every heading, button, and link rendered with its base style, so you set the look of each element type once for the whole site. Selecting it switches the right panel to the **Style** tab automatically. See **[Design mode](/docs/studio/design)** for how it fits into styling.
 
-![Jx Studio Stylebook mode showing element defaults across breakpoints](../../images/stylebook.png)
+![Jx Studio Project Styles showing element defaults across breakpoints](../../images/stylebook.png)
+
+## Project Settings
+
+Your project's configuration — `project.json` — opens as a document too, and **Open Settings** shows it in its own editor: the sections down the left (Overview, Contexts, Site head, Definitions, Content types, Packages, Extensions, Deploy, Raw JSON), the section you picked filling the rest of the pane. Because it is a document, :kbd[⌘Z], the unsaved dot and :kbd[⌘S] mean here exactly what they mean in a page.
+
+The pane's context bar steps aside for it. A settings form has no canvas view to choose, no rendering context to resolve against, and the place contexts are _defined_ is a section of the very document on screen — so the editor takes the whole pane instead of sitting under a row of controls with nothing to say. Full guide: **[Project settings](/docs/studio/projects/settings)**.
+
+**Project Styles** and **Code** are two more editors over that same file, so switching between them keeps one undo history and one unsaved dot. **Edit Global Styles**, in the Overview section, is the way across to Project Styles.
 
 ## Which files offer what
 
@@ -50,6 +59,8 @@ Every file opens in its natural editor and view, and the two controls offer only
 | Components and pages (`.json`)     | **Canvas** · Edit  | **Code**, **Project Styles** | **Design**, **Preview** |
 | Spreadsheets (`.csv`)              | **Grid**           | **Code**                     | —                       |
 | The project file (`project.json`)  | **Project Styles** | **Code**                     | —                       |
+
+Opening `project.json` from the Files tree lands on **Project Styles**; **Open Settings** puts that same document into its settings editor.
 
 Installed format extensions can add their own file types with their own lists, so this table can grow with your project.
 

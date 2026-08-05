@@ -33,8 +33,8 @@ import { primarySelection } from "../tabs/selection";
 import { canRedo, canUndo } from "../tabs/transact";
 import { collabState } from "../collab/collab-state";
 
-import { emptyContext } from "./context";
-import type { CanvasView, CommandContext, EditorKind, FocusRegion } from "./context";
+import { canvasViewForMode, editorKindForMode, emptyContext } from "./context";
+import type { CommandContext, FocusRegion } from "./context";
 import type { StudioPlatform } from "../types";
 
 /** Elements that own the keyboard while focused. Matches the old listener's target test exactly. */
@@ -53,25 +53,6 @@ export function isTextEntryFocused(doc: Document = document): boolean {
   const el = doc.activeElement;
   return el instanceof HTMLElement && el.matches(TEXT_ENTRY);
 }
-
-/** The `canvasMode` strings, mapped onto the two orthogonal context keys they conflate. */
-const EDITOR_KIND: Readonly<Record<string, EditorKind>> = {
-  design: "canvas",
-  edit: "canvas",
-  "git-diff": "diff",
-  grid: "grid",
-  manage: "library",
-  preview: "canvas",
-  source: "code",
-  stylebook: "config",
-};
-
-/** Only the three canvas modes carry a view; everything else reports the neutral "design". */
-const CANVAS_VIEW: Readonly<Record<string, CanvasView>> = {
-  design: "design",
-  edit: "edit",
-  preview: "preview",
-};
 
 /** The facts this module cannot reach without an import cycle or a DOM/platform singleton. */
 export interface LiveContextSources {
@@ -135,8 +116,8 @@ export function createLiveContext(sources: LiveContextSources): () => CommandCon
     ctx.document.canUndo = tab ? canUndo(tab) : false;
     ctx.document.canRedo = tab ? canRedo(tab) : false;
 
-    ctx.editor.kind = tab ? (EDITOR_KIND[mode] ?? "canvas") : "none";
-    ctx.canvas.view = CANVAS_VIEW[mode] ?? "design";
+    ctx.editor.kind = tab ? editorKindForMode(mode) : "none";
+    ctx.canvas.view = canvasViewForMode(mode);
     // Panes land in P3; until then the grid is one pane showing the focused tab.
     ctx.pane.count = workspace.tabOrder.length > 0 ? 1 : 0;
 

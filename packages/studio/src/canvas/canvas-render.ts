@@ -28,6 +28,11 @@ import { view } from "../view";
 import { shell } from "../shell";
 import { parseSourceForPath, serializeDocument } from "../files/file-ops";
 import { detachGridPanel, gridPanelMounted, renderGridMode } from "../grid/grid-panel";
+import {
+  detachSettingsPane,
+  renderSettingsPane,
+  settingsPaneMounted,
+} from "../panels/settings-pane";
 import { formatByName, formatForPath } from "../format/format-host";
 import { modelUriFor } from "../services/model-uri";
 import { renderWelcome } from "../panels/welcome-screen";
@@ -533,6 +538,12 @@ function renderCanvasImpl() {
     return;
   }
 
+  // Settings fast-path, same shape: the Project Settings editor subscribes to the section registry
+  // And to its own chosen section, so a mounted editor needs nothing from the canvas pipeline.
+  if (canvasMode === "settings" && settingsPaneMounted(canvasWrap)) {
+    return;
+  }
+
   // Stylebook fast-path: a style edit re-applies IN PLACE via the bridge (the iframe re-runs the
   // Runtime's style applier on the specimen root — real @media, no re-render, no iframe reload).
   // Filter/Customized changes fall through to the full rebuild (they change which specimens exist),
@@ -593,6 +604,9 @@ function renderCanvasImpl() {
     // Destroy the grid panel if switching away from grid mode
     detachGridPanel();
 
+    // Same for the Project Settings editor, which holds a registry subscription
+    detachSettingsPane();
+
     // Dispose Monaco editor if switching away from source mode
     disposeSourceCollab();
     if (view.monacoEditor) {
@@ -650,6 +664,17 @@ function renderCanvasImpl() {
     litRender(html`<div class="preview-stage">${panelTpl}</div>`, canvasWrap);
     canvasPanels.push(panel as unknown as CanvasPanel);
     renderCanvasIntoPanel(panel as unknown as CanvasPanel, S.ui.featureToggles);
+    return;
+  }
+
+  /* Settings mode: the Project Settings document (plan §9.3). Same non-iframe-editor pattern as
+     grid and stylebook — the panel owns its own reactivity from here — and the reason the seven
+     settings screenshots now crop `pane.primary` instead of `overlay.dialog:settings` without one
+     manifest step changing. */
+  if (canvasMode === "settings") {
+    canvasWrap.style.padding = "0";
+    canvasWrap.style.display = "block";
+    renderSettingsPane(canvasWrap);
     return;
   }
 

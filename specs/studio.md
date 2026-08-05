@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.5.2-draft
+**Version:** 0.6.0-draft
 **Status:** Partial
 **Updated:** 2026-08-05
 **License:** MIT
@@ -662,11 +662,19 @@ Three consequences are normative:
 3.  **A selection is replaced, never mutated in place.** Effects track the set, not the array
     identity; an in-place push would move the selection without repainting the panel drawing it.
 
-## 7. Stylebook Mode
+## 7. Project Styles
 
 ### 7.1 Overview
 
-Design token management and component gallery. Renders all HTML elements and project components with the document's root styles applied, enabling visual design system development.
+The project's design tokens and element defaults, edited as a **document** (§17) with the live
+canvas beside them: every HTML element and project component rendered under the project's root
+styles, so tuning a token shows the page changing rather than describing it.
+
+**The user-facing name is Project Styles; `"stylebook"` remains the wire value.** It is a member of
+`CANVAS_MODES` and therefore of the `ParentToIframe` union, so renaming it would require the studio
+bundle and `dist/iframe-entry.js` rebuilt in lockstep. The id and the name are different things, and
+the code says which is which. Tokens are pickable as chips from any Style field, and a colour scheme
+is declared as a row in Contexts (§16) rather than by a control that exists only here.
 
 ### 7.2 Canvas
 
@@ -1453,8 +1461,66 @@ from a panel that has stopped working.
 
 ---
 
+## 17. Project Documents (Settings and Styles)
+
+**Status:** Partial — `project.json` is a document under the transaction log and both surfaces
+render from it; the formatting-preserving writer described in §17.2 is not built.
+
+Project configuration used to be edited through a modal by **29 fire-and-forget call sites across
+eight files**, twenty-one of which dropped a rejected write on the floor — `void
+saveProjectConfig()`, or an `await` inside an un-awaited click handler. It was the app's
+highest-consequence silent-failure path, and it wrote the file that defines the project.
+
+### 17.1 Configuration is a document
+
+`project.json` is a **Tab**, which is what makes the rest true rather than aspirational: it gets
+undo, the dirty flag, ⌘S and the history delegate from the same machinery every document uses. Two
+surfaces render it — **Project Settings** (sections as inner nav: Overview, Contexts, Site head,
+Definitions, Content types, Packages, Extensions, Deploy, Raw JSON) and **Project Styles** (§7) —
+and both edit one object.
+
+Three rules follow, and they are the section's whole content:
+
+1.  **One chokepoint.** Every configuration write goes through a single commit path: one
+    serialization, one error path. A rejected write raises a **Problem** (§16) naming the file; it
+    is never dropped.
+2.  **`registerSettingsSection` survives.** An extension contributes a section, and a section that
+    fails to load reports to Problems rather than leaving a blank pane.
+3.  **`project.json` is excluded from collaboration replication.** No session attaches to a tab whose
+    `documentPath` is `project.json`, so no history delegate is registered over it. Its edits arrive
+    from surfaces that are not the canvas, and its value configures the local editor's formats,
+    extensions, schemas and style cascade — a shared document would let one author's configuration
+    reconfigure another's editor mid-keystroke, and would let the source-canonical freeze pause
+    configuration edits that contain no text. `specs/collab.md` states the same exclusion.
+
+### 17.2 A no-op edit writes nothing
+
+The committed `project.json` files in a repository are formatted by whatever formatter the project
+uses, not by `JSON.stringify`. Re-serializing a parsed config therefore does **not** reproduce the
+bytes on disk — short arrays get expanded, authored line breaks are lost — so a writer that compares
+bytes would rewrite the entire file's indentation on the first settings edit, and every settings
+edit would arrive as a whole-file diff that hides what actually changed.
+
+**The commit compares semantically and writes nothing when nothing changed.** That is
+formatting-independent, and it is what makes a settings edit reviewable.
+
+A real one-field edit still re-serializes the whole file, so it still reformats. Preserving the
+author's formatting through a genuine edit needs a key-span splice over the original text and is
+**not built**; until it is, a configuration edit is a whole-file diff, and this section says so
+rather than implying otherwise.
+
+### 17.3 What the surfaces may assume
+
+A settings surface renders from the configuration document and commits through the chokepoint. It
+may not keep its own copy of the config object: two objects is how an edit gets silently reverted
+by whichever writer runs second. A surface that needs to reject a value validates it and reports
+inline (§16), rather than writing and hoping.
+
+---
+
 ## Changelog
 
+- **0.6.0-draft** (2026-08-05) — §7 Stylebook becomes Project Styles (name only — "stylebook" stays the wire value) and §17 Project Documents: project.json as a Tab under the transaction log, one write chokepoint, a no-op edit that writes nothing, and the collab exclusion.
 - **0.5.2-draft** (2026-08-05) — §5.2 the move buttons follow the primary selection and stay single-target under a multiple selection.
 - **0.5.1-draft** (2026-08-05) — §6.2 corrects the Target Line illustration — the selector is the last segment and a scheme variant appears only at Base — and retires the breakpoint-tabs, inline-selector-picker and Active-toggle subsections the Target Line replaced.
 - **0.5.0-draft** (2026-08-04) — §6.2 the Target Line and its scope chip; §6.6 the one value-source ladder; §6.7 provenance chips naming the donor, and selection as a JxPath[] with Mixed values and one transaction per batch; §7.4 scheme declaration moves to Contexts.
@@ -1506,4 +1572,4 @@ from a panel that has stopped working.
 
 ---
 
-_`@jxsuite/studio` Specification v0.5.2-draft_
+_`@jxsuite/studio` Specification v0.6.0-draft_

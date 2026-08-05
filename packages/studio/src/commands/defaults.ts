@@ -158,8 +158,19 @@ export function noopCommandDeps(): CommandDeps {
 /** A document is open and editable — the precondition most document-level verbs share. */
 const documentOpen = (ctx: CommandContext) => ctx.document.open;
 
-/** At least one node is selected. */
-const hasSelection = (ctx: CommandContext) => ctx.selection.count > 0;
+/**
+ * At least one node is selected, **on a canvas**.
+ *
+ * The editor-kind conjunct is not belt-and-braces. `keyScope` gates `handleKeyEvent` and nothing
+ * else, so a record reachable from the palette, the element menu, `__jxAutomation` or the assistant
+ * is reachable regardless of scope — and the Outline renders whatever
+ * `activeTab.value.doc.document` is, which with Project Settings open is the project CONFIGURATION
+ * object drawn as a layer tree. Clicking a row there writes `session.selection`, so Delete and
+ * Duplicate would transact against `project.json` and splice element nodes into the file that
+ * defines the project.
+ */
+const hasSelection = (ctx: CommandContext) =>
+  ctx.selection.count > 0 && ctx.editor.kind === "canvas";
 
 /**
  * Every selected path names a position a structural verb can act on.

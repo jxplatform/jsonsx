@@ -11,7 +11,7 @@ import {
 import { collabState, isCollabActive, isCollabPath } from "../src/collab/collab-state";
 import { reloadCleanTab } from "../src/files/files";
 import { saveFile } from "../src/files/file-ops";
-import { mutateUpdateProperty, transactDoc } from "../src/tabs/transact";
+import { getHistoryDelegate, mutateUpdateProperty, transactDoc } from "../src/tabs/transact";
 import { seedStructure, yDocToJson } from "@jxsuite/collab";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import { afterEach, describe, expect, test } from "bun:test";
@@ -101,6 +101,30 @@ describe("session attach", () => {
     const tab = openTab({ document: structuredClone(DOC), documentPath: PATH, id: PATH });
     await settleCollab();
     expect(collabState(tab).active).toBe(false);
+  });
+
+  /*
+   * `project.json` is declared out of replication (specs/collab.md). It is the one document whose
+   * edits arrive from surfaces that are not the canvas and whose value the studio itself reads to
+   * configure formats, extensions and the style cascade, so a shared Y.Doc over it would let a
+   * peer's extension list reconfigure your editor mid-keystroke. Returning early in `ensureCollab`
+   * is the whole gate: no session, and therefore no Yjs history delegate over the tab
+   * `tabs/project-config.ts` transacts configuration onto.
+   */
+  test("project.json is out of replication — no session, no history delegate", async () => {
+    const hub = createMockCollabHub();
+    installMockPlatform({ collab: hub.capability });
+    const tab = openTab({
+      document: { name: "Site" } as unknown as JxMutableNode,
+      documentPath: "project.json",
+      id: "project.json",
+    });
+    await settleCollab();
+
+    expect(collabState(tab).active).toBe(false);
+    expect(isCollabPath("project.json")).toBe(false);
+    expect(hub.connectionCount("project.json")).toBe(0);
+    expect(getHistoryDelegate(tab)).toBeNull();
   });
 
   test("read-only identity mounts as an observer", async () => {

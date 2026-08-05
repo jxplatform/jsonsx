@@ -1029,3 +1029,51 @@ button.provenance-chip:focus-visible {
   font-style: italic;
   color: var(--fg-dim);
 }
+
+/* ─── P6 · Project Styles: token chips and the override affordance (§9.4) ────
+   A style value that is exactly `var(--token)` is a REFERENCE, and raw text is
+   the one rendering that hides which token and what it currently is. The chip
+   reuses the provenance-chip vocabulary above — same border, same 9px, same
+   radius — because "this value comes from somewhere else" is the same sentence
+   in both places; only the donor differs. It is a <span>, not a button: it
+   states, it does not navigate (§6.2). */
+.style-token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  max-width: 14ch;
+  overflow: hidden;
+  padding: 0 5px;
+  border: 1px solid currentcolor;
+  border-radius: var(--radius);
+  color: var(--handler);
+  font-size: 9px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+.style-token-chip-swatch {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+}
+.style-token-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The add-an-override picker, under a token's existing context rows. It aligns
+   with them rather than with the token name, because it belongs to the override
+   list and not to the token — the affordance that was missing is "give this
+   token a value in a context it has none in", and a control that lined up with
+   the base value would read as a second base value. */
+.css-var-override-add {
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+}
+.css-var-override-add sp-picker {
+  font-size: var(--spectrum-font-size-50, 11px);
+}

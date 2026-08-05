@@ -1,26 +1,31 @@
 /**
- * Tests for src/settings/general-settings.ts — site identity (name, description, production URL),
- * favicon, platform adapter, and the global-styles shortcut.
+ * Tests for src/settings/general-settings.ts — the Overview section: site identity (name,
+ * description, production URL), favicon, and the Project Styles shortcut.
  *
- * Mocks ../src/files/files so "Edit Global Styles" doesn't pull in the full tab-opening machinery.
  * Persistence flows through updateSiteConfig → platform.writeFile("project.json"), and every write
  * in this section surfaces its rejection instead of dropping it — that is what the "save failures"
  * block pins.
  *
- * Breakpoints are NOT tested here any more: they were one of four `$media` definition sites and now
- * live in Settings › Contexts (tests/contexts-section.test.ts), which is the only one.
+ * Two things are NOT tested here any more, both because they left. Breakpoints were one of four
+ * `$media` definition sites and live in Contexts (tests/contexts-section.test.ts). The platform
+ * adapter moved to Deploy in P6.2 (tests/project-sections.test.ts) — Overview says what the site
+ * IS, Deploy says where it ships.
  */
-import { flush, installMockPlatform, pointer, resetStudioState } from "./harness";
-import { describe, expect, mock, test } from "bun:test";
+import {
+  flush,
+  installMockPlatform,
+  pointer,
+  resetStudioState,
+  resetWorkspaceWithTab,
+} from "./harness";
+import { describe, expect, test } from "bun:test";
 import { projectState } from "../src/store";
 
 import type { MockPlatformState } from "./harness";
 import type { StudioPlatform } from "../src/types";
 
-const openFileInTab = mock(async (_path: string) => {});
-void mock.module("../src/files/files.js", () => ({ openFileInTab }));
-
 const { renderGeneralSettings } = await import("../src/settings/general-settings");
+const { activeTab } = await import("../src/workspace/workspace");
 
 type AnyConfig = Record<string, any>;
 
@@ -38,7 +43,7 @@ function setup(
 function field(container: HTMLElement, cls: string): HTMLElement {
   const el = container.querySelector(`.${cls}`);
   if (!el) {
-    throw new Error(`no .${cls} in the General section`);
+    throw new Error(`no .${cls} in the Overview section`);
   }
   return el as HTMLElement;
 }
@@ -207,13 +212,10 @@ describe("save failures", () => {
   });
 
   test("a failure on a field with no control of its own lands at the top of the section", async () => {
-    const { container } = setup({ build: { adapter: "static" } }, failing);
-    const picker = container.querySelector("sp-picker")!;
-    (picker as unknown as { value: string }).value = "bun";
-    picker.dispatchEvent(new Event("change", { bubbles: true }));
+    const { container } = setup({ $head: [] }, failing);
+    setAndFire(field(container, "settings-site-description"), "A bistro");
     await flush(4);
     const shown = container.querySelector(".settings-field-error")!;
-    expect(shown.previousElementSibling?.tagName.toLowerCase()).toBe("h3");
     expect(shown.textContent?.trim()).toContain("Could not save project.json");
   });
 
@@ -338,33 +340,20 @@ describe("favicon", () => {
 // ─── Platform adapter ────────────────────────────────────────────────────────
 
 describe("platform adapter", () => {
-  test("picker defaults to static and lists all adapters", () => {
-    const { container } = setup({});
-    const picker = container.querySelector("sp-picker")!;
-    const options = [...picker.querySelectorAll("sp-menu-item")].map((m) =>
-      m.getAttribute("value"),
-    );
-    expect(options).toEqual(["static", "bun", "node", "cloudflare-workers", "cloudflare-pages"]);
-  });
-
-  test("changing the adapter merges into build config and persists", async () => {
-    const { container, state } = setup({ build: { outDir: "dist" } });
-    setAndFire(container.querySelector("sp-picker")!, "bun");
-    await flush();
-    expect(config().build).toEqual({ adapter: "bun", outDir: "dist" });
-    const written = JSON.parse(state.files.get("project.json")!);
-    expect(written.build.adapter).toBe("bun");
+  test("is no longer on Overview — it is a Deploy fact, not an identity one", () => {
+    const { container } = setup({ build: { adapter: "static" } });
+    expect(container.querySelector("sp-picker")).toBeNull();
   });
 });
 
 // ─── Global styles shortcut ──────────────────────────────────────────────────
 
 describe("global styles shortcut", () => {
-  test("Edit Global Styles closes the settings modal and opens project.json", async () => {
+  test("Edit Global Styles switches the SAME document to the Project Styles editor", () => {
+    resetWorkspaceWithTab();
     const { container } = setup({});
     pointer(buttonByText(container, "Edit Global Styles"), "click");
-    // The handler lazy-imports settings-modal; give the dynamic import time to settle.
-    await flush(20);
-    expect(openFileInTab).toHaveBeenCalledWith("project.json");
+    // Nothing closes and nothing re-opens: project.json is already the document on screen.
+    expect(activeTab.value?.session.ui.canvasMode).toBe("stylebook");
   });
 });

@@ -9,9 +9,19 @@ import type {
   InlineEditDef,
   JsonValue,
 } from "../types";
+import { editorKindForMode } from "../commands/context";
 import type { EditorKind } from "../commands/context";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxDocOp, JxFmOp } from "./patch-ops";
+
+/**
+ * The project's configuration file, project-relative.
+ *
+ * Named here rather than at the four places that used to spell it, because it is a DOCUMENT PATH —
+ * `inferModes` answers `["stylebook", "source"]` for it (editor kind `config`), and
+ * `tabs/project-config.ts` binds the tab at this path as the configuration document.
+ */
+export const PROJECT_CONFIG_PATH = "project.json";
 
 export interface TabUi {
   rightTab: string;
@@ -322,7 +332,7 @@ export function createTab({
  * @returns {string[]}
  */
 function inferModes(documentPath: string | null | undefined, sourceFormat: string | null) {
-  if (documentPath === "project.json") {
+  if (documentPath === PROJECT_CONFIG_PATH) {
     return ["stylebook", "source"];
   }
   const format = formatByName(sourceFormat) ?? formatForPath(documentPath);
@@ -354,29 +364,10 @@ function inferDocumentMode(documentPath: string | null | undefined, sourceFormat
 // The pane model needs the first one on its own: the second pane is capped to non-Canvas kinds
 // Until P8's `canvas-patcher` fan-out lands, because a second live `@jxsuite/runtime` host is the
 // Expensive part.
-
-/** The `canvasMode` strings, mapped onto the editor they actually name. */
-const EDITOR_KIND_BY_MODE: Readonly<Record<string, EditorKind>> = {
-  design: "canvas",
-  edit: "canvas",
-  "git-diff": "diff",
-  grid: "grid",
-  manage: "library",
-  preview: "canvas",
-  source: "code",
-  stylebook: "config",
-};
-
-/**
- * The editor kind a mode string names. Unknown modes read as Canvas, which is what every
- * format-declared mode that is not one of the eight above turns out to be.
- *
- * @param {string} mode
- * @returns {EditorKind}
- */
-export function editorKindForMode(mode: string): EditorKind {
-  return EDITOR_KIND_BY_MODE[mode] ?? "canvas";
-}
+//
+// The mode → kind map itself is `commands/context.ts`'s `editorKindForMode`. It was duplicated
+// Here, and the copy that drifted is what let a settings document resolve into the canvas key
+// Scope; the pane model and the command context now read the same table.
 
 /**
  * The editor kind a tab is currently showing. Reads the BASE mode: the preview toggle is a value on

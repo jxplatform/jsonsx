@@ -111,10 +111,14 @@ export const CONTRACT_VERSION = 1;
  * - `argSelectors` a puppeteer handler prefix (`xpath/`, `pierce/`) inside a step's `args`. Always
  *   zero, and landing it at zero is what keeps it zero.
  * - `inputSteps` raw input: keystrokes, typing, caret placement, synthetic drags. §13.6 wanted ≤6. It
- *   lands at **19**, and the gap is almost entirely the three ids that have no command record yet
- *   (`settings.selectEntry` ×5, `element.insertData`, `media.browse`) plus `tab-strip-shot`, which
- *   types into a real editor because the dirty flag is EARNED, not asserted. Each falls out as its
- *   record lands.
+ *   lands at **14**, and the gap is almost entirely the two ids that have no command record yet
+ *   (`element.insertData`, `media.browse`) plus `tab-strip-shot`, which types into a real editor
+ *   because the dirty flag is EARNED, not asserted. Each falls out as its record lands.
+ *
+ *   **19 → 14 in P6.2**, the ratchet moving the way it is meant to: `settings.selectEntry` was the
+ *   five of them, and it did not become a record of its own — `settings.open` grew an `entry`
+ *   argument, because a map-layout section's entry is a KEY in that section and naming it is naming
+ *   state. Not one `settings.open {section}` step changed.
  *
  *   **18 → 19 in P5, and it is the one direction this file says a number may not move**, so here is
  *   the justification the rule asks for. A quarantined shot's steps are not counted (they are read
@@ -127,10 +131,10 @@ export const CONTRACT_VERSION = 1;
  * - `nonDerivedRegions` DISTINCT region ids no registry stamps for free — the hand-stamped leaves
  *   §13.3 budgets for (`navigator/panel:git/commit`, `navigator/statements`, the settings entry
  *   rows, the media-picker's browse button…). Contract 0 counted 17 CSS selectors here.
- * - `unstable` `{reason, until}` escape hatches. **7**, and every one is a step that would otherwise
- *   be a `cmd` naming an id no registry declares — except `blog-insert-data`'s, whose id LANDED in
- *   P5 (`insert.data`) and whose step survives because the shot's subject is the merge-tag LIST, a
- *   control. That one is a docs decision, not a registry gap. See {@link REMEDY}.
+ * - `unstable` `{reason, until}` escape hatches. **2** after P6.2 retired the five `settings.
+ *   selectEntry` steps. Of what is left, one is `blog-insert-data`'s, whose id LANDED in P5
+ *   (`insert.data`) and whose step survives because the shot's subject is the merge-tag LIST, a
+ *   control — a docs decision, not a registry gap. See {@link REMEDY}.
  */
 export const CONTRACT_BUDGET = {
   selectorActions: 0,
@@ -138,9 +142,9 @@ export const CONTRACT_BUDGET = {
   regionSelectors: 0,
   clipSelectors: 0,
   argSelectors: 0,
-  inputSteps: 19,
+  inputSteps: 14,
   nonDerivedRegions: 12,
-  unstable: 7,
+  unstable: 2,
 } as const;
 
 export type BudgetKey = keyof typeof CONTRACT_BUDGET;

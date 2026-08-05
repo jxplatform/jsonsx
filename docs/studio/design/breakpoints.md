@@ -37,7 +37,7 @@ Breakpoints layer in the same order a browser applies their media queries, so wh
 
 ## Define your breakpoints
 
-Breakpoints are defined in one place: **Settings › Contexts**. Click the **Settings** gear at the bottom of the activity bar and pick **Contexts**, or open the context bar's **Context** popover and click **Manage contexts…** at the bottom of it — which gets you there without losing your element selection.
+Breakpoints are defined in one place: **Settings › Contexts**. Press :kbd[⌘K] and run **Open Settings** — or pick it from the **⬢ menu** in the Command Bar — then choose **Contexts** in the section list. From the canvas, the context bar's **Context** popover has a **Manage contexts…** button at the bottom that lands on the same section without losing your element selection.
 
 The section holds three groups, because all three are the same thing on disk and only differ in what their condition asks about:
 
@@ -47,7 +47,9 @@ The section holds three groups, because all three are the same thing on disk and
 
 Above them sits **Base width** — how wide the Base canvas panel renders when no other context applies.
 
-Name a context in plain language; Studio derives the stored name ("Wide screen" becomes `--wide-screen`). Every change is schema-checked and then written to `project.json`. If the schema refuses the value or the write fails, the reason appears under the control that caused it and the old value stays put — a refused edit never looks like the field forgetting what you typed.
+Name a context in plain language; Studio derives the stored name ("Wide screen" becomes `--wide-screen`). Every change is schema-checked and then written to `project.json`. If the schema refuses the value or the write fails, the reason appears under the control that caused it and the stored value stays as it was — a refused edit never looks like the field forgetting what you typed. Settings is a document like any other, so :kbd[⌘Z] takes a context change back.
+
+Whatever you declare here is also what a [design token](/docs/studio/design/tokens) can carry a different value in: declare a Dark scheme and every color token gains a **Dark** row, declare a breakpoint and any token can be given a value at it.
 
 A colour scheme is what turns on the **Auto / Light / Dark** control in the context bar's **Context** popover. Auto follows your OS preference; Light and Dark force that scheme on the canvas — exactly what a visitor's [color-scheme switcher](/docs/framework/concepts/color-schemes) does on the published site. The control appears only once the project declares a scheme.
 
@@ -64,4 +66,4 @@ Breakpoints are stored as a `$media` map in `project.json`. A single document ma
 ## Next
 
 - See which breakpoint an edit lands in while you style — **[Style inspector](/docs/studio/design/style-inspector)**
-- Element defaults respond to breakpoints too — **[Stylebook](/docs/studio/design/stylebook)**
+- Element defaults respond to breakpoints too — **[Project Styles](/docs/studio/design/stylebook)**

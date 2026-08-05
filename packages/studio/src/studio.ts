@@ -186,7 +186,7 @@ import { openNewProjectModal, registerNewProjectCommands } from "./new-project/n
 import { registerInspectorCommands } from "./panels/properties-panel";
 import { registerStyleCommands } from "./panels/style-panel";
 import { registerGridCommands } from "./grid/grid-open";
-import { registerSettingsCommands } from "./settings/settings-modal";
+import { registerSettingsCommands } from "./settings/settings-document";
 import { registerPreferencesCommands } from "./settings/preferences-dialog";
 import { registerBrowseCommands } from "./browse/browse-modal";
 import { convertToComponent } from "./editor/convert-to-component";

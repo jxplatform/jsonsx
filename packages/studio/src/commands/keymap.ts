@@ -11,12 +11,23 @@
  * 3. **Resolution through a scope stack.** `caret > grid/code engine > focused dock > global`. A chord
  *    bound in a narrower scope shadows the same chord in a wider one — that is the mechanism, not
  *    an accident, and it is why `keyScope` exists as a field separate from `level`.
+ *    {@link overlappingScopes} is the same fact read the other way round: which scopes can be live
+ *    at one instant, and therefore which pairs cannot both answer one chord.
  *
  * Conflicts fail loudly at registration: two commands claiming one chord in ONE scope throws. That
  * is the class of bug that let ⌘W (`editor/shortcuts.ts:192`, refuses to close the last tab) and
  * the tab strip's × (`panels/tab-strip.ts:182`, closes it happily) disagree for a year.
+ *
+ * 4. **The user's layer.** A rebinding is an OVERRIDE (`setOverrides`), never an edit to a record:
+ *    `declaredFor(id)` keeps answering what the registry declared, which is what a reset restores
+ *    and what `specs/studio.md` §15 rule 2 means by the Keyboard sheet being a projection. The two
+ *    layers meet by one rule — **an override outranks a default, and a default never evicts an
+ *    override** — so the outcome does not depend on registration order, and a stored override that
+ *    a later release's new default happens to collide with cannot throw the bootstrap. Two defaults
+ *    colliding still throws, because that one is a bug in the app and nobody's preference.
  */
 
+import { KEY_SCOPES } from "./levels";
 import type { KeyScope } from "./levels";
 
 /** Canonical modifier order. `mod` is ⌘ on mac and Ctrl elsewhere — one token, one meaning. */
@@ -239,12 +250,57 @@ export class KeybindingConflictError extends Error {
   }
 }
 
+/** The overlay's stack, and the only one `palette` appears in. */
+const PALETTE_SCOPES: readonly KeyScope[] = ["palette"];
+
+/** Every scope a dispatch stack can reach outside an overlay, `global` last-resort but named first. */
+const DISPATCHABLE_SCOPES: readonly KeyScope[] = [
+  "global",
+  ...KEY_SCOPES.filter((scope) => scope !== "global" && scope !== "palette"),
+];
+
+/**
+ * Every scope that can be live at the same instant as `scope` — including `scope` itself.
+ *
+ * Scopes are NOT independent namespaces, and treating them as one is how a rebinding steals a
+ * chord. Dispatch walks a stack (`commands/context.ts` `keyScopeStack`), and every stack Studio can
+ * be in is either the overlay's `["palette"]` or `[<one engine scope>, "global"]`. So:
+ *
+ * - **`global` overlaps every engine scope.** Binding a canvas command to ⌘S does not "also" bind ⌘S
+ *   — it SHADOWS Save for as long as the canvas has focus, and Save stops responding with no trace.
+ *   Whichever of the two is the newcomer, the pair cannot both answer that chord.
+ * - **Two engine scopes never overlap.** `caret` and `grid` are never on one stack, so one chord may
+ *   mean two things there for ever; refusing that would forbid the shadowing ladder's whole point.
+ * - **`palette` overlaps nothing but itself.** An overlay owns the keyboard outright: nothing else
+ *   resolves while one is up, and a palette binding resolves nowhere else.
+ *
+ * Ordered so that {@link Keymap.resolveChord} over the result names the most direct holder first:
+ * the same scope, then the wider one.
+ */
+export function overlappingScopes(scope: KeyScope): readonly KeyScope[] {
+  if (scope === "palette") {
+    return PALETTE_SCOPES;
+  }
+  if (scope === "global") {
+    return DISPATCHABLE_SCOPES;
+  }
+  return [scope, "global"];
+}
+
 /** One resolved chord. */
 export interface KeymapMatch {
   commandId: string;
   chord: string;
   scope: KeyScope;
 }
+
+/**
+ * The user's keybinding layer: command id → the chords it holds INSTEAD of the ones it declared.
+ *
+ * An entry with an empty list is a command the user unbound. An id with no entry is a command that
+ * still has whatever the registry declared — absence is what makes a default a default.
+ */
+export type KeybindingOverrides = ReadonlyMap<string, readonly string[]>;
 
 export interface Keymap {
   /**
@@ -261,8 +317,19 @@ export interface Keymap {
   add: (record: BindableRecord) => void;
   /** Drop a record's bindings — used when a registry is rebuilt, not in normal operation. */
   remove: (id: string) => void;
-  /** Canonical chords bound to `id`, in declaration order. */
+  /** Canonical chords LIVE for `id` — the user's, when they have overridden it. */
   bindingsFor: (id: string) => readonly string[];
+  /**
+   * Canonical chords `id` DECLARED, whatever the user layer says.
+   *
+   * This is what a reset restores, and it is why a rebinding is a layer rather than an edit: the
+   * registry stays the one place a default chord is written down.
+   */
+  declaredFor: (id: string) => readonly string[];
+  /** Replace the user's layer and re-index every record against it. */
+  setOverrides: (overrides: KeybindingOverrides) => void;
+  /** The user's layer, as applied. A copy: the layer is replaced, never mutated in place. */
+  overrides: () => KeybindingOverrides;
   /** The first binding of `id`, formatted for this platform, or `undefined` if unbound. */
   formatBinding: (id: string) => string | undefined;
   /** Walk `scopeStack` narrowest-first and return the first scope that binds `chord`. */
@@ -278,12 +345,22 @@ export interface Keymap {
  *
  * @param options.mac Whether to format chords with mac glyphs. Defaults to platform detection.
  */
+/** Which layer a live claim came from — the whole of the precedence rule is this one field. */
+interface Claim {
+  id: string;
+  source: "default" | "override";
+}
+
 export function createKeymap(options: { mac?: boolean } = {}): Keymap {
   const mac = options.mac ?? isMacPlatform();
-  /** Scope → chord → command id. */
-  const byScope = new Map<KeyScope, Map<string, string>>();
-  /** Command id → its canonical chords, in declaration order. */
+  /** Scope → chord → who holds it. */
+  const byScope = new Map<KeyScope, Map<string, Claim>>();
+  /** Command id → the chords it holds LIVE, in declaration order. */
   const byId = new Map<string, string[]>();
+  /** Command id → what it declared. Never written by a rebinding. */
+  const declared = new Map<string, { chords: string[]; scope: KeyScope }>();
+  /** The user's layer. Replaced wholesale by `setOverrides`; empty until one is applied. */
+  let userLayer = new Map<string, readonly string[]>();
 
   function chordsOf(record: BindableRecord): string[] {
     const raw = record.keybinding;
@@ -293,6 +370,77 @@ export function createKeymap(options: { mac?: boolean } = {}): Keymap {
     return (typeof raw === "string" ? [raw] : [...raw]).map((chord) => normalizeChord(chord));
   }
 
+  function tableFor(scope: KeyScope): Map<string, Claim> {
+    let table = byScope.get(scope);
+    if (!table) {
+      table = new Map<string, Claim>();
+      byScope.set(scope, table);
+    }
+    return table;
+  }
+
+  /**
+   * Index one record's LIVE chords.
+   *
+   * `strict` is registration: two defaults colliding is an app bug and throws, and the throw
+   * happens before anything is written so a rejected record leaves nothing behind. A rebuild is not
+   * strict — by then every collision involves the user's layer, which has an answer.
+   */
+  function claim(id: string, strict: boolean): void {
+    const record = declared.get(id);
+    if (!record) {
+      return;
+    }
+    const override = userLayer.get(id);
+    const source: Claim["source"] = override === undefined ? "default" : "override";
+    const chords = override ?? record.chords;
+    const table = tableFor(record.scope);
+    if (strict) {
+      for (const chord of chords) {
+        const held = table.get(chord);
+        if (held && held.id !== id && held.source === "default" && source === "default") {
+          throw new KeybindingConflictError(chord, record.scope, held.id, id);
+        }
+      }
+    }
+    const taken: string[] = [];
+    for (const chord of chords) {
+      const held = table.get(chord);
+      if (held && held.id !== id) {
+        if (source === "default") {
+          // A default never evicts an override: the user asked for this chord by name, and a
+          // Command that ships with it later is the one that goes unbound.
+          continue;
+        }
+        // An override always evicts. (Two overrides on one chord can only come from a hand-edited
+        // Store — `rebindCommand` refuses it — and then the later record wins, deterministically.)
+        byId.set(
+          held.id,
+          (byId.get(held.id) ?? []).filter((bound) => bound !== chord),
+        );
+      }
+      table.set(chord, { id, source });
+      taken.push(chord);
+    }
+    byId.set(id, taken);
+  }
+
+  /** Re-index everything: overridden records first, so their claims are the ones that survive. */
+  function rebuild(): void {
+    byScope.clear();
+    byId.clear();
+    for (const id of declared.keys()) {
+      if (userLayer.has(id)) {
+        claim(id, false);
+      }
+    }
+    for (const id of declared.keys()) {
+      if (!userLayer.has(id)) {
+        claim(id, false);
+      }
+    }
+  }
+
   return {
     mac,
     format(chord) {
@@ -300,39 +448,34 @@ export function createKeymap(options: { mac?: boolean } = {}): Keymap {
     },
     add(record) {
       const scope: KeyScope = record.keyScope ?? "global";
-      const chords = chordsOf(record);
-      if (chords.length === 0) {
-        return;
+      declared.set(record.id, { chords: chordsOf(record), scope });
+      try {
+        claim(record.id, true);
+      } catch (error) {
+        declared.delete(record.id);
+        throw error;
       }
-      let table = byScope.get(scope);
-      if (!table) {
-        table = new Map<string, string>();
-        byScope.set(scope, table);
-      }
-      for (const chord of chords) {
-        const existing = table.get(chord);
-        if (existing !== undefined && existing !== record.id) {
-          throw new KeybindingConflictError(chord, scope, existing, record.id);
-        }
-      }
-      // Only mutate once every chord has cleared, so a rejected record leaves nothing behind.
-      for (const chord of chords) {
-        table.set(chord, record.id);
-      }
-      byId.set(record.id, chords);
     },
     remove(id) {
-      for (const table of byScope.values()) {
-        for (const [chord, boundId] of table) {
-          if (boundId === id) {
-            table.delete(chord);
-          }
-        }
-      }
-      byId.delete(id);
+      declared.delete(id);
+      // A rebuild rather than a targeted delete, so anything this record was displacing gets its
+      // Chord back — the same reason `setOverrides` rebuilds.
+      rebuild();
     },
     bindingsFor(id) {
       return byId.get(id) ?? [];
+    },
+    declaredFor(id) {
+      return declared.get(id)?.chords ?? [];
+    },
+    setOverrides(overrides) {
+      userLayer = new Map(
+        [...overrides].map(([id, chords]) => [id, chords.map((chord) => normalizeChord(chord))]),
+      );
+      rebuild();
+    },
+    overrides() {
+      return new Map(userLayer);
     },
     formatBinding(id) {
       const first = byId.get(id)?.[0];
@@ -343,10 +486,10 @@ export function createKeymap(options: { mac?: boolean } = {}): Keymap {
       // Narrowest scope first: the stack IS the precedence order, so the first hit wins and a
       // Caret binding shadows the same chord bound globally.
       const scope = scopeStack.find((candidate) => byScope.get(candidate)?.has(normalized));
-      const commandId = scope === undefined ? undefined : byScope.get(scope)?.get(normalized);
-      return scope === undefined || commandId === undefined
+      const held = scope === undefined ? undefined : byScope.get(scope)?.get(normalized);
+      return scope === undefined || held === undefined
         ? undefined
-        : { chord: normalized, commandId, scope };
+        : { chord: normalized, commandId: held.id, scope };
     },
     resolveEvent(event, scopeStack) {
       return this.resolveChord(chordFromEvent(event, mac), scopeStack);
@@ -354,8 +497,8 @@ export function createKeymap(options: { mac?: boolean } = {}): Keymap {
     entries() {
       const all: KeymapMatch[] = [];
       for (const [scope, table] of byScope) {
-        for (const [chord, commandId] of table) {
-          all.push({ chord, commandId, scope });
+        for (const [chord, held] of table) {
+          all.push({ chord, commandId: held.id, scope });
         }
       }
       return all;

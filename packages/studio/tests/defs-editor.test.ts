@@ -117,7 +117,14 @@ describe("defs list panel", () => {
 // ─── New definition flow ─────────────────────────────────────────────────────
 
 describe("new definition flow", () => {
-  test("create via Enter trims the name, selects it, and persists with tab indent", async () => {
+  /*
+   * The indentation assertion is inverted on purpose. This editor used to own a second writer at
+   * `JSON.stringify(config, null, "\t")`, so adding one data shape re-indented every line of
+   * `project.json` — a file that is on disk with two spaces everywhere in this repository. There is
+   * one serialisation now (tabs/project-config.ts), and it is the one every other JSON document
+   * Studio saves already uses.
+   */
+  test("create via Enter trims the name, selects it, and persists at the project indent", async () => {
     const { container, state } = setup({});
     pointer(buttonByText(container, "New Data Shape"), "click");
     const input = container.querySelector(".settings-inline-form sp-textfield")!;
@@ -129,7 +136,8 @@ describe("new definition flow", () => {
     await flush();
     const written = state.files.get("project.json");
     expect(written).toBeDefined();
-    expect(written).toContain("\t");
+    expect(written).not.toContain("\t");
+    expect(written).toContain('\n  "$defs"');
     expect(JSON.parse(written!).$defs.ApiResponse).toBeDefined();
   });
 
@@ -591,5 +599,75 @@ describe("delete definition", () => {
     );
     expect(config().$defs).toEqual({});
     expect(state.calls.filter(([name]) => name === "writeFile")).toHaveLength(0);
+  });
+});
+
+// ─── The reference field, completed (plan §11.3 "Settings → Definitions") ────
+
+describe("reference fields", () => {
+  /** A project whose $defs hold one reference field, beside two content types to point at. */
+  function setupRefs(ref: AnyConfig): { container: HTMLElement; state: MockPlatformState } {
+    const { state } = installMockPlatform();
+    resetStudioState({
+      projectConfig: {
+        $defs: { Post: { properties: { author: ref }, required: [], type: "object" } },
+        content: { authors: { source: "./content/authors" }, tags: {} },
+      } as unknown,
+    });
+    const container = document.createElement("div");
+    renderDefsEditor(container);
+    selectDef(container, "Post");
+    return { container, state };
+  }
+
+  test("a reference field offers every content type as a target", () => {
+    const { container } = setupRefs({ $ref: "#/content/authors" });
+    const picker = container.querySelector(".schema-field-ref-target sp-picker");
+    expect(picker).not.toBeNull();
+    expect(
+      [...picker!.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value")),
+    ).toEqual(["authors", "tags"]);
+    expect(picker!.getAttribute("value")).toBe("authors");
+  });
+
+  test("choosing a target rewrites the $ref and persists it", async () => {
+    const { container, state } = setupRefs({ $ref: "#/content/authors" });
+    const picker = container.querySelector(".schema-field-ref-target sp-picker")!;
+    (picker as unknown as { value: string }).value = "tags";
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush(4);
+    expect(config().$defs.Post.properties.author).toEqual({ $ref: "#/content/tags" });
+    expect(JSON.parse(state.files.get("project.json")!).$defs.Post.properties.author).toEqual({
+      $ref: "#/content/tags",
+    });
+  });
+
+  test("a target chosen for a field that has gone is a guarded no-op", async () => {
+    const { container, state } = setupRefs({ $ref: "#/content/authors" });
+    const picker = container.querySelector(".schema-field-ref-target sp-picker")!;
+    resetStudioState({
+      projectConfig: {
+        $defs: { Post: { properties: {}, required: [], type: "object" } },
+        content: { authors: {} },
+      } as unknown,
+    });
+    (picker as unknown as { value: string }).value = "authors";
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush(4);
+    expect(state.calls.filter(([name]) => name === "writeFile")).toHaveLength(0);
+  });
+
+  test("with no content types the picker is not drawn — there is nothing to point at", () => {
+    const { state } = installMockPlatform();
+    expect(state).toBeDefined();
+    resetStudioState({
+      projectConfig: {
+        $defs: { Post: { properties: { author: { $ref: "#/content/gone" } }, type: "object" } },
+      } as unknown,
+    });
+    const container = document.createElement("div");
+    renderDefsEditor(container);
+    selectDef(container, "Post");
+    expect(container.querySelector(".schema-field-ref-target")).toBeNull();
   });
 });

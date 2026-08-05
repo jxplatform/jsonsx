@@ -31,6 +31,23 @@ control, the event-mode picker and the Style/Content `caps` arrays each survived
 sites, and the schema-form control only appears once a value is _already_ a `$ref`, so no gesture in
 those forms starts a binding at all.
 
+**G · What P6 changed about the plan itself** (added on landing). **The count was 29, not 42**,
+across eight files — but the number that mattered was hidden inside it: **21 of the 29 dropped a
+rejected write on the floor** (`void saveProjectConfig()`, or an `await` inside an un-awaited click
+handler), which is the silent-failure path the workstream existed to close. **"One serialisation"
+was not enough.** 2-space is canonical and `oxfmt --check` agrees, but `JSON.stringify(config,
+null, 2)` does not round-trip 13 of the 14 committed `project.json` files, because the formatter
+keeps short arrays on one line — so a byte-comparing writer would have rewritten almost every
+project on its first settings edit. The guarantee that works is semantic: **a no-op edit writes
+nothing at all**. A real one-field edit still reformats, and §17.2 says so rather than implying
+otherwise. **A settings document is not a canvas, and the code did not know it**: `tab.ts` and
+`live-context.ts` each hold a copy of the mode→editor-kind map, neither had a `settings` entry, both
+fall through to `"canvas"`, and ⌘V therefore inserted an element node into `project.json` through
+the transaction log. Duplicated maps fail open. **The new spec section is §17, not §16** — P4 took
+§16 for Feedback, and docs `spec:` frontmatter anchors section numbers, so they are appended, never
+renumbered. Finally, the `settings-modal` **shot name became false** the moment the modal died; a
+shot is named for what it photographs, so it is `settings-document` now.
+
 **C · Facts and dropped surfaces.** 36 `project.json` write sites → **42**, across eight files. `"stylebook"` is a wire-protocol value (`iframe-protocol.ts:25`), so it stays one. The Layout show/hide toggle, the GitHub-App install prompt, the per-recent remove affordance and the `?project=` deep link all get an explicit home in §11. The New Project wizard rework is scheduled in P1, the Insert command family in P3. Six owner-less findings — the 158 silent catch blocks, `leftTab`/`rightTab`, the three `$elements` writers, the unvirtualized trees, the panel scheduler's silent deferral, and inline formatting's level — each get a phase and a decision.
 
 ---

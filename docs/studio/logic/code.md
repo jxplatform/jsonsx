@@ -5,6 +5,7 @@ code:
   - packages/studio/src/panels/editors.ts
   - packages/studio/src/canvas/canvas-render.ts
   - packages/studio/src/services/code-services.ts
+  - packages/studio/src/settings/project-sections.ts
 ---
 
 # Code editing
@@ -47,6 +48,12 @@ The **Code** entry in the context bar's **Editor** control shows the open file i
 :::doc-note
 You never have to generate those files yourself: Studio refreshes them whenever they are missing or out of date, so a project you have never run `jx schema` on still validates, and turning an extension on or off updates the rules without a restart. In the browser at [studio.jxsuite.com](https://studio.jxsuite.com) the rules are composed for you on the server and nothing is written to your repository at all.
 :::
+
+### The project file
+
+Your project's configuration is a document like any other, so it has a Code editor too. In **[Project settings](/docs/studio/projects/settings)**, the **Raw JSON** section shows the whole of `project.json` as it is saved, and **Edit as code** opens that same document in Code — one undo stack, one unsaved dot, so a hand edit in the source and a change made in a settings form can never disagree about what the file says. It is schema-checked as you type like any other JSON.
+
+`project.json` is also the one document co-editing leaves alone: it configures _your_ editor, so it is never shared with a collaborator. See **[Real-time collaboration](/docs/studio/publish/collaboration)**.
 
 ## When to drop down
 

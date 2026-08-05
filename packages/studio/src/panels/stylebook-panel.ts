@@ -1,11 +1,16 @@
 /// <reference lib="dom" />
 /**
- * Stylebook panel — renders the Stylebook mode canvas (element catalog with per-file style
- * defaults) through the IFRAME canvas pipeline: a specimen document is generated parent-side
+ * The **Project Styles** canvas — the element catalogue with its per-file style defaults, rendered
+ * through the IFRAME canvas pipeline: a specimen document is generated parent-side
  * ({@link file://./stylebook-doc.ts}) and mounted per breakpoint panel via `mountStylebookCanvas`,
  * so each panel is a real width-sized viewport and `@media` blocks evaluate for real (no JS
  * flatten). Hits decode to tags in the host and route back here through the injected stylebook-hit
  * handler (`setStylebookHitHandler` in studio.ts).
+ *
+ * Every identifier here still says `stylebook`, and that is deliberate: `"stylebook"` is the
+ * `CANVAS_MODES` wire value this module mounts against, shared with `dist/iframe-entry.js`. The
+ * user-facing name is {@link PROJECT_STYLES_TITLE} and nothing a reader sees may be spelled from
+ * the wire value — see {@link file://../style/project-styles.ts}.
  */
 
 import { html, render as litRender } from "lit-html";
@@ -22,6 +27,7 @@ import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
 import { parseMediaEntries } from "../utils/canvas-media";
 import { mediaDisplayName } from "./shared";
 import { buildStylebookDoc } from "./stylebook-doc";
+import { PROJECT_STYLES_TITLE } from "../style/project-styles";
 import { mountStylebookCanvas, panToStylebookTag } from "../canvas/iframe-host";
 import stylebookMeta from "../../data/stylebook-meta.json";
 import type { TemplateResult } from "lit-html";
@@ -77,11 +83,16 @@ export function renderStylebookMode(ctx: StylebookCtx) {
       class="sb-chrome"
       style="position:absolute;top:0;left:0;right:0;z-index:15;background:var(--bg-panel);border-bottom:1px solid var(--border)"
     >
-      <div style="display:flex;align-items:center;padding:4px 8px;gap:4px">
+      <div
+        style="display:flex;align-items:center;padding:4px 8px;gap:4px"
+        role="toolbar"
+        aria-label=${PROJECT_STYLES_TITLE}
+      >
         <input
           class="field-input"
           style="flex:1;max-width:200px"
           placeholder="Filter…"
+          aria-label="Filter the ${PROJECT_STYLES_TITLE} catalogue"
           .value=${live(shell.stylebook.filter)}
           @input=${onFilterInput}
         />
@@ -90,6 +101,8 @@ export function renderStylebookMode(ctx: StylebookCtx) {
             active: shell.stylebook.customizedOnly,
             "tb-toggle": true,
           })}
+          aria-pressed=${String(shell.stylebook.customizedOnly)}
+          title="Show only the elements this file has already styled"
           @click=${onCustomizedToggle}
         >
           Customized

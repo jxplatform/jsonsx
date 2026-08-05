@@ -1,6 +1,6 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.3
+**Version:** 0.3.4
 **Status:** Implemented
 **Updated:** 2026-08-05
 **Applies to:** `packages/studio/`
@@ -552,6 +552,16 @@ S.document.children[0].style.color = "red";
 - Each entry snapshots `{ document, selection }`
 - `undo()` / `redo()` from `state.js`
 
+**History covers project documents too.** `project.json` is a Tab (`studio.md` §17), so a settings
+mistake is undone with the same chord as a document mistake. This is not a convenience: it is the
+precondition for making configuration non-modal at all. A surface that can change the file defining
+the project, with no undo behind it, is more dangerous the easier it is to reach — so recoverability
+lands before, not after.
+
+A batch of related edits is **one** entry, and a failed write leaves no entry at all: the document,
+its frontmatter, the selection and the dirty flag are all restored. A change the author can see but
+cannot undo or save is worse than a refused change.
+
 ### 9.3 Render Orchestration
 
 The `update()` function triggers selective re-renders based on what changed:
@@ -804,6 +814,7 @@ that must be fixed is a Problem, and an error the user cannot act on is a toast 
 
 ## Changelog
 
+- **0.3.4** (2026-08-05) — §9.2 history covers project documents — a settings mistake undoes like a document mistake, and a failed write leaves no entry.
 - **0.3.3** (2026-08-05) — §8.1 corrects where accumulate is authored — the canvas toggles a node into the selection too; only the marquee is absent.
 - **0.3.2** (2026-08-04) — §4.2 the set dot is the provenance chip's set-here state, in four states with the donor named; §8.1 selection is a list, with the anchor/primary rule and the one-transaction requirement.
 - **0.3.1** (2026-08-04) — §13 Notification Tiers — choosing a tier by the action required, the rendering rules, and the four rules that keep feedback from becoming a fourth surface.

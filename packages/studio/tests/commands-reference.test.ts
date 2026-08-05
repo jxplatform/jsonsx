@@ -120,6 +120,34 @@ describe("shortcutReference", () => {
     const app = appCommandSet();
     expect(shortcutReference(app)).toEqual(shortcutReference(app));
   });
+
+  test("with no user layer every row is a default — which is what the docs page prints", () => {
+    expect(shortcutReference(FIXTURE).every((row) => row.overridden)).toBe(false);
+    expect(shortcutReference(appCommandSet()).some((row) => row.overridden)).toBe(false);
+  });
+
+  test("a user layer is projected by the SAME function, so the sheet cannot drift", () => {
+    const rows = shortcutReference(FIXTURE, new Map([["edit.redo", ["Mod+Alt+Y"]]]));
+    const redo = rows.filter((row) => row.commandId === "edit.redo");
+    // Two declared chords collapse to the one the author asked for, canonicalised and marked.
+    expect(redo).toHaveLength(1);
+    expect(redo[0]!.chord).toBe("mod+alt+y");
+    expect(redo[0]!.mac).toBe("\u2318\u2325Y");
+    expect(redo[0]!.pc).toBe("Ctrl+Alt+Y");
+    expect(redo[0]!.overridden).toBe(true);
+    // An untouched command is untouched, and still says so.
+    expect(rows.find((row) => row.commandId === "selection.delete")!.overridden).toBe(false);
+  });
+
+  test("an unbound command has no row, exactly like one that never declared a chord", () => {
+    const rows = shortcutReference(FIXTURE, new Map([["edit.redo", []]]));
+    expect(rows.some((row) => row.commandId === "edit.redo")).toBe(false);
+  });
+
+  test("a layer naming a command the registry does not have changes nothing", () => {
+    const rows = shortcutReference(FIXTURE, new Map([["ghost.gone", ["mod+g"]]]));
+    expect(rows).toEqual(shortcutReference(FIXTURE));
+  });
 });
 
 describe("the generated markdown", () => {

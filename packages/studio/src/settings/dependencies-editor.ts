@@ -198,7 +198,7 @@ function render() {
 
   const tpl = html`
     <div class="settings-section">
-      <h3 class="settings-section-title">Dependencies</h3>
+      <h3 class="settings-section-title">Packages</h3>
       <p class="settings-field-desc">Manage this project's npm dependencies.</p>
 
       <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">

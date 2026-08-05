@@ -103,10 +103,19 @@ export interface ProjectToolsCtx {
   /** Fired after adoption is verified — the session store re-keys the live chat here. */
   onProjectAdopted?: (root: string) => void;
   /**
-   * Fired after a successful `project.json` write so workspace/project state stay in sync. The
-   * config has passed the project-schema gate by then, which is what makes the type honest.
+   * Fired after a successful `project.json` write so the configuration DOCUMENT holds what was
+   * written. The config has passed the project-schema gate by then, which is what makes the type
+   * honest.
+   *
+   * AWAITED, and the only thing that reconciles this write with the rest of the app:
+   * `tabs/project-config.ts` owns `project.json`, and a write that does not reach its document
+   * leaves that document holding the PREVIOUS configuration for the next settings edit to persist
+   * back over this one. It used to be fire-and-forget, and the write survived only because an open
+   * tab happened to be re-read from disk afterwards ({@link ProjectToolsCtx.reloadTab}); that
+   * re-read is gone, because a second parse of `project.json` is the very rival object the
+   * configuration document exists to prevent.
    */
-  onProjectConfigWritten?: (config: ProjectConfig) => void;
+  onProjectConfigWritten?: (config: ProjectConfig) => void | Promise<void>;
 }
 
 /**
@@ -376,15 +385,18 @@ export function registerProjectTools(
           };
         }
 
+        /* `project.json`'s open tab IS the configuration document, so adopting the write refreshes
+           it — re-reading the file here would parse a SECOND configuration object and hand it to
+           that tab, which is the split the adoption just closed. Every other path is a plain file
+           and its tab has to be told from disk. */
         if (projectConfig) {
-          onProjectConfigWritten?.(projectConfig);
+          await onProjectConfigWritten?.(projectConfig);
+        } else if (openTab) {
+          await reloadTab(relPath);
         }
 
-        let summary = `Wrote "${relPath}" ${NOT_UNDOABLE}.`;
-        if (openTab) {
-          await reloadTab(relPath);
-          summary = `Wrote "${relPath}" and refreshed its open editor tab ${NOT_UNDOABLE}.`;
-        }
+        const refreshed = openTab ? " and refreshed its open editor tab" : "";
+        const summary = `Wrote "${relPath}"${refreshed} ${NOT_UNDOABLE}.`;
         return { success: true, summary: tokenHints ? `${summary}\n\n${tokenHints}` : summary };
       },
     }),

@@ -131,7 +131,8 @@ describe("the records that settle an existing argument", () => {
     // None, and mutateDuplicateNode would splice at a non-numeric index. Both rendering surfaces
     // Hand-guarded this before the record declared it.
     const registry = createCommandRegistry({
-      getContext: () => makeContext({ selection: { count: 1, isRoot: true } }),
+      getContext: () =>
+        makeContext({ editor: { kind: "canvas" }, selection: { count: 1, isRoot: true } }),
       mac: true,
     });
     registry.registerAll(defaultCommandSet());
@@ -157,7 +158,8 @@ describe("the records that settle an existing argument", () => {
   test("repeat refuses the document root and refuses a repeater", () => {
     const gate = (selection: { isRoot?: boolean; isRepeater?: boolean }) => {
       const registry = createCommandRegistry({
-        getContext: () => makeContext({ selection: { count: 1, ...selection } }),
+        getContext: () =>
+          makeContext({ editor: { kind: "canvas" }, selection: { count: 1, ...selection } }),
         mac: true,
       });
       registry.registerAll(defaultCommandSet());
@@ -177,7 +179,7 @@ describe("the records that settle an existing argument", () => {
 
   test("repeat runs the converter it does not import at module scope", async () => {
     const registry = createCommandRegistry({
-      getContext: () => makeContext({ selection: { count: 1 } }),
+      getContext: () => makeContext({ editor: { kind: "canvas" }, selection: { count: 1 } }),
       mac: true,
     });
     registry.registerAll(defaultCommandSet());
@@ -188,7 +190,8 @@ describe("the records that settle an existing argument", () => {
 
   test("delete is destructive, undoable, and refuses the document root", () => {
     const registry = createCommandRegistry({
-      getContext: () => makeContext({ selection: { count: 1, isRoot: true } }),
+      getContext: () =>
+        makeContext({ editor: { kind: "canvas" }, selection: { count: 1, isRoot: true } }),
       mac: true,
     });
     registry.registerAll(defaultCommandSet());
@@ -208,7 +211,8 @@ describe("the records that settle an existing argument", () => {
     // Doing four fifths of what the user asked for is worse than saying why it cannot.
     const gate = (paths: (string | number)[][]) => {
       const registry = createCommandRegistry({
-        getContext: () => makeContext({ selection: { count: paths.length, paths } }),
+        getContext: () =>
+          makeContext({ editor: { kind: "canvas" }, selection: { count: paths.length, paths } }),
         mac: true,
       });
       registry.registerAll(defaultCommandSet());
@@ -495,5 +499,37 @@ describe("the context record", () => {
     expect(first).toEqual(emptyContext());
     first.project.open = true;
     expect(emptyContext().project.open).toBe(false);
+  });
+});
+
+describe("canvas verbs do not reach the project configuration document", () => {
+  // `keyScope` gates `handleKeyEvent` and nothing else, so a record reachable from the palette, the
+  // Element menu or the assistant is reachable whatever the scope stack says. The Outline renders
+  // Whatever `activeTab.value.doc.document` is — with Project Settings open that is the CONFIG
+  // Object drawn as a layer tree — and a click there writes `session.selection`. Delete and
+  // Duplicate would then transact against project.json and splice element nodes into the file that
+  // Defines the project.
+  const gateFor = (kind: "canvas" | "config") => {
+    const registry = createCommandRegistry({
+      getContext: () =>
+        makeContext({
+          document: { open: true },
+          editor: { kind },
+          selection: { count: 1, paths: [["children", 0]] },
+        }),
+      mac: true,
+    });
+    registry.registerAll(defaultCommandSet());
+    return registry;
+  };
+
+  test("selection verbs are unavailable over a config editor, and available on a canvas", () => {
+    const config = gateFor("config");
+    const canvas = gateFor("canvas");
+    for (const id of ["selection.delete", "selection.duplicate", "selection.repeat"]) {
+      expect(config.isVisible(id), `${id} over config`).toBe(false);
+      // The control case, so neither assertion can pass by the record simply being absent.
+      expect(canvas.isVisible(id), `${id} over canvas`).toBe(true);
+    }
   });
 });

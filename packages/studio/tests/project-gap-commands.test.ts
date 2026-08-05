@@ -5,7 +5,7 @@
  * The interesting one is `settings.open`. It replaces THREE manifest verbs (`openSettings`,
  * `openSettings {section}` and the refused `settings.setSection`, whose press-shim mirrored the
  * section registry's LABELS), and its validation has to be asynchronous because extension-
- * contributed sections register a tick after the modal opens. A synchronous refusal would reject
+ * contributed sections register a tick after the document opens. A synchronous refusal would reject
  * `connections`, `data` and `content` — all real; no refusal at all is what lets `css-variables`
  * (the key is `cssVars`) render an empty pane and call it a screenshot.
  */
@@ -27,8 +27,9 @@ void mock.module("../src/files/files.js", () => ({
 }));
 void mock.module("../src/settings/extension-sections.js", () => ({
   deriveSettingsSection: () => null,
+  extensionSectionsReady: () => Promise.resolve(),
   syncExtensionSettingsSections: () =>
-    import("../src/settings/settings-modal").then(({ registerSettingsSection }) => {
+    import("../src/settings/section-registry").then(({ registerSettingsSection }) => {
       // Stand in for @jxsuite/parser and the connector extension: two contributed sections that
       // Only exist AFTER the async sync, which is exactly the race `settings.open` has to survive.
       registerSettingsSection({
@@ -47,13 +48,10 @@ void mock.module("../src/settings/extension-sections.js", () => ({
 }));
 
 const { gridCommands, registerGridCommands } = await import("../src/grid/grid-open");
-const {
-  activeSettingsSection,
-  closeSettingsModal,
-  registerSettingsCommands,
-  settingsCommands,
-  settingsSectionKeys,
-} = await import("../src/settings/settings-modal");
+const { registerSettingsCommands, settingsCommands } =
+  await import("../src/settings/settings-document");
+const { resetSettingsDocumentState, settingsDocumentSection, settingsSectionKeys } =
+  await import("../src/settings/section-registry");
 const { browseCommands, closeBrowseModal, registerBrowseCommands } =
   await import("../src/browse/browse-modal");
 const { NEW_PROJECT_TABS, newProjectCommands, registerNewProjectCommands } =
@@ -95,7 +93,7 @@ async function refusal(id: string, args?: Record<string, unknown>): Promise<stri
 beforeEach(() => {
   installMockPlatform();
   closeAllTabs();
-  closeSettingsModal();
+  resetSettingsDocumentState();
   closeBrowseModal();
   resetStudioState({
     projectConfig: {
@@ -192,26 +190,41 @@ describe("data.openGrid", () => {
 });
 
 describe("settings.open", () => {
-  test("opens on General with no argument", async () => {
+  test("opens on Overview with no argument", async () => {
     await registry.run("settings.open");
-    expect(activeSettingsSection()).toBe("general");
+    expect(settingsDocumentSection()).toBe("overview");
+    expect(workspace.tabs.get("project.json")).toBeDefined();
   });
 
   test("opens on a built-in section", async () => {
     await registry.run("settings.open", { section: "cssVars" });
-    expect(activeSettingsSection()).toBe("cssVars");
+    expect(settingsDocumentSection()).toBe("cssVars");
   });
 
-  test("RETARGETS an already-open modal — the predecessor was open-once-then-inert", async () => {
+  test("RETARGETS an already-open document — the predecessor was open-once-then-inert", async () => {
     await registry.run("settings.open", { section: "cssVars" });
     await registry.run("settings.open", { section: "head" });
-    expect(activeSettingsSection()).toBe("head");
+    expect(settingsDocumentSection()).toBe("head");
   });
 
   test("accepts a section that only exists after the extension sync", async () => {
     await registry.run("settings.open", { section: "content" });
-    expect(activeSettingsSection()).toBe("content");
+    expect(settingsDocumentSection()).toBe("content");
     expect(settingsSectionKeys()).toContain("connections");
+  });
+
+  test("accepts an entry of a contributed section, and refuses one it has not got", async () => {
+    await registry.run("settings.open", { entry: "posts", section: "content" });
+    expect(settingsDocumentSection()).toBe("content");
+    expect(await refusal("settings.open", { entry: "drafts", section: "content" })).toContain(
+      'is not an entry of settings section "content" — entries: comments, posts',
+    );
+  });
+
+  test("refuses an entry with no section to name it in", async () => {
+    expect(await refusal("settings.open", { entry: "posts" })).toContain(
+      'argument "entry" needs a "section"',
+    );
   });
 
   test('refuses a key nothing registers — "css-variables" is not "cssVars"', async () => {

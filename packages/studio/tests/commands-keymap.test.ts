@@ -12,9 +12,13 @@ import {
   isMacPlatform,
   KeybindingConflictError,
   normalizeChord,
+  overlappingScopes,
   parseChord,
   serializeChord,
 } from "../src/commands/keymap";
+import { keyScopeStack, makeContext } from "../src/commands/context";
+import { KEY_SCOPES } from "../src/commands/levels";
+import type { KeyScope } from "../src/commands/levels";
 
 /** A KeyboardEvent-shaped literal — the keymap only reads these five fields. */
 function keyEvent(
@@ -280,6 +284,86 @@ describe("resolution through the scope stack", () => {
   });
 });
 
+/**
+ * `overlappingScopes` is the second half of the shadowing rule, and it exists because the rebinding
+ * sheet has to ask a question dispatch never asks: not "who answers this chord HERE", but "who
+ * could be made to stop answering it anywhere". Getting it wrong in either direction is a real
+ * defect — too narrow and a rebinding steals ⌘S from Save the moment the canvas has focus; too wide
+ * and Bold and Fill Down can never share ⌘B though they are never live in the same breath.
+ *
+ * So the table is asserted BOTH ways against the stacks `keyScopeStack` actually returns. It is the
+ * only thing keeping two definition sites — the ladder in `context.ts` and this projection of it —
+ * from drifting the way the app's two ⌘W handlers once did.
+ */
+describe("which scopes can be live at once", () => {
+  /** Every stack the dispatcher can be in, taken from the function that chooses them. */
+  const STACKS: readonly (readonly KeyScope[])[] = [
+    keyScopeStack(makeContext({ modal: { open: true } })),
+    keyScopeStack(makeContext({ caret: { active: true } })),
+    keyScopeStack(makeContext({ focus: { region: "navigator" } })),
+    keyScopeStack(makeContext({ editor: { kind: "grid" } })),
+    keyScopeStack(makeContext({ editor: { kind: "code" } })),
+    keyScopeStack(makeContext({ editor: { kind: "canvas" } })),
+    keyScopeStack(makeContext({ editor: { kind: "canvas" }, canvas: { view: "preview" } })),
+    keyScopeStack(makeContext()),
+  ];
+
+  test("every scope the app declares is reachable from some stack", () => {
+    // A scope no stack contains would be a keyboard scope nothing can ever dispatch in — and this
+    // Table would be describing a fiction.
+    for (const scope of KEY_SCOPES) {
+      expect(STACKS.some((stack) => stack.includes(scope))).toBe(true);
+    }
+  });
+
+  test("a scope overlaps itself, and the relation is symmetric", () => {
+    for (const scope of KEY_SCOPES) {
+      expect(overlappingScopes(scope)).toContain(scope);
+      for (const other of overlappingScopes(scope)) {
+        expect(overlappingScopes(other)).toContain(scope);
+      }
+    }
+  });
+
+  test("everything that shares a stack is reported as overlapping", () => {
+    for (const stack of STACKS) {
+      for (const a of stack) {
+        for (const b of stack) {
+          expect(overlappingScopes(a)).toContain(b);
+        }
+      }
+    }
+  });
+
+  test("nothing is reported as overlapping that no stack puts together", () => {
+    for (const a of KEY_SCOPES) {
+      for (const b of overlappingScopes(a)) {
+        expect(STACKS.some((stack) => stack.includes(a) && stack.includes(b))).toBe(true);
+      }
+    }
+  });
+
+  test("global overlaps every engine scope, and the engines overlap only global", () => {
+    expect(overlappingScopes("global")).toEqual([
+      "global",
+      "canvas",
+      "caret",
+      "grid",
+      "code",
+      "dock",
+    ]);
+    expect(overlappingScopes("caret")).toEqual(["caret", "global"]);
+    expect(overlappingScopes("grid")).toEqual(["grid", "global"]);
+    // Named first, so `resolveChord` over the list reports the most direct holder.
+    expect(overlappingScopes("canvas")[0]).toBe("canvas");
+  });
+
+  test("an overlay owns the keyboard outright, so palette overlaps nothing else", () => {
+    expect(overlappingScopes("palette")).toEqual(["palette"]);
+    expect(overlappingScopes("global")).not.toContain("palette");
+  });
+});
+
 describe("the digit row, and the platform decision made once", () => {
   test("⌘⇧2 resolves by physical key, whatever glyph the layout produces", () => {
     // With ⇧ held, `key` is "@" on US, '"' on UK and "é" on FR. A chord table spelling
@@ -326,5 +410,120 @@ describe("the digit row, and the platform decision made once", () => {
     expect(pcKeymap.mac).toBe(false);
     expect(pcKeymap.format("mod+shift+p")).toBe("Ctrl+Shift+P");
     expect(pcKeymap.format("f6")).toBe("F6");
+  });
+});
+
+describe("the user's layer", () => {
+  /** Two commands, one of them the one an author would want to move. */
+  const bound = () => {
+    const keymap = createKeymap({ mac: true });
+    keymap.add({ id: "file.save", keybinding: "mod+s" });
+    keymap.add({ id: "edit.redo", keybinding: ["mod+shift+z", "mod+y"] });
+    return keymap;
+  };
+
+  test("an override replaces the declared chord without editing what was declared", () => {
+    const keymap = bound();
+    keymap.setOverrides(new Map([["file.save", ["Mod+Alt+S"]]]));
+    // What is LIVE is the author's…
+    expect(keymap.bindingsFor("file.save")).toEqual(["mod+alt+s"]);
+    expect(keymap.formatBinding("file.save")).toBe("⌘⌥S");
+    expect(keymap.resolveChord("mod+alt+s", ["global"])?.commandId).toBe("file.save");
+    // …and the old chord stops resolving, because nothing holds it any more.
+    expect(keymap.resolveChord("mod+s", ["global"])).toBeUndefined();
+    // …while the registry's own record of the default is untouched, which is what a reset restores.
+    expect(keymap.declaredFor("file.save")).toEqual(["mod+s"]);
+  });
+
+  test("dropping the entry restores the default — a reset is a removal, not a remembered value", () => {
+    const keymap = bound();
+    keymap.setOverrides(new Map([["file.save", ["mod+alt+s"]]]));
+    keymap.setOverrides(new Map());
+    expect(keymap.bindingsFor("file.save")).toEqual(["mod+s"]);
+    expect(keymap.resolveChord("mod+s", ["global"])?.commandId).toBe("file.save");
+    expect(keymap.overrides().size).toBe(0);
+  });
+
+  test("an entry with no chords is a command the author unbound", () => {
+    const keymap = bound();
+    keymap.setOverrides(new Map([["file.save", []]]));
+    expect(keymap.bindingsFor("file.save")).toEqual([]);
+    expect(keymap.formatBinding("file.save")).toBeUndefined();
+    expect(keymap.resolveChord("mod+s", ["global"])).toBeUndefined();
+    // And the chord is free for someone else to take.
+    keymap.setOverrides(
+      new Map([
+        ["file.save", []],
+        ["edit.redo", ["mod+s"]],
+      ]),
+    );
+    expect(keymap.resolveChord("mod+s", ["global"])?.commandId).toBe("edit.redo");
+  });
+
+  test("an override evicts a default that already held the chord, whichever order they arrive", () => {
+    const first = bound();
+    first.setOverrides(new Map([["edit.redo", ["mod+s"]]]));
+    expect(first.resolveChord("mod+s", ["global"])?.commandId).toBe("edit.redo");
+    expect(first.bindingsFor("file.save")).toEqual([]);
+    // The same outcome when the displaced command is registered AFTER the layer is applied — which
+    // Is the order the bootstrap uses, and the reason the layer lives in the keymap.
+    const second = createKeymap({ mac: true });
+    second.setOverrides(new Map([["edit.redo", ["mod+s"]]]));
+    second.add({ id: "edit.redo", keybinding: "mod+y" });
+    expect(() => second.add({ id: "file.save", keybinding: "mod+s" })).not.toThrow();
+    expect(second.resolveChord("mod+s", ["global"])?.commandId).toBe("edit.redo");
+    expect(second.bindingsFor("file.save")).toEqual([]);
+    // The displaced command still knows what it declared, so the sheet can say what it lost.
+    expect(second.declaredFor("file.save")).toEqual(["mod+s"]);
+  });
+
+  test("a stale override cannot brick the bootstrap the way a default conflict must", () => {
+    // Two DEFAULTS on one chord is a bug in the app and still throws at registration…
+    const keymap = createKeymap({ mac: true });
+    keymap.setOverrides(new Map([["view.zen", ["mod+alt+z"]]]));
+    keymap.add({ id: "document.close", keybinding: "mod+w" });
+    expect(() => keymap.add({ id: "window.close", keybinding: "mod+w" })).toThrow(
+      KeybindingConflictError,
+    );
+    // …and the rejected record leaves nothing behind, override layer or not.
+    expect(keymap.declaredFor("window.close")).toEqual([]);
+  });
+
+  test("the same chord in another scope is still not a conflict, override or not", () => {
+    const keymap = createKeymap({ mac: true });
+    keymap.add({ id: "selection.delete", keybinding: "backspace", keyScope: "canvas" });
+    keymap.add({ id: "grid.clearCell", keybinding: "backspace", keyScope: "grid" });
+    keymap.setOverrides(new Map([["selection.delete", ["mod+backspace"]]]));
+    expect(keymap.resolveChord("backspace", ["grid"])?.commandId).toBe("grid.clearCell");
+    expect(keymap.resolveChord("backspace", ["canvas"])).toBeUndefined();
+  });
+
+  test("removing a record hands its chord back to whatever it was displacing", () => {
+    const keymap = bound();
+    keymap.setOverrides(new Map([["edit.redo", ["mod+s"]]]));
+    expect(keymap.bindingsFor("file.save")).toEqual([]);
+    keymap.remove("edit.redo");
+    expect(keymap.resolveChord("mod+s", ["global"])?.commandId).toBe("file.save");
+    expect(keymap.declaredFor("edit.redo")).toEqual([]);
+  });
+
+  test("the layer is a copy in both directions — nobody edits it by holding a reference", () => {
+    const keymap = bound();
+    const applied = new Map([["file.save", ["mod+alt+s"]]]);
+    keymap.setOverrides(applied);
+    applied.set("edit.redo", ["mod+alt+y"]);
+    expect(keymap.overrides().has("edit.redo")).toBe(false);
+    (keymap.overrides() as Map<string, readonly string[]>).delete("file.save");
+    expect(keymap.overrides().get("file.save")).toEqual(["mod+alt+s"]);
+  });
+
+  test("entries() reports what is LIVE, which is what the generated sheet must print", () => {
+    const keymap = bound();
+    keymap.setOverrides(new Map([["file.save", ["mod+alt+s"]]]));
+    expect(keymap.entries().toSorted((a, b) => a.chord.localeCompare(b.chord))).toEqual([
+      { chord: "mod+alt+s", commandId: "file.save", scope: "global" },
+      { chord: "mod+shift+z", commandId: "edit.redo", scope: "global" },
+      { chord: "mod+y", commandId: "edit.redo", scope: "global" },
+    ]);
   });
 });

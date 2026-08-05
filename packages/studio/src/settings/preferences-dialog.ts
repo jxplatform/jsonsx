@@ -17,10 +17,13 @@
  *   that was broken for want of one. That dialog is deleted; this is where it went.
  * - **Accounts** — GitHub, the AI provider and Cloudflare, listed with a Disconnect each. Before
  *   this, `clearGithubToken()` had zero callers: signing out of GitHub was not expressible.
- * - **Keyboard** — read-only, and GENERATED from `commands/reference.ts`'s `shortcutReference()`, the
- *   same projection `docs/studio/interface/shortcuts.md` is built from. The registry is the one
- *   place a chord is declared, so the sheet cannot drift from the app or from the docs. Per §13.5
- *   there is deliberately no screenshot of it — photographing generated content is a bug.
+ * - **Keyboard** — GENERATED from `commands/reference.ts`'s `shortcutReference()`, the same
+ *   projection `docs/studio/interface/shortcuts.md` is built from. The registry is the one place a
+ *   chord is declared, so the sheet cannot drift from the app or from the docs. Per §13.5 there is
+ *   deliberately no screenshot of it — photographing generated content is a bug. It is searchable
+ *   two ways, because there are two questions ("what is the shortcut for X" and "what did I just
+ *   press"), and rebindable — as a LAYER over the registry (`settings/preferences-keymap.ts`), so
+ *   the sheet stays a projection and the app's own record of a default is never edited.
  *
  * Modality: an `sp-dialog-wrapper` through {@link showDialog}, which is focus-managed and dismissed
  * by Escape — not `openModal`'s `inset:40px` blackout. Preferences does not suspend the app.
@@ -34,12 +37,15 @@ import { createAiCredentialsForm } from "../ui/ai-credentials-form";
 import { createManagedConnect } from "../ui/ai-managed-connect";
 import { activeRegistry } from "../commands/active-registry";
 import { shortcutReference, SCOPE_LABELS } from "../commands/reference";
-import { formatChord, isMacPlatform } from "../commands/keymap";
+import { chordFromEvent } from "../commands/keymap";
 import { listAccounts, notifyCredentialsChanged, revokeAccount } from "./preferences-accounts";
+import { applyKeybindingOverrides, rebindCommand, resetKeybinding } from "./preferences-keymap";
 import { overlayRegion } from "../ui/regions";
 
 import type { TemplateResult } from "lit-html";
 import type { ChromeTheme } from "../shell";
+import type { ShortcutRow } from "../commands/reference";
+import type { RebindResult } from "./preferences-keymap";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
 /** One section of the sheet. The `id` is what `app.preferences { section }` accepts. */
@@ -195,40 +201,248 @@ function accountsTpl(): TemplateResult {
   `;
 }
 
+// ─── Keyboard ─────────────────────────────────────────────────────────────────
+
+/**
+ * What the sheet is showing, if not everything.
+ *
+ * Two kinds because there are two questions. `text` answers "what is the shortcut for Duplicate";
+ * `chord` answers "what did I just press", which is the one a list cannot answer by being read — a
+ * chord's printed form is not what a person searching for it would type.
+ */
+type KeyFilter = { kind: "text"; value: string } | { kind: "chord"; chord: string } | null;
+
+/** The next chord goes to the search box, or onto a command. `null` while nothing is listening. */
+type KeyCapture = { mode: "search" } | { mode: "rebind"; command: AnyCommand } | null;
+
+/** Keydowns that are not a chord yet: a modifier held on its way to one. */
+const MODIFIER_KEYS = new Set(["Meta", "Control", "Alt", "Shift", "CapsLock", "OS"]);
+
+let _keyFilter: KeyFilter = null;
+let _keyCapture: KeyCapture = null;
+/** The last refusal, held until the author does something else. */
+let _keyRefusal: (RebindResult & { ok: false }) | null = null;
+
+/** Forget the Keyboard section's transient state. Opening the sheet should never resume a capture. */
+function resetKeyboardState(): void {
+  _keyFilter = null;
+  _keyCapture = null;
+  _keyRefusal = null;
+}
+
+/** Whether a row survives the current filter. `format` is injected so one platform decision holds. */
+function keyRowMatches(row: ShortcutRow, format: (chord: string) => string): boolean {
+  if (!_keyFilter) {
+    return true;
+  }
+  if (_keyFilter.kind === "chord") {
+    return row.chord === _keyFilter.chord;
+  }
+  const query = _keyFilter.value.toLowerCase();
+  return (
+    row.title.toLowerCase().includes(query) ||
+    row.commandId.toLowerCase().includes(query) ||
+    format(row.chord).toLowerCase().includes(query)
+  );
+}
+
+/**
+ * One keydown while the sheet is listening.
+ *
+ * `stopPropagation` is the load-bearing line: the dispatcher is a `document` listener and
+ * Preferences deliberately does not suspend the app (§15), so without it, capturing ⌘S would SAVE
+ * while the author was trying to bind it.
+ */
+function onKeyboardKeyDown(event: KeyboardEvent): void {
+  if (!_keyCapture || MODIFIER_KEYS.has(event.key)) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  const capture = _keyCapture;
+  _keyCapture = null;
+  if (event.key === "Escape") {
+    _keyRefusal = null;
+    repaint();
+    return;
+  }
+  const registry = activeRegistry();
+  if (!registry) {
+    repaint();
+    return;
+  }
+  const chord = chordFromEvent(event, registry.keymap.mac);
+  if (capture.mode === "search") {
+    _keyFilter = { kind: "chord", chord };
+    _keyRefusal = null;
+  } else {
+    const result = rebindCommand(registry, capture.command, chord);
+    _keyRefusal = result.ok ? null : result;
+  }
+  repaint();
+}
+
+/** The refusal, and the one thing that can be done about it: go and look at the command holding it. */
+function keyRefusalTpl(): TemplateResult | typeof nothing {
+  if (!_keyRefusal) {
+    return nothing;
+  }
+  const { conflict } = _keyRefusal;
+  return html`
+    <div class="prefs-field">
+      <sp-help-text variant="negative">${_keyRefusal.reason}</sp-help-text>
+      ${
+        conflict
+          ? html`
+              <sp-button
+                size="s"
+                treatment="outline"
+                @click=${() => {
+                  _keyFilter = { kind: "text", value: conflict.title };
+                  _keyRefusal = null;
+                  repaint();
+                }}
+              >
+                Show ${conflict.title}
+              </sp-button>
+            `
+          : nothing
+      }
+    </div>
+  `;
+}
+
+/**
+ * One binding.
+ *
+ * The record is passed in rather than looked up: the rows and the commands come from the same
+ * `registry.list()` call, so there is no window in which a row can name something the sheet cannot
+ * resolve, and no assertion pretending so.
+ */
+function keyRowTpl(
+  row: ShortcutRow,
+  command: AnyCommand,
+  registry: CommandRegistry,
+): TemplateResult {
+  const capturing = _keyCapture?.mode === "rebind" && _keyCapture.command.id === row.commandId;
+  return html`
+    <div class="prefs-key" data-command=${row.commandId}>
+      <kbd class="prefs-key-chord">
+        ${capturing ? "Press a shortcut…" : registry.keymap.format(row.chord)}
+      </kbd>
+      <span class="prefs-key-title">${row.title}${row.overridden ? " — changed" : ""}</span>
+      <sp-action-button
+        size="s"
+        quiet
+        ?selected=${capturing}
+        aria-label=${capturing ? `Stop changing ${row.title}` : `Change the shortcut for ${row.title}`}
+        @click=${() => {
+          _keyCapture = capturing ? null : { mode: "rebind", command };
+          _keyRefusal = null;
+          repaint();
+        }}
+      >
+        ${capturing ? "Cancel" : "Change"}
+      </sp-action-button>
+      ${
+        row.overridden
+          ? html`
+              <sp-action-button
+                size="s"
+                quiet
+                aria-label=${`Reset the shortcut for ${row.title}`}
+                @click=${() => {
+                  resetKeybinding(registry, row.commandId);
+                  _keyRefusal = null;
+                  repaint();
+                }}
+              >
+                Reset
+              </sp-action-button>
+            `
+          : nothing
+      }
+    </div>
+  `;
+}
+
 /**
  * The keyboard sheet — every live binding, grouped by the scope it is live in.
  *
- * Read-only by design in this phase: §9.3's "rebindable" needs a persisted override map and a
- * conflict resolver, and shipping the LIST first is what makes the app teach its own keyboard
- * (§8.5) at a cost of one projection call. The rows come from the running registry, so a command
- * registered by an extension appears here without this file knowing it exists.
+ * The rows come from the running registry through `shortcutReference`, so a command registered by
+ * an extension appears here without this file knowing it exists, and the user's layer is passed to
+ * the same projection rather than patched into its output.
+ *
+ * A command that declares two chords has two rows and rebinding either one leaves it with one — a
+ * user who asked for ⌥⌘Y is not also asking to keep ⌘Y, and Reset brings both back.
  */
 function keyboardTpl(): TemplateResult {
   const registry = activeRegistry();
   const commands: readonly AnyCommand[] = registry ? [...registry.list()] : [];
-  const rows = shortcutReference(commands);
-  if (rows.length === 0) {
+  const rows = registry ? shortcutReference(commands, registry.keymap.overrides()) : [];
+  if (!registry || rows.length === 0) {
     return html`<p class="prefs-empty">No commands are registered in this window.</p>`;
   }
-  const mac = isMacPlatform();
-  const scopes = [...new Set(rows.map((row) => row.scope))];
+  const format = (chord: string) => registry.keymap.format(chord);
+  const byId = new Map(commands.map((command) => [command.id, command]));
+  const visible = rows.flatMap((row) => {
+    const command = byId.get(row.commandId);
+    return command && keyRowMatches(row, format) ? [{ command, row }] : [];
+  });
+  const scopes = [...new Set(visible.map(({ row }) => row.scope))];
+  const capturingSearch = _keyCapture?.mode === "search";
   return html`
-    <div class="prefs-keys">
-      ${scopes.map(
-        (scope) => html`
-          <h4 class="prefs-keys-scope">${SCOPE_LABELS[scope]}</h4>
-          ${rows
-            .filter((row) => row.scope === scope)
-            .map(
-              (row) => html`
-                <div class="prefs-key">
-                  <kbd class="prefs-key-chord">${formatChord(row.chord, mac)}</kbd>
-                  <span class="prefs-key-title">${row.title}</span>
-                </div>
+    <div class="prefs-keys" @keydown=${onKeyboardKeyDown}>
+      <div class="prefs-field">
+        <sp-search
+          size="s"
+          placeholder="Find a shortcut…"
+          .value=${
+            _keyFilter === null
+              ? ""
+              : _keyFilter.kind === "chord"
+                ? format(_keyFilter.chord)
+                : _keyFilter.value
+          }
+          @input=${(event: Event) => {
+            const { value } = event.target as HTMLInputElement;
+            _keyFilter = value ? { kind: "text", value } : null;
+            _keyCapture = null;
+            repaint();
+          }}
+          @submit=${(event: Event) => event.preventDefault()}
+        ></sp-search>
+        <sp-action-button
+          size="s"
+          ?selected=${capturingSearch}
+          @click=${() => {
+            _keyCapture = capturingSearch ? null : { mode: "search" };
+            _keyRefusal = null;
+            repaint();
+          }}
+        >
+          ${capturingSearch ? "Press it now" : "Search by keystroke"}
+        </sp-action-button>
+      </div>
+      ${keyRefusalTpl()}
+      ${
+        visible.length === 0
+          ? html`<p class="prefs-empty">
+              ${
+                _keyFilter?.kind === "chord"
+                  ? `Nothing is bound to ${format(_keyFilter.chord)}.`
+                  : "No shortcut matches that."
+              }
+            </p>`
+          : scopes.map(
+              (scope) => html`
+                <h4 class="prefs-keys-scope">${SCOPE_LABELS[scope]}</h4>
+                ${visible
+                  .filter(({ row }) => row.scope === scope)
+                  .map(({ command, row }) => keyRowTpl(row, command, registry))}
               `,
-            )}
-        `,
-      )}
+            )
+      }
     </div>
   `;
 }
@@ -266,6 +480,7 @@ export function openPreferences(section?: string): Promise<null> {
   _section =
     section !== undefined && isPreferencesSection(section) ? section : DEFAULT_PREFERENCES_SECTION;
   credsForm.startEdit();
+  resetKeyboardState();
   return showDialog<null>(
     (done) => {
       let wrapperEl: HTMLElement | null = null;
@@ -303,6 +518,10 @@ export function openPreferences(section?: string): Promise<null> {
                       aria-current=${candidate.id === _section ? "true" : "false"}
                       @click=${() => {
                         _section = candidate.id;
+                        // Leaving a section abandons what it was in the middle of: an armed key
+                        // Capture whose listener is no longer mounted would otherwise swallow the
+                        // First chord pressed on the author's NEXT visit.
+                        resetKeyboardState();
                         repaint();
                       }}
                     >
@@ -387,7 +606,15 @@ export function preferencesCommands(): AnyCommand[] {
   ];
 }
 
-/** Register the preferences verb. Called from the bootstrap, beside the state it writes. */
+/**
+ * Register the preferences verb, and apply the preferences that are already stored.
+ *
+ * The keyboard layer is applied HERE rather than at the end of the bootstrap because the keymap
+ * holds the layer itself: every record registered after this call — including the ones the
+ * bootstrap registers below it — is indexed against the author's overrides, so a rebinding survives
+ * a reload without anything having to run last.
+ */
 export function registerPreferencesCommands(registry: CommandRegistry): void {
   registry.registerAll(preferencesCommands());
+  applyKeybindingOverrides(registry);
 }

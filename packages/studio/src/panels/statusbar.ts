@@ -40,6 +40,7 @@ import { shell } from "../shell";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import { primarySelection } from "../tabs/selection";
+import { EDITOR_KIND_LABELS } from "../commands/context";
 import { activeRegistry } from "../commands/active-registry";
 import { collabState } from "../collab/collab-state";
 import { problemCount, problems } from "../services/notify";
@@ -179,15 +180,6 @@ function projectFieldTpl(registry: CommandRegistry | null) {
 
 // ─── ⑫b DOCUMENT ─────────────────────────────────────────────────────────────
 
-/** The editor kinds that are not the Canvas, named as a reader would name them. */
-const KIND_LABEL: Readonly<Record<Exclude<EditorKind, "canvas" | "none">, string>> = {
-  code: "Code",
-  config: "Stylebook",
-  diff: "Diff",
-  grid: "Grid",
-  library: "Library",
-};
-
 /**
  * What the pane is showing, in the words the pane context bar uses.
  *
@@ -199,7 +191,7 @@ export function viewLabel(kind: EditorKind, view: string): string {
     return "";
   }
   if (kind !== "canvas") {
-    return KIND_LABEL[kind];
+    return EDITOR_KIND_LABELS[kind];
   }
   return view.charAt(0).toUpperCase() + view.slice(1);
 }
