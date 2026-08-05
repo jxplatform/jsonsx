@@ -657,12 +657,7 @@
           "of": "overlay.menu:block-action-bar",
           "padding": 260
         }
-      ],
-      "status": {
-        "state": "quarantined",
-        "reason": "the block action bar never renders because the caret step selects nothing: children/1 sits 203px below the fold since the Document Header card moved in-column, and probe.revealPath is inert on the scrolling Edit surface \u2014 it pans view.panY, which only exists under the Design panzoom transform (measured: scrollTop stays 0, the node's y is unchanged at 1139 in an 885px viewport). P5 owns the caret and inline-edit surface and should fix reveal for the scrolling surface, at which point this shot needs no change.",
-        "since": "6604ede8"
-      }
+      ]
     },
     {
       "name": "slash-menu-shot",
@@ -1028,11 +1023,6 @@
     {
       "name": "repeat-dialog",
       "docs": ["studio/design/repeaters"],
-      "status": {
-        "reason": "the Repeat dialog is reachable only through the element context menu, whose \"selection.repeat\" record lives in editor/context-menu.ts's own registry rather than the app's; the contract has no right-click input kind. P5 moves the record into the app registry.",
-        "since": "d4e63504",
-        "state": "quarantined"
-      },
       "open": {
         "project": "scripts/screenshots/fixtures/statements",
         "file": "components/rsvp-card.json",
@@ -1665,11 +1655,6 @@
     {
       "name": "blog-repeat-dialog",
       "docs": ["start/first-collection"],
-      "status": {
-        "reason": "the Repeat dialog is reachable only through the element context menu, whose \"selection.repeat\" record lives in editor/context-menu.ts's own registry rather than the app's; the contract has no right-click input kind. P5 moves the record into the app registry.",
-        "since": "d4e63504",
-        "state": "quarantined"
-      },
       "open": {
         "project": "scripts/screenshots/fixtures/first-collection-state",
         "file": "pages/blog.json",
@@ -1722,8 +1707,8 @@
           "region": "overlay.menu:block-action-bar/insertData",
           "text": "",
           "unstable": {
-            "reason": "\"element.insertData\" has no command record; P5 lands it as insert.data",
-            "until": "P5"
+            "reason": "the SUBJECT of this shot is the open merge-tag list, and a list is a control — \"insert.data\" (P5) is the ITEM, and running it photographs a token spliced into the middle of the heading's existing text instead. Either the shot is deleted and docs/start/first-collection.md §12 becomes prose, or block-action-bar.ts grows an idempotent verb that opens the list; both are calls the docs owner makes, not the manifest.",
+            "until": "P7"
           }
         }
       ],

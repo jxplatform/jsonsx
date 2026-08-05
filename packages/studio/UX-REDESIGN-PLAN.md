@@ -16,6 +16,21 @@ This revision applies verified corrections to the first draft. What changed:
 
 **E · What P4 changed about the plan itself** (added on landing, not designed up front). Three corrections the phase forced. **The rail foot** was two hand-authored buttons calling module functions directly, and the gear opened _project_ configuration from an application-level slot — §3.2 ② always said Preferences ⌘, belonged there, and P3 never finished it; About became the `help.about` record it had never had. **Problems' host** was genuinely ambiguous in this document — §3.2 ③ lists it as a Navigator panel, ⑪ as a Bottom-dock tab, and §7.2's table as "Bottom dock ⑪, badge on the rail". §7.2 wins; the other two readings let the same list be open in two places at once. **The tab strip is not deleted** — P3 deleted the tab _bar_ (`#tab-bar`, the old context row) and the frontmatter band; `panels/tab-strip.ts` is alive and is now one strip per pane, which is what the shot manifest already photographs as `pane.primary/tabs`. Anywhere this plan reads as though documents lost their tabs, it means that row.
 
+**F · What P5 changed about the plan itself** (added on landing). Four things this document got
+wrong, each found by reading the code rather than the plan. **The Target Line's segments** are
+element → breakpoint → scheme → **selector last**, and a scheme variant exists only at Base, because
+scheme × breakpoint compound blocks are unsupported — §6.1's illustration
+`⌖ h1 · @md · :hover · dark variant` shows a state the app cannot render. **Canvas Ctrl/Cmd-click
+already accumulates** (`iframe-host.ts:1605` toggles into the set); only the marquee is absent, so
+"the Outline is where multi-selection is authored" was too narrow. **The scope chip understates the
+widest case**: `resolveScope` treats only `layouts/` as project-wide, so `project.json` — the
+document Stylebook opens by default, whose root style merges into every page and component — reads
+"in this document". **Six vocabularies was an undercount of the work, not of the vocabularies**:
+§6.3 collapsed the dynamic-slot ring and the expression operand picker, but the schema-form binding
+control, the event-mode picker and the Style/Content `caps` arrays each survived as separate call
+sites, and the schema-form control only appears once a value is _already_ a `$ref`, so no gesture in
+those forms starts a binding at all.
+
 **C · Facts and dropped surfaces.** 36 `project.json` write sites → **42**, across eight files. `"stylebook"` is a wire-protocol value (`iframe-protocol.ts:25`), so it stays one. The Layout show/hide toggle, the GitHub-App install prompt, the per-recent remove affordance and the `?project=` deep link all get an explicit home in §11. The New Project wizard rework is scheduled in P1, the Insert command family in P3. Six owner-less findings — the 158 silent catch blocks, `leftTab`/`rightTab`, the three `$elements` writers, the unvirtualized trees, the panel scheduler's silent deferral, and inline formatting's level — each get a phase and a decision.
 
 ---

@@ -1,8 +1,8 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.1
+**Version:** 0.3.3
 **Status:** Implemented
-**Updated:** 2026-08-04
+**Updated:** 2026-08-05
 **Applies to:** `packages/studio/`
 
 ---
@@ -191,6 +191,21 @@ When a property has an explicit value, show a small accent dot to the left of th
 - Use `.set-dot--section` (7x7px) for accordion heading indicators
 - Only show when the property is explicitly set — absent means inherited/default
 
+**The dot is the "set here" state of the provenance chip, not a separate affordance.** A field label
+carries exactly one chip, in four states (`studio.md` §6.7): accent for set-here and clickable to
+clear; amber for inherited, **naming the donor** and clickable to jump there; violet for bound,
+naming the signal; and nothing at all for default, because absence is the ghost state and an
+explicit "not set" badge on every unset row is noise on the majority of rows.
+
+Three rules follow, and they are what stop the chip becoming decoration:
+
+- **An inherited chip that does not name its donor is a bug.** "Inherited" alone is what an input
+  placeholder already said, and a placeholder is visually identical to the CSS initial value.
+- **A collapsed section header carries the same states as a tally**, which is why there is no
+  separate "show only the properties that are set" toggle.
+- **Where a value differs across a multiple selection the chip reads Mixed**, and the row must not
+  offer a plain clear affordance as though the selection agreed.
+
 ### 4.3 Input Components
 
 | Component                                   | When to Use                                                                                      |
@@ -352,6 +367,23 @@ selects that block. There is no separate gesture for "select" versus "edit".
 - Hover highlight: 1px dashed accent outline at reduced opacity
 - A block may also be selected WITHOUT a caret (from the layers panel, or by a structural edit
   moving the selection); surfaces that act on a text range must handle that state
+
+**Selection is a list.** `session.selection` is a `JxPath[]`; `[]` means nothing is selected and the
+root path is `[[]]`. The first entry is the range anchor, the last is the **primary**, and every
+surface that addresses one node resolves it through a single shared function so that a
+one-element selection is indistinguishable from the single-path field it replaced.
+
+- **Shift extends from the anchor; Ctrl/Cmd accumulates.** A range is authored in the **Outline**,
+  because a list of rows is where "everything between these two" has an unambiguous meaning.
+  Accumulate works wherever an element can be clicked — the Outline and the **canvas** both toggle a
+  node into the set. A marquee is a third gesture and is deliberately absent: a half-built marquee
+  in the canvas hit test is worse than none.
+- **A command that cannot express itself over several targets stays single-target and says so.**
+  "Move six nodes up one slot" has no answer when they are not siblings; those verbs act on the
+  primary rather than guessing.
+- **A structural command over a selection is one transaction**, so the batch is one undo step, and
+  it must not be able to leave the document partly mutated and unrecorded — an edit the author can
+  see but cannot undo or save is worse than a refused edit.
 
 ### 8.2 Drag and Drop
 
@@ -772,6 +804,8 @@ that must be fixed is a Problem, and an error the user cannot act on is a toast 
 
 ## Changelog
 
+- **0.3.3** (2026-08-05) — §8.1 corrects where accumulate is authored — the canvas toggles a node into the selection too; only the marquee is absent.
+- **0.3.2** (2026-08-04) — §4.2 the set dot is the provenance chip's set-here state, in four states with the donor named; §8.1 selection is a list, with the anchor/primary rule and the one-transaction requirement.
 - **0.3.1** (2026-08-04) — §13 Notification Tiers — choosing a tier by the action required, the rendering rules, and the four rules that keep feedback from becoming a fourth surface.
 - **0.3.0** (2026-08-02) — Empty States and Copy (§11); Command and Menu Rendering Rules incl. the level × placement matrix (§12).
 - **0.2.3** (2026-08-02) — One teaching empty-state pattern (new §11); focus-visible rings replace bare outline:none; settings writes surface failure at the control.

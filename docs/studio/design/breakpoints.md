@@ -3,6 +3,7 @@ title: "Breakpoints"
 description: "Breakpoints in Jx Studio: one live canvas per screen size, defining breakpoints in Settings, and how base styles cascade into overrides."
 code:
   - packages/studio/src/settings/contexts-section.ts
+  - packages/studio/src/panels/pane-context.ts
   - packages/studio/src/utils/canvas-media.ts
   - packages/studio/src/utils/inherited-style.ts
 ---
@@ -15,21 +16,22 @@ A breakpoint is a named screen-size condition — Tablet, Desktop — at which y
 
 ## The active breakpoint
 
-Styling always targets one breakpoint at a time. Two controls stay in sync:
+Styling always targets one breakpoint at a time. Two controls choose it, and they are the same setting:
 
-- The **breakpoint tabs** at the top of the [Style inspector](/docs/studio/design/style-inspector) — **Base** plus one tab per breakpoint.
+- The pane's **Context** control — its **Size** group lists **Base** plus one button per breakpoint.
 - The **panel headers** on the canvas — click a panel's header to make its breakpoint active.
 
-Pick **Base** to edit the styles that apply everywhere; pick a breakpoint to edit that screen size's overrides.
+Pick **Base** to edit the styles that apply everywhere; pick a breakpoint to edit that screen size's overrides. Whichever you use, the [Style tab](/docs/studio/design/style-inspector)'s Target Line states the answer — `⌖ h1 · @Tablet` — so the breakpoint you're editing is on screen beside the fields you're editing it with.
 
 ## How the cascade works
 
 Base is the design; breakpoints are exceptions to it:
 
-1. Values on the **Base** tab apply at every size.
-2. On a breakpoint tab, everything inherited from earlier in the cascade shows as a dimmed placeholder — nothing is duplicated.
-3. Set a value on a breakpoint tab and it becomes an override for that breakpoint only, marked with a set-dot.
-4. Click the dot to remove the override; the inherited value shows through again.
+1. Values set at **Base** apply at every size.
+2. On a breakpoint, everything inherited from earlier in the cascade shows as a dimmed placeholder — nothing is duplicated.
+3. Every inherited value **names the breakpoint it came from**: the field's chip reads **from Base**, or **from Tablet**, and clicking it switches to that breakpoint so you can edit the value at its source.
+4. Set a value while a breakpoint is active and it becomes an override for that breakpoint only, marked with an accent dot.
+5. Click the dot to remove the override; the inherited value shows through again, and its chip says where from.
 
 Breakpoints layer in the same order a browser applies their media queries, so what you see per panel is exactly what ships.
 
@@ -49,15 +51,17 @@ Name a context in plain language; Studio derives the stored name ("Wide screen" 
 
 A colour scheme is what turns on the **Auto / Light / Dark** control in the context bar's **Context** popover. Auto follows your OS preference; Light and Dark force that scheme on the canvas — exactly what a visitor's [color-scheme switcher](/docs/framework/concepts/color-schemes) does on the published site. The control appears only once the project declares a scheme.
 
+Forcing a scheme while the size is **Base** points your edits at that scheme's overrides, and the Target Line grows a segment to say so — `⌖ h1 · Base · Dark variant`. Base values show through as inherited, their chips reading **from Base**, and clicking one sets the control back to **Auto** so you can edit the value where it lives. A size breakpoint is always breakpoint-scoped: schemes and sizes don't compound into a single block.
+
 :::doc-note
-**Definition and selection are separate.** Settings › Contexts is the only place a context is created, renamed or deleted. The context bar's **Context** popover only _chooses_ among what is defined there. Earlier versions of Studio let you create breakpoints from the New Project wizard, Settings › General, the Properties panel's Media section and the CSS Variables editor's "Enable dark scheme" button; all four are gone.
+**Definition and selection are separate.** Settings › Contexts is the only place a context is created, renamed or deleted. The context bar's **Context** popover only _chooses_ among what is defined there, and the Style tab's Target Line only _states_ what was chosen — clicking its breakpoint segment takes you to Settings › Contexts rather than offering a third list to disagree with.
 :::
 
 :::doc-note
-Breakpoints are stored as a `$media` map in `project.json`. The file format is unchanged: a document may still carry its own `$media` map, and it still merges over the project's at render time — what moved is where you author it. Per-breakpoint styles nest under the breakpoint's name inside each element's `style`, as described in **[Styling](/docs/framework/concepts/styling)**.
+Breakpoints are stored as a `$media` map in `project.json`. A single document may also carry a `$media` map of its own, which merges over the project's at render time. Per-breakpoint styles nest under the breakpoint's name inside each element's `style`, as described in **[Styling](/docs/framework/concepts/styling)**.
 :::
 
 ## Next
 
-- Use the breakpoint tabs while styling in the **[Style inspector](/docs/studio/design/style-inspector)**
+- See which breakpoint an edit lands in while you style — **[Style inspector](/docs/studio/design/style-inspector)**
 - Element defaults respond to breakpoints too — **[Stylebook](/docs/studio/design/stylebook)**

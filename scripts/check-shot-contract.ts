@@ -115,11 +115,22 @@ export const CONTRACT_VERSION = 1;
  *   (`settings.selectEntry` ×5, `element.insertData`, `media.browse`) plus `tab-strip-shot`, which
  *   types into a real editor because the dirty flag is EARNED, not asserted. Each falls out as its
  *   record lands.
+ *
+ *   **18 → 19 in P5, and it is the one direction this file says a number may not move**, so here is
+ *   the justification the rule asks for. A quarantined shot's steps are not counted (they are read
+ *   past, below), so `block-action-bar-shot` being broken since 6604ede8 is what took this to 18 —
+ *   the count fell because a shot STOPPED WORKING. P5 fixed what broke it (`probe.revealPath` was
+ *   inert on the Edit surface: it panned `view.panY`, which only reaches the screen through a panzoom
+ *   transform Edit does not render), and lifting the quarantine hands its one `caret` step back. No
+ *   step was added, and the number of shots the app can actually be driven through went up. This is
+ *   the only way this budget may rise: a step returning from quarantine, named.
  * - `nonDerivedRegions` DISTINCT region ids no registry stamps for free — the hand-stamped leaves
  *   §13.3 budgets for (`navigator/panel:git/commit`, `navigator/statements`, the settings entry
  *   rows, the media-picker's browse button…). Contract 0 counted 17 CSS selectors here.
  * - `unstable` `{reason, until}` escape hatches. **7**, and every one is a step that would otherwise
- *   be a `cmd` naming an id no registry declares. See {@link REMEDY}.
+ *   be a `cmd` naming an id no registry declares — except `blog-insert-data`'s, whose id LANDED in
+ *   P5 (`insert.data`) and whose step survives because the shot's subject is the merge-tag LIST, a
+ *   control. That one is a docs decision, not a registry gap. See {@link REMEDY}.
  */
 export const CONTRACT_BUDGET = {
   selectorActions: 0,
@@ -127,7 +138,7 @@ export const CONTRACT_BUDGET = {
   regionSelectors: 0,
   clipSelectors: 0,
   argSelectors: 0,
-  inputSteps: 18,
+  inputSteps: 19,
   nonDerivedRegions: 12,
   unstable: 7,
 } as const;

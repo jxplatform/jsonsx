@@ -39,6 +39,7 @@ import { getNodeAtPath, nodeLabel, projectState, statusbarEl } from "../store";
 import { shell } from "../shell";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
+import { primarySelection } from "../tabs/selection";
 import { activeRegistry } from "../commands/active-registry";
 import { collabState } from "../collab/collab-state";
 import { problemCount, problems } from "../services/notify";
@@ -295,11 +296,21 @@ export function selectionCrumbs(document: unknown, selection: JxPath): Selection
 
 function selectionFieldTpl(registry: CommandRegistry | null) {
   const tab = activeTab.value;
-  const selection = tab?.session.selection as JxPath | null | undefined;
+  const paths = tab?.session.selection ?? [];
+  const selection = primarySelection(paths);
   if (tab && selection?.length) {
     const node = getNodeAtPath(tab.doc.document, selection);
     const crumbs = selectionCrumbs(tab.doc.document, selection);
     return fieldTpl("statusbar/selection", [
+      // A batch says its SIZE before it says its address: the crumbs that follow lead to the
+      // Primary, and without the count they would read as the whole selection.
+      paths.length > 1
+        ? itemTpl(registry, {
+            command: null,
+            label: `${paths.length} selected`,
+            title: `${paths.length} elements are selected; the trail names the primary`,
+          })
+        : nothing,
       // The last crumb IS the selected element, and its label is the TAG while this one prefers
       // `$id` — so the two say different things and both earn their place, except when they say the
       // Same thing. An element whose id matches its tag rendered "re-hero  re-hero".
@@ -368,7 +379,7 @@ export function mountStatusbar(): void {
         void tab.doc.dirty;
         void tab.doc.mode;
         void tab.documentPath;
-        void tab.session.selection;
+        void tab.session.selection.map((path) => path.join("/")).join("|");
         void tab.session.ui.canvasMode;
         void tab.session.ui.preview;
         void collabState(tab).peers.length;

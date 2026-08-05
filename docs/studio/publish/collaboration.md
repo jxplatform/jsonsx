@@ -21,7 +21,7 @@ When two people open the same file through the same Studio backend, the tab beco
 - **A status pill** in the toolbar — **Live** while the session is connected, and a plain word for every other state: **Solo** when nobody else is here, **Connecting…**, **Offline — changes sync on reconnect**, or **Not connected** when the session could not start. Hover it for the reason. It replaces the usual unsaved-changes dot for this tab.
 - **Flags beside the pill** — **Read-only** when you may look but not publish, and **Code view held** while a collaborator has the text view (see below). Both are standing statements, not error messages.
 - **Presence chips** — one colored circle per collaborator, showing their avatar or initial. Hover one to see who it is and which file they're in; peers elsewhere in the project show up too, labeled with the file they're browsing.
-- **Selections on the canvas** — each peer's selected element is outlined in their color, labeled with their name, and follows them live.
+- **Selections on the canvas** — every element a peer has selected is outlined in their color, labeled with their name, and follows them live. A peer working across several elements at once shows all of them, so you can see the whole shape of what they are about to change rather than one node of it.
 - **Cursors in Code view** — in the **[Code](/docs/studio/logic/code)** mode the shared text carries every writer's caret and selection in their color, with their name on the caret.
 
 ## How co-editing behaves

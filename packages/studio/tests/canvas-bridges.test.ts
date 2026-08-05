@@ -125,7 +125,7 @@ describe("makeCanvasContextMenuHandler", () => {
     // Right-click resolved to the <strong> INSIDE the <p> — the menu must act on the <p>.
     handler.show({ clientX: 77, clientY: 88, path: ["children", 0, "children", 0] });
     await flush();
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
     const popover = document.querySelector("#layer-popover sp-popover") as HTMLElement;
     expect(popover).toBeTruthy();
     expect(popover.getAttribute("style")).toContain("left: 77px");

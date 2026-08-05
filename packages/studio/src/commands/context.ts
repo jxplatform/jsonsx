@@ -22,6 +22,7 @@
  */
 
 import type { KeyScope } from "./levels";
+import type { JxPath } from "../state";
 
 /** PAL-derived capability keys. One `when` clause replaces a scattered `if (platform.x)`. */
 export const CAPABILITIES = [
@@ -83,11 +84,27 @@ export interface CommandContext {
   };
   selection: {
     count: number;
+    /**
+     * The selected document paths, in selection order — `[]` when nothing is selected (§6.5).
+     *
+     * The context is what `probe.state()` answers with, so this is how a script, a screenshot step
+     * or the assistant READS a multi-selection back. `count` is its length; the last entry is the
+     * primary, which every other fact in this group describes.
+     */
+    paths: JxPath[];
     /** Tag or node kind of the primary selection, "" when nothing is selected. */
     kind: string;
     isRoot: boolean;
     isComponentInstance: boolean;
     isLayoutNode: boolean;
+    /**
+     * Whether the selection IS a repeater — an `$prototype: "Array"` pseudo-element.
+     *
+     * A fact rather than a verb's precondition, in the idiom of `isComponentInstance`: a repeater
+     * has no child list (its content is the single `map` template), so several structural verbs
+     * mean nothing on one, and each of them used to re-derive it from the node it could not see.
+     */
+    isRepeater: boolean;
   };
   /**
    * Whether a live text caret owns the keyboard. Derived host-side in `iframe-host.ts` from the
@@ -136,10 +153,12 @@ export function emptyContext(): CommandContext {
     pane: { count: 1, derived: false },
     selection: {
       count: 0,
+      paths: [],
       kind: "",
       isRoot: false,
       isComponentInstance: false,
       isLayoutNode: false,
+      isRepeater: false,
     },
     caret: { active: false },
     focus: { region: "pane" },

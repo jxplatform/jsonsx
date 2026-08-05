@@ -498,7 +498,7 @@ describe("the old dispatch — twelve modifier chords", () => {
   });
 
   test('⌘Z undoes and ⌘⇧Z redoes, uppercase key included (`case "z"` / `case "Z"`)', () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     pressDoc("d", { ctrlKey: true });
     expect(childCount()).toBe(4);
     pressDoc("z", { ctrlKey: true });
@@ -509,7 +509,7 @@ describe("the old dispatch — twelve modifier chords", () => {
   });
 
   test('⌘D duplicates the selection (`case "d"`)', () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     pressDoc("d", { ctrlKey: true });
     expect(childCount()).toBe(4);
   });
@@ -525,7 +525,7 @@ describe("the old dispatch — twelve modifier chords", () => {
     ["x", () => cutNode],
     ["v", () => pasteNode],
   ])('⌘%s reaches the clipboard action (`case "c"/"x"/"v"`)', (key, handler) => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     pressDoc(key, { ctrlKey: true });
     expect(handler()).toHaveBeenCalledTimes(1);
   });
@@ -577,79 +577,112 @@ describe("the old dispatch — twelve modifier chords", () => {
 
 describe("the old dispatch — seven bare keys", () => {
   test.each(["Delete", "Backspace"])("%s removes the selected node", (key) => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     pressDoc(key);
     const children = activeTab.value!.doc.document.children as { textContent?: string }[];
     expect(children.length).toBe(2);
     expect(children[0]!.textContent).toBeUndefined();
   });
 
+  test("Delete on a multi-selection removes every selected node in ONE undo step", () => {
+    const tab = activeTab.value!;
+    const before = tab.history.index;
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 2],
+    ];
+    pressDoc("Delete");
+    expect(childCount()).toBe(1);
+    expect(tab.history.index).toBe(before + 1);
+  });
+
+  test("a batch containing the document element is refused whole, not partly performed", () => {
+    // `ctx.selection.isRoot` is the BATCH's gate — "any selected path is the document element" —
+    // Because silently deleting a subset of what the author selected is worse than refusing.
+    const tab = activeTab.value!;
+    tab.session.selection = [[], ["children", 0]];
+    pressDoc("Delete");
+    expect(childCount()).toBe(3);
+  });
+
+  test("⌘D on a multi-selection duplicates every selected node in ONE undo step", () => {
+    const tab = activeTab.value!;
+    const before = tab.history.index;
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 2],
+    ];
+    pressDoc("d", { ctrlKey: true });
+    expect(childCount()).toBe(5);
+    expect(tab.history.index).toBe(before + 1);
+  });
+
   test("Backspace on the document element does nothing (`selection.length >= 2`)", () => {
-    activeTab.value!.session.selection = [];
+    activeTab.value!.session.selection = [[]];
     pressDoc("Backspace");
     expect(childCount()).toBe(3);
   });
 
   test("Enter inserts a paragraph after the selection and selects it", () => {
     const tab = activeTab.value!;
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     pressDoc("Enter");
     const children = tab.doc.document.children as { tagName?: string; textContent?: string }[];
     expect(children.length).toBe(4);
     expect(children[1]).toEqual({ tagName: "p", textContent: "" });
     // The new node is selected; the iframe canvas re-enters inline edit for it via its own posted
     // EnterEdit flow (no parent-side enterEditOnPath callback anymore).
-    expect(tab.session.selection).toEqual(["children", 1]);
+    expect(tab.session.selection).toEqual([["children", 1]]);
   });
 
   test("ArrowDown moves to the next sibling and ArrowUp back", () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     pressDoc("ArrowDown");
-    expect(activeTab.value!.session.selection).toEqual(["children", 1]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 1]]);
     pressDoc("ArrowUp");
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
   });
 
   test("ArrowUp at the first sibling stays put", () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     pressDoc("ArrowUp");
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
   });
 
   test("ArrowDown without a selection selects the document element", () => {
-    activeTab.value!.session.selection = null;
+    activeTab.value!.session.selection = [];
     pressDoc("ArrowDown");
-    expect(activeTab.value!.session.selection as unknown).toEqual([]);
+    expect(activeTab.value!.session.selection as unknown).toEqual([[]]);
   });
 
   test("ArrowDown with the document element selected is a no-op", () => {
-    activeTab.value!.session.selection = [];
+    activeTab.value!.session.selection = [[]];
     pressDoc("ArrowDown");
-    expect(activeTab.value!.session.selection).toEqual([]);
+    expect(activeTab.value!.session.selection).toEqual([[]]);
   });
 
   test("ArrowLeft selects the parent element", () => {
-    activeTab.value!.session.selection = ["children", 1, "children", 0];
+    activeTab.value!.session.selection = [["children", 1, "children", 0]];
     pressDoc("ArrowLeft");
-    expect(activeTab.value!.session.selection).toEqual(["children", 1]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 1]]);
   });
 
   test("ArrowRight descends into the first child", () => {
-    activeTab.value!.session.selection = ["children", 1];
+    activeTab.value!.session.selection = [["children", 1]];
     pressDoc("ArrowRight");
-    expect(activeTab.value!.session.selection).toEqual(["children", 1, "children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 1, "children", 0]]);
   });
 
   test("ArrowRight on a childless node stays put", () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     pressDoc("ArrowRight");
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
   });
 
   test("an unhandled plain key falls through", () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     const e = pressDoc("a");
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
     expect(e.defaultPrevented).toBe(false);
   });
 });
@@ -660,7 +693,7 @@ describe("the old dispatch — the three blanket guards", () => {
     const slot = document.createElement("div");
     slot.innerHTML = "<sp-dialog-wrapper open></sp-dialog-wrapper>";
     document.querySelector("#layer-dialog")!.append(slot);
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
 
     pressDoc("p", { ctrlKey: true });
     pressDoc("s", { ctrlKey: true });
@@ -699,7 +732,7 @@ describe("the old dispatch — the three blanket guards", () => {
     });
 
     test.each(["c", "x", "v", "d", "0", "=", "-"])("⌘%s belongs to the grid", (key) => {
-      activeTab.value!.session.selection = ["children", 0];
+      activeTab.value!.session.selection = [["children", 0]];
       const e = pressDoc(key, { ctrlKey: true });
       expect(e.defaultPrevented).toBe(false);
       expect(copyNode).not.toHaveBeenCalled();
@@ -712,11 +745,11 @@ describe("the old dispatch — the three blanket guards", () => {
     test.each(["Delete", "Backspace", "Enter", "Escape", "ArrowUp", "ArrowDown"])(
       "%s drives the grid's own cell navigation, never the document",
       (key) => {
-        activeTab.value!.session.selection = ["children", 0];
+        activeTab.value!.session.selection = [["children", 0]];
         const e = pressDoc(key);
         expect(e.defaultPrevented).toBe(false);
         expect(childCount()).toBe(3);
-        expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+        expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
       },
     );
   });
@@ -741,7 +774,7 @@ describe("the old dispatch — the three blanket guards", () => {
       ["v", () => pasteNode],
     ])("⌘%s is left to the caret", (key, handler) => {
       caretActive = true;
-      activeTab.value!.session.selection = ["children", 0];
+      activeTab.value!.session.selection = [["children", 0]];
       const e = pressDoc(key, { ctrlKey: true });
       expect(handler()).not.toHaveBeenCalled();
       // Not preventDefaulted either — the chord belongs to the frame the caret is in.
@@ -750,7 +783,7 @@ describe("the old dispatch — the three blanket guards", () => {
 
     test("⌘X mid-sentence leaves the paragraph in the document", () => {
       caretActive = true;
-      activeTab.value!.session.selection = ["children", 0];
+      activeTab.value!.session.selection = [["children", 0]];
       pressDoc("x", { ctrlKey: true });
       expect(cutNode).not.toHaveBeenCalled();
       expect(childCount()).toBe(3);
@@ -758,16 +791,16 @@ describe("the old dispatch — the three blanket guards", () => {
 
     test("Delete does not remove the selected node while the caret is live", () => {
       caretActive = true;
-      activeTab.value!.session.selection = ["children", 0];
+      activeTab.value!.session.selection = [["children", 0]];
       pressDoc("Delete");
       expect(childCount()).toBe(3);
     });
 
     test("Escape in a text field leaves the canvas selection alone", () => {
       focusTextField();
-      activeTab.value!.session.selection = ["children", 0];
+      activeTab.value!.session.selection = [["children", 0]];
       pressDoc("Escape");
-      expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+      expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
     });
   });
 });
@@ -778,7 +811,7 @@ describe("the old dispatch — Preview refuses to edit", () => {
   });
 
   test.each(["d", "x", "v", "0", "=", "-"])("⌘%s does not mutate or zoom", (key) => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     pressDoc(key, { ctrlKey: true });
     expect(cutNode).not.toHaveBeenCalled();
     expect(pasteNode).not.toHaveBeenCalled();
@@ -788,7 +821,7 @@ describe("the old dispatch — Preview refuses to edit", () => {
   });
 
   test.each(["Delete", "Backspace", "Enter"])("%s does not mutate the document", (key) => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     pressDoc(key);
     expect(childCount()).toBe(3);
   });
@@ -820,17 +853,17 @@ describe("deliberate divergences", () => {
         one node meant losing the whole path back to it. It now walks the ladder. */
   test("Escape selects the parent, and clears only at the document element", () => {
     const tab = activeTab.value!;
-    tab.session.selection = ["children", 1, "children", 0];
+    tab.session.selection = [["children", 1, "children", 0]];
     pressDoc("Escape");
-    expect(tab.session.selection).toEqual(["children", 1]);
+    expect(tab.session.selection).toEqual([["children", 1]]);
+    pressDoc("Escape");
+    expect(tab.session.selection).toEqual([[]]);
     pressDoc("Escape");
     expect(tab.session.selection).toEqual([]);
-    pressDoc("Escape");
-    expect(tab.session.selection).toBeNull();
   });
 
   test("Escape with nothing selected is not swallowed", () => {
-    activeTab.value!.session.selection = null;
+    activeTab.value!.session.selection = [];
     expect(pressDoc("Escape").defaultPrevented).toBe(false);
   });
 
@@ -865,15 +898,15 @@ describe("deliberate divergences", () => {
         selection. Escape and the arrows go with them. */
   test.each(["Escape", "ArrowDown", "ArrowLeft"])("%s no longer acts in Preview", (key) => {
     canvasMode = "preview";
-    activeTab.value!.session.selection = ["children", 1, "children", 0];
+    activeTab.value!.session.selection = [["children", 1, "children", 0]];
     const e = pressDoc(key);
-    expect(activeTab.value!.session.selection).toEqual(["children", 1, "children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 1, "children", 0]]);
     expect(e.defaultPrevented).toBe(false);
   });
 
   test("⌘C no longer copies an invisible Preview selection", () => {
     canvasMode = "preview";
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     pressDoc("c", { ctrlKey: true });
     expect(copyNode).not.toHaveBeenCalled();
   });
@@ -882,7 +915,7 @@ describe("deliberate divergences", () => {
         the registry refuses it, and the key is spoken for. The old switch's `if` bodies simply did
         nothing, without preventDefault. */
   test("Delete on the document element is refused, not passed to the browser", () => {
-    activeTab.value!.session.selection = [];
+    activeTab.value!.session.selection = [[]];
     const e = pressDoc("Delete");
     expect(childCount()).toBe(3);
     expect(e.defaultPrevented).toBe(true);
@@ -890,7 +923,7 @@ describe("deliberate divergences", () => {
 
   /* 7. Chords that had no branch at all in the old switch and are now real commands. */
   test("⌘⇧Z is redo even without the uppercase-key spelling", () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     pressDoc("d", { ctrlKey: true });
     pressDoc("z", { ctrlKey: true });
     expect(childCount()).toBe(3);
@@ -943,7 +976,7 @@ describe("deliberate divergences", () => {
         so this is inert in the running app — it is the rung being put in place. */
   test("with focus in a dock the canvas chords are not live", () => {
     shell.focusRegion = "navigator";
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     const e = pressDoc("Delete");
     expect(childCount()).toBe(3);
     expect(e.defaultPrevented).toBe(false);

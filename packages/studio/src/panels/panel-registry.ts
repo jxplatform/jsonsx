@@ -99,7 +99,8 @@ export interface NavigatorPanelDeps {
 export interface NavigatorDocument {
   document: JxMutableNode;
   mode: string;
-  selection: JxPath | null;
+  /** The whole selection SET the navigator/inspector panels render against (§6.5). */
+  selection: JxPath[];
   canvas: Record<string, unknown> | null;
   content?: { frontmatter?: Record<string, unknown> } | undefined;
   documentPath?: string | null | undefined;

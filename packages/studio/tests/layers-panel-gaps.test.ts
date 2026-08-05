@@ -154,11 +154,11 @@ describe("renderLayersTemplate — selection and collapse", () => {
   test("clicking a row selects its path", async () => {
     await renderLayers();
     rowByKey(["children", 1])!.click();
-    expect(activeTab.value!.session.selection).toEqual(["children", 1]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 1]]);
   });
 
   test("selected row gets the selected class", async () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     await renderLayers();
     expect(rowByKey(["children", 0])!.classList.contains("selected")).toBe(true);
   });
@@ -201,7 +201,7 @@ describe("renderLayersTemplate — selection and collapse", () => {
     row.dispatchEvent(
       new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }),
     );
-    expect(activeTab.value!.session.selection).toEqual(["children", 1]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 1]]);
   });
 });
 
@@ -217,7 +217,7 @@ describe("renderLayersTemplate — move and delete actions", () => {
    * it cannot) and the surface is not allowed to know either string.
    */
   async function buttons(path: JxPath): Promise<Record<string, HTMLElement>> {
-    activeTab.value!.session.selection = path;
+    activeTab.value!.session.selection = [path];
     await renderLayers();
     const out: Record<string, HTMLElement> = {};
     for (const btn of rowByKey(path)!.querySelectorAll("sp-action-button[data-command]")) {
@@ -236,7 +236,7 @@ describe("renderLayersTemplate — move and delete actions", () => {
   }
 
   test("actions are built only for the selected row", async () => {
-    activeTab.value!.session.selection = ["children", 1];
+    activeTab.value!.session.selection = [["children", 1]];
     await renderLayers();
     expect(rowByKey(["children", 1])!.querySelectorAll("sp-action-button").length).toBeGreaterThan(
       0,

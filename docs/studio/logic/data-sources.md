@@ -75,7 +75,7 @@ Two small structural sources round out the built-ins: **Set** (a list without du
 - **sort** — zero or more rules, each a **field** and an **order** (`asc` or `desc`).
 - **limit** — the maximum number of entries to return.
 
-On a page with a dynamic address, a field holding a reference shows a binding picker instead of a plain value — **Static value**, the page's URL parameters, or **Custom…** — so a detail page can query "the entry this URL names".
+A field that already holds a reference is edited with a binding picker instead of a plain value. The picker lists **Static value** — which clears the binding and hands the field back its ordinary editor — then one entry per URL parameter the page's address declares (`$params/slug` and friends), then **Custom…**, which reveals a free-form `#/$params/…` field for any other pointer. That is how a detail page queries "the entry this URL names".
 
 ## Database sources
 

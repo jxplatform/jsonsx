@@ -160,7 +160,7 @@ describe("remote presence", () => {
         clientId: 7,
         state: {
           focusedPath: tab.documentPath,
-          structuralSelection: ["children", 0],
+          structuralSelection: [["children", 0]],
           user: { color: "#e5484d", login: "octo", name: "Octo Cat" },
         },
       },
@@ -169,7 +169,7 @@ describe("remote presence", () => {
         clientId: 8,
         state: {
           focusedPath: "pages/elsewhere.json",
-          structuralSelection: ["children", 1],
+          structuralSelection: [["children", 1]],
           user: { color: "#30a46c", login: "away" },
         },
       },
@@ -205,6 +205,51 @@ describe("remote presence", () => {
     expect(box.style.cssText).toContain("#e5484d");
     expect(canvasEl.querySelectorAll(".overlay-presence")).toHaveLength(1);
   });
+
+  test("a peer with a MULTI-selection draws one box per path, all under their own name", async () => {
+    const tab = resetWorkspaceWithTab() as Tab;
+    collabState(tab).peers = [
+      {
+        clientId: 7,
+        state: {
+          focusedPath: tab.documentPath,
+          structuralSelection: [
+            ["children", 0],
+            ["children", 1],
+          ],
+          user: { color: "#e5484d", login: "octo", name: "Octo Cat" },
+        },
+      },
+    ] as never;
+
+    const canvasEl = await mountReady(tab.id);
+    const ch = channels.at(-1)!;
+    ch.posts.length = 0;
+    ch.deliver({ gen: 1, kind: "renderComplete" });
+
+    const measure = ch.posts.findLast((p) => p.kind === "measure") as
+      | { paths: (string | number)[][]; reqId: number }
+      | undefined;
+    expect(measure!.paths).toEqual([
+      ["children", 0],
+      ["children", 1],
+    ]);
+
+    ch.deliver({
+      hits: [
+        { path: ["children", 0], rect: { height: 12, width: 80, x: 4, y: 6 } },
+        { path: ["children", 1], rect: { height: 12, width: 80, x: 4, y: 30 } },
+      ],
+      kind: "geometry",
+      reqId: measure!.reqId,
+    });
+    const boxes = [...canvasEl.querySelectorAll(".overlay-presence")] as HTMLElement[];
+    expect(boxes).toHaveLength(2);
+    for (const box of boxes) {
+      expect(box.style.cssText).toContain("#e5484d");
+      expect(box.querySelector(".overlay-presence-tag")!.textContent).toBe("Octo Cat");
+    }
+  });
 });
 
 // ─── Not-ready selection gates ───────────────────────────────────────────────
@@ -217,7 +262,7 @@ describe("not-ready selection gates", () => {
     await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl); // Never 'ready'.
     const ch = channels.at(-1)!;
     ch.posts.length = 0;
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     await flush();
     expect(ch.posts.some((p) => p.kind === "measure")).toBe(false);
   });
@@ -339,7 +384,7 @@ describe("debounced timers", () => {
         clientId: 4,
         state: {
           focusedPath: tab.documentPath,
-          structuralSelection: ["children", 0],
+          structuralSelection: [["children", 0]],
           user: { color: "#4f9cf9", login: "late-peer" },
         },
       },

@@ -465,7 +465,8 @@ export interface CanvasPanel {
 export interface DocumentStackEntry {
   document: JxMutableNode;
   documentPath: string | null;
-  selection: JxPath | null;
+  /** The whole selection set the frame was left with — `[]` when nothing was selected. */
+  selection: JxPath[];
   dirty?: boolean;
   mode?: string;
   sourceFormat?: string | null;

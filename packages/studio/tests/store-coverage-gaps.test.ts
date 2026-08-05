@@ -61,10 +61,10 @@ describe("updateSession", () => {
       canvas: { error: "boom", status: "error" },
       clipboard: clip,
       hover: ["children", 0],
-      selection: ["children", 1],
+      selection: [["children", 1]],
     });
     expect(tab.session.hover).toEqual(["children", 0]);
-    expect(tab.session.selection).toEqual(["children", 1]);
+    expect(tab.session.selection).toEqual([["children", 1]]);
     expect(tab.session.clipboard).toEqual(clip);
     expect(tab.session.canvas.status).toBe("error");
     expect(tab.session.canvas.error).toBe("boom");

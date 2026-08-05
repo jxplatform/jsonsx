@@ -72,7 +72,7 @@ const TWO_PARAGRAPHS: JxMutableNode = {
 
 function setup(node: JxMutableNode = TWO_PARAGRAPHS, selection: JxPath = ["children", 1]) {
   const tab = resetWorkspaceWithTab(structuredClone(node));
-  tab.session.selection = selection as never;
+  tab.session.selection = selection ? [selection] : [];
   return tab;
 }
 
@@ -209,7 +209,7 @@ describe("the selection command records", () => {
 
   test("a cold registry reports no selection at all", () => {
     resetWorkspaceWithTab();
-    activeTab.value!.session.selection = null as never;
+    activeTab.value!.session.selection = [];
     const ctx = selectionCommandContext();
     expect(ctx.selection.count).toBe(0);
     expect(ctx.document.open).toBe(true);

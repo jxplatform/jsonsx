@@ -109,6 +109,8 @@ If a panel is showing a yellow **New changes — applied when you finish editing
 
 The status bar along the bottom carries **ambient state only** — three fields in scope order: your project, then the document, then the selection. It's the project name and branch, the document's path and save state, the trail of ancestors above what you've selected. Every item is clickable and runs a command.
 
+With more than one element selected, the selection field leads with a count — **3 selected** — before the trail. The trail names the _primary_ element, the one the inspector and the block action bar are pointed at, so the count is what stops that trail reading as though it described everything you have selected.
+
 **No message ever flashes past down there.** Outcomes go to toasts and Problems, which are readable for as long as you need and can be acted on; the status bar answers "where am I and what state is this in?", which stays true until something changes it.
 
 ## Related

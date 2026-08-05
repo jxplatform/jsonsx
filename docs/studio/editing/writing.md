@@ -32,6 +32,8 @@ There is nothing to start or stop. The cursor is simply on the page, the way it 
 - **Drag** — or hold :kbd[Shift] and move — to select, including across several blocks at once.
 - :kbd[Esc] puts the cursor away.
 
+Placing the cursor also selects the block it lands in — one block. So clicking into a paragraph while [several elements are selected](/docs/studio/design/layers#select-several-at-once) narrows the selection back to that paragraph, and the toolbar above it is that paragraph's. To add a block to a selection instead of replacing it, hold :kbd[⌘] (macOS) / :kbd[Ctrl] (Windows/Linux) as you click.
+
 Your writing is saved into the document as you pause, so :kbd[⌘S] (macOS) / :kbd[Ctrl+S] (Windows/Linux) always writes what is on screen, mid-sentence or not.
 
 ## What you can click into

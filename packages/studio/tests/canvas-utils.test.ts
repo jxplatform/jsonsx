@@ -25,6 +25,7 @@ import {
   requestEditZoom,
   resetFits,
   resetZoom,
+  revealScroller,
   setFit,
   setEditZoom,
   setUserZoom,
@@ -725,6 +726,79 @@ describe("panToParentRect", () => {
     panToParentRect({ height: 0, top: 0 });
     // OffsetY = 300 → target = 350
     expect(view.panY).toBeCloseTo(350);
+  });
+
+  /*
+   * The Edit surface. `revealCanvasPath` composes exactly this with a measure on either side, so
+   * these four cases are the geometry the block-action-bar shot's caret step depends on: while this
+   * function only wrote `view.panY`, Edit — which renders no `.panzoom-wrap` — did not move at all.
+   */
+  test("scrolls the active panel's container when the pane is a scrolling surface", () => {
+    const scrollContainer = document.createElement("div");
+    scrollContainer.scrollTop = 0;
+    makeRenderedPanel({ scrollContainer });
+    stubRect(canvasWrap, { height: 885, top: 0 });
+
+    // The measured case from P4: children/1 at y=1139 in an 885px viewport.
+    panToParentRect({ height: 40, top: 1139 });
+
+    // ElCenterY = 1159, vpCenterY = 442.5, offsetY = -716.5 → scrollTop = 0 + 716.5
+    expect(scrollContainer.scrollTop).toBeCloseTo(716.5);
+  });
+
+  test("scrolls back up for a node above the fold, from the container's current position", () => {
+    const scrollContainer = document.createElement("div");
+    scrollContainer.scrollTop = 800;
+    makeRenderedPanel({ scrollContainer });
+    stubRect(canvasWrap, { height: 600, top: 100 });
+
+    // Rect centre 150 is 50px below the pane's top, i.e. 250px above its centre.
+    panToParentRect({ height: 100, top: 100 });
+
+    expect(scrollContainer.scrollTop).toBeCloseTo(800 - 250);
+  });
+
+  test("does not ease the scroll — the point it answers with must be true on return", () => {
+    const scrollContainer = document.createElement("div");
+    const scrollTo = mock((_opts: ScrollToOptions) => {});
+    (scrollContainer as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
+    makeRenderedPanel({ scrollContainer });
+    stubRect(canvasWrap, { height: 600, top: 0 });
+
+    panToParentRect({ height: 0, top: 1000 });
+
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(scrollContainer.scrollTop).toBeCloseTo(700);
+  });
+
+  test("still pans when the active panel is a panzoom stage, scroll container or not", () => {
+    makeRenderedPanel();
+    makePanzoomWrap();
+    stubRect(canvasWrap, { height: 600, top: 0 });
+    globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
+      cb(performance.now() + 1000);
+      return 0;
+    }) as typeof requestAnimationFrame;
+
+    view.panY = 0;
+    panToParentRect({ height: 0, top: 900 });
+
+    // OffsetY = 300 - 900 = -600
+    expect(view.panY).toBeCloseTo(-600);
+  });
+});
+
+describe("revealScroller", () => {
+  test("is null with no panel, and null for a panzoom panel", () => {
+    expect(revealScroller()).toBeNull();
+    makeRenderedPanel();
+    expect(revealScroller()).toBeNull();
+  });
+
+  test("is the active panel's scroll container on the Edit surface", () => {
+    const scrollContainer = document.createElement("div");
+    makeRenderedPanel({ scrollContainer });
+    expect(revealScroller()).toBe(scrollContainer);
   });
 });
 

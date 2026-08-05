@@ -9,8 +9,9 @@
 import { flush, installMockPlatform, pointer } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { initLayers } from "../src/ui/layers";
+import { emptyContext } from "../src/commands/context";
 
-const { closeAboutModal, openAboutModal } = await import("../src/about/about-modal");
+const { aboutCommands, closeAboutModal, openAboutModal } = await import("../src/about/about-modal");
 
 for (const id of ["layer-popover", "layer-modal", "layer-dialog"]) {
   if (!document.querySelector(`#${id}`)) {
@@ -178,5 +179,26 @@ describe("closing", () => {
   test("closeAboutModal without an open modal is a no-op", () => {
     expect(() => closeAboutModal()).not.toThrow();
     expect(modal()).toBeNull();
+  });
+});
+
+describe("the help.about record", () => {
+  // About left the rail in P4: it is opened roughly once in an app's lifetime, so it cannot repay a
+  // Permanent slot, and as a record it stays reachable by name from the palette.
+  test("is declared once, application-level, palette-only", () => {
+    const [record] = aboutCommands();
+    expect(aboutCommands()).toHaveLength(1);
+    expect(record!.id).toBe("help.about");
+    expect(record!.level).toBe("application");
+    expect(record!.menus).toEqual(["palette"]);
+    expect(record!.title).toContain("About");
+  });
+
+  test("running it opens the modal", async () => {
+    const [record] = aboutCommands();
+    record!.run(emptyContext(), undefined as never);
+    await flush();
+    expect(modal()).not.toBeNull();
+    closeAboutModal();
   });
 });

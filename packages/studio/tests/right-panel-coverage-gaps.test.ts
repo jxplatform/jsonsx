@@ -69,7 +69,7 @@ describe("right panel gaps", () => {
       state: { greet: { $prototype: "Function", body: "return 1" } },
       tagName: "my-widget",
     } as never);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     mount(makeCtx() as never);
     updateUi("rightTab", "events");
     render();

@@ -3,6 +3,7 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import { childIndex, childList, getNodeAtPath, parentElementPath } from "../store";
+import { primarySelection } from "../tabs/selection";
 import { activeTab } from "../workspace/workspace";
 import { transactDoc } from "../tabs/transact";
 import { showDialog } from "../ui/layers";
@@ -21,11 +22,11 @@ interface RepeaterConfig {
 /** Convert the currently selected element into a repeater template. */
 export async function convertToRepeater() {
   const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) {
+  const path = primarySelection(tab?.session.selection);
+  if (!tab || !path || path.length < 2) {
     return;
   }
 
-  const path = tab.session.selection;
   const node = getNodeAtPath(tab.doc.document, path);
   if (!node) {
     return;

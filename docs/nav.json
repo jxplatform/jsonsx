@@ -67,7 +67,7 @@
         { "path": "studio/logic/formulas", "label": "Formulas and expressions" },
         { "path": "studio/logic/formula-workspace", "label": "Formula workspace" },
         { "path": "studio/logic/statements", "label": "Statements" },
-        { "path": "studio/logic/events", "label": "Events" },
+        { "path": "studio/logic/events", "label": "Logic tab" },
         { "path": "studio/logic/data-explorer", "label": "Data explorer" },
         { "path": "studio/logic/data-sources", "label": "Data sources" },
         { "path": "studio/logic/code", "label": "Code editing" },

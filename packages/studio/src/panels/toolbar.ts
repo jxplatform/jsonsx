@@ -35,6 +35,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { presenceChipsTemplate } from "../collab/presence-chips";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
+import { primarySelection } from "../tabs/selection";
 import { shell } from "../shell";
 import { openQuickSearch } from "./quick-search";
 import { showPromptDialog } from "../ui/layers";
@@ -280,9 +281,15 @@ export function selectionSegmentLabel(tab: Tab | null): string {
   if (shell.layoutSelection) {
     return "layout";
   }
-  const selection = tab?.session.selection;
+  const paths = tab?.session.selection ?? [];
+  const selection = primarySelection(paths);
   if (!tab || !selection) {
     return "";
+  }
+  // A batch is not a place, so the address bar names its SIZE rather than one of its members —
+  // Printing the primary's tag would say `section` while five other elements were also selected.
+  if (paths.length > 1) {
+    return `${paths.length} elements`;
   }
   return nodeLabel(getNodeAtPath(tab.doc.document, selection));
 }
@@ -599,7 +606,9 @@ export function mount(rootEl: HTMLElement, _ctx: ToolbarCtx = {}) {
         void tab.doc.document;
         void tab.doc.dirty;
         void tab.doc.mode;
-        void tab.session.selection;
+        // The whole SET, joined — a bare property read would not re-trigger when the selection
+        // Changes WITHIN the array, and §6.5's helpers always replace it but nothing enforces that.
+        void tab.session.selection.map((path) => path.join("/")).join("|");
         void tab.session.ui.canvasMode;
         // Open in Browser needs a value for every route param before it can resolve a page.
         void tab.session.ui.previewParams;

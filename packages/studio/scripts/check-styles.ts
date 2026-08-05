@@ -218,8 +218,6 @@ export const ALLOWED_ORPHANS = new Set<string>([
   "statement-lane-header",
   "statement-lane-remove",
   "statement-list",
-  // Owner: panels/style-panel.ts
-  "style-scheme-badge",
   // Owner: panels/welcome-screen.ts
   "welcome-catalogue",
   // Owner: publish/publish-panel.ts

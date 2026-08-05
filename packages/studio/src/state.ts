@@ -422,7 +422,6 @@ export function createState(doc: JxMutableNode): StudioState {
       rightTab: "properties", // 'properties' | 'events' | 'style'
       settingsTab: "stylebook", // "stylebook" | "definitions" | "contentTypes"
       styleFilter: "", // Free-text filter for CSS property names
-      styleFilterActive: false, // True = show only props with values set
       styleSections: {}, // { layout: true, ... } — section open/closed state
       styleShorthands: {}, // { padding: true, ... } — shorthand expand/collapse state
       stylebookCustomizedOnly: false, // Show only customized elements

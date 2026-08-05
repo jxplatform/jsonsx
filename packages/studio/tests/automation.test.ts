@@ -158,8 +158,18 @@ describe("run is registry.run", () => {
 
   test("an id with a registry gap says which phase lands it", async () => {
     const { deps } = makeFixture();
+    const error = await rejection(createAutomationApi(deps).run("media.browse"));
+    expect(error.message).toContain("has no command record yet (P7.5 — media.browse)");
+  });
+
+  test("an id whose record has landed leaves the countdown entirely", async () => {
+    // `element.insertData` was the P5 entry. It is now `insert.data` in `canvas/canvas-render.ts`,
+    // So the old id is not a gap with a phase attached — it is simply not a command, and the
+    // Countdown must not keep answering for ids that have been superseded.
+    const { deps } = makeFixture();
     const error = await rejection(createAutomationApi(deps).run("element.insertData"));
-    expect(error.message).toContain("has no command record yet (P5 — insert.data)");
+    expect(error.message).toContain('unknown command "element.insertData"');
+    expect(Object.keys(AUTOMATION_COMMANDS)).not.toContain("element.insertData");
   });
 
   test("an id §13.5 refuses says WHY, not 'unknown'", async () => {

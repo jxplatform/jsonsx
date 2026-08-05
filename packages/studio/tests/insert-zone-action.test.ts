@@ -99,6 +99,6 @@ describe("runInsertZoneAction", () => {
     expect(call.def).toEqual({ tagName: "p" });
 
     // The new node is selected at [...insertParentPath, "children", index].
-    expect(lastT!.session.selection).toEqual([...zone.insertParentPath, "children", zone.index]);
+    expect(lastT!.session.selection).toEqual([[...zone.insertParentPath, "children", zone.index]]);
   });
 });

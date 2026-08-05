@@ -76,7 +76,7 @@ describe("renderKeywordInput", () => {
       children: [{ style: { fontFamily: "Georgia, serif" }, tagName: "p" }],
       tagName: "div",
     } as unknown as JxMutableNode);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const container = await renderInto(
       renderKeywordInput(["uppercase"], "textTransform", "", () => {}),
     );
@@ -179,7 +179,7 @@ describe("renderComboboxInput — fontFamily", () => {
       style: { "--font-body": "Inter, sans-serif" },
       tagName: "div",
     } as unknown as JxMutableNode);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     return tab;
   }
 

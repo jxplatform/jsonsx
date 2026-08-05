@@ -1,5 +1,4 @@
 {
-  "enableWorkflows": true,
   "permissions": {
     "allow": [
       "Bash(*)",
@@ -35,5 +34,14 @@
       "WebSearch",
       "Write"
     ]
-  }
+  },
+  "enableWorkflows": true,
+  "enabledMcpjsonServers": [
+    "chrome-devtools",
+    "chrome-devtools-nixos",
+    "fetch",
+    "filesystem",
+    "memory",
+    "ttsc-graph"
+  ]
 }

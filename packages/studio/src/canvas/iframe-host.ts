@@ -38,6 +38,8 @@ import {
   updateUi,
 } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
+import { cloneSelection, primarySelection, toggleSelected } from "../tabs/selection";
+import type { JxPath } from "../state";
 import { setLayoutSelection, shell } from "../shell";
 import { formatEditableVerdicts } from "../format/constraints";
 import { formatByName } from "../format/format-host";
@@ -82,10 +84,18 @@ interface HostState {
   ready: boolean;
   pending: ParentToIframe | null;
   overlay: OverlayLayer;
-  /** Document path of the current selection (mirrors `session.selection`), for hover de-dupe. */
+  /** Primary selected path (mirrors `session.selection`'s last entry), for hover de-dupe. */
   selectionPath: (string | number)[] | null;
+  /** The whole selection this host last measured, so a re-measure redraws every box. */
+  selectionPaths: JxPath[];
   /** Id of the most recent selection `measure` request, so stale `geometry` replies are dropped. */
   selReqId: number;
+  /**
+   * The NON-primary selected paths the in-flight selection `measure` covers, serialized. The
+   * geometry reply draws a co-selection box for every hit whose path is in this set — a set of one
+   * selected node leaves it empty, so nothing but the selection box is ever drawn.
+   */
+  coSelectionKeys: Set<string>;
   /** Id of the most recent presence `measure` request (allocated from the selReqId counter). */
   presenceReqId: number;
   /** Serialized peer path → presence box meta for the in-flight presence measure. */
@@ -607,10 +617,10 @@ export interface CanvasPoint {
 /** How long a point request waits for its `geometry` reply before answering null. */
 export const MEASURE_TIMEOUT_MS = 500;
 
-/** Frames of an unchanged iframe offset that end a pan animation. */
+/** Frames of an unchanged iframe offset that end a reveal. */
 const PAN_SETTLE_FRAMES = 2;
 
-/** Give up on a pan that never settles rather than await it forever. */
+/** Give up on a reveal that never settles rather than await it forever. */
 const PAN_SETTLE_MAX_FRAMES = 40;
 
 /**
@@ -684,7 +694,14 @@ export function canvasPointAt(path: readonly (string | number)[]): Promise<Canva
   return host ? measureIn(host, path) : Promise.resolve(null);
 }
 
-/** Resolve once the iframe's offset has stopped moving — the pan animation is a rAF tween. */
+/**
+ * Resolve once the iframe's offset has stopped moving.
+ *
+ * The iframe's own top is the right thing to watch precisely because it does not care HOW the pane
+ * moved: a Design pan is a 250ms rAF tween of `view.panY`, an Edit reveal is one synchronous
+ * `scrollTop` write, and both show up here as the frame's on-screen offset changing and then
+ * holding still.
+ */
 function panSettled(host: HostState): Promise<void> {
   return new Promise((resolve) => {
     let last = Number.NaN;
@@ -708,8 +725,13 @@ function panSettled(host: HostState): Promise<void> {
 /**
  * Bring the node at `path` into view and answer where it landed.
  *
- * The pan is the same {@link panToParentRect} the stylebook's pan-to-card uses, and the second
- * measure is not belt-and-braces: the point BEFORE the pan is not the point a caller can act on.
+ * The move is the same {@link panToParentRect} the stylebook's pan-to-card uses, and the second
+ * measure is not belt-and-braces: the point BEFORE the move is not the point a caller can act on.
+ *
+ * `panToParentRect` is what makes this work on BOTH surfaces — it pans a panzoom stage and scrolls
+ * a scrolling one. While it only panned, this function was a measured no-op in Edit mode: it
+ * returned the node's original, off-screen point, and `runInput`'s caret step then clicked a point
+ * outside the pane and selected nothing.
  */
 export async function revealCanvasPath(
   path: readonly (string | number)[],
@@ -1151,7 +1173,10 @@ function ensureSelectionWatch(): void {
   const scope = effectScope(true);
   scope.run(() => {
     effect(() => {
-      const sel = activeTab.value?.session.selection ?? null;
+      const sel = activeTab.value?.session.selection ?? [];
+      // Track the selection deeply enough that a change WITHIN the set re-measures: the effect
+      // Reads every path, not just the array reference.
+      void sel.map((path) => path.join("/")).join("|");
       // Track the stylebook selection too: stylebook hosts measure the selected TAG's card
       // (session.selection is deliberately [] in stylebook mode).
       void shell.stylebook.selection;
@@ -1209,12 +1234,17 @@ function requestPresence(host: HostState): void {
     if (!structuralSelection || peer.state.focusedPath !== tab?.documentPath) {
       continue;
     }
-    const path = [...structuralSelection];
-    paths.push(path);
-    host.presenceMeta.set(JSON.stringify(path), {
-      color: peer.state.user.color,
-      label: peer.state.user.name ?? peer.state.user.login,
-    });
+    // A peer publishes their whole selection SET (§6.5). Every path gets its own box under the
+    // Same name and colour — the meta map is keyed by path, so a peer selecting six nodes draws
+    // Six boxes and a peer selecting one draws exactly the one box it always did.
+    for (const path of structuralSelection) {
+      const copy = [...path];
+      paths.push(copy);
+      host.presenceMeta.set(JSON.stringify(copy), {
+        color: peer.state.user.color,
+        label: peer.state.user.name ?? peer.state.user.login,
+      });
+    }
   }
   if (paths.length === 0) {
     host.presenceReqId = -1;
@@ -1226,28 +1256,44 @@ function requestPresence(host: HostState): void {
   host.channel.post({ kind: "measure", paths, reqId: host.presenceReqId });
 }
 
-/** Track the selection on a host and ask its iframe to measure it (or clear the box when null). */
-function requestSelection(host: HostState, sel: (string | number)[] | null): void {
+/**
+ * Track the selection on a host and ask its iframe to measure it (or clear the boxes when empty).
+ *
+ * The PRIMARY path is posted first and drawn as the selection box; the rest are drawn as
+ * co-selection boxes from the same reply, so one round trip covers the whole set. With one path
+ * selected the request is byte-identical to what it always was — one path in, one box out.
+ */
+function requestSelection(host: HostState, sel: readonly JxPath[]): void {
   if (host.stylebook) {
     requestStylebookSelection(host);
     return;
   }
-  host.selectionPath = sel;
+  const primary = primarySelection(sel);
+  host.selectionPath = primary;
+  host.selectionPaths = sel as JxPath[];
   if (!host.iframe.isConnected) {
     liveHosts.delete(host);
     return;
   }
-  if (!sel) {
+  if (!primary) {
+    host.coSelectionKeys.clear();
     host.overlay.setSelection(null);
+    host.overlay.setCoSelection([]);
     return;
   }
   if (!host.ready) {
     return;
   }
-  host.selReqId += 1;
   // Post a plain copy: `session.selection` is a reactive proxy, and only serializable values may
   // Cross the postMessage boundary.
-  host.channel.post({ kind: "measure", paths: [[...sel]], reqId: host.selReqId });
+  const others = cloneSelection(sel.slice(0, -1));
+  host.coSelectionKeys = new Set(others.map((path) => JSON.stringify(path)));
+  host.selReqId += 1;
+  host.channel.post({
+    kind: "measure",
+    paths: [[...primary], ...others],
+    reqId: host.selReqId,
+  });
 }
 
 /**
@@ -1356,6 +1402,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     iframe,
     insertHideTimer: null,
     insertHover: false,
+    coSelectionKeys: new Set<string>(),
     insertZone: null,
     lastRenderedGen: -1,
     lastSelectionRect: null,
@@ -1373,6 +1420,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     preview: false,
     ready: false,
     selectionPath: null,
+    selectionPaths: [],
     selReqId: 0,
     snapshot: null,
     stylebook: null,
@@ -1508,7 +1556,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         state.pending = null;
       }
       // Re-measure the current selection now that the iframe can answer.
-      requestSelection(state, state.selectionPath);
+      requestSelection(state, state.selectionPaths);
       return;
     }
     case "hit": {
@@ -1547,10 +1595,16 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         return;
       }
       // A click in the canvas selects the node; the selection watcher redraws the box via `measure`.
+      // Ctrl/Cmd-click ACCUMULATES instead — the same modifier the Outline uses, so the two
+      // Surfaces answer the same gesture. Without the modifier this is a plain replace, which is
+      // What every canvas click has always been.
       state.selectionPath = msg.hit.path;
+      state.selectionPaths = [msg.hit.path];
       const tab = activeTab.value;
       if (tab) {
-        tab.session.selection = msg.hit.path;
+        tab.session.selection = msg.additive
+          ? toggleSelected(tab.session.selection, msg.hit.path)
+          : [msg.hit.path];
       }
       // Draw immediately from the posted rect for snappiness (the measure round-trip confirms it).
       {
@@ -1572,9 +1626,10 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       setLayoutSelection(msg.hit);
       // Mutually exclusive with a document selection: the inspector renders one panel or the other.
       state.selectionPath = null;
+      state.selectionPaths = [];
       const tab = activeTab.value;
       if (tab) {
-        tab.session.selection = null;
+        tab.session.selection = [];
       }
       const rect = canvasRectToParent(msg.hit.rect);
       state.overlay.setSelection(rect, `LAYOUT · ${msg.hit.layoutFile}`);
@@ -1649,10 +1704,29 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         return;
       }
       if (msg.reqId === state.selReqId) {
-        const [hit] = msg.hits;
-        const rect = hit ? canvasRectToParent(hit.rect) : null;
+        // A stylebook host measures a SPECIMEN path — a card in a generated catalogue, which is
+        // Not a `session.selection` path at all — so its one hit is its one box, as it always was.
+        // Everywhere else the primary is chosen by PATH rather than by position, because a path
+        // The iframe could not resolve is simply absent from `hits`.
+        const primaryKey = JSON.stringify(state.selectionPath);
+        const co: OverlayPlacement[] = [];
+        let rect: ParentRect | null = null;
+        if (state.stylebook) {
+          const [hit] = msg.hits;
+          rect = hit ? canvasRectToParent(hit.rect) : null;
+        } else {
+          for (const hit of msg.hits) {
+            const key = JSON.stringify(hit.path);
+            if (key === primaryKey) {
+              rect = canvasRectToParent(hit.rect);
+            } else if (state.coSelectionKeys.has(key)) {
+              co.push(canvasRectToParent(hit.rect));
+            }
+          }
+        }
         const sbTag = state.stylebook ? shell.stylebook.selection : null;
         state.overlay.setSelection(rect, sbTag ? `<${sbTag}>` : null);
+        state.overlay.setCoSelection(co);
         if (rect) {
           state.lastSelectionRect = rect;
         }
@@ -2022,7 +2096,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
  */
 function onDomUpdated(state: HostState, gen: number): void {
   state.lastRenderedGen = gen;
-  requestSelection(state, state.selectionPath);
+  requestSelection(state, state.selectionPaths);
   requestPresence(state);
   hideInsertZoneNow(state);
   if (state.pendingEnterEdit && gen >= state.pendingEnterEdit.minGen) {
@@ -2314,7 +2388,7 @@ export function postStyleUpdateToStylebookHosts(style: Record<string, unknown>):
     if (host.ready && host.stylebook) {
       host.channel.post({ gen: host.lastRenderedGen, kind: "styleUpdate", style: cloneable });
       posted += 1;
-      requestSelection(host, host.selectionPath);
+      requestSelection(host, host.selectionPaths);
     }
   }
   return posted;

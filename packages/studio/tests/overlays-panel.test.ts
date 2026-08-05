@@ -78,7 +78,7 @@ describe("overlays — header sync", () => {
     const panel = makePanel();
     const marker = document.createElement("div");
     panel.canvas.append(marker);
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     await mountAndFlush();
     expect(panel.canvas.contains(marker)).toBe(true);
   });
@@ -90,7 +90,7 @@ describe("overlays — lifecycle", () => {
     await mountAndFlush();
     renderBlockActionBar.mockClear();
     // A selection change re-runs the tracked effect, which schedules another flush.
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     await flush();
     expect(renderBlockActionBar).toHaveBeenCalled();
   });

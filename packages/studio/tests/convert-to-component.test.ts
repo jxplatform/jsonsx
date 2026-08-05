@@ -78,20 +78,20 @@ function confirmDialog() {
 
 describe("guards", () => {
   test("no selection → resolves without showing a dialog", async () => {
-    tab.session.selection = null;
+    tab.session.selection = [];
     await convertToComponent();
     expect(dialog()).toBeNull();
   });
 
   test("root selection → no dialog", async () => {
-    tab.session.selection = [];
+    tab.session.selection = [[]];
     await convertToComponent();
     expect(dialog()).toBeNull();
   });
 
   test("node without tagName → no dialog", async () => {
     (tab.doc.document.children as unknown[])[0] = { textContent: "bare" };
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     await convertToComponent();
     expect(dialog()).toBeNull();
   });
@@ -101,7 +101,7 @@ describe("guards", () => {
 
 describe("default name", () => {
   test("hyphenated $id becomes the default name", async () => {
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
     expect(textfield().getAttribute("value")).toBe("hero-block");
@@ -110,7 +110,7 @@ describe("default name", () => {
   });
 
   test("plain tag gets a jx- prefix", async () => {
-    tab.session.selection = ["children", 1];
+    tab.session.selection = [["children", 1]];
     const done = convertToComponent();
     await flush();
     expect(textfield().getAttribute("value")).toBe("jx-p");
@@ -120,7 +120,7 @@ describe("default name", () => {
 
   test("hyphenated tag is used directly", async () => {
     (tab.doc.document.children as unknown[])[1] = { tagName: "fancy-card" };
-    tab.session.selection = ["children", 1];
+    tab.session.selection = [["children", 1]];
     const done = convertToComponent();
     await flush();
     expect(textfield().getAttribute("value")).toBe("fancy-card");
@@ -133,7 +133,7 @@ describe("default name", () => {
 
 describe("conversion", () => {
   test("confirm replaces the node, adds the $ref, and writes the component file", async () => {
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
 
@@ -159,7 +159,7 @@ describe("conversion", () => {
   test("converting a second time does not duplicate the $ref", async () => {
     const doc = tab.doc.document as Record<string, unknown>;
     doc.$elements = [{ $ref: "../components/hero-block.json" }];
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
     setName("hero-block");
@@ -169,7 +169,7 @@ describe("conversion", () => {
   });
 
   test("cancel leaves the document untouched", async () => {
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
     dialog()!.dispatchEvent(new Event("cancel"));
@@ -195,7 +195,7 @@ describe("conversion", () => {
       ],
       tagName: "div",
     } as never;
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
     setName("slotty-block");
@@ -216,7 +216,7 @@ describe("conversion", () => {
         throw new Error("disk full");
       },
     });
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
     setName("hero-block");
@@ -231,7 +231,7 @@ describe("conversion", () => {
 
 describe("name validation", () => {
   async function startDialog() {
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
     return { done };

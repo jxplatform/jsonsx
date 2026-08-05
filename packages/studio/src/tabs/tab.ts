@@ -49,7 +49,6 @@ export interface TabUi {
   inspectorSections: Record<string, boolean>;
   styleShorthands: Record<string, boolean>;
   styleFilter: string;
-  styleFilterActive: boolean;
   pendingInlineEdit: InlineEditDef | null;
 }
 
@@ -68,10 +67,10 @@ export interface StoredLivePreview {
 interface HistorySnapshot {
   /** Full document at this state (checkpoint), or null when the ops describe the transition. */
   document: Record<string, unknown> | null;
-  /** Selection after this state's transaction. */
-  selection: (string | number)[] | null;
+  /** Selection after this state's transaction — the whole set, so a batch undoes back to it. */
+  selection: (string | number)[][];
   /** Selection before this state's transaction (restored on surgical undo). */
-  selectionBefore?: (string | number)[] | null;
+  selectionBefore?: (string | number)[][];
   /** Replayable ops transforming the previous state into this one. */
   forwardOps?: JxDocOp[] | null;
   /** Replayable ops transforming this state back into the previous one. */
@@ -153,7 +152,16 @@ export interface Tab {
     dirty: boolean;
   };
   session: {
-    selection: (string | number)[] | null;
+    /**
+     * The selected document paths, in the order the user built them (§6.5).
+     *
+     * `[]` is "nothing selected" — there is no `null` state, because "no selection" and "a
+     * selection of nothing" were never two different things. `selection[0]` is the anchor a
+     * shift-range extends from; the LAST entry is the primary, which every single-target surface
+     * reads through `tabs/selection.ts`'s `primarySelection`. **Always assign a fresh array**:
+     * several render effects track this with a bare property read and would miss an in-place push.
+     */
+    selection: (string | number)[][];
     hover: (string | number)[] | null;
     clipboard: JxMutableNode | null;
     /**
@@ -206,7 +214,6 @@ function createDefaultUi(canvasMode: string, preview = false) {
     rightTab: "properties",
     showLayout: true,
     styleFilter: "",
-    styleFilterActive: false,
     styleSections: {},
     styleShorthands: {},
     zoom: 1,
@@ -280,7 +287,7 @@ export function createTab({
     fileHandle,
     history: reactive({
       index: 0,
-      snapshots: [{ document: structuredClone(document), selection: null }],
+      snapshots: [{ document: structuredClone(document), selection: [] }],
     }),
     id,
     pinned: false,
@@ -298,7 +305,7 @@ export function createTab({
       documentStack: [],
       hover: null,
       openedFrom,
-      selection: null,
+      selection: [],
       ui: createDefaultUi(initialCanvasMode, initialPreview),
     }),
   })) as unknown as Tab;
@@ -476,7 +483,7 @@ export function pushSubDocument(tab: Tab, next: SubDocument): SubDocumentFrame {
     document: tab.doc.document,
     documentPath: tab.documentPath,
     mode: tab.doc.mode,
-    selection: tab.session.selection,
+    selection: tab.session.selection.map((path) => [...path]),
     sourceFormat: tab.doc.sourceFormat,
     ui: captureTabUi(tab.session.ui),
   };
@@ -486,7 +493,7 @@ export function pushSubDocument(tab: Tab, next: SubDocument): SubDocumentFrame {
   tab.doc.mode = (next.mode ?? null) as unknown as string;
   tab.doc.sourceFormat = next.sourceFormat ?? null;
   tab.documentPath = next.documentPath;
-  tab.session.selection = null;
+  tab.session.selection = [];
   return frame;
 }
 
@@ -502,7 +509,7 @@ function restoreFrame(tab: Tab, frame: SubDocumentFrame) {
   tab.doc.mode = frame.mode as string;
   tab.doc.sourceFormat = frame.sourceFormat ?? null;
   tab.documentPath = frame.documentPath;
-  tab.session.selection = frame.selection;
+  tab.session.selection = frame.selection.map((path) => [...path]);
   restoreTabUi(tab, frame.ui);
 }
 

@@ -9,7 +9,7 @@ import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { initShellRefs, rightPanel, updateUi } from "../src/store";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
-import { INSPECTOR_TAB_IDS } from "../src/shell";
+import { INSPECTOR_TAB_IDS, setLayoutSelection, shell } from "../src/shell";
 import { INSPECTOR_TABS } from "../src/commands/defaults";
 
 const { inspectorTab, mount, render, setInspectorTab, unmount } =
@@ -53,6 +53,7 @@ beforeEach(() => {
 afterEach(() => {
   unmount();
   closeAllTabs();
+  shell.layoutSelection = null;
 });
 
 describe("the four tabs", () => {
@@ -156,7 +157,7 @@ describe("the four tabs", () => {
 describe("the header names its target", () => {
   test("with a selection it names the node", async () => {
     const tab = resetWorkspaceWithTab();
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     mount(makeCtx() as never);
     render();
     await flush(4);
@@ -176,6 +177,72 @@ describe("the header names its target", () => {
     render();
     await flush(4);
     expect(rightPanel.querySelector(".panel-header-level")?.textContent).toBe("no document");
+  });
+});
+
+describe("the layout selection", () => {
+  const headerHit = {
+    className: "site-header",
+    layoutFile: "layouts/base.json",
+    layoutPath: ["children", 0, "children", 0],
+    rect: { height: 40, width: 800, x: 0, y: 0 },
+    tagName: "header",
+  };
+
+  test("clicking layout chrome repaints the dock on its own, and Content answers", async () => {
+    resetWorkspaceWithTab();
+    mount(makeCtx() as never);
+    render();
+    await flush(4);
+
+    // No renderOnly, no selection change — only the shell record the canvas host writes.
+    setLayoutSelection(headerHit as never);
+    await flush(4);
+
+    const body = visibleBodies()[0]!;
+    expect(body.querySelector('sp-accordion-item[label="Layout Element"]')).not.toBeNull();
+    expect(body.textContent).toContain("<header>");
+    expect(body.textContent).toContain("layouts/base.json");
+  });
+
+  test("the header names the layout element AND the file it came from", async () => {
+    resetWorkspaceWithTab();
+    mount(makeCtx() as never);
+    render();
+    await flush(4);
+    setLayoutSelection(headerHit as never);
+    await flush(4);
+    expect(rightPanel.querySelector(".panel-header-level")?.textContent?.trim()).toBe(
+      "<header> in layouts/base.json",
+    );
+  });
+
+  test("the inspector header names the BATCH when several elements are selected (§6.5)", async () => {
+    const tab = resetWorkspaceWithTab();
+    mount(makeCtx() as never);
+    render();
+    await flush(4);
+    tab.session.selection = [["children", 0]];
+    await flush(4);
+    const oneLabel = rightPanel.querySelector(".panel-header-level")?.textContent?.trim();
+    expect(oneLabel).not.toBe("2 elements");
+    tab.session.selection = [["children", 0], []];
+    await flush(4);
+    expect(rightPanel.querySelector(".panel-header-level")?.textContent?.trim()).toBe("2 elements");
+  });
+
+  test("releasing it puts the dock back on the document", async () => {
+    resetWorkspaceWithTab();
+    mount(makeCtx() as never);
+    render();
+    await flush(4);
+    setLayoutSelection(headerHit as never);
+    await flush(4);
+    setLayoutSelection(null);
+    await flush(4);
+    expect(
+      visibleBodies()[0]!.querySelector('sp-accordion-item[label="Layout Element"]'),
+    ).toBeNull();
   });
 });
 

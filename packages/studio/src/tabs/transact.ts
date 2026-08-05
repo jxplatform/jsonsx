@@ -1,7 +1,14 @@
 /// <reference lib="dom" />
 import { toRaw } from "../reactivity";
 import { jsonClone } from "../utils/studio-utils";
-import { childIndex, getNodeAtPath, isAncestor, parentElementPath, pathsEqual } from "../state";
+import { childIndex, getNodeAtPath, parentElementPath, pathsEqual } from "../state";
+import {
+  cloneSelection,
+  isSpliceablePath,
+  primarySelection,
+  pruneSelection,
+  structuralBatch,
+} from "./selection";
 import { applyDocOpToDoc, childArray, cloneValue } from "./doc-op-apply";
 import {
   beginRecording,
@@ -126,8 +133,53 @@ export function setTransactGate(fn: TransactGate | null) {
 }
 
 /**
+ * Undo a transaction that threw part-way through, using the pairs it managed to record.
+ *
+ * **Why the inverses are enough.** Every mutator records its op AFTER its splice or assignment
+ * succeeds, so `record.docOps` describes exactly the changes that landed — no more, no less.
+ * Replaying their inverses in reverse is the same replay `undo` performs on a committed entry, run
+ * against a document that never got a history entry. A mutator that changed the document WITHOUT
+ * recording is already broken for undo; this is no weaker a guarantee than the one history gives.
+ *
+ * The document root reference is replaced so every effect re-reads, and nothing is marked consumed
+ * — the canvas takes the full-render path, because the patch ops recorded for the half-applied
+ * state describe changes that no longer exist.
+ */
+function rollbackFailedTransaction(
+  tab: Tab,
+  record: TransactionRecord,
+  selectionBefore: JxPath[],
+  dirtyBefore: boolean,
+) {
+  for (let i = record.docOps.length - 1; i >= 0; i--) {
+    applyDocOpToDoc(tab.doc.document, toRaw(record.docOps[i]!.inverse) as JxDocOp);
+  }
+  for (let i = record.fmOps.length - 1; i >= 0; i--) {
+    const op = record.fmOps[i]!;
+    applyFmState(tab, op.field, op.before);
+  }
+  tab.doc.document = { ...toRaw(tab.doc.document) };
+  // Mutators repair the selection as they go (`pruneSelection`, "select the clone"); rolling their
+  // Edits back and leaving the selection pointing at coordinates that no longer exist would be its
+  // Own corruption.
+  tab.session.selection = selectionBefore;
+  // `mutateUpdateFrontmatter` marks the tab dirty itself, mid-mutation. Rolling its write back and
+  // Leaving the mark standing would report unsaved changes that no longer exist; restoring the
+  // Captured value is right in both directions, since nothing but this transaction could have
+  // Moved it.
+  tab.doc.dirty = dirtyBefore;
+}
+
+/**
  * Apply a document mutation transactionally: push to history and mark dirty. The mutationFn
  * receives the tab and should mutate tab.doc.document in place.
+ *
+ * **All of it or none of it.** A mutationFn that throws part-way — a batch whose third splice hits
+ * a coordinate that is not one — used to leave the earlier splices standing in the live reactive
+ * tree while the throw skipped the new document reference, the history entry, the dirty mark and
+ * the collab observer: the document was changed on screen, unreachable by undo, and invisible to
+ * Save. The exception now rolls the applied ops back ({@link rollbackFailedTransaction}) and only
+ * then rethrows, so a failed transaction is indistinguishable from one that never ran.
  *
  * @param {Tab | null} tab
  * @param {(tab: Tab) => void} mutationFn
@@ -148,13 +200,23 @@ export function transactDoc(
   if (origin !== "remote" && _transactGate?.(tab, origin)) {
     return;
   }
-  const selectionBefore = tab.session.selection ? [...tab.session.selection] : null;
+  const selectionBefore = cloneSelection(tab.session.selection);
+  const dirtyBefore = tab.doc.dirty;
   beginRecording();
   let record: TransactionRecord;
+  let failure: { error: unknown } | null = null;
   try {
     mutationFn(tab);
+  } catch (error) {
+    // Boxed rather than tested for truthiness: a mutation is free to throw a falsy value, and
+    // "did it throw" must not become "was what it threw interesting".
+    failure = { error };
   } finally {
     record = endRecording();
+  }
+  if (failure) {
+    rollbackFailedTransaction(tab, record, selectionBefore, dirtyBefore);
+    throw failure.error;
   }
 
   // Replace the document root reference so effects tracking tab.doc.document re-trigger.
@@ -207,13 +269,13 @@ export function transactDoc(
  * @param {Tab} tab
  * @param {JxMutableNode} raw Post-mutation raw document
  * @param {TransactionRecord} record
- * @param {JxPath | null} selectionBefore
+ * @param {JxPath[]} selectionBefore
  */
 function pushHistoryEntry(
   tab: Tab,
   raw: JxMutableNode,
   record: TransactionRecord,
-  selectionBefore: JxPath | null,
+  selectionBefore: JxPath[],
   coalesceKey: string | null = null,
 ) {
   const truncated = tab.history.snapshots.slice(0, tab.history.index + 1);
@@ -234,7 +296,7 @@ function pushHistoryEntry(
     // Leaving the node holding both keys at once. Undo replays inverses in reverse order, so
     // Appending yields "undo the last commit, then the one before it, …".
     prev.inverseOps = [...prev.inverseOps, ...record.docOps.map((pair) => pair.inverse)];
-    prev.selection = tab.session.selection ? [...tab.session.selection] : null;
+    prev.selection = cloneSelection(tab.session.selection);
     if (prev.document) {
       prev.document = jsonClone(raw);
     }
@@ -250,7 +312,7 @@ function pushHistoryEntry(
     forwardOps: useOps ? record.docOps.map((p) => p.forward) : null,
     inverseOps: useOps ? record.docOps.map((p) => p.inverse) : null,
     coalesceKey,
-    selection: tab.session.selection ? [...tab.session.selection] : null,
+    selection: cloneSelection(tab.session.selection),
     selectionBefore,
   });
   if (truncated.length > HISTORY_LIMIT) {
@@ -424,7 +486,7 @@ export function endBatch() {
     const raw = toRaw(tab.doc.document);
     const snapshot = {
       document: jsonClone(raw),
-      selection: tab.session.selection ? [...tab.session.selection] : null,
+      selection: cloneSelection(tab.session.selection),
     };
     const truncated = tab.history.snapshots.slice(0, tab.history.index + 1);
     truncated.push(snapshot);
@@ -500,7 +562,7 @@ function restoreState(tab: Tab, index: number) {
   const { snapshots } = tab.history;
   tab.doc.document = materializeState(snapshots, index);
   const snap = snapshots[index]!;
-  tab.session.selection = snap.selection ? [...toRaw(snap.selection)] : null;
+  tab.session.selection = cloneSelection(toRaw(snap.selection));
 }
 
 /** Debug-flag assertion: ops-based undo/redo must land on the same state replay produces. */
@@ -554,7 +616,7 @@ export function undo(tab: Tab) {
       },
       { origin: "history", skipHistory: true },
     );
-    tab.session.selection = entry.selectionBefore ? [...toRaw(entry.selectionBefore)] : null;
+    tab.session.selection = cloneSelection(toRaw(entry.selectionBefore ?? []));
     tab.history.index -= 1;
     assertHistoryConsistency(tab, tab.history.index);
   } else {
@@ -595,7 +657,7 @@ export function redo(tab: Tab) {
       },
       { origin: "history", skipHistory: true },
     );
-    tab.session.selection = entry.selection ? [...toRaw(entry.selection)] : null;
+    tab.session.selection = cloneSelection(toRaw(entry.selection));
     tab.history.index += 1;
     assertHistoryConsistency(tab, tab.history.index);
   } else {
@@ -632,11 +694,18 @@ export function mutateInsertNode(
 }
 
 /**
+ * Remove the node at `path` from its parent's children array.
+ *
+ * The guard is {@link isSpliceablePath}, not `path.length < 2`: the shorter test admits the
+ * Outline's map-template and `$switch`-case rows, whose `parentElementPath` is a children ARRAY
+ * rather than a node — `.children.splice` on it throws, and the throw is what left a batch's
+ * earlier removals applied and unrecorded.
+ *
  * @param {Tab} tab
  * @param {JxPath} path
  */
 export function mutateRemoveNode(tab: Tab, path: JxPath) {
-  if (!path || path.length < 2) {
+  if (!path || !isSpliceablePath(path)) {
     return;
   }
   const elemPath = parentElementPath(path) as JxPath;
@@ -650,9 +719,7 @@ export function mutateRemoveNode(tab: Tab, path: JxPath) {
     forward: { index: idx, op: "remove-child", parentPath: elemPath },
     inverse: { index: idx, node: cloneValue(removed), op: "insert-child", parentPath: elemPath },
   });
-  if (tab.session.selection && isAncestor(path, tab.session.selection)) {
-    tab.session.selection = null;
-  }
+  tab.session.selection = pruneSelection(tab.session.selection, path);
 }
 
 /**
@@ -660,7 +727,7 @@ export function mutateRemoveNode(tab: Tab, path: JxPath) {
  * @param {JxPath} path
  */
 export function mutateDuplicateNode(tab: Tab, path: JxPath) {
-  if (!path || path.length < 2) {
+  if (!path || !isSpliceablePath(path)) {
     return;
   }
   const node = getNodeAtPath(tab.doc.document, path);
@@ -676,7 +743,66 @@ export function mutateDuplicateNode(tab: Tab, path: JxPath) {
     forward: { index: idx + 1, node: cloneValue(clone), op: "insert-child", parentPath: elemPath },
     inverse: { index: idx + 1, op: "remove-child", parentPath: elemPath },
   });
-  tab.session.selection = [...elemPath, "children", idx + 1];
+  tab.session.selection = [[...elemPath, "children", idx + 1]];
+}
+
+/**
+ * Remove every selected node, in ONE transaction and therefore ONE undo step (§6.5).
+ *
+ * Three things make a batch different from a loop. `structuralBatch` drops paths contained by
+ * another selected path — deleting a `<section>` and a paragraph inside it is one deletion — drops
+ * paths that name no splice coordinate at all (the document element, a repeater's map template, a
+ * `$switch` case, each of which the Outline offers as a ctrl-clickable row), and orders what
+ * survives LAST-node-first, so each splice happens above coordinates no later step depends on. A
+ * forward loop would delete `children/0` and then `children/1`, which by then is the node that used
+ * to be `children/2`.
+ *
+ * Selection repair is `mutateRemoveNode`'s, applied once per removal: a path is dropped when the
+ * node it addresses has gone. With a single path in, that is exactly the old behaviour — the
+ * selection ends up empty.
+ *
+ * @param {Tab} tab
+ * @param {readonly JxPath[]} paths
+ */
+export function mutateRemoveNodes(tab: Tab, paths: readonly JxPath[]) {
+  for (const path of structuralBatch(paths)) {
+    mutateRemoveNode(tab, path);
+  }
+}
+
+/**
+ * Duplicate every selected node in one transaction, selecting the clones.
+ *
+ * Same descending order, for the same reason: inserting a clone at `idx + 1` renumbers every later
+ * sibling, so the batch starts at the last. The resulting selection is the clones in document
+ * order, which means a duplicate-then-duplicate-again walks down the page the way repeating the
+ * single-node command always did.
+ *
+ * @param {Tab} tab
+ * @param {readonly JxPath[]} paths
+ */
+export function mutateDuplicateNodes(tab: Tab, paths: readonly JxPath[]) {
+  let clones: JxPath[] = [];
+  for (const path of structuralBatch(paths)) {
+    const before = tab.session.selection;
+    mutateDuplicateNode(tab, path);
+    const made = primarySelection(tab.session.selection);
+    // `mutateDuplicateNode` refuses a path that addresses nothing and leaves the selection alone;
+    // Only a real insertion contributes a clone.
+    if (!made || tab.session.selection === before) {
+      continue;
+    }
+    // Descending order keeps the ORIGINALS valid, but not the clones already made: this insertion
+    // Sits before them, so every one of their coordinates moved up by one. Translating them here
+    // Is the difference between "the copies are selected" and "two of the originals are".
+    const parentPath = parentElementPath(made) as JxPath;
+    const spliceIndex = childIndex(made) as number;
+    clones = clones.map((clone) => shiftPrefixedIndex(parentPath, clone, spliceIndex, 1, true));
+    clones.unshift(made);
+  }
+  if (clones.length > 0) {
+    tab.session.selection = clones;
+  }
 }
 
 /**
@@ -685,7 +811,7 @@ export function mutateDuplicateNode(tab: Tab, path: JxPath) {
  * @param {string} wrapperTag
  */
 export function mutateWrapNode(tab: Tab, path: JxPath, wrapperTag = "div") {
-  if (!path || path.length < 2) {
+  if (!path || !isSpliceablePath(path)) {
     return;
   }
   const node = getNodeAtPath(tab.doc.document, path);
@@ -705,7 +831,7 @@ export function mutateWrapNode(tab: Tab, path: JxPath, wrapperTag = "div") {
     forward: { index: idx, node: cloneValue(wrapper), op: "set-child", parentPath: elemPath },
     inverse: { index: idx, node: original, op: "set-child", parentPath: elemPath },
   });
-  tab.session.selection = [...elemPath, "children", idx];
+  tab.session.selection = [[...elemPath, "children", idx]];
 }
 
 /**
@@ -756,7 +882,7 @@ export function mutateMoveNode(tab: Tab, fromPath: JxPath, toParentPath: JxPath,
     },
   });
 
-  if (pathsEqual(tab.session.selection, fromPath)) {
+  if (pathsEqual(primarySelection(tab.session.selection), fromPath)) {
     let idx = toIndex;
     if (
       fromParentPath.length === toParentPath.length &&
@@ -765,7 +891,7 @@ export function mutateMoveNode(tab: Tab, fromPath: JxPath, toParentPath: JxPath,
     ) {
       idx = toIndex - 1;
     }
-    tab.session.selection = [...toParentPath, "children", idx];
+    tab.session.selection = [[...toParentPath, "children", idx]];
   }
 }
 

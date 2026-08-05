@@ -70,6 +70,12 @@ export interface OverlayLayer {
    * each call; pass [] to clear. Placements are overlay-local coords like setSelection's.
    */
   setPresence: (items: { placement: OverlayPlacement; color: string; label: string }[]) => void;
+  /**
+   * Draw the NON-primary members of a multi-selection (§6.5). Replaces the whole set each call;
+   * pass [] to clear, which is what a selection of one always does — one selected node draws the
+   * selection box and nothing else, exactly as it did before the selection became a list.
+   */
+  setCoSelection: (placements: OverlayPlacement[]) => void;
   /** Position the hover box (or hide it when `placement` is null). */
   setHover: (placement: OverlayPlacement | null) => void;
   /**
@@ -171,7 +177,19 @@ export function createOverlayLayer(doc: Document = document): OverlayLayer {
   const presenceGroup = doc.createElement("div");
   presenceGroup.className = "overlay-presence-group";
 
-  root.append(hoverBox, selectionBox, dropBox, replaceBox, insertButton, presenceGroup);
+  // The other members of a multi-selection, same container discipline as presence.
+  const coSelectionGroup = doc.createElement("div");
+  coSelectionGroup.className = "overlay-coselection-group";
+
+  root.append(
+    hoverBox,
+    selectionBox,
+    coSelectionGroup,
+    dropBox,
+    replaceBox,
+    insertButton,
+    presenceGroup,
+  );
 
   return {
     dispose: () => root.remove(),
@@ -183,6 +201,15 @@ export function createOverlayLayer(doc: Document = document): OverlayLayer {
     setReplaceTarget: (placement) => place(replaceBox, placement),
     setSuppressed: (suppressed) => {
       root.style.display = suppressed ? "none" : "";
+    },
+    setCoSelection: (placements) => {
+      coSelectionGroup.replaceChildren();
+      for (const placement of placements) {
+        const box = doc.createElement("div");
+        box.className = "overlay-box overlay-selection overlay-coselection";
+        place(box, placement);
+        coSelectionGroup.append(box);
+      }
     },
     setPresence: (items) => {
       presenceGroup.replaceChildren();

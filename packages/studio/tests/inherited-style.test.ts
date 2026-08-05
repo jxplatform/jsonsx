@@ -1,6 +1,6 @@
 import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
-import { computeInheritedStyle } from "../src/utils/inherited-style";
+import { computeInheritedSources, computeInheritedStyle } from "../src/utils/inherited-style";
 
 // ─── Desktop-first cascade (max-width: Base → lg → md → sm) ─────────────────
 
@@ -199,5 +199,64 @@ describe("computeInheritedStyle — edge cases", () => {
     const result = computeInheritedStyle(style, ["--md"], "--xl");
     // --xl not found in iteration, so all media blocks are layered
     expect(result).toEqual({ color: "blue" });
+  });
+});
+
+// ─── The donor the walk always knew ──────────────────────────────────────────
+
+describe("computeInheritedSources — naming the donor", () => {
+  const mediaNames = ["--lg", "--md", "--sm"];
+
+  test("a base value reports a null donor; a breakpoint value reports its name", () => {
+    const style = {
+      "@--lg": { gap: "1.5rem" },
+      display: "grid",
+      gap: "2rem",
+    };
+    expect(computeInheritedSources(style, mediaNames, "--md")).toEqual({
+      display: { donor: null, value: "grid" },
+      gap: { donor: "--lg", value: "1.5rem" },
+    });
+  });
+
+  test("the LAST donor before the active tab wins, as the cascade does", () => {
+    const style = { "@--lg": { gap: "2rem" }, "@--md": { gap: "1rem" }, gap: "3rem" };
+    expect(computeInheritedSources(style, mediaNames, "--sm").gap).toEqual({
+      donor: "--md",
+      value: "1rem",
+    });
+  });
+
+  test("selector inheritance carries donors too", () => {
+    const style = {
+      "@--lg": { ":hover": { color: "green" } },
+      ":hover": { color: "red" },
+    };
+    expect(computeInheritedSources(style, mediaNames, "--md", ":hover")).toEqual({
+      color: { donor: "--lg", value: "green" },
+    });
+    expect(computeInheritedSources(style, mediaNames, "--lg", ":hover")).toEqual({
+      color: { donor: null, value: "red" },
+    });
+  });
+
+  test("nothing to inherit at the base tab, or with no breakpoints declared", () => {
+    expect(computeInheritedSources({ gap: "1rem" }, mediaNames, null)).toEqual({});
+    expect(computeInheritedSources({ gap: "1rem" }, [], "--md")).toEqual({});
+  });
+
+  test("computeInheritedStyle is exactly this, with the donors dropped", () => {
+    const style = { "@--lg": { gap: "1.5rem" }, display: "grid", gap: "2rem" };
+    expect(computeInheritedStyle(style, mediaNames, "--md")).toEqual({
+      display: "grid",
+      gap: "1.5rem",
+    });
+  });
+
+  test("an explicitly undefined value becomes the empty string rather than vanishing", () => {
+    const style = { gap: undefined } as unknown as Record<string, string>;
+    expect(computeInheritedSources(style, mediaNames, "--md")).toEqual({
+      gap: { donor: null, value: "" },
+    });
   });
 });

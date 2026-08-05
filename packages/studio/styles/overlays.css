@@ -1180,21 +1180,7 @@ sp-table-row:has(.browse-thumb) {
   font-size: 13px;
 }
 
-/* ─── Style toolbar (media tabs + selector) ──── */
-.style-toolbar {
-  display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  gap: 8px;
-}
-.style-toolbar-tabs {
-  flex: 1;
-  min-width: 0;
-}
-.style-toolbar .selector-select {
-  flex-shrink: 0;
-  max-width: 120px;
-}
+/* ─── Style filter bar ───────────────────────── */
 .style-filter-bar {
   display: flex;
   align-items: center;
@@ -1206,34 +1192,6 @@ sp-table-row:has(.browse-thumb) {
   min-width: 0;
   --spectrum-textfield-texticon-min-width: 0;
 }
-.style-filter-toggle[selected] {
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-.selector-select {
-  min-width: 0;
-  font-size: 10px;
-}
-.selector-custom-input {
-  flex: 1;
-  min-width: 0;
-  padding: 3px 6px;
-  font: inherit;
-  font-size: 10px;
-  font-family: var(--font-mono);
-  color: var(--fg);
-  background: var(--bg-input);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
-  /* Pointer focus only — the keyboard ring is restored below. */
-  outline: none;
-}
-
-.selector-custom-input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
-}
-
 /* ─── Git panel ──────────────────────────────── */
 .git-panel {
   display: flex;
@@ -1623,15 +1581,6 @@ sp-table-row:has(.browse-thumb) {
 }
 
 /* ─── Stylebook ─────────────────────────────────── */
-.stylebook-style-header {
-  padding: 6px 8px;
-  font-size: var(--spectrum-font-size-50, 11px);
-  font-weight: 600;
-  color: var(--accent);
-  border-bottom: 1px solid var(--border);
-  font-family: var(--font-mono);
-}
-
 /* Chrome bar (tabs + filter) above the canvas viewport */
 .sb-chrome {
   display: flex;

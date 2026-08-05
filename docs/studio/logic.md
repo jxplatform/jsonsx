@@ -13,8 +13,8 @@ There is no single "logic mode" in Studio. Interactivity comes from a few focuse
 
 - **[State](/docs/studio/logic/state)** — a Navigator panel, opened by name from the palette. _What does this page or component know?_ Declare values, computed entries, data sources, and functions here.
 - **[Data](/docs/studio/logic/data-explorer)** — the Navigator rail's :kbd[⌘7]. _What are those values right now?_ It shows the resolved data as the page runs. Fetches wait for a **Refresh** or for preview rather than re-running on every edit.
-- **[Events](/docs/studio/logic/events)** — the Inspector's **Logic** tab, :kbd[⌘⇧3]. _What happens when a visitor clicks or types?_ Bind behavior to the selected element here.
-- **[Formulas](/docs/studio/logic/formulas)** — not a place but an affordance: almost any value field carries an **fx** menu that turns a fixed value into a computed one, with live previews as you build it. A **[full-screen workspace](/docs/studio/logic/formula-workspace)** opens when a formula deserves the whole canvas.
+- **[The Logic tab](/docs/studio/logic/events)** — the Inspector's third tab, :kbd[⌘⇧3]. _How does this element behave?_ Events, repeating lists, conditions, and a custom element's outward contract all live here, because they are one job: wiring the selected element to something.
+- **[Formulas](/docs/studio/logic/formulas)** — not a place but an affordance. _How is this value computed rather than typed?_ A state entry can be a formula, an event can run one, and every operand inside one can be another, with live previews of the real result as you build. A **[full-screen workspace](/docs/studio/logic/formula-workspace)** opens when a formula deserves the whole canvas.
 - **[Code](/docs/studio/logic/code)** — the escape hatch. A real code editor for function bodies, and a **Code** canvas mode that shows any file as raw source.
 
 ![Jx Studio State panel listing a component's state and functions](../images/state-panel.png)
@@ -26,7 +26,7 @@ Together they cover the whole range: most interactions never need code, and the 
 Here is the shape of the workflow, end to end:
 
 1. Open a component, press :kbd[⌘K] and run **Show State**. Choose _+ Add… > Value_, name it `$count`, set its **Type** to `integer` and its **Default** to `0`. The component now knows a number.
-2. Add a button to the canvas and set its text to show `$count` — any text field's **fx** menu can point at a state value.
+2. Add a button to the canvas and set its text to show `$count` — click the **value source** chip beside **Text Content** on the Content tab, pick **From data…**, and choose `$count`.
 3. With the button selected, open the Inspector's **Logic** tab and click **Add Event**. Set the event to `onclick`, choose the **Expression** mode, and build the one-step formula `$count += 1`.
 4. Pick **Preview** in the **View** control on the context bar and click the button. The number climbs — and in the **Data** panel (:kbd[⌘7]) you can watch `$count` change in real time.
 
@@ -35,8 +35,9 @@ No files were written by hand: Studio stored the value, the binding, and the han
 ## When each surface applies
 
 - Reach for **State** first — every other surface refers back to what you declare there.
-- Use the Inspector's **Logic** tab whenever behavior belongs to one element ("this button submits", "this field filters the list").
+- Use the Inspector's **Logic** tab whenever behavior belongs to one element ("this button submits", "this list repeats per product", "this field filters the list").
 - Use **formulas** for values that are calculated rather than typed, and **[statements](/docs/studio/logic/statements)** when a handler needs several steps in order.
+- Prefer the plainest value source a field will accept. A signal (**From data…**) is easier to read and to revisit than a formula that only fetches one value.
 - Open **Data** whenever something looks wrong — it shows what the page actually sees, not what you hoped it sees.
 - Drop into **Code** when a function outgrows the structured editors, or when you want to read exactly what Studio wrote.
 

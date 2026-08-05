@@ -278,7 +278,7 @@ describe("layers-panel gaps", () => {
    * `disabled` rather than off the button's presence.
    */
   async function canMoveIn(path: JxPath): Promise<boolean> {
-    activeTab.value!.session.selection = path;
+    activeTab.value!.session.selection = [path];
     await renderLayers();
     const btn = rowByKey(path)?.querySelector('sp-action-button[data-command="selection.moveIn"]');
     if (!btn) {

@@ -26,6 +26,7 @@ import {
   renderOnly,
 } from "../store";
 import { mutateInsertNode, mutateMoveNode, transact, transactDoc } from "../tabs/transact";
+import { primarySelection } from "../tabs/selection";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import {
@@ -180,7 +181,7 @@ export function registerLayersDnD() {
 
         if (wasExpanded) {
           const tab = activeTab.value;
-          const newPath = tab?.session.selection;
+          const newPath = primarySelection(tab?.session.selection);
           if (newPath) {
             const collapsed = (view._layersCollapsed ||= new Set());
             collapsed.add(newPath.join("/"));

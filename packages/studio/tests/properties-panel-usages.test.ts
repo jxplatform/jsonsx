@@ -69,7 +69,7 @@ function usageResult(over: Partial<ReferencesResult> = {}): ReferencesResult {
 /** Select the `<my-card>` instance in a fresh document, with the registry knowing its definition. */
 function selectCard(): void {
   const tab = resetWorkspaceWithTab(CARD_DOC);
-  tab.session.selection = ["children", 0] as never;
+  tab.session.selection = [["children", 0]] as never;
   componentRegistry.length = 0;
   componentRegistry.push({ path: "components/card.json", tagName: "my-card" });
 }
@@ -180,7 +180,7 @@ describe("the Usage section", () => {
       children: [{ children: [], tagName: "p" }],
       tagName: "div",
     } as unknown as JxMutableNode);
-    tab.session.selection = ["children", 0] as never;
+    tab.session.selection = [["children", 0]] as never;
     const root = await renderInto(renderPropertiesPanelTemplate(ctx));
     await flush(3);
     expect(usageSection(root)).toBeNull();
@@ -189,6 +189,22 @@ describe("the Usage section", () => {
   test("the section key is addressable by inspector.setSection", () => {
     resetWorkspaceWithTab(CARD_DOC);
     expect(inspectorSectionKeys()).toContain("__usages");
+  });
+
+  test("its accordion toggle writes through the same per-tab record as every other section", async () => {
+    installMockPlatform({ findReferences: async () => usageResult() });
+    selectCard();
+    await renderInto(renderPropertiesPanelTemplate(ctx));
+    await flush(3);
+    const root = await renderInto(renderPropertiesPanelTemplate(ctx));
+    // Collapsed by default: the heading IS the answer.
+    expect(usageSection(root)!.hasAttribute("open")).toBe(false);
+
+    usageSection(root)!.dispatchEvent(new Event("sp-accordion-item-toggle", { bubbles: true }));
+    expect(activeTab.value!.session.ui.inspectorSections.__usages).toBe(true);
+
+    const reopened = await renderInto(renderPropertiesPanelTemplate(ctx));
+    expect(usageSection(reopened)!.hasAttribute("open")).toBe(true);
   });
 });
 
@@ -254,7 +270,7 @@ describe("selection.findUsages", () => {
       children: [{ children: [], tagName: "p" }],
       tagName: "div",
     } as unknown as JxMutableNode);
-    tab.session.selection = ["children", 0] as never;
+    tab.session.selection = [["children", 0]] as never;
 
     void record().run(emptyContext(), undefined as never);
     await flush(2);

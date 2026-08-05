@@ -452,6 +452,18 @@
 .overlay-hover {
   border: 1px solid var(--accent-50);
 }
+/* A container only — its children are absolutely positioned against the overlay root, so it must
+   not introduce a box of its own between them and it. */
+.overlay-coselection-group {
+  display: contents;
+}
+/* The other members of a multi-selection (§6.5). Same accent, thinner: one box is the primary —
+   what the Inspector, the block action bar and the status bar address — and the rest are along for
+   the batch. A selection of one draws no co-selection boxes at all. */
+.overlay-coselection {
+  border-width: 1px;
+  border-style: dashed;
+}
 /* Layout-chrome selection: the author clicked a header/footer the LAYOUT file contributes, not
    page content. Purple + dashed says "selected, but not yours to edit here" — it must never read
    as the ordinary accent-solid selection, because Backspace and typing do not apply to it.

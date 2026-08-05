@@ -357,7 +357,7 @@ describe("registerLayersDnD — monitor", () => {
   test("onDrop applies the instruction and persists collapse for expanded sources", async () => {
     const { rows } = await setupLayers();
     const tab = resetWorkspaceWithTab(makeDoc());
-    tab.session.selection = ["children", 2];
+    tab.session.selection = [["children", 2]];
     monitors[0]!.onDrop({
       location: {
         current: {
@@ -378,7 +378,7 @@ describe("registerLayersDnD — monitor", () => {
   test("onDrop from a non-expanded source does not touch the collapsed set", async () => {
     const { rows } = await setupLayers();
     const tab = resetWorkspaceWithTab(makeDoc());
-    tab.session.selection = ["children", 2];
+    tab.session.selection = [["children", 2]];
     monitors[0]!.onDrop({
       location: {
         current: {

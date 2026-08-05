@@ -666,10 +666,10 @@ canvasWrap.addEventListener("click", (e: MouseEvent) => {
   if (e.target !== canvasWrap && e.target !== view.panzoomWrap) {
     return;
   }
-  if (!activeTab.value?.session.selection) {
+  if (!activeTab.value?.session.selection.length) {
     return;
   }
-  activeTab.value.session.selection = null;
+  activeTab.value.session.selection = [];
 });
 
 function safeRenderRightPanel() {

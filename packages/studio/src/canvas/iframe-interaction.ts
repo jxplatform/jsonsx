@@ -163,7 +163,15 @@ export function startInteraction(
     }
     const hit = nearestHit(e.target);
     if (hit) {
-      channel.post({ hit, kind: "hit" });
+      // Ctrl/Cmd is the accumulate gesture (§6.5). The iframe reports the modifier and nothing
+      // Else — it holds no selection state, so what a modified click MEANS is the parent's to
+      // Decide, exactly as the unmodified click already was.
+      const mouse = e as MouseEvent;
+      channel.post({
+        additive: mouse.ctrlKey === true || mouse.metaKey === true,
+        hit,
+        kind: "hit",
+      });
     }
   };
 

@@ -37,6 +37,8 @@ Tokens surface right inside the [Style inspector](/docs/studio/design/style-insp
 
 A field showing a token name is _following_ the token: edit the token in Settings and every element using it updates.
 
+In the **[Stylebook](/docs/studio/design/stylebook)**, a value that arrives from your project's site-wide style rather than from the open file wears an inherited chip reading **from site tokens** — so an element default that comes with the project is never mistaken for one written in this file.
+
 Studio also nudges toward tokens in the other direction — when its AI assistant writes styles, hard-coded values that duplicate an existing token are flagged with the token to use instead.
 
 :::doc-note

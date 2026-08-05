@@ -110,7 +110,7 @@ describe("the seed registry", () => {
           clientId: 7,
           state: {
             focusedPath: null,
-            structuralSelection: ["children", 0],
+            structuralSelection: [["children", 0]],
             user: { color: "#30a46c", login: "maya" },
           },
         },

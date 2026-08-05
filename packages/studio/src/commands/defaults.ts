@@ -6,6 +6,11 @@
  * so this module imports no state and can be loaded by a CI check in a bare Bun process. Next wave
  * the bootstrap passes the real functions; nothing about the records changes.
  *
+ * The one value import is `isSpliceablePath` — a four-token predicate over a path array, from the
+ * module that also enforces it inside the mutators. An enablement predicate and the mutator it
+ * guards disagreeing about which paths are editable is exactly how a Delete comes to be offered on
+ * a selection it corrupts, so the two read the same function rather than the same sentence.
+ *
  * Two of them exist to settle arguments the current code has with itself:
  *
  * - `document.close` is ⌘W. Today `editor/shortcuts.ts:192` refuses to close the last tab while
@@ -18,6 +23,8 @@
  * The primary Command Bar cluster is capped at five by `scripts/check-chrome-budget.ts`; four are
  * spent here (Save, Undo, Redo, Open in Browser) exactly as plan §3.2 region ① specifies.
  */
+
+import { isSpliceablePath } from "../tabs/selection";
 
 import type { AnyCommand } from "./registry";
 import type { CommandContext } from "./context";
@@ -155,6 +162,23 @@ const documentOpen = (ctx: CommandContext) => ctx.document.open;
 const hasSelection = (ctx: CommandContext) => ctx.selection.count > 0;
 
 /**
+ * Every selected path names a position a structural verb can act on.
+ *
+ * Two halves, because two surfaces answer this question with different halves of the context. A
+ * menu opened over ONE node reports its verdict as `selection.isRoot` and carries no path list
+ * (`editor/context-menu.ts` builds a synthetic context from its target); the running app carries
+ * the real `selection.paths` and sets `isRoot` only for the document element. `isRoot` alone would
+ * leave a ctrl-clicked repeater template enabled — and Delete on a selection that includes one used
+ * to splice into a children ARRAY and throw, leaving the earlier removals applied and unrecorded.
+ *
+ * It is `every`, not `some`, deliberately: a batch that silently skips two of the five nodes the
+ * user selected is a worse answer than a Delete that says why it is unavailable. Offering a verb
+ * that cannot perform what the selection asks for is the defect, not the refusal.
+ */
+const structurallyEditable = (ctx: CommandContext) =>
+  !ctx.selection.isRoot && ctx.selection.paths.every((path) => isSpliceablePath(path));
+
+/**
  * The default command set.
  *
  * Order is the order surfaces iterate in, so it is the order these read in the palette and in the
@@ -249,16 +273,59 @@ export function defaultCommands(deps: CommandDeps): AnyCommand[] {
       undo: "document",
       when: hasSelection,
       // Same gate as `selection.delete`: duplicating needs a sibling position to insert into. The
-      // Document root and a repeater template have none, and `mutateDuplicateNode` splices at a
-      // Non-numeric index there — a live button that silently corrupts the document. Both surfaces
-      // That render this record had to hand-guard it before the record said so.
-      enablement: (ctx) => !ctx.selection.isRoot,
+      // Document root, a repeater template and a `$switch` case have none, and `mutateDuplicateNode`
+      // Would splice at a non-numeric index there — a live button that silently corrupts the
+      // Document. Both surfaces that render this record had to hand-guard it before the record
+      // Said so.
+      enablement: structurallyEditable,
       requires: "an element that has a sibling position",
       aiTool: {
         name: "duplicate_node",
         description: "Duplicate the currently selected element, inserting the copy after it.",
       },
       run: () => deps.duplicateSelection(),
+    },
+    {
+      id: "selection.repeat",
+      title: "Repeat...",
+      category: "Selection",
+      level: "selection",
+      keyScope: "canvas",
+      menus: ["context/element", "palette"],
+      group: "3_structure",
+      undo: "document",
+      when: hasSelection,
+      // Two ways to mean nothing: an element with no sibling position (`mutateInsertNode`'s
+      // Coordinate is the same splice index Duplicate needs), and an element that IS the repeater
+      // Already — its content is the single `map` template, not a child list.
+      enablement: (ctx) => structurallyEditable(ctx) && !ctx.selection.isRepeater,
+      requires: "an element with a sibling position that is not already a repeater",
+      aiTool: {
+        name: "repeat_node",
+        description:
+          "Turn the selected element into a repeater template, rendering it once per item of a " +
+          "data collection the author picks in the dialog this opens.",
+      },
+      /*
+       * The one record here whose implementation is not injected, and the reason is a property of
+       * the implementation rather than of this record: `convertToRepeater()` is self-contained —
+       * it reads the active tab, opens its own dialog and commits its own transaction — so there
+       * is no bootstrap state for a `CommandDeps` verb to carry, and injecting it would only mean
+       * the bootstrap re-exporting a function that needs nothing from the bootstrap.
+       *
+       * Imported at CALL time, which is what keeps this module's one load-bearing property intact:
+       * it still imports no state at module scope, so `scripts/check-command-levels.ts` and its two
+       * sibling checks still load the command set in a bare Bun process with no DOM.
+       *
+       * Deliberately NOT awaited, exactly as `selection.convertToComponent` is not: the promise
+       * resolves when a HUMAN answers the dialog, and a command whose promise waits on a person is
+       * a command nothing automated can call — `run()` means "start this flow".
+       */
+      run: () => {
+        void import("../editor/convert-to-repeater").then(({ convertToRepeater }) =>
+          convertToRepeater(),
+        );
+      },
     },
     {
       id: "selection.delete",
@@ -272,8 +339,11 @@ export function defaultCommands(deps: CommandDeps): AnyCommand[] {
       destructive: true,
       undo: "document",
       when: hasSelection,
-      // The document root is the document; deleting it is not an edit, it is an empty file.
-      enablement: (ctx) => !ctx.selection.isRoot,
+      // The document root is the document; deleting it is not an edit, it is an empty file. The
+      // Outline's other unspliceable rows — a repeater's map template, a `$switch` case — are
+      // Refused by the same gate, and refusing the whole batch is why a mixed selection can no
+      // Longer half-apply.
+      enablement: structurallyEditable,
       requires: "an element selection that is not the document root",
       aiTool: {
         name: "delete_node",

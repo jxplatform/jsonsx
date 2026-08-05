@@ -34,7 +34,7 @@ Type in the **Filter elements…** box to narrow the palette by name; categories
 1. On the canvas or in [Outline](/docs/studio/design/layers), select the element you want to insert into.
 2. Click a card. The new element lands inside the selection, after its existing children.
 
-With nothing selected, the element is added at the end of the document.
+With nothing selected, the element is added at the end of the document. With [several elements selected](/docs/studio/design/layers#select-several-at-once), it lands inside the last one you added to the selection — inserting is a one-place verb, and that is the place you pointed at most recently.
 
 ## Insert by drag
 

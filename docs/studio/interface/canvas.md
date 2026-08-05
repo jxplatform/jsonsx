@@ -3,6 +3,7 @@ title: "The canvas"
 description: "Working on the Jx Studio canvas — pan, zoom, selection, the block action bar, inserting elements, drag and drop, and the context menu."
 spec:
   - studio.md#4.4
+  - studio.md#6.7
   - studio-ui-guidelines.md#8.1
 code:
   - packages/studio/src/editor/shortcuts.ts
@@ -10,6 +11,8 @@ code:
   - packages/studio/src/editor/context-menu.ts
   - packages/studio/src/editor/insert-zone-action.ts
   - packages/studio/src/panels/canvas-dnd-bridge.ts
+  - packages/studio/src/canvas/iframe-interaction.ts
+  - packages/studio/src/tabs/selection.ts
 ---
 
 # The canvas
@@ -36,7 +39,9 @@ Click any element to select it. Studio outlines it, the Inspector inspects it, a
 
 That includes the parts of the page that come from its **[layout](/docs/studio/projects/pages-layouts-components)** — the header and footer render dimmed, under a `LAYOUT · layouts/base.json` chip, and clicking one selects it and offers **Open Layout →** in the Inspector. They can't be typed into from here, because they belong to every page that uses that layout; see **[Layout elements](/docs/studio/design/properties#layout-elements)**.
 
-You can also move the selection from the keyboard: :kbd[↑] and :kbd[↓] step between siblings, :kbd[←] selects the parent, :kbd[→] steps into the first child, and :kbd[Esc] clears the selection. The full list is in the **[shortcut reference](/docs/studio/interface/shortcuts)**.
+:kbd[⌘]-click (macOS) / :kbd[Ctrl]-click (Windows/Linux) adds an element to the selection or takes it out again. Every selected element keeps a box on the canvas, while the block action bar, the Inspector's single-element controls and the status trail address the one you clicked most recently; the status bar says **N selected** in front of the trail so the trail is never mistaken for the whole set. Ranges are drawn in the **[Outline](/docs/studio/design/layers#select-several-at-once)**, where a :kbd[Shift]-click covers everything between two rows — the canvas has no rubber-band selection.
+
+You can also move the selection from the keyboard: :kbd[↑] and :kbd[↓] step between siblings, :kbd[→] steps into the first child, and :kbd[←] or :kbd[Esc] steps out to the parent — pressed on the outermost element, :kbd[Esc] clears the selection instead. With nothing selected at all, :kbd[↑] or :kbd[↓] selects the outermost element, so the first key press always lands somewhere. The full list is in the **[shortcut reference](/docs/studio/interface/shortcuts)**.
 
 ## The block action bar
 
@@ -52,6 +57,10 @@ A small floating toolbar appears above the selected element:
 :::doc-tip
 The bar keeps one shape. An action that cannot apply to the current selection — moving the first child up, deleting the document root — is shown greyed with a tooltip saying what it needs, rather than disappearing. Buttons never move under your cursor.
 :::
+
+The bar also carries the structural verbs — **Duplicate** and **Delete**. It shows a fixed run of them and keeps any further verb, with its name and its shortcut, behind a **More block actions** button rather than dropping it.
+
+With several elements selected the bar sits on the last one you clicked and names it. **Duplicate** and **Delete** act on everything selected, in one undo step; the move arrows act on that one element, because moving several elements one slot along has no single meaning. See **[Select several at once](/docs/studio/design/layers#select-several-at-once)**.
 
 ## Inserting elements
 
@@ -69,7 +78,11 @@ Files from your desktop work too. Drop an image on empty space and Studio upload
 
 ## The right-click context menu
 
-Right-click any element for the full action list: **Copy**, **Cut**, **Duplicate**, **Copy styles** and **Paste styles**, **Insert before** and **Insert after**, **Wrap in Div**, **Repeat…** (turn the element into a repeating list), **Set Title**, **Edit Component** or **Convert to Component**, and **Delete**. With something on the clipboard, **Paste inside** and **Paste after** appear too.
+Right-click any element for the full action list: **Copy**, **Cut**, **Duplicate**, **Copy styles** and **Paste styles**, **Insert before** and **Insert after**, **Wrap in Div**, **Repeat...** (turn the element into a repeating list), **Set Title**, **Edit Component** or **Convert to Component**, and **Delete**. With something on the clipboard, **Paste inside** and **Paste after** appear too.
+
+Right-clicking an element that is already part of a [multiple selection](/docs/studio/design/layers#select-several-at-once) keeps that selection rather than collapsing it to the element you aimed at; right-clicking anything else selects it alone. **Cut** then removes the whole selection in one undo step, putting the element you aimed at on the clipboard. The other rows address that one element: to duplicate or delete a whole selection, use :kbd[⌘D] and :kbd[Delete], or the block action bar.
+
+The structural rows are commands as well as menu items, so **Repeat...**, **Duplicate** and **Delete** can be run by name from the [command palette](/docs/studio/interface/quick-access) — with the same wording, and the same reason when they are unavailable. See **[Commands](/docs/studio/interface/commands)**.
 
 ## Editing text
 

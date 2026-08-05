@@ -4,6 +4,7 @@ import { html, render as litRender } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { ref } from "lit-html/directives/ref.js";
 import { childIndex, getNodeAtPath, parentElementPath } from "../store";
+import { primarySelection } from "../tabs/selection";
 import { activeTab } from "../workspace/workspace";
 import { transact } from "../tabs/transact";
 import { componentRegistry, computeRelativePath, loadComponentRegistry } from "../files/components";
@@ -20,11 +21,12 @@ const VALID_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/;
 /** Convert the currently selected element into a reusable component. */
 export async function convertToComponent() {
   const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) {
+  const selected = primarySelection(tab?.session.selection);
+  if (!tab || !selected || selected.length < 2) {
     return;
   }
 
-  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
+  const node = getNodeAtPath(tab.doc.document, selected);
   if (!node || !node.tagName) {
     return;
   }
@@ -44,7 +46,7 @@ export async function convertToComponent() {
   const refPath = computeRelativePath(tab.documentPath, componentFile);
 
   // Single atomic mutation: replace node + add $elements ref
-  const selectionPath = tab.session.selection;
+  const selectionPath = selected;
   transact(tab, (doc) => {
     // Navigate to parent's children array and replace the node
     const pp = parentElementPath(selectionPath) ?? [];

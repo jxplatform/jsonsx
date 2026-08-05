@@ -196,7 +196,7 @@ describe("statusbar/selection", () => {
     renderStatusbar();
     expect(resolveRegion("statusbar/selection")).toBeNull();
 
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     renderStatusbar();
     const field = resolveRegion("statusbar/selection");
     expect(field).not.toBeNull();

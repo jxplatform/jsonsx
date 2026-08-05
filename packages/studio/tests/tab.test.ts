@@ -19,7 +19,7 @@ describe("Tab primitive", () => {
     expect(tab.doc.document.tagName).toBe("div");
     expect(tab.doc.mode).toBe("component");
     expect(tab.doc.dirty).toBe(false);
-    expect(tab.session.selection).toBe(null);
+    expect(tab.session.selection).toEqual([]);
     expect(tab.session.ui.rightTab).toBe("properties");
     expect(tab.history.index).toBe(0);
     expect(tab.history.snapshots).toHaveLength(1);
@@ -101,14 +101,14 @@ describe("Tab primitive", () => {
       id: "test-3",
     });
 
-    let observedSelection: (string | number)[] | null = null;
+    let observedSelection: (string | number)[][] = [];
     const stop = effect(() => {
       observedSelection = tab.session.selection;
     });
 
-    expect(observedSelection).toBe(null);
-    tab.session.selection = [0, 1];
-    expect(observedSelection as (string | number)[] | null).toEqual([0, 1]);
+    expect(observedSelection).toEqual([]);
+    tab.session.selection = [[0, 1]];
+    expect(observedSelection as (string | number)[][]).toEqual([[0, 1]]);
 
     stop();
     disposeTab(tab);

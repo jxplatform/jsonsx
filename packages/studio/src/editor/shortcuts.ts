@@ -39,10 +39,11 @@ import {
   projectState,
 } from "../store";
 import { activeTab, closeTab, workspace } from "../workspace/workspace";
+import { primarySelection } from "../tabs/selection";
 import {
-  mutateDuplicateNode,
+  mutateDuplicateNodes,
   mutateInsertNode,
-  mutateRemoveNode,
+  mutateRemoveNodes,
   redo as tabRedo,
   undo as tabUndo,
   transactDoc,
@@ -130,30 +131,32 @@ function navigateSelection(direction: -1 | 1): void {
   if (!tab) {
     return;
   }
-  if (!tab.session.selection) {
-    tab.session.selection = [];
+  const selected = primarySelection(tab.session.selection);
+  if (!selected) {
+    tab.session.selection = [[]];
     return;
   }
-  if (tab.session.selection.length < 2) {
+  if (selected.length < 2) {
     return;
   }
-  const parentPath = parentElementPath(tab.session.selection) as JxPath;
+  const parentPath = parentElementPath(selected) as JxPath;
   const parent = getNodeAtPath(tab.doc.document, parentPath);
-  const newIndex = (childIndex(tab.session.selection) as number) + direction;
+  const newIndex = (childIndex(selected) as number) + direction;
   if (newIndex >= 0 && newIndex < childList(parent).length) {
-    tab.session.selection = [...parentPath, "children", newIndex];
+    tab.session.selection = [[...parentPath, "children", newIndex]];
   }
 }
 
 /** Descend into the first child of the selected node. */
 function selectFirstChild(): void {
   const tab = activeTab.value;
-  if (!tab?.session.selection) {
+  const selected = primarySelection(tab?.session.selection);
+  if (!tab || !selected) {
     return;
   }
-  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
+  const node = getNodeAtPath(tab.doc.document, selected);
   if (childList(node).length > 0) {
-    tab.session.selection = [...tab.session.selection, "children", 0];
+    tab.session.selection = [[...selected, "children", 0]];
   }
 }
 
@@ -168,46 +171,54 @@ function selectFirstChild(): void {
  */
 function selectParent(): void {
   const tab = activeTab.value;
-  if (!tab?.session.selection) {
+  const selected = primarySelection(tab?.session.selection);
+  if (!tab || !selected) {
     return;
   }
-  if (tab.session.selection.length >= 2) {
-    tab.session.selection = parentElementPath(tab.session.selection);
-    return;
-  }
-  tab.session.selection = null;
+  // Escape collapses a multi-selection to the primary's parent, exactly as it collapses one — the
+  // Ladder is about depth, and walking out of a batch of siblings lands on the one thing above it.
+  const parent = parentElementPath(selected);
+  tab.session.selection = selected.length >= 2 && parent ? [parent] : [];
 }
 
 /** Insert an empty paragraph after the selection and select it. */
 function insertSiblingParagraph(): void {
   const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) {
+  const selected = primarySelection(tab?.session.selection);
+  if (!tab || !selected || selected.length < 2) {
     return;
   }
-  const parentPath = parentElementPath(tab.session.selection) as JxPath;
-  const index = childIndex(tab.session.selection) as number;
+  const parentPath = parentElementPath(selected) as JxPath;
+  const index = childIndex(selected) as number;
   const newPath = [...parentPath, "children", index + 1];
   transactDoc(tab, (t) => {
     mutateInsertNode(t, parentPath, index + 1, { tagName: "p", textContent: "" });
-    t.session.selection = newPath;
+    t.session.selection = [newPath];
   });
   // The iframe canvas re-enters inline edit for the freshly-selected node via its own posted
   // EnterEdit flow, so no parent-side enterEditOnPath is needed here.
 }
 
+/**
+ * Duplicate the whole selection in ONE transaction, so a batch is one undo step (§6.5).
+ *
+ * With one path selected this is `mutateDuplicateNode` on that path and nothing else — the batch
+ * form calls the single form, it does not reimplement it.
+ */
 function duplicateSelection(): void {
   const tab = activeTab.value;
-  const selection = tab?.session.selection;
-  if (tab && selection) {
-    transactDoc(tab, (t) => mutateDuplicateNode(t, selection));
+  const selection = tab?.session.selection ?? [];
+  if (tab && selection.length > 0) {
+    transactDoc(tab, (t) => mutateDuplicateNodes(t, selection));
   }
 }
 
+/** Delete the whole selection in ONE transaction. The document element is never deletable. */
 function deleteSelection(): void {
   const tab = activeTab.value;
-  const selection = tab?.session.selection;
-  if (tab && selection && selection.length >= 2) {
-    transactDoc(tab, (t) => mutateRemoveNode(t, selection));
+  const deletable = (tab?.session.selection ?? []).filter((path) => path.length >= 2);
+  if (tab && deletable.length > 0) {
+    transactDoc(tab, (t) => mutateRemoveNodes(t, deletable));
   }
 }
 

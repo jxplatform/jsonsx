@@ -196,7 +196,10 @@ export function renderStylebookMode(ctx: StylebookCtx) {
 export function selectStylebookTag(tag: string, media?: string | null, { panCanvas = false } = {}) {
   shell.stylebook.selection = tag;
   updateSession({
-    selection: [],
+    // The ROOT path, not an empty selection: stylebook mode has always parked the selection on the
+    // Document element while the Style tab edits a TAG, and widening the field to a list changed
+    // Which literal spells that — `[[]]` is one selected path, the root — not what it means.
+    selection: [[]],
     ui: {
       activeSelector: tag,
       rightTab: "style",

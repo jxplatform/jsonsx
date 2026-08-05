@@ -519,37 +519,79 @@ export function resetZoom() {
 }
 
 /**
- * Smoothly pan/scroll the canvas vertically to center the given DOM element.
+ * How far, in parent-viewport px, the pane must move down-screen to centre `rect`.
  *
- * @param {HTMLElement} el
- * @param {{ scrollContainer?: HTMLElement | null }} [panel]
+ * Both inputs are `getBoundingClientRect` space, which is also the space the canvas host answers in
+ * (`iframe-host.ts`'s `pointForRect` composes the frame offset and the empirical scale before it
+ * hands a rect back), so one arithmetic serves a rect measured from a parent DOM element and a rect
+ * measured inside a canvas iframe alike.
  */
-function _panToEl(el: HTMLElement, panel?: { scrollContainer?: HTMLElement | null }) {
+function centeringOffset(rect: { top: number; height: number }): number {
   const wrapRect = rectOf(canvasWrap);
-  const elRect = rectOf(el);
-  const elCenterY = elRect.top + elRect.height / 2 - wrapRect.top;
-  const vpCenterY = wrapRect.height / 2;
-  const offsetY = vpCenterY - elCenterY;
-
-  if (panel?.scrollContainer) {
-    panel.scrollContainer.scrollTo({
-      behavior: "smooth",
-      top: panel.scrollContainer.scrollTop - offsetY,
-    });
-  } else {
-    animatePanBy(offsetY);
-  }
+  const elCenterY = rect.top + rect.height / 2 - wrapRect.top;
+  return wrapRect.height / 2 - elCenterY;
 }
 
 /**
- * Pan the panzoom canvas vertically so a PARENT-VIEWPORT rect is centered — for callers whose
- * target lives inside an iframe (no parent DOM element to measure; the host converts the measured
- * iframe rect and passes it here).
+ * The element a reveal actually MOVES, or `null` when the panzoom transform is the only mover.
+ *
+ * This is the whole Edit-vs-Design distinction, in one place. Design, Stylebook and git-diff render
+ * a `.panzoom-wrap` and are moved by writing `view.panY`; **Edit renders no panzoom wrap at all** —
+ * it is an ordinary scrolling column (`.content-edit-canvas`, the edit branch of `renderCanvas`),
+ * and the only thing that brings a node below the fold into view there is its scroll container.
+ *
+ * Reading it off the active panel is what keeps the two callers from disagreeing. It is the
+ * discriminator `_panToEl` has always used, and `renderCanvas` re-establishes it on every render:
+ * `canvasPanels` is emptied and `view.panzoomWrap` nulled before any branch runs, so the panel that
+ * answers here is this mode's, never the last mode's.
+ */
+export function revealScroller(): HTMLElement | null {
+  return getActivePanel()?.scrollContainer ?? null;
+}
+
+/**
+ * Move the pane by `offsetY`, on whichever surface this mode actually moves.
+ *
+ * `smooth` is the caller's intent, not a property of the surface: the Outline's jump-to-node is a
+ * gesture an author watches, so it eases. The panzoom branch always eases — its 250ms tween is the
+ * one {@link import("./iframe-host").revealCanvasPath} waits out frame by frame — but a scroll has
+ * no such settle protocol, so an un-eased caller gets a scroll that is finished on return.
+ */
+function revealBy(offsetY: number, smooth: boolean): void {
+  const scroller = revealScroller();
+  if (!scroller) {
+    animatePanBy(offsetY);
+    return;
+  }
+  const top = scroller.scrollTop - offsetY;
+  if (smooth) {
+    scroller.scrollTo({ behavior: "smooth", top });
+    return;
+  }
+  // No clamp: the browser clamps `scrollTop` into `[0, scrollHeight - clientHeight]` itself, and
+  // Clamping here would only make a unit test agree with arithmetic the DOM never performs.
+  scroller.scrollTop = top;
+}
+
+/**
+ * Smoothly pan/scroll the canvas vertically to center the given DOM element.
+ *
+ * @param {HTMLElement} el
+ */
+function _panToEl(el: HTMLElement) {
+  revealBy(centeringOffset(rectOf(el)), true);
+}
+
+/**
+ * Centre a PARENT-VIEWPORT rect in the pane — for callers whose target lives inside an iframe (no
+ * parent DOM element to measure; the host converts the measured iframe rect and passes it here).
+ *
+ * Was `animatePanBy` unconditionally, which made it a NO-OP on the Edit surface: `view.panY` only
+ * reaches the screen through a `.panzoom-wrap` transform, and Edit has none — so `revealCanvasPath`
+ * reported a node's unchanged off-screen point and the click that followed selected nothing.
  */
 export function panToParentRect(rect: { top: number; height: number }) {
-  const wrapRect = rectOf(canvasWrap);
-  const elCenterY = rect.top + rect.height / 2 - wrapRect.top;
-  animatePanBy(wrapRect.height / 2 - elCenterY);
+  revealBy(centeringOffset(rect), false);
 }
 
 /** Animate `view.panY` by `offsetY` with the shared 250ms ease-out. */
@@ -584,7 +626,7 @@ export function panToElement(path: (string | number)[]) {
   if (!el) {
     return;
   }
-  _panToEl(el, panel);
+  _panToEl(el);
 }
 
 // ─── Commands ─────────────────────────────────────────────────────────────────

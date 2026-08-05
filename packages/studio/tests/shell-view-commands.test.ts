@@ -331,6 +331,6 @@ describe("the workspace still behaves", () => {
   test("a tab can be opened alongside — the records touch no document state", () => {
     const tab = resetWorkspaceWithTab();
     void registry.run("view.setActivity", { tab: "layers" });
-    expect(tab.session.selection).toBeNull();
+    expect(tab.session.selection).toEqual([]);
   });
 });

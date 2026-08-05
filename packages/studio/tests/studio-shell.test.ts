@@ -377,40 +377,40 @@ describe("canvas-wrap background click", () => {
 
   test("clears the selection when the wrap itself is clicked", () => {
     const tab = openShellTab();
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     canvasWrap().dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(tab.session.selection).toBeNull();
+    expect(tab.session.selection).toEqual([]);
   });
 
   test("ignores clicks on child elements", () => {
     const tab = openShellTab();
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const child = document.createElement("div");
     canvasWrap().append(child);
     child.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(tab.session.selection).toEqual(["children", 0]);
+    expect(tab.session.selection).toEqual([["children", 0]]);
     child.remove();
   });
 
   test("no-op when nothing is selected", () => {
     const tab = openShellTab();
-    tab.session.selection = null;
+    tab.session.selection = [];
     expect(() => {
       canvasWrap().dispatchEvent(new MouseEvent("click", { bubbles: true }));
     }).not.toThrow();
-    expect(tab.session.selection).toBeNull();
+    expect(tab.session.selection).toEqual([]);
   });
 });
 
 describe("navigateToComponent", () => {
   test("opens the component in its own tab and leaves the parent tab intact", async () => {
     const parent = openShellTab();
-    parent.session.selection = ["children", 0];
+    parent.session.selection = [["children", 0]];
     await blockBarCtx.navigateToComponent("components/card.json");
 
     // The parent is still open, still on its own document, still holding its selection.
     expect(parent.documentPath).toBe("pages/current.json");
-    expect(parent.session.selection).toEqual(["children", 0]);
+    expect(parent.session.selection).toEqual([["children", 0]]);
     expect(parent.session.documentStack).toHaveLength(0);
 
     // The component is a real, separately-keyed tab.
@@ -478,7 +478,7 @@ describe("navigateBack", () => {
       document: { children: [], tagName },
       documentPath: "pages/parent.json",
       mode: null,
-      selection: null,
+      selection: [],
       sourceFormat: null,
       ui: { ...captureTabUi(createTab({ document: {}, id: "frame" }).session.ui), ...ui },
     };
@@ -606,7 +606,7 @@ describe("navigateToLevel", () => {
       document: { children: [], tagName },
       documentPath: `pages/${tagName}.json`,
       mode: null,
-      selection: null,
+      selection: [],
       sourceFormat: null,
       ui: captureTabUi(createTab({ document: {}, id: "frame" }).session.ui),
     };

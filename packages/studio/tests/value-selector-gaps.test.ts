@@ -149,6 +149,40 @@ describe("jx-value-selector events", () => {
     expect(el.querySelector("sp-picker.jx-combobox-picker")).toBeTruthy();
   });
 
+  test("a typed value commits on blur/Enter as a change event", async () => {
+    const el = await mountSelector({ value: "" });
+    const changes: Event[] = [];
+    const inputs: Event[] = [];
+    el.addEventListener("change", (e) => changes.push(e));
+    el.addEventListener("input", (e) => inputs.push(e));
+    const tf = el.querySelector("sp-textfield")!;
+    (tf as unknown as { value: string }).value = "onpointerdown";
+    tf.dispatchEvent(new Event("change", { bubbles: false }));
+    expect(el.value).toBe("onpointerdown");
+    expect(changes.length).toBe(1);
+    expect(changes[0]!.bubbles).toBe(true);
+    expect(changes[0]!.composed).toBe(true);
+    expect(inputs.length).toBe(0);
+  });
+
+  test("clicking into the textfield does not reach the overlay trigger", async () => {
+    const el = await mountSelector({ value: "" });
+    const seen: Event[] = [];
+    el.addEventListener("click", (e) => seen.push(e));
+    el.querySelector("sp-textfield")!.dispatchEvent(new Event("click", { bubbles: true }));
+    expect(seen.length).toBe(0);
+  });
+
+  test("the textfield's own change does not escape as a second event", async () => {
+    const el = await mountSelector({ value: "" });
+    const seen: Event[] = [];
+    el.addEventListener("change", (e) => seen.push(e));
+    const tf = el.querySelector("sp-textfield")!;
+    (tf as unknown as { value: string }).value = "x";
+    tf.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(seen.length).toBe(1);
+  });
+
   test("textfield input updates value and dispatches an input event", async () => {
     const el = await mountSelector({ value: "" });
     const events: Event[] = [];

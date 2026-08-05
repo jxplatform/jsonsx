@@ -4,6 +4,7 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 
 import { getNodeAtPath } from "../store";
 import { activeTab } from "../workspace/workspace";
+import { primarySelection } from "../tabs/selection";
 import cssMeta from "../../data/css-meta.json";
 
 let cssInitialMap = new Map<string, string>();
@@ -236,9 +237,8 @@ export const TYPO_PREVIEW_PROPS = new Set([
 /** Resolve the current font family for typography preview (handles var() references) */
 export function currentFontFamily() {
   const tab = activeTab.value;
-  const node = tab?.session.selection
-    ? getNodeAtPath(tab.doc.document, tab.session.selection)
-    : null;
+  const selected = primarySelection(tab?.session.selection);
+  const node = selected ? getNodeAtPath(tab!.doc.document, selected) : null;
   const raw = node?.style?.fontFamily;
   if (!raw) {
     return "";

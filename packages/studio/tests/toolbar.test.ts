@@ -241,7 +241,7 @@ describe("the Command Center pill", () => {
   test("names the project, the document and the selection, and prints ⌘K", async () => {
     stageProject();
     const tab = openTestTab("/acme/pages/blog/index.md");
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     toolbar.mount(root);
     await flush();
 
@@ -253,7 +253,7 @@ describe("the Command Center pill", () => {
   test("each segment opens the palette pre-scoped, and the gap opens the mode picker", async () => {
     stageProject();
     const tab = openTestTab("/acme/pages/index.md");
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     toolbar.mount(root);
     await flush();
 
@@ -296,6 +296,18 @@ describe("the Command Center pill", () => {
     expect(toolbar.selectionSegmentLabel(null)).toBe("");
     const tab = openTestTab();
     expect(toolbar.selectionSegmentLabel(tab)).toBe("");
+  });
+
+  test("one selected element is named by its node label, exactly as it always was", () => {
+    const tab = openTestTab();
+    tab.session.selection = [["children", 0]];
+    expect(toolbar.selectionSegmentLabel(tab)).toBe("p — Hi");
+  });
+
+  test("a batch is not a place, so the address bar names its size (§6.5)", () => {
+    const tab = openTestTab();
+    tab.session.selection = [["children", 0], []];
+    expect(toolbar.selectionSegmentLabel(tab)).toBe("2 elements");
   });
 });
 

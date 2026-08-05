@@ -316,7 +316,7 @@ describe("the SELECTION field", () => {
       children: [{ children: [{ tagName: "li", textContent: "Item" }], tagName: "ul" }],
       tagName: "div",
     });
-    tab.session.selection = ["children", 0, "children", 0];
+    tab.session.selection = [["children", 0, "children", 0]];
     renderStatusbar();
     const selection = field("selection")!;
     expect(selection.querySelector(".sb-state")?.textContent).toContain("li");
@@ -333,7 +333,7 @@ describe("the SELECTION field", () => {
       tagName: "div",
     });
     ctx = makeContext({ document: { open: true } });
-    tab.session.selection = ["children", 0, "children", 0];
+    tab.session.selection = [["children", 0, "children", 0]];
     renderStatusbar();
     (field("selection")!.querySelector("button") as HTMLElement).click();
     expect(ran).toEqual([{ args: { path: ["children", 0] }, id: "selection.set" }]);
@@ -344,7 +344,7 @@ describe("the SELECTION field", () => {
       children: [{ tagName: "p", textContent: "<b>&hi" }],
       tagName: "div",
     });
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     renderStatusbar();
     expect(statusbarEl.querySelector("b")).toBeNull();
     expect(field("selection")?.textContent).toContain("<b>&hi");
@@ -360,7 +360,7 @@ describe("the SELECTION field", () => {
   test("a node selection wins over the stylebook selector", () => {
     const tab = resetWorkspaceWithTab({ children: [{ tagName: "p" }], tagName: "div" });
     shell.stylebook.selection = "h1";
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     renderStatusbar();
     expect(field("selection")?.textContent).not.toContain("h1");
   });
@@ -422,7 +422,7 @@ describe("mountStatusbar", () => {
     mountStatusbar();
     await flush();
     expect(field("selection")).toBeNull();
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     await flush();
     expect(field("selection")).not.toBeNull();
   });
@@ -437,12 +437,27 @@ describe("mountStatusbar", () => {
     expect(items()).toContain("⚠ 1");
   });
 
+  test("a multi-selection says its SIZE before the trail to the primary (§6.5)", async () => {
+    const tab = resetWorkspaceWithTab();
+    mountStatusbar();
+    await flush();
+    tab.session.selection = [["children", 0]];
+    await flush();
+    expect(items()).not.toContain("2 selected");
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
+    await flush();
+    expect(items()).toContain("2 selected");
+  });
+
   test("is idempotent — a second mount replaces the effect rather than stacking one", async () => {
     const tab = resetWorkspaceWithTab();
     mountStatusbar();
     mountStatusbar();
     await flush();
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     await flush();
     expect(statusbarEl.querySelectorAll('[data-jx-region="statusbar/selection"]')).toHaveLength(1);
   });
@@ -453,7 +468,7 @@ describe("mountStatusbar", () => {
     await flush();
     expect(field("selection")).toBeNull();
     unmountStatusbar();
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     await flush();
     expect(field("selection")).toBeNull();
   });
@@ -468,7 +483,7 @@ describe("the selection field does not say the same thing twice", () => {
       children: [{ $id: "re-hero", children: [], tagName: "re-hero" }],
       tagName: "div",
     } as never);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     renderStatusbar();
     const text = field("selection")!.textContent!.replaceAll(/\s+/g, " ").trim();
     expect(text).toBe("re-hero");
@@ -479,7 +494,7 @@ describe("the selection field does not say the same thing twice", () => {
       children: [{ $id: "masthead", children: [], tagName: "header" }],
       tagName: "div",
     } as never);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     renderStatusbar();
     const text = field("selection")!.textContent!.replaceAll(/\s+/g, " ").trim();
     expect(text).toContain("masthead");

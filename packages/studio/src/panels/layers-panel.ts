@@ -43,6 +43,13 @@ import {
   pathsEqual,
 } from "../store";
 import { activeTab } from "../workspace/workspace";
+import {
+  isSelected as isPathSelected,
+  primarySelection,
+  rangeSelection,
+  selectionAnchor,
+  toggleSelected,
+} from "../tabs/selection";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import { mutateUpdateProperty, transactDoc } from "../tabs/transact";
@@ -374,7 +381,11 @@ export function applyTreeRovingTabindex(tree: HTMLElement): void {
   if (rows.length === 0) {
     return;
   }
-  const selected = rows.find((row) => row.getAttribute("aria-selected") === "true");
+  // The PRIMARY row is the tab stop, not merely the first selected one: a multi-selection has one
+  // Keyboard position, and it is the row the author last pointed at. `data-primary` is stamped by
+  // The row template, so the two never have to re-derive the same answer.
+  const primary = rows.find((row) => row.dataset.primary !== undefined);
+  const selected = primary ?? rows.find((row) => row.getAttribute("aria-selected") === "true");
   const stop = selected ?? rows[0]!;
   for (const row of rows) {
     row.tabIndex = row === stop ? 0 : -1;
@@ -392,14 +403,70 @@ function focusRow(tree: HTMLElement, row: HTMLElement | undefined): void {
   row.focus();
 }
 
-/** Select the node a row stands for, so the canvas and the inspector follow the keyboard. */
-function selectRow(row: HTMLElement): void {
-  const key = row.dataset.path;
+/**
+ * The visible rows' paths, in display order — the list a shift-range is a range OF.
+ *
+ * Read from the DOM rather than from a captured array, because "visible" is exactly what the DOM
+ * knows: a collapsed ancestor removes its descendants' rows, and the range must skip what the
+ * author cannot see. `data-jx-path` is the serialized path the P5 plan put on every row for this.
+ *
+ * @param {HTMLElement} tree
+ * @returns {JxPath[]}
+ */
+function visibleRowPaths(tree: HTMLElement): JxPath[] {
+  const paths: JxPath[] = [];
+  for (const row of treeRows(tree)) {
+    const raw = row.dataset.jxPath;
+    if (raw) {
+      paths.push(JSON.parse(raw) as JxPath);
+    }
+  }
+  return paths;
+}
+
+/**
+ * Apply one row activation to the selection, honouring the two accumulate gestures (§6.5).
+ *
+ * - Plain: replace the selection with this path. **This is the only branch a keyboard walk or an
+ *   unmodified click can reach, and it is byte-identical to what the Outline always did.**
+ * - Ctrl/Cmd: toggle this path in or out, leaving the rest alone.
+ * - Shift: the contiguous run of VISIBLE rows from the anchor to here.
+ *
+ * @param {HTMLElement | null} tree The tree element, needed only to resolve a shift-range.
+ * @param {JxPath} path
+ * @param {{ additive?: boolean; range?: boolean }} gesture
+ */
+export function applyRowSelection(
+  tree: HTMLElement | null,
+  path: JxPath,
+  gesture: { additive?: boolean; range?: boolean } = {},
+): void {
   const tab = activeTab.value;
-  if (key === undefined || !tab) {
+  if (!tab) {
     return;
   }
-  tab.session.selection = pathFromKey(key);
+  if (gesture.range && tree) {
+    tab.session.selection = rangeSelection(
+      visibleRowPaths(tree),
+      selectionAnchor(tab.session.selection),
+      path,
+    );
+    return;
+  }
+  if (gesture.additive) {
+    tab.session.selection = toggleSelected(tab.session.selection, path);
+    return;
+  }
+  tab.session.selection = [path];
+}
+
+/** Select the node a row stands for, so the canvas and the inspector follow the keyboard. */
+function selectRow(row: HTMLElement, gesture: { additive?: boolean; range?: boolean } = {}): void {
+  const key = row.dataset.path;
+  if (key === undefined) {
+    return;
+  }
+  applyRowSelection(row.closest<HTMLElement>('[role="tree"]'), pathFromKey(key), gesture);
 }
 
 /**
@@ -430,7 +497,9 @@ export function onTreeKeydown(
     e.preventDefault();
     const next = rows[index + (e.key === "ArrowDown" ? 1 : -1)];
     if (next) {
-      selectRow(next);
+      // Shift+Arrow extends the range, the same gesture shift-click makes and through the same
+      // Function. Without Shift the walk replaces the selection, exactly as it always has.
+      selectRow(next, { range: e.shiftKey });
       focusRow(tree, next);
     }
   } else if (e.key === "ArrowRight") {
@@ -621,7 +690,10 @@ export function renderLayersTemplate(ctx: {
     }
 
     const key = rowKey;
-    const isSelected = pathsEqual(path, tab!.session.selection);
+    // Every member of the set draws selected; the PRIMARY additionally carries the roving tab stop,
+    // So a batch has one keyboard position rather than six.
+    const isSelected = isPathSelected(tab!.session.selection, path);
+    const isPrimary = pathsEqual(path, primarySelection(tab!.session.selection));
     const hasChildren = Array.isArray(jxNode.children) && jxNode.children.length > 0;
     const hasMapChildren =
       jxNode.children &&
@@ -699,15 +771,20 @@ export function renderLayersTemplate(ctx: {
           aria-level=${depth + 1}
           aria-selected=${isSelected ? "true" : "false"}
           aria-expanded=${isExpandable ? (collapsed.has(key) ? "false" : "true") : nothing}
-          tabindex=${isSelected ? "0" : "-1"}
+          tabindex=${isPrimary ? "0" : "-1"}
+          data-primary=${isPrimary ? "" : nothing}
           data-jx-path=${JSON.stringify(path)}
           data-path=${key}
           data-dnd-row=${isStructural ? key : nothing}
           data-dnd-depth=${isStructural ? depth : nothing}
           data-dnd-void=${isStructural && isVoidEl ? "" : nothing}
           data-dnd-expanded=${isStructural && isExpandable && !collapsed.has(key) ? "" : nothing}
-          @click=${() => {
-            activeTab.value!.session.selection = path;
+          @click=${(e: MouseEvent) => {
+            applyRowSelection(
+              (e.currentTarget as HTMLElement).closest<HTMLElement>('[role="tree"]'),
+              path,
+              { additive: e.ctrlKey || e.metaKey, range: e.shiftKey },
+            );
             panToElement(path);
           }}
           @dblclick=${

@@ -7,6 +7,7 @@ import { renderFieldRow } from "./field-row";
 import { renderFormulaChips } from "./formula-chips";
 import { applyCatalogPick, calleeEntry, formulaCatalog } from "./formula-catalog";
 import { openFormulaPalette } from "./formula-palette";
+import { VALUE_SOURCE_LABELS } from "./value-source";
 import { renderEmptyState } from "../panels/empty-state";
 
 import type {
@@ -181,6 +182,10 @@ function operatorInfo(op: string): OperatorInfo {
 // ─── Operand Mode Detection ─────────────────────────────────────────────────
 
 /**
+ * Which rung of the value ladder an operand occupies. The three answers are the same three the
+ * Properties, Style and Logic tabs give, and they are spelled the same way — `ui/value-source.ts`
+ * owns the words, so `lit / $ref / expr` is gone from the operand picker (plan §6.3).
+ *
  * @param {unknown} operand
  * @returns {"ref" | "expression" | "literal"}
  */
@@ -481,16 +486,17 @@ export function renderOperandEditor(
     <div style="display:flex;gap:4px;align-items:flex-start;flex:1">
       <sp-picker
         size="s"
-        style="min-width:60px"
+        style="min-width:112px"
+        label="Value source"
         .value=${live(mode)}
         @change=${(e: Event) => {
           const newMode = (e.target as HTMLInputElement).value;
           onChange(defaultForMode(newMode));
         }}
       >
-        <sp-menu-item value="literal">lit</sp-menu-item>
-        <sp-menu-item value="ref">$ref</sp-menu-item>
-        <sp-menu-item value="expression">expr</sp-menu-item>
+        <sp-menu-item value="literal">${VALUE_SOURCE_LABELS.literal}</sp-menu-item>
+        <sp-menu-item value="ref">${VALUE_SOURCE_LABELS.ref}</sp-menu-item>
+        <sp-menu-item value="expression">${VALUE_SOURCE_LABELS.expression}</sp-menu-item>
       </sp-picker>
       ${
         mode === "literal"

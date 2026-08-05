@@ -48,7 +48,7 @@ const {
   availableSelectors,
   registerStyleCommands,
   renderStylePanelTemplate,
-  resetSelectorPicker,
+  resetSelectorMenu,
   styleCommands,
 } = await import("../src/panels/style-panel");
 
@@ -89,7 +89,7 @@ beforeEach(() => {
   renderLeftPanel.mockClear();
   renderCanvas.mockClear();
   resetDataRowExpansion();
-  resetSelectorPicker();
+  resetSelectorMenu();
   selectSignal(null);
   ctx = makeContext({ document: { open: true }, selection: { count: 1 } });
   registry = createCommandRegistry({ getContext: () => ctx });
@@ -312,29 +312,29 @@ describe("formula.editDef / formula.editEvent", () => {
 });
 
 describe("style.openSelectorMenu", () => {
-  test("opens the picker the panel's own template captured", async () => {
-    activeTab.value!.session.selection = ["children", 0];
+  test("opens the menu the Target Line's own template captured", async () => {
+    activeTab.value!.session.selection = [["children", 0]];
     const host = document.createElement("div");
     document.body.append(host);
-    // Render the REAL Style sidebar: the picker handle comes from the template's `ref`, which is
-    // The whole point — no selector crosses the boundary, in the manifest or in this test.
+    // Render the REAL Style sidebar: the handle comes from the Target Line's `ref`, which is the
+    // Whole point — no selector crosses the boundary, in the manifest or in this test.
     litRender(renderStylePanelTemplate({ getCanvasMode: () => "design" }), host);
     await flush();
 
-    const picker = host.querySelector(".selector-select") as
-      | (HTMLElement & { open: boolean })
+    const trigger = host.querySelector("overlay-trigger") as
+      | (HTMLElement & { open?: string })
       | null;
-    expect(picker).not.toBeNull();
+    expect(trigger).not.toBeNull();
     void registry.run("style.openSelectorMenu");
-    expect(picker?.open).toBe(true);
+    expect(trigger?.open).toBe("click");
     host.remove();
   });
 
   test("refuses when the Style tab is not rendered, rather than pressing nothing", () => {
-    resetSelectorPicker();
+    resetSelectorMenu();
     expect(() => registry.run("style.openSelectorMenu")).toThrow(
       'command "style.openSelectorMenu" needs the Inspector\'s Style tab rendered; its selector ' +
-        "picker is not in the document",
+        "menu is not in the document",
     );
   });
 
@@ -382,18 +382,18 @@ describe("style.setSelector", () => {
 
 describe("availableSelectors", () => {
   test("is the common set plus what the selected element declares", () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     expect(availableSelectors()).toContain(":hover");
   });
 
   test("includes the active selector even when nothing declares it yet", () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     activeTab.value!.session.ui.activeSelector = "[open]";
     expect(availableSelectors()).toContain("[open]");
   });
 
   test("with nothing selected it is just the common set", () => {
-    activeTab.value!.session.selection = null;
+    activeTab.value!.session.selection = [];
     expect(availableSelectors()).toContain(":focus");
   });
 

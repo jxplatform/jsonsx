@@ -1,5 +1,6 @@
 /**
- * The canvas view verbs — `canvas.setMode` / `setZoom` / `setEditZoom` — and `selection.set`.
+ * The canvas pane's verbs — `canvas.setMode` / `setZoom` / `setEditZoom`, `selection.set`, and
+ * `insert.data`.
  *
  * `canvas.setMode` is the record that retires `canvas.togglePreview`, the toggle six screenshots
  * went through: a toggle cannot say which state it ends in, so those six photographed whichever way
@@ -28,13 +29,21 @@ void mock.module("../src/canvas/canvas-live-render.js", () => ({
   initCanvasLiveRender: () => {},
   resolveCanvasDocument: () => Promise.resolve(null),
 }));
+/** What `insert.data` posted to the canvas bridge, and the caret path the host reports. */
+const formatIntents: { command: string; token?: string }[] = [];
+let caretPath: (string | number)[] | null = null;
 void mock.module("../src/canvas/iframe-host.js", () => ({
   adoptCanvasPreviewMode: () => {},
   commitActiveEditSession: () => {},
   getEditBarAnchorRect: () => null,
-  getEditSnapshot: () => ({ editing: false, snapshot: null }),
+  getEditSnapshot: () => ({
+    editing: caretPath !== null,
+    snapshot: caretPath && { path: caretPath },
+  }),
   mountIframeCanvas: () => Promise.resolve(),
-  postApplyFormat: () => {},
+  postApplyFormat: (intent: { command: string; token?: string }) => {
+    formatIntents.push(intent);
+  },
   postStyleUpdateToStylebookHosts: () => {},
   requestCanvasEval: () => Promise.resolve(null),
   setToolbarRefresh: () => {},
@@ -145,6 +154,8 @@ describe("the records themselves", () => {
       "canvas.setFit",
       "canvas.setEditZoom",
       "selection.set",
+      "selection.setPaths",
+      "insert.data",
     ]);
     expect(ids.some((id) => /\.toggle[A-Z]/.test(id))).toBe(false);
   });
@@ -294,21 +305,122 @@ describe("canvas.setEditZoom", () => {
   });
 });
 
+/*
+ * `insert.data` — the manifest's `element.insertData`, which had no record and was reached by
+ * clicking the block action bar's Insert-data button and then a row in the menu it opens. §13.5
+ * refuses that shape outright ("the ITEM is the command"), so the record takes the token.
+ */
+describe("insert.data", () => {
+  const BOUND_DOC = {
+    children: [
+      {
+        $prototype: "Array",
+        items: { $ref: "#/state/posts" },
+        map: { children: [{ tagName: "h3", textContent: "Post title" }], tagName: "article" },
+      },
+    ],
+    state: { posts: { $prototype: "ContentCollection", contentType: "posts" } },
+    tagName: "div",
+  };
+
+  function openBound() {
+    closeAllTabs();
+    return openTab({
+      capabilities: { modes: ["edit", "design"] },
+      document: structuredClone(BOUND_DOC),
+      documentPath: "pages/blog.json",
+      id: "bound",
+    });
+  }
+
+  beforeEach(() => {
+    formatIntents.length = 0;
+    caretPath = null;
+    ctx = makeContext({ caret: { active: true }, document: { open: true } });
+    openBound();
+  });
+
+  test("is hidden without a live caret — a token has nowhere to land", () => {
+    ctx = makeContext({ document: { open: true } });
+    expect(registry.isVisible("insert.data")).toBe(false);
+    expect(registry.get("insert.data")?.requires).toBe("a live text caret in the canvas");
+  });
+
+  test("posts the insertData intent for a state token the document defines", () => {
+    void registry.run("insert.data", { token: "state.posts" });
+    expect(formatIntents).toEqual([{ command: "insertData", token: "state.posts" }]);
+  });
+
+  test("accepts a nested walk under a defined state entry", () => {
+    void registry.run("insert.data", { token: "state.posts.length" });
+    expect(formatIntents).toHaveLength(1);
+  });
+
+  test("refuses a state entry the document does not define, listing what it does", () => {
+    expect(() => registry.run("insert.data", { token: "state.authors" })).toThrow(
+      'command "insert.data" argument "token": "state.authors" names no state entry — this ' +
+        "document defines: posts",
+    );
+    expect(formatIntents).toEqual([]);
+  });
+
+  test('a bare "state" names no entry either', () => {
+    expect(() => registry.run("insert.data", { token: "state" })).toThrow("names no state entry");
+  });
+
+  test("accepts item/index when the caret sits inside a repeater template", () => {
+    caretPath = ["children", 0, "map", "children", 0];
+    void registry.run("insert.data", { token: "item.data.title" });
+    void registry.run("insert.data", { token: "index" });
+    expect(formatIntents.map((i) => i.token)).toEqual(["item.data.title", "index"]);
+  });
+
+  test("falls back to the element selection when no caret snapshot is reported", () => {
+    activeTab.value!.session.selection = [["children", 0, "map", "children", 0]];
+    void registry.run("insert.data", { token: "item" });
+    expect(formatIntents).toHaveLength(1);
+  });
+
+  test("refuses a repeater-scope token outside a repeater template", () => {
+    expect(() => registry.run("insert.data", { token: "item.data.title" })).toThrow(
+      "is a repeater-scope token, and the caret is not inside a repeater template",
+    );
+  });
+
+  test("refuses a token that binds to nothing the vocabulary has", () => {
+    expect(() => registry.run("insert.data", { token: "window.location" })).toThrow(
+      'is not an insertable token — a token reads "state.<name>", "item", "item.<field>" or ' +
+        '"index"',
+    );
+  });
+
+  test("refuses an empty token rather than inserting an empty placeholder", () => {
+    expect(() => registry.run("insert.data", { token: "" })).toThrow("expected a non-empty string");
+  });
+
+  test("refuses when no document is open", () => {
+    closeAllTabs();
+    expect(() => registry.run("insert.data", { token: "state.posts" })).toThrow(
+      "needs an open document",
+    );
+  });
+});
+
 describe("selection.set", () => {
   test("selects a node the document holds", () => {
     void registry.run("selection.set", { path: ["children", 0] });
-    expect(activeTab.value?.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value?.session.selection).toEqual([["children", 0]]);
   });
 
   test("the empty path is the document root, not an absence", () => {
     void registry.run("selection.set", { path: [] });
-    expect(activeTab.value?.session.selection).toEqual([]);
+    expect(activeTab.value?.session.selection).toEqual([[]]);
   });
 
   test("null clears the selection", () => {
     void registry.run("selection.set", { path: ["children", 0] });
     void registry.run("selection.set", { path: null });
-    expect(activeTab.value?.session.selection).toBeNull();
+    expect(activeTab.value?.session.selection).toEqual([]);
   });
 
   test("refuses a path that addresses nothing, naming the document", () => {
@@ -316,7 +428,7 @@ describe("selection.set", () => {
       'command "selection.set" argument "path": [children, 9] addresses no node in ' +
         "pages/index.json",
     );
-    expect(activeTab.value?.session.selection).toBeNull();
+    expect(activeTab.value?.session.selection).toEqual([]);
   });
 
   test("refuses a path that is not an array", () => {
@@ -343,10 +455,104 @@ describe("selection.set", () => {
   });
 });
 
+describe("selection.setPaths", () => {
+  test("selects several nodes, last one primary and first one anchor", () => {
+    void registry.run("selection.setPaths", {
+      paths: [
+        ["children", 0],
+        ["children", 0, "children", 0],
+      ],
+    });
+    expect(activeTab.value?.session.selection).toEqual([
+      ["children", 0],
+      ["children", 0, "children", 0],
+    ]);
+  });
+
+  test("one path in is exactly what selection.set would have done", () => {
+    void registry.run("selection.setPaths", { paths: [["children", 0]] });
+    const many = activeTab.value?.session.selection;
+    void registry.run("selection.set", { path: ["children", 0] });
+    expect(many).toEqual(activeTab.value!.session.selection);
+  });
+
+  test("[] selects nothing — the same state selection.set { path: null } reaches", () => {
+    void registry.run("selection.set", { path: ["children", 0] });
+    void registry.run("selection.setPaths", { paths: [] });
+    expect(activeTab.value?.session.selection).toEqual([]);
+  });
+
+  test("is idempotent: the same list twice lands on the same selection", () => {
+    const args = {
+      paths: [
+        ["children", 0],
+        ["children", 0, "children", 0],
+      ],
+    };
+    void registry.run("selection.setPaths", args);
+    const first = JSON.stringify(activeTab.value?.session.selection);
+    void registry.run("selection.setPaths", args);
+    expect(JSON.stringify(activeTab.value?.session.selection)).toBe(first);
+  });
+
+  test("a repeated path is deduplicated, keeping the first occurrence", () => {
+    void registry.run("selection.setPaths", {
+      paths: [
+        ["children", 0],
+        ["children", 0, "children", 0],
+        ["children", 0],
+      ],
+    });
+    expect(activeTab.value?.session.selection).toEqual([
+      ["children", 0],
+      ["children", 0, "children", 0],
+    ]);
+  });
+
+  test("refuses a path that addresses nothing, naming it and the document", () => {
+    expect(() =>
+      registry.run("selection.setPaths", {
+        paths: [
+          ["children", 0],
+          ["children", 9],
+        ],
+      }),
+    ).toThrow(
+      'command "selection.setPaths" argument "paths": [children, 9] addresses no node in ' +
+        "pages/index.json",
+    );
+  });
+
+  test("refuses a bare path passed where a LIST of paths belongs", () => {
+    expect(() => registry.run("selection.setPaths", { paths: ["children", 0] })).toThrow(
+      "entry 0 is not a document path",
+    );
+  });
+
+  test("refuses anything that is not an array at all", () => {
+    expect(() => registry.run("selection.setPaths", { paths: "children/0" })).toThrow(
+      "expected an array of document paths",
+    );
+  });
+
+  test("refuses when no tab is open", () => {
+    closeAllTabs();
+    ctx = makeContext({ document: { open: true } });
+    expect(() => registry.run("selection.setPaths", { paths: [] })).toThrow(
+      "needs an open document",
+    );
+  });
+
+  test("is hidden with no document", () => {
+    ctx = makeContext();
+    expect(registry.isVisible("selection.setPaths")).toBe(false);
+  });
+});
+
 describe("the harness tab shape is what these verbs expect", () => {
   test("resetWorkspaceWithTab yields a selectable root", () => {
     resetWorkspaceWithTab();
     void registry.run("selection.set", { path: [] });
-    expect(activeTab.value?.session.selection).toEqual([]);
+    expect(activeTab.value?.session.selection).toEqual([[]]);
   });
 });

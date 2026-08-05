@@ -22,10 +22,11 @@ import { getNodeAtPath } from "../../state";
 import { fetchAvailableModels } from "../../services/ai-models";
 import { getModel, setModel } from "../../services/ai-settings";
 import { activeTab } from "../../workspace/workspace";
+import { primarySelection } from "../../tabs/selection";
 import { buildMessageWithContext } from "./attached-context";
 import type { ContextChip } from "./attached-context";
 import type { AiModel } from "../../services/ai-models";
-import type { JxMutableNode, JxPath } from "@jxsuite/schema/types";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 /** Tallest the textarea auto-grows before it scrolls internally. */
 const MAX_INPUT_HEIGHT = 120;
@@ -137,7 +138,7 @@ export function createComposer(opts: ComposerOptions): Composer {
   function contextCandidates() {
     const tab = activeTab.value;
     const documentPath = tab?.documentPath || null;
-    const selection = (tab?.session.selection as JxPath | null) || null;
+    const selection = primarySelection(tab?.session.selection);
     let selectionChip: ContextChip | null = null;
     if (tab && selection) {
       const node = getNodeAtPath(tab.doc.document as JxMutableNode, selection) as

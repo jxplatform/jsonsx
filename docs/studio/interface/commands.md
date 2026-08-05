@@ -35,20 +35,28 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 ## Selection
 
-| Command                   | Id                             | Shortcut                | Level     | Requires                                                       |
-| ------------------------- | ------------------------------ | ----------------------- | --------- | -------------------------------------------------------------- |
-| Convert to Component      | `selection.convertToComponent` | —                       | selection | an element that is not the document root                       |
-| Delete (destructive)      | `selection.delete`             | `Delete` or `Backspace` | selection | an element selection that is not the document root             |
-| Duplicate                 | `selection.duplicate`          | `⌘D`                    | selection | an element that has a sibling position                         |
-| Edit Component            | `selection.editComponent`      | —                       | selection | a component instance                                           |
-| Find Usages               | `selection.findUsages`         | —                       | selection | a component instance, on a backend that can search the project |
-| Go to Symbol in Document… | `palette.openNodes`            | —                       | document  | an open document                                               |
-| Move Down                 | `selection.moveDown`           | —                       | selection | an element with a sibling below it                             |
-| Move Into Previous        | `selection.moveIn`             | —                       | selection | a container directly above the element                         |
-| Move Out of Parent        | `selection.moveOut`            | —                       | selection | an element nested inside another                               |
-| Move Up                   | `selection.moveUp`             | —                       | selection | an element with a sibling above it                             |
-| Select Element            | `selection.set`                | —                       | document  | an open document                                               |
-| Select Parent             | `selection.selectParent`       | `Esc` or `←`            | selection | an element selection                                           |
+| Command                   | Id                             | Shortcut                | Level     | Requires                                                          |
+| ------------------------- | ------------------------------ | ----------------------- | --------- | ----------------------------------------------------------------- |
+| Convert to Component      | `selection.convertToComponent` | —                       | selection | an element that is not the document root                          |
+| Delete (destructive)      | `selection.delete`             | `Delete` or `Backspace` | selection | an element selection that is not the document root                |
+| Duplicate                 | `selection.duplicate`          | `⌘D`                    | selection | an element that has a sibling position                            |
+| Edit Component            | `selection.editComponent`      | —                       | selection | a component instance                                              |
+| Find Usages               | `selection.findUsages`         | —                       | selection | a component instance, on a backend that can search the project    |
+| Go to Symbol in Document… | `palette.openNodes`            | —                       | document  | an open document                                                  |
+| Move Down                 | `selection.moveDown`           | —                       | selection | an element with a sibling below it                                |
+| Move Into Previous        | `selection.moveIn`             | —                       | selection | a container directly above the element                            |
+| Move Out of Parent        | `selection.moveOut`            | —                       | selection | an element nested inside another                                  |
+| Move Up                   | `selection.moveUp`             | —                       | selection | an element with a sibling above it                                |
+| Repeat...                 | `selection.repeat`             | —                       | selection | an element with a sibling position that is not already a repeater |
+| Select Element            | `selection.set`                | —                       | document  | an open document                                                  |
+| Select Elements           | `selection.setPaths`           | —                       | document  | an open document                                                  |
+| Select Parent             | `selection.selectParent`       | `Esc` or `←`            | selection | an element selection                                              |
+
+## Insert
+
+| Command     | Id            | Shortcut | Level     | Requires                        |
+| ----------- | ------------- | -------- | --------- | ------------------------------- |
+| Insert Data | `insert.data` | —        | selection | a live text caret in the canvas |
 
 ## View
 
@@ -143,6 +151,12 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Collaborate: Share this document                 | `collab.setEnabled` | —        | document | an open document               |
 | Collaborate: Stop sharing                        | `collab.stop`       | —        | document | a live collaboration session   |
 | Collaborate: What is happening in this document? | `collab.showStatus` | —        | document | an open document               |
+
+## Help
+
+| Command         | Id           | Shortcut | Level       | Requires |
+| --------------- | ------------ | -------- | ----------- | -------- |
+| About Jx Studio | `help.about` | —        | application | —        |
 
 ## Related
 

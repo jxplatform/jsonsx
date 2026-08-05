@@ -129,7 +129,7 @@ describe("renderElementsTemplate — element insertion", () => {
       children: [{ children: [{ tagName: "p", textContent: "x" }], tagName: "section" }],
       tagName: "div",
     });
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     await renderElements();
     (host.querySelector('[data-block-tag="img"]') as HTMLElement).click();
     const section = (activeTab.value!.doc.document.children as JxMutableNode[])[0]!;

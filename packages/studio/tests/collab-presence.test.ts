@@ -41,7 +41,7 @@ describe("presence chips", () => {
         clientId: 1,
         state: {
           focusedPath: PATH,
-          structuralSelection: ["children", 0],
+          structuralSelection: [["children", 0]],
           user: { color: "#e5484d", login: "octocat", name: "Octo Cat" },
         },
       },
@@ -109,17 +109,17 @@ describe("selection publishing", () => {
     expect(collabState(tab).active).toBe(true);
 
     const peer = (await hub.capability(PATH))!;
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     await settleCollab();
 
     const states = [...peer.awareness.getStates().values()] as {
-      structuralSelection?: (string | number)[] | null;
+      structuralSelection?: (string | number)[][] | null;
       focusedPath?: string | null;
     }[];
     const published = states.find((s) => s.focusedPath === PATH);
-    expect(published?.structuralSelection).toEqual(["children", 0]);
+    expect(published?.structuralSelection).toEqual([["children", 0]]);
 
-    tab.session.selection = null;
+    tab.session.selection = [];
     await settleCollab();
     const cleared = [...peer.awareness.getStates().values()] as {
       structuralSelection?: unknown;

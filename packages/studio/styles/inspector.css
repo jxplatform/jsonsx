@@ -153,6 +153,182 @@ textarea.field-input {
   text-decoration: underline;
 }
 
+/* ─── The Target Line (plan §6.1) ─────────────────────────────────────────────
+   One sentence at the top of the Style tab, stating the compound coordinate an
+   edit lands in: element · breakpoint · scheme variant · selector, then the
+   scope chip. Every segment is a control, so every segment is a button with the
+   chrome taken off — the row must read as a sentence, not as a toolbar, which is
+   exactly what the three widgets it replaces failed to do. */
+.target-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1.4;
+}
+.tl-glyph {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.tl-segments {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.tl-sep {
+  color: var(--fg-dim);
+  opacity: 0.6;
+}
+.tl-seg {
+  padding: 1px 3px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+button.tl-seg:hover {
+  background: var(--hover-bg);
+  color: var(--accent);
+}
+button.tl-seg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.tl-seg--element {
+  color: var(--tag);
+}
+.tl-seg--media,
+.tl-seg--scheme {
+  color: var(--fg-dim);
+}
+.tl-seg--selector {
+  color: var(--signal);
+}
+.tl-selector-popover {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.tl-selector-menu {
+  min-width: 160px;
+}
+/* The scope chip. Element scope is ambient and reads as ambient; the two tag-wide
+   scopes are the ones a reader has to notice before typing, so they carry weight. */
+.tl-scope {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.tl-scope--document {
+  border-color: var(--accent-50);
+  color: var(--accent);
+}
+.tl-scope--project {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.tl-warning {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  border-left: 2px solid var(--warning);
+  background: var(--bg-panel);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.tl-warning-text {
+  margin: 0;
+  color: var(--warning);
+}
+.tl-warning-action {
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.tl-affected {
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 140px;
+  overflow-y: auto;
+  list-style: none;
+}
+.tl-affected-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+  color: var(--fg-dim);
+}
+.tl-affected-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+.tl-affected-count {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+.tl-affected-empty {
+  margin: 4px 0 0;
+  color: var(--fg-dim);
+}
+
+/* ─── Provenance dots on a section heading (plan §6.2) ────────────────────────
+   The chip itself is styled with the rest of the row vocabulary further down —
+   one block, because Style and Component Props are the same chip in two
+   cascades. What is only needed here is the DOT form: a collapsed accordion
+   heading has room for a tally, not for three labelled chips, so the two states
+   that normally carry text collapse to coloured dots beside the accent one.
+   That tally is what retired the Style tab's "Active" filter toggle. */
+.set-dot.provenance-chip--inherited {
+  background: var(--warning);
+  border: none;
+  cursor: default;
+}
+.set-dot.provenance-chip--bound {
+  background: var(--handler);
+  border: none;
+  cursor: default;
+}
+/* `mixed` (§6.5) — the multi-selection's own state. Neutral on purpose: unlike the other three it
+   says nothing about WHERE the value came from, only that the selected elements disagree, so it
+   must not borrow the accent that means "set here" or the amber that means "inherited". */
+.set-dot.provenance-chip--mixed {
+  background: var(--text-secondary);
+  border: none;
+  cursor: default;
+}
+.provenance-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+/* Heading dots are the 7x7 size `.set-dot--section` established, so a section heading reads at the
+   same weight it always did — it just now has up to three of them and a tally on hover. */
+.provenance-dots .set-dot {
+  width: 7px;
+  height: 7px;
+}
+.style-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* ─── Style sidebar (Spectrum accordion) ──────── */
 .style-sidebar sp-accordion {
   border: none;
@@ -195,10 +371,6 @@ textarea.field-input {
 }
 .set-dot:hover {
   background: var(--danger);
-}
-.set-dot--section {
-  width: 7px;
-  height: 7px;
 }
 .style-row--warning .style-row-label {
   color: var(--warning);
@@ -702,4 +874,158 @@ jx-styled-combobox sp-picker {
   flex-shrink: 0;
   color: var(--fg-dim);
   font-variant-numeric: tabular-nums;
+}
+
+/* ─── P5 · Provenance chips (UX-REDESIGN-PLAN §6.2) ─────────────────────────
+   Four states, one vocabulary, reused in every cascade: `set` keeps the accent
+   dot it has always been (see .set-dot above); `inherited` is amber and names
+   its donor; `bound` is violet and names the signal or formula; `default`
+   renders nothing at all, because a ghost dot on every unset row is 138 dots
+   on the Style tab. Rendered by panels/provenance.ts:renderProvenanceChip, which
+   ui/field-row.ts calls for every row that states its provenance. */
+.provenance-chip {
+  flex-shrink: 0;
+}
+button.provenance-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 14ch;
+  overflow: hidden;
+  padding: 0 5px;
+  border: 1px solid currentcolor;
+  border-radius: var(--radius);
+  background: transparent;
+  font: inherit;
+  font-size: 9px;
+  line-height: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+button.provenance-chip:not(:disabled) {
+  cursor: pointer;
+}
+.provenance-chip--inherited {
+  color: var(--warning);
+}
+.provenance-chip--bound {
+  color: var(--handler);
+}
+.provenance-chip--mixed {
+  color: var(--text-secondary);
+}
+button.provenance-chip:hover,
+button.provenance-chip:focus-visible {
+  background: var(--hover-bg);
+}
+/* The collapsed-header dot is an INDICATOR, not a control: it inherited
+   .set-dot's pointer cursor and danger hover and had no handler behind either.
+   §6.2 keeps the dot (a closed section must still say whether anything in it is
+   set) and drops the affordance. */
+.set-dot--section {
+  width: 7px;
+  height: 7px;
+  cursor: default;
+}
+.set-dot--section:hover {
+  background: var(--accent);
+}
+
+/* ─── The read-only name/value line ─────────────────────────────────────────
+   Observed Attributes, CSS Properties and CSS Parts were three copies of the
+   same inline-styled flex row. One row, one rule, and it responds to the theme
+   now that it has a class at all. */
+.kv-static-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.kv-static-name {
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+.kv-static-detail {
+  color: var(--fg-dim);
+}
+.kv-static-value {
+  margin-left: auto;
+  color: var(--fg-dim);
+}
+.kv-static-tag {
+  padding: 1px 4px;
+  border-radius: var(--radius);
+  background: var(--hover-bg);
+  font-size: 9px;
+}
+.kv-static-value + .kv-static-tag,
+.kv-static-detail + .kv-static-tag {
+  margin-left: auto;
+}
+.kv-static-value ~ .kv-static-tag {
+  margin-left: 0;
+}
+
+/* ─── Logic tab structure ───────────────────────────────────────────────────
+   The Repeater and Switch sections used to carry their layout in inline style=
+   attributes, which is how they also ended up as the last rows in the inspector
+   without a set-dot or a clear affordance. */
+.logic-edit-template {
+  margin-top: 8px;
+  width: 100%;
+}
+.logic-subhead {
+  margin: 8px 0 4px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 600;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.logic-case-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.logic-case-name {
+  flex: 1;
+  min-width: 0;
+}
+.logic-case-open {
+  flex-shrink: 0;
+}
+
+/* ─── The Layout-element card ───────────────────────────────────────────────
+   What the inspector says when you click page chrome — §8.2's first click. */
+.layout-origin {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.layout-origin-badge {
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  background: var(--map);
+  color: var(--accent-fg);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.layout-origin-tag {
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.layout-origin-class {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  word-break: break-all;
+}
+.layout-origin-note {
+  margin: 0;
+  padding: 4px 0;
+  font-size: 10px;
+  font-style: italic;
+  color: var(--fg-dim);
 }

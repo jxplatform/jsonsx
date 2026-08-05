@@ -77,8 +77,10 @@ A function stored in a separate file shows **Source** and **Export** fields inst
 
 When the open file is a component, its plain state entries double as the component's options — the values a page can set when it uses the component. Component files add a few fields:
 
-- On plain values: **Attribute** (the HTML attribute that sets this value), **Reflects**, and **Deprecated**.
+- On plain values: **Attribute** (the HTML attribute that sets this value), **Reflects**, and **Deprecated**. Every entry that names an attribute is listed back on the Logic tab's **Observed Attributes** section when the component's root is selected — that section is the read-out, this panel is where you declare it.
 - On functions: an **Emits** list declaring the events the component can send, each with a name, type, and description. Declared events show up in the Inspector's **[Logic tab](/docs/studio/logic/events)** wherever the component is used.
+
+An entry's **Default** is what an instance falls back to, and it is what the instance's provenance chip names: a setting left alone on the instance reads _from the component default_, and clicking that chip opens the component file this panel belongs to. See **[Working with components](/docs/studio/design/components)**.
 
 Name an entry with a leading `#` (like `#cache`) to keep it private: private entries never become component options and are left out of the component's published description.
 

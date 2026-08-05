@@ -103,6 +103,8 @@ describe("startInteraction", () => {
     inner.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(posts).toEqual([
       {
+        // Unmodified: the accumulate gesture is off, so this is the plain replace it always was.
+        additive: false,
         hit: { path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } },
         kind: "hit",
       },

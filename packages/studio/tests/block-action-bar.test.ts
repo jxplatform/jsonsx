@@ -13,6 +13,7 @@ import { getConvertTargets } from "../src/editor/convert-targets";
 import { dismissSlashMenu, isSlashMenuOpen } from "../src/editor/slash-menu";
 import { componentRegistry } from "../src/files/components";
 import { initLayers } from "../src/ui/layers";
+import { setTransactGate } from "../src/tabs/transact";
 import { view } from "../src/view";
 import { activeTab } from "../src/workspace/workspace";
 
@@ -111,7 +112,7 @@ function setAnchor(
 
 function setup(docNode: JxMutableNode, selection: JxPath | null) {
   const tab = resetWorkspaceWithTab(docNode);
-  tab.session.selection = selection as never;
+  tab.session.selection = selection ? [selection] : [];
   setAnchor();
   return tab;
 }
@@ -207,11 +208,11 @@ describe("block action bar", () => {
     expect(bar()).toBeNull();
 
     canvasMode = "design";
-    activeTab.value!.session.selection = null as never;
+    activeTab.value!.session.selection = [];
     renderBlockActionBar();
     expect(bar()).toBeNull();
 
-    activeTab.value!.session.selection = ["children", 0] as never;
+    activeTab.value!.session.selection = [["children", 0]] as never;
     host.anchor = null; // No anchor rect from the bridge → nothing to position from.
     renderBlockActionBar();
     expect(bar()).toBeNull();
@@ -352,7 +353,61 @@ describe("block action bar", () => {
     renderBlockActionBar();
     cmdButton("selection.delete").click();
     expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A"]);
-    expect(activeTab.value!.session.selection).toEqual([]);
+    expect(activeTab.value!.session.selection).toEqual([[]]);
+  });
+
+  test("Delete over a row that names no splice coordinate moves nothing at all", () => {
+    // A repeater's map template is a first-class Outline row and therefore a selectable target,
+    // But `structuralBatch` filters it out: there is no `children/<n>` to splice. The bar used to
+    // Run the transaction anyway and THEN move the selection to `parentElementPath(path)` —
+    // `["children"]`, which addresses no node — so the author watched their selection jump to a
+    // Dangling path while the document, and the delete they asked for, stood still.
+    const tab = setup(
+      {
+        children: [{ $prototype: "Array", map: { tagName: "li", textContent: "A" } }],
+        tagName: "ul",
+      },
+      ["children", 0, "map"],
+    );
+    tab.doc.dirty = false;
+    const historyBefore = tab.history.index;
+    renderBlockActionBar();
+    cmdButton("selection.delete").click();
+
+    expect(activeTab.value!.session.selection).toEqual([["children", 0, "map"]]);
+    expect((doc().children as JxMutableNode[])[0]!.map).toEqual({
+      tagName: "li",
+      textContent: "A",
+    });
+    // No transaction ran, so there is no empty undo step and no unsaved-changes mark to explain.
+    expect(tab.history.index).toBe(historyBefore);
+    expect(tab.doc.dirty).toBe(false);
+  });
+
+  test("Delete leaves the selection where it was when the transaction is declined", () => {
+    // `transactDoc` refuses while a peer holds source-canonical. The document is untouched, so the
+    // Selection must be too — the move is conditional on the transaction having changed something,
+    // Not on it having been attempted.
+    const tab = setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+        ],
+        tagName: "div",
+      },
+      ["children", 1],
+    );
+    renderBlockActionBar();
+    setTransactGate(() => "source-canonical");
+    try {
+      cmdButton("selection.delete").click();
+    } finally {
+      setTransactGate(null);
+    }
+
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "B"]);
+    expect(tab.session.selection).toEqual([["children", 1]]);
   });
 
   test("Duplicate inserts a copy after the selection", () => {
@@ -360,6 +415,56 @@ describe("block action bar", () => {
     renderBlockActionBar();
     cmdButton("selection.duplicate").click();
     expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "A"]);
+  });
+
+  test("Delete on a multi-selection removes every one, in ONE undo step (§6.5)", () => {
+    const tab = setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+          { tagName: "p", textContent: "C" },
+        ],
+        tagName: "div",
+      },
+      ["children", 0],
+    );
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 2],
+    ];
+    const before = tab.history.index;
+    renderBlockActionBar();
+    cmdButton("selection.delete").click();
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["B"]);
+    expect(tab.history.index).toBe(before + 1);
+  });
+
+  test("Duplicate on a multi-selection copies every one, in ONE undo step", () => {
+    const tab = setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+        ],
+        tagName: "div",
+      },
+      ["children", 0],
+    );
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
+    const before = tab.history.index;
+    renderBlockActionBar();
+    cmdButton("selection.duplicate").click();
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual([
+      "A",
+      "A",
+      "B",
+      "B",
+    ]);
+    expect(tab.history.index).toBe(before + 1);
   });
 
   test("badge prefers the node $id over the tag name", () => {
@@ -399,7 +504,7 @@ describe("block action bar", () => {
     ]);
     renderBlockActionBar();
     bar()!.querySelector("sp-icon-back")!.parentElement!.click();
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
   });
 
   test("Move down and Move up reorder siblings and track the selection", () => {
@@ -418,13 +523,13 @@ describe("block action bar", () => {
     cmdButton("selection.moveDown").click();
     let children = doc().children as JxMutableNode[];
     expect(children.map((c) => c.textContent)).toEqual(["B", "A"]);
-    expect(activeTab.value!.session.selection).toEqual(["children", 1]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 1]]);
 
     renderBlockActionBar(); // Selection now at idx 1
     cmdButton("selection.moveUp").click();
     children = doc().children as JxMutableNode[];
     expect(children.map((c) => c.textContent)).toEqual(["A", "B"]);
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
   });
 
   test("Move up at the first index and Move down at the last index are no-ops", () => {
@@ -442,7 +547,7 @@ describe("block action bar", () => {
     cmdButton("selection.moveUp").click(); // Disabled guard
     expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "B"]);
 
-    activeTab.value!.session.selection = ["children", 1] as never;
+    activeTab.value!.session.selection = [["children", 1]] as never;
     renderBlockActionBar();
     expect(cmdButton("selection.moveDown").hasAttribute("disabled")).toBe(true);
     cmdButton("selection.moveDown").click();

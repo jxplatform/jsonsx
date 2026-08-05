@@ -163,7 +163,7 @@ describe("left panel — document tabs", () => {
   });
 
   test("layers tab scrolls the selected row into view", async () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     const scrolled: Element[] = [];
     const orig = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
@@ -329,7 +329,7 @@ describe("left panel — lifecycle and recovery", () => {
   test("reactive effect re-renders on selection change", async () => {
     await mountWith();
     expect(leftPanel.querySelector(".layer-row.selected")).toBeNull();
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     await flush(3);
     expect(leftPanel.querySelector(".layer-row.selected")).not.toBeNull();
   });

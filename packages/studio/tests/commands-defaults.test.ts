@@ -140,6 +140,52 @@ describe("the records that settle an existing argument", () => {
     expect(registry.disabledReason("selection.duplicate")).toContain("sibling position");
   });
 
+  /*
+   * `selection.repeat` used to live in `editor/context-menu.ts`'s OWN registry, which is why the
+   * two `repeat-dialog` shots were quarantined: the app registry never held it, so the palette
+   * could not list it and `__jxAutomation.run("selection.repeat")` answered "unknown command".
+   * Beside Duplicate and Delete it is one record with three renderings.
+   */
+  test("repeat is a context-menu row AND a palette entry AND an assistant tool", () => {
+    const repeat = defaultCommandSet().find((c) => c.id === "selection.repeat");
+    expect(repeat?.menus).toEqual(["context/element", "palette"]);
+    expect(repeat?.aiTool?.name).toBe("repeat_node");
+    expect(repeat?.undo).toBe("document");
+    expect(repeat?.group).toBe("3_structure");
+  });
+
+  test("repeat refuses the document root and refuses a repeater", () => {
+    const gate = (selection: { isRoot?: boolean; isRepeater?: boolean }) => {
+      const registry = createCommandRegistry({
+        getContext: () => makeContext({ selection: { count: 1, ...selection } }),
+        mac: true,
+      });
+      registry.registerAll(defaultCommandSet());
+      return registry;
+    };
+    expect(gate({}).isEnabled("selection.repeat")).toBe(true);
+    expect(gate({ isRoot: true }).isEnabled("selection.repeat")).toBe(false);
+    // The one the old private record needed a node for: a repeater's content is its single `map`
+    // Template, so repeating it again means nothing. The context now carries the fact.
+    const onArray = gate({ isRepeater: true });
+    expect(onArray.isVisible("selection.repeat")).toBe(true);
+    expect(onArray.isEnabled("selection.repeat")).toBe(false);
+    expect(onArray.disabledReason("selection.repeat")).toBe(
+      "an element with a sibling position that is not already a repeater",
+    );
+  });
+
+  test("repeat runs the converter it does not import at module scope", async () => {
+    const registry = createCommandRegistry({
+      getContext: () => makeContext({ selection: { count: 1 } }),
+      mac: true,
+    });
+    registry.registerAll(defaultCommandSet());
+    // No tab is open, so `convertToRepeater` returns on its own first guard — what is asserted is
+    // That the lazy import RESOLVES, which is the half a bare-Bun record could get wrong.
+    await registry.run("selection.repeat");
+  });
+
   test("delete is destructive, undoable, and refuses the document root", () => {
     const registry = createCommandRegistry({
       getContext: () => makeContext({ selection: { count: 1, isRoot: true } }),
@@ -152,6 +198,37 @@ describe("the records that settle an existing argument", () => {
     expect(registry.isVisible("selection.delete")).toBe(true);
     expect(registry.isEnabled("selection.delete")).toBe(false);
     expect(registry.disabledReason("selection.delete")).toContain("not the document root");
+  });
+
+  test("delete and duplicate refuse a selection holding a row no splice can perform", () => {
+    // The Outline draws a repeater's map template as its own row, so a ctrl-click puts
+    // `["children", 1, "map"]` in the selection beside an ordinary element. `parentElementPath` of
+    // It is the children ARRAY, and the splice used to throw mid-batch — after earlier removals had
+    // Already landed, and before anything was recorded. The records refuse the whole selection:
+    // Doing four fifths of what the user asked for is worse than saying why it cannot.
+    const gate = (paths: (string | number)[][]) => {
+      const registry = createCommandRegistry({
+        getContext: () => makeContext({ selection: { count: paths.length, paths } }),
+        mac: true,
+      });
+      registry.registerAll(defaultCommandSet());
+      return registry;
+    };
+    const mixed = gate([
+      ["children", 0],
+      ["children", 1, "map"],
+    ]);
+    expect(mixed.isEnabled("selection.delete")).toBe(false);
+    expect(mixed.isEnabled("selection.duplicate")).toBe(false);
+    // A `$switch` case is the same shape of row, and the document element is refused by `isRoot`.
+    expect(gate([["children", 1, "cases", "warn"]]).isEnabled("selection.delete")).toBe(false);
+    // Every path a splice coordinate — the multi-select case the batch mutators exist for.
+    const spliceable = gate([
+      ["children", 0],
+      ["children", 2, "children", 1],
+    ]);
+    expect(spliceable.isEnabled("selection.delete")).toBe(true);
+    expect(spliceable.isEnabled("selection.duplicate")).toBe(true);
   });
 
   test("the Command Bar's primary cluster is Save, Undo, Redo and Open in Browser", () => {

@@ -43,8 +43,8 @@ The canvas now shows your component once per breakpoint — empty for the moment
 ## 4. Add a button and a text line
 
 1. Press :kbd[⌘K] and run **Show Insert** to open the palette.
-2. With nothing selected, click the **button** card. The button is added to the empty component.
-3. Press :kbd[Esc] to clear the selection — otherwise the next element would land _inside_ the button — then click the **p** card to add a paragraph.
+2. With nothing selected, click the `<button>` card. The button is added to the empty component.
+3. Click the `<p>` card to add a paragraph. A card inserts into whatever is selected, as its last child; with nothing selected that's the component's root, so the paragraph lands after the button rather than inside it.
 4. Select the button, open the Inspector's **Content** tab, and type `Add one` into **Text Content**.
 
 ![The design canvas with a button labeled Add one and an empty paragraph below it](../images/counter-elements.png)
@@ -58,7 +58,7 @@ The component needs somewhere to keep its number. That's a state entry:
 1. Press :kbd[⌘K] and run **Show State**.
 2. Click the **+ Add…** picker at the bottom of the panel and choose **Value**. The new entry appears with a placeholder name and its editor open.
 3. Rename it first: type `count` into the **Name** field and press :kbd[Enter].
-4. Set **Type** to `integer` and leave **Default** at `0`.
+4. Set **Type** to `integer`, then type `0` into **Default**. A new entry starts with an empty default, and an empty string is not something you can add one to.
 
 ![Jx Studio State panel listing a component's state and functions](../images/state-panel.png)
 
@@ -69,24 +69,24 @@ The panel now shows a **State** section with one row: an **S** badge and the nam
 Now point the paragraph at the value instead of typing fixed text:
 
 1. Select the paragraph on the canvas.
-2. In the Inspector's **Content** tab, find the **Text Content** row. Beside its label sits a small mode button reading **abc** — the sign that the value is static.
-3. Click the button until it reads **${}** — the template mode. Each click steps to the next mode; the tooltip names the one a click will switch to.
-4. Studio pre-fills the field with your first state entry: `${state.count}`. Keep it, or mix in words: `Clicked ${state.count} times`.
+2. In the Inspector's **Content** tab, find the **Text Content** row in the **Element** section. Beside its label sits a small chip reading **Fixed value** — that's the row's _value source_, and it says the text is a literal you typed.
+3. Click the chip. A short list opens naming every source this field accepts — **Fixed value**, **From data…**, **Mixed text** — each with a line saying what it does. Pick **Mixed text**. Any source is one click away; the chip never cycles you through the ones you didn't want.
+4. Studio fills the field with your first state entry: `${state.count}`. Keep it, or mix in words: `Clicked ${state.count} times`.
 
-![The Text Content row in template mode holding ${state.count}, with the mode button accent-colored](../images/counter-text-binding.png)
+![The Text Content row set to Mixed text, holding ${state.count}, with its value-source chip accent-colored](../images/counter-text-binding.png)
 
-The mode button takes on the accent color: this value is now dynamic, and the paragraph will always show the current count. The full ladder of dynamic values — **abc**, **$ref**, **${}**, **fx** — is explained in **[Formulas and expressions](/docs/studio/logic/formulas)**.
+The chip takes on the accent color: this value is produced from something else now, and the paragraph will always show the current count. The same four words name a value's source everywhere in Studio — **Fixed value**, **From data…**, **Mixed text**, **Formula** — and each field offers only the ones it can legally hold, which is why Text Content shows three of them. The dynamic ones are explained in **[Formulas and expressions](/docs/studio/logic/formulas)**.
 
 ## 7. Make the button count
 
-1. Select the button and click **Logic** in the Inspector.
-2. Click **Add Event**. A binding appears on `onclick` — and since the file has no functions yet, it starts as an inline handler.
-3. Switch the binding's mode to **Expression**, the mode for one-step reactions.
-4. In the formula editor, set the **Operator** to `+=`, point the **Target** at `count` (a **$ref**), and type `1` as the **Value**.
+1. Select the button and open the Inspector's **Logic** tab — click it, or press :kbd[⌘⇧3]. Logic is where an element's behavior lives: its events, and the condition or repeating-list settings when it has them.
+2. In the **Events** section, click **Add Event**. A binding appears on `onclick` — and since the file has no functions yet, it starts as an inline handler.
+3. The picker beside the event name chooses how the binding responds. Set it to **Expression**, the mode for one-step reactions. (**Inline code** and **Existing function** are the other two.)
+4. In the formula editor, set the **Operator** to `+=`. The **Target** row becomes a signal picker — choose `count`. In the **Value** row, leave the source on **Fixed value**, change its type from `null` to `num`, and enter `1`.
 
 ![The Logic tab with an onclick binding in expression mode incrementing count](../images/counter-onclick.png)
 
-The formula reads `$count += 1` in the chip strip, and green badges beside the operands show live values evaluated against the running page. The three ways an event can respond — a named function, an expression, an inline handler — are covered in **[Events](/docs/studio/logic/events)**.
+A chip strip above the editor summarizes the formula — a `count` chip followed by a `+=` chip — and each chip carries a small badge with the value it evaluates to against the running page. The three ways an event can respond — **Existing function**, **Expression**, **Inline code** — are covered in **[Events](/docs/studio/logic/events)**.
 
 ## 8. Try it in Preview
 
@@ -128,7 +128,7 @@ A working, reusable component — and every piece of the interactive toolkit in 
 
 - A **state entry** (`count`) — the component's memory, and automatically its prop.
 - A **template binding** (`${state.count}`) — text that follows the value wherever it goes.
-- An **event expression** (`$count += 1`) — behavior without a line of code.
+- An **event expression** (`count += 1`, assembled from an operator and two operands) — behavior without a line of code.
 - **Preview**, the **Data explorer**, and **test values** — three ways to watch it run.
 
 :::doc-note

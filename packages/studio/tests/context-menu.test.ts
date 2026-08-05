@@ -142,7 +142,7 @@ function makeDoc(): JxMutableNode {
 }
 
 function select(path: JxPath | null) {
-  activeTab.value!.session.selection = path as never;
+  activeTab.value!.session.selection = path ? [path] : [];
 }
 
 function doc(): JxMutableNode {
@@ -434,6 +434,44 @@ describe("style clipboard", () => {
     expect((doc().children as JxMutableNode[])[1]!.style).toEqual({ fontWeight: "bold" });
   });
 
+  test("pasteStyles reaches EVERY selected element, in ONE undo step (§6.5)", () => {
+    const tab = activeTab.value!;
+    const before = tab.history.index;
+    workspace.styleClipboard = { fontWeight: "bold" };
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
+    pasteStyles();
+    const children = doc().children as JxMutableNode[];
+    expect(children[0]!.style).toEqual({ fontWeight: "bold" });
+    expect(children[1]!.style).toEqual({ fontWeight: "bold" });
+    expect(tab.history.index).toBe(before + 1);
+  });
+
+  test("each element gets its OWN copy of the pasted style, not a shared reference", () => {
+    workspace.styleClipboard = { fontWeight: "bold" };
+    activeTab.value!.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
+    pasteStyles();
+    const children = doc().children as JxMutableNode[];
+    expect(children[0]!.style).not.toBe(children[1]!.style as never);
+  });
+
+  test("cutNode removes every selected node but keeps the PRIMARY on the clipboard", async () => {
+    const tab = activeTab.value!;
+    const before = tab.history.index;
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
+    await cutNode();
+    expect((doc().children as JxMutableNode[]).length).toBe(0);
+    expect(tab.history.index).toBe(before + 1);
+  });
+
   test("pasteStyles is a no-op without a style clipboard or selection", () => {
     select(["children", 1]);
     pasteStyles();
@@ -500,12 +538,11 @@ describe("element command records", () => {
     expect(onChild.find((c) => c.id === "edit.cut")!.enablement!(ctx)).toBe(true);
   });
 
-  test("Repeat refuses a repeater and Paste inside refuses its child list", () => {
+  test("Paste inside and Paste after refuse a repeater's absent child list", () => {
     const ctx = emptyContext();
     const onArray = elementCommands(
       stubDeps(stubTarget(["children", 0], { $prototype: "Array" } as JxMutableNode)),
     );
-    expect(onArray.find((c) => c.id === "selection.repeat")!.enablement!(ctx)).toBe(false);
     expect(onArray.find((c) => c.id === "edit.pasteInside")!.enablement!(ctx)).toBe(false);
     expect(onArray.find((c) => c.id === "edit.pasteAfter")!.enablement!(ctx)).toBe(false);
   });
@@ -538,7 +575,7 @@ describe("showContextMenu", () => {
     workspace.styleClipboard = { color: "blue" };
     const e = rightClick(["children", 0]);
     expect(e.defaultPrevented).toBe(true);
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
     // Group order, then title order — the registry's sort, not a hand-kept array.
     expect(menuIds()).toEqual([
       "edit.copy",
@@ -633,6 +670,55 @@ describe("showContextMenu", () => {
     expect(isDisabled("selection.delete")).toBe(true);
     expect(isDisabled("edit.cut")).toBe(true);
     expect(isDisabled("edit.copy")).toBe(false);
+  });
+
+  test("Duplicate and Delete run on the menu's target, gated only by their records", () => {
+    // Both records live in `commands/defaults.ts` and declare `enablement: structurallyEditable`,
+    // Which reads `selection.isRoot` — and this file derives that from the SHARED
+    // `isSpliceablePath`. The implementations here therefore carry no second copy of the test:
+    // `activateRow` never reaches a disabled row, and `registry.run` throws before it would.
+    resetWorkspaceWithTab({
+      children: [
+        { tagName: "p", textContent: "A" },
+        { tagName: "p", textContent: "B" },
+      ],
+      tagName: "div",
+    });
+
+    rightClick(["children", 0]);
+    itemById("selection.duplicate").click();
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "A", "B"]);
+
+    rightClick(["children", 1]);
+    itemById("selection.delete").click();
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "B"]);
+  });
+
+  test("the record's own gate refuses Duplicate on an unspliceable target", () => {
+    resetWorkspaceWithTab({
+      children: [
+        {
+          $prototype: "Array",
+          items: { $ref: "#/state/rows" },
+          map: { tagName: "li", textContent: "i" },
+        } as never,
+      ],
+      state: { rows: { default: [], type: "array" } },
+      tagName: "div",
+    });
+    rightClick(["children", 0, "map"]);
+    expect(isDisabled("selection.duplicate")).toBe(true);
+    // Clicking the greyed row does nothing, and reaching past the row to the registry is a throw —
+    // Not a hand-written warning toast beside a mutator that would have spliced at NaN.
+    itemById("selection.duplicate").click();
+    expect(() => contextMenuRegistry().run("selection.duplicate")).toThrow(
+      "an element that has a sibling position",
+    );
+    expect((doc().children as JxMutableNode[])[0]!.map).toEqual({
+      tagName: "li",
+      textContent: "i",
+    });
+    expect((doc().children as JxMutableNode[]).length).toBe(1);
   });
 
   test("does nothing without a tab or for a missing node", () => {

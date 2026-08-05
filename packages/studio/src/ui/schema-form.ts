@@ -5,9 +5,17 @@
  * Maps schema property types to Spectrum controls (enum → picker, boolean → checkbox,
  * number/integer → number-field, `json-schema` format → multiline JSON editor, array-of-objects →
  * multi-row inline form, other array/object → JSON text field, default → textfield). Hosts commit
- * edits through a single `onChange(patch)` callback; dynamic enum choices and `$ref` bindings
- * resolve through a {@link SchemaFormContext}. Custom controls register by name via
- * {@link registerFormControl} and are consulted first for `ui` overrides.
+ * edits through a single `onChange(patch)` callback; dynamic enum choices resolve through a
+ * {@link SchemaFormContext}. Custom controls register by name via {@link registerFormControl} and
+ * are consulted first for `ui` overrides.
+ *
+ * **Binding is the same ladder as everywhere else** (§6.6). A host that names somewhere a value can
+ * come from — route params, the document's signals — gets a Value Source chip on every scalar
+ * field, drawn by `ui/dynamic-slot.ts` and named by `ui/value-source.ts`. It replaces two things: a
+ * private `Static value / $params/… / Custom…` picker that mounted only when the field ALREADY held
+ * a `$ref` (so no form had a gesture for starting a binding at all), and a link button beside the
+ * textfield that silently committed the first route param. A host that names no source — the
+ * project settings forms — draws no chip and edits fixed values, exactly as before.
  */
 
 import { html, nothing } from "lit-html";
@@ -16,7 +24,11 @@ import { live } from "lit-html/directives/live.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { isRef } from "@jxsuite/schema/guards";
 import { renderFieldRow } from "./field-row";
+import { renderDynamicSlot } from "./dynamic-slot";
+import { configFieldSchema } from "./value-source";
 import type { TemplateResult } from "lit-html";
+import type { SignalOption } from "./dynamic-slot";
+import type { JsonValue } from "../types";
 
 /** A (possibly nested) JSON Schema node, covering both object and property level keys. */
 export interface JsonSchema {
@@ -40,7 +52,13 @@ export interface SchemaFormContext {
   resolvePointer: (pointer: string, scope?: Record<string, unknown>) => unknown;
   /** Route params available for `$ref` bindings (e.g. from the document path). */
   params?: string[] | undefined;
-  /** Unique prefix for per-field ephemeral UI state (e.g. the binding control's custom mode). */
+  /**
+   * State keys a field may bind to. Together with {@link params} this is the whole answer to "where
+   * could this value come from" — and naming none of them is how a host says the form edits fixed
+   * values only, which is why the settings forms show no Value Source chip.
+   */
+  signals?: string[] | undefined;
+  /** Unique prefix for the dynamic slot's per-field, per-rung value memory. */
   fieldKeyPrefix?: string | undefined;
   /**
    * Commit hook for the "secret" control: stores the VALUE in the platform's secret store (never
@@ -311,16 +329,9 @@ function renderPropertyControl(
     }
   }
 
-  if (
-    isRef(currentValue) &&
-    ps.format !== "json-schema" &&
-    ps.type !== "object" &&
-    ps.type !== "array"
-  ) {
-    const binding = controlRegistry.get("binding");
-    if (binding) {
-      return binding(controlArgs);
-    }
+  /* A ref left in a form whose host named nowhere to bind: no ladder is drawn, so the pointer is
+     edited as the string it is rather than rendered as "[object Object]" in a typed widget. */
+  if (isRef(currentValue) && isBindableField(ps)) {
     return refTextField(prop, currentValue.$ref, commit);
   }
 
@@ -490,35 +501,38 @@ function renderPropertyControl(
 
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let debounce: ReturnType<typeof setTimeout> | undefined;
-  const params = ctx.params ?? [];
   const ph = ps.default !== undefined ? String(ps.default) : (ps.examples?.[0] ?? "");
-  return html`<div style="display:flex;gap:4px;align-items:center">
-    <sp-textfield
-      size="s"
-      style="flex:1"
-      .value=${currentValue ?? ""}
-      placeholder=${ph || nothing}
-      title=${ps.description || nothing}
-      @input=${(e: Event) => {
-        clearTimeout(debounce);
-        debounce = setTimeout(() => commit((e.target as HTMLInputElement).value || undefined), 400);
-      }}
-    ></sp-textfield>
-    ${
-      params.length > 0
-        ? html`<sp-action-button
-            quiet
-            size="s"
-            title="Bind to route param"
-            @click=${() => {
-              commit({ $ref: `#/$params/${params[0]}` });
-              opts.rerender?.();
-            }}
-            ><sp-icon-link slot="icon"></sp-icon-link
-          ></sp-action-button>`
-        : nothing
-    }
-  </div>`;
+  return html`<sp-textfield
+    size="s"
+    style="flex:1"
+    .value=${currentValue ?? ""}
+    placeholder=${ph || nothing}
+    title=${ps.description || nothing}
+    @input=${(e: Event) => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => commit((e.target as HTMLInputElement).value || undefined), 400);
+    }}
+  ></sp-textfield>`;
+}
+
+// ─── The Value Source ladder (§6.6) ──────────────────────────────────────────
+
+/**
+ * Whether a property is edited as a single value at all. The three that are not — a nested JSON
+ * Schema, an object and an array — are edited as raw JSON or as a multi-row sub-form, and a chip
+ * offering to replace that editor with a signal pointer would be offering to delete the user's
+ * work.
+ */
+function isBindableField(ps: JsonSchema): boolean {
+  return ps.format !== "json-schema" && ps.type !== "object" && ps.type !== "array";
+}
+
+/** Every pointer this form's host says a value may come from. */
+function refSourcesFor(ctx: SchemaFormContext): SignalOption[] {
+  return [
+    ...(ctx.signals ?? []).map((name) => ({ label: name, value: `#/state/${name}` })),
+    ...(ctx.params ?? []).map((name) => ({ label: `$params/${name}`, value: `#/$params/${name}` })),
+  ];
 }
 
 // ─── Field validation (§7.1, inline tier) ────────────────────────────────────
@@ -600,6 +614,7 @@ export function renderForm(
 ): TemplateResult {
   const required = new Set(schema.required);
   const ctx = opts.context ?? NULL_CONTEXT;
+  const refSources = refSourcesFor(ctx);
 
   const propertyFields = Object.entries(schema.properties ?? {}).map(([prop, ps]) => {
     const labelText = prop + (required.has(prop) ? " *" : "");
@@ -608,11 +623,29 @@ export function renderForm(
       opts.errors?.[prop] ||
       validateFieldValue(ps, value[prop], Boolean(opts.showRequired) && required.has(prop));
     const count = opts.errorCounts?.[prop];
+    const staticWidget = renderPropertyControl(prop, ps, value, required, opts, ctx);
+    /* A `ui.control` override owns its whole field — the secret control writes an env-var NAME
+       rather than the value it was handed, so a rung switch above it would be editing a different
+       thing than the one on screen. */
+    const laddered =
+      refSources.length > 0 && isBindableField(ps) && !opts.ui?.[prop]?.control
+        ? renderDynamicSlot({
+            allowCustomRef: true,
+            caps: { schema: configFieldSchema(ps) },
+            extraSignals: refSources,
+            fieldKey: `${ctx.fieldKeyPrefix ?? ""}.${prop}`,
+            onChange: (v?: JsonValue) => opts.onChange({ [prop]: v }),
+            staticWidget,
+            stateDefs: [],
+            value: value[prop],
+          })
+        : null;
     return renderFieldRow({
       hasValue: false,
       label: labelText,
       prop: ps.name || prop,
-      widget: renderPropertyControl(prop, ps, value, required, opts, ctx),
+      widget: laddered ? laddered.widget : staticWidget,
+      ...(laddered ? { labelExtra: laddered.modeButton } : {}),
       ...(error ? { error } : {}),
       ...(count === undefined ? {} : { errorCount: count }),
     });

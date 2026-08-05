@@ -11,7 +11,16 @@ import { loadedMonaco, loadMonaco } from "../services/monaco-lazy";
 
 import { canvasPanels, canvasWrap, getNodeAtPath, updateCanvas } from "../store";
 import { activeTab } from "../workspace/workspace";
-import { argsSchema, nullablePathArg, pathProperty } from "../commands/command-args";
+import { primarySelection, uniquePaths } from "../tabs/selection";
+import {
+  argsSchema,
+  nullablePathArg,
+  pathListArg,
+  pathListProperty,
+  pathProperty,
+  stringArg,
+  stringProperty,
+} from "../commands/command-args";
 import { collabSourceContext } from "../collab/collab-session";
 import { attachCursorStyles } from "../collab/monaco-cursors";
 import type { AwarenessLike } from "../collab/monaco-cursors";
@@ -41,9 +50,12 @@ import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
 import {
   adoptCanvasPreviewMode,
   commitActiveEditSession,
+  getEditSnapshot,
   mountIframeCanvas,
+  postApplyFormat,
   postStyleUpdateToStylebookHosts,
 } from "./iframe-host";
+import { findEnclosingRepeater } from "../editor/repeater-scope";
 import {
   canvasPerf,
   SPAN_FULL_RENDER,
@@ -1004,18 +1016,74 @@ export function renderOverlays() {
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
+/** The root identifier a merge-tag token binds to — `state`, `item` or `index`, or `""`. */
+function tokenRoot(token: string): string {
+  return /^[A-Za-z_$][\w$]*/.exec(token)?.[0] ?? "";
+}
+
 /**
- * Set (or clear) the active document's element selection.
+ * Refuse a `${…}` token the open document cannot resolve, naming what it could have been.
  *
- * Defined beside the surface that DRAWS a selection rather than beside the field that stores it:
- * every consumer of `session.selection` — the overlay boxes, the Outline's selected row, the
- * Inspector, the block action bar — is downstream of this module's render, and the one thing this
- * verb must guarantee is that the path it accepts is one those surfaces can actually draw.
+ * The same rule `data.expandRow` applies to a row name, for the same reason: an unresolvable token
+ * renders as EMPTY TEXT, so inserting one silently produces a document that looks bound and is not
+ * — and a capture of it documents a binding that never existed.
+ */
+function refuseUnresolvableToken(token: string): void {
+  const tab = activeTab.value;
+  if (!tab) {
+    throw new RangeError(`command "insert.data" needs an open document; no tab is active`);
+  }
+  const root = tokenRoot(token);
+  const state = (tab.doc.document.state ?? {}) as Record<string, unknown>;
+  if (root === "state") {
+    const name = token.split(".")[1] ?? "";
+    if (!(name in state)) {
+      const defined = Object.keys(state);
+      throw new RangeError(
+        `command "insert.data" argument "token": "${token}" names no state entry — this ` +
+          `document defines: ${defined.length > 0 ? defined.join(", ") : "nothing"}`,
+      );
+    }
+    return;
+  }
+  if (root === "item" || root === "index") {
+    // The repeater scope exists only INSIDE a `map` template, and the caret's own doc path is what
+    // Says whether it does — the same question `panels/block-action-bar.ts` asks before it offers
+    // These tokens at all.
+    const path = getEditSnapshot().snapshot?.path ?? primarySelection(tab.session.selection);
+    if (!findEnclosingRepeater(tab.doc.document, path)) {
+      throw new RangeError(
+        `command "insert.data" argument "token": "${token}" is a repeater-scope token, and the ` +
+          `caret is not inside a repeater template`,
+      );
+    }
+    return;
+  }
+  throw new RangeError(
+    `command "insert.data" argument "token": "${token}" is not an insertable token — a token ` +
+      `reads "state.<name>", "item", "item.<field>" or "index"`,
+  );
+}
+
+/**
+ * The two verbs that address what the canvas pane is pointing AT — the element, and the caret.
  *
- * `path: []` is the document ROOT and is a legal selection (`selector-menu-shot` uses it). `null`
- * clears the selection. Anything else is resolved against the open document and REFUSED when it
- * addresses nothing — a stale path used to select a hole, and every panel downstream then rendered
- * its empty state while the shot recorded that as the truth.
+ * Both are defined beside the surface that DRAWS them rather than beside the fields that store
+ * them: every consumer of `session.selection` — the overlay boxes, the Outline's selected row, the
+ * Inspector, the block action bar — is downstream of this module's render, and both verbs must
+ * guarantee that what they accept is something those surfaces can actually draw.
+ *
+ * `selection.set`: `path: []` is the document ROOT and is a legal selection (`selector-menu-shot`
+ * uses it). `null` clears the selection. Anything else is resolved against the open document and
+ * REFUSED when it addresses nothing — a stale path used to select a hole, and every panel
+ * downstream then rendered its empty state while the shot recorded that as the truth.
+ *
+ * `insert.data`: the capability has shipped since the merge-tag menu landed and has been reachable
+ * from that menu ALONE — `panels/block-action-bar.ts` posts an `insertData` intent straight to the
+ * canvas bridge, so the palette, the keyboard, the AI and `__jxAutomation` could not do the one
+ * thing the whole Insert-data affordance exists for. The screenshot manifest reached it by clicking
+ * the toolbar button and then a row of the menu it opens, which is the shape §13.5 refuses on
+ * principle: opening a menu to press an item names a CONTROL; the item is the command.
  */
 export function selectionCommands(): AnyCommand[] {
   return [
@@ -1052,15 +1120,99 @@ export function selectionCommands(): AnyCommand[] {
               `${tab.documentPath ?? "the open document"}`,
           );
         }
-        tab.session.selection = path;
+        tab.session.selection = path === null ? [] : [path];
       },
       title: "Select Element",
+    },
+    {
+      args: argsSchema({
+        paths: pathListProperty(
+          "The document paths to select, in order — an array of paths. The LAST one becomes the " +
+            "primary (what the Inspector edits); the first is the anchor a shift-range extends " +
+            "from. [] selects nothing.",
+        ),
+      }),
+      category: "Selection",
+      id: "selection.setPaths",
+      level: "document",
+      menus: ["palette"],
+      group: "2_navigate",
+      requires: "an open document",
+      when: (ctx) => ctx.document.open,
+      aiTool: {
+        description:
+          "Select several elements at once so one decision — a style paste, a delete, a duplicate " +
+          "— applies to all of them as a single undoable step. Pass [] to select nothing.",
+        name: "select_nodes",
+      },
+      /**
+       * The idempotent SET for the whole selection, beside `selection.set`'s single path.
+       *
+       * There is deliberately no `selection.add` or `selection.toggle`: an accumulate verb names a
+       * DELTA against state the caller cannot observe, which is the same objection that bans a
+       * `toggle*` id without a `set*` beside it (§13). Ctrl-clicking twice is a gesture; the
+       * command is always "the selection is now exactly these". `selection.set { path }` survives
+       * unchanged because selecting one node is what almost every caller — every screenshot step,
+       * and the assistant — actually does.
+       */
+      run: (_commandCtx, args) => {
+        const paths = pathListArg("selection.setPaths", args, "paths");
+        const tab = activeTab.value;
+        if (!tab) {
+          throw new RangeError(
+            `command "selection.setPaths" needs an open document; no tab is active`,
+          );
+        }
+        for (const path of paths) {
+          if (path.length > 0 && !getNodeAtPath(tab.doc.document, path)) {
+            throw new RangeError(
+              `command "selection.setPaths" argument "paths": [${path.join(", ")}] addresses no ` +
+                `node in ${tab.documentPath ?? "the open document"}`,
+            );
+          }
+        }
+        // Deduplicated, so running the same list twice lands on the same anchor and the same
+        // Primary — the property that makes it photographable.
+        tab.session.selection = uniquePaths(paths);
+      },
+      title: "Select Elements",
+    },
+    {
+      args: argsSchema({
+        token: stringProperty(
+          'The token to insert, without the ${…} wrapper — "state.<name>", "item", ' +
+            '"item.<field>" or "index".',
+        ),
+      }),
+      category: "Insert",
+      id: "insert.data",
+      level: "selection",
+      keyScope: "caret",
+      // NOT `blockbar`: the bar's Insert-data control opens a PICKER, and a picker cannot be the
+      // Rendering of a record that requires a token. The record is what the picker's rows run.
+      menus: ["palette"],
+      group: "5_data",
+      undo: "document",
+      requires: "a live text caret in the canvas",
+      when: (ctx) => ctx.caret.active,
+      aiTool: {
+        description:
+          "Insert a live data placeholder at the text caret, binding that run of text to a state " +
+          "entry or, inside a repeater template, to the current item.",
+        name: "insert_data_token",
+      },
+      run: (_commandCtx, args) => {
+        const token = stringArg("insert.data", args, "token");
+        refuseUnresolvableToken(token);
+        postApplyFormat({ command: "insertData", token });
+      },
+      title: "Insert Data",
     },
   ];
 }
 
 /**
- * Register the selection verb. Called from the bootstrap.
+ * Register the canvas pane's addressing verbs. Called from the bootstrap.
  *
  * @param {CommandRegistry} registry
  */

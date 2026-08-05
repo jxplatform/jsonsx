@@ -32,11 +32,12 @@ import { effect, effectScope, reactive } from "../reactivity";
 import { createPanelScheduler } from "./panel-scheduler";
 import type { PanelScheduler } from "./panel-scheduler";
 import { activeTab } from "../workspace/workspace";
+import { primarySelection } from "../tabs/selection";
 import { openPageAction, renderEmptyState } from "./empty-state";
-import { eventsSidebarTemplate } from "./events-panel";
+import { renderLogicPanelTemplate } from "./events-panel";
 import { isCustomElementDoc } from "./signals-panel";
 
-import { DEFAULT_INSPECTOR_TAB, isInspectorTabId } from "../shell";
+import { DEFAULT_INSPECTOR_TAB, isInspectorTabId, shell } from "../shell";
 import { INSPECTOR_TABS } from "../commands/defaults";
 import { inspectorTabRegion, REGION_ATTR } from "../ui/regions";
 import { isColorPopoverOpen } from "../ui/color-selector";
@@ -98,18 +99,24 @@ export function mount(ctx: RightPanelCtx) {
   _scope.run(() => {
     effect(() => {
       const tab = activeTab.value;
+      // Layout chrome is not IN the document, so nothing per-tab changes when the canvas reports a
+      // `layoutHit` — and the panel that answers it (the Content tab's Layout Element card) spent a
+      // Release cycle repainting only because the canvas host happened to call `renderOnly` too.
+      // Reading it here makes the dock's dependency on it real.
+      void shell.layoutSelection;
       // No tab is a state the inspector renders (its no-document empty state), not one it skips.
       if (tab) {
         // Track properties the right panel reads
         void tab.doc.document;
-        void tab.session.selection;
+        // The whole SET, joined — a bare property read would not re-trigger when the selection
+        // Changes WITHIN the array, and §6.5's helpers always replace it but nothing enforces that.
+        void tab.session.selection.map((path) => path.join("/")).join("|");
         void tab.session.ui.rightTab;
         void tab.session.ui.activeMedia;
         void tab.session.ui.activeSelector;
         void tab.session.ui.styleSections;
         void tab.session.ui.styleShorthands;
         void tab.session.ui.styleFilter;
-        void tab.session.ui.styleFilterActive;
         void tab.session.ui.inspectorSections;
       }
       render();
@@ -199,9 +206,21 @@ function inspectorTarget(): string {
   if (!tab) {
     return "no document";
   }
-  const { selection } = tab.session;
+  // Layout chrome first: it is mutually exclusive with a document selection, and it is the one
+  // Target whose name has to say where it came FROM — "<header> in layouts/base.json" is the whole
+  // Answer to "why can I not edit this".
+  const layout = shell.layoutSelection;
+  if (layout) {
+    return `<${layout.tagName || "element"}> in ${layout.layoutFile || "the layout"}`;
+  }
+  const paths = tab.session.selection;
+  const selection = primarySelection(paths);
   if (selection) {
-    return nodeLabel(getNodeAtPath(tab.doc.document, selection));
+    // The inspector's title names the batch when there is one — it edits all of them, and titling
+    // It after the primary alone is how a Mixed field ends up looking like a plain value.
+    return paths.length > 1
+      ? `${paths.length} elements`
+      : nodeLabel(getNodeAtPath(tab.doc.document, selection));
   }
   const path = tab.documentPath;
   return path ? (path.split("/").at(-1) ?? "document") : "document";
@@ -286,7 +305,7 @@ function _doRender() {
       );
     } else if (tab === "events") {
       litRender(
-        eventsSidebarTemplate({
+        renderLogicPanelTemplate({
           isCustomElementDoc: () =>
             isCustomElementDoc({
               document: aTab.doc.document,

@@ -23,6 +23,7 @@
 import { effect, onScopeDispose, reactive, toRaw } from "../reactivity";
 import { getPlatform } from "../platform";
 import { jsonClone } from "../utils/studio-utils";
+import { cloneSelection } from "../tabs/selection";
 import {
   applyExternalDocOps,
   isBatching,
@@ -702,7 +703,7 @@ function detachSession(tab: Tab): void {
   tab.history.snapshots = [
     {
       document: jsonClone(toRaw(tab.doc.document)) as Record<string, unknown>,
-      selection: tab.session.selection ? [...tab.session.selection] : null,
+      selection: cloneSelection(tab.session.selection),
     },
   ];
   tab.history.index = 0;
@@ -800,11 +801,11 @@ function createSession(
   );
   session.undoManager = undoManager;
   const onStackAdd = ({ stackItem }: { stackItem: { meta: Map<unknown, unknown> } }) => {
-    stackItem.meta.set("selection", tab.session.selection ? [...tab.session.selection] : null);
+    stackItem.meta.set("selection", cloneSelection(tab.session.selection));
   };
   const onStackPop = ({ stackItem }: { stackItem: { meta: Map<unknown, unknown> } }) => {
-    const selection = stackItem.meta.get("selection") as (string | number)[] | null | undefined;
-    tab.session.selection = selection ? [...selection] : null;
+    const selection = stackItem.meta.get("selection") as (string | number)[][] | undefined;
+    tab.session.selection = cloneSelection(selection ?? []);
   };
   undoManager.on("stack-item-added", onStackAdd);
   undoManager.on("stack-item-popped", onStackPop);
@@ -940,7 +941,12 @@ function createSession(
     // FocusedPath, so per-doc boxes come free from the one project-level awareness state). The
     // Plain `selection` field is y-monaco's (in-buffer text cursors) — never write it here.
     effect(() => {
-      const structuralSelection = tab.session.selection ? [...tab.session.selection] : null;
+      // The whole selection SET crosses awareness, so a peer's canvas draws every node the author
+      // Has selected. A selection of one publishes a one-entry list, which is the same box.
+      // Empty stays `null` rather than `[]`: "this peer is not pointing at anything" is one fact
+      // With one wire value, and every consumer already tests it by presence.
+      const structuralSelection =
+        tab.session.selection.length > 0 ? cloneSelection(tab.session.selection) : null;
       const local = handle.awareness.getLocalState();
       if (local) {
         handle.awareness.setLocalState({ ...local, structuralSelection });

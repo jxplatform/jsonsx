@@ -35,10 +35,11 @@ import {
   parentElementPath,
 } from "../store";
 import { activeTab } from "../workspace/workspace";
+import { primarySelection, structuralBatch } from "../tabs/selection";
 import {
-  mutateDuplicateNode,
+  mutateDuplicateNodes,
   mutateMoveNode,
-  mutateRemoveNode,
+  mutateRemoveNodes,
   mutateUpdateProperty,
   transactDoc,
 } from "../tabs/transact";
@@ -124,7 +125,7 @@ export function onCanvasScroll(e: Event): void {
   if (!_ctx || _linkPopoverOpen) {
     return;
   }
-  if (!activeTab.value?.session.selection) {
+  if (activeTab.value?.session.selection.length === 0) {
     return;
   }
   const mode = _ctx.getCanvasMode();
@@ -262,7 +263,28 @@ let _commandTarget: JxPath | null = null;
 
 /** The path the selection verbs currently address: an explicit target, else the selection. */
 export function commandTargetPath(): JxPath | null {
-  return _commandTarget ?? activeTab.value?.session.selection ?? null;
+  return _commandTarget ?? primarySelection(activeTab.value?.session.selection);
+}
+
+/**
+ * The paths a BATCH verb addresses — Delete and Duplicate, the two that are meaningful on a set.
+ *
+ * An explicit target wins outright and is always exactly one path:
+ * `PLACEMENT_MATRIX["outline/row"]` says a row action acts on the row's node, and a hovered row is
+ * not the selection. With no explicit target this is the whole selection, so `length === 1` hands
+ * back the single path the verbs have always received.
+ *
+ * The move verbs deliberately do NOT use this. "Move six nodes up one slot" has no single answer
+ * when they are not siblings, and every one of them is `childIndex` arithmetic against a parent
+ * that the previous move just renumbered.
+ *
+ * @returns {JxPath[]}
+ */
+export function commandTargetPaths(): JxPath[] {
+  if (_commandTarget) {
+    return [_commandTarget];
+  }
+  return activeTab.value?.session.selection ?? [];
 }
 
 /** Run `fn` with `path` as the command target. Synchronous — the target never outlives the call. */
@@ -390,7 +412,7 @@ function moveTargetUp(): void {
   }
   const { index, parentPath, path, tab } = target;
   transactDoc(tab, (t) => mutateMoveNode(t, path, parentPath, index - 1));
-  tab.session.selection = [...parentPath, "children", index - 1];
+  tab.session.selection = [[...parentPath, "children", index - 1]];
 }
 
 /** Move the target down one slot among its siblings, keeping it selected. */
@@ -403,7 +425,7 @@ function moveTargetDown(): void {
   // `index + 2`: mutateMoveNode removes before it inserts, so a same-parent move down needs the
   // Post-removal index of the slot AFTER the next sibling.
   transactDoc(tab, (t) => mutateMoveNode(t, path, parentPath, index + 2));
-  tab.session.selection = [...parentPath, "children", index + 1];
+  tab.session.selection = [[...parentPath, "children", index + 1]];
 }
 
 /** Append the target to its previous sibling, making it that element's last child. */
@@ -416,7 +438,7 @@ function moveTargetIn(): void {
   const prevPath = [...parentPath, "children", index - 1];
   const { length } = childList(getNodeAtPath(tab.doc.document, prevPath));
   transactDoc(tab, (t) => mutateMoveNode(t, path, prevPath, length));
-  tab.session.selection = [...prevPath, "children", length];
+  tab.session.selection = [[...prevPath, "children", length]];
 }
 
 /** Lift the target out of its parent, landing it directly after that parent. */
@@ -431,28 +453,54 @@ function moveTargetOut(): void {
     return;
   }
   transactDoc(target.tab, (t) => mutateMoveNode(t, target.path, grandparent, parentIndex + 1));
-  target.tab.session.selection = [...grandparent, "children", parentIndex + 1];
+  target.tab.session.selection = [[...grandparent, "children", parentIndex + 1]];
 }
 
-/** Delete the target, leaving its parent selected (never a dangling path). */
+/**
+ * Delete every targeted node, leaving the primary's parent selected (never a dangling path).
+ *
+ * One transaction, therefore one undo step — a six-node delete that produced six history entries
+ * would make ⌘Z a rebuild rather than a reversal.
+ *
+ * **A delete that removes nothing moves nothing.** The selection jump is the visible half of this
+ * verb, and running it over an unchanged document is the app telling the author something happened
+ * when nothing did. There are two ways to remove nothing, and each is checked on its own side of
+ * the transaction:
+ *
+ * - `mutateRemoveNodes` removes exactly {@link structuralBatch}, which drops every path that names no
+ *   splice coordinate — the document element, a repeater's map template, a `$switch` case. A target
+ *   made only of those filters out entirely, and calling `transactDoc` anyway would ALSO mark the
+ *   tab dirty and push an undo step that reverses nothing. So an empty batch returns before the
+ *   transaction rather than after it.
+ * - `transactDoc` itself declines while a peer holds source-canonical, and says so by leaving the
+ *   document root reference — which it otherwise always replaces — exactly as it found it.
+ */
 function deleteTarget(): void {
   const tab = activeTab.value;
+  const paths = commandTargetPaths();
   const path = commandTargetPath();
-  if (!tab || !path) {
+  // An empty target and a target of nothing-spliceable are the same answer: `structuralBatch([])`
+  // Is `[]`, so one test covers both.
+  if (!tab || !path || structuralBatch(paths).length === 0) {
     return;
   }
-  transactDoc(tab, (t) => mutateRemoveNode(t, path));
-  tab.session.selection = parentElementPath(path);
+  const documentBefore = tab.doc.document;
+  transactDoc(tab, (t) => mutateRemoveNodes(t, paths));
+  if (tab.doc.document === documentBefore) {
+    return;
+  }
+  const parentPath = parentElementPath(path);
+  tab.session.selection = parentPath ? [parentPath] : [];
 }
 
-/** Duplicate the target, inserting the copy directly after it. */
+/** Duplicate every targeted node in one transaction, selecting the copies. */
 function duplicateTarget(): void {
   const tab = activeTab.value;
-  const path = commandTargetPath();
-  if (!tab || !path) {
+  const paths = commandTargetPaths();
+  if (!tab || paths.length === 0) {
     return;
   }
-  transactDoc(tab, (t) => mutateDuplicateNode(t, path));
+  transactDoc(tab, (t) => mutateDuplicateNodes(t, paths));
 }
 
 /** Select the target's parent element. */
@@ -461,7 +509,7 @@ function selectParentOfTarget(): void {
   const path = commandTargetPath();
   const parentPath = path ? parentElementPath(path) : null;
   if (tab && parentPath) {
-    tab.session.selection = parentPath;
+    tab.session.selection = [parentPath];
   }
 }
 
@@ -784,7 +832,7 @@ function onFormatClick(e: MouseEvent, action: InlineAction) {
  */
 function renderParentButton(registry: CommandRegistry) {
   const tab = activeTab.value;
-  const selection = tab?.session.selection ?? null;
+  const selection = primarySelection(tab?.session.selection);
   const parentPath = selection ? parentElementPath(selection) : null;
   const parentNode = tab && parentPath ? getNodeAtPath(tab.doc.document, parentPath) : null;
   const command = registry.get("selection.selectParent");
@@ -1039,7 +1087,7 @@ function onMergeTagClick(e: MouseEvent) {
   // When the caret sits inside a repeater, offer its local scope (item/index + item fields). There is
   // No live `$map` in edit mode — the perimeter renders one glyph template — so fields resolve
   // Parent-side from schema, keyed off the selected element's doc path (which carries a `map` segment).
-  const selPath = getEditSnapshot().snapshot?.path ?? tab?.session.selection;
+  const selPath = getEditSnapshot().snapshot?.path ?? primarySelection(tab?.session.selection);
   const arrayNode = tab && selPath ? findEnclosingRepeater(tab.doc.document, selPath) : null;
   if (arrayNode) {
     const tokens = resolveRepeaterItemFields(
@@ -1223,7 +1271,8 @@ export function renderBlockActionBar() {
   const tab = activeTab.value;
   const canvasMode = _ctx.getCanvasMode();
 
-  if (!tab?.session.selection || (canvasMode !== "design" && canvasMode !== "edit")) {
+  const selection = primarySelection(tab?.session.selection);
+  if (!tab || !selection || (canvasMode !== "design" && canvasMode !== "edit")) {
     litRender(nothing, view.blockActionBarEl);
     return;
   }
@@ -1234,7 +1283,6 @@ export function renderBlockActionBar() {
     return;
   }
 
-  const { selection } = tab.session;
   const node = getNodeAtPath(tab.doc.document, selection);
   if (!node) {
     litRender(nothing, view.blockActionBarEl);
@@ -1350,7 +1398,7 @@ export function renderBlockActionBar() {
                 // Structured clone rejects when the src crosses postMessage (DataCloneError
                 // Killed the whole handle drag), and a live reference would also mutate the
                 // Retained srcData if the selection changed mid-drag.
-                path: [...(activeTab.value?.session.selection ?? [])],
+                path: [...(primarySelection(activeTab.value?.session.selection) ?? [])],
                 type: "tree-node",
               }),
               onGenerateDragPreview: ({

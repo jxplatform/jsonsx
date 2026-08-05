@@ -474,13 +474,99 @@ describe("iframe canvas interaction", () => {
       kind: "hit",
     });
 
-    expect(activeTab.value?.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value?.session.selection).toEqual([["children", 0]]);
     const sel = canvasEl.querySelector(".overlay-selection") as HTMLElement;
     expect(sel.style.display).toBe("block");
     expect(sel.style.left).toBe("10px");
     expect(sel.style.top).toBe("5px");
     expect(sel.style.width).toBe("100px");
     expect(sel.style.height).toBe("20px");
+  });
+
+  test("a ctrl/cmd-click ACCUMULATES instead of replacing (§6.5)", async () => {
+    await mountReady();
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } },
+      kind: "hit",
+    });
+    channels[0]!.deliver({
+      additive: true,
+      hit: { path: ["children", 1], rect: { height: 20, width: 100, x: 10, y: 40 } },
+      kind: "hit",
+    });
+    expect(activeTab.value?.session.selection).toEqual([
+      ["children", 0],
+      ["children", 1],
+    ]);
+  });
+
+  test("an additive click on an already-selected node removes it from the set", async () => {
+    await mountReady();
+    activeTab.value!.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
+    channels[0]!.deliver({
+      additive: true,
+      hit: { path: ["children", 1], rect: { height: 20, width: 100, x: 10, y: 40 } },
+      kind: "hit",
+    });
+    expect(activeTab.value?.session.selection).toEqual([["children", 0]]);
+  });
+
+  test("a multi-selection measures every path and draws the others as co-selection boxes", async () => {
+    const canvasEl = await mountReady();
+    activeTab.value!.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    const measure = channels[0]!.posts.findLast((p) => p.kind === "measure") as
+      | { paths: (string | number)[][]; reqId: number }
+      | undefined;
+    // The PRIMARY is posted first, so the reply can be matched by path rather than by position.
+    expect(measure?.paths).toEqual([
+      ["children", 1],
+      ["children", 0],
+    ]);
+    channels[0]!.deliver({
+      hits: [
+        { path: ["children", 1], rect: { height: 20, width: 100, x: 10, y: 40 } },
+        { path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } },
+      ],
+      kind: "geometry",
+      reqId: measure!.reqId,
+    });
+    const sel = canvasEl.querySelector(
+      ".overlay-selection:not(.overlay-coselection)",
+    ) as HTMLElement;
+    expect(sel.style.top).toBe("40px");
+    const co = canvasEl.querySelectorAll(".overlay-coselection");
+    expect(co).toHaveLength(1);
+    expect((co[0] as HTMLElement).style.top).toBe("5px");
+  });
+
+  test("a selection of ONE draws no co-selection box at all", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } },
+      kind: "hit",
+    });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    const measure = channels[0]!.posts.findLast((p) => p.kind === "measure") as
+      | { paths: (string | number)[][]; reqId: number }
+      | undefined;
+    expect(measure?.paths).toEqual([["children", 0]]);
+    channels[0]!.deliver({
+      hits: [{ path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } }],
+      kind: "geometry",
+      reqId: measure!.reqId,
+    });
+    expect(canvasEl.querySelectorAll(".overlay-coselection")).toHaveLength(0);
   });
 
   test("a layoutHit selects the layout chrome, clears the document selection, and labels the box", async () => {
@@ -493,7 +579,7 @@ describe("iframe canvas interaction", () => {
       hit: { path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } },
       kind: "hit",
     });
-    expect(activeTab.value?.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value?.session.selection).toEqual([["children", 0]]);
 
     channels[0]!.deliver({
       hit: {
@@ -511,7 +597,7 @@ describe("iframe canvas interaction", () => {
     expect(shell.layoutSelection?.layoutFile).toBe("layouts/base.json");
     expect(shell.layoutSelection?.layoutPath).toEqual(["children", 0, "children", 0]);
     expect(shell.layoutSelection?.tagName).toBe("a");
-    expect(activeTab.value?.session.selection).toBeNull();
+    expect(activeTab.value?.session.selection).toEqual([]);
     const sel = canvasEl.querySelector(".overlay-selection") as HTMLElement;
     expect(sel.style.display).toBe("block");
     expect(sel.style.left).toBe("24px");
@@ -562,7 +648,7 @@ describe("iframe canvas interaction", () => {
     channels[0]!.posts.length = 0; // Drop the initial render post.
 
     // Selection set from outside the canvas (e.g. the layers panel).
-    tab.session.selection = ["children", 2];
+    tab.session.selection = [["children", 2]];
     await flush();
     const measure = channels[0]!.posts.find((p) => p.kind === "measure") as Msg | undefined;
     expect(measure).toMatchObject({ kind: "measure", paths: [["children", 2]] });
@@ -582,7 +668,7 @@ describe("iframe canvas interaction", () => {
     expect(sel.style.display).toBe("block");
 
     // The matching reqId with no hit clears the box.
-    tab.session.selection = ["children", 3];
+    tab.session.selection = [["children", 3]];
     await flush();
     const measure2 = channels[0]!.posts.findLast((p) => p.kind === "measure") as Msg;
     channels[0]!.deliver({ hits: [], kind: "geometry", reqId: measure2.reqId as number });
@@ -599,7 +685,7 @@ describe("iframe canvas interaction", () => {
     const sel = canvasEl.querySelector(".overlay-selection") as HTMLElement;
     expect(sel.style.display).toBe("block");
 
-    tab.session.selection = null;
+    tab.session.selection = [];
     await flush();
     expect(sel.style.display).toBe("none");
   });
@@ -607,7 +693,7 @@ describe("iframe canvas interaction", () => {
   test("renderComplete re-measures the current selection", async () => {
     const tab = resetWorkspaceWithTab();
     await mountReady();
-    tab.session.selection = ["children", 1];
+    tab.session.selection = [["children", 1]];
     await flush();
     channels[0]!.posts.length = 0;
 
@@ -787,7 +873,7 @@ describe("iframe canvas patch bridge", () => {
   test("patchComplete re-measures the current selection", async () => {
     const tab = resetWorkspaceWithTab();
     await mountReady();
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     await flush();
     channels[0]!.posts.length = 0;
 
@@ -2263,7 +2349,7 @@ describe("stylebook host capability", () => {
       kind: "hit",
     });
     expect(hits).toEqual([["p b", "sm"]]);
-    expect(activeTab.value?.session.selection).toBeNull();
+    expect(activeTab.value?.session.selection).toEqual([]);
     const sel = canvasEl.querySelector(".overlay-selection") as HTMLElement;
     expect(sel.style.display).toBe("block");
     expect((sel.querySelector(".overlay-label") as HTMLElement).textContent).toBe("<p b>");
@@ -2421,7 +2507,7 @@ describe("stylebook host capability", () => {
     });
     // Routed as a normal document hit: session.selection written, no stylebook decode.
     expect(hits).toHaveLength(0);
-    expect(activeTab.value?.session.selection).toEqual(SPECIMEN_PATH);
+    expect(activeTab.value?.session.selection).toEqual([SPECIMEN_PATH]);
   });
 });
 
@@ -2646,7 +2732,7 @@ describe("preview renders", () => {
       hit: { path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } },
       kind: "hit",
     });
-    expect(activeTab.value?.session.selection).toBeNull();
+    expect(activeTab.value?.session.selection).toEqual([]);
     const sel = canvasEl.querySelector(".overlay-selection") as HTMLElement;
     expect(sel.style.display).toBe("none");
   });

@@ -7,8 +7,6 @@
 
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
-import { live } from "lit-html/directives/live.js";
-import { isRef } from "@jxsuite/schema/guards";
 import { dynamicRouteParams } from "../page-params";
 import { projectState } from "../state";
 import type { JsonValue } from "../types";
@@ -24,12 +22,13 @@ import { renderFieldRow } from "../ui/field-row";
 import { rawTextArea, spTextField } from "../ui/field-input";
 import { expressionHint, renderExpressionEditor } from "../ui/expression-editor";
 import { renderEmptyState } from "./empty-state";
+import { bindableSignalNames } from "./properties-panel";
 import { registerPanel } from "./panel-registry";
 import { renderStatementEditor } from "./statement-editor";
 import { livePreviewExpression } from "../services/live-preview";
 import { renderMediaPicker } from "../ui/media-picker";
 import { renderOnly, updateSession } from "../store";
-import { registerFormControl, renderForm } from "../ui/schema-form";
+import { renderForm } from "../ui/schema-form";
 import { resolveContextPointer } from "../services/context-resolver";
 import type { JsonSchema } from "../ui/schema-form";
 import type { TabUi } from "../tabs/tab";
@@ -50,7 +49,7 @@ interface SignalsPanelState {
   document: JxMutableNode;
   ui?: TabUi | Record<string, unknown>;
   mode?: string;
-  selection?: (string | number)[] | null;
+  selection?: (string | number)[][];
   canvas?: Record<string, unknown>;
   _collapsedSignalCats?: Set<string>;
   documentPath?: string | null | undefined;
@@ -99,14 +98,6 @@ let expandedSignal: string | null = null;
 
 /** Track which functions have the advanced param editor open. */
 const advancedParamOpen = new Set();
-
-/** Schema fields whose binding picker is in free-form Custom mode (cleared on commit). */
-const bindingCustomOpen = new Set<string>();
-
-/** Reset binding-control ephemeral UI state (test hook). */
-export function resetBindingUiState() {
-  bindingCustomOpen.clear();
-}
 
 /** Default templates for creating new signal definitions. */
 const DEF_TEMPLATES = {
@@ -1421,77 +1412,6 @@ function resolveSignalsContextPointer(pointer: string, scope?: Record<string, un
 }
 
 /**
- * Render a binding picker for a `{ $ref }` config value — route params derived from the document
- * path plus a free-form custom ref, with a switch back to a static value.
- */
-function renderBindingControl(opts: {
-  refVal: string;
-  params: string[];
-  fieldKey: string;
-  commit: (next: { $ref: string } | undefined) => void;
-  rerender: (() => void) | undefined;
-}) {
-  const paramRefs = opts.params.map((p) => `#/$params/${p}`);
-  const isCustom =
-    bindingCustomOpen.has(opts.fieldKey) ||
-    (opts.refVal !== "" && !paramRefs.includes(opts.refVal));
-  return html`
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <sp-picker
-        size="s"
-        .value=${live(isCustom ? "__custom__" : opts.refVal || "__static__")}
-        @change=${(e: Event) => {
-          const v = (e.target as HTMLInputElement).value;
-          if (v === "__custom__") {
-            bindingCustomOpen.add(opts.fieldKey);
-            opts.rerender?.();
-            return;
-          }
-          bindingCustomOpen.delete(opts.fieldKey);
-          opts.commit(v === "__static__" ? undefined : { $ref: v });
-          opts.rerender?.();
-        }}
-      >
-        <sp-menu-item value="__static__">Static value</sp-menu-item>
-        ${paramRefs.length > 0 ? html`<sp-menu-divider></sp-menu-divider>` : nothing}
-        ${paramRefs.map((r) => html`<sp-menu-item value=${r}>${r.slice(2)}</sp-menu-item>`)}
-        <sp-menu-divider></sp-menu-divider>
-        <sp-menu-item value="__custom__">Custom…</sp-menu-item>
-      </sp-picker>
-      ${
-        isCustom
-          ? html`<sp-textfield
-              size="s"
-              placeholder="#/$params/…"
-              .value=${live(opts.refVal)}
-              @change=${(e: Event) => {
-                const v = (e.target as HTMLInputElement).value.trim();
-                if (!v) {
-                  bindingCustomOpen.delete(opts.fieldKey);
-                }
-                opts.commit(v ? { $ref: v } : undefined);
-                opts.rerender?.();
-              }}
-            ></sp-textfield>`
-          : nothing
-      }
-    </div>
-  `;
-}
-
-// The "binding" control registers here rather than in ui/form-controls.ts because it owns
-// Panel-local ephemeral UI state (bindingCustomOpen) and the route-param picker semantics.
-registerFormControl("binding", ({ key, value, onChange, ctx, rerender }) =>
-  renderBindingControl({
-    commit: onChange,
-    fieldKey: `${ctx.fieldKeyPrefix ?? ""}.${key}`,
-    params: ctx.params ?? [],
-    refVal: isRef(value) ? value.$ref : "",
-    rerender,
-  }),
-);
-
-/**
  * Render config form fields from a JSON Schema `properties` object — a thin wrapper over the shared
  * schema-form engine. Skips studio-reserved keys, resolves enum/context refs against the project
  * config, and commits every patch through transactDoc/mutateUpdateDef.
@@ -1516,6 +1436,8 @@ export function renderSchemaFieldsTemplate(
       fieldKeyPrefix: name,
       params: dynamicRouteParams(S.documentPath),
       resolvePointer: resolveSignalsContextPointer,
+      // A config value may point at any signal but this one — a def that reads itself is a cycle.
+      signals: bindableSignalNames(S.document).filter((signal) => signal !== name),
     },
     onChange: (patch) => transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, patch)),
     ...(ctx && { rerender: () => ctx.renderLeftPanel() }),

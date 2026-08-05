@@ -348,7 +348,10 @@ export type IframeToParent =
   // Srcs, several starters ship a 404 favicon, and lazy images below the fold never complete. A
   // Pending retry is the one image fact only the app knows.
   | { kind: "idle"; gen: number; fonts: boolean; animations: number; images: number }
-  | { kind: "hit"; hit: NodeHit }
+  // `additive` is Ctrl/Cmd being held at the moment of the click — the ACCUMULATE gesture, which
+  // The parent turns into a toggle against `session.selection` (studio §6.5). Absent/false is a
+  // Plain replace, which is what every canvas click was before the selection became a set.
+  | { kind: "hit"; hit: NodeHit; additive?: boolean }
   // A click on layout chrome (see {@link LayoutHit}). Distinct from `hit` because the target is not
   // In the page document at all: the parent adopts it as `view.layoutSelection` (which shows the
   // Read-only layout panel with its "Open Layout →" action) rather than as a document selection.

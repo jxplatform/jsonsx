@@ -1,9 +1,12 @@
 ---
 title: "Outline panel"
-description: "The Outline panel in Jx Studio: read your page's structure as a tree, select, rename, reorder by drag and drop, and act on any element."
+description: "The Outline panel in Jx Studio: read your page's structure as a tree, select one element or many, rename, reorder by drag and drop, and act on them."
+spec:
+  - studio.md#6.7
 code:
   - packages/studio/src/panels/layers-panel.ts
   - packages/studio/src/panels/dnd.ts
+  - packages/studio/src/tabs/selection.ts
 ---
 
 # Outline panel
@@ -31,11 +34,35 @@ An empty page has no tree to show, so the panel says so and offers **Add an elem
 
 ## Select and navigate
 
-Click a row to select that element. The canvas pans to bring it into view, and the Inspector's [Content](/docs/studio/design/properties) and [Style](/docs/studio/design/style-inspector) tabs switch to it. Selection works in both directions: click something on the canvas and its row highlights and scrolls into view in Outline.
+Click a row to select that element. The canvas pans to bring it into view, and the Inspector's [Content](/docs/studio/design/properties), [Style](/docs/studio/design/style-inspector) and [Logic](/docs/studio/logic/events) tabs switch to it. Selection works in both directions: click something on the canvas and its row highlights and scrolls into view in Outline.
+
+## Select several at once
+
+Outline is where a selection of more than one element is built:
+
+- **:kbd[Shift]-click** a row and everything from the **anchor** — the row the selection started at — down to the row you clicked is selected, inclusive. The anchor stays where it is, so shift-clicking a third row redraws the range from the same starting point instead of starting over.
+- **:kbd[⌘]-click** (macOS) / :kbd[Ctrl]-click (Windows/Linux) adds one row to the selection, or takes it out again if it is already in.
+- **:kbd[Shift+↑]** and **:kbd[Shift+↓]** extend the same range from the keyboard.
+
+A range covers the rows you can actually see, so collapsing a branch keeps its children out of a range drawn past it.
+
+Every selected row is highlighted, and the last one you added is the **primary** — it holds the keyboard position in the tree, and it is the one element that the surfaces which can only speak about one thing address: the block action bar, and the ancestor trail in the status bar, which puts **N selected** in front of the trail to say the trail is naming one member of a set. On the canvas, every selected element gets a box.
+
+What a multiple selection changes:
+
+- **The Inspector says Mixed** wherever the selected elements disagree about a value, instead of showing the primary's value as though it were everyone's. The chip counts the elements it speaks for — **mixed (6)** — typing a value writes it to all six in one step, and clicking the chip clears it from all six. See the **[Content tab](/docs/studio/design/properties)**.
+- **Delete and Duplicate act on the whole selection, as a single undo step** — one :kbd[⌘Z] brings all six elements back. They are the canvas keys :kbd[Delete] and :kbd[⌘D], and they are also in the [command palette](/docs/studio/interface/quick-access). Duplicating leaves the copies selected, in page order; deleting leaves the primary's parent selected.
+- **Whatever the elements have in common, one decision covers.** A style value typed with six cards selected is one transaction, so it is one undo step rather than six.
+- **A selection that includes something with no sibling position is refused rather than half-applied.** The document element, a repeating list's template row and a condition's case row cannot be spliced, so **Duplicate** and **Delete** turn unavailable for the whole selection — greyed, with the reason they always give — instead of quietly acting on the rest of it.
+- **Right-clicking a row that is already selected keeps the selection**; right-clicking anywhere else selects that row alone.
+
+:::doc-note
+**Move up / down / in / out stay single-target**, because moving several elements that are not siblings one slot along has no single meaning. From the [block action bar](/docs/studio/interface/canvas#the-block-action-bar) they act on the primary; from a row's own buttons they act on that row. The same goes for renaming and for dragging: you drag the row you grabbed, not the set.
+:::
 
 ## Rename an element
 
-Rows are named automatically from the element's content. To give one a name of your own — "Hero section" beats a `div` with a text preview — double-click the row, type the name, and press :kbd[Enter]. Press :kbd[Esc] to cancel, or commit an empty name to go back to the automatic label.
+Rows are named automatically from the element's content. To give one a name of your own — "Hero section" beats a `div` with a text preview — double-click the row, type the name, and press :kbd[Enter]. From the keyboard, :kbd[Enter] or :kbd[F2] on the focused row starts the same rename. Press :kbd[Esc] to cancel, or commit an empty name to go back to the automatic label.
 
 :::doc-note
 The name is a display title only — Studio stores it as a `$title` key on the element in the file. It never changes what the page renders.
@@ -48,19 +75,19 @@ Select a row — or just hover it — and its actions appear on the right:
 - **Move up** / **Move down** arrows swap the element with its neighbors.
 - The **right arrow** moves the element inside the sibling above it.
 - The **left arrow** moves the element out of its parent, to sit just after it.
-- **⋮** holds **Duplicate** and **Delete**.
+- **More actions** holds **Duplicate** and **Delete**.
 
-An action that cannot apply — moving the first child up, say — is shown greyed rather than hidden, with a tooltip saying what it needs. The buttons never move under your cursor.
+A row's buttons act on **that row** — the one under your pointer, which is not always the one you selected. An action that cannot apply — moving the first child up, say — is shown greyed rather than hidden, with a tooltip saying what it needs. The buttons never move under your cursor.
 
 :::doc-tip
-The tree is keyboard-navigable. :kbd[↑] and :kbd[↓] walk the rows, :kbd[→] and :kbd[←] expand and collapse, and :kbd[Home] / :kbd[End] jump to the ends.
+The tree is keyboard-navigable. :kbd[↑] and :kbd[↓] walk the rows and take the selection with them, :kbd[→] expands a row or steps into it, :kbd[←] collapses it or climbs to its parent, and :kbd[Home] / :kbd[End] jump to the ends.
 :::
 
 For bigger moves, drag the **⠿** handle — which appears on any row you hover — or the row itself. An indicator shows where the element will land: above or below the row under the cursor, or inside it as a child. You can also drag a row straight onto the canvas and drop it at the spot you see. Press :kbd[Esc] mid-drag to cancel with nothing changed. Dropping an element into itself or its own descendants is blocked.
 
 ## Right-click for everything else
 
-Right-clicking a row opens the same context menu as the canvas — **Copy**, **Duplicate**, **Copy styles**, **Wrap in Div**, **Repeat…**, **Convert to Component**, **Delete**, and more. The full list is in **[The canvas](/docs/studio/interface/canvas)**. **Set Title** in that menu starts the same rename as double-clicking.
+Right-clicking a row opens the same context menu as the canvas — **Copy**, **Duplicate**, **Copy styles**, **Wrap in Div**, **Repeat...**, **Convert to Component**, **Delete**, and more. The full list is in **[The canvas](/docs/studio/interface/canvas)**. **Set Title** in that menu starts the same rename as double-clicking.
 
 In **Stylebook** the Outline panel switches to the element catalog instead of the document tree — see **[Stylebook](/docs/studio/design/stylebook)**.
 

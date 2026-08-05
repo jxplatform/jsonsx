@@ -172,7 +172,7 @@ describe("selectStylebookTag", () => {
     expect(tab.session.ui.activeSelector).toBe("table th");
     expect(tab.session.ui.rightTab).toBe("style");
     expect(tab.session.ui.activeMedia).toBe("md");
-    expect(tab.session.selection).toEqual([]);
+    expect(tab.session.selection).toEqual([[]]);
   });
 
   test("omitting media leaves the current breakpoint context untouched", () => {

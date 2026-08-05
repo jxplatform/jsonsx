@@ -32,7 +32,7 @@ function parentTab(): Tab {
     rightTab: "style",
     zoom: 0.75,
   });
-  tab.session.selection = ["children", 0];
+  tab.session.selection = [["children", 0]];
   tab.doc.dirty = true;
   return tab;
 }
@@ -78,7 +78,7 @@ describe("pushSubDocument", () => {
 
     expect(frame.documentPath).toBe("pages/index.json");
     expect(frame.dirty).toBe(true);
-    expect(frame.selection).toEqual(["children", 0]);
+    expect(frame.selection).toEqual([["children", 0]]);
     expect(frame.ui.activeMedia).toBe("@md");
     expect(frame.ui.rightTab).toBe("style");
 
@@ -87,7 +87,7 @@ describe("pushSubDocument", () => {
     expect(tab.documentPath).toBeNull();
     expect(tab.doc.dirty).toBe(false);
     expect(tab.doc.mode).toBe("component");
-    expect(tab.session.selection).toBeNull();
+    expect(tab.session.selection).toEqual([]);
     disposeTab(tab);
   });
 
@@ -125,7 +125,7 @@ describe("popSubDocument", () => {
     expect(tab.documentPath).toBe("pages/index.json");
     expect(tab.doc.document.tagName).toBe("main");
     expect(tab.doc.dirty).toBe(true);
-    expect(tab.session.selection).toEqual(["children", 0]);
+    expect(tab.session.selection).toEqual([["children", 0]]);
     expect(tab.session.ui.rightTab).toBe("style");
     expect(tab.session.ui.zoom).toBe(0.75);
     expect(tab.session.ui.activeSelector).toBe(":hover");

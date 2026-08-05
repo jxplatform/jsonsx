@@ -373,7 +373,7 @@ describe("applyInlineSplit", () => {
     expect(newPath).toEqual(["children", 1]);
     expect(kids()[0]!.textContent).toBe("Hel");
     expect(kids()[1]).toMatchObject({ tagName: "p", textContent: "lo" });
-    expect(tab.session.selection).toEqual(["children", 1]);
+    expect(tab.session.selection).toEqual([["children", 1]]);
   });
 });
 
@@ -483,7 +483,7 @@ describe("explicit-tab routing", () => {
   test("a commit against an INACTIVE tab mutates that tab without touching its selection", async () => {
     const { openTab, workspace } = await import("../src/workspace/workspace");
     const original = tab;
-    original.session.selection = ["children", 0];
+    original.session.selection = [["children", 0]];
     openTab({ document: { tagName: "div" }, id: "front-tab" });
     expect(workspace.activeTabId).toBe("front-tab");
 
@@ -498,7 +498,7 @@ describe("explicit-tab routing", () => {
     const originalKids = original.doc.document.children as Record<string, unknown>[];
     expect(newPath).toEqual(["children", 1]);
     expect(originalKids).toHaveLength(2);
-    expect(original.session.selection).toEqual(["children", 0]);
+    expect(original.session.selection).toEqual([["children", 0]]);
   });
 });
 

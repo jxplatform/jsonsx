@@ -38,7 +38,7 @@ The paperclip menu offers two attachments, each shown as a removable chip above 
 - **Current page** — the file open in the active tab.
 - **Selected element** — the element currently selected on the canvas, identified by its tag and a snippet of its text.
 
-Attaching the selected element is the precise way to say "this one": "make _this_ heading smaller" works reliably when the heading rides along as a chip. One chip of each kind is kept, chips clear after sending, and sent messages display their chips so you can see later what a request pointed at.
+With several elements selected, the chip carries the **primary** one — the last you added — so the attachment always names a single, unambiguous target. Attaching the selected element is the precise way to say "this one": "make _this_ heading smaller" works reliably when the heading rides along as a chip. One chip of each kind is kept, chips clear after sending, and sent messages display their chips so you can see later what a request pointed at.
 
 Even without attachments the assistant already knows a lot: each message carries the open page's full contents and a summary of the project — its name, settings, component names, and file paths. Attachments are for pointing, not for granting access.
 

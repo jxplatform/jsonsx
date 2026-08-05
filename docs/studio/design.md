@@ -22,10 +22,10 @@ Breakpoints themselves — where they come from and how overrides cascade — ar
 
 Design mode is the canvas plus a set of panels, each with its own page:
 
-- **[Outline panel](/docs/studio/design/layers)** — the page's structure as a tree: select, rename, reorder, and act on any element.
+- **[Outline panel](/docs/studio/design/layers)** — the page's structure as a tree: select one element or a whole range, rename, reorder, and act on them together.
 - **[Insert palette](/docs/studio/design/elements)** — add HTML elements and your components by click or drag.
 - **[Content tab](/docs/studio/design/properties)** — attributes, link targets, component props, and page settings for the selection.
-- **[Style inspector](/docs/studio/design/style-inspector)** — visual CSS controls for the selection, section by section.
+- **[Style inspector](/docs/studio/design/style-inspector)** — visual CSS controls for the selection, under a Target Line that states exactly what an edit will change.
 - **[Hover states and selectors](/docs/studio/design/states-and-selectors)** — style `:hover`, `:focus`, and selectors of your own.
 - **[Design tokens](/docs/studio/design/tokens)** — name your colors, fonts, and sizes once and reuse them everywhere.
 - **[Stylebook](/docs/studio/design/stylebook)** — set the default look of every heading, button, and link in one catalog.

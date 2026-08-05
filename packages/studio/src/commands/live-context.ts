@@ -29,6 +29,7 @@ import { componentRegistry } from "../files/components";
 import { getNodeAtPath, projectState } from "../store";
 import { shell } from "../shell";
 import { activeTab, workspace } from "../workspace/workspace";
+import { primarySelection } from "../tabs/selection";
 import { canRedo, canUndo } from "../tabs/transact";
 import { collabState } from "../collab/collab-state";
 
@@ -139,17 +140,23 @@ export function createLiveContext(sources: LiveContextSources): () => CommandCon
     // Panes land in P3; until then the grid is one pane showing the focused tab.
     ctx.pane.count = workspace.tabOrder.length > 0 ? 1 : 0;
 
-    const selection = tab?.session.selection ?? null;
+    const paths = tab?.session.selection ?? [];
+    const selection = primarySelection(paths);
     if (selection) {
       const node = getNodeAtPath(tab!.doc.document, selection);
-      ctx.selection.count = 1;
+      ctx.selection.count = paths.length;
+      ctx.selection.paths = paths.map((path) => [...path]);
+      // Every remaining fact describes the PRIMARY — the one node a single-target verb addresses —
+      // Except `isRoot`, which is the batch's own gate: a batch containing the document element
+      // Cannot be deleted or duplicated any more than that element could be on its own.
       ctx.selection.kind = typeof node?.tagName === "string" ? node.tagName : "";
       // A path of fewer than two segments addresses the document element itself — the same test
       // `shortcuts.ts` spelled as `selection.length >= 2` at four separate call sites.
-      ctx.selection.isRoot = selection.length < 2;
+      ctx.selection.isRoot = paths.some((path) => path.length < 2);
       ctx.selection.isComponentInstance = componentRegistry.some(
         (c) => c.tagName === node?.tagName,
       );
+      ctx.selection.isRepeater = node?.$prototype === "Array";
     }
     // Layout chrome is NOT a document selection: the node is not in the open page at all.
     ctx.selection.isLayoutNode = shell.layoutSelection !== null;

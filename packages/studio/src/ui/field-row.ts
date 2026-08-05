@@ -1,20 +1,24 @@
 /// <reference lib="dom" />
 /**
- * Field-row.js — Universal field row layout for all Studio panels.
+ * Field-row.js — the inspector's row vocabulary, in one module.
  *
- * Renders the consistent pattern: indicator dot + label + widget slot, plus §7.1's **third
- * notification tier** — an `error` line rendered at the control, under the widget it belongs to.
+ * Three rows, and every panel that draws one imports it from here:
  *
- * The other two tiers are hosted records in `services/notify.ts`: a toast is taken away on a timer,
- * a problem is kept until somebody fixes it. An inline error is neither, because it is not a record
- * at all — it is a property of the value currently in the field, and it lives exactly as long as
- * that value does. Which is the point: a rejected value used to be announced in a three-second grey
- * line at the bottom of the window, hundreds of pixels from the field that rejected it, and by the
- * time you looked down the field had snapped back and the reason was gone.
+ * - {@link renderFieldRow} — label + widget, plus §7.1's **third notification tier** (an `error` line
+ *   rendered at the control) and §6.2's **provenance chip** (where this value came from). The chip
+ *   itself is `panels/provenance.ts`'s: one vocabulary, two cascades, one template.
+ * - {@link renderKvRow} — an editable key/value pair with a delete affordance. Custom attributes and
+ *   custom CSS properties are the same row; they were two.
+ * - {@link renderStaticKvRow} — the read-only name/value line. Observed Attributes, CSS Properties
+ *   and CSS Parts each hand-wrote it with the same inline style declarations.
  *
- * Every panel that renders a field row inherits it: style, attributes, frontmatter, signals,
- * schema-driven settings forms. A consumer with a message passes one; a consumer with none passes
- * nothing and the row is exactly what it was.
+ * **The error line.** The other two notification tiers are hosted records in `services/notify.ts`:
+ * a toast is taken away on a timer, a problem is kept until somebody fixes it. An inline error is
+ * neither, because it is not a record at all — it is a property of the value currently in the
+ * field, and it lives exactly as long as that value does. Which is the point: a rejected value used
+ * to be announced in a three-second grey line at the bottom of the window, hundreds of pixels from
+ * the field that rejected it, and by the time you looked down the field had snapped back and the
+ * reason was gone.
  *
  * **Validated on commit, never on input** (§7.1). Producers decide a value is bad on `change` or
  * blur, not on `input` — a field cannot spend the middle of every word telling you it is wrong.
@@ -22,6 +26,11 @@
 
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
+import { renderProvenanceChip } from "../panels/provenance";
+
+import type { FieldProvenance } from "../panels/provenance";
+
+// ─── The field row ───────────────────────────────────────────────────────────
 
 /** Options for {@link renderFieldRow}. */
 export interface FieldRowOptions {
@@ -34,6 +43,12 @@ export interface FieldRowOptions {
   labelExtra?: unknown;
   span?: number;
   warning?: boolean;
+  /**
+   * Where this value came from (§6.2). When omitted the row derives the `set`/`default` pair from
+   * `hasValue` and `onClear`, which is what every caller meant by them all along; a caller that can
+   * answer the richer question passes the answer.
+   */
+  provenance?: FieldProvenance | undefined;
   /**
    * Why the value in this control is not acceptable — §7.1's inline tier.
    *
@@ -56,7 +71,7 @@ export interface FieldRowOptions {
 }
 
 /**
- * Render a universal field row with indicator dot, label, widget, and an optional inline error.
+ * Render a universal field row with a provenance chip, label, widget, and an optional inline error.
  *
  * @param {FieldRowOptions} opts
  * @returns {import("lit-html").TemplateResult}
@@ -70,10 +85,14 @@ export function renderFieldRow({
   labelExtra,
   span,
   warning,
+  provenance,
   error,
   errorCount,
 }: FieldRowOptions) {
   const invalid = Boolean(error);
+  const chip: FieldProvenance | undefined =
+    provenance ??
+    (hasValue && onClear ? { onClick: onClear, state: "set", title: `Clear ${prop}` } : undefined);
   return html`
     <div
       class=${classMap({
@@ -85,18 +104,7 @@ export function renderFieldRow({
       style=${span === 2 ? "grid-column: 1 / -1" : ""}
     >
       <div class="style-row-label">
-        ${
-          hasValue && onClear
-            ? html`<span
-                class="set-dot"
-                title="Clear ${prop}"
-                @click=${(e: Event) => {
-                  e.stopPropagation();
-                  onClear();
-                }}
-              ></span>`
-            : nothing
-        }
+        ${chip ? renderProvenanceChip(prop, chip) : nothing}
         <sp-field-label size="s" title=${prop}>${label}</sp-field-label>
         ${labelExtra ?? nothing}
       </div>
@@ -112,6 +120,130 @@ export function renderFieldRow({
             </p>`
           : nothing
       }
+    </div>
+  `;
+}
+
+// ─── The editable key/value row ──────────────────────────────────────────────
+
+/** Options for {@link renderKvRow}. */
+export interface KvRowOptions {
+  /** The pair's current key. */
+  name: string;
+  /** The pair's current value. */
+  value: string;
+  /** Commit both cells, debounced, with the current contents of each. */
+  onCommit: (name: string, value: string) => void;
+  /** Remove the pair outright. */
+  onDelete: () => void;
+  /**
+   * The value cell's placeholder, resolved from the key — a CSS property's initial value, say.
+   *
+   * A resolver rather than a string because the key is editable: typing `display` into the key cell
+   * should offer `inline` under it before anything is committed, and only the caller knows the
+   * map.
+   */
+  placeholderFor?: ((name: string) => string) | undefined;
+  /** Debounce before {@link KvRowOptions.onCommit}, in ms. */
+  debounceMs?: number;
+}
+
+/**
+ * An editable key/value pair with a delete affordance — the ONE implementation.
+ *
+ * Custom HTML attributes and custom CSS properties are the same row and were written twice, with
+ * different rename behaviour (one committed on `input`, the other on `change`) and different
+ * placeholder plumbing. They now differ only in what they pass in.
+ *
+ * @param {KvRowOptions} opts
+ */
+export function renderKvRow({
+  name,
+  value,
+  onCommit,
+  onDelete,
+  placeholderFor,
+  debounceMs = 400,
+}: KvRowOptions) {
+  let debounce: ReturnType<typeof setTimeout> | undefined;
+  let currentName = name;
+  let currentValue = value;
+  const commit = () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => onCommit(currentName, currentValue), debounceMs);
+  };
+  return html`
+    <div class="kv-row" data-prop=${name}>
+      <sp-textfield
+        size="s"
+        class="kv-key"
+        .value=${name}
+        @input=${(e: Event) => {
+          currentName = (e.target as HTMLInputElement).value;
+          commit();
+        }}
+        @change=${
+          placeholderFor
+            ? (e: Event) => {
+                const cell = (e.target as HTMLInputElement)
+                  .closest(".kv-row")
+                  ?.querySelector(".kv-val");
+                cell?.setAttribute(
+                  "placeholder",
+                  placeholderFor((e.target as HTMLInputElement).value),
+                );
+              }
+            : nothing
+        }
+      ></sp-textfield>
+      <sp-textfield
+        size="s"
+        class="kv-val"
+        .value=${value}
+        placeholder=${placeholderFor ? placeholderFor(name) : ""}
+        @input=${(e: Event) => {
+          currentValue = (e.target as HTMLInputElement).value;
+          commit();
+        }}
+      ></sp-textfield>
+      <sp-action-button size="xs" quiet title="Remove ${name}" @click=${onDelete}>
+        <sp-icon-close slot="icon"></sp-icon-close>
+      </sp-action-button>
+    </div>
+  `;
+}
+
+// ─── The read-only key/value row ─────────────────────────────────────────────
+
+/** Options for {@link renderStaticKvRow}. */
+export interface StaticKvRowOptions {
+  /** The thing being named — an attribute, a custom property, a part. Rendered as code. */
+  name: string;
+  /** What it maps to, rendered immediately after the name ("→ count", "<button>"). */
+  detail?: string | undefined;
+  /** Its value or type, rendered hard right. */
+  value?: string | undefined;
+  /** Flags, rendered hard right after the value ("reflects"). */
+  tags?: readonly string[] | undefined;
+}
+
+/**
+ * A read-only name/value line.
+ *
+ * Observed Attributes, CSS Properties and CSS Parts each hand-wrote this with the same
+ * `display:flex;gap:6px;align-items:center;padding:2px 0;font-size:…` inline block — three copies
+ * of one row, none of them addressable by a stylesheet, and so none of them able to respond to the
+ * theme. They differ only in which of the three slots they fill.
+ *
+ * @param {StaticKvRowOptions} opts
+ */
+export function renderStaticKvRow({ name, detail, value, tags }: StaticKvRowOptions) {
+  return html`
+    <div class="kv-static-row" data-prop=${name}>
+      <code class="kv-static-name">${name}</code>
+      ${detail ? html`<span class="kv-static-detail">${detail}</span>` : nothing}
+      ${value ? html`<span class="kv-static-value">${value}</span>` : nothing}
+      ${(tags ?? []).map((tag) => html`<span class="kv-static-tag">${tag}</span>`)}
     </div>
   `;
 }

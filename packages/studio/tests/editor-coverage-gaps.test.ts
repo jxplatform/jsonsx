@@ -126,7 +126,7 @@ describe("convert-to-repeater gaps", () => {
       state: {},
       tagName: "ul",
     } as never);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
 
     const done = convertToRepeater();
     await flush();
@@ -152,7 +152,7 @@ describe("convert-to-repeater gaps", () => {
       state: { rows: { default: [], type: "array" } },
       tagName: "div",
     } as never);
-    tab.session.selection = ["meta", "x"];
+    tab.session.selection = [["meta", "x"]];
 
     const done = convertToRepeater();
     await flush();
@@ -223,7 +223,7 @@ describe("context-menu clipboard gaps", () => {
 
   test("text/html that converts to nothing falls through to text/plain", async () => {
     readResult = [fakeItem({ "text/html": "", "text/plain": "plain fallback" })];
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     await pasteNode();
     const children = doc().children as Record<string, unknown>[];
     expect(children).toHaveLength(3);
@@ -232,7 +232,7 @@ describe("context-menu clipboard gaps", () => {
 
   test("pasting onto a dangling selection is a no-op", async () => {
     readResult = [fakeItem({ "text/plain": "orphan" })];
-    activeTab.value!.session.selection = ["children", 9];
+    activeTab.value!.session.selection = [["children", 9]];
     await pasteNode();
     expect(doc().children).toHaveLength(2);
   });

@@ -119,15 +119,15 @@ describe("undo/redo", () => {
 
   test("undo restores the selection from just before the undone edit", () => {
     const tab = makeTab();
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }));
-    tab.session.selection = ["children", 1];
+    tab.session.selection = [["children", 1]];
     transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 1], "textContent", "world"));
 
     undo(tab); // Selection as it was before the text edit
-    expect(tab.session.selection).toEqual(["children", 1]);
+    expect(tab.session.selection).toEqual([["children", 1]]);
     undo(tab); // Selection as it was before the insert
-    expect(tab.session.selection).toEqual(["children", 0]);
+    expect(tab.session.selection).toEqual([["children", 0]]);
   });
 });
 
@@ -158,9 +158,9 @@ describe("mutateRemoveNode", () => {
 
   test("clears selection if removed node is selected", () => {
     const tab = makeTab();
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     transactDoc(tab, (t) => mutateRemoveNode(t, ["children", 0]));
-    expect(tab.session.selection).toBeNull();
+    expect(tab.session.selection).toEqual([]);
     disposeTab(tab);
   });
 });
@@ -171,7 +171,7 @@ describe("mutateDuplicateNode", () => {
     transactDoc(tab, (t) => mutateDuplicateNode(t, ["children", 0]));
     expect(tab.doc.document.children).toHaveLength(2);
     expect((tab.doc.document as any).children[1].tagName).toBe("p");
-    expect(tab.session.selection).toEqual(["children", 1]);
+    expect(tab.session.selection).toEqual([["children", 1]]);
     disposeTab(tab);
   });
 });

@@ -32,11 +32,26 @@ In Webflow, every style is a class you name, combine, and manage forever. Jx spr
 
 The Style inspector itself gives you the CSS control you're used to — spacing, typography, layout, backgrounds — plus `:hover`, `:focus`, and selectors of your own via **[States and selectors](/docs/studio/design/states-and-selectors)**.
 
+## Every value says where it came from
+
+With that many layers, the question you ask most is "why is this element this color?" Beside each field's label sits a small chip that answers it:
+
+- **Set here** — an accent dot. Click it to clear the value.
+- **Inherited** — it _names the donor_: "from Base", "from site tokens", "from the component default". Clicking it takes you to that layer, so you never have to reason backwards through the cascade to find what's winning.
+- **Bound** — names the signal or formula producing the value, and opens it on click.
+- **Unset** — nothing at all, which keeps the majority of rows quiet.
+
+Collapse a style section and its heading carries the same states as a tally — hover it and it reads "3 set here · 2 inherited". That's why there's no "show only what's set" filter to hunt for: a closed section already tells you whether anything inside it is yours.
+
 ## A canvas per breakpoint
 
 Instead of one canvas you flip between breakpoints, Design mode renders a live panel for **every** breakpoint side by side, each running your real responsive rules. A tablet-only change shows up in the tablet panel while the others hold still — no more toggling back and forth to check you didn't break desktop. See **[Design mode](/docs/studio/design)** and **[Breakpoints](/docs/studio/design/breakpoints)**.
 
 ![Jx Studio's Design mode rendering one component across four responsive breakpoints with the style inspector open](../images/mode-design.png)
+
+## Selecting more than one thing
+
+A selection in Jx is a list, not a single element. In the **[Outline](/docs/studio/design/layers#select-several-at-once)**, :kbd[Shift]-click extends a range from the row you started at; :kbd[⌘]-click (macOS) / :kbd[Ctrl]-click (Windows/Linux) adds one element at a time or takes it back out, and that second gesture works on the canvas too. Set a style property, an attribute, or an event binding with several elements selected and the edit lands on all of them as one undoable step — as do Delete and Duplicate. Where the selected elements disagree about a value the field reads **Mixed**, with the count, instead of showing you the last one you clicked as though it spoke for the rest; type into it and every one of them gets the new value. Verbs with no answer over several elements at once — Move Up, say — act on the one you clicked most recently.
 
 ## Symbols and components
 
@@ -52,7 +67,7 @@ Collections cover the content you author. Data that arrives while the site is ru
 
 ## Interactions, honestly
 
-Behavior in Jx comes from three surfaces working together: **[State](/docs/studio/logic/state)** declares what a page knows, the **[Events](/docs/studio/logic/events)** tab binds behavior to clicks, typing, and submits, and **[formulas](/docs/studio/logic/formulas)** compute values live. Toggles, tabs, filtered lists, form behavior — the logic side of interactions — is covered, often more directly than a timeline can express it.
+Behavior in Jx comes from three surfaces working together: **[State](/docs/studio/logic/state)** declares what a page knows, the Inspector's **Logic** tab (:kbd[⌘⇧3]) binds **[events](/docs/studio/logic/events)** to clicks, typing, and submits, and **[formulas](/docs/studio/logic/formulas)** compute values live. Logic is also where a `$switch` picks between variants and where a repeater is pointed at its list, so everything about how one element behaves is in one place. Toggles, tabs, filtered lists, form behavior — the logic side of interactions — is covered, often more directly than a timeline can express it.
 
 What Jx doesn't have is Webflow's scroll-driven animation timeline. Hover and focus effects with CSS transitions come through [States and selectors](/docs/studio/design/states-and-selectors), but choreographed scroll animation isn't a built-in surface today.
 

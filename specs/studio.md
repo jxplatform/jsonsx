@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.4.4-draft
+**Version:** 0.5.2-draft
 **Status:** Partial
-**Updated:** 2026-08-04
+**Updated:** 2026-08-05
 **License:** MIT
 
 ---
@@ -296,7 +296,9 @@ Flattened tree of all elements in the document with indentation representing nes
 
 **Drag and Drop** — The entire layer row is draggable via Atlassian Pragmatic Drag and Drop. Users can grab any part of the row to drag; a grip glyph appears on hover to advertise it. Drop indicators show reorder (above/below) and reparent (make-child) targets.
 
-**Move Action Buttons** — The **selected** non-root element row carries contextual move buttons. Selection rather than hover, because the buttons are Spectrum custom elements and building five of them for every visible row made the panel's render cost scale with document size; a click on a row both selects it and reveals its actions. The grab affordance is a plain glyph and therefore stays on every row.
+**Move Action Buttons** — The row carrying the **primary** selection carries contextual move buttons.
+They stay single-target under a multiple selection (§6.7): moving several non-sibling nodes one slot
+has no single meaning, and each step is arithmetic against a parent the previous step renumbered. Selection rather than hover, because the buttons are Spectrum custom elements and building five of them for every visible row made the panel's render cost scale with document size; a click on a row both selects it and reveals its actions. The grab affordance is a plain glyph and therefore stays on every row.
 
 | Button | Icon          | Action                                             | Shown when                                        |
 | ------ | ------------- | -------------------------------------------------- | ------------------------------------------------- |
@@ -430,9 +432,38 @@ When a Jx component is selected, the property panel renders its declared `state`
 | `"date"`  | Text field with `placeholder="YYYY-MM-DD"`                       |
 | `"color"` | Color picker (reuses style panel `renderColorSelector`)          |
 
-Each prop also supports dynamic values via the shared dynamic-slot mode button beside its label (caps: literal / `$ref` / `${}` template). Cycling to `$ref` replaces the widget with a signal picker listing available `state` entries; each mode's former value is remembered for the session, so cycling back restores it.
+Each prop's value source is chosen from the shared ladder (§6.6) rather than a cycle button, and each
+prop row carries a provenance chip (§6.7) distinguishing a value set here from the component's own
+default — the same vocabulary the Style tab uses, because it is the same question asked of a second
+cascade.
 
 ### 6.2 Style Sidebar (Metadata-Driven)
+
+**The Target Line states the compound target before you type.** A style edit is addressed by a tuple
+— element, breakpoint, selector, colour-scheme variant — that the panel has always computed
+internally as its per-field key, and never showed. It is now one sentence at the top of the tab,
+region `inspector/target`, each segment a control:
+
+```text
+⌖  h1 · Base · Dark variant · :hover                   [ this element ]
+```
+
+The segments are the element, the breakpoint, the colour-scheme variant when there is one, and the
+selector last. A scheme variant appears **only at Base**: scheme × breakpoint compound blocks are
+not supported (`spec.md` §9.5's pure-query limitation), so at a breakpoint the line reads
+`⌖ h1 · @md · :hover`.
+
+The trailing **scope chip** states the blast radius: _this element_, _all `<h1>` in this document_,
+or _all `<h1>` in this project_. The project case renders as a warning band with a count of affected
+files and a way to list them, and where the count cannot be answered it says **unknown** — never a
+confident zero. This is what makes Stylebook safe: entering it used to convert every subsequent edit
+from "this element" to "every element of this tag" with one line of after-the-fact text as the only
+signal.
+
+The Target Line **replaces** the breakpoint tab strip, the selector picker and the scheme badge.
+The breakpoint and scheme axes are selected on the pane context bar (§3.2 ⑦), whose definition site
+is Project Settings › Contexts (§16); the Style tab does not own a third selector and therefore
+cannot disagree with the one the canvas is rendering under.
 
 Organized, metadata-driven style sections. Metadata loaded from `css-meta.json` (JSON Schema definitions for each CSS property).
 
@@ -521,22 +552,29 @@ A custom LitElement (no shadow DOM) used across all dual-mode style inputs. Repl
 
 Properties conditionally appear based on other property values (e.g. flex properties when `display: flex`).
 
-#### Media Breakpoint Tabs
+#### The breakpoint and scheme axes
 
-Tabs for each `$media` breakpoint, allowing responsive style editing per breakpoint. The media tabs and pseudo-selector share a single compact toolbar row — tabs on the left, selector picker on the right (quiet `sp-picker`).
-
-Color-scheme variants add **no extra tabs**: the tab-bar Auto/Light/Dark control (§4.1) is the one scheme switch per tab. While a scheme with a matching declared scheme query is forced, Base-context reads and commits target that scheme's `@--name` block through the same media-style mutations, a "… variant" badge beside the tabs marks the active layer, and base values show through as inherited placeholders. Size-breakpoint tabs stay breakpoint-scoped regardless of the toggle — scheme × breakpoint compound blocks are not supported (spec.md §9.5's pure-query limitation).
+Neither is chosen here. Both are selected on the pane context bar (§3.2 ⑦) and defined in Project
+Settings › Contexts (§16); the Target Line's segments **state** the resolved value and route to that
+definition site. While a scheme is forced, Base-context reads and commits target that scheme's
+`@--name` block through the same media-style mutations, and base values are reported by the
+provenance chip as inherited **from Base** rather than as a placeholder indistinguishable from the
+CSS initial value.
 
 #### Nested Selector Context
 
-Nested CSS selectors (`:hover`, `:focus`, `:active`, `& childTag`) are editable as separate style contexts. The selector picker is inline in the media tabs toolbar bar, right-aligned. The Relative Styling section's "+ Add" affordance opens an Add Nested Selector dialog (`showPromptDialog`, studio-ui-guidelines.md §8.7) and creates an empty rule for the entered selector.
+Nested CSS selectors (`:hover`, `:focus`, `:active`, `& childTag`) are editable as separate style
+contexts, and the active one is the Target Line's last segment. Naming a new selector opens a prompt
+dialog (`studio-ui-guidelines.md` §8.7) with validation; accepting it **points the tab at that
+selector without writing anything** — the rule is created by the first property set, so an abandoned
+selector leaves no empty rule behind.
 
-#### Property Filter Bar
+#### Property Filter
 
-Below the media/selector toolbar, a filter bar provides two controls:
-
-1. **Search input** — Text field for filtering CSS properties by name or label (case-insensitive substring match). When active, only matching properties are shown and their sections are force-opened; empty sections are hidden.
-2. **Active toggle** — Button that isolates only properties with set values, providing a focused view of applied styles. When active, sections without set properties are hidden.
+One control: a search input filtering CSS properties by name or label (case-insensitive substring),
+which force-opens matching sections and hides empty ones. There is deliberately **no second control
+isolating properties that have values** — that is what the provenance tally on each collapsed
+section header now says, continuously, without the author having to toggle a mode to find out.
 
 ### 6.3 State Editor
 
@@ -569,6 +607,61 @@ For custom element definitions:
 
 ---
 
+### 6.6 The value-source ladder
+
+Six vocabularies asked "how is this value produced" in six different words — the dynamic-slot ring,
+the events picker, the expression operand picker, the schema-form source select. They are one
+vocabulary now, and the provenance chip **is** the control:
+
+| Rung            | Means                     |
+| --------------- | ------------------------- |
+| **Fixed value** | a literal                 |
+| **From data…**  | a `$ref` to a state entry |
+| **Mixed text**  | a `${…}` template         |
+| **Formula**     | an `$expression`          |
+
+Three rules the ladder must keep:
+
+1.  **Any rung is one action away.** The control opens a picker; it does not cycle. A ring forced
+    `$ref → literal` to pass through `${}`, which is an edit the author did not ask for.
+2.  **Which rungs exist is derived from what the schema permits**, never from a hand-written list.
+    Hand-written lists are how the `Formula` rung came to be drawn on fields where `$expression` was
+    not legal and reachable on none.
+3.  **Switching rungs remembers the representation it left**, so a switch is never destructive, and
+    typing a `${…}` literal does not swap the widget underneath the author mid-keystroke.
+
+### 6.7 Provenance, and multiple selection
+
+**Every field label carries a four-state chip**, and an inherited value NAMES its donor:
+
+| State         | Behaviour                                                                                                  |
+| ------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Set here**  | click clears it                                                                                            |
+| **Inherited** | names the donor — "from Base", "from site tokens", "from the component default" — and clicking jumps there |
+| **Default**   | renders nothing; absence is the ghost state                                                                |
+| **Bound**     | names the signal or formula, and clicking opens it                                                         |
+
+The inheritance walk already knew the donor and discarded it, leaving inherited values rendered as
+an input placeholder — visually identical to the CSS initial value. Collapsed section headers carry
+the same states as a tally, which is why there is no separate "show only active properties" toggle:
+that toggle existed only because provenance was invisible.
+
+**`session.selection` is a `JxPath[]`.** `[]` means nothing is selected — it is no longer a legal
+spelling of the root path, which is `[[]]`. The first entry is the range anchor and the last is the
+**primary**; every surface that addresses a single node resolves it through one function, so at
+`length === 1` each receives exactly what a single-path field handed it. Multi-selection cases are
+additions beside that path, never a rewrite of it.
+
+Three consequences are normative:
+
+1.  **A structural command over a selection is ONE transaction and therefore one undo step.** Splices
+    are applied in descending document order, so no step renumbers a coordinate a later step needs,
+    and paths contained by another selected path are dropped rather than spliced twice.
+2.  **A value that differs across the selection renders as Mixed**, in the same chip vocabulary,
+    rather than showing the primary's value as though it were everyone's.
+3.  **A selection is replaced, never mutated in place.** Effects track the set, not the array
+    identity; an in-place push would move the selection without repainting the panel drawing it.
+
 ## 7. Stylebook Mode
 
 ### 7.1 Overview
@@ -593,7 +686,11 @@ Selection works from both the layers panel (click row) and the canvas (click ele
 
 Editing styles in stylebook mode writes nested CSS rules (`& tag`) to the document's root `$style` object. Media breakpoint tabs allow responsive token editing. Scheme-layer routing applies here exactly as in the style sidebar (§6.2): a forced scheme routes edits into the corresponding `@--name` block, which the live `styleUpdate` path re-applies through the runtime's dual emission.
 
-The site-settings design-token editor is scheme-aware for color tokens: each color row carries a per-scheme override field writing into the project style's scheme block, and an "Enable dark scheme" affordance declares the `--dark` scheme query in `$media` for projects that have none — the opt-in that lights up every scheme control in Studio. Token edits push to live page canvases as an in-place site-style sheet replace (no re-render).
+The site-settings design-token editor is scheme-aware for color tokens: each color row carries a per-scheme override field writing into the project style's scheme block. Declaring a scheme is not done here — the token editor links to Project Settings › Contexts (§16), which is the single definition site for breakpoints and colour schemes, and which is why adding one no longer costs the author their element selection. Token edits push to live page canvases as an in-place site-style sheet replace (no re-render).
+
+Stylebook's own compound target is stated by the Target Line (§6.2), whose scope chip is what tells
+the author, before the first keystroke, that an edit here lands on every element of a tag rather
+than on one.
 
 ---
 
@@ -1358,6 +1455,9 @@ from a panel that has stopped working.
 
 ## Changelog
 
+- **0.5.2-draft** (2026-08-05) — §5.2 the move buttons follow the primary selection and stay single-target under a multiple selection.
+- **0.5.1-draft** (2026-08-05) — §6.2 corrects the Target Line illustration — the selector is the last segment and a scheme variant appears only at Base — and retires the breakpoint-tabs, inline-selector-picker and Active-toggle subsections the Target Line replaced.
+- **0.5.0-draft** (2026-08-04) — §6.2 the Target Line and its scope chip; §6.6 the one value-source ladder; §6.7 provenance chips naming the donor, and selection as a JxPath[] with Mixed values and one transaction per batch; §7.4 scheme declaration moves to Contexts.
 - **0.4.4-draft** (2026-08-04) — §16 Feedback, Problems and Progress — the three notification tiers, the Bottom dock, Activity, and the status bar as ambient state only.
 - **0.4.3-draft** (2026-08-03) — §9.1.1: destructive confirmations state the reference count — what a delete breaks, what a rename rewrites, and the three states (counted / uncountable / unsupported) that are never collapsed.
 - **0.4.2-draft** (2026-08-03) — The Inspector's fourth tab (§3.1, §6): the assistant is Content · Style · Logic · Assistant, not a fifth column; two docks, one persisted record. Application Preferences (§15) — Appearance, Assistant, Accounts (listed and revocable) and a registry-generated Keyboard sheet.
@@ -1406,4 +1506,4 @@ from a panel that has stopped working.
 
 ---
 
-_`@jxsuite/studio` Specification v0.4.4-draft_
+_`@jxsuite/studio` Specification v0.5.2-draft_

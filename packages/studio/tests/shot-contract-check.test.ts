@@ -554,7 +554,11 @@ describe("loadCommandTable", () => {
     expect(loaded.get("seed.projectList")?.source).toBe(DEFAULT_COMMAND_SOURCES[1]);
     expect(loaded.get("seed.git")?.source).toBe(DEFAULT_COMMAND_SOURCES[1]);
     // … and the shim still contributes the ids no registry declares yet.
-    expect(loaded.get("element.insertData")?.source).toBe(DEFAULT_COMMAND_SOURCES[1]);
+    expect(loaded.get("media.browse")?.source).toBe(DEFAULT_COMMAND_SOURCES[1]);
+    // `insert.data` (P5) is the shape of the countdown ending: the record landed in the registry,
+    // So the id resolves from the FIRST source and `element.insertData` left the shim entirely.
+    expect(loaded.get("insert.data")?.source).toBe(DEFAULT_COMMAND_SOURCES[0]);
+    expect(loaded.has("element.insertData")).toBe(false);
   });
 
   test("a module declaring none of the three exports is an error, not an empty projection", async () => {

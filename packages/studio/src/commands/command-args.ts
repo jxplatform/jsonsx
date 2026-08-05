@@ -161,6 +161,38 @@ export function nullablePathArg(
   return pathArg(commandId, args, key);
 }
 
+/**
+ * A LIST of document paths — the whole selection set (§6.5).
+ *
+ * Every element is validated as a path, so a caller that passes one bare path by mistake
+ * (`["children", 0]` rather than `[["children", 0]]`) is refused by name instead of selecting two
+ * nodes called "children" and "0". `[]` is legal and means "select nothing", which is the same
+ * thing `selection.set { path: null }` means.
+ */
+export function pathListArg(
+  commandId: string,
+  args: CommandArgValues,
+  key: string,
+): (string | number)[][] {
+  const value = args[key];
+  if (!Array.isArray(value)) {
+    throw refuse(commandId, key, `expected an array of document paths, got ${describe(value)}`);
+  }
+  return value.map((entry, i) => {
+    if (
+      !Array.isArray(entry) ||
+      !entry.every((s) => typeof s === "string" || typeof s === "number")
+    ) {
+      throw refuse(
+        commandId,
+        key,
+        `entry ${i} is not a document path — expected an array of segments, got ${describe(entry)}`,
+      );
+    }
+    return entry as (string | number)[];
+  });
+}
+
 // ─── Schema fragments ─────────────────────────────────────────────────────────
 // The declarations above are enforced at RUN time; these are the same facts in the form the palette
 // Prompt, the AI tool's parameter list and Lane 1's static check read. Keeping the pair adjacent is
@@ -204,6 +236,15 @@ export function pathProperty(description: string, nullable = false): object {
     type: "array",
   };
   return nullable ? { description, oneOf: [path, { type: "null" }] } : { description, ...path };
+}
+
+/** A property holding a LIST of `JxPath`s — an array of arrays of segments. */
+export function pathListProperty(description: string): object {
+  return {
+    description,
+    items: { items: { type: ["string", "number"] }, type: "array" },
+    type: "array",
+  };
 }
 
 /** A free-form string property. */

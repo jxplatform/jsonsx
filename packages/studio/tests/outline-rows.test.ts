@@ -210,7 +210,7 @@ describe("outlineLabel", () => {
 
 describe("row actions", () => {
   test("only the selected row carries buttons; every other row's slot is empty", async () => {
-    activeTab.value!.session.selection = ["children", 2];
+    activeTab.value!.session.selection = [["children", 2]];
     await renderLayers();
     expect(row(["children", 2]).querySelectorAll("sp-action-button").length).toBe(
       OUTLINE_ROW_MAX_ITEMS + 1, // The four moves plus ⋮.
@@ -221,7 +221,7 @@ describe("row actions", () => {
   });
 
   test("hovering a row builds its cluster, and leaving the tree takes it down", async () => {
-    activeTab.value!.session.selection = ["children", 2];
+    activeTab.value!.session.selection = [["children", 2]];
     await renderLayers();
     const hovered = row(["children", 0]);
     expect(hovered.querySelectorAll("sp-action-button")).toHaveLength(0);
@@ -286,7 +286,7 @@ describe("row actions", () => {
     await renderLayers();
     const target = row(["children", 1]);
     target.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-    activeTab.value!.session.selection = ["children", 1];
+    activeTab.value!.session.selection = [["children", 1]];
     await renderLayers();
 
     const now = row(["children", 1]);
@@ -297,7 +297,7 @@ describe("row actions", () => {
   });
 
   test("the root row has no verbs at all — it is not a node you can move or delete", async () => {
-    activeTab.value!.session.selection = [];
+    activeTab.value!.session.selection = [[]];
     await renderLayers();
     expect(row([]).querySelector(".layer-actions")).toBeNull();
     row([]).dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
@@ -336,7 +336,7 @@ describe("role=tree and the keyboard model", () => {
   });
 
   test("aria-selected follows the selection, and so does the single tab stop", async () => {
-    activeTab.value!.session.selection = ["children", 2];
+    activeTab.value!.session.selection = [["children", 2]];
     await renderLayers();
     expect(row(["children", 2]).getAttribute("aria-selected")).toBe("true");
     const stops = rows().filter((r) => r.tabIndex === 0);
@@ -362,14 +362,14 @@ describe("role=tree and the keyboard model", () => {
   });
 
   test("↑ and ↓ walk the visible rows and take the selection with them", async () => {
-    activeTab.value!.session.selection = [];
+    activeTab.value!.session.selection = [[]];
     await renderLayers();
     press(row([]), "ArrowDown");
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
     expect((document.activeElement as HTMLElement).dataset.path).toBe("children/0");
 
     press(row(["children", 0]), "ArrowUp");
-    expect(activeTab.value!.session.selection).toEqual([]);
+    expect(activeTab.value!.session.selection).toEqual([[]]);
   });
 
   test("↓ at the last row and ↑ at the first stay put", async () => {
@@ -378,7 +378,7 @@ describe("role=tree and the keyboard model", () => {
     press(rows().at(-1)!, "ArrowDown");
     press(rows()[0]!, "ArrowUp");
     expect(rows()).toHaveLength(before);
-    expect(activeTab.value!.session.selection).toBeNull();
+    expect(activeTab.value!.session.selection).toEqual([]);
   });
 
   test("→ expands a collapsed row, then descends into it", async () => {
@@ -409,29 +409,29 @@ describe("role=tree and the keyboard model", () => {
 
     await renderLayers();
     press(row(["children", 0]), "ArrowLeft");
-    expect(activeTab.value!.session.selection).toEqual([]);
+    expect(activeTab.value!.session.selection).toEqual([[]]);
     expect((document.activeElement as HTMLElement).dataset.path).toBe("");
   });
 
   test("← at the top of the tree has nowhere to go", async () => {
     await renderLayers();
     press(row([]), "ArrowLeft");
-    expect(activeTab.value!.session.selection).toBeNull();
+    expect(activeTab.value!.session.selection).toEqual([]);
   });
 
   test("Home and End jump to the ends and select", async () => {
     await renderLayers();
     press(row(["children", 0]), "End");
-    expect(activeTab.value!.session.selection).toEqual(["children", 2]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 2]]);
     press(row(["children", 2]), "Home");
-    expect(activeTab.value!.session.selection).toEqual([]);
+    expect(activeTab.value!.session.selection).toEqual([[]]);
   });
 
   test("Enter and F2 rename the row in place", async () => {
     await renderLayers();
     press(row(["children", 2]), "Enter");
     expect(row(["children", 2]).querySelector(".layer-title-input")).not.toBeNull();
-    expect(activeTab.value!.session.selection).toEqual(["children", 2]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 2]]);
 
     (row(["children", 2]).querySelector(".layer-title-input") as HTMLElement).remove();
     press(row(["children", 0]), "F2");
@@ -441,13 +441,13 @@ describe("role=tree and the keyboard model", () => {
   test("a key pressed outside a row is not the tree's business", async () => {
     await renderLayers();
     press(tree(), "ArrowDown");
-    expect(activeTab.value!.session.selection).toBeNull();
+    expect(activeTab.value!.session.selection).toEqual([]);
   });
 
   test("an unhandled key falls through", async () => {
-    activeTab.value!.session.selection = [];
+    activeTab.value!.session.selection = [[]];
     await renderLayers();
     press(row([]), "a");
-    expect(activeTab.value!.session.selection).toEqual([]);
+    expect(activeTab.value!.session.selection).toEqual([[]]);
   });
 });

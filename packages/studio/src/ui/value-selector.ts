@@ -6,6 +6,11 @@
  * dropdown overlay (manual combobox) when it doesn't. Both modes share identical styled menu items,
  * ensuring visual consistency.
  *
+ * The option list is a set of SUGGESTIONS, never a whitelist: both modes emit `change` on commit
+ * (picker selection, menu selection, or blur/Enter in the textfield) and combobox mode also emits
+ * `input` while typing, so a caller can offer a short list of common values without forbidding the
+ * rest — which is what lets a control like the event-name field stop being a list of ten.
+ *
  * Usage: html`<jx-value-selector size="s" .value=${"italic"} placeholder="normal" .options=${[{
  * value: "italic", label: "Italic", style: "font-style: italic" }]} @change=${handler}
  * @input=${handler}
@@ -101,6 +106,20 @@ export class JxValueSelector extends LitElement {
     this.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
   }
 
+  /**
+   * Combobox mode: textfield @change handler (blur / Enter).
+   *
+   * Without this, a typed value only ever reached listeners as `input`. Every consumer that binds
+   * `@change` — the pattern for "commit this to the document" everywhere else in the app — saw
+   * nothing at all, so the free-form half of this dual-mode control was decorative: you could type
+   * a value the option list did not contain and it would never be written down.
+   */
+  _handleTextChange(e: Event) {
+    e.stopPropagation();
+    this.value = (e.target as HTMLInputElement).value;
+    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  }
+
   /** Set popover min-width to match trigger width (replicates sp-picker behavior) */
   _setPopoverWidth(e: Event) {
     const group = this.querySelector(".jx-combobox-group");
@@ -133,6 +152,7 @@ export class JxValueSelector extends LitElement {
           placeholder=${this.placeholder}
           .value=${live(this.value || "")}
           @input=${this._handleInput}
+          @change=${this._handleTextChange}
           @click=${(e: Event) => e.stopPropagation()}
         ></sp-textfield>
         <sp-picker-button size=${this.size}></sp-picker-button>

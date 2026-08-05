@@ -53,7 +53,7 @@ beforeAll(() => {
   const tab = resetWorkspaceWithTab();
   // A selection too: `probe.commands()` is `registry.visible()`, so the selection-level records
   // Are correctly absent until something is selected — which is the projection working, not a gap.
-  tab.session.selection = ["children", 0];
+  tab.session.selection = [["children", 0]];
 });
 
 describe("the hook installed, over the composed registry", () => {

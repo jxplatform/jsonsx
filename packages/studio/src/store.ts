@@ -215,7 +215,8 @@ export function renderOnly(...names: string[]) {
  * @param {object} patch — partial session object, e.g. { ui: { zoom: 2 } }
  */
 export function updateSession(patch: {
-  selection?: JxPath | null;
+  /** The whole selection SET — `[]` clears it. Widened with `session.selection` itself (§6.5). */
+  selection?: JxPath[];
   hover?: JxPath | null;
   clipboard?: JxMutableNode | null;
   ui?: Record<string, unknown>;
@@ -224,7 +225,7 @@ export function updateSession(patch: {
   const tab = activeTab.value;
   if (tab) {
     if (patch.selection !== undefined) {
-      tab.session.selection = patch.selection as JxPath | null;
+      tab.session.selection = patch.selection;
     }
     if (patch.hover !== undefined) {
       tab.session.hover = patch.hover as JxPath | null;

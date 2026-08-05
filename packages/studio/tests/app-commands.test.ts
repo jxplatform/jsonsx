@@ -35,6 +35,9 @@ describe("the set", () => {
       "file",
       "formula",
       "help",
+      // `insert.data` — a `${…}` merge tag placed at the live caret. Its one definition site is
+      // `canvas/canvas-render.ts`, beside `selection.set`: both name what the pane points at.
+      "insert",
       "inspector",
       "palette",
       // `pane.toggleZoom` — the pane model (a parallel workstream).

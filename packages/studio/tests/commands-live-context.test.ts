@@ -150,7 +150,7 @@ describe("selection", () => {
   });
 
   test("a nested selection reports its tag and is not the root", () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     const ctx = context();
     expect(ctx.selection.count).toBe(1);
     expect(ctx.selection.kind).toBe("p");
@@ -158,18 +158,55 @@ describe("selection", () => {
   });
 
   test("the document element is a selection of one, and IS the root", () => {
-    activeTab.value!.session.selection = [];
+    activeTab.value!.session.selection = [[]];
     const ctx = context();
     expect(ctx.selection.count).toBe(1);
     expect(ctx.selection.isRoot).toBe(true);
     expect(ctx.selection.kind).toBe("div");
   });
 
+  test("nothing selected reports no paths", () => {
+    expect(context().selection.paths).toEqual([]);
+  });
+
+  test("the paths ARE the selection, in order, so probe.state() can read a batch back", () => {
+    activeTab.value!.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
+    const ctx = context();
+    expect(ctx.selection.paths).toEqual([
+      ["children", 0],
+      ["children", 1],
+    ]);
+    expect(ctx.selection.count).toBe(2);
+  });
+
+  test("every fact but isRoot describes the PRIMARY — the last selected path", () => {
+    activeTab.value!.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
+    expect(context().selection.kind).toBe("jx-card");
+  });
+
+  test("isRoot is the BATCH's gate: any selected path being the document element sets it", () => {
+    activeTab.value!.session.selection = [[], ["children", 0]];
+    expect(context().selection.isRoot).toBe(true);
+  });
+
+  test("the reported paths are a copy, so a caller cannot steer the selection through them", () => {
+    activeTab.value!.session.selection = [["children", 0]];
+    const { paths } = context().selection;
+    paths[0]![1] = 99;
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
+  });
+
   test("a registered component tag reads as an instance", () => {
     componentRegistry.push({ path: "/project/card.jx.json", tagName: "jx-card" } as never);
-    activeTab.value!.session.selection = ["children", 1];
+    activeTab.value!.session.selection = [["children", 1]];
     expect(context().selection.isComponentInstance).toBe(true);
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     expect(context().selection.isComponentInstance).toBe(false);
   });
 

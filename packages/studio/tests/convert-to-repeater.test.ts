@@ -48,7 +48,7 @@ function setup(state: Record<string, unknown> | undefined) {
   installMockPlatform();
   pluginSchemaCache.clear();
   tab = resetWorkspaceWithTab(makeDoc(state) as never);
-  tab.session.selection = ["children", 0];
+  tab.session.selection = [["children", 0]];
 }
 
 beforeEach(() => {
@@ -95,13 +95,13 @@ function child0() {
 
 describe("guards", () => {
   test("no selection → no dialog", async () => {
-    tab.session.selection = null;
+    tab.session.selection = [];
     await convertToRepeater();
     expect(dialog()).toBeNull();
   });
 
   test("missing node → no dialog", async () => {
-    tab.session.selection = ["children", 9];
+    tab.session.selection = [["children", 9]];
     await convertToRepeater();
     expect(dialog()).toBeNull();
   });

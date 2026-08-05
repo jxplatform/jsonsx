@@ -5,6 +5,7 @@ import { html, nothing } from "lit-html";
 import { childList, getNodeAtPath } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { mutateInsertNode, transactDoc } from "../tabs/transact";
+import { primarySelection } from "../tabs/selection";
 import { view } from "../view";
 import { getEffectiveElements } from "../site-context";
 import { buildComponentInstance, componentRegistry } from "../files/components";
@@ -58,7 +59,7 @@ export function renderElementsTemplate(ctx: {
                 data-block-tag=${tag}
                 @click=${() => {
                   const t = activeTab.value;
-                  const parentPath = t?.session.selection || [];
+                  const parentPath = primarySelection(t?.session.selection) ?? [];
                   const parent = getNodeAtPath(t!.doc.document, parentPath);
                   const idx = childList(parent).length;
                   transactDoc(t!, (tr) =>
@@ -133,7 +134,7 @@ export function renderElementsTemplate(ctx: {
                     }
                     @click=${() => {
                       const t = activeTab.value;
-                      const parentPath = t?.session.selection || [];
+                      const parentPath = primarySelection(t?.session.selection) ?? [];
                       const parent = getNodeAtPath(t!.doc.document, parentPath);
                       const idx = childList(parent).length;
                       const instanceDef = buildComponentInstance(comp);

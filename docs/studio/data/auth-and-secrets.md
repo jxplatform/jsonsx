@@ -100,7 +100,7 @@ An input named anything else is invisible to the handler, and the attempt goes o
 On success a handler stops the browser's own form submission, refreshes the session, re-runs the page's table queries — so a list scoped to `owner` fills in the moment someone signs in — and sends the visitor to the matching **redirect** if you configured one. On failure (wrong password, an address that already has an account) the page is simply left as it was; surfacing a message is up to you.
 
 :::doc-note
-The wiring is two state entries and one property on the form. The **[Events panel](/docs/studio/logic/events)** picker only offers plain functions, so point the form at its handler in **[Code mode](/docs/studio/logic/code)**:
+The wiring is two state entries and one property on the form. The **[Events](/docs/studio/logic/events)** section of the Inspector's **Logic** tab (:kbd[⌘⇧3]) lists plain functions in its handler picker, and an auth handler is one key inside a state entry rather than a function of its own — so point the form at it in **[Code mode](/docs/studio/logic/code)**:
 
 ```json
 {

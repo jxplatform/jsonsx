@@ -73,7 +73,7 @@ let canvasMode = "design";
 
 function setup(docNode: JxMutableNode, selection: JxPath | null) {
   const tab = resetWorkspaceWithTab(docNode);
-  tab.session.selection = selection as never;
+  tab.session.selection = selection ? [selection] : [];
   host.anchor = { height: 20, left: 30, top: 200, width: 100 };
   return tab;
 }
@@ -229,7 +229,7 @@ describe("block action bar gaps", () => {
       'sp-action-button[data-command="selection.moveDown"]',
     ) as HTMLElement;
     const before = JSON.stringify(tab.doc.document);
-    tab.session.selection = null;
+    tab.session.selection = [];
     up.click();
     down.click();
     expect(JSON.stringify(tab.doc.document)).toBe(before);

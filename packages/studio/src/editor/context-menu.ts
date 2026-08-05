@@ -26,17 +26,18 @@ import { ref } from "lit-html/directives/ref.js";
 import { htmlToJx } from "@jxsuite/markup/html-to-jx";
 import { childIndex, getNodeAtPath, parentElementPath } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
+import { isSelected, isSpliceablePath, primarySelection } from "../tabs/selection";
 import {
   mutateDuplicateNode,
   mutateInsertNode,
   mutateRemoveNode,
+  mutateRemoveNodes,
   mutateReplaceStyle,
   mutateWrapNode,
   transactDoc,
 } from "../tabs/transact";
 import { notify } from "../services/notify";
 import { convertToComponent } from "./convert-to-component";
-import { convertToRepeater } from "./convert-to-repeater";
 import { componentRegistry } from "../files/components";
 import { renderPopover } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
@@ -172,10 +173,11 @@ async function readFromClipboard() {
 
 export async function copyNode() {
   const tab = activeTab.value;
-  if (!tab?.session.selection) {
+  const selected = primarySelection(tab?.session.selection);
+  if (!tab || !selected) {
     return;
   }
-  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
+  const node = getNodeAtPath(tab.doc.document, selected);
   if (!node) {
     return;
   }
@@ -186,17 +188,19 @@ export async function copyNode() {
 
 export async function cutNode() {
   const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) {
+  const sel = primarySelection(tab?.session.selection);
+  if (!tab || !sel || sel.length < 2) {
     return;
   }
-  const sel = tab.session.selection;
   const node = getNodeAtPath(tab.doc.document, sel);
   if (!node) {
     return;
   }
   const json = jsonClone(node);
   await writeToClipboard(json);
-  transactDoc(tab, (t) => mutateRemoveNode(t, sel));
+  // The clipboard holds the primary node; the cut removes everything selected, in one undo step.
+  const cutting = tab.session.selection.filter((path) => path.length >= 2);
+  transactDoc(tab, (t) => mutateRemoveNodes(t, cutting));
   notify.success("Cut", { action: "edit.undo", key: "clipboard" });
 }
 
@@ -211,15 +215,16 @@ export async function pasteNode() {
     return;
   }
 
-  const pPath = tab.session.selection || [];
+  const selected = primarySelection(tab.session.selection);
+  const pPath = selected ?? [];
   const parent = getNodeAtPath(tab.doc.document, pPath);
   if (!parent) {
     return;
   }
 
-  if (tab.session.selection && tab.session.selection.length >= 2) {
-    const pp = parentElementPath(tab.session.selection) as JxPath;
-    const idx = childIndex(tab.session.selection) as number;
+  if (selected && selected.length >= 2) {
+    const pp = parentElementPath(selected) as JxPath;
+    const idx = childIndex(selected) as number;
     transactDoc(tab, (t) => {
       for (let i = 0; i < nodes.length; i++) {
         mutateInsertNode(t, pp, idx + 1 + i, nodes[i]!);
@@ -238,10 +243,11 @@ export async function pasteNode() {
 
 export function copyStyles() {
   const tab = activeTab.value;
-  if (!tab?.session.selection) {
+  const selected = primarySelection(tab?.session.selection);
+  if (!tab || !selected) {
     return;
   }
-  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
+  const node = getNodeAtPath(tab.doc.document, selected);
   if (!node?.style) {
     return;
   }
@@ -254,13 +260,22 @@ export function pasteStyles() {
     return;
   }
   const tab = activeTab.value;
-  if (!tab?.session.selection) {
+  const targets = tab?.session.selection ?? [];
+  if (!tab || targets.length === 0) {
     return;
   }
   const style = jsonClone(workspace.styleClipboard);
-  const sel = tab.session.selection as JxPath;
-  transactDoc(tab, (t) => mutateReplaceStyle(t, sel, style));
-  notify.success("Styles pasted", { action: "edit.undo", key: "clipboard" });
+  // Pasting one style onto six cards is the §6.5 example, and it is one undo step: `transactDoc`
+  // Records everything its callback mutates as a single history entry.
+  transactDoc(tab, (t) => {
+    for (const sel of targets) {
+      mutateReplaceStyle(t, sel, jsonClone(style));
+    }
+  });
+  notify.success(
+    targets.length === 1 ? "Styles pasted" : `Styles pasted to ${targets.length} elements`,
+    { action: "edit.undo", key: "clipboard" },
+  );
 }
 
 // ─── The menu target ─────────────────────────────────────────────────────────
@@ -291,19 +306,6 @@ export interface ElementCommandDeps {
   componentPathFor: (tagName: string) => string | null;
 }
 
-/**
- * Whether `path` names a removable/insertable child position.
- *
- * `parentElementPath` + `childIndex` only produce a splice coordinate for a path of the form `[…,
- * "children", <number>]`. The document root (`[]`) has none, and neither does a repeater template
- * (path tail `"map"`) — for the template `childIndex` yields the string `"map"`, and
- * `mutateRemoveNode` would then `splice("map", 1)`, i.e. splice at NaN and delete the WRONG child.
- * Every structural verb gates on this.
- */
-function isSpliceable(path: JxPath): boolean {
-  return path.length >= 2 && typeof childIndex(path) === "number";
-}
-
 /** Whether the node is a repeater (an `Array` prototype node), whose one child is its template. */
 function isArrayNode(node: JxMutableNode): boolean {
   return node.$prototype === "Array";
@@ -314,9 +316,15 @@ function isArrayNode(node: JxMutableNode): boolean {
 /**
  * The commands the element context menu contributes.
  *
- * `selection.duplicate` and `selection.delete` are deliberately NOT here: they are defined in
- * `commands/defaults.ts` and already declare `context/element`, and a second definition site is the
- * exact failure the registry exists to prevent.
+ * `selection.duplicate`, `selection.delete` and `selection.repeat` are deliberately NOT here: they
+ * are defined in `commands/defaults.ts` and already declare `context/element`, and a second
+ * definition site is the exact failure the registry exists to prevent.
+ *
+ * `selection.repeat` was here, in this file's PRIVATE registry, which is why the two
+ * `repeat-dialog` shots were quarantined: the app registry never held it, so the palette could not
+ * list it, no chord could reach it, the AI could not call it, and
+ * `__jxAutomation.run("selection.repeat")` answered "unknown command" — the Repeat dialog was
+ * reachable by right-click and by nothing else.
  */
 export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
   /** A menu is open over some node — the precondition every row in this file shares. */
@@ -324,7 +332,7 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
   /** The target sits in a splice coordinate, so structural verbs can address it. */
   const spliceable = () => {
     const target = deps.target();
-    return target !== null && isSpliceable(target.path);
+    return target !== null && isSpliceablePath(target.path);
   };
   /** Not the repeater itself: its content is the single `map` template, not a child list. */
   const notRepeater = () => {
@@ -525,21 +533,6 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
         }
       },
     },
-    {
-      // Title kept verbatim: scripts/screenshots/manifest.json reaches this row through
-      // `__jxAutomation.run("element.repeat")`, whose xpath matches the row's exact text.
-      id: "selection.repeat",
-      title: "Repeat...",
-      category: "Selection",
-      level: "selection",
-      menus: ["context/element", "palette"],
-      group: "3_structure",
-      undo: "document",
-      when: hasTarget,
-      enablement: () => spliceable() && notRepeater(),
-      requires: "an element that is not already a repeater",
-      run: () => convertToRepeater(),
-    },
 
     // ── Identity ──
     {
@@ -641,7 +634,7 @@ const liveDeps: ElementCommandDeps = {
  * `selection.isRoot` is the context's "this selection has no removable position" flag — it is what
  * `selection.delete` gates on — so it reports true for a repeater template as well as for the
  * document root. Both are unspliceable, and treating only the literal root as root would let Delete
- * splice a template at NaN (see {@link isSpliceable}).
+ * splice a template at NaN (see {@link isSpliceablePath}).
  */
 function liveContext(): CommandContext {
   const target = _target;
@@ -654,7 +647,8 @@ function liveContext(): CommandContext {
     selection: {
       count: target ? 1 : 0,
       isComponentInstance: Boolean(target && liveDeps.componentPathFor(target.node.tagName ?? "")),
-      isRoot: target ? !isSpliceable(target.path) : false,
+      isRepeater: target ? isArrayNode(target.node) : false,
+      isRoot: target ? !isSpliceablePath(target.path) : false,
       kind: target?.node.tagName ?? "",
     },
   });
@@ -677,24 +671,23 @@ export function contextMenuRegistry(): CommandRegistry {
   const registry = createCommandRegistry({ getContext: liveContext });
   const inherited = defaultCommands({
     ...noopCommandDeps(),
+    // Neither implementation re-checks spliceability. `selection.delete` and `selection.duplicate`
+    // Both declare `enablement: structurallyEditable`, which reads `selection.isRoot` — and
+    // {@link liveContext} sets that from the very predicate a hand-guard here would repeat.
+    // `registry.run` throws `CommandUnavailableError` before a disabled record's `run` is reached,
+    // So the guard was unreachable, and a second copy of the invariant is how the two come to
+    // Disagree.
     deleteSelection: () => {
       const target = _target;
-      if (target && isSpliceable(target.path)) {
+      if (target) {
         transactDoc(activeTab.value, (t) => mutateRemoveNode(t, target.path));
       }
     },
     duplicateSelection: () => {
       const target = _target;
-      // Guarded here as well as by the record: `selection.duplicate` in defaults.ts declares no
-      // `enablement`, so it stays enabled on an unspliceable target, where `mutateDuplicateNode`
-      // Would splice at NaN and corrupt the document. The record wants
-      // `enablement: (ctx) => !ctx.selection.isRoot`, exactly as `selection.delete` already has;
-      // Until it does, this says so out loud rather than failing silently.
-      if (!target || !isSpliceable(target.path)) {
-        notify.warn("Nothing to duplicate — this element has no sibling position.");
-        return;
+      if (target) {
+        transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, target.path));
       }
-      transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, target.path));
     },
   }).filter((command) => (command.menus ?? []).includes("context/element"));
   registry.registerAll(inherited);
@@ -911,8 +904,13 @@ export function showContextMenu(
     return;
   }
 
-  // Select the node — the menu addresses it, and so does everything the commands read.
-  tab.session.selection = path;
+  // Select the node — the menu addresses it, and so does everything the commands read. A
+  // Right-click INSIDE an existing multi-selection keeps that selection, the way every list does:
+  // Collapsing six selected cards to one because the user aimed at one of them would silently
+  // Retarget the very batch commands the menu is about to offer.
+  if (!isSelected(tab.session.selection, path)) {
+    tab.session.selection = [path];
+  }
   _target = { node, onEditComponent: opts.onEditComponent, path, rerender: opts.rerender };
   _rows = buildRows(opts.placement ?? "context/element");
   if (_rows.length === 0) {

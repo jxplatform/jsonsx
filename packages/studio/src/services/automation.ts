@@ -118,19 +118,19 @@ export interface ManifestId {
  * — only to explain, when the registry refuses an id, which of the three fates that id has.
  *
  * This is a countdown, in the idiom of the checker's own `TOGGLE_DEBT`: it may only shrink. It went
- * 39 → 8 when the manifest converted (S2). What left: every `seed` entry, now read off
- * {@link seedIds} and answered from the live registry rather than from a hand-kept list; every
- * `toggle*` entry, which {@link TOGGLE_ID} refuses before this map is ever consulted; and every
- * `command` entry whose record has since landed.
+ * 39 → 8 when the manifest converted (S2), and 8 → 7 when `element.insertData` became `insert.data`
+ * (P5, `canvas/canvas-render.ts`). What left: every `seed` entry, now read off {@link seedIds} and
+ * answered from the live registry rather than from a hand-kept list; every `toggle*` entry, which
+ * {@link TOGGLE_ID} refuses before this map is ever consulted; and every `command` entry whose
+ * record has since landed.
  *
- * What is left is two kinds. Three `command` entries are the manifest's real registry gaps — each
+ * What is left is two kinds. Two `command` entries are the manifest's real registry gaps — each
  * reached today by an `input` step clicking a hand-stamped region, and each of those steps carries
  * an `unstable` hatch naming the phase that lands the record, so this map and that hatch count are
  * the same debt. Five `refused` entries are NOT a countdown: they are §13.3's normative refusals,
  * and they stay so that a caller reaching for one gets the reason instead of "unknown command".
  */
 export const AUTOMATION_COMMANDS: Readonly<Record<string, ManifestId>> = {
-  "element.insertData": { disposition: "command", note: "P5 — insert.data" },
   "file.contextMenu": {
     disposition: "refused",
     note: "opening a menu to press an item names a control; the ITEM is the command",
