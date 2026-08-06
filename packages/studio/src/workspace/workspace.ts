@@ -62,6 +62,7 @@ export const SECONDARY_PANE_KINDS: ReadonlySet<EditorKind> = new Set<EditorKind>
   "code",
   "diff",
   "config",
+  "entry",
   "grid",
   "library",
 ]);

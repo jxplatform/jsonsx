@@ -40,7 +40,7 @@
           "path": "studio/projects/pages-layouts-components",
           "label": "Pages, layouts, components"
         },
-        { "path": "studio/projects/browse", "label": "Browse your project" },
+        { "path": "studio/projects/browse", "label": "The Library" },
         { "path": "studio/projects/starters", "label": "Starter templates" },
         { "path": "studio/projects/media", "label": "Media" },
         { "path": "studio/projects/content-types", "label": "Content types" },
@@ -84,6 +84,7 @@
         { "path": "studio/publish/github", "label": "GitHub" },
         { "path": "studio/publish/cloudflare", "label": "Cloudflare Pages" },
         { "path": "studio/publish/other-hosts", "label": "Other hosts" },
+        { "path": "studio/publish/redirects", "label": "Redirects" },
         { "path": "studio/publish/collaboration", "label": "Real-time collaboration" },
         { "path": "studio/desktop", "label": "The desktop app" }
       ]

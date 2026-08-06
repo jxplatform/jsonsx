@@ -29,22 +29,35 @@ describe("the set", () => {
       "canvas",
       "collab",
       "collection",
+      // `content.*` — the content-entry verbs (P7.3/P7.4): create one seeded from its collection's
+      // Schema, open one as a form, mark one a draft, and choose whether drafts are listed. The
+      // Draft pair are `set*` because a toggle against unstated state can publish something the
+      // Author believed was private.
+      "content",
       "data",
       "document",
       "edit",
       "file",
       "formula",
+      "git",
+      "grid",
       "help",
       // `insert.data` — a `${…}` merge tag placed at the live caret. Its one definition site is
       // `canvas/canvas-render.ts`, beside `selection.set`: both name what the pane points at.
       "insert",
       "inspector",
+      // `library.*` — the Library editor kind (P7.1). It replaced `project.browse`, which was one
+      // Verb over a modal; the Library's category, layout, filter, rescan and new-entry states are
+      // Each a record, so the palette and the assistant can reach what only its own buttons could.
+      "library",
       "palette",
       // `pane.toggleZoom` — the pane model (a parallel workstream).
       "pane",
       // One `panel.focus.<id>` per Navigator panel, generated from the panel registry's own roster.
       "panel",
       "project",
+      "publish",
+      "redirects",
       "selection",
       "settings",
       "state",
@@ -154,7 +167,7 @@ describe("the ids the screenshot manifest names now have records", () => {
     "formula.editEvent",
     "formula.openWorkspace",
     "inspector.setSection",
-    "project.browse",
+    "library.open",
     "project.new",
     "selection.set",
     "settings.open",

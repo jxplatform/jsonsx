@@ -176,6 +176,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.1.42-draft** (2026-08-06) — §7.2 the Library and its window contract, §7.5 the CRUD table corrected — rename, delete and CSV editing already shipped and were listed Pending, §7.6 the draft pill, §8.6 merged-$head previews with no score, §9.4 usage keyed on the authored ref, §11.4 redirects as a GridSource with chain, loop and shadow validation.
 - **0.1.41-draft** (2026-08-05) — §3.2 names the consequence of the cascade — every property reaches every route, which is why Studio states the blast radius and edits the file under undo.
 - **0.1.40-draft** (2026-07-30) — A page uses a component when its tag appears in the prerendered HTML or in one of the page's island modules (§12.4).
 - **0.1.39-draft** (2026-07-28) — §9.3: editors that open a collection entry standalone must apply the mount rewrite to their render representation only, with the browser-side existence-check divergence stated.

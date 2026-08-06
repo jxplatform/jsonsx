@@ -16,6 +16,8 @@ import { renderMediaPicker } from "../ui/media-picker";
 import { activeTab } from "../workspace/workspace";
 import { mutateUpdateFrontmatter, transactDoc } from "../tabs/transact";
 import { findContentTypeSchema } from "../utils/studio-utils";
+import { NULL_FORM_CONTEXT, getFormControl, referenceTarget } from "../ui/schema-form";
+import type { JsonSchema } from "../ui/schema-form";
 
 import type { JsonValue } from "../types";
 import type { Tab } from "../tabs/tab";
@@ -26,6 +28,8 @@ export interface FmSchemaEntry {
   enum?: string[];
   format?: string;
   properties?: Record<string, unknown>;
+  /** `#/content/<type>` — a relationship to another collection (site-architecture.md §6.1). */
+  $ref?: string;
 }
 
 export interface FmField {
@@ -122,6 +126,33 @@ export function renderFmField(
   const displayLabel = label + (isRequired ? " *" : "");
   const hasVal = value !== undefined && value !== "" && value !== false;
   const onClear = () => transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field));
+
+  /* A relationship to another collection is the ONE registered `reference` control — the same
+     picker the entry editor and the settings forms draw, reached through the registry rather than
+     reimplemented here. Before this branch a `$ref` field fell through to the textfield at the
+     bottom of this function, so the author typed an entry id from memory with no way to see what
+     ids exist and no sign when the one they typed was wrong. */
+  const referenceControl =
+    referenceTarget(entry) === null ? undefined : getFormControl("reference");
+  if (referenceControl) {
+    return renderFieldRow({
+      hasValue: hasVal,
+      label: displayLabel,
+      onClear,
+      prop: field,
+      widget: referenceControl({
+        // The reference control resolves nothing through the context — its choices are files.
+        ctx: NULL_FORM_CONTEXT,
+        key: field,
+        onChange: (next) =>
+          transactDoc(activeTab.value, (t) =>
+            mutateUpdateFrontmatter(t, field, (next ?? undefined) as JsonValue),
+          ),
+        schema: entry as JsonSchema,
+        value,
+      }),
+    });
+  }
 
   if (entry.type === "boolean") {
     return renderFieldRow({

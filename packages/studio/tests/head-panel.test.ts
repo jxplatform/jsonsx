@@ -7,9 +7,24 @@ import {
   resetWorkspaceWithTab,
 } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { invalidateLayoutPickerCache, renderHeadTemplate } from "../src/panels/head-panel";
+import {
+  BUILD_FALLBACK_TITLE,
+  buildSeoPreview,
+  invalidateLayoutHeadCache,
+  invalidateLayoutPickerCache,
+  layoutDisplayName,
+  layoutHeadEntries,
+  renderHeadTemplate,
+  resolveMetaField,
+  resolveSeoUrl,
+  resolveTitleField,
+  seoField,
+  seoPreviewFor,
+} from "../src/panels/head-panel";
+import { invalidateLayoutCache } from "../src/site-context";
 import { closeAllTabs } from "../src/workspace/workspace";
 
+import type { HeadLayers, SeoPreview } from "../src/panels/head-panel";
 import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -646,5 +661,436 @@ describe("frontmatter section", () => {
     setupContentTab({ $internal: "x", title: "only reserved" }, false);
     const { container } = await renderHead({ tagName: "div" });
     expect(sectionByTitle(container, "Frontmatter")).toBeNull();
+  });
+});
+
+// ─── The merged `$head`, as a preview model ───────────────────────────────────
+
+/**
+ * The half of the SEO block that has no DOM: resolving what actually reaches the browser out of
+ * site → layout → page, and naming the layer it came from.
+ *
+ * These assertions are the contract with `packages/compiler/src/site/head-merger.ts`. Studio does
+ * not depend on `@jxsuite/compiler`, so nothing mechanical keeps the two in step — this is what
+ * fails if the merger's precedence, its `<title>` handling or its canonical rule ever changes.
+ */
+
+const meta = (attr: "name" | "property", key: string, content: string): JxHeadEntry => ({
+  attributes: { [attr]: key, content },
+  tagName: "meta",
+});
+
+function layers(over: Partial<HeadLayers> = {}): HeadLayers {
+  return { layout: [], layoutName: null, page: [], site: [], ...over };
+}
+
+function warningIds(preview: SeoPreview): string[] {
+  return preview.warnings.map((w) => w.id);
+}
+
+describe("resolveMetaField — later layer wins, and says which one spoke", () => {
+  test("the page's own entry is `set here`, with no donor to name", () => {
+    const field = resolveMetaField(
+      layers({
+        page: [meta("name", "description", "the page")],
+        site: [meta("name", "description", "the site")],
+      }),
+      "name",
+      "description",
+    );
+    expect(field).toEqual({ donor: null, source: "page", value: "the page" });
+  });
+
+  test("a layout entry is inherited from the layout, by name", () => {
+    const field = resolveMetaField(
+      layers({ layout: [meta("name", "description", "from base")], layoutName: "Base" }),
+      "name",
+      "description",
+    );
+    expect(field).toEqual({ donor: "Base", source: "layout", value: "from base" });
+  });
+
+  test("an unnamed layout still names itself as something", () => {
+    const field = resolveMetaField(
+      layers({ layout: [meta("name", "description", "x")] }),
+      "name",
+      "description",
+    );
+    expect(field.donor).toBe("the layout");
+  });
+
+  test("a site entry is inherited from Site head", () => {
+    const field = resolveMetaField(
+      layers({ site: [meta("property", "og:image", "/card.png")] }),
+      "property",
+      "og:image",
+    );
+    expect(field).toEqual({ donor: "Site head", source: "site", value: "/card.png" });
+  });
+
+  test("nothing anywhere resolves to `none`, not to an empty page value", () => {
+    expect(resolveMetaField(layers(), "name", "description").source).toBe("none");
+  });
+
+  test("the LAST entry in a layer wins — the merger folds a layer into a keyed map in order", () => {
+    const field = resolveMetaField(
+      layers({
+        page: [meta("name", "description", "first"), meta("name", "description", "second")],
+      }),
+      "name",
+      "description",
+    );
+    expect(field.value).toBe("second");
+  });
+
+  test("an empty page entry SHADOWS the site's, because the merged map is keyed", () => {
+    const field = resolveMetaField(
+      layers({
+        page: [meta("name", "description", "")],
+        site: [meta("name", "description", "the site")],
+      }),
+      "name",
+      "description",
+    );
+    expect(field).toEqual({ donor: null, source: "page", value: "" });
+  });
+});
+
+describe("resolveTitleField — page title, then the site name, then the build", () => {
+  test("the page's title wins and is trimmed", () => {
+    expect(resolveTitleField("  Hello  ", "Acme")).toEqual({
+      donor: null,
+      source: "page",
+      value: "Hello",
+    });
+  });
+
+  test("a blank page title falls through to the site name", () => {
+    expect(resolveTitleField("   ", "Acme")).toEqual({
+      donor: "Site name",
+      source: "site",
+      value: "Acme",
+    });
+  });
+
+  test("with neither, the build supplies one and is named as the donor", () => {
+    expect(resolveTitleField("")).toEqual({
+      donor: "the build",
+      source: "build",
+      value: BUILD_FALLBACK_TITLE,
+    });
+    expect(resolveTitleField("", "   ")).toEqual({
+      donor: "the build",
+      source: "build",
+      value: BUILD_FALLBACK_TITLE,
+    });
+  });
+});
+
+describe("resolveSeoUrl — the canonical the build would emit, or the honest absence", () => {
+  test("a site URL and a route produce a breadcrumb, a host and an href", () => {
+    expect(resolveSeoUrl("/blog/hello", "https://example.com")).toEqual({
+      crumb: "example.com › blog › hello",
+      host: "example.com",
+      href: "https://example.com/blog/hello",
+    });
+  });
+
+  test("the site root is just the host", () => {
+    expect(resolveSeoUrl("/", "https://example.com").crumb).toBe("example.com");
+  });
+
+  test("no site URL means no canonical — the build emits none either", () => {
+    expect(resolveSeoUrl("/blog/hello")).toEqual({
+      crumb: "/blog/hello",
+      host: "",
+      href: null,
+    });
+  });
+
+  test("a document with no route (not a page) has no canonical", () => {
+    expect(resolveSeoUrl(null, "https://example.com")).toEqual({
+      crumb: "/",
+      host: "",
+      href: null,
+    });
+  });
+
+  test("a malformed site URL degrades to the route instead of throwing", () => {
+    expect(resolveSeoUrl("/about", "not a url")).toEqual({
+      crumb: "/about",
+      host: "",
+      href: null,
+    });
+  });
+});
+
+describe("buildSeoPreview — the six fields, in render order, with their budgets", () => {
+  test("every previewed key is present, once, with the limit that applies to it", () => {
+    const preview = buildSeoPreview(layers(), { pageTitle: "T", route: "/" });
+    expect(preview.fields.map((f) => f.key)).toEqual([
+      "title",
+      "description",
+      "og:title",
+      "og:description",
+      "og:image",
+      "og:type",
+    ]);
+    expect(preview.fields.map((f) => f.limit)).toEqual([60, 160, 60, 200, null, null]);
+  });
+
+  test("seoField looks a key up, and invents an unsupplied one rather than throwing", () => {
+    const preview = buildSeoPreview(layers(), { pageTitle: "T", route: "/" });
+    expect(seoField(preview, "title").value).toBe("T");
+    expect(seoField(preview, "twitter:card")).toEqual({
+      donor: null,
+      key: "twitter:card",
+      label: "twitter:card",
+      limit: null,
+      source: "none",
+      value: "",
+    });
+  });
+});
+
+describe("seoWarnings — named consequences, never a total", () => {
+  const full = () =>
+    layers({
+      page: [
+        meta("name", "description", "A real description."),
+        meta("property", "og:title", "Card title"),
+        meta("property", "og:description", "Card summary."),
+        meta("property", "og:image", "/card.png"),
+      ],
+    });
+
+  test("a fully-described page with a site URL raises nothing at all", () => {
+    const preview = buildSeoPreview(full(), {
+      pageTitle: "Hello",
+      route: "/hello",
+      siteUrl: "https://example.com",
+    });
+    expect(preview.warnings).toEqual([]);
+  });
+
+  test("a page that INHERITS its description is never told it has none", () => {
+    const inherited = buildSeoPreview(
+      layers({
+        page: [
+          meta("property", "og:title", "t"),
+          meta("property", "og:description", "d"),
+          meta("property", "og:image", "/i.png"),
+        ],
+        site: [meta("name", "description", "the site's own description")],
+      }),
+      { pageTitle: "Hello", route: "/hello", siteUrl: "https://example.com" },
+    );
+    expect(warningIds(inherited)).toEqual([]);
+    expect(seoField(inherited, "description").source).toBe("site");
+  });
+
+  test("each absent field raises its own named warning, and they do not merge", () => {
+    const preview = buildSeoPreview(layers(), { pageTitle: "Hello", route: "/hello" });
+    expect(warningIds(preview)).toEqual([
+      "description-missing",
+      "og-title-missing",
+      "og-description-missing",
+      "og-image-missing",
+      "site-url-missing",
+    ]);
+    expect(preview.warnings.map((w) => w.field)).toEqual([
+      "description",
+      "og:title",
+      "og:description",
+      "og:image",
+      "url",
+    ]);
+  });
+
+  test("no title anywhere names the string the build ships instead", () => {
+    const preview = buildSeoPreview(full(), {
+      pageTitle: "",
+      route: "/hello",
+      siteUrl: "https://example.com",
+    });
+    expect(warningIds(preview)).toEqual(["title-missing"]);
+    expect(preview.warnings[0]!.message).toContain(BUILD_FALLBACK_TITLE);
+  });
+
+  test("a title inherited from the site name is NOT a missing title", () => {
+    const preview = buildSeoPreview(full(), {
+      pageTitle: "",
+      route: "/hello",
+      siteName: "Acme",
+      siteUrl: "https://example.com",
+    });
+    expect(warningIds(preview)).toEqual([]);
+    expect(seoField(preview, "title")).toMatchObject({ donor: "Site name", source: "site" });
+  });
+
+  test("over-budget fields are counted, not scored", () => {
+    const long = layers({
+      page: [
+        meta("name", "description", "d".repeat(161)),
+        meta("property", "og:title", "t"),
+        meta("property", "og:description", "s"),
+        meta("property", "og:image", "/i.png"),
+      ],
+    });
+    const preview = buildSeoPreview(long, {
+      pageTitle: "T".repeat(61),
+      route: "/hello",
+      siteUrl: "https://example.com",
+    });
+    expect(warningIds(preview)).toEqual(["title-long", "description-long"]);
+    expect(preview.warnings[0]!.message).toBe("Title is 61 characters; headlines are cut near 60.");
+    expect(preview.warnings[1]!.message).toBe(
+      "Description is 161 characters; summaries are cut near 160.",
+    );
+    // Nothing sums them. The report IS the list.
+    expect(Object.keys(preview)).toEqual(["fields", "url", "warnings"]);
+  });
+
+  test("an og:description over budget says `summaries`, matching its shape not its label", () => {
+    const longSummary = "s".repeat(201);
+    const page = [
+      meta("name", "description", "d"),
+      meta("property", "og:title", "t"),
+      meta("property", "og:description", longSummary),
+      meta("property", "og:image", "/i.png"),
+    ];
+    const preview = buildSeoPreview(layers({ page }), {
+      pageTitle: "T",
+      route: "/h",
+      siteUrl: "https://example.com",
+    });
+    expect(preview.warnings[0]!.message).toBe(
+      "Social description is 201 characters; summaries are cut near 200.",
+    );
+  });
+
+  test("a <title> in any layer is reported as discarded — the merger overwrites it", () => {
+    for (const layer of ["site", "layout", "page"] as const) {
+      const preview = buildSeoPreview(
+        layers({ ...full(), [layer]: [...full().page, { tagName: "title", textContent: "x" }] }),
+        { pageTitle: "Hello", route: "/hello", siteUrl: "https://example.com" },
+      );
+      expect(warningIds(preview)).toContain("head-title-ignored");
+    }
+  });
+});
+
+// ─── The layout layer ─────────────────────────────────────────────────────────
+
+describe("layoutHeadEntries — the one layer that lives in a file", () => {
+  const LAYOUT = JSON.stringify({
+    $head: [{ attributes: { content: "from the layout", name: "description" }, tagName: "div" }],
+    tagName: "div",
+  });
+
+  function seedLayout(body = LAYOUT) {
+    installMockPlatform({}, { "layouts/main-layout.json": body });
+    resetStudioState({
+      isSiteProject: true,
+      projectConfig: { defaults: { layout: "./layouts/main-layout.json" } },
+    });
+    resetWorkspaceWithTab(undefined, { documentPath: "pages/about.json" });
+  }
+
+  beforeEach(() => {
+    invalidateLayoutCache();
+    invalidateLayoutHeadCache();
+  });
+
+  test("a non-page document never reads a layout at all", () => {
+    resetStudioState({ isSiteProject: false, projectConfig: {} });
+    resetWorkspaceWithTab(undefined, { documentPath: "components/card.json" });
+    expect(layoutHeadEntries()).toEqual({ entries: [], name: null });
+  });
+
+  test("the first call is empty and schedules the read; the second has the entries", async () => {
+    seedLayout();
+    expect(layoutHeadEntries()).toEqual({ entries: [], name: "Main Layout" });
+    await flush();
+    const resolved = layoutHeadEntries();
+    expect(resolved.name).toBe("Main Layout");
+    expect(resolved.entries).toHaveLength(1);
+  });
+
+  test("an unreadable layout caches as empty rather than re-reading on every render", async () => {
+    installMockPlatform();
+    resetStudioState({
+      isSiteProject: true,
+      projectConfig: { defaults: { layout: "./layouts/gone.json" } },
+    });
+    resetWorkspaceWithTab(undefined, { documentPath: "pages/about.json" });
+    layoutHeadEntries();
+    await flush();
+    expect(layoutHeadEntries().entries).toEqual([]);
+  });
+
+  test("invalidateLayoutPickerCache drops the head too — one event, one answer", async () => {
+    seedLayout();
+    layoutHeadEntries();
+    await flush();
+    expect(layoutHeadEntries().entries).toHaveLength(1);
+    invalidateLayoutPickerCache();
+    expect(layoutHeadEntries().entries).toEqual([]);
+  });
+
+  test("a second layout asked for mid-flight owns the cache; the first is discarded", async () => {
+    seedLayout();
+    layoutHeadEntries("./layouts/main-layout.json");
+    layoutHeadEntries("./layouts/other.json");
+    await flush();
+    // The superseded read must not have written "Main Layout"'s entries under "Other".
+    expect(layoutHeadEntries("./layouts/other.json").entries).toEqual([]);
+  });
+
+  test("layoutDisplayName reads a path the way a person names the layout", () => {
+    expect(layoutDisplayName("./layouts/blog_post.json")).toBe("Blog Post");
+    expect(layoutDisplayName("layouts/nested/marketing-page.json")).toBe("Nested Marketing Page");
+  });
+
+  test("seoPreviewFor reads the open document, its layout, and the project config", async () => {
+    installMockPlatform(
+      {},
+      {
+        "layouts/main-layout.json": JSON.stringify({
+          $head: [
+            { attributes: { content: "layout summary", name: "description" }, tagName: "meta" },
+          ],
+          tagName: "div",
+        }),
+      },
+    );
+    resetStudioState({
+      isSiteProject: true,
+      projectConfig: {
+        $head: [
+          { attributes: { content: "/site-card.png", property: "og:image" }, tagName: "meta" },
+        ],
+        defaults: { layout: "./layouts/main-layout.json" },
+        name: "Acme",
+        url: "https://acme.test",
+      },
+    });
+    resetWorkspaceWithTab(undefined, { documentPath: "pages/about.json" });
+    seoPreviewFor({ tagName: "div" });
+    await flush();
+
+    const preview = seoPreviewFor({ tagName: "div", title: "About" });
+    expect(preview.url.href).toBe("https://acme.test/about");
+    expect(seoField(preview, "title")).toMatchObject({ source: "page", value: "About" });
+    expect(seoField(preview, "description")).toMatchObject({
+      donor: "Main Layout",
+      source: "layout",
+      value: "layout summary",
+    });
+    expect(seoField(preview, "og:image")).toMatchObject({
+      donor: "Site head",
+      source: "site",
+      value: "/site-card.png",
+    });
   });
 });

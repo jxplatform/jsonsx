@@ -105,9 +105,10 @@ beforeEach(() => {
 
 describe("registration", () => {
   test("both built-ins are registered on import", () => {
-    expect(builtinFormControls).toEqual(["schema-builder", "secret"]);
+    expect(builtinFormControls).toEqual(["schema-builder", "secret", "reference"]);
     expect(getFormControl("schema-builder")).toBeDefined();
     expect(getFormControl("secret")).toBeDefined();
+    expect(getFormControl("reference")).toBeDefined();
   });
 });
 

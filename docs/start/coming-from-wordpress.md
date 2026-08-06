@@ -47,7 +47,7 @@ Entries are files in a folder instead of database rows: Markdown, CSV, or JSON. 
 
 ## Media
 
-Drag files into the Manage view and they land in your project's `public/` folder — no attachment posts, no uploads table. When the site builds, every image is optimized automatically into multiple sizes and modern formats, which is the job you used to install an optimizer plugin for. See **[Media](/docs/studio/projects/media)**.
+Drag files into the Library and they land in your project's `public/` folder — no attachment posts, no uploads table. When the site builds, every image is optimized automatically into multiple sizes and modern formats, which is the job you used to install an optimizer plugin for. See **[Media](/docs/studio/projects/media)**.
 
 ## Plugins
 

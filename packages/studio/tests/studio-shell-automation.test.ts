@@ -71,7 +71,7 @@ describe("the hook installed, over the composed registry", () => {
       "data.openGrid",
       "formula.editDef",
       "inspector.setSection",
-      "project.browse",
+      "library.open",
       "project.new",
       "settings.open",
       "state.selectSignal",

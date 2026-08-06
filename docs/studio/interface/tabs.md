@@ -5,6 +5,7 @@ spec:
   - studio.md#14
 code:
   - packages/studio/src/panels/tab-strip.ts
+  - packages/studio/src/commands/context.ts
   - packages/studio/src/tabs/tab.ts
   - packages/studio/src/tabs/project-config.ts
   - packages/studio/src/panels/pane-context.ts
@@ -19,7 +20,7 @@ Every document you open in Jx Studio belongs to a **pane**. A pane is one editor
 
 ## Opening and switching
 
-Open documents from the **Files** panel, the **[Manage](/docs/studio/projects/browse)** browser, or the Command Center — :kbd[⌘K], or :kbd[⌘P] straight into file search. Click a document in the strip to switch to it; the Files tree follows along, so the strip and the tree never disagree about where you are.
+Open documents from the **Files** panel, the **[Library](/docs/studio/projects/browse)**, or the Command Center — :kbd[⌘K], or :kbd[⌘P] straight into file search. Click a document in the strip to switch to it; the Files tree follows along, so the strip and the tree never disagree about where you are.
 
 - Switch back and forth with :kbd[⌃Tab] / :kbd[⌃⇧Tab], which walk your documents in the order you last used them rather than left to right.
 - Close one with its **×**, by middle-clicking it, or with :kbd[⌘W].
@@ -77,7 +78,7 @@ The new one carries a small **↳** marker, and hovering it names the document y
 
 ## Two panes
 
-:kbd[⌘\] splits the window in two. The active document moves into a second pane beside the first, on an editor that pane can host — **Code**, **Grid**, **Diff**, **Library** or **Project Styles** — so you can read a page's source, its data or its diff with the canvas still on screen. The canvas stays in the main pane.
+:kbd[⌘\] splits the window in two. The active document moves into a second pane beside the first, on an editor that pane can host — **Code**, **Grid**, **Diff**, **Entry**, **Library** or **Project Styles** — so you can read a page's source, its fields, its data or its diff with the canvas still on screen. The canvas stays in the main pane.
 
 - :kbd[⌘⌥0] focuses the side pane; **Focus Primary Pane** in the palette goes back.
 - **Toggle Pane Zoom** fills the grid with the pane you're in, and puts both back.
@@ -89,7 +90,7 @@ Each pane has its own strip and its own context bar, and the focused pane is the
 
 Under each pane's strip, a labelled row states three things about the document in that pane — and only those three:
 
-- **Editor** — which editor is open on it: **Canvas**, **Code**, **Grid**, **Diff**, **Library** or **Project Styles**. It offers only the editors this file actually supports, so it never holds an entry that cannot be picked, and a document with one editor prints its name as text rather than as a dropdown that goes nowhere.
+- **Editor** — which editor is open on it: **Canvas**, **Code**, **Grid**, **Diff**, **Entry**, **Library** or **Project Styles**. It offers only the editors this file actually supports, so it never holds an entry that cannot be picked, and a document with one editor prints its name as text rather than as a dropdown that goes nowhere. Those are the same names the [status bar](/docs/studio/interface#status-bar) prints, read from one list.
 - **View** — for the Canvas editor, **Edit │ Design │ Preview** as one control with three values. See [Modes and views](/docs/studio/interface/modes).
 - **Context** — what the page is being rendered _with_: the breakpoint, the color scheme, any feature queries, and whether the layout's own elements are shown. The summary reads at a glance (`Base · Auto`); open it for the full set, and for **Manage contexts…**, which takes you to where breakpoints and schemes are defined. Beside it, **resolving with** carries the document's own data — a picker per URL parameter on a dynamic page, a small field per option on a component.
 
@@ -104,4 +105,4 @@ The bar is there when it has something to say. The settings editor takes the who
 ## Next
 
 - Find any file fast with **[Quick Access](/docs/studio/interface/quick-access)**
-- Browse the whole project visually in **[Manage](/docs/studio/projects/browse)**
+- Browse the whole project visually in **[the Library](/docs/studio/projects/browse)**

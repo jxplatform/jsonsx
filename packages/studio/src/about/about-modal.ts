@@ -14,7 +14,7 @@ import { openModal } from "../ui/layers";
 import { getPlatform } from "../platform";
 import { APP_NAME, BUILD_DATE, GIT_COMMIT, LINKS, VERSION } from "../version";
 import type { AppInfo, PackageInfo } from "../types";
-import type { Command } from "../commands/registry";
+import type { Command, CommandRegistry } from "../commands/registry";
 
 let _handle: ReturnType<typeof openModal> | null = null;
 
@@ -169,4 +169,19 @@ export function aboutCommands(): Command[] {
       },
     },
   ];
+}
+
+/**
+ * Register the About verb on the app registry.
+ *
+ * `appCommandSet()` is the projection CI counts and `docs/studio/interface/commands.md` is
+ * generated from — it is NOT what the running app registers. P4 composed `help.about` into that set
+ * only, and deleted the rail's About button in the same change, so About became unreachable in the
+ * app while every check reported it present. The two roots have to agree.
+ *
+ * @param {CommandRegistry} registry
+ * @returns {void}
+ */
+export function registerAboutCommands(registry: CommandRegistry): void {
+  registry.registerAll(aboutCommands());
 }

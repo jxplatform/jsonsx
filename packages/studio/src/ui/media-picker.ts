@@ -6,6 +6,15 @@
  * project and assigns it, and a Browse dropdown of media already in the project's public/
  * directory, with thumbnail previews for images.
  *
+ * **The browse list carries metadata, and it costs nothing.** Size comes from the directory listing
+ * the widget already performs to enumerate the files (`seedMediaMeta`), and pixel dimensions come
+ * from the thumbnails it already loads (`recordImageSize`) — measuring an image is a decode the
+ * `<img>` has finished by the time `load` fires, so the caption is a read of work already done
+ * rather than a second fetch per row. What is NOT here is a usage count: `findReferences` sweeps
+ * every document in the project per query, and fifty of those to caption a dropdown is the wrong
+ * trade. Usage is asked once, about one file, where it changes a decision — the delete confirmation
+ * (`files/media-usage.ts`).
+ *
  * @docs studio/projects/media
  */
 
@@ -25,28 +34,42 @@ import {
   extensionOf,
   uploadAssets,
 } from "../files/media-upload";
+import {
+  invalidateMediaMeta,
+  mediaMetaSummary,
+  peekMediaMeta,
+  recordImageSize,
+  seedMediaMeta,
+} from "../files/media-meta";
+import { mediaSiteUrl } from "../files/media-paths";
 
 // ─── Media file cache ────────────────────────────────────────────────────────
 
-/** @type {{ path: string; name: string; isImage: boolean }[]} */
-let mediaCache: { path: string; name: string; isImage: boolean }[] = [];
+/** One browsable media file: the ref a pick writes, and the file that ref names. */
+interface MediaEntry {
+  /** The value committed to the field — the site URL, which is the authored form. */
+  path: string;
+  /** Project-relative path on disk, the key everything in `media-meta` is stored under. */
+  file: string;
+  name: string;
+  isImage: boolean;
+}
+
+let mediaCache: MediaEntry[] = [];
 let mediaCacheLoaded = false;
 
 /**
- * Recursively collect media files from a directory.
- *
- * @param {string} dir
- * @param {ReturnType<typeof getPlatform>} platform
- * @returns {Promise<{ path: string; name: string; isImage: boolean }[]>}
+ * Recursively collect media files from a directory, seeding {@link seedMediaMeta} with the listing
+ * on the way past — the size of every row is already in the response that enumerated it.
  */
 async function collectMedia(
   dir: string,
   platform: ReturnType<typeof getPlatform>,
-): Promise<{ path: string; name: string; isImage: boolean }[]> {
-  /** @type {{ path: string; name: string; isImage: boolean }[]} */
-  const results = [];
+): Promise<MediaEntry[]> {
+  const results: MediaEntry[] = [];
   try {
     const entries = await platform.listDirectory(dir);
+    seedMediaMeta(entries);
     for (const entry of entries) {
       if (entry.type === "directory") {
         const sub = await collectMedia(entry.path, platform);
@@ -55,9 +78,12 @@ async function collectMedia(
         const ext = extensionOf(entry.name);
         if (MEDIA_EXTENSIONS.has(ext)) {
           results.push({
+            file: entry.path,
             isImage: IMAGE_EXTENSIONS.has(ext),
             name: entry.name,
-            path: `/${entry.path}`,
+            // The site URL is what production serves and therefore what a document should say.
+            // Media-paths holds the one definition of that mapping.
+            path: mediaSiteUrl(entry.path),
           });
         }
       }
@@ -74,20 +100,22 @@ async function loadMediaCache() {
   }
   const platform = getPlatform();
   mediaCache = await collectMedia("public", platform);
-  // Strip "public/" prefix so paths match production (public/ contents served at root)
-  for (const m of mediaCache) {
-    m.path = m.path.replace(/^\/public\//, "/");
-  }
   mediaCacheLoaded = true;
   // Re-render the host panels so the browse popover has entries to show once the async listing
   // Resolves. Mirrors loadLayoutEntries()'s renderOnly() in head-panel.
   renderOnly("leftPanel", "rightPanel", "frontmatterPanel");
 }
 
-/** Force media cache reload (e.g. after upload). */
+/**
+ * Force media cache reload (e.g. after upload).
+ *
+ * The metadata cache goes with it, and for the same reason: both were derived from a listing that
+ * is now out of date, and a size that survives the write it contradicts is worse than no size.
+ */
 export function invalidateMediaCache() {
   mediaCache = [];
   mediaCacheLoaded = false;
+  invalidateMediaMeta();
 }
 
 // ─── Popover state ───────────────────────────────────────────────────────────
@@ -128,6 +156,30 @@ function onPopoverOutsideClick(e: MouseEvent) {
   if (!host.contains(e.target as Node)) {
     dismissMediaPickerPopover();
   }
+}
+
+/** A repaint scheduled by a thumbnail that just reported its size, or 0 when none is pending. */
+let _sizeRepaint = 0;
+
+/**
+ * Fold a loaded thumbnail's intrinsic size into the metadata cache and, if that was news, repaint
+ * the popover once so the caption appears.
+ *
+ * The repaint is coalesced across a whole grid of images landing in the same frame, and it cannot
+ * loop: re-rendering recreates the `<img>` elements, whose `load` fires again from cache, and
+ * `recordImageSize` returns false the second time because the measurement has not changed.
+ */
+function noteImageSize(file: string, target: EventTarget | null) {
+  const img = target as HTMLImageElement | null;
+  if (!img || !recordImageSize(file, img.naturalWidth, img.naturalHeight) || _sizeRepaint !== 0) {
+    return;
+  }
+  _sizeRepaint = requestAnimationFrame(() => {
+    _sizeRepaint = 0;
+    if (_popoverAnchorEl) {
+      renderMediaPickerPopover();
+    }
+  });
 }
 
 function renderMediaPickerPopover() {
@@ -196,8 +248,9 @@ function renderMediaPickerPopover() {
         >
           ${
             options.length > 0
-              ? options.map(
-                  (m) => html`
+              ? options.map((m) => {
+                  const caption = mediaMetaSummary(peekMediaMeta(m.file));
+                  return html`
                     <sp-menu-item value=${m.path}>
                       ${
                         m.isImage
@@ -206,13 +259,15 @@ function renderMediaPickerPopover() {
                               src=${loopbackAssetSrc(m.path)}
                               alt=""
                               style="width:24px;height:24px;object-fit:cover;border-radius:var(--spectrum-corner-radius-75, 2px)"
+                              @load=${(e: Event) => noteImageSize(m.file, e.target)}
                             />`
                           : nothing
                       }
                       ${m.name}
+                      ${caption ? html`<span slot="description">${caption}</span>` : nothing}
                     </sp-menu-item>
-                  `,
-                )
+                  `;
+                })
               : html`<sp-menu-item disabled>No matches</sp-menu-item>`
           }
           ${

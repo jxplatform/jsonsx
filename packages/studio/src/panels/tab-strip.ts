@@ -7,7 +7,7 @@
  * addressed by REGION id — `pane.primary/tabs`, `pane.secondary/tabs` — rather than by element id,
  * so the shell can move or rename the divs without touching this file.
  *
- * Five things the strip owes the author:
+ * Six things the strip owes the author:
  *
  * - **A label that identifies the document.** A realistic Jx session has four tabs whose basename is
  *   `index.md`, so the label is the shortest unique path suffix — and for a page, its ROUTE, which
@@ -22,6 +22,9 @@
  *   is worth more in Jx than in VS Code, because the palette's `@`/`#` modes make browsing cheap
  *   and browsing must not litter. Committing — an edit, a pin, a double-click — makes the tab
  *   permanent.
+ * - **A context menu**, which is `registry.forPlacement("context/tab")` and nothing else. Six records
+ *   declare that placement; until this menu existed, right-click — the gesture the placement is FOR
+ *   — reached none of them. See {@link placedTabItems}.
  */
 
 import { html, render as litRender, nothing } from "lit-html";
@@ -39,6 +42,11 @@ import {
   workspace,
 } from "../workspace/workspace";
 import { gridTabLabel } from "../grid/grid-source";
+import { entryDraftPill } from "../content/entry-editor";
+import { DRAFT_FIELD, isDraftEntry } from "../content/draft-state";
+import { entryFields } from "../content/entry-fields";
+import { collectionOfPath } from "../content/entry-model";
+import { activeRegistry } from "../commands/active-registry";
 import type { Pane } from "../workspace/workspace";
 import type { Tab } from "../tabs/tab";
 import { renderPopover, showConfirmDialog } from "../ui/layers";
@@ -108,6 +116,9 @@ export function mount(host: HTMLElement) {
         void tab.pinned;
         void tab.preview;
         void tab.session.openedFrom;
+        // The draft pill is on the chip, so the chip has to repaint when the flag changes — reading
+        // The absent key tracks its ADDITION too, which is the transition that matters most.
+        void tab.doc.content?.frontmatter?.[DRAFT_FIELD];
       }
       // An edit is a commitment: a preview tab with unsaved changes is no longer disposable, and
       // The dirty flags this effect already tracks are exactly the signal.
@@ -119,6 +130,7 @@ export function mount(host: HTMLElement) {
 
 export function unmount() {
   dismissOverflowMenu();
+  dismissTabContextMenu();
   _scope?.stop();
   _scope = null;
   _primaryHost = null;
@@ -242,10 +254,17 @@ function tabChip(pane: Pane, id: string, index: number, labels: Map<string, stri
           void requestClose(id);
         }
       }}
+      @contextmenu=${(e: MouseEvent) => openTabContextMenu(e, tab)}
       title=${tabTooltip(tab)}
     >
       ${origin ? html`<span class="tab-strip-origin" aria-hidden="true">↳</span>` : nothing}
       <span class="tab-strip-label">${label}</span>
+      ${
+        /* The draft pill (§7.6). On the CHIP, not only inside the entry editor: the mistake this
+           prevents — publishing something you believed was private — is made while glancing at a
+           row of tabs, and it is made about a document that may not even be the active one. */
+        entryDraftPill(tab)
+      }
       ${tab.doc.dirty ? html`<span class="tab-strip-dirty">●</span>` : nothing}
       <button
         class="tab-strip-pin"
@@ -419,6 +438,209 @@ function openOverflowMenu(e: MouseEvent, pane: Pane, labels: Map<string, string>
       },
     },
   );
+}
+
+// ─── Context menu ─────────────────────────────────────────────────────────────
+
+let _tabCtxHandle: { dismiss: () => void } | null = null;
+
+/** Dismiss the tab context menu if open. */
+export function dismissTabContextMenu() {
+  _tabCtxHandle?.dismiss();
+  _tabCtxHandle = null;
+}
+
+/** One row of the tab menu. Every field on it was read off a command record. */
+interface TabMenuItem {
+  label: string;
+  action?: () => void;
+  disabled?: boolean;
+  /** The `requires` sentence, printed under a disabled row. */
+  reason?: string;
+  /** What is true NOW, for a row whose command names a state — see {@link statedState}. */
+  state?: string | undefined;
+  /** A group boundary in `forPlacement`'s ordering. */
+  dividerAbove?: boolean;
+}
+
+/**
+ * A tab addresses ONE document, and this is everything the chip can say about it — keyed by the
+ * ARGUMENT NAME that asks for it.
+ *
+ * The whole `context/tab` placement asks for exactly one argument today: `content.setDraft
+ * {draft}`. The other five records take none, because they read the ACTIVE document — which is why
+ * {@link openTabContextMenu} activates the chip before it builds a single row.
+ *
+ * A fact is stated ONLY when it is true of this tab, and that is what decides whether a command
+ * appears at all: `styles/main.css` is an entry of no collection, so it states no `draft`, so "Set
+ * Draft" is not offered on it. The condition is `collectionOfPath` — the same question
+ * `content.setDraft`'s own `enablement` asks — so the menu never invents a rule the command does
+ * not have, and never renders a row into a refusal.
+ *
+ * The VALUE is the state the row would reach, not the state the tab is in: a setter is named for
+ * where it lands (`content/draft-state.ts` says why), so the row offers the flip of what is true
+ * now and {@link statedState} reads the current state back out of it for the checkmark.
+ */
+function tabRowFacts(tab: Tab): Record<string, unknown> {
+  const facts: Record<string, unknown> = {};
+  if (collectionOfPath(tab.documentPath)) {
+    facts.draft = !isDraftEntry(entryFields(tab));
+  }
+  return facts;
+}
+
+/**
+ * The state a row is IN, derived from the state it would reach — or `undefined` when the record
+ * says nothing about state.
+ *
+ * A menu is the one surface that is READ before it is used, so it is the one surface that can show
+ * a boolean instead of asking the author to remember it. That is an argument for the SETTER over
+ * the toggle, and it is why this is derived from the args rather than from a list of command ids:
+ * `content.setDraft {draft}` names the state it reaches, so the row can say which state the tab is
+ * in now and still land somewhere definite when clicked. `document.togglePinned` names no state —
+ * "Pin / Unpin Document" is a title that admits it does not know which it will do — so it renders
+ * as a plain row here. Its idempotent sibling `document.setPinned {pinned}` would state its own
+ * value, with no edit to this file, on the day its record declares `context/tab`; that declaration
+ * lives in `workspace/workspace.ts`, which is the only place it can be made.
+ */
+function statedState(args: Record<string, unknown>): string | undefined {
+  const entries = Object.entries(args);
+  const only = entries.length === 1 ? entries[0] : undefined;
+  if (!only || typeof only[1] !== "boolean") {
+    return undefined;
+  }
+  // The fact is the state the row would REACH, so the state it is in now is the negation. Phrased
+  // As `Key: yes|no` because the key is whatever the record's schema calls it — "Draft: no" reads,
+  // Where a sentence built around an arbitrary property name does not.
+  const key = only[0].charAt(0).toUpperCase() + only[0].slice(1);
+  return `${key}: ${only[1] ? "no" : "yes"}`;
+}
+
+/**
+ * The declared `context/tab` commands this chip can offer.
+ *
+ * Everything a row prints comes off the record — its title, its position (`forPlacement` sorts by
+ * `group`, and a change of group draws the divider), whether it is enabled and the sentence saying
+ * why not. Nothing here names a command, so a new `context/tab` record appears in the strip with no
+ * edit to this file — and with no registry published there are no rows at all, because every row
+ * there has ever been came from one.
+ */
+function placedTabItems(tab: Tab): TabMenuItem[] {
+  const registry = activeRegistry();
+  if (!registry) {
+    return [];
+  }
+  const facts = tabRowFacts(tab);
+  const items: TabMenuItem[] = [];
+  let group: string | undefined;
+  for (const command of registry.forPlacement("context/tab")) {
+    const schema = command.args as
+      | { properties?: Record<string, unknown>; required?: readonly string[] }
+      | undefined;
+    if (!(schema?.required ?? []).every((key) => key in facts)) {
+      continue;
+    }
+    const args: Record<string, unknown> = {};
+    for (const key of Object.keys(schema?.properties ?? {})) {
+      if (key in facts) {
+        args[key] = facts[key];
+      }
+    }
+    const dividerAbove = items.length > 0 && command.group !== group;
+    ({ group } = command);
+    const reason = registry.disabledReason(command.id);
+    items.push({
+      state: statedState(args),
+      dividerAbove,
+      label: command.title,
+      ...(reason === undefined
+        ? { action: () => void registry.run(command.id, args) }
+        : { disabled: true, reason }),
+    });
+  }
+  return items;
+}
+
+/**
+ * Open the menu on a chip.
+ *
+ * **Activating first is the wiring, not a courtesy.** Five of the six `context/tab` records read
+ * `workspace.activeTabId` and the sixth reads `activeTab.value`, and the registry rebuilds its
+ * context on every `forPlacement` / `disabledReason` / `run` call. Build the rows without
+ * activating and the menu states the OTHER tab's enablement — "Keep Document Open" greyed out over
+ * a preview tab — and then acts on the other tab too. Activation makes the tab the author aimed at
+ * the one the records are talking about, which is what every list does on right-click anyway.
+ *
+ * With nothing declared, no menu opens: an empty popover is a dead control, the same judgement the
+ * overflow chevron makes one section up.
+ */
+function openTabContextMenu(e: MouseEvent, tab: Tab) {
+  e.preventDefault();
+  e.stopPropagation();
+  dismissTabContextMenu();
+  dismissOverflowMenu();
+  activateTab(tab.id);
+
+  const items = placedTabItems(tab);
+  if (items.length === 0) {
+    return;
+  }
+
+  // Clamp to the viewport: a right-click near an edge would otherwise open a menu partly off
+  // Screen, and a menu you cannot read is a menu you cannot use.
+  const x = Math.min(e.clientX, window.innerWidth - 4);
+  const y = Math.min(e.clientY, window.innerHeight - 4);
+
+  _tabCtxHandle = renderPopover(
+    html`<sp-popover open style="position:fixed;z-index:10000;left:${x}px;top:${y}px">
+      <sp-menu>${items.map((item) => tabMenuItemTemplate(item))}</sp-menu>
+    </sp-popover>`,
+    {
+      dismissOnOutsideClick: true,
+      onDismiss: () => {
+        _tabCtxHandle = null;
+      },
+    },
+  );
+}
+
+/**
+ * The line under a row: why it is disabled, or what is true now.
+ *
+ * A disabled row prints the record's own `requires` sentence — the same words the palette and the
+ * assistant print, never re-worded here. An enabled row whose command names a state prints that
+ * state, because a setter is named for where it LANDS and its title alone cannot say where you are
+ * now.
+ *
+ * A description rather than a checkbox, for a mechanical reason: Spectrum's `Menu` reassigns every
+ * item's role one frame after connect whenever the menu declares no `selects`, so
+ * `role="menuitemcheckbox"` does not survive — verified in a real browser, because happy-dom never
+ * runs that reassignment and no test here can see it either way. Declaring `selects` would make all
+ * six rows checkboxes, including the five that carry no state.
+ *
+ * @param {TabMenuItem} item
+ */
+function descriptionTemplate(item: TabMenuItem) {
+  const line = item.reason === undefined ? item.state : `Needs ${item.reason}`;
+  return line === undefined ? nothing : html`<span slot="description">${line}</span>`;
+}
+
+/** One rendered row. A disabled row stays on screen when clicked — it is there to be read. */
+function tabMenuItemTemplate(item: TabMenuItem) {
+  return html`${
+      item.dividerAbove ? html`<sp-menu-divider role="separator"></sp-menu-divider>` : nothing
+    }<sp-menu-item
+      ?disabled=${item.disabled === true}
+      aria-disabled=${item.disabled === true ? "true" : "false"}
+      @click=${() => {
+        if (item.disabled === true) {
+          return;
+        }
+        dismissTabContextMenu();
+        void item.action?.();
+      }}
+      >${item.label}${descriptionTemplate(item)}</sp-menu-item
+    >`;
 }
 
 // ─── Labels ───────────────────────────────────────────────────────────────────

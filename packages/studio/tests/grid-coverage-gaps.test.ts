@@ -36,11 +36,17 @@ void mock.module("../src/ui/layers.js", () => ({
       dismiss: () => {
         host.remove();
       },
+      host,
+      update: (tpl: unknown) => render(tpl as never, host),
     };
   },
-  showConfirmDialog: async () => true,
+  showConfirmDialog: async () => dialogAnswers.confirm,
   showDialog: async () => null,
+  showPromptDialog: async () => dialogAnswers.prompt,
 }));
+
+/** What the mocked dialogs answer. Mutated per test — `mock.module` runs once, at import. */
+const dialogAnswers: { confirm: boolean; prompt: string | null } = { confirm: true, prompt: null };
 void mock.module("../src/ui/progress-modal.js", () => ({
   showProgressModal: () => ({ done: () => {}, fail: () => {}, setStatus: () => {} }),
 }));

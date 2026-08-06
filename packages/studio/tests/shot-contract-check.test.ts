@@ -43,6 +43,12 @@ const FIXTURES = "scripts/screenshots/fixtures/contract";
 async function runCheck(args: string[]) {
   const proc = Bun.spawn([process.execPath, join("scripts", "check-shot-contract.ts"), ...args], {
     cwd: REPO_ROOT,
+    // The assertions below match stderr lines by their `  ✗ ` prefix, so the child's output has to
+    // Be plain. Inheriting a developer's `FORCE_COLOR` puts an ANSI escape in front of every line
+    // And the filter silently yields [] — which reads as "the checker found nothing" rather than
+    // "the test cannot see". Three separate agents reported this file as a blocking failure before
+    // It was pinned down; it was their shell, every time.
+    env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -431,7 +437,7 @@ describe("the contract-1 bespoke verbs (§13.6's codemod, applied at read time)"
       ["settings.open", { section: "contexts" }],
       ["formula.editEvent", { path: ["children", 3], eventKey: "onClick" }],
       ["selection.set", { path: null }],
-      ["project.browse", {}],
+      ["library.open", {}],
     ]);
   });
 
@@ -679,8 +685,9 @@ describe("the CLI", () => {
   });
 
   test("main() returns an exit code and resolves paths against the repo root, not cwd", async () => {
-    // This test's cwd is packages/studio; the same repo-relative arguments must still resolve.
-    expect(process.cwd()).not.toBe(REPO_ROOT);
+    // The point is that repo-relative arguments resolve against the REPO ROOT rather than the
+    // Process cwd. Asserting `cwd !== REPO_ROOT` first made the test itself fail when run from the
+    // Repo root — a false alarm about the subject under test — so the invariant is stated directly.
     const args = ["--manifest", `${FIXTURES}/clean.json`, "--commands", `${FIXTURES}/commands.ts`];
     expect(await main(args)).toBe(0);
     expect(await main([...args.slice(0, 2), "--commands", `${FIXTURES}/commands.ts`])).toBe(0);

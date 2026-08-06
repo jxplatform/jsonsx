@@ -8,6 +8,7 @@ code:
   - packages/studio/src/panels/toolbar.ts
   - packages/studio/src/panels/activity-bar.ts
   - packages/studio/src/panels/left-panel.ts
+  - packages/studio/src/files/files.ts
   - packages/studio/src/panels/right-panel.ts
   - packages/studio/src/panels/bottom-dock.ts
   - packages/studio/src/panels/statusbar.ts
@@ -26,7 +27,7 @@ The bar across the top of the window. Everything in it is a command, so what you
 
 From left to right:
 
-- The **⬢ menu** holds the commands that don't need a permanent button — **Open Project…**, **Open Recent…**, **New Project…**, **Manage Files**, **Preferences…**, **Zen Mode**, and the rest — each with its own keyboard shortcut printed beside it.
+- The **⬢ menu** holds the commands that don't need a permanent button — **Open Project…**, **Open Recent…**, **New Project…**, **Open Library**, **Preferences…**, **Zen Mode**, and the rest — each with its own keyboard shortcut printed beside it.
 - The **layout tabs** — **Write · Design · Build · Ship** — are named arrangements of the workspace. Clicking one sets the Navigator panel, the dock widths, the Inspector tab and the Bottom dock in a single step. Double-click a tab to rename it, and press **+** to save whatever is on screen now as a layout of your own. Layouts are remembered per project.
 - The **Command Center pill** sits in the middle: `◈ project › document › selection`, with :kbd[⌘K] at its right end. It is the app's address — it always names the project you're in, the document you're editing and the element you have selected — and each segment is a button that opens the palette already scoped to that level. Click the pill's empty space to open the palette with nothing pre-picked.
 - The **verb cluster** on the right holds the four actions worth a permanent button: **Save**, **Open in Browser**, **Undo** and **Redo**. A greyed-out one tells you in its tooltip what it is waiting for.
@@ -46,7 +47,7 @@ The vertical strip on the far left. Every button carries a **text label under it
 
 **Project**
 
-- **Files** (:kbd[⌘1]) — the project file tree. Open, rename and organize the files in your project folder. **New File…** — from the panel's toolbar, or from a folder's right-click menu — opens a dialog with `untitled.json` pre-filled and the extension left unselected, so typing replaces just the name. Studio picks the starting content from the extension you give it. Drag files in from your desktop and they upload into whichever folder you drop them on — see [Media](/docs/studio/projects/media).
+- **Files** (:kbd[⌘1]) — the project file tree. Open, rename and organize the files in your project folder. **New File…** — from the panel's toolbar, or from a folder's right-click menu — opens the [creation dialog](#creating-a-file) with `untitled.json` pre-filled and only the name part selected, so typing replaces the name and keeps the extension. Studio picks the starting content from the extension you give it. Drag files in from your desktop and they upload into whichever folder you drop them on — see [Media](/docs/studio/projects/media).
 - **Source Control** (:kbd[⌘3]) — the built-in git client. A badge counts changed files. See [Git & publish](/docs/studio/publish).
 - **Problems** (:kbd[⌘4]) — everything that needs fixing, with a badge counting it. The button is on the rail because "how many things need fixing" is a question you ask without opening anything; the list itself opens in the [Bottom dock](#bottom-dock).
 
@@ -68,6 +69,20 @@ At the foot of the rail sit **About** — the app version, its release channel a
 The dock to the right of the rail shows one panel at a time, under a header naming the panel and the level it works at — `FILES · project`, `OUTLINE · document`. That header is how you always know which panel you're looking at and whether closing the last document would empty it.
 
 Drag the dock's inner edge to resize it — up to half the window — and double-click that edge to snap back to the default width.
+
+## Creating a file
+
+There is one creation flow, and every surface that makes a file uses it — **New File…** in the Files tree, **New** in the [Library](/docs/studio/projects/browse), and **New Entry** for a content collection. Wherever you start from, the dialog behaves the same way:
+
+- **It says where the file is going**, above the field — `Creating in content/blog/`, or _Creating in the project root_. The destination is part of the gesture you made, never guessed from a filter or a fallback.
+- **A name that folder already has is refused at the field.** The dialog stays open and tells you `about.md already exists in content/blog/.`, so nothing is overwritten and there is nothing to undo. A blank name, or one with no letters or digits left in it, is refused the same way.
+- **What it asks for depends on whether the extension is already settled.** The Files tree and the Library's **New** ask for a **file name** and take it as typed, so the extension is yours to choose — `untitled.json` and `untitled` are the respective prefills, with only the name part selected. **New Entry** for a content collection asks for a **display name** instead, because that collection already fixes the extension: `My First Post` becomes `my-first-post.md`.
+
+The new file is written with the starting content its type calls for: a content entry is seeded from its content type's fields, so it is valid the moment it exists. Creating from the Library or from a collection opens the new file for you as well.
+
+:::doc-note
+If the write itself fails, the reason arrives as a **Problem** in the [Bottom dock](#bottom-dock) carrying the path, rather than as a toast that scrolls away — the thing you have to do next is about that path.
+:::
 
 ## Panes and the canvas
 
@@ -108,7 +123,7 @@ Almost nothing in Studio blocks the whole app any more. Installing dependencies 
 The strip along the bottom carries **ambient state only** — things that are true until something changes them — in three fields, in the same order as the levels above them:
 
 - **Project** — the project name, the git branch with its ahead/behind counts, a count of open problems, and who else is in the document with you.
-- **Document** — the document's path, the pane's effective view (`Edit`, `Design`, `Preview`, `Code`, `Grid`…), and the save state in words: **Unsaved changes**, **Saved**, **Saved 2 minutes ago**, or **Read-only** when a collaborator holds the file.
+- **Document** — the document's path, the pane's effective view (`Edit`, `Design`, `Preview`, `Code`, `Grid`, `Library`…) in the same words the [pane context bar](/docs/studio/interface/tabs#the-pane-context-bar) uses, and the save state in words: **Unsaved changes**, **Saved**, **Saved 2 minutes ago**, or **Read-only** when a collaborator holds the file.
 - **Selection** — the selected element and the chain of elements above it, each step clickable so you can jump to any ancestor.
 
 Nearly every item is a button that runs the command behind it: the project name opens your recents, the branch reveals Source Control, the problem count opens the Bottom dock, **Unsaved changes** saves.

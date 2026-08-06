@@ -121,8 +121,8 @@
       "width": 3840
     },
     "docs/images/blog-grid.png": {
-      "bytes": 227730,
-      "capturedAt": "2026-08-05T03:20:07Z",
+      "bytes": 228384,
+      "capturedAt": "2026-08-06T04:44:26Z",
       "capturedBy": "screenshots@local",
       "definition": "0e8a0d9df9c3c6cc71eff7f71406b315871323a5e311e73d87d4d3b8a00c4e0f",
       "height": 2000,
@@ -131,7 +131,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "66bb56e4d8350cfce27db01b96eb4e1021061390a075e0b45ee600650f4b3554",
+      "sha256": "14917d31ef740dd351fdefc42b089f08229086a5c33f7cc1ac72691c8aed3d62",
       "shot": "blog-grid",
       "width": 3840
     },
@@ -391,8 +391,8 @@
       "width": 480
     },
     "docs/images/data-grid.png": {
-      "bytes": 791107,
-      "capturedAt": "2026-08-05T03:20:56Z",
+      "bytes": 792739,
+      "capturedAt": "2026-08-06T04:45:10Z",
       "capturedBy": "screenshots@local",
       "definition": "7733baf1d19aff069527b88fefd317f30bb3a8b2ec780f65ed6f5dfbb25d08ea",
       "height": 2000,
@@ -401,7 +401,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "a085af6e67f65d24e4f7daab6d7e2955217a7940a4b04f0a4c5943c601226183",
+      "sha256": "f33de76601a55f2024aaad82ff493472a23c0994cec3fd73e9505683d1ce8a33",
       "shot": "data-grid",
       "width": 3840
     },
@@ -571,8 +571,8 @@
       "width": 480
     },
     "docs/images/grid-mode.png": {
-      "bytes": 270377,
-      "capturedAt": "2026-08-05T03:18:51Z",
+      "bytes": 271025,
+      "capturedAt": "2026-08-06T04:43:18Z",
       "capturedBy": "screenshots@local",
       "definition": "fe8772d3e21af28d303c67f656233f511914d0b52ba84c5b4764ea72f6f006cb",
       "height": 2000,
@@ -581,7 +581,7 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "3d5560334a5d13f02e4f46bf861d493c29706a8f03985083dde92111907924f9",
+      "sha256": "5b46b9e47f9de7b0a791cf33f5edcb96ad7d1dbf59c3cffe5c063ac19d7b8bf4",
       "shot": "grid-mode",
       "width": 3840
     },
@@ -646,8 +646,8 @@
       "width": 480
     },
     "docs/images/media-picker.png": {
-      "bytes": 252014,
-      "capturedAt": "2026-08-05T03:19:34Z",
+      "bytes": 254669,
+      "capturedAt": "2026-08-06T04:43:57Z",
       "capturedBy": "screenshots@local",
       "definition": "9ecb2262d50e2772e32381150e251dbed90c577ff5e60d8a7b7d1d72d870c8e5",
       "height": 1240,
@@ -656,24 +656,24 @@
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "aa55caf9c02787078472d8b57b3d4c51aac242618d746b990acee958302fc5be",
+      "sha256": "0d552cd12f336a0e5936546eebe5826feebfaf1f0eb6b3c0329de43c5bb71b4f",
       "shot": "media-picker-shot",
       "width": 836
     },
     "docs/images/media-upload.png": {
-      "bytes": 1256905,
-      "capturedAt": "2026-08-04T02:38:03Z",
+      "bytes": 245965,
+      "capturedAt": "2026-08-06T04:45:25Z",
       "capturedBy": "screenshots@local",
-      "definition": "fea2b26fb83946ca63b17145393a8a994b99cd68fe5a6e3aa374c459551645aa",
-      "height": 1738,
+      "definition": "ac0e427d3f9e29401cf944d5957009c5a615bf559b5de440f0a488e78f776b18",
+      "height": 1686,
       "runtime": {
-        "chromium": "150",
+        "chromium": "151",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "94294251f8af4e1d716953144b1a46801cae3b8a07ab778a2989d6b19be6950a",
+      "sha256": "91e1f38e598949fe98e1ab16f67d299e09f51f317d0a943acc2c8b5aa78c9e0b",
       "shot": "media-upload",
-      "width": 3676
+      "width": 2688
     },
     "docs/images/mode-design.png": {
       "bytes": 1072894,
@@ -706,17 +706,17 @@
       "width": 3840
     },
     "docs/images/mode-manage.png": {
-      "bytes": 1350883,
-      "capturedAt": "2026-08-05T03:17:31Z",
+      "bytes": 574767,
+      "capturedAt": "2026-08-06T04:42:01Z",
       "capturedBy": "screenshots@local",
-      "definition": "0b929f9a9bf4bb5d375f2cd8325f589702b1bb42b4b449fc44c2848f2ac40ba7",
+      "definition": "30af42c718ebeb7e90b6ba0ae1e36adf2265aabc3bd12e504887b02adf8313e4",
       "height": 2000,
       "runtime": {
         "chromium": "151",
         "fontset": "fc:1b695f444a2f",
         "os": "nixos-26.11"
       },
-      "sha256": "69e9e31878b3b6bc54cdd7e465696c9ac0702a3dbeb392bbca13302c4490ac7c",
+      "sha256": "ff3efe99601e980e60d6aa8c80b694748eff88eca8ee03fe5da2ca19a233c068",
       "shot": "mode-manage",
       "width": 3840
     },

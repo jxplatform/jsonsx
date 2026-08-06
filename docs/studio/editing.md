@@ -20,7 +20,7 @@ Markdown pages open in Edit automatically. For anything else, pick **Edit** in t
 
 - **[Writing and formatting](/docs/studio/editing/writing)** — typing on the page, paragraphs, the inline formatting toolbar, links, pasting, and editing text inside components.
 - **[Slash commands](/docs/studio/editing/slash-commands)** — type `/` to insert headings, lists, images, tables, and more without leaving the keyboard.
-- **[Frontmatter and page metadata](/docs/studio/editing/frontmatter)** — the **Document** activity's forms for titles, descriptions, social-share cards, and your content type's fields.
+- **[Frontmatter and page metadata](/docs/studio/editing/frontmatter)** — the **Page** panel's forms for titles, descriptions, social-share cards, and your content type's fields.
 - **[Grid mode](/docs/studio/editing/grid)** — a spreadsheet view for whole collections, CSV files, and page metadata, with one batched Save.
 
 ## It's just Markdown
@@ -30,4 +30,4 @@ Everything you write saves as standard Markdown with your metadata on top. Open 
 ## Next
 
 - Structure and style the page in **[Design mode](/docs/studio/design)**
-- Organize the content files themselves in **[Browse your project](/docs/studio/projects/browse)**
+- Organize the content files themselves in **[the Library](/docs/studio/projects/browse)**

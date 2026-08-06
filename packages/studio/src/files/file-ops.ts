@@ -16,6 +16,8 @@
 
 import { html, nothing } from "lit-html";
 import { loadUsages, usageWarning } from "../services/references";
+import { isMediaFile } from "./media-upload";
+import { loadMediaUsages } from "./media-usage";
 import { showConfirmDialog } from "../ui/layers";
 import { locateDocument } from "../services/code-services";
 import { errorMessage } from "@jxsuite/schema/parse";
@@ -348,11 +350,22 @@ export async function serializeDocument(tab: Tab): Promise<string> {
  * confirm button that becomes truthful two frames after the user has already pressed it is the same
  * defect as not counting at all.
  *
+ * **A media file is asked about through the media index, and that is not a refinement.** The
+ * generic sweep compares each authored reference's RESOLVED path to the path it was asked about,
+ * and a media file's authored ref usually resolves somewhere else: `public/hero.jpg` is written
+ * `/hero.jpg` and resolves to `hero.jpg`; an asset inside a collection whose `source` is not
+ * already `content/<type>/` is addressed at its asset mount and resolves under that prefix. Asking
+ * the generic index about the file on disk returns a confident zero for both, which is the one
+ * answer a delete dialog must never invent. `media-usage.ts` asks every authored form and unions
+ * the answers — and reports **unknown** when a lane cannot be counted, rather than totalling the
+ * lanes that could.
+ *
  * @param path — the file about to be deleted or renamed.
  * @param verb — which way the references go. A rename repairs them; a delete breaks them.
  */
 async function usageLine(path: string, verb: "delete" | "rename") {
-  const sentence = usageWarning(await loadUsages({ path }), verb);
+  const state = isMediaFile(path) ? await loadMediaUsages(path) : await loadUsages({ path });
+  const sentence = usageWarning(state, verb);
   return sentence === null ? nothing : html`<p class="dialog-consequence">${sentence}</p>`;
 }
 

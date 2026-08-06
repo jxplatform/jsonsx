@@ -48,6 +48,34 @@ the transaction log. Duplicated maps fail open. **The new spec section is §17, 
 renumbered. Finally, the `settings-modal` **shot name became false** the moment the modal died; a
 shot is named for what it photographs, so it is `settings-document` now.
 
+**H · What P7 changed about the plan itself** (added on landing). **There are two command roots and
+they can diverge.** `appCommandSet()` is what `check-command-levels` counts and
+`docs/studio/interface/commands.md` is generated from; the running app registers through
+`register*(commandRegistry)` calls in `studio.ts`. Nothing tied them together, so P7 shipped four
+factories in NEITHER — Push, Deploy, Save View and the whole Redirects editor absent from the
+palette with no other entry point, while their unit tests passed and CI reported a healthy count —
+and P4 had put `help.about` and the entire `collab.*` family in the projection ALONE, so CI counted
+commands the app could not run, in the same change that deleted the button one of them replaced.
+Six unreachable command sets across two phases, none of which any gate could see, because a command
+that is never composed is simply absent and absence reads as fine.
+`tests/app-commands-composition.test.ts` is the guard.
+
+**Two tests could not fail.** `entry-editor.test.ts` built its tab with `openTab({ frontmatter })` —
+state the real open path never produces for a JSON entry — so the editor rendered a blank form and
+discarded every edit while reporting "Saved", and every fixture agreed it was fine. The Library's
+perf test **deletes the global `IntersectionObserver`**, so it structurally could not see that
+observation targets are never released and scrolling degrades the longer you scroll. A test that
+constructs state the app never constructs will confirm whatever you built; both of these did.
+
+**Measurement finds what review cannot.** Item 1's acceptance test — 300 pages, one category — was
+worth stating as a number, and building it turned up three bugs nobody was looking for: an LRU that
+never marked on-screen previews as used, a cache cap SMALLER than one window (so it thrashed against
+itself), and a failed scan retried by the very repaint its failure caused.
+
+**`site-architecture.md` §7 had eight stale `Pending` markers** — rename, delete and CSV editing all
+shipped long ago. A status table that has to be re-derived from the code is worse than none, because
+it is the one artifact a reader consults _instead of_ reading the code.
+
 **C · Facts and dropped surfaces.** 36 `project.json` write sites → **42**, across eight files. `"stylebook"` is a wire-protocol value (`iframe-protocol.ts:25`), so it stays one. The Layout show/hide toggle, the GitHub-App install prompt, the per-recent remove affordance and the `?project=` deep link all get an explicit home in §11. The New Project wizard rework is scheduled in P1, the Insert command family in P3. Six owner-less findings — the 158 silent catch blocks, `leftTab`/`rightTab`, the three `$elements` writers, the unvirtualized trees, the panel scheduler's silent deferral, and inline formatting's level — each get a phase and a decision.
 
 ---

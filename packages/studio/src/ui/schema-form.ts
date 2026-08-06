@@ -44,6 +44,12 @@ export interface JsonSchema {
   examples?: string[];
   name?: string;
   items?: JsonSchema;
+  /**
+   * A pointer to another schema. `#/content/<type>` is the one this engine acts on: it is how
+   * site-architecture.md §6.1 declares a relationship between collections, and it is what the
+   * schema-builder writes (`form-controls.ts`'s `onChangeRefTarget`).
+   */
+  $ref?: string;
 }
 
 /** Host-provided context threaded to every control. */
@@ -131,8 +137,30 @@ export function getFormControl(name: string): SchemaFormControl | undefined {
   return controlRegistry.get(name);
 }
 
-/** Inert context used when a host renders a form without one. */
-const NULL_CONTEXT: SchemaFormContext = {
+// ─── References between collections ──────────────────────────────────────────
+
+/** `#/content/<type>` — a property whose value is the id of an entry in another collection. */
+const CONTENT_REF = /^#\/content\/([^/]+)$/;
+
+/**
+ * The collection a property references, or null when it references nothing.
+ *
+ * Exported because it is the ONE test for "is this field a relationship", and three surfaces have
+ * to agree on it: this engine, the frontmatter renderer, and the grid's relationship cell. A fourth
+ * reading of `$ref` is how the picker ends up existing three times with three behaviours.
+ */
+export function referenceTarget(schema: { $ref?: string } | undefined): string | null {
+  const match = typeof schema?.$ref === "string" ? CONTENT_REF.exec(schema.$ref) : null;
+  return match ? match[1]! : null;
+}
+
+/**
+ * Inert context used when a host renders a form without one.
+ *
+ * Exported because a host with genuinely nowhere to resolve from — the frontmatter renderer, whose
+ * one registered control reads FILES — should name this rather than write a second empty closure.
+ */
+export const NULL_FORM_CONTEXT: SchemaFormContext = {
   resolvePointer: () => {
     // Nothing to resolve against without a host context
   },
@@ -215,6 +243,9 @@ function refTextField(key: string, refVal: string, onChange: (next: unknown) => 
  * @param {(val: unknown) => void} onChange
  * @param {SchemaFormContext | undefined} ctx
  * @param {Record<string, unknown>} [scope] - Scope for dependent enum refs (the parent form value)
+ * @param {() => void} [rerender] - Repaint hook, threaded so an inline reference can show its
+ *   choices once they load — an async control with no way to ask for a second frame renders its
+ *   loading state forever.
  */
 export function renderInlineField(
   key: string,
@@ -223,9 +254,22 @@ export function renderInlineField(
   onChange: (val: unknown) => void,
   ctx?: SchemaFormContext,
   scope?: Record<string, unknown>,
+  rerender?: () => void,
 ) {
   if (isRef(value)) {
     return refTextField(key, value.$ref, onChange);
+  }
+  const referenceControl =
+    referenceTarget(schema) === null ? undefined : controlRegistry.get("reference");
+  if (referenceControl) {
+    return referenceControl({
+      ctx: ctx ?? NULL_FORM_CONTEXT,
+      key,
+      onChange,
+      rerender,
+      schema,
+      value,
+    });
   }
   const enumValues = resolveFormEnum(schema.enum, ctx, scope);
 
@@ -333,6 +377,20 @@ function renderPropertyControl(
      edited as the string it is rather than rendered as "[object Object]" in a typed widget. */
   if (isRef(currentValue) && isBindableField(ps)) {
     return refTextField(prop, currentValue.$ref, commit);
+  }
+
+  /* A relationship to another collection (`$ref: "#/content/<type>"`) is the registered `reference`
+     control, wherever the form is drawn — §9.2's "one picker" is this dispatch plus the single
+     `registerFormControl("reference", …)` in `ui/form-controls.ts`. It is deliberately NOT an enum:
+     the choices are entry files on disk, so they are read asynchronously and can be stale, and a
+     schema `enum` is a closed set the document itself declares. When the control is not registered
+     (a bare-Bun import of this engine), the field falls through to the plain textfield below rather
+     than rendering nothing. */
+  if (referenceTarget(ps) !== null) {
+    const referenceControl = controlRegistry.get("reference");
+    if (referenceControl) {
+      return referenceControl(controlArgs);
+    }
   }
 
   const enumValues = resolveFormEnum(opts.ui?.[prop]?.enum ?? ps.enum, ctx, value);
@@ -460,6 +518,7 @@ function renderPropertyControl(
                   },
                   ctx,
                   value,
+                  opts.rerender,
                 ),
               )}
               <sp-action-button
@@ -613,7 +672,7 @@ export function renderForm(
   opts: RenderFormOptions,
 ): TemplateResult {
   const required = new Set(schema.required);
-  const ctx = opts.context ?? NULL_CONTEXT;
+  const ctx = opts.context ?? NULL_FORM_CONTEXT;
   const refSources = refSourcesFor(ctx);
 
   const propertyFields = Object.entries(schema.properties ?? {}).map(([prop, ps]) => {

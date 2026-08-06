@@ -40,8 +40,10 @@ import {
   setWorkspaceProject,
   workspace,
 } from "../workspace/workspace";
-import { openCollectionGrid, openCsvGridTab, openPagesGrid } from "../grid/grid-open";
+import { openCsvGridTab, openPagesGrid } from "../grid/grid-open";
 import { collectionDirs } from "../grid/sources/content-source";
+import { activeRegistry } from "../commands/active-registry";
+import { collectionOfPath } from "../content/entry-model";
 import {
   confirmFileDelete,
   parseSourceForPath,
@@ -876,6 +878,84 @@ function dismissFileContextMenu() {
   }
 }
 
+/** One row of the file menu. The divider is the em-dash label; `disabled` rows explain themselves. */
+interface FileMenuItem {
+  label: string;
+  action?: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  /** The `requires` sentence, printed under a disabled row. */
+  reason?: string;
+}
+
+/**
+ * A file row addresses ONE thing, and this is everything it can say about it — keyed by the
+ * ARGUMENT NAME that asks for it.
+ *
+ * `menus: ["context/file"]` names a placement, and a placement nothing renders is the same defect
+ * as a command nothing registers, one layer down: `content.openEntry` declared this menu and the
+ * tree drew a hand-built list beside it, so the row simply never existed. Rendering the placement
+ * is the fix, and it needs the one thing the element menu does not — an argument.
+ * `content.openEntry` wants a `path`, `collection.editInGrid` wants a `name`, and only the row
+ * knows either.
+ *
+ * A fact is stated ONLY when it is true of this row, and that is what decides whether a command
+ * appears at all: `styles/main.css` is an entry of no collection, so it states no `path`, so "Open
+ * Entry Form" is not offered on it. A command whose required arguments this row cannot answer is
+ * skipped — never rendered into a refusal the author cannot act on.
+ */
+function fileRowFacts(entry: { path: string; type: string }): Record<string, unknown> {
+  const facts: Record<string, unknown> = {};
+  if (entry.type === "directory") {
+    const collection = collectionDirs().find(
+      ({ dir }) => entry.path === dir || entry.path.endsWith(`/${dir}`),
+    );
+    if (collection) {
+      facts.name = collection.name;
+    }
+  } else if (collectionOfPath(entry.path)) {
+    facts.path = entry.path;
+  }
+  return facts;
+}
+
+/**
+ * The declared `context/file` commands this row can offer.
+ *
+ * Everything a row prints comes off the record — its title, its position (`forPlacement` sorts by
+ * `group`), whether it is enabled and the sentence saying why not. Nothing here names a command, so
+ * a new `context/file` record appears in the tree with no edit to this file.
+ */
+function placedFileItems(entry: { path: string; type: string }): FileMenuItem[] {
+  const registry = activeRegistry();
+  if (!registry) {
+    return [];
+  }
+  const facts = fileRowFacts(entry);
+  const items: FileMenuItem[] = [];
+  for (const command of registry.forPlacement("context/file")) {
+    const schema = command.args as
+      | { properties?: Record<string, unknown>; required?: readonly string[] }
+      | undefined;
+    if (!(schema?.required ?? []).every((key) => key in facts)) {
+      continue;
+    }
+    const args: Record<string, unknown> = {};
+    for (const key of Object.keys(schema?.properties ?? {})) {
+      if (key in facts) {
+        args[key] = facts[key];
+      }
+    }
+    const reason = registry.disabledReason(command.id);
+    items.push(
+      reason === undefined
+        ? { action: () => void registry.run(command.id, args), label: command.title }
+        : { disabled: true, label: command.title, reason },
+    );
+  }
+  return items;
+}
+
 function showFileContextMenu(
   e: MouseEvent,
   entry: { name: string; path: string; type: string },
@@ -885,8 +965,7 @@ function showFileContextMenu(
   dismissFileContextMenu();
   const isDir = entry.type === "directory";
 
-  /** @type {{ label: string; action?: () => void; danger?: boolean }[]} */
-  const items = [];
+  const items: FileMenuItem[] = [];
 
   if (!isDir) {
     items.push({ action: () => ctx.openFileFn(entry.path), label: "Open" });
@@ -902,19 +981,9 @@ function showFileContextMenu(
         label: "Upload Files\u2026",
       },
     );
-    // Directories backing a content collection get a bulk-edit affordance.
-    const collection = collectionDirs().find(
-      ({ dir }) => entry.path === dir || entry.path.endsWith(`/${dir}`),
-    );
-    if (collection) {
-      items.push({
-        action: () => {
-          openCollectionGrid(collection.name);
-        },
-        label: "Edit Collection in Grid",
-      });
-    }
     if (entry.path === "pages" || entry.path.endsWith("/pages")) {
+      // The one hand-built row left: no command declares "open the pages grid". `grid-open.ts`'s
+      // `collection.editInGrid` has no pages sibling, so there is nothing here to render yet.
       items.push({
         action: () => {
           openPagesGrid();
@@ -924,6 +993,9 @@ function showFileContextMenu(
     }
   }
   items.push(
+    // The declared rows sit between what the TREE does to a file (open it, create in it, upload to
+    // It) and what it does to the file's existence (rename, delete).
+    ...placedFileItems(entry),
     { label: "\u2014" },
     {
       action: () => renameFile(entry, ctx.renderLeftPanel),
@@ -967,11 +1039,20 @@ function showFileContextMenu(
             ? html`<sp-menu-divider></sp-menu-divider>`
             : html`<sp-menu-item
                 style=${item.danger ? "color: var(--danger)" : ""}
+                ?disabled=${item.disabled === true}
+                aria-disabled=${item.disabled === true ? "true" : "false"}
                 @click=${() => {
+                  if (item.disabled === true) {
+                    return;
+                  }
                   dismissFileContextMenu();
                   void item.action?.();
                 }}
-                >${item.label}</sp-menu-item
+                >${item.label}${
+                  // A disabled row says what it needs, the same sentence the palette and the agent
+                  // Print — `requires`, off the record, never re-worded here.
+                  item.reason ? html`<span slot="description">Needs ${item.reason}</span>` : nothing
+                }</sp-menu-item
               >`,
         )}
       </sp-menu>
@@ -987,39 +1068,124 @@ function showFileContextMenu(
 
 // ─── File CRUD ────────────────────────────────────────────────────────────────
 
-async function createNewFile(dirPath: string, renderLeftPanel: () => void) {
-  const name = await showPromptDialog("New File", {
-    confirmLabel: "Create",
-    message: dirPath === "." ? "Creating in the project root." : `Creating in ${dirPath}/`,
-    placeholder: "untitled.json",
-    select: "stem",
-    validate: (v) => (v.trim() ? "" : "Enter a file name."),
-    value: "untitled.json",
-  });
-  if (!name) {
-    return;
-  }
-  const path = dirPath === "." ? name : `${dirPath}/${name}`;
-  markLocalMutation(path);
+/** The default body for a path no format claims — a document, since that is what Jx authors. */
+const BLANK_DOCUMENT = JSON.stringify(
+  { children: [{ children: [], tagName: "p" }], tagName: "div" },
+  null,
+  2,
+);
+
+/**
+ * One creation, named.
+ *
+ * `dir` is required and has no default. That is the whole point of the type: the Library used to
+ * derive its destination from whichever CATEGORY filter happened to be active — and "All" derived
+ * nothing, so a new page landed wherever the writer's fallback pointed. A creation flow that cannot
+ * say where the file is going has no business asking for its name.
+ */
+export interface NewFileRequest {
+  /** Destination directory, project-relative. `"."` is the project root. */
+  dir: string;
+  /** Dialog title — "New File", "New Page", "New Post". Defaults to "New File". */
+  title?: string;
+  /** Pre-filled value; its stem is selected so typing replaces the name and keeps the extension. */
+  suggestedName?: string;
+  /**
+   * When set, the field asks for a DISPLAY NAME and this extension is appended to its slug — "My
+   * First Post" becomes `my-first-post.md`. When absent, the field asks for a file name and takes
+   * it verbatim, which is what the Files tree has always done.
+   */
+  ext?: string;
+  /** Body to write. Defaults to the resolved format's `newFileTemplate`. */
+  content?: string;
+  /** Who is creating, for the Problem's `source` line. Defaults to "Files". */
+  source?: string;
+}
+
+/**
+ * Create one file, from the one flow both the Files tree and the Library use.
+ *
+ * Two behaviours the callers used to disagree about, settled here:
+ *
+ * - **A name that is already taken is refused in the FIELD**, not discovered afterwards. Both
+ *   predecessors called `writeFile` straight onto the composed path, so creating `about.md` in a
+ *   directory that had one silently replaced it — with no undo, because the file was never open.
+ *   The destination is listed once before the prompt so `validate` can say so while it can still be
+ *   fixed.
+ * - **A failure is a Problem carrying the path**, not a toast that scrolls away, since the thing the
+ *   author must do next is about that path.
+ *
+ * @returns The created path, or `null` when the author cancelled or the write failed.
+ */
+export async function createFileIn(request: NewFileRequest): Promise<string | null> {
+  const { dir, ext, source = "Files" } = request;
   await loadFormats();
-  const format = formatForPath(name);
-  const content =
-    format?.studio?.newFileTemplate ??
-    (format
-      ? ""
-      : JSON.stringify({ children: [{ children: [], tagName: "p" }], tagName: "div" }, null, 2));
+
+  // One listing, before the field opens: the names it must refuse are known while typing.
+  let taken = new Set<string>();
   try {
-    const platform = getPlatform();
-    await platform.writeFile(path, content);
-    await loadDirectory(dirPath);
-    renderLeftPanel();
+    const listing = await getPlatform().listDirectory(dir);
+    taken = new Set(listing.map((entry) => entry.name));
+  } catch {
+    // A directory that cannot be listed is usually one that does not exist yet — the write below
+    // Is the authority on whether that is a problem, and it reports with the real reason.
+  }
+
+  const fileNameFor = (input: string) =>
+    ext === undefined
+      ? input.trim()
+      : `${input
+          .trim()
+          .toLowerCase()
+          .replaceAll(/\s+/g, "-")
+          .replaceAll(/[^a-z\d-]/g, "")}${ext}`;
+
+  const entered = await showPromptDialog(request.title ?? "New File", {
+    confirmLabel: "Create",
+    message: dir === "." ? "Creating in the project root." : `Creating in ${dir}/`,
+    ...(request.suggestedName === undefined ? {} : { placeholder: request.suggestedName }),
+    select: "stem",
+    validate: (value) => {
+      if (!value.trim()) {
+        return ext === undefined ? "Enter a file name." : "Enter a name.";
+      }
+      const candidate = fileNameFor(value);
+      if (!candidate || candidate === ext) {
+        return "Enter at least one letter or number.";
+      }
+      return taken.has(candidate) ? `${candidate} already exists in ${dir}/.` : "";
+    },
+    value: request.suggestedName ?? "untitled.json",
+  });
+  if (!entered) {
+    return null;
+  }
+
+  const fileName = fileNameFor(entered);
+  const path = dir === "." ? fileName : `${dir}/${fileName}`;
+  markLocalMutation(path);
+  const format = formatForPath(fileName);
+  const content =
+    request.content ?? format?.studio?.newFileTemplate ?? (format ? "" : BLANK_DOCUMENT);
+  try {
+    await getPlatform().writeFile(path, content);
+    await loadDirectory(dir);
     notify.success(`Created ${path}`);
+    return path;
   } catch (error) {
     notify.error(`Could not create ${path}.`, {
       detail: errorMessage(error),
       path,
-      source: "Files",
+      source,
     });
+    return null;
+  }
+}
+
+async function createNewFile(dirPath: string, renderLeftPanel: () => void) {
+  const created = await createFileIn({ dir: dirPath, suggestedName: "untitled.json" });
+  if (created !== null) {
+    renderLeftPanel();
   }
 }
 

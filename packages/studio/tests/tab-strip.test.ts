@@ -1,19 +1,27 @@
 /**
- * Tab strip — reactive rendering of open tabs, activation, dirty indicator, and close flow
- * (including the unsaved-changes confirm dialog).
+ * Tab strip — reactive rendering of open tabs, activation, dirty indicator, the close flow
+ * (including the unsaved-changes confirm dialog), and the `context/tab` menu.
  */
-import { flush } from "./harness";
+import { flush, resetStudioState } from "./harness";
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mount, unmount } from "../src/panels/tab-strip";
 import { collabState } from "../src/collab/collab-state";
 import {
   closeAllTabs,
   closePane,
+  closeTab,
   openTab,
+  paneCommands,
   splitRight,
+  tabCommands,
   workspace,
 } from "../src/workspace/workspace";
 import { initLayers } from "../src/ui/layers";
+import { createCommandRegistry } from "../src/commands/registry";
+import { setActiveRegistry } from "../src/commands/active-registry";
+import { makeContext } from "../src/commands/context";
+import { defaultCommands, noopCommandDeps } from "../src/commands/defaults";
+import { contentCommands } from "../src/content/entry-commands";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 let host: HTMLElement;
@@ -468,5 +476,324 @@ describe("per-pane strips", () => {
       .querySelector(".tab-strip-row")!
       .dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(workspace.activePaneId).toBe("primary");
+  });
+});
+
+// ─── Context menu ─────────────────────────────────────────────────────────────
+
+/**
+ * `context/tab` is a DECLARED placement, and six records declare it. Until the strip rendered it,
+ * right-click — the gesture the placement exists to describe — reached none of them: `Set Draft`,
+ * `Reopen Closed Document`, `Pin / Unpin Document`, `Keep Document Open`, `Split Right` and `Close
+ * Document` all shipped with a menu entry no surface drew. Every case below goes through the real
+ * records, so a record that loses its placement fails here rather than shipping unreachable.
+ */
+describe("tab context menu", () => {
+  /** What the chip's own `closeDocument` dep did, and to which tab. */
+  let closed: string[];
+  /** Paths `document.reopenClosed` asked to open. */
+  let reopened: string[];
+
+  function menuItems(): HTMLElement[] {
+    return [...document.querySelectorAll("#layer-popover sp-menu-item")] as HTMLElement[];
+  }
+
+  /** A row's label without the `Needs …` sentence a disabled row prints under it. */
+  function labelOf(el: Element): string {
+    const description = el.querySelector("[slot=description]")?.textContent ?? "";
+    return (el.textContent ?? "").replace(description, "").trim();
+  }
+
+  function labels(): string[] {
+    return menuItems().map((el) => labelOf(el));
+  }
+
+  function rowFor(label: string): HTMLElement {
+    return menuItems().find((el) => labelOf(el) === label)!;
+  }
+
+  function rightClick(el: HTMLElement, init: MouseEventInit = {}) {
+    el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, ...init }));
+  }
+
+  /**
+   * The app's real `context/tab` records, in one registry.
+   *
+   * `closeDocument` is the one dep with a body: it does what `editor/shortcuts.ts` does — close
+   * whatever is active when the command runs — so a test can tell WHICH tab the menu addressed.
+   */
+  function publishRegistry() {
+    const registry = createCommandRegistry({
+      getContext: () => makeContext({ document: { open: workspace.activeTabId !== null } }),
+    });
+    registry.registerAll([
+      ...defaultCommands({
+        ...noopCommandDeps(),
+        closeDocument: () => {
+          const id = workspace.activeTabId!;
+          closed.push(id);
+          closeTab(id);
+        },
+      }),
+      ...tabCommands({
+        openFile: (path: string) => {
+          reopened.push(path);
+        },
+      }),
+      ...paneCommands(),
+      ...contentCommands(),
+    ]);
+    setActiveRegistry(registry);
+    return registry;
+  }
+
+  /** A project whose `posts` collection is JSON-backed, so `posts/*.json` is a content entry. */
+  function siteWithPosts() {
+    resetStudioState({
+      projectConfig: {
+        content: {
+          posts: {
+            format: "json",
+            schema: { properties: { draft: { type: "boolean" }, title: { type: "string" } } },
+            source: "./posts/",
+          },
+        },
+        name: "Demo",
+      },
+    });
+  }
+
+  beforeEach(() => {
+    closed = [];
+    reopened = [];
+    // `closeAllTabs()` feeds the reopen stack, and it runs between every case in this file — so
+    // Without this, `document.reopenClosed`'s enablement is decided by the PREVIOUS test.
+    workspace.closedTabs = [];
+    siteWithPosts();
+  });
+
+  afterEach(() => {
+    setActiveRegistry(null);
+    resetStudioState();
+  });
+
+  test("every declared context/tab record is reachable by right-click, in the records' own order", async () => {
+    open("posts/first.json", "posts/first.json");
+    publishRegistry();
+    await flush();
+
+    rightClick(tabs()[0]!);
+    await flush();
+
+    // Sorted by `group` then title, by `forPlacement` — not by this file.
+    expect(labels()).toEqual([
+      "Close Document",
+      "Keep Document Open",
+      "Pin / Unpin Document",
+      "Reopen Closed Document",
+      "Set Draft",
+      "Split Right",
+    ]);
+    // A group change draws a divider: 1_file → 3_document → 5_pane is two of them.
+    expect(document.querySelectorAll("#layer-popover sp-menu-divider")).toHaveLength(2);
+  });
+
+  test("with no registry published there are no rows — so no menu opens at all", async () => {
+    open("a");
+    publishRegistry();
+    await flush();
+    rightClick(tabs()[0]!);
+    await flush();
+    expect(menuItems().length).toBeGreaterThan(0);
+
+    // The defect this whole surface fixes, in reverse: every row came from the registry, so
+    // Without one there is nothing to draw — and an empty popover is a dead control.
+    setActiveRegistry(null);
+    rightClick(tabs()[0]!);
+    await flush();
+    expect(document.querySelector("#layer-popover sp-popover")).toBeNull();
+  });
+
+  test("right-click activates the chip it was aimed at, so the rows describe THAT tab", async () => {
+    const preview = openTab({
+      document: { children: [], tagName: "div" } as JxMutableNode,
+      documentPath: "/project/preview.json",
+      id: "preview",
+      preview: true,
+    });
+    open("other");
+    publishRegistry();
+    await flush();
+    expect(workspace.activeTabId).toBe("other");
+
+    rightClick(tabs()[0]!);
+    await flush();
+
+    // Every one of these records reads the ACTIVE document. Without activation the menu would
+    // State `other`'s enablement — "Keep Document Open" greyed out over a preview tab.
+    expect(workspace.activeTabId).toBe("preview");
+    expect(rowFor("Keep Document Open").hasAttribute("disabled")).toBeFalse();
+    expect(preview.preview).toBeTrue();
+  });
+
+  test("a row runs its command against the right-clicked tab", async () => {
+    open("a");
+    open("b", "/project/b.json");
+    publishRegistry();
+    await flush();
+
+    rightClick(tabs()[0]!);
+    await flush();
+    rowFor("Pin / Unpin Document").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+
+    expect(workspace.tabs.get("a")!.pinned).toBeTrue();
+    expect(workspace.tabs.get("b")!.pinned).toBeFalse();
+    // Running a row dismisses the menu.
+    expect(document.querySelector("#layer-popover sp-popover")).toBeNull();
+  });
+
+  test("Close Document closes the tab the menu was opened on, not the one that was active", async () => {
+    open("a");
+    open("b", "/project/b.json");
+    publishRegistry();
+    await flush();
+
+    rightClick(tabs()[0]!);
+    await flush();
+    rowFor("Close Document").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+
+    expect(closed).toEqual(["a"]);
+    expect([...workspace.tabs.keys()]).toEqual(["b"]);
+  });
+
+  test("Set Draft is offered only on a content entry, shows the state it is in, and lands on the other", async () => {
+    const entry = open("posts/first.json", "posts/first.json");
+    publishRegistry();
+    await flush();
+
+    rightClick(tabs()[0]!);
+    await flush();
+    const row = rowFor("Set Draft");
+    // A setter names the state it REACHES, so the row says where the tab is now and the click
+    // Takes it to the other one. Stated in the description rather than as a checkbox role:
+    // Spectrum's `Menu` reassigns every item's role one frame after connect when the menu declares
+    // No `selects`, so `menuitemcheckbox` does not survive in a real browser — and this test could
+    // Not see that, because happy-dom never runs the reassignment.
+    expect(row.querySelector('[slot="description"]')?.textContent).toBe("Draft: no");
+
+    row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+    expect((entry.doc.document as unknown as Record<string, unknown>).draft).toBeTrue();
+
+    rightClick(tabs()[0]!);
+    await flush();
+    // Re-opened, the row states the value the click produced — and now offers the way back.
+    expect(rowFor("Set Draft").querySelector('[slot="description"]')?.textContent).toBe(
+      "Draft: yes",
+    );
+  });
+
+  test("a tab that is no collection's entry states no `draft`, so the row is absent, not refusing", async () => {
+    open("styles/site.css", "styles/site.css");
+    publishRegistry();
+    await flush();
+
+    rightClick(tabs()[0]!);
+    await flush();
+    expect(labels()).not.toContain("Set Draft");
+    // The rows that need nothing of the tab are still there.
+    expect(labels()).toContain("Close Document");
+    // A no-arg row names no state, so it says nothing under its label — the description slot is
+    // Reserved for a `requires` sentence or a stated value, and an empty one would be noise.
+    expect(rowFor("Pin / Unpin Document").querySelector('[slot="description"]')).toBeNull();
+  });
+
+  test("a disabled row prints the record's own sentence and survives being clicked", async () => {
+    open("a");
+    publishRegistry();
+    await flush();
+
+    rightClick(tabs()[0]!);
+    await flush();
+    // Nothing has been closed in this session, so `document.reopenClosed` is visible-but-disabled.
+    const row = rowFor("Reopen Closed Document");
+    expect(row.hasAttribute("disabled")).toBeTrue();
+    expect(row.getAttribute("aria-disabled")).toBe("true");
+    expect(row.textContent).toContain("Needs a document closed in this session");
+
+    row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+    expect(reopened).toEqual([]);
+    // A row that explains itself has to stay on screen long enough to be read.
+    expect(document.querySelector("#layer-popover sp-popover")).not.toBeNull();
+  });
+
+  test("Reopen Closed Document is enabled once a document has been closed, and opens it", async () => {
+    open("a", "/project/a.json");
+    open("b", "/project/b.json");
+    publishRegistry();
+    await flush();
+    closeTab("a");
+    await flush();
+
+    rightClick(tabs()[0]!);
+    await flush();
+    rowFor("Reopen Closed Document").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+
+    expect(reopened).toEqual(["/project/a.json"]);
+  });
+
+  test("the menu is clamped to the viewport, and a second right-click replaces the first", async () => {
+    open("a");
+    open("b", "/project/b.json");
+    publishRegistry();
+    await flush();
+
+    rightClick(tabs()[0]!, { clientX: 2000, clientY: 2000 });
+    await flush();
+    const popover = document.querySelector("#layer-popover sp-popover") as HTMLElement;
+    expect(popover.style.left).toBe(`${window.innerWidth - 4}px`);
+    expect(popover.style.top).toBe(`${window.innerHeight - 4}px`);
+
+    rightClick(tabs()[1]!);
+    await flush();
+    expect(document.querySelectorAll("#layer-popover sp-popover")).toHaveLength(1);
+  });
+
+  test("the overflow menu and the context menu never share the screen", async () => {
+    open("a");
+    open("b", "/project/b.json");
+    publishRegistry();
+    await flush();
+    stubMetrics(strip(), 400, 100);
+    // Re-render so the chevron is measured in.
+    workspace.tabs.get("a")!.doc.dirty = true;
+    await flush();
+    (host.querySelector(".tab-strip-overflow") as HTMLElement).dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
+    await flush();
+    expect(document.querySelectorAll("#layer-popover sp-popover")).toHaveLength(1);
+
+    rightClick(tabs()[0]!);
+    await flush();
+    expect(document.querySelectorAll("#layer-popover sp-popover")).toHaveLength(1);
+    expect(labels()).toContain("Close Document");
+  });
+
+  test("unmounting the strip takes its menu with it", async () => {
+    open("a");
+    publishRegistry();
+    await flush();
+    rightClick(tabs()[0]!);
+    await flush();
+    expect(document.querySelector("#layer-popover sp-popover")).not.toBeNull();
+
+    unmount();
+    expect(document.querySelector("#layer-popover sp-popover")).toBeNull();
+    mount(host);
   });
 });

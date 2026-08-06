@@ -28,6 +28,8 @@ import { view } from "../view";
 import { shell } from "../shell";
 import { parseSourceForPath, serializeDocument } from "../files/file-ops";
 import { detachGridPanel, gridPanelMounted, renderGridMode } from "../grid/grid-panel";
+import { detachLibraryPane, libraryPaneMounted, renderLibraryMode } from "../browse/library-pane";
+import { detachEntryPane, entryPaneMounted, renderEntryMode } from "../content/entry-editor";
 import {
   detachSettingsPane,
   renderSettingsPane,
@@ -247,6 +249,8 @@ function resetCanvasView() {
     view.functionEditor = null;
   }
   detachGridPanel();
+  detachLibraryPane();
+  detachEntryPane();
   disposeSourceCollab();
   if (view.monacoEditor) {
     view.monacoEditor.getModel()?.dispose();
@@ -538,6 +542,18 @@ function renderCanvasImpl() {
     return;
   }
 
+  // Library fast-path, same shape: the Library pane owns its own reactivity (view state, scan,
+  // Window), so a same-tab re-render while it is mounted needs nothing from the canvas pipeline.
+  if (canvasMode === "manage" && libraryPaneMounted(tab)) {
+    return;
+  }
+
+  // Entry fast-path, same shape: the entry form owns its own effect over the tab's frontmatter, so
+  // A field commit repaints the form and nothing reaches the canvas pipeline.
+  if (canvasMode === "entry" && entryPaneMounted(tab)) {
+    return;
+  }
+
   // Settings fast-path, same shape: the Project Settings editor subscribes to the section registry
   // And to its own chosen section, so a mounted editor needs nothing from the canvas pipeline.
   if (canvasMode === "settings" && settingsPaneMounted(canvasWrap)) {
@@ -603,6 +619,13 @@ function renderCanvasImpl() {
 
     // Destroy the grid panel if switching away from grid mode
     detachGridPanel();
+
+    // The Library holds an IntersectionObserver and an LRU of live runtime subtrees; leaving the
+    // Mode without releasing them is exactly the unbounded retention P7.1 exists to remove.
+    detachLibraryPane();
+
+    // Same for the entry form, whose effect scope subscribes to the document's frontmatter
+    detachEntryPane();
 
     // Same for the Project Settings editor, which holds a registry subscription
     detachSettingsPane();
@@ -675,6 +698,27 @@ function renderCanvasImpl() {
     canvasWrap.style.padding = "0";
     canvasWrap.style.display = "block";
     renderSettingsPane(canvasWrap);
+    return;
+  }
+
+  /* Library mode: the project's own contents, over a GridSource, in one of five layouts
+     (`browse/library-pane.ts`). `commands/context.ts` already mapped `manage` to the `library`
+     editor kind — this is the surface that map was pointing at. */
+  if (canvasMode === "manage") {
+    canvasWrap.style.padding = "0";
+    canvasWrap.style.display = "block";
+    renderLibraryMode(canvasWrap, tab);
+    return;
+  }
+
+  /* Entry mode: one content entry's fields, typed by its collection's schema
+     (`content/entry-editor.ts`). Same non-iframe-editor pattern as the Library and Settings — and
+     the reason `entry` is in `commands/context.ts`'s mode map, without which a form over a
+     frontmatter record would have resolved into the CANVAS key scope. */
+  if (canvasMode === "entry") {
+    canvasWrap.style.padding = "0";
+    canvasWrap.style.display = "block";
+    renderEntryMode(canvasWrap, tab);
     return;
   }
 

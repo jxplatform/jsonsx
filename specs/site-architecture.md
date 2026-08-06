@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.41-draft
+**Version:** 0.1.42-draft
 **Status:** Pending
-**Updated:** 2026-08-05
+**Updated:** 2026-08-06
 **License:** MIT
 
 ---
@@ -781,15 +781,25 @@ Additionally, the **Browse** canvas mode provides a full-screen project file tab
 
 ### 7.2 Content Collection Browser
 
-The Browse view serves as the current collection browser. Future enhancements:
+The **Library** is the collection browser — an editor kind over a `GridSource`, so a collection is
+the same kind of thing as a data table and is windowed by the same primitive.
 
-| View              | Status          | Description                                                                              |
-| ----------------- | --------------- | ---------------------------------------------------------------------------------------- |
-| **Table view**    | **Implemented** | File listing with Name, Category, Type, Path columns. Filterable by category and search. |
-| **Card view**     | **Pending**     | Visual card layout with hero image, title, and summary. Good for blog posts.             |
-| **Calendar view** | **Pending**     | Date-sorted timeline. Useful for date-based collections (blog, events).                  |
+| Layout       | Status          | Description                                                               |
+| ------------ | --------------- | ------------------------------------------------------------------------- |
+| **Table**    | **Implemented** | Name, Category, Type, Path. Filterable by category and search.            |
+| **Cards**    | **Implemented** | Hero image, title and summary, with previews mounted only while on screen |
+| **Calendar** | **Implemented** | Date-sorted, for date-bearing collections                                 |
+| **Board**    | **Implemented** | Grouped by a chosen field                                                 |
+| **Media**    | **Implemented** | Thumbnails, for the asset categories                                      |
 
-The view mode will be selectable per collection. Studio will remember the preference.
+**Views are windowed, and the window is the contract.** Rendering a live runtime instance per card
+does not survive a real project: the measured case is 300 pages in one category, where the whole
+list is 300 cards and 1,830 DOM nodes against a window's 40 and 270. Previews are mounted by an
+`IntersectionObserver` and held in an LRU whose cap must exceed one window's worth — a cap smaller
+than the window thrashes against itself and re-renders continuously.
+
+The layout is selectable per collection and remembered, along with the filter, sort, columns and
+grouping, as a **saved view**.
 
 ### 7.3 Markdown WYSIWYG Editing (Implemented)
 
@@ -804,8 +814,13 @@ Markdown files (`.md`) open in **content mode** — a centered column WYSIWYG ca
 
 #### Frontmatter Form
 
-> **Status: Pending.**
-> When a markdown content entry belongs to a collection with a defined schema, the **right panel** should render a schema-driven form for editing frontmatter fields. This reuses the existing `widgetForType()` / `inferInputType()` pattern already used for HTML attribute editing:
+> **Status: Implemented.** A content entry belonging to a collection with a schema opens the **entry
+> editor**, a schema-driven form over the same widget mapping the inspector uses.
+
+**One editor, two storage shapes.** Where an entry's fields LIVE depends on its format and nothing
+else: a Markdown entry keeps them in frontmatter, a JSON entry _is_ the document. The editor reads
+and writes whichever the format declares — forking the editor per format is how a JSON entry came to
+render a blank form and discard every edit while reporting success.
 
 | JSON Schema Type                     | Widget                                        |
 | ------------------------------------ | --------------------------------------------- |
@@ -822,32 +837,38 @@ Markdown files (`.md`) open in **content mode** — a centered column WYSIWYG ca
 
 #### JSON Data Entry Editing
 
-> **Status: Pending.**
-> JSON content entries (e.g., `authors/authors.json`) should open a form-based editor generated from the collection's JSON Schema, reusing the same widget mapping.
+> **Status: Implemented.** A JSON entry opens the same form as a Markdown one, generated from the
+> collection's schema. Its fields are the document's own properties — see the storage-shape rule
+> above.
 
 #### CSV Editing
 
-> **Status: Pending.**
-> CSV content entries should render as an inline table editor using `<sp-table>` with column types derived from the schema.
+> **Status: Implemented**, though not as this section imagined it. A `.csv` entry opens as a
+> **`GridSource`** rather than a bespoke `<sp-table>`, so it inherits the table, the edit buffer,
+> undo and the import path that every other tabular surface uses. Column types still derive from the
+> schema.
 
 ### 7.5 Content CRUD Operations
 
-| Operation       | Status          | Action                                                                                                                                                                              |
-| --------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Create**      | **Pending**     | "New Entry" button on collection. Creates a file with schema defaults. For Markdown, creates a file with frontmatter stub. Studio assigns a slug from the title or prompts for one. |
-| **Read**        | **Implemented** | Browse view lists all content files; clicking opens in WYSIWYG (Markdown) or component editor (JSON).                                                                               |
-| **Update**      | **Partial**     | Markdown body editable via WYSIWYG canvas. Frontmatter and JSON data forms not yet available.                                                                                       |
-| **Delete**      | **Pending**     | Context menu → Delete. Confirms with dialog. Removes the file from disk.                                                                                                            |
-| **Rename/Move** | **Pending**     | Context menu → Rename. Updates filename (and therefore entry ID/slug). Warns if other entries reference this ID.                                                                    |
+| Operation       | Status          | Action                                                                                                                                                                    |
+| --------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Create**      | **Implemented** | Collection-scoped **New Entry**, seeded from the content type's schema defaults so the entry is valid the moment it exists. One creation flow, shared with the file tree. |
+| **Read**        | **Implemented** | The Library lists a collection; opening an entry gives the WYSIWYG canvas (Markdown) or the entry editor (JSON).                                                          |
+| **Update**      | **Implemented** | The entry editor edits an entry's fields for both storage shapes — Markdown frontmatter and the JSON document itself.                                                     |
+| **Delete**      | **Implemented** | Context menu → Delete, behind a confirmation that states the reference count (§9.4).                                                                                      |
+| **Rename/Move** | **Implemented** | Context menu → Rename. Updates the filename, and therefore the entry id and slug.                                                                                         |
 
 ### 7.6 Draft Workflow
 
 Entries with `"draft": true` (a conventional boolean field in the schema):
 
-- Shown with a "Draft" badge in the collection browser
+- Shown with a "Draft" badge in the collection browser, **and on the pane tab of an open entry** —
+  the failure this guards against is publishing something the author believed was private, and that
+  belief is formed while editing, not while browsing
 - Excluded from production builds by default
 - Included in dev server builds for preview
-- Filterable in the collection browser
+- A column and a filter in the Library, with an explicit "including drafts" perspective rather than
+  a hidden default
 
 ---
 
@@ -988,9 +1009,18 @@ The compiler serializes the `textContent` object to a JSON string within the `<s
 
 ### 8.6 Studio SEO Panel
 
-> **Status: Pending.** The compiler handles `$head` merge (§8.3) at build time, but Studio has no visual SEO editing UI.
+> **Status: Implemented.** The previews live in the Document Header card rather than an inspector
+> tab, because they describe the document rather than a selection.
 
-The Studio inspector will include an "SEO" tab for any page or content entry:
+**The preview shows the MERGED `$head`** (§8.3), not the page's own entries — a page appends to the
+site's head rather than replacing it, so a preview of the page's half would misreport every title
+that inherits. Values the page did not author are marked as inherited, naming the donor, in the same
+provenance vocabulary the inspector uses for style and props.
+
+**There is no score.** Counters and named warnings only. A number out of 100 invites optimising the
+number, and the number is not the thing.
+
+The Document Header card shows, for any page or content entry:
 
 - **Title preview:** Shows how the title will appear in Google search results (truncated to ~60 chars)
 - **Description preview:** Shows the meta description (truncated to ~155 chars)
@@ -1167,9 +1197,18 @@ Only statically referenced files are copied into the build. A `src` computed at 
 
 ### 9.4 Studio Media Browser
 
-> **Status: Partial.** Upload and browsing ship; metadata and usage tracking do not. The full Studio-side contract is `studio.md` §9.3 — this section states only what it means for the media on disk.
+> **Status: Implemented.** Upload, browsing, metadata and usage all ship. The full Studio-side
+> contract is `studio.md` §9.3 — this section states only what it means for the media on disk.
 
-Studio adds media to a project from four places: the Upload button on any image field, a file dropped on the canvas, a file dropped on the Files tree, and the Manage view's drop zone. All of them write through the same core, which decides:
+**Usage is keyed on the AUTHORED reference, not the resolved one.** A content-relative `./images/`
+reference previews at its asset-mount URL while the source keeps the authored form, so keying on
+what the browser fetched would under-count every content-relative use — and an under-count is what
+makes a delete look safe when it is not. A delete states its reference count, and where the count
+cannot be answered it says **unknown**, never zero.
+
+Studio adds media to a project from four places: the Upload button on any image field, a file
+dropped on the canvas, a file dropped on the Files tree, and the Library's drop zone — which names
+its destination before the drop rather than choosing one for you. All of them write through the same core, which decides:
 
 - **Destination** — a document inside a content collection co-locates its media in `content/<collection>/images/` (§9.1); everything else lands in `public/`. The Files tree and the Manage view name their destination explicitly instead.
 - **Reference** — written per §9.3: `public/` contents from the site root (`/hero.jpg`), a content asset relative to its own entry (`./images/hero.jpg`) so the collection loader rewrites it to the asset mount, anything else relative to the project root.
@@ -1340,9 +1379,18 @@ Status 200 redirects function as rewrites (proxy-style).
 
 ### 11.4 Studio Redirect Editor
 
-> **Status: Pending.** The compiler generates `_redirects` and HTML meta-refresh files from `project.json` redirect rules at build time, but Studio has no visual editor for managing them.
+> **Status: Implemented.** Redirects are edited as a `GridSource`, so they get the same table,
+> the same undo and the same import path as any other tabular data.
 
-Studio will provide a dedicated redirect management UI under site settings:
+Three validations run over the rule set, each reporting as a Problem naming the rule, because none
+of them is visible by reading the file:
+
+- **Chains** — a redirect whose target is itself a redirect, costing a second round trip.
+- **Loops** — a cycle, which is a broken page rather than a slow one.
+- **Shadows** — a rule for a path a real route already serves, which is dead configuration the
+  author will never find by inspection.
+
+Studio provides redirect management as a document:
 
 - Table of all redirects with source, destination, and status columns
 - Add/edit/delete with inline editing
@@ -1773,6 +1821,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.1.42-draft** (2026-08-06) — §7.2 the Library and its window contract, §7.5 the CRUD table corrected — rename, delete and CSV editing already shipped and were listed Pending, §7.6 the draft pill, §8.6 merged-$head previews with no score, §9.4 usage keyed on the authored ref, §11.4 redirects as a GridSource with chain, loop and shadow validation.
 - **0.1.41-draft** (2026-08-05) — §3.2 names the consequence of the cascade — every property reaches every route, which is why Studio states the blast radius and edits the file under undo.
 - **0.1.40-draft** (2026-07-30) — A page uses a component when its tag appears in the prerendered HTML or in one of the page's island modules (§12.4).
 - **0.1.39-draft** (2026-07-28) — §9.3: editors that open a collection entry standalone must apply the mount rewrite to their render representation only, with the browser-side existence-check divergence stated.

@@ -1,6 +1,5 @@
 /**
- * The project-level verbs the screenshot manifest names: grids, Settings, the file browser, New
- * Project.
+ * The project-level verbs the screenshot manifest names: grids, Settings, the Library, New Project.
  *
  * The interesting one is `settings.open`. It replaces THREE manifest verbs (`openSettings`,
  * `openSettings {section}` and the refused `settings.setSection`, whose press-shim mirrored the
@@ -22,6 +21,7 @@ import type { AnyCommand, CommandRegistry } from "../src/commands/registry";
 // ─── Seams ────────────────────────────────────────────────────────────────────
 
 void mock.module("../src/files/files.js", () => ({
+  createFileIn: () => Promise.resolve(null),
   initProjectRepo: () => Promise.resolve(),
   openFileInTab: () => Promise.resolve(),
 }));
@@ -52,8 +52,7 @@ const { registerSettingsCommands, settingsCommands } =
   await import("../src/settings/settings-document");
 const { resetSettingsDocumentState, settingsDocumentSection, settingsSectionKeys } =
   await import("../src/settings/section-registry");
-const { browseCommands, closeBrowseModal, registerBrowseCommands } =
-  await import("../src/browse/browse-modal");
+const { libraryCommands, registerLibraryCommands } = await import("../src/browse/library-commands");
 const { NEW_PROJECT_TABS, newProjectCommands, registerNewProjectCommands } =
   await import("../src/new-project/new-project-modal");
 
@@ -77,7 +76,7 @@ let ctx: CommandContext = makeContext();
 let registry: CommandRegistry;
 
 function allRecords(): AnyCommand[] {
-  return [...gridCommands(), ...settingsCommands(), ...browseCommands(), ...newProjectCommands()];
+  return [...gridCommands(), ...settingsCommands(), ...libraryCommands(), ...newProjectCommands()];
 }
 
 /** Run a command that is expected to refuse, and return the message it refused with. */
@@ -94,7 +93,6 @@ beforeEach(() => {
   installMockPlatform();
   closeAllTabs();
   resetSettingsDocumentState();
-  closeBrowseModal();
   resetStudioState({
     projectConfig: {
       content: { comments: { source: "./content/comments" }, posts: { source: "./content/posts" } },
@@ -108,7 +106,7 @@ beforeEach(() => {
   registry = createCommandRegistry({ getContext: () => ctx });
   registerGridCommands(registry);
   registerSettingsCommands(registry);
-  registerBrowseCommands(registry);
+  registerLibraryCommands(registry);
   registerNewProjectCommands(registry);
 });
 
@@ -122,7 +120,12 @@ describe("the records themselves", () => {
       "collection.editInGrid",
       "data.openGrid",
       "settings.open",
-      "project.browse",
+      "library.open",
+      "library.setCategory",
+      "library.setLayout",
+      "library.setSearch",
+      "library.refresh",
+      "library.newEntry",
       "project.new",
     ]);
   });
@@ -248,20 +251,50 @@ describe("settings.open", () => {
   });
 });
 
-describe("project.browse", () => {
-  test("opens the Manage Files overlay, and is idempotent", async () => {
-    void registry.run("project.browse");
+describe("library.open", () => {
+  test("opens the Library tab, and is idempotent", async () => {
+    void registry.run("library.open");
     await flush();
-    expect(document.querySelector(".browse-modal")).not.toBeNull();
-    void registry.run("project.browse");
+    expect(workspace.tabs.has("grid://library")).toBe(true);
+    const before = workspace.tabs.size;
+    void registry.run("library.open");
     await flush();
-    expect(document.querySelectorAll(".browse-modal").length).toBe(1);
-    closeBrowseModal();
+    expect(workspace.tabs.size).toBe(before);
+  });
+
+  test("the Library tab draws the library editor kind, not the canvas", async () => {
+    void registry.run("library.open");
+    await flush();
+    expect(workspace.tabs.get("grid://library")?.capabilities.modes).toEqual(["manage"]);
   });
 
   test("is hidden with no project open", () => {
     ctx = makeContext();
-    expect(registry.isVisible("project.browse")).toBe(false);
+    expect(registry.isVisible("library.open")).toBe(false);
+  });
+});
+
+describe("the Library's state setters", () => {
+  test("refuse a category the Library does not declare, naming what it does", async () => {
+    expect(await refusal("library.setCategory", { category: "widgets" })).toContain(
+      "declared: all, pages, layouts, components, content, media",
+    );
+  });
+
+  test("refuse a layout that is not one of the five", async () => {
+    expect(await refusal("library.setLayout", { layout: "gallery" })).toContain(
+      "declared: table, cards, media, calendar, board",
+    );
+  });
+
+  test("refuse a new-entry kind the project does not declare, listing what it does", async () => {
+    expect(await refusal("library.newEntry", { type: "widget" })).toContain("collection:comments");
+  });
+
+  test("none of them is a toggle — every one names the state it reaches", () => {
+    for (const command of libraryCommands()) {
+      expect(command.id).not.toMatch(/\.toggle[A-Z]/);
+    }
   });
 });
 

@@ -31,6 +31,8 @@ The **schema** editor is the same visual field builder as **[content types](/doc
 
 A **reference** field links a row to something else — its **Target** picker lists your content types, and the row stores the target entry's id. How references resolve is the same story as content **[relationships](/docs/framework/site/relationships)**.
 
+Studio draws one picker for every field that points at a collection, wherever that field appears — a schema-driven settings form, a content entry's **[frontmatter](/docs/studio/editing/frontmatter)**, a row inside a repeatable group. It lists that collection's entries, and it never quietly hides a problem: an id that no longer matches an entry stays in the field marked "— not found", and if the entries can't be listed at all the field keeps editing as plain text with the reason beside it and a **Retry**.
+
 :::doc-note
 Under the hood a table's fields are ordinary Jx field schemas in the `data` section of `project.json`. The schema format also allows table-to-table references — a to-one reference becomes a `<field>_id` column, and a to-many reference between two tables materializes a junction table on push — but the visual Target picker currently offers content types; table targets are written in the JSON directly.
 :::

@@ -108,7 +108,7 @@ import { renderImportsTemplate } from "./panels/imports-panel";
 import { renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
 import { installAutomationHook } from "./services/automation";
-import { invalidateBrowseCache } from "./browse/browse";
+import { invalidateLibrary } from "./browse/library-pane";
 import { invalidateMediaCache } from "./ui/media-picker";
 import { setMediaChangedHandler } from "./files/media-upload";
 import { applyFileDrop } from "./editor/file-drop-action";
@@ -135,7 +135,12 @@ import { html, render as litRender } from "lit-html";
 
 import webdata from "../data/webdata.json";
 import { registerDataExplorerCommands, renderDataExplorerTemplate } from "./panels/data-explorer";
-import { cleanupGitPanel, cloneRepository, renderGitPanel } from "./panels/git-panel";
+import {
+  cleanupGitPanel,
+  cloneRepository,
+  registerSourceControlCommands,
+  renderGitPanel,
+} from "./panels/git-panel";
 
 // ─── Spectrum Web Components ──────────────────────────────────────────────────
 // Explicit class imports + registration — bare side-effect imports are tree-shaken
@@ -188,7 +193,13 @@ import { registerStyleCommands } from "./panels/style-panel";
 import { registerGridCommands } from "./grid/grid-open";
 import { registerSettingsCommands } from "./settings/settings-document";
 import { registerPreferencesCommands } from "./settings/preferences-dialog";
-import { registerBrowseCommands } from "./browse/browse-modal";
+import { registerAboutCommands } from "./about/about-modal";
+import { registerCollabCommands } from "./collab/collab-commands";
+import { registerLibraryCommands } from "./browse/library-commands";
+import { registerPublishCommands } from "./publish/publish-commands";
+import { registerGridViewCommands } from "./grid/grid-panel";
+import { registerRedirectsCommands } from "./grid/redirects-grid";
+import { registerContentCommands } from "./content/entry-commands";
 import { convertToComponent } from "./editor/convert-to-component";
 import type { GitDiffState } from "./types";
 import type { Tab } from "./tabs/tab";
@@ -447,7 +458,7 @@ setFileDropHandler(applyFileDrop);
 // Files afterwards. Injected here because all three modules import from media-upload.
 setMediaChangedHandler(async (dir) => {
   invalidateMediaCache();
-  invalidateBrowseCache();
+  invalidateLibrary();
   await loadDirectory(dir);
   renderLeftPanel();
 });
@@ -1121,9 +1132,16 @@ registerFormulaEditorCommands(commandRegistry, { renderCanvas: () => renderCanva
 registerGridCommands(commandRegistry);
 registerSettingsCommands(commandRegistry);
 registerPreferencesCommands(commandRegistry);
-registerBrowseCommands(commandRegistry);
+registerLibraryCommands(commandRegistry);
+registerContentCommands(commandRegistry);
 registerNewProjectCommands(commandRegistry);
 registerStyleCommands(commandRegistry);
+registerSourceControlCommands(commandRegistry);
+registerPublishCommands(commandRegistry);
+registerGridViewCommands(commandRegistry);
+registerRedirectsCommands(commandRegistry);
+registerAboutCommands(commandRegistry);
+registerCollabCommands(commandRegistry);
 /*
  * The structural selection verbs — Move Up/Down/In/Out, Convert to Component, Edit Component.
  *

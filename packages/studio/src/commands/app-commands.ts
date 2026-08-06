@@ -42,7 +42,12 @@ import { settingsCommands } from "../settings/settings-document";
 import { collabCommands } from "../collab/collab-commands";
 import { preferencesCommands } from "../settings/preferences-dialog";
 import { aboutCommands } from "../about/about-modal";
-import { browseCommands } from "../browse/browse-modal";
+import { libraryCommands } from "../browse/library-commands";
+import { sourceControlCommands } from "../panels/git-panel";
+import { publishCommands } from "../publish/publish-commands";
+import { gridViewCommands } from "../grid/grid-panel";
+import { redirectsCommands } from "../grid/redirects-grid";
+import { contentCommands } from "../content/entry-commands";
 import { newProjectCommands } from "../new-project/new-project-modal";
 import { registerSelectionCommands } from "../panels/block-action-bar";
 import { registerTabCommands } from "../workspace/workspace";
@@ -90,7 +95,12 @@ export function appCommandSet(): AnyCommand[] {
     ...collabCommands(),
     ...preferencesCommands(),
     ...aboutCommands(),
-    ...browseCommands(),
+    ...libraryCommands(),
+    ...contentCommands(),
+    ...sourceControlCommands(),
+    ...publishCommands(),
+    ...gridViewCommands(),
+    ...redirectsCommands(),
     ...newProjectCommands(),
     ...styleCommands(),
   ];

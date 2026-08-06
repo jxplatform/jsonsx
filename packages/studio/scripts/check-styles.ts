@@ -107,8 +107,6 @@ const VENDOR_CLASS_PREFIXES = [
 export const ALLOWED_ORPHANS = new Set<string>([
   // Owner: about/about-modal.ts
   "about-section",
-  // Owner: browse/browse.ts
-  "browse-upload-input",
   // Owner: canvas/iframe-host.ts
   "jx-canvas-iframe",
   // Owner: canvas/iframe-overlay.ts

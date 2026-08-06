@@ -79,12 +79,12 @@
           "cmd": "view.setActivity"
         },
         {
-          "cmd": "project.browse"
+          "cmd": "library.open"
         }
       ],
       "expect": [
         {
-          "region": "overlay.dialog:library"
+          "region": "pane.primary"
         }
       ],
       "capture": [
@@ -2271,22 +2271,22 @@
       },
       "steps": [
         {
-          "cmd": "project.browse"
+          "cmd": "library.open"
         },
         {
           "input": "dragOver",
-          "region": "overlay.dialog:library/view"
+          "region": "pane.primary/library/dropZone"
         }
       ],
       "expect": [
         {
-          "region": "overlay.dialog:library/view"
+          "region": "pane.primary/library/dropZone"
         }
       ],
       "capture": [
         {
           "image": "media-upload",
-          "of": "overlay.dialog:library/view"
+          "of": "pane.primary/library/dropZone"
         }
       ]
     },

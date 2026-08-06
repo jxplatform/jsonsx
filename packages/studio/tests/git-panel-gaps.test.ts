@@ -79,7 +79,7 @@ void mock.module("../src/services/notify.js", () =>
 );
 
 void mock.module("../src/github/github-publish.js", () => ({
-  publishToGithub: async (opts: unknown) => {
+  createGithubRepository: async (opts: unknown) => {
     publishCalls.push(opts);
     return true;
   },
@@ -375,7 +375,7 @@ describe("panel bootstrap", () => {
     expect(statusMessages).toContain("Repository initialized.");
   });
 
-  test("publish button in non-repo state calls publishToGithub with project name", async () => {
+  test("publish button in non-repo state calls createGithubRepository with project name", async () => {
     git.status = { ahead: 0, behind: 0, branch: "", files: [], isRepo: false, remotes: [] };
     const div = renderPanel();
     click(findButton(div, "Create GitHub repository"));

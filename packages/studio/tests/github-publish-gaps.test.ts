@@ -7,6 +7,7 @@
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
+import { resetActivities } from "../src/panels/activity-panel";
 import { render as litRender } from "lit-html";
 
 let statusMessages: string[] = [];
@@ -81,7 +82,7 @@ void mock.module("../src/services/notify.js", () =>
   notifyModule((call) => record(call.message, call.options)),
 );
 
-const { publishToGithub } = await import("../src/github/github-publish.js");
+const { createGithubRepository } = await import("../src/github/github-publish.js");
 
 async function flush(turns = 3) {
   for (let i = 0; i < turns; i++) {
@@ -107,7 +108,7 @@ function stubFetch(responses: { ok: boolean; json: unknown }[]) {
 
 /** Start the publish flow and wait for the dialog to appear. */
 async function openPublishDialog(projectName = "proj") {
-  const promise = publishToGithub({ projectName });
+  const promise = createGithubRepository({ projectName });
   await flush();
   const host = dialogHosts.at(-1)!;
   expect(host).toBeTruthy();
@@ -115,6 +116,7 @@ async function openPublishDialog(projectName = "proj") {
 }
 
 beforeEach(() => {
+  resetActivities();
   statusMessages = [];
   refreshCalls = 0;
   remoteCalls = [];
@@ -131,7 +133,7 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-describe("publishToGithub dialog", () => {
+describe("createGithubRepository dialog", () => {
   test("confirm with edited fields creates the repo with those values", async () => {
     stubFetch([
       {
@@ -165,7 +167,7 @@ describe("publishToGithub dialog", () => {
     expect(refreshCalls).toBe(1);
     expect(
       statusMessages.some((m) =>
-        m.includes("Published to GitHub: https://github.com/u/custom-repo"),
+        m.includes("Repository created: https://github.com/u/custom-repo"),
       ),
     ).toBe(true);
   });
@@ -222,12 +224,12 @@ describe("publishToGithub dialog", () => {
     wrapper.dispatchEvent(new Event("confirm"));
     expect(await promise).toBe(false);
     expect(statusMessages).toContain("Could not create the GitHub repository.");
-    expect(details).toContain("Failed to create repository");
+    expect(details.join("\n")).toContain("GitHub answered 422.");
   });
 
   test("no token short-circuits before showing the dialog", async () => {
     authToken = null;
-    const result = await publishToGithub({ projectName: "proj" });
+    const result = await createGithubRepository({ projectName: "proj" });
     expect(result).toBe(false);
     expect(dialogHosts).toEqual([]);
     expect(fetchCalls).toEqual([]);

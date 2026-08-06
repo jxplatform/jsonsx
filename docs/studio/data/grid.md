@@ -5,6 +5,7 @@ code:
   - packages/studio/src/grid/sources/connector-source.ts
   - packages/studio/src/grid/grid-open.ts
   - packages/studio/src/grid/grid-panel.ts
+  - packages/studio/src/grid/grid-layout.ts
   - packages/server/src/data-api.ts
 ---
 
@@ -26,7 +27,16 @@ Columns come straight from the real database, so the grid always shows what's ac
 
 ## Page through rows
 
-Big tables aren't loaded whole: the grid shows 50 rows at a time, with **‹ Prev** / **Next ›** and the current range next to the total count in the toolbar. The **Filter rows** box searches within the rows currently loaded — use the pager to move through the rest. Per-column filters and click-to-sort, which file grids offer, aren't available on database grids yet.
+Big tables aren't loaded whole: the grid shows 50 rows at a time, with **‹ Prev** / **Next ›** and the current range next to the total count in the toolbar. The **Filter rows** box searches within the rows currently loaded — use the pager to move through the rest. The per-column filter boxes and click-to-sort headers that file grids offer aren't drawn on a database grid, because they would only ever act on the page in front of you.
+
+## Sort, group, and save the view
+
+The **View** button works here as it does in **[Grid mode](/docs/studio/editing/grid)** — columns, sort, group by, and saved views — with one difference worth knowing:
+
+- **Sort** is done by the database, over the whole table, not just the rows on screen. Change it and the grid re-reads the first page of the new order.
+- **Group by** and **Filter rows** work on the rows currently loaded, so on a table longer than one page they group and search that page.
+
+Saved views are per table: arrange `comments` the way you review it — the three columns you care about, newest first — save it as "Triage", and it's waiting the next time you open that table. Views live in Studio on this computer, not in the database or your project.
 
 ## Edit, add, delete
 
@@ -44,13 +54,14 @@ Database rows aren't files in your project — they're not in version control, a
 
 ## Where it's different from file grids
 
-|                 | File grids (collections, pages, CSV)                                     | Data grid                  |
-| --------------- | ------------------------------------------------------------------------ | -------------------------- |
-| Rows are        | files in your project                                                    | rows in a database         |
-| Loaded          | whole                                                                    | 50 per page                |
-| Save writes     | files (frontmatter, CSV cells)                                           | one database write per row |
-| Conflict safety | stale-file detection                                                     | per-row database errors    |
-| Undo after save | revert the file in [Source control](/docs/studio/publish/source-control) | none — the write is live   |
+|                 | File grids (collections, pages, CSV)                                     | Data grid                       |
+| --------------- | ------------------------------------------------------------------------ | ------------------------------- |
+| Rows are        | files in your project                                                    | rows in a database              |
+| Loaded          | whole                                                                    | 50 per page                     |
+| Sorting         | in Studio, over every row                                                | in the database, over every row |
+| Save writes     | files (frontmatter, CSV cells)                                           | one database write per row      |
+| Conflict safety | stale-file detection                                                     | per-row database errors         |
+| Undo after save | revert the file in [Source control](/docs/studio/publish/source-control) | none — the write is live        |
 
 ## User accounts in the grid
 

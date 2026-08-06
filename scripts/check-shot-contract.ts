@@ -220,7 +220,7 @@ const INPUT_ACTIONS = new Set([
 const LEGACY_ACTIONS: Readonly<Record<string, { id: string; valueAs?: string }>> = {
   editDef: { id: "formula.editDef" },
   editFunction: { id: "formula.editEvent" },
-  openBrowse: { id: "project.browse" },
+  openBrowse: { id: "library.open" },
   openDataGrid: { id: "data.openGrid" },
   openNewProject: { id: "project.new" },
   openQuickSearch: { id: "search.openPalette" },

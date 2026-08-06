@@ -21,8 +21,10 @@ import { POLL_GIT } from "../ui/timing";
 import { renderEmptyState } from "./empty-state";
 import { registerPanel } from "./panel-registry";
 import { notify } from "../services/notify";
-import { publishToGithub } from "../github/github-publish";
+import { authenticateGithub } from "../github/github-auth";
+import { createGithubRepository } from "../github/github-publish";
 import { pullWithPackageSync } from "../packages/pull-package-sync";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
 type GitFileEntry = GitFileStatus;
 
@@ -107,6 +109,49 @@ export async function cloneRepository(ctx: { openRecentProject: (root: string) =
 /** @returns {boolean} */
 export function platformSupportsClone() {
   return Boolean(getPlatform().gitClone);
+}
+
+/**
+ * Start tracking this project with git.
+ *
+ * A function rather than an inline click handler because it is now also a command ({@link
+ * sourceControlCommands}) and the first step of the deploy checklist, and three call sites of the
+ * same three lines is how the panel and the palette come to disagree about what a verb does.
+ */
+export async function initRepository(): Promise<void> {
+  try {
+    notify.info("Initializing repository…", { key: "git.init" });
+    await getPlatform().gitInit();
+    notify.success("Repository initialized.", { key: "git.init" });
+  } catch (error) {
+    notify.error("Could not initialize the repository.", {
+      action: "git.init",
+      detail: errorMessage(error),
+      key: "git.init",
+      source: "Source Control",
+    });
+    return;
+  }
+  await refreshGitStatus();
+}
+
+/** Push the current branch. Same loading/error contract as every other panel verb. */
+export async function pushCurrentBranch(): Promise<void> {
+  await gitAction("gitPush");
+}
+
+/**
+ * Sign in to GitHub, or report why it could not.
+ *
+ * The report belongs to `github/github-auth.ts` — this only says what a SUCCESS was, which that
+ * module cannot, because it is also called mid-flow by "Create GitHub Repository" where a toast
+ * saying "Signed in" in front of a half-finished operation would be noise.
+ */
+export async function signInToGithub(): Promise<void> {
+  const token = await authenticateGithub();
+  if (token) {
+    notify.success("Signed in to GitHub.", { key: "github.auth" });
+  }
 }
 
 /**
@@ -212,12 +257,7 @@ export function renderGitPanel(ctx: {
             icon: html`<sp-icon-add slot="icon"></sp-icon-add>`,
             label: "Initialize Repository",
             run: () => {
-              void (async () => {
-                notify.info("Initializing repository…", { key: "git.init" });
-                await getPlatform().gitInit();
-                notify.success("Repository initialized.", { key: "git.init" });
-                await refreshGitStatus();
-              })();
+              void initRepository();
             },
           },
           {
@@ -225,7 +265,7 @@ export function renderGitPanel(ctx: {
             icon: html`<sp-icon-share slot="icon"></sp-icon-share>`,
             label: "Create GitHub repository",
             run: () => {
-              void publishToGithub({ projectName: projectState?.name || "my-project" });
+              void createGithubRepository({ projectName: projectState?.name || "my-project" });
             },
           },
         ],
@@ -358,7 +398,7 @@ export function renderGitPanel(ctx: {
           <sp-action-button
             size="s"
             @click=${() =>
-              publishToGithub({
+              createGithubRepository({
                 projectName: projectState?.name || "my-project",
               })}
             ?disabled=${loading}
@@ -794,6 +834,97 @@ export function relativeDate(iso: string) {
     return `${days}d ago`;
   }
   return d.toLocaleDateString();
+}
+
+/**
+ * The `Source Control:` family — the four verbs that were only ever buttons.
+ *
+ * Every one of them was reachable from exactly one place: two from an empty state that disappears
+ * the moment the repository exists, one from a 20px icon with a `title` attribute, and the fourth —
+ * signing in to GitHub — from nowhere at all, because it only ever happened as a side effect of
+ * something else. That is why a failed sign-in had no Retry to name: there was no record to point
+ * at. Naming them here gives the palette, `__jxAutomation`, the assistant, the deploy checklist and
+ * every `notify` Retry the same four ids.
+ *
+ * `git.signInToGithub` is `application`-level and the other three are `project`-level, and the
+ * split is the credential's: a GitHub token is one per machine and is revoked in Preferences ›
+ * Accounts, while a branch, a remote and a push belong to one repository.
+ */
+export function sourceControlCommands(): AnyCommand[] {
+  return [
+    {
+      category: "Source Control",
+      id: "git.init",
+      level: "project",
+      menus: ["commandbar/overflow", "palette"],
+      group: "7_scm",
+      requires: "an open project that git is not already tracking",
+      when: (ctx) => ctx.project.open,
+      enablement: (ctx) => ctx.project.open && !ctx.project.isRepo,
+      aiTool: {
+        description:
+          "Run git init in the project root so the project has a history and can be pushed.",
+        name: "init_repository",
+      },
+      run: async () => {
+        await initRepository();
+      },
+      title: "Initialize Repository",
+    },
+    {
+      category: "Source Control",
+      id: "git.createGithubRepository",
+      level: "project",
+      menus: ["commandbar/overflow", "palette"],
+      group: "7_scm",
+      requires: "an open project",
+      when: (ctx) => ctx.project.open,
+      aiTool: {
+        description:
+          "Create a new GitHub repository for this project, add it as the origin remote, and push. " +
+          "This creates a repository; it does not deploy a site — that is publish.setUp.",
+        name: "create_github_repository",
+      },
+      run: async () => {
+        await createGithubRepository({ projectName: projectState?.name || "my-project" });
+      },
+      title: "Create GitHub Repository",
+    },
+    {
+      category: "Source Control",
+      id: "git.push",
+      level: "project",
+      menus: ["commandbar/overflow", "palette"],
+      group: "7_scm",
+      requires: "a project tracked by git",
+      when: (ctx) => ctx.project.open,
+      enablement: (ctx) => ctx.project.isRepo,
+      aiTool: {
+        description: "Push the current branch to its remote.",
+        name: "git_push",
+      },
+      run: async () => {
+        await pushCurrentBranch();
+      },
+      title: "Push",
+    },
+    {
+      category: "Source Control",
+      id: "git.signInToGithub",
+      level: "application",
+      menus: ["palette"],
+      group: "7_scm",
+      run: async () => {
+        await signInToGithub();
+      },
+      title: "Sign In to GitHub",
+    },
+  ];
+}
+
+/** Register the `Source Control:` family. */
+export function registerSourceControlCommands(registry: CommandRegistry): void {
+  registry.registerAll(sourceControlCommands());
 }
 
 /** Stop the background refresh. Called on unmount and whenever a different project is opened. */

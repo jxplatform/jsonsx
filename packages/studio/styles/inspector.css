@@ -1077,3 +1077,34 @@ button.provenance-chip:focus-visible {
 .css-var-override-add sp-picker {
   font-size: var(--spectrum-font-size-50, 11px);
 }
+
+/* ─── The reference control (ui/form-controls.ts) ────────────────────────────
+   A property whose `$ref` names another collection. One registration, so this
+   is the only block that styles a relationship field wherever it is drawn — the
+   entry editor, a settings form, the frontmatter card. The note carries the two
+   states a dropdown alone cannot express: "no entries yet" and "the read
+   failed", and the failed one is coloured because it is a fault, not a fact. */
+.reference-control {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.reference-field {
+  flex: 1;
+  min-width: 0;
+}
+.reference-note {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1.4;
+}
+.reference-note--failed {
+  color: var(--spectrum-red-600, #e34850);
+}
+/* The entry the value names is not on disk. Kept in the list — see the control's
+   note on dangling references — and marked so it cannot be mistaken for one. */
+.reference-missing {
+  color: var(--spectrum-red-600, #e34850);
+}

@@ -1,10 +1,11 @@
 ---
 title: "Modes and views"
-description: "Edit, Design, Preview, Grid, Code and Project Styles — what each editor and view is for, and which files offer which."
+description: "Edit, Design, Preview, Grid, Code, Entry, Library and Project Styles — what each editor and view is for, and which files offer which."
 spec:
   - studio.md#4.2
 code:
   - packages/studio/src/panels/toolbar.ts
+  - packages/studio/src/commands/context.ts
   - packages/studio/src/tabs/tab.ts
   - packages/studio/src/panels/pane-context.ts
   - packages/studio/src/canvas/canvas-render.ts
@@ -13,7 +14,9 @@ code:
 
 # Modes and views
 
-Two controls on the [context bar](/docs/studio/interface/tabs) decide how the open file is presented, and they answer different questions. **Editor** is _which editor_ — **Canvas**, **Grid**, **Code**, **Diff** or **Project Styles** — and it lists only the editors this file supports, so there is nothing in it to be disabled. **View** is _which view of the canvas_ — **Edit**, **Design** or **Preview** — and it appears only while the Canvas editor is open. A view is a lens, not a different app: the same file underneath, shown the way that suits the job. Every open file remembers both as you switch between tabs.
+Two controls on the [context bar](/docs/studio/interface/tabs) decide how the open file is presented, and they answer different questions. **Editor** is _which editor_ — **Canvas**, **Grid**, **Code**, **Diff**, **Entry**, **Library** or **Project Styles** — and it lists only the editors this file supports, so there is nothing in it to be disabled. **View** is _which view of the canvas_ — **Edit**, **Design** or **Preview** — and it appears only while the Canvas editor is open. A view is a lens, not a different app: the same file underneath, shown the way that suits the job. Every open file remembers both as you switch between tabs.
+
+Those seven names come from one list in Studio, which is why the pane's context bar and the status bar can never print different words for the same editor.
 
 ## Edit
 
@@ -30,6 +33,14 @@ Design is for structure and style. The canvas shows a live panel per breakpoint 
 ## Grid
 
 Grid is for tabular data. Files like CSV spreadsheets open as an editable table: click a cell to change it, and use the familiar copy, paste, and selection keys — they work on the table's rows and cells rather than the page. Cell edits collect in the tab until you **Save**, which writes them all back to the file at once.
+
+## Entry
+
+Entry is for one content entry's fields. A file that belongs to a content collection can open as a form built from that collection's schema — a date picker for a date, a toggle for a boolean, a tag input for a list, a picker of real entries for a field that references another collection. **Open Entry Form** in the palette opens it, and the body of the same file stays one :kbd[⌘Z] history away in the Canvas editor. Full guide: **[Frontmatter and page metadata](/docs/studio/editing/frontmatter)**.
+
+## Library
+
+Library is the project's browser: every page, layout, component, content entry and media file, filtered by category and searchable, in the layout that suits what you're looking at — **Table**, **Cards**, **Media**, **Calendar** or **Board**. **Open Library** — from the **⬢ menu** or the palette — opens it as a document in a pane, so it sits in the strip alongside your files rather than over the top of them, and you can keep it beside a page in a [split](/docs/studio/interface/tabs#two-panes). Full guide: **[Browse your project](/docs/studio/projects/browse)**.
 
 ## Code
 
@@ -61,6 +72,8 @@ Every file opens in its natural editor and view, and the two controls offer only
 | The project file (`project.json`)  | **Project Styles** | **Code**                     | —                       |
 
 Opening `project.json` from the Files tree lands on **Project Styles**; **Open Settings** puts that same document into its settings editor.
+
+A file that belongs to a content collection also has an **Entry** editor. **Open Entry Form** is how you reach it, and it joins that file's **Editor** control from then on, so you can move between the form and the body without losing your place in either.
 
 Installed format extensions can add their own file types with their own lists, so this table can grow with your project.
 

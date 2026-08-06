@@ -19,6 +19,7 @@ import {
 } from "./sources/content-source";
 import { createConnectorSource } from "./sources/connector-source";
 import { makeGridTabId } from "./grid-source";
+import { libraryTabId } from "../browse/library-source";
 import { argsSchema, optionalStringArg, stringArg, stringProperty } from "../commands/command-args";
 import type { GridSource } from "./grid-source";
 import type { Tab } from "../tabs/tab";
@@ -80,6 +81,32 @@ export function openCollectionGrid(typeName: string): Tab {
     return existing;
   }
   return openVirtualGridTab(createCollectionSource(typeName));
+}
+
+/**
+ * Open (or activate) the Library.
+ *
+ * A real tab, in the primary pane, with `manage` as its only mode — `commands/context.ts` maps that
+ * to the `library` editor kind, so the status bar and the pane context bar can name what is on
+ * screen. It is opened here rather than in `browse/` because this is the module that knows how a
+ * virtual tab is made; the pane itself resolves its own source and its own view state.
+ *
+ * Idempotent by construction, which is what lets a shot say "the Library is open" without caring
+ * whether an earlier step opened it.
+ */
+export function openLibraryTab(): Tab {
+  const id = libraryTabId();
+  const existing = workspace.tabs.get(id);
+  if (existing) {
+    activateTab(id);
+    return existing;
+  }
+  return openTab({
+    capabilities: { modes: ["manage"] },
+    document: structuredClone(GRID_STUB_DOCUMENT),
+    documentPath: null,
+    id,
+  });
 }
 
 /** Open (or activate) the pages metadata grid. */

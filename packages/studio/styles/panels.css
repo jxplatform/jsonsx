@@ -1254,3 +1254,180 @@
 .settings-edit-as-code {
   align-self: flex-start;
 }
+
+/* ─── The Document Header card's SEO block ───────────────────────────────────
+   Two rendered previews of the MERGED site → layout → page $head, the resolved fields with their
+   character counters and provenance chips, and the named warnings. No score: there is deliberately
+   no rule here that can render a total (plan §9.2, §14).
+
+   The card itself is styled in styles/canvas.css, beside .doc-header — it is drawn in the stage,
+   not in a panel. These rules live here because the SEO block landed in the phase that owns this
+   stylesheet; they belong beside their siblings and should move when the two are next touched
+   together. */
+.seo-previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0 8px;
+}
+.seo-card {
+  flex: 1 1 220px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+/* The two cards want different floors before they wrap: the result row is text and reads badly
+   narrow, the social card is a fixed-height image with two lines under it. */
+.seo-card--serp {
+  flex-basis: 260px;
+}
+.seo-card--social {
+  flex-basis: 200px;
+}
+.seo-card-label {
+  display: block;
+  padding-bottom: 6px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+/* A search result, in its own proportions: the URL line small, the title the largest thing in the
+   card, the snippet two lines. Clamped rather than truncated at a character count — where a given
+   engine cuts is its business, and the counter beside the field is what states the budget. */
+.seo-serp-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.seo-serp-title {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  padding: 2px 0;
+  font-size: var(--spectrum-font-size-200, 16px);
+  color: var(--accent);
+}
+.seo-serp-desc {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+}
+.seo-social-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+.seo-social-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.seo-social-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-top: 6px;
+}
+.seo-social-domain {
+  font-size: var(--spectrum-font-size-50, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+}
+.seo-social-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 700;
+  color: var(--fg);
+}
+.seo-social-desc {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+/* Absence, said once and in one colour, wherever a preview has nothing to draw. */
+.seo-unset {
+  font-style: italic;
+  color: var(--fg-dim);
+}
+.seo-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0 0 6px;
+  list-style: none;
+}
+.seo-field {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.seo-field-label {
+  flex: 0 0 96px;
+  color: var(--fg-dim);
+}
+.seo-field-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+}
+/* The counter is a reference line, not a verdict — over budget is stated, never scored. */
+.seo-field-count {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-dim);
+}
+.seo-field-count--over {
+  color: var(--warning);
+}
+.seo-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 6px;
+  list-style: none;
+}
+.seo-warning {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.seo-warning-field {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  color: var(--warning);
+}

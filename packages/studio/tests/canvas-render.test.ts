@@ -144,6 +144,14 @@ void mock.module("../src/canvas/iframe-host.js", () => ({
   adoptCanvasPreviewMode: (canvas: HTMLElement, preview: boolean) =>
     previewAdoptions.push({ canvas, preview }),
   commitActiveEditSession: () => {},
+  /* Three exports this file never calls, stubbed because a PARTIAL mock of a module the graph
+     reaches is a load error rather than a missing stub at call time. canvas-render now draws the
+     Library, whose creation flow is `files/files.ts`, which pulls `packages/ensure-deps` →
+     `services/automation` → `services/idle` — and those two modules read `canvasIdleBlockers`,
+     `canvasPointAt` and `revealCanvasPath` off the iframe host. */
+  canvasIdleBlockers: () => [],
+  canvasPointAt: () => Promise.resolve(null),
+  revealCanvasPath: () => Promise.resolve(null),
   postStyleUpdateToStylebookHosts: (style: Record<string, unknown>) => styleUpdateImpl(style),
   getEditBarAnchorRect: () => null,
   getEditSnapshot: () => ({ editing: false, snapshot: null }),
@@ -191,6 +199,10 @@ void mock.module("../src/panels/stylebook-panel.js", () => ({
 void mock.module("../src/files/file-ops.js", () => ({
   parseSourceForPath: parseSourceForPathMock,
   serializeDocument: serializeDocumentMock,
+  /* Two more the Library's context menu reads. canvas-render draws the Library now, so this
+     partial mock has to cover what that path imports — see the iframe-host note above. */
+  confirmFileDelete: () => Promise.resolve(false),
+  renamePromptMessage: () => Promise.resolve(""),
 }));
 
 const { initCanvasRender, renderCanvas, renderOverlays, scheduleCanvasRender } =

@@ -253,51 +253,18 @@
   letter-spacing: 0.5px;
 }
 
-/* ─── Browse modal ──────────────────────────────── */
-.browse-modal {
-  position: fixed;
-  inset: 40px;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: var(--spectrum-corner-radius-200, 8px);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
-  overflow: hidden;
-}
-.browse-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-}
-.browse-modal-title {
-  margin: 0;
-  font-size: var(--spectrum-font-size-100, 14px);
-  font-weight: 600;
-  color: var(--fg);
-}
-.browse-modal-content {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* ─── Browse view ────────────────────────────── */
-.browse-view {
+/* ─── Library ────────────────────────────────────
+   The Library is a PANE surface, not an overlay — the Manage modal it replaces is gone. It keeps
+   its rules here beside the grid's for one reason: both are non-iframe editors drawn into
+   #canvas-wrap, and splitting them across two sheets is how the two drifted apart before. */
+.library {
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
-.browse-view.browse-drop-active {
-  outline: 2px dashed var(--spectrum-blue-600, #0070c1);
-  outline-offset: -4px;
-}
-.browse-filter-bar {
+.library-toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -305,95 +272,240 @@
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
-.browse-filter-bar sp-search {
-  width: 240px;
+.library-toolbar sp-search {
+  width: 220px;
 }
-.browse-table {
+.library-upload-input {
+  display: none;
+}
+.library-spacer {
   flex: 1;
-  overflow: auto;
+}
+.library-layout-switch {
+  margin-left: auto;
+}
+.library-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--spectrum-orange-100, #3a2a10);
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.library-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  position: relative;
+}
+.library-body.library-drop-active {
+  outline: 2px dashed var(--spectrum-blue-600, #0070c1);
+  outline-offset: -4px;
+}
+.library-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--fg-dim);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.library-empty-detail {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+.library-truncated {
+  margin: 8px 0 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+
+/* Cards and Media — the two windowed grids. The item sizes here are the ones
+   `library-layouts.ts`'s LAYOUT_METRICS counts rows in; change one and change both. */
+.library-grid {
+  display: grid;
+  gap: 12px;
+  padding: 12px 16px;
+  align-items: start;
+}
+.library-grid-cards {
+  grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
+}
+.library-grid-media {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+.library-card,
+.library-tile {
+  cursor: pointer;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+.library-card:hover,
+.library-tile:hover {
+  border-color: var(--spectrum-blue-600, #0070c1);
+}
+.library-card-preview,
+.library-tile-preview {
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--spectrum-gray-100, #222);
+  pointer-events: none;
+}
+.library-preview-slot {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.library-preview-slot > * {
+  transform: scale(0.4);
+  transform-origin: top left;
+  width: 250%;
+  height: 250%;
+}
+.library-thumb {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.library-card-label,
+.library-tile-label {
+  padding: 6px 8px 0;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.library-card-meta {
+  padding: 0 8px 6px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+
+/* Table — a windowed list, not a `sp-table`: the rows have to be sliceable. */
+.library-table {
+  display: flex;
+  flex-direction: column;
   padding: 0 16px 16px;
 }
-.browse-table sp-table {
-  width: 100%;
-  min-width: 100%;
+.library-table-head,
+.library-table-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  border-bottom: 1px solid var(--border);
 }
-.browse-table sp-table-head-cell:nth-child(1),
-.browse-table sp-table-cell:nth-child(1) {
-  flex: 3;
+.library-table-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-panel);
+  font-weight: 600;
+  font-size: var(--spectrum-font-size-75, 12px);
 }
-.browse-table sp-table-head-cell:nth-child(2),
-.browse-table sp-table-cell:nth-child(2) {
-  flex: 0 0 80px;
-}
-.browse-table sp-table-head-cell:nth-child(3),
-.browse-table sp-table-cell:nth-child(3) {
-  flex: 0 0 60px;
-}
-.browse-table sp-table-head-cell:nth-child(4),
-.browse-table sp-table-cell:nth-child(4) {
-  flex: 2;
-}
-.browse-row {
+.library-table-row {
   cursor: pointer;
 }
-.browse-row-media,
-sp-table-row:has(.browse-thumb) {
-  cursor: default;
-}
-.browse-row:hover {
+.library-table-row:hover {
   background: var(--spectrum-gray-200, #333);
 }
-.browse-name-cell {
+.library-table-cell {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.library-table-cell[data-field="name"] {
+  flex: 3;
   font-weight: 500;
 }
-.browse-thumb {
-  width: 32px;
-  height: 32px;
-  object-fit: cover;
-  border-radius: var(--radius);
-  vertical-align: middle;
-  margin-right: 8px;
-  background: var(--spectrum-gray-200, #2a2a2a);
-}
-.browse-path-cell {
+.library-table-cell[data-field="path"] {
+  flex: 3;
   color: var(--fg-dim);
   font-family: var(--font-mono);
   font-size: var(--spectrum-font-size-50, 11px);
 }
-.browse-view-switcher {
-  display: flex;
-  gap: 2px;
-  margin-left: auto;
+.library-table-cell[data-field="size"],
+.library-table-cell[data-field="modified"] {
+  flex: 0 0 96px;
 }
-.browse-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-  padding: 12px;
-  align-items: start;
+
+/* Calendar and Board — grouped, capped, and each states what it left out. */
+.library-calendar {
+  padding: 12px 16px;
 }
-.browse-grid .element-card {
-  cursor: pointer;
-  margin-bottom: 0;
-  overflow: hidden;
+.library-day {
+  margin-bottom: 16px;
 }
-.browse-grid .element-card-preview {
-  aspect-ratio: 4/3;
-  max-height: none;
-  min-height: unset;
-  display: block;
-  overflow: hidden;
+.library-day-date {
+  margin: 0 0 4px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 600;
+  color: var(--fg);
 }
-.browse-grid-empty {
-  padding: 24px;
-  text-align: center;
+.library-day-undated .library-day-date {
   color: var(--fg-dim);
 }
-.browse-body {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
+.library-day-note {
+  margin: 0 0 4px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.library-board {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  align-items: flex-start;
+  overflow-x: auto;
+}
+.library-board-column {
+  flex: 0 0 220px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  background: var(--bg-panel);
+}
+.library-board-title {
+  margin: 0 0 6px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+}
+.library-board-count {
+  color: var(--fg-dim);
+  font-weight: 400;
+}
+.library-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.library-list-item {
+  padding: 3px 4px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: var(--spectrum-font-size-75, 12px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.library-list-item:hover {
+  background: var(--spectrum-gray-200, #333);
 }
 
 /* ─── Settings Modal ─── */
@@ -2190,7 +2302,8 @@ sp-table-row:has(.browse-thumb) {
   justify-content: flex-end;
 }
 .jx-grid-cell-popover .jx-grid-select,
-.jx-grid-cell-popover .jx-grid-input {
+.jx-grid-cell-popover .jx-grid-input,
+.jx-grid-view-popover .jx-grid-input {
   width: 100%;
   background: var(--bg);
   color: var(--fg);
@@ -2198,6 +2311,73 @@ sp-table-row:has(.browse-thumb) {
   border-radius: var(--spectrum-corner-radius-75, 2px);
   padding: 3px 6px;
   font: inherit;
+}
+
+/* Saved views — one popover for the four facets a view is made of (plan §12 P7.2). The name of the
+   applied view is on the toolbar button, so the control says what is on screen before it is
+   opened. */
+.jx-grid-view-button {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jx-grid-view-popover .jx-grid-cell-popover-body {
+  min-width: 280px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.jx-grid-view-empty {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.jx-grid-view-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.jx-grid-view-name {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--fg);
+  font: inherit;
+  padding: 3px 6px;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  cursor: pointer;
+}
+.jx-grid-view-name:hover {
+  background: var(--bg-hover);
+}
+.jx-grid-view-name.is-active {
+  font-weight: 600;
+  background: var(--bg-selected);
+}
+.jx-grid-view-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.jx-grid-sort-field,
+.jx-grid-sort-dir,
+.jx-grid-group-field {
+  width: 100%;
+}
+
+/* The redirect paste box (site-architecture.md §11.4's "import from _redirects or CSV"). Monospace
+   because both formats are column-aligned in the file the author copied them out of. */
+.jx-redirect-import {
+  width: 100%;
+  min-width: 420px;
+  font-family: var(--font-mono, monospace);
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  padding: 6px;
+  resize: vertical;
 }
 
 /* ─── ④ The toast host — the fourth overlay layer ─────────────────────────── */
@@ -2355,4 +2535,72 @@ sp-table-row:has(.browse-thumb) {
   line-height: 1.4;
   text-align: center;
   pointer-events: none;
+}
+
+/* ─── The Entry editor (content/entry-editor.ts) ─────────────────────────────
+   One content entry's fields, drawn by ui/schema-form.ts in a pane. Same
+   pane-editor family as the Project Settings document above, so it borrows its
+   metrics rather than inventing a second set. */
+.entry-editor {
+  height: 100%;
+  padding: 16px;
+  overflow-y: auto;
+  background: var(--bg-panel);
+}
+.entry-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.entry-editor-header h3 {
+  margin: 0;
+  font-size: var(--spectrum-font-size-100, 14px);
+  font-weight: 600;
+}
+.entry-editor-collection {
+  padding: 1px 8px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.entry-draft-switch {
+  margin-left: auto;
+}
+.entry-editor-fields {
+  display: flex;
+  flex-direction: column;
+}
+.entry-editor-note {
+  margin: 0 0 12px;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1.5;
+}
+.entry-editor-empty {
+  display: flex;
+  max-width: 46ch;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1.5;
+}
+
+/* The draft pill, on the tab chip. "Published" is deliberately as visible as
+   "Draft": a state you can only see one half of is a state you cannot check. */
+.entry-pill {
+  padding: 0 5px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 15px;
+  white-space: nowrap;
+}
+.entry-pill--draft {
+  background: var(--spectrum-yellow-400, #d8b400);
+  color: var(--spectrum-gray-900, #000);
 }

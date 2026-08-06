@@ -49,6 +49,11 @@ void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
 
 const { registerFileTreeDnD, renderFilesTemplate, setupTreeKeyboard } =
   await import("../src/files/files");
+const { createCommandRegistry } = await import("../src/commands/registry");
+const { emptyContext } = await import("../src/commands/context");
+const { setActiveRegistry } = await import("../src/commands/active-registry");
+const { gridCommands } = await import("../src/grid/grid-open");
+const { registerContentCommands } = await import("../src/content/entry-commands");
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -197,6 +202,9 @@ beforeEach(() => {
 afterEach(async () => {
   await dismissOutside();
   host.remove();
+  // The tree's context menu renders `forPlacement("context/file")`; a registry left published
+  // Would leak declared rows into every later case.
+  setActiveRegistry(null);
 });
 
 // ─── renderFilesTemplate — empty / welcome states ─────────────────────────────
@@ -587,19 +595,61 @@ describe("file context menu", () => {
     ]);
   });
 
-  test("collection and pages directories offer grid bulk-edit entries", async () => {
-    const handle = installFsPlatform();
+  /**
+   * The tree with a project that declares a `posts` collection, and the app registry published.
+   *
+   * The registry is the point of these cases. `context/file` is a DECLARED placement, and until now
+   * the tree drew a hand-built list beside it — so `content.openEntry` shipped with a menu entry no
+   * surface rendered, and "Edit Collection in Grid" existed twice: once as `collection.editInGrid`
+   * and once as a literal string here. Every row below comes out of `forPlacement`.
+   */
+  async function renderTreeWithRegistry() {
+    const handle = installFsPlatform({
+      "posts/first.md": "---\ntitle: First\n---\n",
+      "styles/site.css": "body{}",
+    });
     siteState({
       projectConfig: {
-        content: { posts: { format: "Markdown", schema: {}, source: "./posts/" } },
+        content: {
+          posts: {
+            format: "Markdown",
+            schema: { properties: { title: { type: "string" } } },
+            source: "./posts/",
+          },
+        },
         name: "Demo",
       },
     });
     seedTreeState();
-    requireProjectState().dirs.get(".")!.push({ name: "posts", path: "posts", type: "directory" });
+    requireProjectState()
+      .dirs.get(".")!
+      .push(
+        { name: "posts", path: "posts", type: "directory" },
+        { name: "styles", path: "styles", type: "directory" },
+      );
+    requireProjectState().dirs.set("posts", [
+      { name: "first.md", path: "posts/first.md", type: "file" },
+    ]);
+    requireProjectState().dirs.set("styles", [
+      { name: "site.css", path: "styles/site.css", type: "file" },
+    ]);
+    requireProjectState().expanded.add("posts");
+    requireProjectState().expanded.add("styles");
+
+    const registry = createCommandRegistry({
+      getContext: () => ({ ...emptyContext(), project: { open: true } }) as never,
+    });
+    registry.registerAll(gridCommands());
+    registerContentCommands(registry);
+    setActiveRegistry(registry);
+
     const tree = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(tree.ctx), host);
-    void handle;
+    return { ...tree, handle, out, registry };
+  }
+
+  test("a collection directory offers the DECLARED collection.editInGrid row", async () => {
+    const { out } = await renderTreeWithRegistry();
 
     pointer(rowFor(out, "posts"), "contextmenu");
     await flush();
@@ -608,12 +658,94 @@ describe("file context menu", () => {
     );
     await clickMenuItem("Edit Collection in Grid");
     expect(workspace.tabs.has("grid://collection/posts")).toBeTrue();
+  });
+
+  test("a content entry offers Open Entry Form; a file in no collection does not", async () => {
+    const { out } = await renderTreeWithRegistry();
+
+    pointer(rowFor(out, "posts/first.md"), "contextmenu");
+    await flush();
+    expect(popoverMenuItems().map((el) => el.textContent?.trim())).toContain("Open Entry Form");
+
+    // `styles/site.css` states no `path` fact, because it is an entry of no collection — so the
+    // Command that requires one is not offered rather than being offered and refusing.
+    pointer(rowFor(out, "styles/site.css"), "contextmenu");
+    await flush();
+    expect(popoverMenuItems().map((el) => el.textContent?.trim())).not.toContain("Open Entry Form");
+  });
+
+  test("Open Entry Form opens the tab in entry mode — the route the palette could not offer", async () => {
+    const { out } = await renderTreeWithRegistry();
+
+    pointer(rowFor(out, "posts/first.md"), "contextmenu");
+    await flush();
+    await clickMenuItem("Open Entry Form");
+    await flush();
+    await flush();
+
+    const tab = [...workspace.tabs.values()].find((t) => t.documentPath === "posts/first.md")!;
+    expect(tab).toBeDefined();
+    expect(tab.session.ui.canvasMode).toBe("entry");
+  });
+
+  test("the declared rows come from the registry — with none published, they are absent", async () => {
+    const { out } = await renderTreeWithRegistry();
+    setActiveRegistry(null);
+
+    pointer(rowFor(out, "posts"), "contextmenu");
+    await flush();
+    const labels = popoverMenuItems().map((el) => el.textContent?.trim());
+    expect(labels).not.toContain("Edit Collection in Grid");
+    // The tree's own verbs are unaffected: they are what the TREE does, not what a command does.
+    expect(labels).toEqual(["New File…", "Upload Files…", "Rename…", "Delete"]);
+  });
+
+  test("the pages directory keeps its hand-built grid row — no command declares one", async () => {
+    const { out } = await renderTreeWithRegistry();
 
     pointer(rowFor(out, "pages"), "contextmenu");
     await flush();
     expect(popoverMenuItems().map((el) => el.textContent?.trim())).toContain("Edit Pages in Grid");
     await clickMenuItem("Edit Pages in Grid");
     expect(workspace.tabs.has("grid://pages")).toBeTrue();
+  });
+
+  test("a declared row whose command is disabled is shown, greyed, with its reason", async () => {
+    const { out } = await renderTreeWithRegistry();
+    const registry = createCommandRegistry({
+      getContext: () => ({ ...emptyContext(), project: { open: true } }) as never,
+    });
+    registry.register({
+      args: {
+        additionalProperties: false,
+        properties: { path: { type: "string" } },
+        required: ["path"],
+        type: "object",
+      },
+      category: "File",
+      enablement: () => false,
+      id: "content.demoDisabled",
+      level: "project",
+      menus: ["context/file"],
+      requires: "a reason the author can act on",
+      run: () => {},
+      title: "Demo Disabled",
+      when: () => true,
+    });
+    setActiveRegistry(registry);
+
+    pointer(rowFor(out, "posts/first.md"), "contextmenu");
+    await flush();
+    const item = popoverMenuItems().find((el) => el.textContent?.includes("Demo Disabled"))!;
+    expect(item).toBeDefined();
+    expect(item.hasAttribute("disabled")).toBeTrue();
+    expect(item.textContent).toContain("Needs a reason the author can act on");
+
+    // Clicking it does nothing AND does not close the menu — a row that explains itself has to
+    // Stay on screen long enough to be read.
+    pointer(item, "click");
+    await flush();
+    expect(document.querySelector("#layer-popover sp-popover")).not.toBeNull();
   });
 
   test("opening a second menu dismisses the first", async () => {

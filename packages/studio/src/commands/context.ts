@@ -47,7 +47,15 @@ export type FocusRegion =
   | "palette";
 
 /** The editor kind the focused pane is rendering. */
-export type EditorKind = "canvas" | "grid" | "code" | "diff" | "library" | "config" | "none";
+export type EditorKind =
+  | "canvas"
+  | "grid"
+  | "code"
+  | "diff"
+  | "library"
+  | "config"
+  | "entry"
+  | "none";
 
 /** The Canvas view axis — one control, three values (§4.2). */
 export type CanvasView = "edit" | "design" | "preview";
@@ -72,6 +80,10 @@ export type CanvasView = "edit" | "design" | "preview";
 const EDITOR_KIND_BY_MODE: Readonly<Record<string, EditorKind>> = {
   design: "canvas",
   edit: "canvas",
+  /* The Entry editor — `content/entry-editor.ts`'s ENTRY_MODE. A form over ONE content entry's
+     frontmatter, typed by its collection's schema; the same document the canvas edits the body of,
+     which is why it is a mode of that tab rather than a tab of its own. */
+  entry: "entry",
   "git-diff": "diff",
   grid: "grid",
   manage: "library",
@@ -103,6 +115,7 @@ export const EDITOR_KIND_LABELS: Readonly<Record<EditorKind, string>> = {
   code: "Code",
   config: "Project Styles",
   diff: "Diff",
+  entry: "Entry",
   grid: "Grid",
   library: "Library",
   none: "None",
