@@ -23,6 +23,8 @@ void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
 const fakeHost = { id: "host" } as unknown as AnyRec;
 const calls: AnyRec[] = [];
 let hostAt: AnyRec | null = fakeHost;
+/** The tab each fake host is rendering — what `dragHostTab` answers. */
+const hostTabs = new Map<AnyRec, AnyRec>();
 let dragSeq = 5;
 // The native-drag-enter handler the bridge installs via setNativeDragEnterHandler.
 let nativeEnterHandler: ((host: AnyRec) => void) | null = null;
@@ -43,6 +45,9 @@ void mock.module("../src/canvas/iframe-host", () => ({
   },
   clearDropIndicator: (host: AnyRec) => calls.push({ fn: "clearIndicator", host }),
   currentDragSession: () => dragSeq,
+  // What the bound host is showing. The ghost label names a node at a path, and a path only means
+  // Something in ONE document — so the bridge asks the HOST rather than the focus.
+  dragHostTab: (host: AnyRec) => hostTabs.get(host) ?? null,
   endDragSession: (seq: number) => calls.push({ fn: "end", seq }),
   hostDragGeometry: (host: AnyRec) => {
     calls.push({ fn: "geo", host });
@@ -70,6 +75,7 @@ void mock.module("../src/panels/drag-ghost", () => ({
 
 const { buildDragMessages, isCancelDrop, registerCanvasDndBridge } =
   await import("../src/panels/canvas-dnd-bridge");
+const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
 
 /** A pragmatic monitor location with the cursor at (clientX, clientY). */
 const loc = (x: number, y: number) => ({ current: { input: { clientX: x, clientY: y } } });
@@ -229,6 +235,57 @@ describe("registerCanvasDndBridge — coordinator", () => {
     const show = calls.find((c) => c.fn === "ghostShow");
     expect(show!.label).toBe("section");
     expect({ x: show!.x, y: show!.y }).toEqual({ x: 300, y: 250 });
+  });
+
+  /*
+   * A tree-node source carries a PATH, and a path only names a node in one document. `ghostLabel`
+   * resolved it against `activeTab` while the ghost is raised over the pane the drag is IN, so
+   * dragging the side pane's ⠿ handle chipped the label with whatever tag happened to sit at that
+   * index in the FOCUSED document — a `<section>` for an `<img>`, or the bare word "node" when the
+   * path did not exist there at all. Cosmetic, and on screen for the whole length of the drag.
+   */
+  test("a tree-node ghost is labelled from the TARGET host's document", () => {
+    const sideHost = { id: "side" } as unknown as AnyRec;
+    hostTabs.set(sideHost, {
+      doc: { document: { children: [{ tagName: "img" }], tagName: "div" } },
+    });
+    // The focused document has a DIFFERENT tag at the same path; the ghost must not name it.
+    closeAllTabs();
+    openTab({
+      document: { children: [{ children: [], tagName: "section" }], tagName: "div" },
+      id: "dnd-focused",
+    });
+    hostAt = sideHost;
+
+    m().onDragStart({
+      location: loc(300, 250),
+      source: { data: { path: ["children", 0], type: "tree-node" } },
+    });
+
+    const show = calls.find((c) => c.fn === "ghostShow");
+    console.log(`[canvas-dnd] tree-node ghost over the SIDE host → label=${show!.label}`);
+    expect(show!.label).toBe("img");
+    closeAllTabs();
+    hostTabs.clear();
+  });
+
+  test("with no host under the cursor the ghost falls back to the focused document", () => {
+    closeAllTabs();
+    openTab({
+      document: { children: [{ children: [], tagName: "aside" }], tagName: "div" },
+      id: "dnd-offcanvas",
+    });
+    // A drag begun outside every artboard has no pane, and the Navigator layer row it started from
+    // Is showing the focused document — so that IS the right answer here.
+    hostAt = null;
+
+    m().onDragStart({
+      location: loc(5, 5),
+      source: { data: { path: ["children", 0], type: "tree-node" } },
+    });
+
+    expect(calls.find((c) => c.fn === "ghostShow")!.label).toBe("aside");
+    closeAllTabs();
   });
 
   test("onDrag moves the ghost to the raw cursor 1:1 (not the converted iframe coord)", () => {

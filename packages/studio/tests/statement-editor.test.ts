@@ -11,8 +11,8 @@ import {
   withLaneList,
 } from "../src/panels/statement-editor";
 import {
-  INSPECTOR_STATEMENTS_REGION,
   NAVIGATOR_STATEMENTS_REGION,
+  inspectorStatementsRegion,
   resolveAllRegions,
   resolveRegion,
 } from "../src/ui/regions";
@@ -691,7 +691,7 @@ describe("the region id names the HOST, not the control", () => {
     render(
       renderStatementEditor(stmts, () => {}, {
         ...DEFAULT_OPTS,
-        region: INSPECTOR_STATEMENTS_REGION,
+        region: inspectorStatementsRegion("onClick"),
       } as never),
       document.querySelector("#right-panel")!,
     );
@@ -701,16 +701,50 @@ describe("the region id names the HOST, not the control", () => {
     bothDocks();
 
     const navigator = resolveAllRegions(NAVIGATOR_STATEMENTS_REGION);
-    const inspector = resolveAllRegions(INSPECTOR_STATEMENTS_REGION);
+    const inspector = resolveAllRegions(inspectorStatementsRegion("onClick"));
     console.log(
       `[statement-editor] both docks open: navigator/statements → ${navigator.length} element(s), ` +
-        `inspector/statements → ${inspector.length}`,
+        `inspector/statements:onClick → ${inspector.length}`,
     );
     expect(navigator).toHaveLength(1);
     expect(inspector).toHaveLength(1);
     // The shot's id crops the NAVIGATOR's editor — the one the docs page is about.
     expect(resolveRegion(NAVIGATOR_STATEMENTS_REGION)!.closest("#left-panel")).not.toBeNull();
-    expect(resolveRegion(INSPECTOR_STATEMENTS_REGION)!.closest("#right-panel")).not.toBeNull();
+    expect(
+      resolveRegion(inspectorStatementsRegion("onClick"))!.closest("#right-panel"),
+    ).not.toBeNull();
+  });
+
+  /*
+   * The Inspector's Events tab draws ONE of these per structured handler on the selected node, so a
+   * constant `inspector/statements` was unique only while a node had a single handler. Two handlers
+   * made two elements answer to it and `resolveRegion` took the second — the same defect the
+   * Navigator/Inspector split closed, one level further in.
+   */
+  test("two handlers on one node are two ids, each resolving to its own editor", () => {
+    document.body.innerHTML = `<div id="app"><div id="right-panel"></div></div>`;
+    const host = document.querySelector("#right-panel")!;
+    const stmts: JxStatement[] = [{ operator: "=", target: { $ref: "#/state/count" }, value: 1 }];
+    for (const evKey of ["onClick", "onInput"]) {
+      const slot = document.createElement("div");
+      host.append(slot);
+      render(
+        renderStatementEditor(stmts, () => {}, {
+          ...DEFAULT_OPTS,
+          region: inspectorStatementsRegion(evKey),
+        } as never),
+        slot,
+      );
+    }
+    const clickEditors = resolveAllRegions(inspectorStatementsRegion("onClick"));
+    const inputEditors = resolveAllRegions(inspectorStatementsRegion("onInput"));
+    console.log(
+      `[statement-editor] two handlers: inspector/statements:onClick → ${clickEditors.length}, ` +
+        `inspector/statements:onInput → ${inputEditors.length}`,
+    );
+    expect(clickEditors).toHaveLength(1);
+    expect(inputEditors).toHaveLength(1);
+    expect(clickEditors[0]).not.toBe(inputEditors[0]);
   });
 
   test("a third host cannot appear without naming itself", () => {

@@ -477,6 +477,21 @@ export type IframeToParent =
   // Browser menu is still suppressed, legacy parity); x/y are IFRAME-VIEWPORT coords for the host
   // To convert via its empirical geometry.
   | { kind: "contextMenu"; path: (string | number)[] | null; x: number; y: number }
+  // ─── Pane focus ─────────────────────────────────────────────────────────────
+  // A pointer went down somewhere in this frame. Nothing else — no path, no coordinates, no
+  // Selection: it says only "the person is working in this pane now", which the parent realm cannot
+  // Observe for itself because a pointer event inside a cross-origin iframe is delivered in the
+  // Frame's own realm and never surfaces above it.
+  //
+  // `hit` used to be the whole seam, and it has two holes. It is not posted in PREVIEW at all — a
+  // Click there is a click on the page, never a selection — so a pane showing Preview could not be
+  // Focused by clicking the thing it is showing; and in edit/design it is only posted when the
+  // Click lands ON a `[data-jx-path]` node, so clicking an artboard's empty margin focused nothing
+  // Either. Both left the keyboard in the other pane while the person was plainly in this one.
+  //
+  // Deliberately NOT in the host's preview block-list: focusing a pane is not an edit, and it is
+  // The one thing preview must still report.
+  | { kind: "paneFocus" }
   // ─── Preview navigation ─────────────────────────────────────────────────────
   // A link was clicked in PREVIEW mode. Preview keeps anchors live (design/edit de-link them onto
   // `data-jx-href`), so the click would navigate the canvas iframe away and destroy the render —

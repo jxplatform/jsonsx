@@ -384,6 +384,45 @@ describe("the configuration tab", () => {
     expect(tab.capabilities.modes).toEqual([SETTINGS_MODE, "stylebook", "source"]);
   });
 
+  /*
+   * Revealing the configuration tab MOVES THE FOCUS, and moving the focus is four operations.
+   *
+   * `revealTab` did one of them — `workspace.activePaneId = pane.id` — which is the assignment
+   * `focusPane` makes after `resetTabCycle`, `promoteMru` and `syncTreeSelection`. So reopening
+   * Project Settings into the side pane left ⌃Tab cycling from the pane the author had left, the
+   * MRU order disagreeing with what was on screen, and the file tree still pointing at the previous
+   * pane's document. Rule 5 of `scripts/check-pane-singletons.ts` is the guard.
+   */
+  test("revealing it in the side pane moves the focus the way `focusPane` does", async () => {
+    const { activateTab, focusPane, openTab, splitRight, PRIMARY_PANE, SECONDARY_PANE } =
+      await import("../src/workspace/workspace");
+    const { projectState } = await import("../src/store");
+    const settings = showSettingsDocument()!;
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    focusPane(PRIMARY_PANE);
+    // Opened AFTER the focus came back, so it lands in the primary — `openTab` opens where the
+    // Keyboard is, which is the whole point of the arrangement.
+    const other = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "pages/other.json",
+      id: "pages/other.json",
+    });
+    activateTab(other.id);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.mruOrder[0]).toBe(other.id);
+
+    showSettingsDocument();
+
+    console.log(
+      `[settings] reopened into the side pane: focus=${workspace.activePaneId} ` +
+        `mru[0]=${workspace.mruOrder[0]} tree=${projectState?.selectedPath}`,
+    );
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+    // The three `focusPane` does that a bare assignment does not.
+    expect(workspace.mruOrder[0]).toBe(settings.id);
+    expect(projectState?.selectedPath).toBe("project.json");
+  });
+
   test("a tab that is in no pane is still returned rather than lost", () => {
     const tab = showSettingsDocument()!;
     for (const pane of workspace.panes) {

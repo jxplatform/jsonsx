@@ -7,7 +7,13 @@ import {
   resetWorkspaceWithTab,
   stubRect,
 } from "./harness";
-import { activateTab, activeTab, PRIMARY_PANE, SECONDARY_PANE } from "../src/workspace/workspace";
+import {
+  activateTab,
+  activeTab,
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  workspace,
+} from "../src/workspace/workspace";
 import { reactive } from "../src/reactivity";
 import { resetProjectShell, shell } from "../src/shell";
 import { initShellRefs, registerRenderer } from "../src/store";
@@ -216,8 +222,8 @@ describe("mountIframeCanvas", () => {
     const first = channels[0]!.posts.find((p) => p.kind === "render") as Record<string, unknown>;
     expect(first.allowAutoRequests).toBeUndefined();
 
-    // Armed by Refresh: the NEXT render carries it.
-    allowAutoRequestsOnNextRender();
+    // Armed by Refresh: the NEXT render of THAT pane carries it.
+    allowAutoRequestsOnNextRender(PRIMARY_PANE);
     await mountIframeCanvas(2, { tagName: "div" } as never, canvasEl);
     const renders = channels[0]!.posts.filter((p) => p.kind === "render") as Record<
       string,
@@ -313,7 +319,7 @@ describe("mountIframeCanvas", () => {
       // Armed once, "the next render" means the whole pass. Consuming the flag per host meant
       // Whichever artboard mounted first swallowed it and the rest kept auto-requests suppressed —
       // The Data activity's Refresh refreshed one artboard out of N.
-      allowAutoRequestsOnNextRender();
+      allowAutoRequestsOnNextRender(PRIMARY_PANE);
       await mountPass(11, { tagName: "div" });
       for (const channel of channels) {
         expect(channel.posts.at(-1)).toMatchObject({ allowAutoRequests: true, kind: "render" });
@@ -325,6 +331,45 @@ describe("mountIframeCanvas", () => {
       for (const channel of channels) {
         expect((channel.posts.at(-1) as Record<string, unknown>).allowAutoRequests).toBeUndefined();
       }
+    });
+
+    /*
+     * The arm is one PANE's, not one pass's and not the app's.
+     *
+     * Per-host was wrong because one Refresh mounts N artboards and the first swallowed the flag.
+     * Per-pass was wrong one pane further out: two panes are two passes, both scheduled through rAF
+     * and both awaiting inside their mount loop, so whichever reached `preparePassRender` first
+     * took an arm the other pane's Refresh had set — the Data activity's Refresh refreshed a pane
+     * nobody had pressed it in, and left its own suppressed.
+     */
+    test("Refresh arms ONE pane — the other pane's pass cannot claim it", async () => {
+      resetWorkspaceWithTab();
+      const wrap = document.createElement("div");
+      document.body.append(wrap);
+      surfaceForPane(SECONDARY_PANE).wrap = wrap;
+      const sideEl = document.createElement("div");
+      wrap.append(sideEl);
+      const primaryEl = document.createElement("div");
+      document.body.append(primaryEl);
+
+      allowAutoRequestsOnNextRender(SECONDARY_PANE);
+      // The FOCUSED pane renders first and must not consume the side pane's arm.
+      await mountIframeCanvas(21, { tagName: "div" } as never, primaryEl, null, null);
+      const chPrimary = channels.at(-1)!;
+      chPrimary.deliver({ kind: "ready" });
+      await mountIframeCanvas(22, { tagName: "aside" } as never, sideEl, null, null);
+      const chSide = channels.at(-1)!;
+      chSide.deliver({ kind: "ready" });
+      const primaryPost = chPrimary.posts.at(-1) as Record<string, unknown>;
+      const sidePost = chSide.posts.at(-1) as Record<string, unknown>;
+
+      console.log(
+        `[iframe-host] Refresh armed ${SECONDARY_PANE}: primary=${String(primaryPost.allowAutoRequests)} ` +
+          `side=${String(sidePost.allowAutoRequests)}`,
+      );
+      expect(primaryPost.allowAutoRequests).toBeUndefined();
+      expect(sidePost.allowAutoRequests).toBe(true);
+      surfaceForPane(SECONDARY_PANE).wrap = undefined as never;
     });
 
     test("a colour-scheme flip between artboards is not baked into the shared payload", async () => {
@@ -357,6 +402,78 @@ describe("mountIframeCanvas", () => {
     activeTab.value!.session.ui.previewColorScheme = "dark";
     await mountIframeCanvas(2, { tagName: "div" } as never, canvasEl);
     expect(channels[0]!.posts[1]).toMatchObject({ colorScheme: "dark", kind: "render" });
+  });
+
+  /*
+   * The scheme a render posts belongs to the tab being RENDERED, not to the tab with the keyboard.
+   *
+   * `session.ui.previewColorScheme` is a per-TAB choice, and this is verbatim the defect
+   * `postColorSchemeToLiveHosts` was given a `root` for — the PUSH path was scoped to one stage and
+   * the RENDER path was not. Worse than the push, because the per-pane effect in `studio.ts` only
+   * re-runs when the scheme CHANGES: nothing repaired the side pane afterwards, so every later
+   * re-render silently reverted it while its own Auto/Light/Dark control went on saying otherwise.
+   */
+  describe("the colour scheme a render posts is the RENDERED tab's", () => {
+    /** A side tab with its own scheme, and a focused tab with a different one. */
+    async function twoSchemes(side: "light" | "dark" | "auto", focused: "light" | "dark" | "auto") {
+      resetWorkspaceWithTab();
+      const { openTab } = await import("../src/workspace/workspace");
+      const focusedTab = activeTab.value!;
+      const sideTab = openTab({ document: { tagName: "div" }, id: "tab-scheme-side" });
+      activateTab(focusedTab.id);
+      focusedTab.session.ui.previewColorScheme = focused;
+      sideTab.session.ui.previewColorScheme = side;
+      return { focusedTab, sideTab };
+    }
+
+    test("a page mount posts its own tab's scheme, not the focused tab's", async () => {
+      const { sideTab } = await twoSchemes("dark", "auto");
+      const canvasEl = document.createElement("div");
+      document.body.append(canvasEl);
+      // The VIEW tab, exactly as `canvas-render.ts` passes it.
+      await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl, null, sideTab.id, sideTab);
+      channels.at(-1)!.deliver({ kind: "ready" });
+      const posted = channels.at(-1)!.posts.at(-1);
+      console.log(
+        `[iframe-host] side=dark focused=auto → side render posts colorScheme=` +
+          `${JSON.stringify((posted as Record<string, unknown>).colorScheme)}`,
+      );
+      expect(posted).toMatchObject({ colorScheme: "dark", kind: "render" });
+    });
+
+    test("and posts null for its own Auto tab while the focused tab is forced dark", async () => {
+      const { sideTab } = await twoSchemes("auto", "dark");
+      const canvasEl = document.createElement("div");
+      document.body.append(canvasEl);
+      await mountIframeCanvas(2, { tagName: "div" } as never, canvasEl, null, sideTab.id, sideTab);
+      channels.at(-1)!.deliver({ kind: "ready" });
+      expect(channels.at(-1)!.posts.at(-1)).toMatchObject({ colorScheme: null, kind: "render" });
+    });
+
+    test("a stylebook mount resolves its tab from the stage it is mounted into", async () => {
+      const { sideTab } = await twoSchemes("light", "dark");
+      // `mountStylebookCanvas` takes no tab — the specimen has no tab identity — so the route is
+      // The STAGE: `tabOfContainer(canvasEl)` → `paneOfContainer` → `stageContaining`.
+      const { focusPane, splitRight } = await import("../src/workspace/workspace");
+      activateTab(sideTab.id);
+      expect(splitRight()?.id).toBe(SECONDARY_PANE);
+      focusPane(PRIMARY_PANE);
+      const wrap = document.createElement("div");
+      document.body.append(wrap);
+      surfaceForPane(SECONDARY_PANE).wrap = wrap;
+      const canvasEl = document.createElement("div");
+      wrap.append(canvasEl);
+
+      mountStylebookCanvas(
+        3,
+        { doc: { tagName: "div" }, pathToTag: new Map(), tagToCardPath: new Map() } as never,
+        canvasEl,
+        null,
+      );
+      channels.at(-1)!.deliver({ kind: "ready" });
+      expect(channels.at(-1)!.posts.at(-1)).toMatchObject({ colorScheme: "light", kind: "render" });
+      surfaceForPane(SECONDARY_PANE).wrap = undefined as never;
+    });
   });
 
   test("postSiteStyleToLiveHosts pushes the project style to ready page hosts", async () => {
@@ -1257,7 +1374,7 @@ describe("iframe canvas inline-edit bridge", () => {
   });
 
   test("editCommit routes to the ORIGINATING tab when it races a tab switch (the bleed)", async () => {
-    const { openTab, workspace } = await import("../src/workspace/workspace");
+    const { openTab } = await import("../src/workspace/workspace");
     const tabA = activeTab.value!;
     const canvasEl = await mountReady();
     // The user switches to tab B; the host is re-mounted for B but the iframe has NOT acked yet —
@@ -2354,6 +2471,91 @@ describe("hit routing across panes", () => {
 
     expect(tabB.session.canvas.scope).toEqual({ posts: "3 items" });
     expect(tabA.session.canvas.scope).toBeNull();
+  });
+
+  /*
+   * A RIGHT-click was the one gesture that still edited the other pane's document.
+   *
+   * `contextmenu` does not fire `click`, so `hit` — where the pane focus moves — never arrives, and
+   * `contextMenu` was the only message a right-click delivered. `editor/canvas-context-menu.ts`
+   * reads `activeTab.value?.doc.document` to bubble the path, and `editor/context-menu.ts` then
+   * WRITES `tab.session.selection = [path]` on that document before deciding which rows to show.
+   * So a right-click in the side pane moved the primary pane's selection to a path from a different
+   * document and built Duplicate/Delete/Wrap against it — and when the focused document had no such
+   * path, the menu returned early and the right-click did nothing at all, silently.
+   */
+  /**
+   * {@link mountBackgroundHost}, plus the real second pane the focus can actually move into.
+   *
+   * `focusPane` is a lookup in `workspace.panes` — with one pane there is nowhere for the focus to
+   * go, and every one of these assertions would pass by accident.
+   */
+  async function mountSplitBackgroundHost() {
+    const { focusPane, openTab, splitRight } = await import("../src/workspace/workspace");
+    const tabA = activeTab.value!;
+    const tabB = openTab({
+      document: { children: [{ tagName: "p", textContent: "B" }], tagName: "div" },
+      id: "tab-side-pane",
+    });
+    // `splitRight` carries the FOCUSED tab into the new pane, so the split happens while tabB is.
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    focusPane(PRIMARY_PANE);
+    activateTab(tabA.id);
+
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, {} as never, canvasEl, null, tabB.id);
+    channels[0]!.deliver({ kind: "ready" });
+    channels[0]!.deliver({ gen: 1, kind: "renderComplete" });
+    secondaryPanels.push({ canvas: canvasEl, mediaName: "base" } as unknown as CanvasPanel);
+    return { canvasEl, tabA, tabB };
+  }
+
+  test("a right-click in the side pane focuses it before the menu is built", async () => {
+    const { tabA } = await mountSplitBackgroundHost();
+    const paths: unknown[] = [];
+    setCanvasContextMenuHandler({
+      dismiss: () => {},
+      // Read the focus AT SHOW TIME — this is exactly what the real handler does.
+      show: (arg) => paths.push([workspace.activePaneId, activeTab.value?.id, arg.path]),
+    });
+
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    channels[0]!.deliver({ kind: "contextMenu", path: ["children", 0], x: 5, y: 7 });
+
+    console.log(`[iframe-host] right-click in the side pane → ${JSON.stringify(paths)}`);
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+    expect(paths).toEqual([[SECONDARY_PANE, "tab-side-pane", ["children", 0]]]);
+    expect(tabA.id).not.toBe("tab-side-pane");
+    setCanvasContextMenuHandler({ dismiss: () => {}, show: () => {} });
+  });
+
+  /*
+   * The other half of the same seam. `hit` is not posted in PREVIEW at all (a click there is a
+   * click on the page), and in edit/design it is only posted when the click lands ON a
+   * `[data-jx-path]` node — so a Preview pane could not be focused by clicking what it is showing,
+   * and an artboard's empty margin focused nothing either. `paneFocus` carries nothing but "a
+   * pointer went down in this frame", which is why it is safe to send from preview.
+   */
+  test("`paneFocus` focuses the pane, and is not refused by a preview host", async () => {
+    const { canvasEl, tabA } = await mountSplitBackgroundHost();
+    // Re-mount this host in PREVIEW: every message in `PREVIEW_BLOCKED` is dropped from it —
+    // `hit` and `contextMenu` among them — and this one must survive that gate.
+    (resolved.mapperCtx as { canvasMode: string }).canvasMode = "preview";
+    await mountIframeCanvas(2, {} as never, canvasEl, null, "tab-side-pane");
+    activateTab(tabA.id);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+
+    // A click on a node would be a `hit`, and preview refuses it — so this is the ONLY signal.
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 1, width: 1, x: 0, y: 0 } },
+      kind: "hit",
+    });
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+
+    channels[0]!.deliver({ kind: "paneFocus" });
+    console.log(`[iframe-host] paneFocus from a PREVIEW host → focus=${workspace.activePaneId}`);
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
   });
 });
 

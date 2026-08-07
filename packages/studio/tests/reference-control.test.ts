@@ -185,9 +185,19 @@ describe("the control", () => {
 describe("every consumer gets it without asking", () => {
   test("the frontmatter renderer reaches the registry rather than its own ladder", async () => {
     const { renderFmField } = await import("../src/panels/frontmatter-fields");
+    // The renderer takes its tab now (it is drawn per pane by the Document Header card), so the
+    // Document it commits into has to exist before the widget is built.
+    const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
+    closeAllTabs();
+    const tab = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "content/blog/hello.md",
+      frontmatter: { author: "ada" },
+      id: "content/blog/hello.md",
+    });
     const container = document.createElement("div");
     render(
-      html`${renderFmField("author", { $ref: "#/content/authors" }, "ada", new Set())}`,
+      html`${renderFmField(tab, "author", { $ref: "#/content/authors" }, "ada", new Set())}`,
       container,
     );
     await flush();
@@ -199,14 +209,6 @@ describe("every consumer gets it without asking", () => {
     );
 
     // And it commits through the document's transaction log, like every other frontmatter widget.
-    const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
-    closeAllTabs();
-    const tab = openTab({
-      document: { children: [], tagName: "div" },
-      documentPath: "content/blog/hello.md",
-      frontmatter: { author: "ada" },
-      id: "content/blog/hello.md",
-    });
     choose(container.querySelector("sp-picker.reference-field")!, "grace");
     expect(tab.doc.content.frontmatter.author).toBe("grace");
     closeAllTabs();

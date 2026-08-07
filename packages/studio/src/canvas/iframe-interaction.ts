@@ -139,6 +139,23 @@ export function startInteraction(
    */
   const isPreview = () => deps?.getMode?.() === "preview";
 
+  /**
+   * Report that the person is now working in this frame's pane — every mode, every button, every
+   * target.
+   *
+   * `pointerdown` rather than `click`, and unconditional rather than mode-gated, because both of
+   * `hit`'s holes are holes in what a CLICK means here. In preview there is no `hit` by design (a
+   * click in preview is a click on the page), and in edit/design `hit` is posted only when the
+   * click lands on a `[data-jx-path]` node — so an artboard's empty margin, a right-click, and
+   * every single interaction with a Preview pane all left the keyboard in the other pane.
+   *
+   * It carries nothing, which is what makes it safe to send from preview: the parent moves pane
+   * focus and does not touch the document, so the page underneath is still just a page.
+   */
+  const onPointerDown = () => {
+    channel.post({ kind: "paneFocus" });
+  };
+
   const onClick = (e: Event) => {
     /*
      * Preview keeps anchors live, so a click would navigate this iframe and destroy the render (and
@@ -296,6 +313,7 @@ export function startInteraction(
     });
   };
 
+  doc.addEventListener("pointerdown", onPointerDown, true);
   doc.addEventListener("click", onClick, true);
   doc.addEventListener("pointermove", onMove, true);
   doc.addEventListener("pointerleave", onLeave, true);
@@ -306,6 +324,7 @@ export function startInteraction(
       cancelRaf(movePending);
       movePending = 0;
     }
+    doc.removeEventListener("pointerdown", onPointerDown, true);
     doc.removeEventListener("click", onClick, true);
     doc.removeEventListener("pointermove", onMove, true);
     doc.removeEventListener("pointerleave", onLeave, true);

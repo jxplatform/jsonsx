@@ -320,6 +320,76 @@ describe("the Layout picker belongs to the card's own document", () => {
   });
 });
 
+/*
+ * Every control on the card commits into the document the card is SHOWING.
+ *
+ * The JSON branch was fixed when the panes landed, and the comment beside it said so. The fix
+ * reached that branch only: a markdown page takes the CONTENT branch, where `applyContentMutation`
+ * resolved `activeTab.value` one call deeper, and every schema-driven field went through
+ * `renderFmField`, which did the same at each of its seven widgets. So on a content document the
+ * card in one pane retitled — and re-categorised, and re-dated — whichever document had the
+ * keyboard, while going on displaying the values it had not changed.
+ */
+describe("the CONTENT branch commits into the card's own document too", () => {
+  /** The card is drawn for a content tab in the PRIMARY pane; the focus is in the side pane. */
+  async function contentCardWithFocusElsewhere() {
+    const card = setupContentTab({ category: "news", title: "LEFT" }, { id: "fm-left" }) as any;
+    card.doc.mode = "content";
+    const other = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "posts/other.json",
+      id: "fm-right",
+    }) as any;
+    other.doc.mode = "content";
+    other.doc.content.frontmatter = { category: "news", title: "RIGHT" };
+    expect(splitRight()?.id).toBe("secondary");
+    expect(paneById("primary")!.activeTabId).toBe(card.id);
+    expect(activeTab.value?.id).toBe(other.id);
+    await mountAndFlush();
+    return { card, other };
+  }
+
+  test("the Title field retitles the card's document, not the focused one", async () => {
+    const { card, other } = await contentCardWithFocusElsewhere();
+    expect(row("title").querySelector("sp-textfield")).not.toBeNull();
+
+    fireChange(row("title").querySelector("sp-textfield")!, "EDITED");
+    await flush(2);
+
+    console.log(
+      `[frontmatter] focus=${activeTab.value?.id} · left.title=${JSON.stringify(card.doc.content.frontmatter.title)} ` +
+        `right.title=${JSON.stringify(other.doc.content.frontmatter.title)}`,
+    );
+    expect(card.doc.content.frontmatter.title).toBe("EDITED");
+    expect(other.doc.content.frontmatter.title).toBe("RIGHT");
+  });
+
+  test("Clear title clears the card's document, not the focused one", async () => {
+    const { card, other } = await contentCardWithFocusElsewhere();
+    const clear = row("title").querySelector<HTMLElement>(".provenance-chip.set-dot");
+    expect(clear).not.toBeNull();
+    clear!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush(2);
+
+    expect(card.doc.content.frontmatter.title).toBeUndefined();
+    expect(other.doc.content.frontmatter.title).toBe("RIGHT");
+  });
+
+  test("a schema frontmatter field commits into the card's document, not the focused one", async () => {
+    const { card, other } = await contentCardWithFocusElsewhere();
+    // `category` is a schema `enum`, drawn by `renderFmField` — one of its seven `activeTab` writes.
+    fireChange(row("category").querySelector("sp-picker")!, "guide");
+    await flush(2);
+
+    console.log(
+      `[frontmatter] schema field · left.category=${JSON.stringify(card.doc.content.frontmatter.category)} ` +
+        `right.category=${JSON.stringify(other.doc.content.frontmatter.category)}`,
+    );
+    expect(card.doc.content.frontmatter.category).toBe("guide");
+    expect(other.doc.content.frontmatter.category).toBe("news");
+  });
+});
+
 describe("one reserved-key policy", () => {
   test("title renders ONCE, as the card's named row, not also as a generic property", async () => {
     setupContentTab({ title: "My Post" });

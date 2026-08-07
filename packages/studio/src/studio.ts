@@ -654,8 +654,14 @@ leftPanelMod.mount({
   // Fetch. Edit/design suppress them (a full render re-resolves every entry, so authoring would
   // Refetch constantly); re-firing them on demand is what that button is for.
   refreshData: () => {
-    allowAutoRequestsOnNextRender();
-    renderCanvas();
+    // ONE read of the focus, shared by the arm and the render. The Data panel is a Navigator
+    // Surface, so its subject genuinely is the focused pane — but `allowAutoRequestsOnNextRender()`
+    // And `renderCanvas()` each used to resolve that for themselves, and two resolutions of the
+    // Same fact are two facts: arming a pane and then rendering a different one is a Refresh that
+    // Refreshes nothing.
+    const paneId = workspace.activePaneId;
+    allowAutoRequestsOnNextRender(paneId);
+    renderCanvas(paneId);
   },
   renderDataExplorerTemplate,
   renderFilesTemplate,

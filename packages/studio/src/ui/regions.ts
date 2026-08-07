@@ -383,8 +383,24 @@ export function inspectorTabRegion(tabId: string): string {
  */
 export const NAVIGATOR_STATEMENTS_REGION = "navigator/statements";
 
-/** @see {@link NAVIGATOR_STATEMENTS_REGION} */
-export const INSPECTOR_STATEMENTS_REGION = "inspector/statements";
+/**
+ * The Inspector's statement editor, named by the HANDLER it edits.
+ *
+ * A constant was only half the fix. `panels/events-panel.ts` draws this editor inside
+ * `eventEntries.map(...)` — one per structured handler on the selected node — so a node with
+ * `onClick` and `onInput` stamped `inspector/statements` on two elements and `resolveRegion` took
+ * the second. That is the same defect the Navigator/Inspector split was made to close, one level
+ * down: an id that is unique because of what happens to be on screen is not unique.
+ *
+ * The Navigator's stays a constant because its host has ONE slot (`expandedSignal`), and deriving
+ * an id there would be inventing a distinction the surface does not have.
+ *
+ * @param {string} eventKey The handler's property key — `onClick`, `onInput`.
+ * @returns {string}
+ */
+export function inspectorStatementsRegion(eventKey: string): string {
+  return `inspector/statements:${eventKey}`;
+}
 
 /**
  * Region id for a Bottom dock tab, derived from the panel's own id.

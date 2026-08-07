@@ -20,7 +20,12 @@ import {
 } from "./canvas-surface";
 import type { CanvasSurface } from "./canvas-surface";
 import { activeTab } from "../workspace/workspace";
-import { findCanvasElement, getActivePanel, panelMediaToActiveMedia } from "./canvas-helpers";
+import {
+  findCanvasElement,
+  getActivePanel,
+  panelMediaToActiveMedia,
+  panelOfSurface,
+} from "./canvas-helpers";
 import { rectOf } from "../utils/geometry";
 import {
   argsSchema,
@@ -615,13 +620,22 @@ function centeringOffset(surface: CanvasSurface, rect: { top: number; height: nu
  * it is an ordinary scrolling column (`.content-edit-canvas`, the edit branch of `renderCanvas`),
  * and the only thing that brings a node below the fold into view there is its scroll container.
  *
- * Reading it off the active panel is what keeps the two callers from disagreeing. It is the
- * discriminator `_panToEl` has always used, and `renderCanvas` re-establishes it on every render:
- * `canvasPanels` is emptied and `view.panzoomWrap` nulled before any branch runs, so the panel that
- * answers here is this mode's, never the last mode's.
+ * Reading it off the stage's own active panel is what keeps the two callers from disagreeing. It is
+ * the discriminator `_panToEl` has always used, and `renderCanvas` re-establishes it on every
+ * render: a surface's `panels` is emptied and its panzoom wrap nulled before any branch runs, so
+ * the panel that answers here is this mode's, never the last mode's.
+ *
+ * **It took its surface as a parameter only after the rule grew a second hop.** It was zero-arity
+ * and called `getActivePanel()`, which is the FOCUSED pane's — so `revealBy(surface, …)` was handed
+ * one stage and scrolled another's. Benign in the tree, because both callers happened to pass the
+ * focused surface, and invisible to the one-hop rule for exactly the wrong reason: a forwarder
+ * whose whole body is `getActivePanel()?.scrollContainer` launders a focus read behind a name.
+ *
+ * @param {CanvasSurface} surface
+ * @returns {HTMLElement | null}
  */
-export function revealScroller(): HTMLElement | null {
-  return getActivePanel()?.scrollContainer ?? null;
+export function revealScroller(surface: CanvasSurface): HTMLElement | null {
+  return panelOfSurface(surface)?.scrollContainer ?? null;
 }
 
 /**
@@ -633,7 +647,7 @@ export function revealScroller(): HTMLElement | null {
  * no such settle protocol, so an un-eased caller gets a scroll that is finished on return.
  */
 function revealBy(surface: CanvasSurface, offsetY: number, smooth: boolean): void {
-  const scroller = revealScroller();
+  const scroller = revealScroller(surface);
   if (!scroller) {
     animatePanBy(surface, offsetY);
     return;

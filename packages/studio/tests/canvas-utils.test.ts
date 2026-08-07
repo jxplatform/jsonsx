@@ -876,15 +876,39 @@ describe("panToParentRect", () => {
 
 describe("revealScroller", () => {
   test("is null with no panel, and null for a panzoom panel", () => {
-    expect(revealScroller()).toBeNull();
+    expect(revealScroller(primary())).toBeNull();
     makeRenderedPanel();
-    expect(revealScroller()).toBeNull();
+    expect(revealScroller(primary())).toBeNull();
   });
 
   test("is the active panel's scroll container on the Edit surface", () => {
     const scrollContainer = document.createElement("div");
     makeRenderedPanel({ scrollContainer });
-    expect(revealScroller()).toBe(scrollContainer);
+    expect(revealScroller(primary())).toBe(scrollContainer);
+  });
+
+  /*
+   * It answers about the SURFACE it was handed, not about the focused pane. It used to be
+   * zero-arity and to call `getActivePanel()`, which resolves through `activeCanvasSurface()` — so
+   * `revealBy(surface, …)` was handed one stage and scrolled whichever one had the keyboard. Benign
+   * only because both callers happened to pass the focused surface; a reveal in a side pane would
+   * have scrolled the primary and then re-measured a node that had not moved.
+   */
+  test("answers for the surface it is given, not the focused one", () => {
+    const sideScroller = document.createElement("div");
+    const side = surfaceForPane("secondary");
+    side.panels.push({
+      canvas: document.createElement("div"),
+      mediaName: "base",
+      scrollContainer: sideScroller,
+    } as unknown as CanvasPanel);
+    // The FOCUSED pane has a scroller of its own, and a different one.
+    const primaryScroller = document.createElement("div");
+    makeRenderedPanel({ scrollContainer: primaryScroller });
+
+    expect(revealScroller(side)).toBe(sideScroller);
+    expect(revealScroller(primary())).toBe(primaryScroller);
+    side.panels.length = 0;
   });
 });
 

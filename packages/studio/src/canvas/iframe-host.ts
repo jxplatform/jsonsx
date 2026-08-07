@@ -31,7 +31,12 @@ import { notify } from "../services/notify";
 import { effect, effectScope } from "../reactivity";
 import { pathsEqual, projectState, renderOnly } from "../store";
 import { activeTab, focusPane, workspace } from "../workspace/workspace";
-import { panelHostingCanvas, stageContaining, tabOfContainer } from "./canvas-surface";
+import {
+  paneOfContainer,
+  panelHostingCanvas,
+  stageContaining,
+  tabOfContainer,
+} from "./canvas-surface";
 import { cloneSelection, primarySelection, toggleSelected } from "../tabs/selection";
 import type { JxPath } from "../state";
 import { setLayoutSelection, shell } from "../shell";
@@ -264,15 +269,24 @@ export function sawIframeDragOver(seq: number): boolean {
 let evalReqId = 0;
 
 /**
- * One-shot: let automatic `$prototype: "Request"` entries fetch on the NEXT page render even in
+ * The panes whose NEXT page render may let automatic `$prototype: "Request"` entries fetch, even in
  * edit/design mode.
  *
  * Those fetches are suppressed outside preview because a full render re-resolves every state entry,
  * so an escalating authoring action would issue a request per render. But the Data activity's
- * Refresh exists to re-fire them on demand — its documented purpose — so it arms this flag and the
- * next render consumes it. Deliberately one-shot: a subsequent escalation must not inherit it.
+ * Refresh exists to re-fire them on demand — its documented purpose — so it arms a pane and that
+ * pane's next render consumes it. Deliberately one-shot: a subsequent escalation must not inherit
+ * it.
+ *
+ * **A `boolean`, then a per-PASS boolean, now a set of panes** — the same fact narrowing each time
+ * something else turned out to be able to claim it. Per-host was wrong because one Refresh mounts N
+ * artboards and the first swallowed the arm. Per-pass was wrong for the same reason one pane
+ * further out: two panes are two passes, both scheduled through rAF and both awaiting inside their
+ * mount loop, so whichever reached `preparePassRender` first took an arm the OTHER pane's Refresh
+ * had set — the button refreshed the pane nobody had pressed it in, and left its own pane
+ * suppressed.
  */
-let _allowAutoRequestsOnce = false;
+const _autoRequestPanes = new Set<string>();
 
 /**
  * Open a preview link's target for real.
@@ -306,15 +320,19 @@ function openPreviewHref(href: string, state: HostState): void {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-/** Arm the next page render to allow automatic request fetches (Data activity Refresh). */
-export function allowAutoRequestsOnNextRender(): void {
-  _allowAutoRequestsOnce = true;
+/**
+ * Arm one pane's next page render to allow automatic request fetches (Data activity Refresh).
+ *
+ * @param {string} paneId The pane the Refresh was pressed for — read ONCE by the caller, so the arm
+ *   and the `renderCanvas` that follows it cannot end up naming different panes.
+ */
+export function allowAutoRequestsOnNextRender(paneId: string): void {
+  _autoRequestPanes.add(paneId);
 }
 
-function consumeAllowAutoRequests(): boolean {
-  const armed = _allowAutoRequestsOnce;
-  _allowAutoRequestsOnce = false;
-  return armed;
+/** Take `paneId`'s arm, if it has one. */
+function consumeAllowAutoRequests(paneId: string): boolean {
+  return _autoRequestPanes.delete(paneId);
 }
 
 /** Pending eval resolvers keyed by reqId; a timeout or stale reply resolves null. */
@@ -754,7 +772,13 @@ export async function revealCanvasPath(
   if (!before) {
     return null;
   }
-  panToParentRect({ height: before.height, top: before.top });
+  /* Pan the stage the MEASUREMENT came from. `hostForPath` prefers the host rendering the focused
+     tab but falls back to any ready page host, and the pan defaulted to `activeCanvasSurface()` —
+     so on the fallback the reveal measured in one pane and scrolled the other, then re-measured a
+     node that had not moved. `undefined` keeps the default for a host no pane claims (a detached
+     artboard in a test). */
+  const surface = panelHostingCanvas(host.canvasEl)?.surface;
+  panToParentRect({ height: before.height, top: before.top }, surface);
   await panSettled(host);
   return measureIn(host, path);
 }
@@ -1178,6 +1202,18 @@ function withEchoSuppressed(host: HostState, paths: (string | number)[][], fn: (
 /** The tab whose document `state`'s iframe currently renders (null when unknown or closed). */
 function hostTab(state: HostState): Tab | null {
   return state.tabId ? (workspace.tabs.get(state.tabId) ?? null) : null;
+}
+
+/**
+ * The tab a drag TARGET is showing — the one public reader on the opaque {@link DragHost} handle.
+ *
+ * `panels/canvas-dnd-bridge.ts` binds a session to the host under the cursor and then had nothing
+ * to ask it, so the one fact it needed about the drag — what the dragged node is CALLED — came from
+ * `activeTab`. The bridge is not supposed to read the handle's fields (that is what "opaque"
+ * means), so the answer is a function rather than a widened type.
+ */
+export function dragHostTab(host: DragHost): Tab | null {
+  return hostTab(host);
 }
 
 /**
@@ -1702,10 +1738,18 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       requestSelection(state, state.selectionPaths);
       return;
     }
+    case "paneFocus": {
+      /* The frame says only that a pointer went down in it. Every mode posts this, including
+         preview — see the message's own docstring for the two holes in `hit` that it closes. */
+      focusHostPane(state);
+      return;
+    }
     case "hit": {
       /* A click in a canvas is a click in a PANE, and the parent realm never saw it. See
          `focusHostPane`; it goes first so everything below writes into the pane the person is now
-         in rather than starting a selection the Inspector will not show. */
+         in rather than starting a selection the Inspector will not show. `paneFocus` has usually
+         beaten it here, and both stay: the canvas bundle ships prebuilt, so a frame whose build
+         predates `paneFocus` must still focus its pane on a click that lands on a node. */
       focusHostPane(state);
       // Selecting a real document node retires any layout selection — the two are alternatives, and
       // A stale layout panel next to a fresh element selection would name the wrong thing.
@@ -2221,6 +2265,15 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       if (state.stylebook) {
         return; // The doc context menu's actions are meaningless for specimen paths.
       }
+      /* A right-click is a click, and it is the ONLY message it delivers: `contextmenu` does not
+         fire `click`, so `hit` — where the other half of this seam focuses the pane — never
+         arrives. Without this line the menu was built against the FOCUSED document while pointing
+         at a node in this one: `editor/context-menu.ts` writes `tab.session.selection = [path]`
+         before it decides which rows to show, so right-clicking the side pane moved the PRIMARY
+         pane's selection to a path from a different document, and Duplicate/Delete/Wrap then
+         operated there. When the focused document had no such path the menu returned early and the
+         right-click did nothing at all, silently. */
+      focusHostPane(state);
       // A canvas right-click — convert to parent-viewport coords and show the Jx element menu.
       const { rect: ifr, scale } = hostDragGeometry(state);
       canvasContextMenuHandler?.show({
@@ -2452,6 +2505,7 @@ function preparePassRender(
   doc: JxMutableNode,
   tabId: string | null,
   viewTab: Tab | null,
+  paneId: string,
 ): Promise<PreparedRender> {
   const byDoc = preparedDocsFor(gen);
   const viewTabId = viewTab?.id ?? null;
@@ -2459,11 +2513,13 @@ function preparePassRender(
   if (cached && cached.tabId === tabId && cached.viewTabId === viewTabId) {
     return cached.payload;
   }
-  // One-shot per PASS, not per host. `allowAutoRequestsOnNextRender` arms "the next render", and
-  // Consuming it inside the per-host mount meant whichever artboard mounted first swallowed it and
-  // The rest re-rendered with automatic `Request` entries still suppressed — the Data activity's
-  // Refresh visibly refreshed one artboard out of N.
-  const allowAutoRequests = consumeAllowAutoRequests();
+  // One-shot per PANE's pass, not per host and not globally. `allowAutoRequestsOnNextRender` arms
+  // "the next render of pane X": consuming it inside the per-host mount meant whichever artboard
+  // Mounted first swallowed it and the rest re-rendered with automatic `Request` entries still
+  // Suppressed, and consuming a GLOBAL here meant whichever PANE's pass got here first did the
+  // Same to the other one. `gen` comes from one monotonic counter shared by every surface, so a
+  // Pass belongs to exactly one pane and this consume is that pane's.
+  const allowAutoRequests = consumeAllowAutoRequests(paneId);
   const payload = timeSpanAsync(SPAN_PREPARE_RENDER, async (): Promise<PreparedRender> => {
     canvasPerf.renderPreparations += 1;
     const resolved = await resolveCanvasDocument(doc, viewTab);
@@ -2544,12 +2600,13 @@ export async function mountIframeCanvas(
   // Own `latestGen`), so the parent must NOT gate on `view.renderGeneration`: during boot many
   // Renders fire and the generation is usually stale by the time resolution finishes, which would
   // Otherwise drop every post.
-  const prepared = await preparePassRender(gen, doc, tabId, viewTab);
+  const prepared = await preparePassRender(gen, doc, tabId, viewTab, paneOfContainer(canvasEl));
   const message: ParentToIframe = {
     ...prepared,
-    // Per-host, and cheap: read at POST time so a scheme flip that raced the shared resolution is
-    // Not baked into the payload every host shares.
-    colorScheme: activeSchemeWire(),
+    // Per-TAB, and read at POST time so a scheme flip that raced the shared resolution is not
+    // Baked into the payload every host shares. `viewTab` is this artboard's tab — defaulted from
+    // `tabOfContainer(canvasEl)`, the same route the rest of this mount takes.
+    colorScheme: schemeWireFor(viewTab),
     gen,
     kind: "render",
   };
@@ -2606,7 +2663,9 @@ export function mountStylebookCanvas(
   // oxlint-disable-next-line unicorn/prefer-structured-clone
   const cloneableShadow = JSON.parse(JSON.stringify(generated.doc)) as unknown;
   const message: ParentToIframe = {
-    colorScheme: activeSchemeWire(),
+    // The specimen carries no tab identity, but the STAGE it is mounted into does: a stylebook is
+    // Opened as a tab like anything else, and its `previewColorScheme` is that tab's.
+    colorScheme: schemeWireFor(tabOfContainer(canvasEl)),
     doc: cloneableDoc,
     docBase: `${canvasBaseOrigin()}/`,
     gen,
@@ -2627,9 +2686,23 @@ export function mountStylebookCanvas(
   deliverRender(state, message);
 }
 
-/** The active tab's forced preview scheme as wire data (auto → null). */
-function activeSchemeWire(): "light" | "dark" | null {
-  const s = activeTab.value?.session.ui.previewColorScheme;
+/**
+ * A TAB's forced preview scheme as wire data (auto → null).
+ *
+ * Takes its tab, and that is the whole fix. It was `activeSchemeWire()` — zero-argument, reading
+ * `activeTab` — and both mounts call it while holding the artboard they are rendering INTO, so
+ * every render of the side pane posted the FOCUSED tab's scheme over its own: a side tab set to
+ * Dark rendered light whenever an Auto tab had the keyboard, and a side tab set to Auto rendered
+ * dark whenever a Dark one did. Its own control went on saying what it had been set to, because the
+ * record it reads is the one nobody wrote.
+ *
+ * This is verbatim the defect {@link postColorSchemeToLiveHosts} was given a `root` for. The PUSH
+ * path was scoped and the RENDER path was not, and the per-pane effect in `studio.ts` only re-runs
+ * when the scheme CHANGES — so nothing repaired the pane afterwards, and any later re-render (a
+ * document edit, a breakpoint change, a mode switch) silently reverted it again.
+ */
+function schemeWireFor(tab: Tab | null): "light" | "dark" | null {
+  const s = tab?.session.ui.previewColorScheme;
   return s === "light" || s === "dark" ? s : null;
 }
 

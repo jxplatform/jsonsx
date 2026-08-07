@@ -29,6 +29,7 @@ import {
   ALLOWED_ACTIVE_TAB_READS,
   analyzeFocusScope,
   ALLOWED_FOCUS_IN_PANE_SCOPE,
+  ALLOWED_FOCUS_WRITES,
   ALLOWED_SINGLE_INSTANCE,
   ALLOWED_VIEW_READS,
   BANNED_VIEW_FIELDS,
@@ -37,6 +38,7 @@ import {
   countPerFile,
   describeFocusSites,
   diffAgainstAllowed,
+  FOCUS_WRITE_RE,
   focusSitesInPaneScope,
   report,
   withFocusDetail,
@@ -330,8 +332,35 @@ describe("the singleton guard", () => {
     });
   });
 
+  test("the fifth rule: only `focusPane` moves the focus, and its list is empty", async () => {
+    /* Rules 1–4 all match READS, and for four rounds that was the whole shape being chased. The
+       mirror image went unnamed for as long: `settings/settings-document.ts` set
+       `workspace.activePaneId = pane.id` directly, which moves the keyboard without
+       `resetTabCycle`, `promoteMru` or `syncTreeSelection` — so Ctrl-Tab still cycled from the pane
+       the author had left, the MRU disagreed with the screen, and the tree kept pointing at the old
+       pane's document. */
+    expect(ALLOWED_FOCUS_WRITES).toEqual({});
+    const writes = await countPerFile(
+      ["src/**/*.ts"],
+      FOCUS_WRITE_RE,
+      "src/workspace/workspace.ts",
+    );
+    console.log(`[pane-singletons] focus writes outside workspace.ts: ${[...writes.keys()]}`);
+    expect([...writes]).toEqual([]);
+    // And the owner really does still write it — a rule whose only writer had vanished would be
+    // Green for the wrong reason.
+    const owner = await countPerFile(["src/workspace/workspace.ts"], FOCUS_WRITE_RE);
+    expect(owner.get("src/workspace/workspace.ts")).toBeGreaterThan(0);
+  });
+
   /**
-   * The thirteen shapes the rule is measured against, written to disk and parsed.
+   * The twenty-two shapes the rule is measured against, written to disk and parsed.
+   *
+   * Thirteen were the AST rule's original table; the last eight are the four blind spots the
+   * widening closed, each with the counter-case that proves the widening did not swallow the brake
+   * it narrowed. **A** is a pane object whose parameter is named `state` or `canvasEl` rather than
+   * `pane`; **B** is the arity brake, which hid every helper that happened to take arguments; **C**
+   * is a transparent forwarder, which laundered a focus read behind a name.
    *
    * On disk because the rule is an AST check now: it asks the TypeScript compiler for a source
    * file, and a compiler takes a path. They go to a temp directory rather than into `tests/`
@@ -452,6 +481,100 @@ describe("the singleton guard", () => {
         }`,
       why: "finding 3: focus reached through a HELPER, one hop away, named import and default",
     },
+    // ── The four blind spots the widening closed. ──
+    {
+      expected: 1,
+      file: "host-state.ts",
+      source: `function onSelection(state: HostState) {
+          state.selectionPath = activeTab.value?.session.selection?.[0] ?? null;
+        }`,
+      why: "A: a pane object whose parameter is named neither `pane` nor `surface`",
+    },
+    {
+      expected: 1,
+      file: "typed-only.ts",
+      source: `export function label(h: DragHost, p: CanvasPanel) {
+          return activeTab.value?.doc.document?.tagName ?? p.mediaName ?? h.tabId;
+        }`,
+      why: "A: the TYPE says it even when the name does not — `DragHost`, `CanvasPanel`",
+    },
+    {
+      expected: 1,
+      file: "canvas-el.ts",
+      source: `export function mount(gen: number, doc: Doc, canvasEl: HTMLElement) {
+          return { colorScheme: activeTab.value?.session.ui.previewColorScheme, gen };
+        }`,
+      why: "A: `canvasEl` is an artboard, and `tabOfContainer` is the route from it",
+    },
+    {
+      expected: 0,
+      file: "arity-reader.ts",
+      source: `export function renderFmField(field: string, value: string) {
+          return transactDoc(activeTab.value, () => value);
+        }
+        export function ghostLabel(src: Src, data: Data) {
+          return activeTab.value?.doc.document?.tagName ?? "node";
+        }`,
+      why: "B: the readers themselves are subject-less, so the defect is at their call sites",
+    },
+    {
+      expected: 2,
+      file: "arity-caller.ts",
+      source: `import { ghostLabel, renderFmField } from "./arity-reader";
+        export function card(tab: Tab, paneId: string) {
+          return [renderFmField("title", "x"), ghostLabel(src, data)];
+        }`,
+      why: "B: a helper with PARAMETERS is not a helper that was told which pane — the arity brake",
+    },
+    {
+      expected: 1,
+      file: "subject-reader.ts",
+      source: `export function updateUi(tab: Tab, field: string) {
+          return activeTab.value === tab ? field : "";
+        }
+        export function fitPane(paneId: string) {
+          return activePane().id === paneId;
+        }`,
+      why: "B: the tab-scoped helper is exempt; the pane-scoped one is charged at its OWN site",
+    },
+    {
+      expected: 0,
+      file: "subject-caller.ts",
+      source: `import { fitPane, updateUi } from "./subject-reader";
+        export function bar(tab: Tab, paneId: string) {
+          return [updateUi(tab, "zoom"), fitPane(paneId)];
+        }`,
+      why: "B: …so the brake still holds for the shapes it was written for",
+    },
+    {
+      expected: 1,
+      file: "forwarder.ts",
+      source: `export function getActivePanel() {
+          return activeCanvasSurface().panels[0] ?? activeTab.value;
+        }
+        export function revealScroller() {
+          return getActivePanel()?.scrollContainer ?? null;
+        }
+        export function revealBy(surface: CanvasSurface, offsetY: number) {
+          const scroller = revealScroller();
+          return scroller ? scroller.scrollTop - offsetY : null;
+        }`,
+      why: "C: a transparent forwarder is one frame of stack, not one hop of reasoning",
+    },
+    {
+      expected: 0,
+      file: "not-a-forwarder.ts",
+      source: `import { getActivePanel } from "./forwarder";
+        export function summarise() {
+          const panel = getActivePanel();
+          const n = panel ? 1 : 0;
+          return n;
+        }
+        export function draw(surface: CanvasSurface) {
+          return summarise();
+        }`,
+      why: "C: two statements is a function with a decision in it — the walk stops there",
+    },
   ];
 
   /** Write `sources` to a temp directory, analyse them, and hand back the counts by file name. */
@@ -473,7 +596,7 @@ describe("the singleton guard", () => {
     }
   }
 
-  test("the AST rule catches all thirteen shapes — including the eight the regex missed", async () => {
+  test("the AST rule catches all twenty-two shapes — the regex's eight and the widening's four", async () => {
     const counts = await analyzeSources(FIXTURES);
     const actual = FIXTURES.map((f) => `${f.file} → ${counts.get(f.file)} · ${f.why}`);
     const wanted = FIXTURES.map((f) => `${f.file} → ${f.expected} · ${f.why}`);

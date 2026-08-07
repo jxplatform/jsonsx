@@ -257,14 +257,21 @@ export function documentHeaderTemplate(tab: Tab, paneId: string): TemplateResult
   // ONE view of the document's head material, whichever realm it lives in: frontmatter keys for a
   // Markdown page, root properties for a JSON one.
   const headDoc = isContent ? buildHeadDoc(tab.doc.document, fm) : tab.doc.document;
+  /*
+   * `tab`, not `activeTab` — the card is drawn for the pane that mounted it, and every other line
+   * in this template already reads that. Both branches resolved through FOCUS, so with two panes
+   * the visible card's controls edited whichever document happened to be focused: click "Clear
+   * title" on the card in the left pane and the field disappears from the right pane's document
+   * instead. Invisible with one stage, which is why it survived the pane keying.
+   *
+   * **The first fix reached the JSON branch only, and the comment here said it was done.** A
+   * markdown page takes the CONTENT branch, where `applyContentMutation` resolved the focus for
+   * itself one call deeper — and `renderFmField` below did the same at each of its seven widgets.
+   * Both take their tab now, so the whole card commits into one document: the one it is showing.
+   */
   const applyMutation = isContent
-    ? (fn: (doc: JxMutableNode) => void) => applyContentMutation(render, fn)
+    ? (fn: (doc: JxMutableNode) => void) => applyContentMutation(tab, render, fn)
     : (fn: (doc: JxMutableNode) => void) => {
-        // `tab`, not `activeTab` — the card is drawn for the pane that mounted it, and every other
-        // Line in this template already reads that. This one resolved through FOCUS, so with two
-        // Panes the visible card's controls edited whichever document happened to be focused: click
-        // "Clear title" on the card in the left pane and the field disappears from the right pane's
-        // Document instead. Invisible with one stage, which is why it survived the pane keying.
         transact(tab, fn);
       };
 
@@ -318,7 +325,7 @@ export function documentHeaderTemplate(tab: Tab, paneId: string): TemplateResult
           ),
         })}
         ${isPageDocument(tab) ? renderLayoutPickerRow(headDoc, applyMutation) : nothing}
-        ${fields.map((f) => renderFmField(f.field, f.entry, f.value, requiredFields))}
+        ${fields.map((f) => renderFmField(tab, f.field, f.entry, f.value, requiredFields))}
       </div>
       ${disclosure(tab.id, _seoOpen, "SEO", seoBody(tab, headDoc, head, applyMutation))}
       ${disclosure(tab.id, _rawOpen, "Raw head tags", rawHeadBody(head))}

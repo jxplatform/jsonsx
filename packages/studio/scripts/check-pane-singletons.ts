@@ -13,7 +13,7 @@
  * `unknown` read that `as number` makes compile. And a module-level `let active` is perfectly
  * well-typed; it is only wrong because there are two stages.
  *
- * Four rules, all in this package's own idiom (`scripts/check-styles.ts`'s `ALLOWED_ORPHANS`), and
+ * Five rules, all in this package's own idiom (`scripts/check-styles.ts`'s `ALLOWED_ORPHANS`), and
  * all failing BOTH ways: a new occurrence fails, and a stale allow-list entry fails too, so the
  * lists can only ratchet down.
  *
@@ -43,6 +43,10 @@
  * function headers is blind to an arrow with a template-literal body, to a return type containing a
  * brace, and — structurally — to a focus read that is one call away. The table in that docstring
  * lists all eight shapes it used to walk past.
+ *
+ * **The FIFTH rule is rule 4's mirror, and it exists because the first four all match READS.** See
+ * {@link FOCUS_WRITE_RE}: `focusPane` is the only thing that may move the focus, because moving it
+ * is four operations and an assignment is one of them.
  *
  * Run: bun scripts/check-pane-singletons.ts
  */
@@ -190,12 +194,24 @@ const INSTANCE_RE = /^let (active|_active|_host|_scheduler|sourceCollabCleanup)\
  * so the Layout picker appeared and vanished in the pane being edited according to the document in
  * the OTHER one. A rule that only reads the body it is standing in cannot say that, however good
  * its regex is, which is why {@link analyzeFocusScope} walks ONE hop of the call graph: a call to a
- * zero-parameter local function that reads the focus is a focus read at the call site.
+ * SUBJECT-LESS local function that reads the focus is a focus read at the call site.
  *
  * One hop rather than a transitive closure, deliberately. Two hops reaches `render()`, and from
  * `render()` everything is reachable from everything — the rule would stop naming a defect and
- * start naming the module graph. Zero-parameter is the second brake: a helper that takes a tab has
- * already been told what it is about, so the caller passing one is the fix rather than the bug.
+ * start naming the module graph. The exception is a TRANSPARENT FORWARDER — a subject-less helper
+ * whose entire body is one call to a reader ({@link forwardedCallees}) — which is charged to its
+ * own caller because it adds no meaning of its own: `revealScroller()` was `return
+ * getActivePanel()?.scrollContainer ?? null`, and stopping at it named a function nobody wrote a
+ * decision in. A forwarder is one frame of stack, not one hop of reasoning.
+ *
+ * **The second brake used to be ZERO PARAMETERS, and that was the wrong reading of its own
+ * rationale.** "A helper that takes a tab has already been told what it is about" is true of a
+ * `tab`; it is not true of `(field, entry, value, requiredFields)`. Under the arity brake,
+ * `renderFmField` (4 params, seven `activeTab.value` writes) was invisible from the Document Header
+ * card that draws it per pane, and so were `applyContentMutation` (2) and `ghostLabel` (2). The
+ * brake is now {@link namesItsSubject}: a helper is exempt when its SIGNATURE says which pane or
+ * which tab it is about — which is also the reason a pane-scoped helper is charged at its own
+ * definition (rule 4 already fires there) rather than at every call site.
  */
 const FOCUS_NAMES: ReadonlySet<string> = new Set([
   "activeTab",
@@ -213,16 +229,51 @@ const FOCUS_NAMES: ReadonlySet<string> = new Set([
  * `canvas-surface.ts`'s `paneOfContainer(container)` exists precisely so stage content that is
  * handed an element and nothing else can still name its pane, so a function taking a container has
  * the same answer available and the same obligation to use it.
+ *
+ * `canvasEl` and `state` join them because `canvas/iframe-host.ts` is written in a different
+ * vocabulary and is the module with the most per-pane surfaces in the package: twenty-two of its
+ * functions take `state: HostState`, every one of them is about ONE artboard, and the route from it
+ * to a pane — `panelHostingCanvas(state.canvasEl)?.surface.paneId` — was already spelled at
+ * `focusHostPane`. A rule that only recognised the word `pane` was blind to the whole file, and
+ * `canvasEl` alone is what found the colour-scheme defect in `mountIframeCanvas`.
+ *
+ * **`host` was measured and left out**, by the same test that keeps `tab` out. In this package
+ * `host` almost never means an artboard: it is the element a surface paints into, and the three
+ * sites it added were `panels/editors.ts`'s Logic-tab dock body, `panels/layers-panel.ts`'s
+ * Navigator Outline body and `panels/tab-strip.ts`'s strip host — all app-level surfaces that
+ * follow the focus by design, none of them a defect. Every `host` parameter that IS a pane's
+ * artboard is typed `HostState` or `DragHost` and is caught by {@link PANE_PARAM_TYPE_RE} instead.
+ * A name in this list must MEAN "a pane"; one that means it a quarter of the time buys three
+ * permanent allow-list entries and no catch.
  */
 export const PANE_PARAM_NAMES: ReadonlySet<string> = new Set([
   "paneId",
   "pane",
   "surface",
   "container",
+  "canvasEl",
+  "state",
 ]);
 
-/** A parameter TYPE that says it, whatever the parameter is called. */
-const PANE_PARAM_TYPE_RE = /\bCanvasSurface\b/;
+/**
+ * A parameter TYPE that says it, whatever the parameter is called.
+ *
+ * `HostState` is one artboard's iframe, overlay and selection; `DragHost` is its alias across the
+ * drag bridge; `CanvasPanel` is one media panel INSIDE one stage. None of them can name the focused
+ * pane without contradicting the parameter they arrived on.
+ */
+const PANE_PARAM_TYPE_RE = /\b(CanvasSurface|HostState|DragHost|CanvasPanel)\b/;
+
+/**
+ * A parameter that says which TAB, which is the other way a caller can have already decided.
+ *
+ * Unlike a pane parameter this is not itself a violation — `isTabActive(tab)` is a real question —
+ * but it is a brake on the one-hop rule: a helper handed a tab is a helper the caller has told.
+ */
+const TAB_PARAM_NAMES: ReadonlySet<string> = new Set(["tab", "targetTab", "tabs"]);
+
+/** A parameter TYPE that names a tab. */
+const TAB_PARAM_TYPE_RE = /\bTab\b/;
 
 /**
  * The module that OWNS focus, excluded by name.
@@ -244,6 +295,12 @@ const FOCUS_SCOPE_SCAN = ["src/**/*.ts"];
  * regex and has two entries under the AST rule, which is the rule working: both are shapes a body
  * scan could not see, and each is written down rather than silently tolerated.
  *
+ * **The widening added none.** All six sites it newly named were defects and all six were fixed —
+ * the colour scheme both mounts posted, the Document Header's content branch and its schema fields,
+ * `revealScroller`, `ghostLabel`, and the focus write in `settings/settings-document.ts`. The only
+ * name it was offered and refused is `host`, which would have bought three entries here for no
+ * catch at all; see {@link PANE_PARAM_NAMES}.
+ *
  * - **`src/panels/editors.ts`** — `functionMountWanted(container, tab, editing)` asks
  *   `activeTab.value === tab` on the far side of Monaco's 12.6 MB dynamic import, and it is right
  *   to. Its `container` is the BOTTOM DOCK's, not a pane's stage: the function editor is one
@@ -252,7 +309,7 @@ const FOCUS_SCOPE_SCAN = ["src/**/*.ts"];
  *   container by its name, and widening the name list was worth this one entry — `container` is how
  *   `canvas-surface.ts`'s `paneOfContainer` route is spelled everywhere else.
  * - **`src/settings/css-vars-editor.ts`** — `renderCssVarsEditor(container)` IS drawn in a pane's
- *   stage, and it calls `pushProjectStylesToCanvas()`, which is a zero-argument focus reader. This
+ *   stage, and it calls `pushProjectStylesToCanvas()`, which is a subject-less focus reader. This
  *   is the one-hop rule earning its keep: the SITE half of that push goes to every live host and is
  *   correct, while the STYLEBOOK half composes `activeTab.value?.doc.document?.style` and posts one
  *   result to all specimen canvases — so two panes each showing a stylebook get the focused
@@ -263,6 +320,38 @@ export const ALLOWED_FOCUS_IN_PANE_SCOPE: Readonly<Record<string, number>> = {
   "src/panels/editors.ts": 1,
   "src/settings/css-vars-editor.ts": 1,
 };
+
+// ─── Rule 5 · only the focus owner MOVES the focus ────────────────────────────
+
+/**
+ * An assignment to `activePaneId`, which is what moving the focus looks like when nobody calls
+ * `focusPane`.
+ *
+ * Rules 1–4 all match READS, and that is the shape every audit so far has been about: a surface
+ * drawn for one pane consulting the focus instead of its own pane. The mirror image went unnamed
+ * for as long — `settings/settings-document.ts` set `workspace.activePaneId = pane.id` directly,
+ * which moves the keyboard without `resetTabCycle`, without `promoteMru` and without
+ * `syncTreeSelection`, so Ctrl-Tab still cycled from the pane the author had left, the MRU order
+ * disagreed with what was on screen, and the tree selection kept pointing at the old pane's
+ * document.
+ *
+ * {@link FOCUS_OWNER} is dropped before the scan, so this names exactly the writers that are not
+ * the one legitimate one. `=>` and `==` are excluded so an arrow default and a comparison are not
+ * assignments.
+ */
+export const FOCUS_WRITE_RE = /\bactivePaneId\s*=(?![=>])/g;
+
+/** Where a focus write would be made. {@link FOCUS_OWNER} is dropped rather than listed here. */
+const FOCUS_WRITE_SCAN = ["src/**/*.ts"];
+
+/**
+ * Files still allowed to move the focus without `focusPane`. Empty: `focusPane` is the only writer.
+ *
+ * Kept as an empty table rather than deleted for the reason every list in this file is: a
+ * re-introduction should land as a diff HERE, beside the sentence saying what `focusPane` does that
+ * a bare assignment does not.
+ */
+export const ALLOWED_FOCUS_WRITES: Readonly<Record<string, number>> = {};
 
 /** A node as the compiler API hands it back; shapes vary by kind, so this stays loose. */
 type AnyNode = any;
@@ -304,18 +393,37 @@ function boundNames(name: AnyNode, out: string[] = []): string[] {
   return out;
 }
 
-/** True when this function's signature says which pane it is about. */
-function isPaneScoped(fn: AnyNode, sf: AnyNode): boolean {
+/** True when some parameter of `fn` is named in `names` or typed to match `typeRe`. */
+function hasParamSaying(
+  fn: AnyNode,
+  sf: AnyNode,
+  names: ReadonlySet<string>,
+  typeRe: RegExp,
+): boolean {
   for (const param of (fn.parameters as AnyNode[] | undefined) ?? []) {
-    if (boundNames(param.name).some((name) => PANE_PARAM_NAMES.has(name))) {
+    if (boundNames(param.name).some((name) => names.has(name))) {
       return true;
     }
     const type = param.type as AnyNode | undefined;
-    if (type && PANE_PARAM_TYPE_RE.test((sf.text as string).slice(type.pos, type.end))) {
+    if (type && typeRe.test((sf.text as string).slice(type.pos, type.end))) {
       return true;
     }
   }
   return false;
+}
+
+/** True when this function's signature says which pane it is about. */
+function isPaneScoped(fn: AnyNode, sf: AnyNode): boolean {
+  return hasParamSaying(fn, sf, PANE_PARAM_NAMES, PANE_PARAM_TYPE_RE);
+}
+
+/**
+ * True when this function's signature says which pane OR which tab it is about — the brake on the
+ * one-hop rule. See {@link FOCUS_NAMES}'s docstring: a helper that has been told is a helper whose
+ * own body is where the fix goes, so its callers are not charged for reaching it.
+ */
+function namesItsSubject(fn: AnyNode, sf: AnyNode): boolean {
+  return isPaneScoped(fn, sf) || hasParamSaying(fn, sf, TAB_PARAM_NAMES, TAB_PARAM_TYPE_RE);
 }
 
 /** Does this subtree name the focus directly? Used to classify a candidate helper. */
@@ -339,8 +447,14 @@ interface ModuleFacts {
   sf: AnyNode;
   /** Local binding name → the `src/` module it was imported from, for relative imports only. */
   importedFrom: Map<string, string>;
-  /** Names of top-level ZERO-parameter functions in this module whose body reads the focus. */
+  /**
+   * Names of top-level functions in this module that a pane-scoped caller is charged for calling:
+   * subject-less helpers whose body reads the focus, plus the transparent forwarders that reach
+   * one. See {@link namesItsSubject} and {@link isForwarder}.
+   */
   readers: Set<string>;
+  /** Subject-less forwarders, name → the callee names their single statement invokes. */
+  forwarders: Map<string, string[]>;
 }
 
 /** Resolve a relative import to a file in `sources`, the way the bundler will. */
@@ -355,6 +469,57 @@ function resolveSpecifier(from: string, spec: string, sources: Set<string>): str
     }
   }
   return undefined;
+}
+
+/**
+ * The callee names a TRANSPARENT FORWARDER invokes, or `null` when `fn` is not one.
+ *
+ * A forwarder is a function whose entire body is one call — `return getActivePanel()?.…` — so it
+ * carries no decision of its own and the reasoning hop it costs a reader is zero. Charging its
+ * caller is therefore not the transitive closure the one-hop brake exists to avoid; it is refusing
+ * to let an alias launder a focus read.
+ *
+ * Deliberately narrow: exactly one statement (or a concise arrow body), and the names it collects
+ * are only the direct `f(…)` callees, so a body that computes anything is not a forwarder.
+ *
+ * @param {AnyNode} fn
+ * @returns {string[] | null} Callee names, or null when this is not a forwarder.
+ */
+function forwardedCallees(fn: AnyNode): string[] | null {
+  const body = fn.body as AnyNode | undefined;
+  if (!body) {
+    return null;
+  }
+  let expr: AnyNode | undefined;
+  if (body.kind === SyntaxKind.Block) {
+    const statements = (body.statements as AnyNode[] | undefined) ?? [];
+    const only = statements.length === 1 ? statements[0] : undefined;
+    if (
+      only &&
+      (only.kind === SyntaxKind.ReturnStatement || only.kind === SyntaxKind.ExpressionStatement)
+    ) {
+      expr = only.expression as AnyNode | undefined;
+    }
+  } else {
+    expr = body;
+  }
+  if (!expr) {
+    return null;
+  }
+  const callees: string[] = [];
+  const collect = (node: AnyNode): void => {
+    if (
+      node.kind === SyntaxKind.CallExpression &&
+      node.expression?.kind === SyntaxKind.Identifier
+    ) {
+      callees.push(node.expression.text as string);
+    }
+    node.forEachChild((child: AnyNode) => {
+      collect(child);
+    });
+  };
+  collect(expr);
+  return callees.length > 0 ? callees : null;
 }
 
 /** A function-shaped top-level declaration: `function f()` or `const f = () => …`. */
@@ -445,23 +610,53 @@ export async function analyzeFocusScope(files: string[]): Promise<Map<string, Fo
         continue;
       }
       const readers = new Set<string>();
+      const forwarders = new Map<string, string[]>();
       for (const { name, fn } of topLevelFunctions(sf)) {
-        const arity = ((fn.parameters as AnyNode[] | undefined) ?? []).length;
-        if (arity === 0 && fn.body && readsFocusDirectly(fn.body)) {
+        if (namesItsSubject(fn, sf)) {
+          continue;
+        }
+        if (fn.body && readsFocusDirectly(fn.body)) {
           readers.add(name);
+          continue;
+        }
+        const callees = forwardedCallees(fn);
+        if (callees) {
+          forwarders.set(name, callees);
         }
       }
-      modules.set(file, { importedFrom: importedBindings(sf, file, sources), readers, sf });
+      modules.set(file, {
+        forwarders,
+        importedFrom: importedBindings(sf, file, sources),
+        readers,
+        sf,
+      });
     }
 
     /**
-     * Is a bare `name()` a call to a zero-argument focus reader — here, or in a module this one
+     * Is a bare `name()` a call to a subject-less focus reader — here, or in a module this one
      * imports it from? Cross-module is the case that matters: finding 3 was `frontmatter-panel.ts`
      * calling `head-panel.ts`'s `isPageDocument()`.
      */
     const isFocusReader = (facts: ModuleFacts, name: string): boolean =>
       facts.readers.has(name) ||
       (modules.get(facts.importedFrom.get(name) ?? "")?.readers.has(name) ?? false);
+
+    /*
+     * Promote every transparent forwarder that reaches a reader, then stop. One promotion round is
+     * the whole of blind spot C: a forwarder is a frame of stack rather than a hop of reasoning, so
+     * folding it in does not restart the transitive walk the one-hop brake exists to prevent.
+     */
+    const promoted: [ModuleFacts, string][] = [];
+    for (const facts of modules.values()) {
+      for (const [name, callees] of facts.forwarders) {
+        if (callees.some((callee) => isFocusReader(facts, callee))) {
+          promoted.push([facts, name]);
+        }
+      }
+    }
+    for (const [facts, name] of promoted) {
+      facts.readers.add(name);
+    }
 
     const found = new Map<string, FocusSite[]>();
     for (const [file, facts] of modules) {
@@ -544,10 +739,22 @@ async function filesFor(patterns: string[]): Promise<string[]> {
  * A file that cannot be read counts as zero rather than throwing. The lists below name paths, and a
  * path that has been deleted or renamed should make this guard say "the rule holds here" — a
  * checker that crashes on a stale entry is a checker nobody can run to find out.
+ *
+ * @param {string[]} patterns
+ * @param {RegExp} re
+ * @param {string | undefined} skip One repo-relative path to drop — {@link FOCUS_OWNER}, which is
+ *   excluded by NAME rather than allow-listed for the reason rule 4 excludes it.
  */
-export async function countPerFile(patterns: string[], re: RegExp): Promise<Map<string, number>> {
+export async function countPerFile(
+  patterns: string[],
+  re: RegExp,
+  skip?: string,
+): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
   for (const file of await filesFor(patterns)) {
+    if (skip !== undefined && relative(ROOT, file) === skip) {
+      continue;
+    }
     const text = await Bun.file(file)
       .text()
       .catch(() => "");
@@ -654,6 +861,11 @@ export async function checkPaneSingletons(): Promise<string[]> {
     ALLOWED_ACTIVE_TAB_READS,
     "focused-tab read(s) in stage geometry",
   );
+  const writeFailures = diffAgainstAllowed(
+    await countPerFile(FOCUS_WRITE_SCAN, FOCUS_WRITE_RE, FOCUS_OWNER),
+    ALLOWED_FOCUS_WRITES,
+    "focus move(s) that bypass `focusPane`",
+  );
   const sites = await focusSitesInPaneScope(FOCUS_SCOPE_SCAN);
   const siteCounts = new Map([...sites].map(([file, found]) => [file, found.length]));
   const paneScopeFailures = withFocusDetail(
@@ -664,7 +876,13 @@ export async function checkPaneSingletons(): Promise<string[]> {
     ),
     sites,
   );
-  return [...viewFailures, ...instanceFailures, ...focusFailures, ...paneScopeFailures];
+  return [
+    ...viewFailures,
+    ...instanceFailures,
+    ...focusFailures,
+    ...writeFailures,
+    ...paneScopeFailures,
+  ];
 }
 
 /**
@@ -688,15 +906,17 @@ export function report(failures: string[]): number {
         "   A function handed a `paneId`, a `pane`, a `surface` or a `container` has already been\n" +
         "   told which pane it is about: ask `tabOfPane(paneId)` / `paneOfContainer(container)` /\n" +
         "   `canvasModeOfTab(tab)`, and pass the tab on to `updateUi` / `setCanvasMode`, which\n" +
-        "   take one. A read marked `(one hop)` is reached through a zero-argument helper — give\n" +
-        "   that helper the tab too, at the call site where the pane is still known.",
+        "   take one. A read marked `(one hop)` is reached through a helper whose signature says\n" +
+        "   nothing about which pane or tab it is for — give that helper the tab too, at the call\n" +
+        "   site where the pane is still known. And the focus MOVES only through `focusPane`:\n" +
+        "   assigning `workspace.activePaneId` skips resetTabCycle/promoteMru/syncTreeSelection.",
     );
     return 1;
   }
   console.log(
     "✓ check-pane-singletons: no per-stage state on `view`, no stage-content singletons, " +
-      "stage geometry reaches per-pane state through a surface, and no function handed a " +
-      "pane consults the focus",
+      "stage geometry reaches per-pane state through a surface, no function handed a " +
+      "pane consults the focus, and only `focusPane` moves it",
   );
   return 0;
 }

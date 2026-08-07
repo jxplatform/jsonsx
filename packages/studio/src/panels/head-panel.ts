@@ -1108,7 +1108,7 @@ function renderFrontmatterSection() {
         >
       </div>
       <div class="head-section-body">
-        ${fields.map((f) => renderFmField(f.field, f.entry, f.value, requiredFields))}
+        ${fields.map((f) => renderFmField(tab, f.field, f.entry, f.value, requiredFields))}
       </div>
     </div>
   `;
@@ -1131,13 +1131,27 @@ export function buildHeadDoc(doc: JxMutableNode, fm: Record<string, unknown>): J
  * The panel edits a `JxMutableNode`; a markdown page's head fields are frontmatter keys. This
  * adapts one to the other in the module that owns both, instead of in the Navigator orchestrator
  * that owns neither.
+ *
+ * **`tab` is a parameter for the same reason {@link renderFmField}'s is.** It resolved
+ * `activeTab.value` itself, and the Document Header card calls it for the CONTENT branch of every
+ * mutation it makes — Title, Clear title, the whole SEO block, the Layout picker. The card is drawn
+ * per pane, so on a markdown page the card in one pane retitled the document in the other. The
+ * comment beside the card's JSON branch has claimed since P8 that this was fixed; the fix reached
+ * the JSON branch only, and this is the half that was left.
+ *
+ * @param {Tab | null} tab The document to commit into.
+ * @param {() => void} rerender
+ * @param {(doc: JxMutableNode) => void} fn
  */
-export function applyContentMutation(rerender: () => void, fn: (doc: JxMutableNode) => void): void {
-  const tabNow = activeTab.value;
-  if (!tabNow) {
+export function applyContentMutation(
+  tab: Tab | null,
+  rerender: () => void,
+  fn: (doc: JxMutableNode) => void,
+): void {
+  if (!tab) {
     return;
   }
-  const fmNow = (tabNow.doc.content?.frontmatter ?? {}) as Record<string, unknown>;
+  const fmNow = (tab.doc.content?.frontmatter ?? {}) as Record<string, unknown>;
   const fmHead = fmNow.$head as JxHeadEntry[] | undefined;
   const tmp: JxMutableNode = {
     ...(typeof fmNow.title === "string" ? { title: fmNow.title } : {}),
@@ -1145,11 +1159,11 @@ export function applyContentMutation(rerender: () => void, fn: (doc: JxMutableNo
   };
   fn(tmp);
   if (tmp.title !== fmNow.title) {
-    mutateUpdateFrontmatter(tabNow, "title", tmp.title as JsonValue);
+    mutateUpdateFrontmatter(tab, "title", tmp.title as JsonValue);
   }
   const newHead = tmp.$head && tmp.$head.length > 0 ? tmp.$head : undefined;
   // JxHeadEntry[] is JSON document content by construction.
-  mutateUpdateFrontmatter(tabNow, "$head", newHead as JsonValue);
+  mutateUpdateFrontmatter(tab, "$head", newHead as JsonValue);
   rerender();
 }
 
@@ -1176,8 +1190,11 @@ export function registerPagePanel(): void {
       // Through `deps`, not the local binding: `studio.ts` owns the wiring, and the Navigator has
       // Injected these renderers since before the registry existed.
       return ctx.deps.renderHeadTemplate({
+        // The Navigator's Page panel IS an app-level surface: it shows the focused document by
+        // Definition, so it spells that out at the call site now instead of leaving it to a helper
+        // Two other surfaces share.
         applyMutation: isContent
-          ? (fn) => applyContentMutation(ctx.rerender, fn)
+          ? (fn) => applyContentMutation(activeTab.value, ctx.rerender, fn)
           : (fn) => {
               transact(activeTab.value, fn);
             },

@@ -494,4 +494,52 @@ describe("preview suppresses the editing affordances", () => {
     expect(event.defaultPrevented).toBe(false);
     expect(posts.some((p) => p.kind === "contextMenu")).toBe(false);
   });
+
+  /*
+   * …but the pane still gets the keyboard. The pane grid moves focus on a `pointerdown` anywhere in
+   * a cell, and it cannot see this one: a pointer event inside a cross-origin iframe is delivered
+   * in the frame's own realm. `hit` was the only re-post, and preview posts none — so a Preview
+   * pane could not be focused by clicking the very thing it exists to show.
+   */
+  test("a pointerdown still reports pane focus — and nothing else", () => {
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 0, y: 0 });
+    const posts = startPreview();
+    inner.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+    expect(posts).toEqual([{ kind: "paneFocus" }]);
+  });
+});
+
+// ─── A pointerdown anywhere in the frame is a pane focus ────────────────────────
+
+describe("pane focus is reported from every mode", () => {
+  let stop: (() => void) | undefined;
+  afterEach(() => {
+    stop?.();
+    stop = undefined;
+  });
+
+  test("a pointerdown on empty artboard margin focuses the pane, though no hit follows", () => {
+    const { channel, posts } = fakeChannel();
+    // No `data-jx-path` anywhere on the way up: `nearestHit` answers null and no `hit` is posted,
+    // Which is the second hole — an artboard's own background focused nothing.
+    const bare = document.createElement("div");
+    document.body.append(bare);
+    stop = startInteraction(channel, document);
+
+    bare.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    bare.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(posts).toEqual([{ kind: "paneFocus" }]);
+  });
+
+  test("teardown removes it with the rest", () => {
+    const { channel, posts } = fakeChannel();
+    const bare = document.createElement("div");
+    document.body.append(bare);
+    stop = startInteraction(channel, document);
+    stop();
+    stop = undefined;
+    bare.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    expect(posts).toHaveLength(0);
+  });
 });

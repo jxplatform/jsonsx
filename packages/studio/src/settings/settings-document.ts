@@ -31,7 +31,7 @@ import { optionalStringArg, stringProperty } from "../commands/command-args";
 import { notify } from "../services/notify";
 import { requireProjectState } from "../state";
 import { PROJECT_CONFIG_PATH } from "../tabs/tab";
-import { activeTab, openTab, workspace } from "../workspace/workspace";
+import { activeTab, focusPane, openTab, workspace } from "../workspace/workspace";
 import {
   notifySettingsDocument,
   registerSettingsSection,
@@ -214,7 +214,13 @@ function revealTab(tab: Tab): Tab {
   for (const pane of workspace.panes) {
     if (pane.tabOrder.includes(tab.id)) {
       pane.activeTabId = tab.id;
-      workspace.activePaneId = pane.id;
+      /* `focusPane`, not `workspace.activePaneId = pane.id`. Moving the keyboard is four
+         operations, and the assignment is one of them: the other three are `resetTabCycle` (so
+         Ctrl-Tab cycles from where you now are, not from the pane you left), `promoteMru` (so the
+         MRU order agrees with what is on screen) and `syncTreeSelection` (so the file tree points
+         at the document you are looking at). Reopening Project Settings into the side pane left
+         all three describing the pane it had come from. */
+      focusPane(pane.id);
       break;
     }
   }

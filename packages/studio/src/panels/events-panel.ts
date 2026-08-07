@@ -37,7 +37,7 @@ import {
 import { clickAnythingTo, renderEmptyState, staleSelectionMessage } from "./empty-state";
 import { renderExpressionEditor } from "../ui/expression-editor";
 import { renderStatementEditor } from "./statement-editor";
-import { INSPECTOR_STATEMENTS_REGION } from "../ui/regions";
+import { inspectorStatementsRegion } from "../ui/regions";
 import { livePreviewExpression } from "../services/live-preview";
 import { renderFieldRow, renderStaticKvRow } from "../ui/field-row";
 import { renderDynamicSlot, slotMode, switchSlotMode } from "../ui/dynamic-slot";
@@ -559,10 +559,12 @@ function renderEventsBody(
                               {
                                 allowEventRef: true,
                                 emits: inlineFn.emits ?? [],
-                                // The Inspector's copy. It answered to `navigator/statements`
-                                // Until now, and won the resolution because it comes second in
-                                // Document order.
-                                region: INSPECTOR_STATEMENTS_REGION,
+                                // The Inspector's copy, named by the handler it edits. It answered
+                                // To `navigator/statements` until the docks were split, and then
+                                // To a bare `inspector/statements` — which this `.map` stamps once
+                                // Per structured handler, so two handlers on a node made two
+                                // Elements answer to it and `resolveRegion` took the second.
+                                region: inspectorStatementsRegion(evKey),
                                 stateDefs: Object.keys(defs),
                                 stateEntries: defs,
                               },

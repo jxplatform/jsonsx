@@ -11,7 +11,7 @@
 import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { flush, registerPrimaryStage, resetWorkspaceWithTab, stubRect } from "./harness";
-import { surfaceForPane } from "../src/canvas/surface-registry";
+import { createPaneSurface, surfaceForPane } from "../src/canvas/surface-registry";
 
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 happyDOM.setURL("http://localhost:3000/");
@@ -312,6 +312,59 @@ describe("revealCanvasPath", () => {
     });
     const point = await pending;
     expect(point).toMatchObject({ top: 10 });
+  });
+
+  /*
+   * `hostForPath()` prefers the host rendering the focused tab and FALLS BACK to any ready page
+   * host. The pan that follows defaulted to `activeCanvasSurface()`, so on the fallback the reveal
+   * measured in one pane and scrolled the other — then re-measured a node that had not moved, and
+   * `runInput`'s caret step clicked a point outside the pane. Only the screenshot pipeline reaches
+   * here, which is the whole reason it went unnoticed: nobody watches a shot being taken.
+   */
+  test("the pan lands on the stage the measurement came from, not on the focused one", async () => {
+    const tab = resetWorkspaceWithTab(undefined, { id: "page-focused" });
+    /* A FRESH record for the focused pane. `animatePanBy` eases over 250ms and holds the surface
+       object it was given, so the reveal two tests above is still writing the one it captured —
+       and this assertion is about whether THIS reveal touched the focused pane, not about whether
+       a previous one has finished. */
+    createPaneSurface("primary");
+    registerPrimaryStage();
+    const side = registerPrimaryStage("secondary");
+    const canvasEl = document.createElement("div");
+    side.wrap!.append(canvasEl);
+    // A ready host in the SIDE pane, rendering a DIFFERENT tab — so `hostForPath` takes its
+    // Fallback branch and answers with this host while the keyboard is in the primary.
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl, null, "page-side");
+    const channel = channels.at(-1)!;
+    channel.deliver({ kind: "ready" });
+    channel.deliver({ gen: 1, kind: "renderComplete" });
+    side.panels.push({ canvas: canvasEl, mediaName: "base" } as never);
+    const iframe = canvasEl.querySelector("iframe")!;
+    Object.defineProperty(iframe, "clientWidth", { configurable: true, value: 100 });
+    stubRect(iframe, { height: 100, left: 0, top: 0, width: 100 });
+    stubRect(side.wrap!, { height: 100, left: 0, top: 0, width: 100 });
+    surfaceForPane("primary").panY = 0;
+    side.panY = 0;
+
+    const pending = revealCanvasPath(["children", 0]);
+    await flush(1);
+    const first = channel.posts.at(-1)!;
+    channel.deliver({
+      hits: [{ path: ["children", 0], rect: { height: 10, width: 10, x: 0, y: 40 } }],
+      kind: "geometry",
+      reqId: first.reqId,
+    });
+    await flush(4);
+    console.log(
+      `[canvas-idle] reveal in the SIDE pane (focus=${tab.id}): ` +
+        `side.panY=${side.panY} primary.panY=${surfaceForPane("primary").panY}`,
+    );
+    expect(side.panY).not.toBe(0);
+    expect(surfaceForPane("primary").panY).toBe(0);
+    const second = channel.posts.at(-1)!;
+    channel.deliver({ hits: [], kind: "geometry", reqId: second.reqId });
+    await pending;
+    side.panels.length = 0;
   });
 
   test("a path that cannot be measured is not panned to", async () => {
