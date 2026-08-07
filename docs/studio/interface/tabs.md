@@ -82,14 +82,15 @@ The new one carries a small **↳** marker, and hovering it names the document y
 
 ## Two panes
 
-:kbd[⌘\] gives the open document a **second pane**, on an editor that pane can host — **Code**, **Grid**, **Diff**, **Entry**, **Library** or **Project Styles** — so reading a page's source, its fields, its data or its diff is one keystroke away from the page itself.
+:kbd[⌘\] puts the open document in a **second pane** beside the first. Both are real: each has its own strip of documents, its own jump bar, its own context bar and its own editing surface, and either can be a live canvas. Watch the JSON while you edit visually, keep a layout on screen while you edit the page it wraps, or put the same page at two breakpoints side by side.
 
-**The canvas belongs to the main pane.** A document with nothing but a canvas to offer can't be split at all — **Split Right** is unavailable, and it says which editors it would need. In the side pane, the context bar's **Editor** control lists only the editors that pane can host and draws no **Edit │ Design │ Preview** group, so it never offers a view that would be refused.
+**Any document can be split.** The tab moves across as it is — a page you were designing arrives still in Design, rather than reopening as Code — and the side pane offers every editor and every view the document supports.
 
-- :kbd[⌘⌥0] focuses the side pane; **Focus Primary Pane** in the palette goes back. The strip, the jump bar, the context bar and the editing surface all follow the focused pane.
+- **Drag the divider** to change the split. Double-click it to go back to even; the ratio is remembered with the rest of your layout.
+- **Click into a pane to work in it.** The Inspector, the Outline, the block action bar and every keyboard shortcut follow the pane you last clicked in — its canvas, its bars, its editor, anywhere. :kbd[⌘⌥0] focuses the side pane without the mouse, and **Focus Primary Pane** in the palette goes back.
 - **Unsplit** collapses the split. Closing a pane never closes documents — they move back into the pane that remains, and a pane you empty collapses on its own rather than standing there with nothing in it.
 
-The focused pane is the one the Inspector, the Outline and the keyboard are pointed at.
+The two panes are independent in everything a document owns: each keeps its own view, breakpoint, colour scheme, zoom and selection, and editing in one leaves the other exactly as it was.
 
 ## The jump bar
 

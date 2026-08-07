@@ -32,7 +32,7 @@ The labelled rail on the far left, and the panel it opens beside it. The rail is
 
 ## The panes and the canvas
 
-The center of the window holds one editor pane — or two, when :kbd[⌘\] gives the open document a pane of its own for reading its source, its diff or its data. A pane renders your page or component live, exactly as it will look in production, and you select, edit and rearrange elements directly on it — see **[The canvas](/docs/studio/interface/canvas)**, **[Edit mode](/docs/studio/editing)** and **[Design mode](/docs/studio/design)**.
+The center of the window holds one editor pane — or two side by side, when :kbd[⌘\] gives the open document a pane of its own, so you can keep a page on screen while you work on its source, its layout or the same page at another size. A pane renders your page or component live, exactly as it will look in production, and you select, edit and rearrange elements directly on it — see **[The canvas](/docs/studio/interface/canvas)**, **[Edit mode](/docs/studio/editing)** and **[Design mode](/docs/studio/design)**.
 
 Above the pane sits its strip of open documents, then the **[jump bar](/docs/studio/interface#the-jump-bar)** — `◈ project › file › element`, every segment a button, so you always know where you are and can step anywhere along the chain. Under those, a context bar states which **Editor** is open on the file, which **View** of the canvas — **Edit**, **Design** or **Preview** — and the **Context** it's being rendered in. Details in **[Documents and panes](/docs/studio/interface/tabs)** and **[Modes and views](/docs/studio/interface/modes)**.
 

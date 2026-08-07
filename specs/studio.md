@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.8.0-draft
+**Version:** 0.9.0-draft
 **Status:** Partial
 **Updated:** 2026-08-07
 **License:** MIT
@@ -1582,20 +1582,23 @@ inline (§16), rather than writing and hoping.
 
 ## 18. Panes
 
-**Status:** Partial — the pane model, per-pane canvas state, the jump bar and the dock takeovers
-ship. A second _live Canvas_ does not: the shell has one stage, and §18.2 says what that costs.
+**Status:** Implemented — the pane grid, two live Canvas panes, per-pane canvas state, the jump bar
+and the dock takeovers. Derived panes (§18.4) are the part that has not shipped.
 
 ### 18.1 A pane is where a document is shown
 
 Two panes at most, and the cap is enforced in code rather than by convention — `splitRight` is the
-only pane creator and refuses past the maximum. The primary keeps the Canvas; the side pane takes a
-capped set of editor kinds.
+only pane creator and refuses past the maximum. **Both panes draw a live Canvas**, and a split is a
+move: the tab crosses as it is.
 
-**The cap is one predicate, asked everywhere.** It was once enforced at the split alone while
-claiming to be enforced in one place, so a tab already in the side pane could be switched back to
-Canvas from the context bar and the cap it existed to enforce was simply absent. The split, the
-mode-setting command, the programmatic setter and the Editor dropdown now all ask the same
-question — and the dropdown asks it in order to not draw a control that would be refused.
+**There is one cap now, and it is on the number of panes.** A second cap used to sit beside it,
+naming the editor kinds a pane other than the primary could host — Code, Diff, Config, Entry, Grid,
+Library, the cheap ones — because a second live host was unaffordable while the shell had one stage
+to hand between panes and one app-wide render generation to invalidate. Neither is true any longer,
+so the kind cap has nothing left to protect and every predicate that read it is deleted, including
+the one that flipped a splitting Design tab to Code on its way across. `MAX_PANES` stays at two
+because two is a measured budget, not a placeholder: each host is a real `@jxsuite/runtime` render,
+an `iframe-channel` connection and a structured clone, all on one main thread.
 
 Three rules govern the lifecycle, and each of them was a defect first:
 
@@ -1634,35 +1637,58 @@ resolved data scope to whichever document happened to be focused. With one stage
 With two it is a data bug, so the resolution is by host everywhere, including the artboard header
 that lives on the parent side.
 
-### 18.3 One stage, and the surfaces that follow it
+### 18.3 The grid draws a cell per pane
 
-Until a second host exists, the shell has one stage and it is **handed between panes**: taking it
-releases the losing pane's mounted artboards and their reactive scopes, and taking it schedules a
-render, because nothing else will — both render effects key on the active tab, and a handover
-changes the pane without changing the tab.
+There is no stage handover. The shell used to own one of each pane-scoped surface — one tab strip,
+one jump bar, one context bar, one stage — as flat rows of the **application** grid, which is to say
+application rows that only ever described the primary pane, handed to whichever pane took focus. The
+pane grid draws **one cell per pane**, each holding that pane's own four surfaces, and every pane
+registers its own canvas surface when its cell is built and releases it when the cell is disposed.
+Nothing changes hands, so no pane is ever left describing DOM it does not own.
 
-A surface that caches "am I mounted?" in a module outlives the DOM it mounted into. Every such fast
-path must also ask whether the mode changed, or it returns on the strength of an editor whose
+**The grid is a keyed template, and the key is load-bearing.** A cell is identified by its pane id,
+so an unchanged cell's DOM is moved rather than rebuilt. That is not a preference: re-parenting an
+`<iframe>` reloads it, dropping its channel, its document and every acknowledged panel. Expressing
+the reconciler declaratively turns a rule the previous imperative version could only ask for in a
+comment into a property of the rendering.
+
+**A split is a side-by-side.** Two documents, both live, both editable, each with its own strip,
+address, context bar and stage, and a splitter between them whose ratio is layout state. Every
+string a reader sees may now say so — and the converse obligation held for as long as it was false,
+which is why `pane.splitRight` spent a release refusing to promise "beside the canvas".
+
+**Clicking into a pane focuses it.** For most of this section's life `focusPane` had exactly one
+call site — the tab strip — so a click on a pane's canvas, its context bar or its editor left the
+keyboard in the other pane, and the unfocused pane was not a rare state but the state you were in
+the moment you clicked into one. A cell focuses its pane on pointerdown; a frame reports the same
+through the protocol, because a click inside a cross-origin document does not reach the parent.
+
+**Nothing drawn for a pane may resolve the focus.** This is the rule the whole section reduces to,
+and it was violated in every module that had been written when there was one stage — the Document
+Header card mutating the focused document, the zoom axis writing the focused tab's scale, a render
+posting the focused tab's colour scheme into whichever pane it was drawing, a host asking the focus
+whether to restore a caret it owed. Each was correct while "the focused pane" and "this pane" named
+the same thing. `scripts/check-pane-singletons.ts` enforces it: a function whose parameters name a
+pane may not read the focus in its body, one hop into a helper that does not name its own subject.
+A rule over a list of field names could not see any of this, which is why it parses.
+
+**A surface that caches "am I mounted?" in a module outlives the DOM it mounted into.** Every such
+fast path must also ask whether the mode changed, or it returns on the strength of an editor whose
 container was thrown away one frame earlier.
 
-The single tab strip follows the same rule as the stage: the pane that holds it draws, and the
-focused pane wins. One strip, one stage, both showing the pane you are in.
+### 18.4 Derived panes
 
-**A split is therefore not a side-by-side, and nothing may say that it is.** The side pane is a
-second place to _be_, reached with `⌘⌥0`; it is not a second thing on screen. Every string a reader
-sees must hold to that — a `requires` sentence is printed verbatim in refusals, tooltips and palette
-rows, and `pane.splitRight` promised "beside the canvas" in all three.
-
-**There is no pane zoom until there is a grid to zoom.** The state and its two commands existed,
-both wrote it, and nothing that draws ever read it: with one stage the focused pane already fills
-the shell, so a "zoom" toggle's only observable effect was on itself. It returns with the second
-live host and not one release earlier — a control that does nothing is worse than an absent one,
-because the absent one does not teach the reader that the app ignores them.
+**Status:** Not built. A derived pane shows a **projection of another pane's document** rather than
+a document of its own — its Code, its layout, the component definition under the selection, its diff
+against HEAD, or the same page at another breakpoint — and follows the pane it derives from until it
+is pinned, at which point it becomes an ordinary tab. The pane model, the grid and the second live
+host are all in place; what is missing is the derivation and the preset menu that offers it.
 
 ---
 
 ## Changelog
 
+- **0.9.0-draft** (2026-08-07) — §18 Panes rewritten for two live panes — the grid draws a keyed cell per pane and the stage handover is deleted; the editor-kind cap on the side pane is gone and a split is a real side-by-side; clicking into a pane focuses it; nothing drawn for a pane may resolve the focus, enforced by check-pane-singletons; §18.4 derived panes named as not built.
 - **0.8.0-draft** (2026-08-07) — Sub-documents withdrawn (§14.3) — the stack had no push, so nothing could enter it; §14.7 closing over unsaved work, and §4.2 source is batched so every exit settles first; the Bottom dock is three tabs and Diff is a pane editor kind (§16.3); §18 Panes — the two-pane cap as one predicate, one stage handed between panes, and no pane zoom until there is a grid to zoom.
 - **0.7.0-draft** (2026-08-06) — §18 Panes — the two-pane cap as one predicate, the three lifecycle rules each defect taught, what a second pane costs and what no fan-out removes, and the single stage handed between panes.
 - **0.6.0-draft** (2026-08-05) — §7 Stylebook becomes Project Styles (name only — "stylebook" stays the wire value) and §17 Project Documents: project.json as a Tab under the transaction log, one write chokepoint, a no-op edit that writes nothing, and the collab exclusion.
@@ -1717,4 +1743,4 @@ because the absent one does not teach the reader that the app ignores them.
 
 ---
 
-_`@jxsuite/studio` Specification v0.8.0-draft_
+_`@jxsuite/studio` Specification v0.9.0-draft_

@@ -14,7 +14,7 @@ code:
 
 The Library is your project seen whole: every page, layout, component, content entry and asset, in one place, with live previews. Press :kbd[⌘K] and run **Open Library** — or pick it from the **⬢ menu** in the Command Bar.
 
-It opens as a document tab like any other, which is the useful part. It sits in the strip beside the page you were working on, one click away for the rest of the session, and :kbd[⌘\] moves it into a second pane so you can browse the project with a page still on screen.
+It opens as a document tab like any other, which is the useful part. It sits in the strip beside the page you were working on, one click away for the rest of the session, and :kbd[⌘\] moves it into a second pane so you can browse the project with a page still live beside it.
 
 ![The Library open in a Studio pane, listing a project's pages and components as cards with live previews](../../images/mode-manage.png)
 

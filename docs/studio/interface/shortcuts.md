@@ -41,6 +41,7 @@ Every row is also a command: press :kbd[⌘K] and type the name to run it withou
 | `⌘,`    | `Ctrl+,`         | Preferences…           | `app.preferences`            |
 | `⌘.`    | `Ctrl+.`         | Zen Mode               | `view.zen`                   |
 | `⌘\`    | `Ctrl+\`         | Split Right            | `pane.splitRight`            |
+| `⌘0`    | `Ctrl+0`         | Focus Primary Pane     | `pane.focusPrimary`          |
 | `⌘1`    | `Ctrl+1`         | Show Files             | `panel.focus.files`          |
 | `⌘2`    | `Ctrl+2`         | Show Search            | `panel.focus.search`         |
 | `⌘3`    | `Ctrl+3`         | Show Source Control    | `panel.focus.git`            |
