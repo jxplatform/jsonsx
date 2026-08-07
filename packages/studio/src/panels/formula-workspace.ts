@@ -133,8 +133,12 @@ export function revealLogicPanel(): void {
  * @param {LogicTarget} target The surface to show and what it should be pointed at.
  */
 export function openLogicTarget(target: LogicTarget): void {
-  updateUi("editingFunction", target.surface === "function" ? target.editing : null);
-  updateUi("editingFormula", target.surface === "formula" ? target.editing : null);
+  updateUi(
+    activeTab.value,
+    "editingFunction",
+    target.surface === "function" ? target.editing : null,
+  );
+  updateUi(activeTab.value, "editingFormula", target.surface === "formula" ? target.editing : null);
   revealLogicPanel();
 }
 
@@ -215,7 +219,7 @@ function writeRoot(tab: Tab, editing: FormulaEditDef, newRoot: unknown) {
 
 /** Close the workspace — clears `editingFormula`; the Logic tab leaves the strip with it. */
 export function closeFormulaWorkspace() {
-  updateUi("editingFormula", null);
+  updateUi(activeTab.value, "editingFormula", null);
 }
 
 // ─── The Logic tab ───────────────────────────────────────────────────────────

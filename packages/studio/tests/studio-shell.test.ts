@@ -345,6 +345,19 @@ function openShellTab(doc?: Record<string, unknown>, opts: Record<string, unknow
   });
 }
 
+/** Two multi-mode tabs, so a `splitRight()` puts one in each pane. `[primary, secondary]`. */
+function openTwoShellTabs(): [Tab, Tab] {
+  const modes = ["edit", "design", "source", "git-diff"];
+  const home = openShellTab(undefined, { capabilities: { modes } });
+  const away = openTab({
+    capabilities: { modes },
+    document: { children: [{ tagName: "p", textContent: "Away" }], tagName: "div" },
+    documentPath: "pages/away.json",
+    id: "shell-tab-away",
+  });
+  return [home, away];
+}
+
 beforeEach(() => {
   closeAllTabs();
   resetStudioState();
@@ -390,23 +403,61 @@ describe("canvas mode", () => {
     expect(toolbarCtx.getCanvasMode()).toBe("design");
   });
 
-  test("setCanvasMode writes through to the active tab session", () => {
+  test("setCanvasMode writes through to the tab it is GIVEN", () => {
     const tab = openShellTab();
-    toolbarCtx.setCanvasMode("code");
+    toolbarCtx.setCanvasMode(tab, "code");
     expect(tab.session.ui.canvasMode).toBe("code");
     expect(toolbarCtx.getCanvasMode()).toBe("code");
   });
 
+  test("setCanvasMode writes the UNFOCUSED pane's tab when that is the tab it is handed", () => {
+    /* The signature IS the fix. It used to take only a mode and open with `activeTab.value`, so
+       every caller wrote whichever pane had focus — and the pane context bar, drawn once per pane
+       from `tabOfPane(paneId)`, is a caller. Clicking "Code" in the SIDE pane's Editor picker moved
+       the PRIMARY's document into the Code editor and left the side pane drawing Design. */
+    const [home, away] = openTwoShellTabs();
+    splitRight();
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+    expect(paneById(SECONDARY_PANE)!.activeTabId).toBe(away.id);
+
+    // The tab in the pane the keyboard is NOT in.
+    toolbarCtx.setCanvasMode(home, "source");
+
+    expect(home.session.ui.canvasMode).toBe("source");
+    expect(away.session.ui.canvasMode).not.toBe("source");
+    // And the focused pane's own read is untouched — the two answers are allowed to differ now.
+    expect(toolbarCtx.getCanvasMode()).toBe(away.session.ui.canvasMode);
+  });
+
   test("setCanvasMode is a no-op without a tab", () => {
-    expect(() => toolbarCtx.setCanvasMode("code")).not.toThrow();
+    expect(() => toolbarCtx.setCanvasMode(null, "code")).not.toThrow();
   });
 
   test("leaving git-diff mode clears gitDiffState", () => {
-    openShellTab();
-    toolbarCtx.setCanvasMode("git-diff");
+    const tab = openShellTab();
+    toolbarCtx.setCanvasMode(tab, "git-diff");
     canvasRenderCtx.setGitDiffState({ path: "a.json" });
     expect(canvasRenderCtx.gitDiffState).toEqual({ path: "a.json" });
-    toolbarCtx.setCanvasMode("design");
+    toolbarCtx.setCanvasMode(tab, "design");
+    expect(canvasRenderCtx.gitDiffState).toBeNull();
+  });
+
+  test("the git-diff check reads the TAB being moved, not the focused pane", () => {
+    /* `if (getCanvasMode() === "git-diff")` asked the focused pane. So moving the PRIMARY's tab out
+       of some other mode, while the side pane sat in git-diff, threw away the diff the side pane
+       was still drawing — and moving the side pane's tab out of git-diff while the primary was in
+       Design left `shell.git.diffState` alive with nothing showing it. */
+    const [home, away] = openTwoShellTabs();
+    splitRight();
+    toolbarCtx.setCanvasMode(away, "git-diff");
+    canvasRenderCtx.setGitDiffState({ path: "side.json" });
+
+    // The PRIMARY's tab moves. It was never in git-diff, so the side pane's diff must survive.
+    toolbarCtx.setCanvasMode(home, "design");
+    expect(canvasRenderCtx.gitDiffState).toEqual({ path: "side.json" });
+
+    // The tab that IS in git-diff moving out of it is what clears it.
+    toolbarCtx.setCanvasMode(away, "design");
     expect(canvasRenderCtx.gitDiffState).toBeNull();
   });
 
@@ -427,18 +478,18 @@ describe("canvas mode", () => {
     expect(workspace.activePaneId).toBe(SECONDARY_PANE);
     // The split moved it AS IT WAS — no rewrite of the mode on the way over.
     expect(tab.session.ui.canvasMode).toBe(before);
-    toolbarCtx.setCanvasMode("design");
+    toolbarCtx.setCanvasMode(tab, "design");
     expect(tab.session.ui.canvasMode).toBe("design");
     // And the same call still goes through back in the primary.
     closePane(SECONDARY_PANE);
-    toolbarCtx.setCanvasMode("source");
+    toolbarCtx.setCanvasMode(tab, "source");
     expect(tab.session.ui.canvasMode).toBe("source");
   });
 
   test("entering git-diff mode preserves gitDiffState", () => {
-    openShellTab();
+    const tab = openShellTab();
     canvasRenderCtx.setGitDiffState({ path: "b.json" });
-    toolbarCtx.setCanvasMode("git-diff");
+    toolbarCtx.setCanvasMode(tab, "git-diff");
     expect(canvasRenderCtx.gitDiffState).toEqual({ path: "b.json" });
     canvasRenderCtx.setGitDiffState(null);
   });
@@ -1010,16 +1061,16 @@ describe("wiring arrows", () => {
   });
 
   test("block action bar ctx shares the same canvas mode source", () => {
-    openShellTab();
-    toolbarCtx.setCanvasMode("content");
+    const tab = openShellTab();
+    toolbarCtx.setCanvasMode(tab, "content");
     expect(blockBarCtx.getCanvasMode()).toBe("content");
   });
 });
 
 describe("shortcuts context", () => {
   test("exposes live canvas state and pan setter, for the STAGE it was asked about", () => {
-    openShellTab();
-    toolbarCtx.setCanvasMode("design");
+    const tab = openShellTab();
+    toolbarCtx.setCanvasMode(tab, "design");
     // The reader takes a surface: the pan offsets and the mode it reports are that pane's, not
     // Whichever pane the keyboard happens to be in.
     const ctx = shortcutsGet!(surfaceForPane("primary"));

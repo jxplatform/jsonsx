@@ -54,7 +54,12 @@ import {
   renderOverlays,
   scheduleCanvasRender,
 } from "./canvas/canvas-render";
-import { canvasModeOfPane, surfaceForPane, tabOfPane } from "./canvas/canvas-surface";
+import {
+  canvasModeOfPane,
+  canvasModeOfTab,
+  surfaceForPane,
+  tabOfPane,
+} from "./canvas/canvas-surface";
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
 import {
   commitActiveEditSession,
@@ -204,6 +209,7 @@ import { registerRedirectsCommands } from "./grid/redirects-grid";
 import { registerContentCommands } from "./content/entry-commands";
 import { convertToComponent } from "./editor/convert-to-component";
 import type { GitDiffState } from "./types";
+import type { Tab } from "./tabs/tab";
 import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
 
 void _swc;
@@ -216,26 +222,45 @@ void _swc;
 // An edit/design base) lives in `canvas/canvas-surface.ts`, beside the panes, because the answer is
 // A property of a pane's tab and every other pane has its own — this is just the focused one, which
 // Is what a panel drawn once for the whole shell means by "the canvas mode".
+//
+// It is a READ, and it is injected only into surfaces the shell draws once: the toolbar, the
+// Inspector, the block bar, the overlays, the live-render context and the canvas view commands.
+// `panels/pane-context.ts` used to take it too and is the reason this comment exists — a bar drawn
+// Once per pane asking "what mode is the canvas in" got the answer for a pane it was not drawing,
+// So the Export button appeared in BOTH bars the moment either pane entered Code. A pane-scoped
+// Caller asks `canvasModeOfPane(paneId)` or `canvasModeOfTab(tab)`, and
+// `scripts/check-pane-singletons.ts`'s fourth rule is what says so mechanically.
 function getCanvasMode() {
   return canvasModeOfPane(workspace.activePaneId);
 }
 
 /**
- * Write the focused pane's BASE canvas mode.
+ * Write a tab's BASE canvas mode. **The only writer, and it cannot find a tab on its own.**
+ *
+ * It used to open with `const tab = activeTab.value` and every injected `setCanvasMode` was `(mode:
+ * string) => void`, which is how the pane context bar's Editor picker — drawn per pane, from
+ * `tabOfPane(paneId)` — moved the FOCUSED pane's tab into Code: click "Code" in the side bar and
+ * the primary became a Code editor while the side pane went on drawing Design. There is no
+ * zero-argument variant anywhere in the graph now; a caller drawn once for the shell passes
+ * `activeTab.value` where a reviewer can see it, and a caller drawn for a pane passes that pane's
+ * tab.
  *
  * No pane check. It used to refuse a mode the tab's pane could not host, because the side pane was
  * capped to the cheap editor kinds and a cap enforced only at the split is one a context-bar click
  * walks straight back out of. Both panes host every kind, so the only thing that can refuse a mode
  * is the document not declaring it — which `canvas.setMode` checks by name.
  *
+ * @param {Tab | null} tab — the tab to move. `null` is a no-op.
  * @param {string} mode
  */
-function setCanvasMode(mode: string) {
-  const tab = activeTab.value;
+function setCanvasMode(tab: Tab | null, mode: string) {
   if (!tab) {
     return;
   }
-  if (getCanvasMode() === "git-diff" && mode !== "git-diff") {
+  /* THIS tab's mode, not the focused pane's. `getCanvasMode()` here meant that leaving git-diff in
+     the side pane kept `shell.git.diffState` alive whenever the primary was in some other mode —
+     and, worse, that changing the PRIMARY's mode cleared the diff the side pane was still showing. */
+  if (canvasModeOfTab(tab) === "git-diff" && mode !== "git-diff") {
     shell.git.diffState = null;
   }
   tab.session.ui.canvasMode = mode;
@@ -350,7 +375,7 @@ tabStrip.mount(primaryCell?.strip ?? document.createElement("div"));
 
 paneContext.mount(primaryCell?.chrome ?? document.createElement("div"), {
   exportFile,
-  getCanvasMode,
+  // No `getCanvasMode`: the bar is drawn once per pane and asks its own pane. See `PaneContextCtx`.
   parseMediaEntries,
   setCanvasMode,
 });
@@ -389,7 +414,7 @@ setStylebookHitHandler((tag, media) => {
     selectStylebookTag(tag, media);
   } else {
     shell.stylebook.selection = null;
-    updateSession({ ui: { activeSelector: null } });
+    updateSession(activeTab.value, { ui: { activeSelector: null } });
   }
 });
 // Commit-on-parent-click: a pointerdown in PARENT chrome outside the edit-session chrome (format

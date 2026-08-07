@@ -63,7 +63,7 @@ export interface ToolbarCtx {
   openFile?: (path: string) => void;
   saveFile?: () => void;
   getCanvasMode?: () => string;
-  setCanvasMode?: (mode: string) => void;
+  setCanvasMode?: (tab: Tab | null, mode: string) => void;
   renderCanvas?: () => void;
   safeRenderRightPanel?: () => void;
   openRecentProject?: (root: string) => Promise<void>;

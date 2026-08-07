@@ -342,6 +342,55 @@ describe("collapsing", () => {
     expect(workspace.panes.length).toBe(1);
   });
 
+  test("closePane(PRIMARY) while SPLIT collapses the side pane instead of the primary", () => {
+    /* The guard used to live in `collapseEmptiedPane`, one layer up, and both of `closePane`'s
+       callers happened to be careful — so the exported function was reachable and unguarded. It
+       produced `panes = ["secondary"]`: `resolveRegion("pane")` canonicalises onto `pane.primary`
+       and answered null, nine shots lost their subject, and `splitRight` then computed
+       `targetId = existing?.id ?? SECONDARY_PANE` with no check that the id was free and pushed a
+       SECOND record under "secondary" — a duplicate key in lit's `repeat`, which is undefined
+       behaviour. The rule belongs where the removal happens. */
+    open("a");
+    open("b");
+    splitRight();
+    expect(workspace.panes.map((p) => p.id)).toEqual([PRIMARY_PANE, SECONDARY_PANE]);
+
+    closePane(PRIMARY_PANE);
+
+    expect(workspace.panes.map((p) => p.id)).toEqual([PRIMARY_PANE]);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    // Both documents are still open, in the pane that stayed.
+    expect(paneById(PRIMARY_PANE)!.tabOrder.toSorted()).toEqual(["a", "b"]);
+    expect(workspace.tabs.size).toBe(2);
+  });
+
+  test("a split after that mints no duplicate pane id — the `repeat` key stays unique", () => {
+    open("a");
+    open("b");
+    splitRight();
+    closePane(PRIMARY_PANE);
+    splitRight();
+    const ids = workspace.panes.map((p) => p.id);
+    expect(ids).toEqual([PRIMARY_PANE, SECONDARY_PANE]);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  test("a pane id is unique by construction — splitting twice adds no second record", () => {
+    /* `addPane` used to push unconditionally. Nothing in `src/` could reach it twice for one id
+       once the primary stopped leaving, but "unreachable today" is not the same property as
+       "cannot happen", and the cost of getting it wrong is two cells drawn for one pane, each
+       `ref` callback overwriting the other's surface record. */
+    open("a");
+    open("b");
+    splitRight();
+    const sideBefore = paneById(SECONDARY_PANE);
+    focusPane(PRIMARY_PANE);
+    splitRight();
+    expect(workspace.panes.map((p) => p.id)).toEqual([PRIMARY_PANE, SECONDARY_PANE]);
+    // The SAME record, not a fresh one pushed under the same key.
+    expect(paneById(SECONDARY_PANE)).toBe(sideBefore);
+  });
+
   test("unsplitting from the PRIMARY leaves the primary showing its own document", () => {
     /* `survivor.activeTabId = pane.activeTabId ?? survivor.activeTabId` was unconditional, and
        `pane.unsplit` closes the SIDE pane whichever pane is focused — so unsplitting while looking

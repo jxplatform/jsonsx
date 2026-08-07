@@ -647,7 +647,9 @@ describe("file rows", () => {
     const modes: string[] = [];
     const diffs: any[] = [];
     const div = renderPanel({
-      setCanvasMode: (m: string) => modes.push(m),
+      // The Source Control panel is drawn ONCE for the shell, so it passes `activeTab.value` — the
+      // Mode it writes is the focused pane's, which is what "show me this diff" means from here.
+      setCanvasMode: (_tab: unknown, m: string) => modes.push(m),
       setGitDiffState: (s: any) => diffs.push(s),
     });
     click(div.querySelector('.git-file-name[title="src/page.json"]'));

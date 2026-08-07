@@ -20,6 +20,7 @@ import { live } from "lit-html/directives/live.js";
 
 import { projectState, updateSession } from "../store";
 import type { CanvasSurface } from "../canvas/canvas-surface";
+import { tabOfPane } from "../canvas/canvas-surface";
 import { activeTab } from "../workspace/workspace";
 import { shell } from "../shell";
 import { componentRegistry } from "../files/components";
@@ -63,7 +64,12 @@ export { default as stylebookMeta } from "../../data/stylebook-meta.json";
  */
 export function renderStylebookMode(surface: CanvasSurface, ctx: StylebookCtx) {
   const canvasWrap = surface.wrap;
-  const tab = activeTab.value;
+  /* THIS stage's tab. It was `activeTab.value` — the focused pane's — so a Stylebook drawn in the
+     unfocused pane took its `$media` breakpoints from whatever document the keyboard was in, and
+     rebuilt its specimen columns at the other document's widths. Found by the fourth rule in
+     `scripts/check-pane-singletons.ts`, which is the whole reason that rule is per-FUNCTION: this
+     module is not a singleton and its other focus read is legitimate. */
+  const tab = tabOfPane(surface.paneId);
   const filter = shell.stylebook.filter.toLowerCase();
   const { customizedOnly } = shell.stylebook;
 
@@ -210,7 +216,7 @@ export function renderStylebookMode(surface: CanvasSurface, ctx: StylebookCtx) {
  */
 export function selectStylebookTag(tag: string, media?: string | null, { panCanvas = false } = {}) {
   shell.stylebook.selection = tag;
-  updateSession({
+  updateSession(activeTab.value, {
     // The ROOT path, not an empty selection: stylebook mode has always parked the selection on the
     // Document element while the Style tab edits a TAG, and widening the field to a list changed
     // Which literal spells that — `[[]]` is one selected path, the root — not what it means.

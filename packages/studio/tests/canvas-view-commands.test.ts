@@ -22,6 +22,7 @@ import {
   workspace,
 } from "../src/workspace/workspace";
 import type { CommandContext } from "../src/commands/context";
+import type { Tab } from "../src/tabs/tab";
 import type { CommandRegistry } from "../src/commands/registry";
 import { surfaceForPane } from "../src/canvas/surface-registry";
 
@@ -128,9 +129,12 @@ const { registerSelectionSetCommand, selectionCommands } =
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 let canvasMode = "design";
-const setCanvasMode = mock((mode: string) => {
+/* Takes the TAB the command resolved, and writes into that one. The double used to take only a
+   mode and resolve `activeTab.value` itself, which is precisely the conflation the injected
+   `setCanvasMode` no longer permits: a double that finds its own target cannot tell "the right
+   document changed" from "some document changed". */
+const setCanvasMode = mock((tab: Tab | null, mode: string) => {
   canvasMode = mode;
-  const tab = activeTab.value;
   if (tab) {
     tab.session.ui.canvasMode = mode;
   }
@@ -198,7 +202,7 @@ describe("the records themselves", () => {
 describe("canvas.setMode", () => {
   test("sets the base mode and leaves preview off", () => {
     void registry.run("canvas.setMode", { mode: "edit" });
-    expect(setCanvasMode).toHaveBeenCalledWith("edit");
+    expect(setCanvasMode).toHaveBeenCalledWith(activeTab.value, "edit");
     expect(activeTab.value?.session.ui.preview).toBe(false);
   });
 
@@ -263,9 +267,9 @@ describe("canvas.setMode", () => {
     splitRight();
     expect(workspace.activePaneId).toBe(SECONDARY_PANE);
     void registry.run("canvas.setMode", { mode: "design" });
-    expect(setCanvasMode).toHaveBeenCalledWith("design");
+    expect(setCanvasMode).toHaveBeenCalledWith(activeTab.value, "design");
     void registry.run("canvas.setMode", { mode: "source" });
-    expect(setCanvasMode).toHaveBeenCalledWith("source");
+    expect(setCanvasMode).toHaveBeenCalledWith(activeTab.value, "source");
   });
 });
 

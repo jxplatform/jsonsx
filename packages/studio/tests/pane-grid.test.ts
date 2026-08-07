@@ -216,19 +216,27 @@ describe("the second cell", () => {
     expect(surfaceForPane(SECONDARY_PANE).wrap).not.toBe(cellForPane(PRIMARY_PANE)!.stage);
   });
 
-  test("every region id in a split grid resolves to exactly ONE element", async () => {
+  test("the four ids THIS module stamps resolve to exactly ONE element each", async () => {
     /* Uniqueness is the load-bearing invariant of the whole family: `resolveRegion` takes the LAST
        match, so two elements carrying `pane.primary` is not an error — it is a silently wrong
-       answer, and the sixty shots that crop `pane.primary`, `pane.primary/tabs` and
-       `pane.primary/context` would photograph the SIDE pane without anything going red. */
+       answer, and the sixty shots that crop `pane.primary` and `pane.primary/tabs` would
+       photograph the SIDE pane without anything going red.
+
+       Scoped to what this module emits, and named rather than swept. The sweep used to run over
+       `listRegions()` on a bare `#pane-grid` and its comment cited `pane.primary/context` — an id
+       that is never in this DOM, because `panels/pane-context.ts` is not mounted here. A sweep is
+       only as strong as the renderers standing in the document, and the version of it that mounts
+       every pane-scoped renderer at once lives in `pane-regions.test.ts`. */
     await split();
-    const ambiguous = listRegions().filter(
-      (id) => !id.startsWith("overlay") && resolveAllRegions(id).length !== 1,
-    );
-    expect(ambiguous).toEqual([]);
-    // Not passing by drawing nothing: both panes really are addressable.
-    expect(listRegions()).toContain("pane.primary");
-    expect(listRegions()).toContain("pane.secondary");
+    const stamped = ["pane.primary", "pane.secondary", "pane.primary/tabs", "pane.secondary/tabs"];
+    for (const id of stamped) {
+      expect(resolveAllRegions(id)).toHaveLength(1);
+      expect(listRegions()).toContain(id);
+    }
+    // And nothing else in this DOM is ambiguous either.
+    expect(
+      listRegions().filter((id) => !id.startsWith("overlay") && resolveAllRegions(id).length !== 1),
+    ).toEqual([]);
   });
 
   test("`pane.primary` still names the PRIMARY cell's stage, which is why no shot moved", async () => {

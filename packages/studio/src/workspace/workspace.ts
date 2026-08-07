@@ -236,12 +236,19 @@ export function splitRight(): Pane | null {
   if (!existing && workspace.panes.length >= MAX_PANES) {
     return null;
   }
-  const targetId = existing?.id ?? SECONDARY_PANE;
   /* The tab moves AS IT IS. `capToPaneKind` used to run here and rewrite `session.ui.canvasMode`
      when the target pane could not host the tab's kind — which, for a Design tab, meant `⌘\`
      silently reopened your page as Code in the pane you had just made. Both panes host every kind
-     now, so a split is a move and nothing else. */
-  const target = existing ?? addPane(targetId);
+     now, so a split is a move and nothing else.
+
+     `SECONDARY_PANE` unconditionally, and it is free unconditionally: {@link closePane} refuses to
+     remove the primary, so "there is no other pane" can only mean the grid is exactly `[primary]`
+     and the source is that primary. This used to be `existing?.id ?? SECONDARY_PANE` handed
+     straight to `addPane` with no check that the id was free — which, on a grid of `["secondary"]`,
+     pushed a SECOND record under that id and gave lit's keyed `repeat` a duplicate key. Both ends
+     are now closed: the state is unreachable, and {@link addPane} would not mint the duplicate
+     even if it were. */
+  const target = existing ?? addPane(SECONDARY_PANE);
   detachTab(tabId);
   insertIntoPane(target, tabId);
   /* Focus moves LAST, and every write above went through {@link addPane}'s reactive record.
@@ -269,6 +276,15 @@ export function splitRight(): Pane | null {
  * @returns {Pane}
  */
 function addPane(paneId: string): Pane {
+  /* A pane id is unique BY CONSTRUCTION, not by every caller checking first. `workspace.panes` is
+     the array lit's keyed `repeat` walks, and two records under one key is undefined behaviour
+     there — the grid draws two cells for one pane, each `ref` overwriting the other's surface
+     record. Handing back the record that is already published is the only answer that cannot
+     produce one. */
+  const existing = paneById(paneId);
+  if (existing) {
+    return existing;
+  }
   workspace.panes = [
     ...workspace.panes,
     { activeTabId: null as string | null, id: paneId, tabOrder: [] as string[] },
@@ -282,14 +298,28 @@ function addPane(paneId: string): Pane {
  * Closing a pane must never close documents — that is the difference between a layout action and a
  * destructive one, and only the second is allowed to lose work.
  *
- * @param {string} paneId
+ * **The PRIMARY never leaves the grid, and asking for it collapses the other pane instead.** §18.1
+ * rule 3 — a pane with nothing in it is a hole in the grid — held on one side only until
+ * `collapseEmptiedPane` was written, and that helper stated the rule a second time: `PRIMARY_PANE`
+ * is the id nine screenshots crop, the one `resolveRegion("pane")` canonicalises onto, and
+ * `panes[0]`, so it must never be the pane that goes. Stating it in a helper left this function
+ * exported and unguarded — `closePane(PRIMARY_PANE)` produced `panes = ["secondary"]`, a
+ * `resolveRegion("pane")` of null, and a `splitRight` that then minted a duplicate `repeat` key.
+ * Both callers happened to guard; the function did not. It does now, and the helper is gone,
+ * because the rule wanted one home rather than two.
+ *
+ * @param {string} paneId The pane to collapse. `PRIMARY_PANE` collapses the other one.
  */
 export function closePane(paneId: string) {
   if (workspace.panes.length < 2) {
     return;
   }
-  const pane = paneById(paneId);
-  const survivor = workspace.panes.find((candidate) => candidate.id !== paneId);
+  const closingId =
+    paneId === PRIMARY_PANE
+      ? workspace.panes.find((candidate) => candidate.id !== PRIMARY_PANE)?.id
+      : paneId;
+  const pane = closingId === undefined ? undefined : paneById(closingId);
+  const survivor = workspace.panes.find((candidate) => candidate.id !== closingId);
   if (!pane || !survivor) {
     return;
   }
@@ -312,11 +342,11 @@ export function closePane(paneId: string) {
      way back was the tab strip. Nothing is lost either way, because the closing pane's tabs have
      just been moved into the survivor above; this only decides which of them is on screen. */
   survivor.activeTabId =
-    workspace.activePaneId === paneId
+    workspace.activePaneId === pane.id
       ? (pane.activeTabId ?? survivor.activeTabId)
       : (survivor.activeTabId ?? pane.activeTabId);
   workspace.activePaneId = survivor.id;
-  workspace.panes = workspace.panes.filter((candidate) => candidate.id !== paneId);
+  workspace.panes = workspace.panes.filter((candidate) => candidate.id !== pane.id);
   resetTabCycle();
 }
 
@@ -352,36 +382,15 @@ function detachTab(tabId: string) {
   // Not `closePane`'s ordering bug, which is fixed: "the active pane exists and has no tab"
   // Produces the identical empty shell, and only this stops it being mintable.
   for (const paneId of emptied) {
-    collapseEmptiedPane(paneId);
+    closePane(paneId);
   }
 }
 
-/**
- * Collapse a pane that has just emptied — whichever side of the splitter it is on.
- *
- * §18.1 rule 3 held on ONE side only: the primary was exempted from the collapse, so closing its
- * last tab while split left a welcome screen sitting beside a live document, in a grid the author
- * had asked to be rid of. The exemption was defending something real, though — `PRIMARY_PANE` is
- * the id nine screenshots crop and the one `resolveRegion("pane")` canonicalises onto, so the
- * primary must never be the pane that LEAVES. Both are satisfied by collapsing in the other
- * direction: the side pane is the one removed, and `closePane` hands its tabs to the primary, whose
- * `activeTabId` is null and therefore adopts the side pane's.
- *
- * @param {string} paneId The pane that just lost its last tab.
- */
-function collapseEmptiedPane(paneId: string): void {
-  if (workspace.panes.length < 2) {
-    return;
-  }
-  if (paneId !== PRIMARY_PANE) {
-    closePane(paneId);
-    return;
-  }
-  const other = workspace.panes.find((candidate) => candidate.id !== PRIMARY_PANE);
-  if (other) {
-    closePane(other.id);
-  }
-}
+/* There is no `collapseEmptiedPane`. It existed to say "collapse whichever side emptied, but never
+   remove the primary — collapse the other one instead", which is a rule about what CLOSING a pane
+   means rather than about emptying one, and {@link closePane} now states it where the removal
+   happens. Two homes for one rule is how `closePane` stayed exported and unguarded while both of
+   its callers were careful. */
 
 /**
  * Put a tab id into a pane at the right place: after the pinned prefix for an ordinary tab, at the
@@ -710,7 +719,7 @@ export function closeTab(tabId: string) {
   // Usually done this already; this is the belt to its braces, and it goes through the same helper
   // So the primary can never be the pane that leaves.
   if (pane && pane.tabOrder.length === 0) {
-    collapseEmptiedPane(pane.id);
+    closePane(pane.id);
   }
   if (!wasActive) {
     return;

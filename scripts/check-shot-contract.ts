@@ -130,7 +130,15 @@ export const CONTRACT_VERSION = 1;
  *   the only way this budget may rise: a step returning from quarantine, named.
  * - `nonDerivedRegions` DISTINCT region ids no registry stamps for free — the hand-stamped leaves
  *   §13.3 budgets for (`navigator/panel:git/commit`, `navigator/statements`, the settings entry
- *   rows, the media-picker's browse button…). Contract 0 counted 17 CSS selectors here.
+ *   rows…). Contract 0 counted 17 CSS selectors here.
+ *
+ *   **12 → 11 with the second pane**, and the media-picker's browse button is the one that left. It
+ *   was hand-stamped `inspector/field:<prop>/browse`, and the stamp was a claim about location the
+ *   picker cannot make: the Document Header card draws the same control inside every pane's STAGE, so
+ *   with two panes the id resolved to two elements and `resolveRegion` answered with the side pane's
+ *   — an `inspector/…` id on a control that is not in the Inspector. `ui/regions.ts` derives it now,
+ *   scoped to the one Inspector, and the number falls the way this file says a number should: because
+ *   a hand-stamp became unnecessary.
  * - `unstable` `{reason, until}` escape hatches. **2** after P6.2 retired the five `settings.
  *   selectEntry` steps. Of what is left, one is `blog-insert-data`'s, whose id LANDED in P5
  *   (`insert.data`) and whose step survives because the shot's subject is the merge-tag LIST, a
@@ -143,7 +151,7 @@ export const CONTRACT_BUDGET = {
   clipSelectors: 0,
   argSelectors: 0,
   inputSteps: 14,
-  nonDerivedRegions: 12,
+  nonDerivedRegions: 11,
   unstable: 2,
 } as const;
 
@@ -182,6 +190,13 @@ export const DERIVED_REGION_PATTERNS: readonly RegExp[] = [
   // Stamped by the inspector's tab record and by `ui/field-row.ts:50`'s `data-prop`.
   /^inspector\/tab:[a-z][\w-]*$/,
   /^inspector\/field:[\w$.-]+$/,
+  /* The Browse control of an Inspector field. It WAS hand-stamped — `ui/media-picker.ts` wrote
+     `inspector/field:${prop}/browse` onto the button — and that stamp was a claim about location
+     the picker is in no position to make: the same control is drawn by the Document Header card,
+     inside each PANE's stage, where two panes made the id resolve to two elements and neither of
+     them was in the Inspector. `ui/regions.ts` derives it now, by finding `.media-picker-browse`
+     inside the Inspector's own `[data-prop]` row, so it is one of the ids nobody authors. */
+  /^inspector\/field:[\w$.-]+\/browse$/,
   // Already in `PLACEMENTS`.
   /^statusbar\/(?:project|document|selection)$/,
   // The pane's own tab strip — names the pane, not `#tab-strip`.

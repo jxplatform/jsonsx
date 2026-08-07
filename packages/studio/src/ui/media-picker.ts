@@ -418,9 +418,13 @@ export function renderMediaPicker(prop: string, value: string, onCommit: (val: s
       >
         <sp-icon-upload slot="icon"></sp-icon-upload>
       </sp-action-button>
+      <!-- No data-jx-region here. The class IS the handle: ui/regions.ts derives
+           inspector/field:PROP/browse by finding this button inside the Inspector's own
+           [data-prop] row, so the id resolves to one element however many panes are drawing a
+           media picker. The stamp claimed an inspector/... id on every picker the app renders,
+           including the two the Document Header card draws inside each pane's STAGE. -->
       <sp-action-button
         class="media-picker-browse"
-        data-jx-region=${`inspector/field:${prop}/browse`}
         size="xs"
         quiet
         title="Browse media"

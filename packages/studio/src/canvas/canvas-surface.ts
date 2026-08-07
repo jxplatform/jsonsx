@@ -12,8 +12,8 @@
  * tab a pane is showing, which stage is showing a tab, which pane mounted an artboard.
  */
 
-import { paneById, workspace } from "../workspace/workspace";
-import { allCanvasSurfaces, surfaceForPane } from "./surface-registry";
+import { PRIMARY_PANE, paneById, workspace } from "../workspace/workspace";
+import { allCanvasSurfaces, stageContaining, surfaceForPane } from "./surface-registry";
 import type { CanvasSurface } from "./surface-registry";
 import type { CanvasPanel } from "../types";
 import type { Tab } from "../tabs/tab";
@@ -135,4 +135,27 @@ export function canvasModeOfTab(tab: Tab | null): string {
  */
 export function canvasModeOfPane(paneId: string): string {
   return canvasModeOfTab(tabOfPane(paneId));
+}
+
+/**
+ * Which pane an element is being drawn into, DERIVED from the element itself.
+ *
+ * The route for stage CONTENT that is handed a host and nothing else. The settings-section registry
+ * is the case that forced it — a contribution's `render(host)` takes an element, and widening that
+ * contract for every extension to thread a pane id through is not on — but the shape is general:
+ * the container is inside a stage, and the stage knows whose it is.
+ *
+ * Falls back to the primary for a detached container (the tests, and anything drawn outside the
+ * pane grid entirely), which is the same answer `resolveRegion("pane")` gives.
+ *
+ * @param {HTMLElement} container
+ * @returns {string}
+ */
+export function paneOfContainer(container: HTMLElement): string {
+  return stageContaining(container)?.paneId ?? PRIMARY_PANE;
+}
+
+/** The tab whose document is being edited in the stage `container` sits inside, or null. */
+export function tabOfContainer(container: HTMLElement): Tab | null {
+  return tabOfPane(paneOfContainer(container));
 }

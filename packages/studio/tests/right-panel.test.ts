@@ -104,7 +104,7 @@ describe("the four tabs", () => {
     const ctx = makeCtx();
     mount(ctx as never);
     for (const tabName of ["events", "style"]) {
-      updateUi("rightTab", tabName);
+      updateUi(activeTab.value, "rightTab", tabName);
       render();
       await flush(4);
       expect(visibleBodies().length).toBe(1);
@@ -125,7 +125,7 @@ describe("the four tabs", () => {
   test("an undeclared stored tab coerces to Content", async () => {
     resetWorkspaceWithTab();
     mount(makeCtx() as never);
-    updateUi("rightTab", "content");
+    updateUi(activeTab.value, "rightTab", "content");
     render();
     await flush(4);
     expect(inspectorTab()).toBe("properties");

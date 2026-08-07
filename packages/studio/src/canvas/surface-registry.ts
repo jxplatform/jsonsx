@@ -72,6 +72,20 @@ export interface CanvasSurface {
   panY: number;
   /** The source view's Monaco, mounted into THIS stage. Two Code panes are two models. */
   monacoEditor: MonacoSurface | null;
+  /**
+   * The Stylebook filter and Customized flag THIS stage's catalogue was last built for.
+   *
+   * A one-slot module cache, until two panes started evicting each other from it.
+   * `shell.stylebook.filter` is a render input for every pane, so both stages render in the same
+   * frame: the first stored the new filter and rebuilt, the second compared against a slot the
+   * first had already advanced, found "nothing changed", and returned through the cheap
+   * `postStyleUpdateToStylebookHosts` path with its catalogue still listing the previous filter's
+   * specimens. Which pane lost was decided by render order, and it stayed wrong until a mode
+   * change. `null` means "this stage has never drawn a catalogue", which is not the same as "drew
+   * one for the empty filter" — the first pass must always rebuild.
+   */
+  prevStylebookFilter: string | null;
+  prevStylebookCustomizedOnly: boolean | null;
   /** Teardown for this stage's source-mode collab binding (unbind + release the lock). */
   sourceCollabCleanup: (() => void) | null;
   /**
@@ -135,6 +149,8 @@ function freshSurface(paneId: string): CanvasSurface {
     paneId,
     panzoomWrap: null,
     prevCanvasMode: null,
+    prevStylebookCustomizedOnly: null,
+    prevStylebookFilter: null,
     renderGeneration: 0,
     sourceCollabCleanup: null,
     wrap: null as unknown as HTMLElement,

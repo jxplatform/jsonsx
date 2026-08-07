@@ -125,9 +125,8 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
 
 interface PaneContextCtx {
   exportFile: () => Promise<void> | void;
-  getCanvasMode: () => string;
   parseMediaEntries: (media: Record<string, string> | null | undefined) => unknown;
-  setCanvasMode: (mode: string) => void;
+  setCanvasMode: (tab: unknown, mode: string) => void;
 }
 let paneCtx: PaneContextCtx | null = null;
 void mock.module("../src/panels/pane-context.ts", () => ({
@@ -185,20 +184,21 @@ test("the idle css-props filler is a no-op once the datalist is gone", () => {
   expect(document.querySelector("#css-props")).toBeNull();
 });
 
-test("the pane-context bar is wired to the four callbacks it still takes", async () => {
+test("the pane-context bar is wired to the three callbacks it still takes", async () => {
   expect(paneCtx).not.toBeNull();
-  // It took four more — `navigateBack`, `navigateToLevel` and the two logic-editor closes — for a
-  // Breadcrumb and a Back this bar no longer draws. What is left is the axes' own wiring, and with
-  // No active tab every one of them is a guarded no-op.
+  /* It took four more — `navigateBack`, `navigateToLevel` and the two logic-editor closes — for a
+     breadcrumb and a Back this bar no longer draws. `getCanvasMode` is the fifth to go, and it went
+     for a different reason: it answered for the FOCUSED pane, and this bar is drawn once per pane.
+     What is left is the axes' own wiring, and with no active tab every one of them is a guarded
+     no-op. */
   expect(Object.keys(paneCtx!).toSorted()).toEqual([
     "exportFile",
-    "getCanvasMode",
     "parseMediaEntries",
     "setCanvasMode",
   ]);
   await paneCtx!.exportFile();
-  expect(typeof paneCtx!.getCanvasMode()).toBe("string");
-  expect(() => paneCtx!.setCanvasMode("edit")).not.toThrow();
+  // The write takes its target: no tab, nothing written, and no throw.
+  expect(() => paneCtx!.setCanvasMode(null, "edit")).not.toThrow();
 });
 
 test("the bootstrap paints the statusbar once, directly", () => {

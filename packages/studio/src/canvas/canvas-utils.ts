@@ -782,13 +782,15 @@ export function canvasViewsFor(tab: ViewableTab): CanvasView[] {
  *
  * @param tab The pane's tab.
  * @param value The view to land on.
- * @param setCanvasMode Writes the BASE mode — `studio.ts`'s own, injected because this module does
- *   not own the canvas render loop.
+ * @param setCanvasMode Writes the BASE mode of the tab it is GIVEN — `studio.ts`'s own, injected
+ *   because this module does not own the canvas render loop. It took only a mode, which is how the
+ *   side pane's `Edit │ Design │ Preview` control cleared its own tab's preview flag and then moved
+ *   the FOCUSED pane's tab to `design`.
  */
-export function setCanvasView(
-  tab: ViewableTab,
+export function setCanvasView<T extends ViewableTab>(
+  tab: T,
   value: CanvasView,
-  setCanvasMode: (mode: string) => void,
+  setCanvasMode: (tab: T, mode: string) => void,
 ): void {
   if (value === "preview") {
     if (PREVIEWABLE_BASE_MODES.has(tab.session.ui.canvasMode)) {
@@ -798,7 +800,7 @@ export function setCanvasView(
   }
   tab.session.ui.preview = false;
   if (tab.session.ui.canvasMode !== value) {
-    setCanvasMode(value);
+    setCanvasMode(tab, value);
   }
 }
 
@@ -806,8 +808,8 @@ export function setCanvasView(
 export interface CanvasCommandDeps {
   /** The effective mode, `ui.preview` already composed in — `studio.ts`'s `getCanvasMode`. */
   getCanvasMode: () => string;
-  /** Write the BASE mode (`ui.canvasMode`) — `studio.ts`'s `setCanvasMode`. */
-  setCanvasMode: (mode: string) => void;
+  /** Write the BASE mode (`ui.canvasMode`) of the tab it is given — `studio.ts`'s `setCanvasMode`. */
+  setCanvasMode: (tab: Tab | null, mode: string) => void;
 }
 
 /** A document is open in a pane — every verb here writes that pane's own view state. */
@@ -887,7 +889,8 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
         // Idempotent in both directions: leaving preview is part of arriving anywhere else, so a
         // Shot that says "design" gets design whether or not the previous step turned preview on.
         tab.session.ui.preview = false;
-        deps.setCanvasMode(mode);
+        // The tab `requireTab()` already resolved, not "whatever is focused when the write lands".
+        deps.setCanvasMode(tab, mode);
       },
       title: "Set Canvas Mode",
     },

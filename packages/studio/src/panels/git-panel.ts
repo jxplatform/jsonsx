@@ -14,6 +14,8 @@ import { getPlatform } from "../platform";
 import { now } from "../services/clock";
 import { formatForPath } from "../format/format-host";
 import { projectState } from "../store";
+import { activeTab } from "../workspace/workspace";
+import type { Tab } from "../tabs/tab";
 import { shell } from "../shell";
 import type { GitLogEntry } from "../shell";
 import { showConfirmDialog, showPromptDialog } from "../ui/layers";
@@ -208,13 +210,13 @@ async function fetchGitLog() {
  * the whole point of the hoist — the panel renders identically with no document open.
  *
  * @param {{
- *   setCanvasMode?: (mode: string) => void;
+ *   setCanvasMode?: (tab: Tab | null, mode: string) => void;
  *   setGitDiffState?: (state: GitDiffState | null) => void;
  *   cloneRepository?: () => void;
  * }} ctx
  */
 export function renderGitPanel(ctx: {
-  setCanvasMode?: (mode: string) => void;
+  setCanvasMode?: (tab: Tab | null, mode: string) => void;
   setGitDiffState?: (state: GitDiffState | null) => void;
   cloneRepository?: () => void;
 }) {
@@ -596,7 +598,7 @@ export function renderGitPanel(ctx: {
           if (ctx.setGitDiffState) {
             ctx.setGitDiffState(diffState);
           }
-          ctx.setCanvasMode("git-diff");
+          ctx.setCanvasMode(activeTab.value, "git-diff");
         }
       } catch (error) {
         shell.git.error = `Failed to load diff: ${errorMessage(error)}`;

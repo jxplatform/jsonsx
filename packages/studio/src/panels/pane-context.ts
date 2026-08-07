@@ -42,7 +42,12 @@ import { html, render as litRender, nothing } from "lit-html";
 import { projectState, updateUi } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { PRIMARY_PANE, workspace } from "../workspace/workspace";
-import { canvasModeOfPane, surfaceForPane, tabOfPane } from "../canvas/canvas-surface";
+import {
+  canvasModeOfPane,
+  canvasModeOfTab,
+  surfaceForPane,
+  tabOfPane,
+} from "../canvas/canvas-surface";
 import { paneRegion } from "../ui/regions";
 import {
   canvasViewOf,
@@ -87,10 +92,22 @@ const PANE_CONTEXT_HEIGHT = 28;
 
 export interface PaneContextCtx {
   exportFile: () => void;
-  /** The EFFECTIVE canvas mode, `ui.preview` composed in. */
-  getCanvasMode: () => string;
-  /** Writes the BASE mode. The editor-kind dropdown and the view control both land here. */
-  setCanvasMode: (mode: string) => void;
+  /*
+   * There is no `getCanvasMode` here, and there cannot be one.
+   *
+   * It answered for the FOCUSED pane — `studio.ts` composes it from `workspace.activePaneId` — and
+   * this bar is drawn once per pane, from `tabOfPane(paneId)`. One reader was left: `exportTpl`,
+   * which is why entering Code in EITHER pane put an Export button in BOTH bars. Every mode
+   * question this module asks is now asked of the pane it is drawing: `canvasModeOfTab(tab)` for
+   * the tab's own effective mode, `canvasModeOfPane(paneId)` for the stage's.
+   */
+  /**
+   * Write the BASE mode of the tab it is GIVEN. The editor-kind dropdown and the view control both
+   * land here, and both are drawn per pane — so the tab is a parameter. It used to be `(mode:
+   * string) => void`, resolving `activeTab.value` inside `studio.ts`, which made the side pane's
+   * Editor picker a control over the primary's document.
+   */
+  setCanvasMode: (tab: Tab, mode: string) => void;
   parseMediaEntries: (media: Record<string, string> | null | undefined) => {
     sizeBreakpoints: {
       name: string;
@@ -317,7 +334,7 @@ function paneChromeTemplate(tab: Tab, paneId: string, ctx: PaneContextCtx): Temp
       <div class="pane-context" data-jx-region=${paneRegion(paneId, "context")}>
         <div class="pc-spacer"></div>
         ${editorKindTpl(tab, ctx)} ${kind === "canvas" ? viewTpl(tab, ctx) : nothing}
-        ${renderingContextTpl(tab, paneId, ctx)} ${exportTpl(ctx)}
+        ${renderingContextTpl(tab, paneId, ctx)} ${exportTpl(tab, ctx)}
       </div>
       ${readOnlyBannerTemplate(tab)}
     </div>
@@ -355,7 +372,7 @@ function editorKindTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult {
             return;
           }
           tab.session.ui.preview = false;
-          ctx.setCanvasMode(mode);
+          ctx.setCanvasMode(tab, mode);
         }}
       >
         ${kinds.map(
@@ -442,7 +459,7 @@ function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): Tem
         </sp-action-button>
         <sp-popover slot="click-content" tip class="pc-context-popover">
           <div class="pc-ctx">
-            ${sizeGroupTpl(sizeBreakpoints, activeMedia)}
+            ${sizeGroupTpl(tab, sizeBreakpoints, activeMedia)}
             ${
               schemeQueries.length > 0
                 ? groupTpl(
@@ -457,7 +474,7 @@ function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): Tem
                               aria-checked=${scheme === value ? "true" : "false"}
                               title=${title}
                               ?selected=${scheme === value}
-                              @click=${() => updateUi("previewColorScheme", value)}
+                              @click=${() => updateUi(tab, "previewColorScheme", value)}
                             >
                               ${label}
                             </sp-action-button>
@@ -482,7 +499,7 @@ function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): Tem
                               title=${query}
                               ?selected=${Boolean(ui.featureToggles[name])}
                               @click=${() => {
-                                updateUi("featureToggles", {
+                                updateUi(tab, "featureToggles", {
                                   ...tab.session.ui.featureToggles,
                                   [name]: !tab.session.ui.featureToggles[name],
                                 });
@@ -506,7 +523,8 @@ function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): Tem
                         size="s"
                         class="pc-layout-switch"
                         ?checked=${ui.showLayout !== false}
-                        @change=${() => updateUi("showLayout", tab.session.ui.showLayout === false)}
+                        @change=${() =>
+                          updateUi(tab, "showLayout", tab.session.ui.showLayout === false)}
                       >
                         Show layout elements
                       </sp-switch>
@@ -570,6 +588,7 @@ function groupTpl(label: string, body: TemplateResult): TemplateResult {
  * field, two ways in. `null` is the base, which is why the list is not simply the breakpoints.
  */
 function sizeGroupTpl(
+  tab: Tab,
   breakpoints: { name: string; width: number }[],
   activeMedia: string | null,
 ): TemplateResult {
@@ -583,7 +602,7 @@ function sizeGroupTpl(
           aria-checked=${activeMedia === null ? "true" : "false"}
           title="The base rendering, with no breakpoint applied"
           ?selected=${activeMedia === null}
-          @click=${() => updateUi("activeMedia", null)}
+          @click=${() => updateUi(tab, "activeMedia", null)}
         >
           Base
         </sp-action-button>
@@ -595,7 +614,7 @@ function sizeGroupTpl(
               aria-checked=${activeMedia === name ? "true" : "false"}
               title=${`${mediaDisplayName(name)} — ${width}px`}
               ?selected=${activeMedia === name}
-              @click=${() => updateUi("activeMedia", name)}
+              @click=${() => updateUi(tab, "activeMedia", name)}
             >
               ${mediaDisplayName(name)}
             </sp-action-button>
@@ -612,8 +631,11 @@ function sizeGroupTpl(
 // Principle 9). It stays in the Code view's trailing slot until the Code editor kind owns an action
 // Strip of its own.
 
-function exportTpl(ctx: PaneContextCtx): TemplateResult | typeof nothing {
-  if (ctx.getCanvasMode() !== "source") {
+function exportTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult | typeof nothing {
+  /* THIS tab's effective mode. `ctx.getCanvasMode()` answered for the focused pane, so a document
+     opened as Code in either pane put an Export button in the OTHER pane's bar as well — over a
+     document that is not the one the button exports. */
+  if (canvasModeOfTab(tab) !== "source") {
     return nothing;
   }
   return html`
@@ -827,7 +849,7 @@ function autoSelectParams(tab: Tab, values: ParamValues) {
     }
   }
   if (Object.keys(additions).length > 0) {
-    updateUi("previewParams", { ...current, ...additions });
+    updateUi(tab, "previewParams", { ...current, ...additions });
   }
 }
 
@@ -857,7 +879,7 @@ function paramPickersTpl(tab: Tab): TemplateResult | typeof nothing {
           value=${previewParams?.[name] ?? ""}
           @change=${(e: Event) => {
             const { value } = e.target as HTMLInputElement;
-            updateUi("previewParams", { ...tab.session.ui.previewParams, [name]: value });
+            updateUi(tab, "previewParams", { ...tab.session.ui.previewParams, [name]: value });
           }}
         >
           ${(values?.[name] ?? []).map(
@@ -923,7 +945,7 @@ function propFieldsTpl(tab: Tab, paneId: string): TemplateResult | typeof nothin
             } else {
               next[name] = parsePropValue(raw);
             }
-            updateUi("previewProps", Object.keys(next).length > 0 ? next : null);
+            updateUi(tab, "previewProps", Object.keys(next).length > 0 ? next : null);
           }}
         ></sp-textfield>
       `,

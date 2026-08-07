@@ -127,17 +127,37 @@ async function splitIntoTwoCanvasPanes() {
   return { left, right };
 }
 
-/** Mount one artboard of `gen` onto a pane's stage and take it all the way to `ready`. */
-async function mountArtboard(paneId: string, gen: number, doc: object, tabId: string) {
+/**
+ * START an artboard mount without waiting for it, and hand back its channel immediately.
+ *
+ * `mountIframeCanvas` builds the host and its channel SYNCHRONOUSLY and only then awaits the pass's
+ * prepared payload, so the channel is knowable before the promise settles. That is what lets a test
+ * interleave two panes' passes the way two rAF-scheduled renders really do — and awaiting each
+ * mount in turn, which every case here used to do, is the one ordering in which the prepared-pass
+ * cache could not be evicted.
+ */
+function beginArtboard(paneId: string, gen: number, doc: object, tabId: string) {
   const surface = surfaceForPane(paneId);
   const canvasEl = document.createElement("div");
   surface.wrap.append(canvasEl);
-  await mountIframeCanvas(gen, doc as never, canvasEl, null, tabId);
-  const channel = channels.at(-1)!;
+  const mounted = mountIframeCanvas(gen, doc as never, canvasEl, null, tabId);
+  return { canvasEl, channel: channels.at(-1)!, mounted, paneId, gen };
+}
+
+/** Take a started artboard all the way to `ready` and record it on its pane. */
+function settleArtboard(started: ReturnType<typeof beginArtboard>) {
+  const { canvasEl, channel, gen, paneId } = started;
   channel.deliver({ kind: "ready" });
   channel.deliver({ gen, kind: "renderComplete" });
-  surface.panels.push({ canvas: canvasEl, ready: true } as unknown as CanvasPanel);
+  surfaceForPane(paneId).panels.push({ canvas: canvasEl, ready: true } as unknown as CanvasPanel);
   return { canvasEl, channel };
+}
+
+/** Mount one artboard of `gen` onto a pane's stage and take it all the way to `ready`. */
+async function mountArtboard(paneId: string, gen: number, doc: object, tabId: string) {
+  const started = beginArtboard(paneId, gen, doc, tabId);
+  await started.mounted;
+  return settleArtboard(started);
 }
 
 const renders = (channel: FakeChannel) => channel.posts.filter((p) => p.kind === "render");
@@ -194,6 +214,48 @@ describe("one preparation, two posts", () => {
     for (const post of [...renders(wide.channel), ...renders(narrow.channel)]) {
       expect(post).toMatchObject({ gen: 2 });
     }
+  });
+
+  test("…and still resolves once when the OTHER pane's pass interleaves with it", async () => {
+    /* **The case above cannot fail, and this is the one it was standing in for.**
+       It awaits each mount in turn, which is the single ordering in which one pass can never be
+       evicted from the prepared-pass cache — and the cache was ONE slot, replaced whenever `gen`
+       differed. Both stages schedule through rAF and `mountIframeCanvas` awaits inside the loop,
+       so two passes interleave at every await: the primary's second artboard came back to a slot
+       the side pane had claimed, re-resolved and re-serialized a document that had been prepared
+       moments earlier, and evicted the side pane's in turn. Three resolutions for three artboards,
+       which is exactly the per-artboard fan-out the cache exists to remove.
+
+       The three mounts below are STARTED before any of them is awaited, in the order
+       primary · side · primary — the second pane's whole contribution, in three lines. */
+    const { left, right } = await splitIntoTwoCanvasPanes();
+    const doc = { tagName: "div" };
+    const sideDoc = { tagName: "section" };
+
+    const wide = beginArtboard(PRIMARY_PANE, 2, doc, left.id);
+    const side = beginArtboard(SECONDARY_PANE, 3, sideDoc, right.id);
+    const narrow = beginArtboard(PRIMARY_PANE, 2, doc, left.id);
+    await Promise.all([wide.mounted, side.mounted, narrow.mounted]);
+    for (const started of [wide, side, narrow]) {
+      settleArtboard(started);
+    }
+
+    // Two passes, two documents, three artboards: two resolutions and two preparations.
+    console.log(
+      `[two-pane hosts] interleaved primary·side·primary over 3 artboards: ` +
+        `${resolveCalls} resolve(s), ${canvasPerf.renderPreparations} preparation(s), ` +
+        `${canvasPerf.hostRenderPosts} host posts`,
+    );
+    expect(resolveCalls).toBe(2);
+    expect(canvasPerf.renderPreparations).toBe(2);
+    expect(canvasPerf.hostRenderPosts).toBe(3);
+    // The primary's two artboards were fed from ONE payload — same object, by identity.
+    const [wideRender] = renders(wide.channel);
+    const [narrowRender] = renders(narrow.channel);
+    expect(wideRender!.doc).toBe(narrowRender!.doc);
+    // And the side pane's is a different pass's, with its own generation.
+    expect(renders(side.channel)[0]).toMatchObject({ gen: 3 });
+    expect(wideRender).toMatchObject({ gen: 2 });
   });
 
   test("a single mutation is ONE patch, fanned to the artboards showing that document", async () => {

@@ -143,6 +143,32 @@ const DERIVED_RESOLVERS: readonly {
   pattern: RegExp;
   locate: (match: RegExpMatchArray, root: RegionRoot) => HTMLElement[];
 }[] = [
+  /*
+   * The Browse control of an Inspector field — ORDER MATTERS, it must precede the bare field rule,
+   * which would otherwise claim `image/browse` as a prop named "image/browse".
+   *
+   * `ui/media-picker.ts` used to STAMP this id on the button itself, and the id was a lie about
+   * where the button is: the same picker draws the Document Header card's Icon and og:image fields,
+   * and that card is rendered inside a PANE's stage. So `inspector/field:icon/browse` resolved to
+   * two elements the moment the grid split — one per pane, neither of them in the Inspector — and
+   * `resolveRegion` takes the LAST, which is the side pane's. `paneRegion` could never have reached
+   * it: an `inspector/…` id on an element outside the Inspector is not a pane-scoping problem, it
+   * is a wrong id.
+   *
+   * Deriving it fixes both halves at once. The id now MEANS "the Browse control of the Inspector's
+   * field `<prop>`", the search is scoped to the one Inspector, and the card's own pickers answer
+   * to nothing — correctly, because they are not in the Inspector. Nothing addresses them today;
+   * when something does, the id is `pane.<id>/field:<prop>/browse` and it is derived from the pane
+   * like every other stage-content id.
+   */
+  {
+    locate: ([, prop], root) => {
+      const row = resolveRegion(`inspector/field:${prop!}`, root);
+      const browse = row?.querySelector<HTMLElement>(".media-picker-browse");
+      return browse ? [browse] : [];
+    },
+    pattern: /^inspector\/field:(.+)\/browse$/,
+  },
   {
     locate: ([, prop], root) => {
       const inspector = resolveRegion("inspector", root);

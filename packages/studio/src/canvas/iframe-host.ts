@@ -2343,8 +2343,21 @@ type PreparedRender = Omit<
   "colorScheme" | "gen" | "kind"
 >;
 
+/** One render pass's prepared payloads, by document IDENTITY. */
+type PreparedDocs = Map<JxMutableNode, { tabId: string | null; payload: Promise<PreparedRender> }>;
+
 /**
- * The prepared payload for the render pass currently in flight, keyed by the source document.
+ * How many render passes may be prepared at once. Two panes, each mid-pass, plus slack.
+ *
+ * A ceiling rather than "however many are in flight", because nothing tells this module when a pass
+ * ENDS: the last artboard of a pass is indistinguishable from the first artboard of the next one. A
+ * small LRU is the honest bound — a pass whose artboards are still arriving is always among the
+ * most recently touched, and anything older cannot be reused by anyone.
+ */
+const PREPARED_PASS_LIMIT = 4;
+
+/**
+ * The prepared payload for every render pass in flight, keyed by generation.
  *
  * A design-mode canvas draws one artboard per breakpoint, and every one of them renders the SAME
  * document at a different viewport width. Resolving it per artboard meant N layout merges, N
@@ -2353,15 +2366,45 @@ type PreparedRender = Omit<
  * `/__jx_resolve__` and that ran once per host. The pass resolves once and every host is fed from
  * the result.
  *
- * Keyed by `gen` (a render pass is exactly one generation, so the map is dropped whole when the
- * next pass starts, and nothing accumulates) and within it by document IDENTITY — git-diff mounts
- * two different documents under one generation and each gets its own entry. `tabId` rides along
- * because `editableTags` is derived from it; a mismatch re-prepares rather than reusing.
+ * **It was ONE pass, and a second stage is what made that wrong.** The slot was replaced whenever
+ * `gen` differed, on the reasoning that "a render pass is exactly one generation, so the map is
+ * dropped whole when the next pass starts". That holds while a pass is the only thing running. Both
+ * stages schedule through rAF and `mountIframeCanvas` awaits inside the loop, so two passes
+ * INTERLEAVE at every await: pane A's second artboard came back to a slot pane B had just claimed,
+ * re-resolved and re-serialized a document that had been prepared moments earlier, and evicted pane
+ * B's in turn. Three preparations for three artboards — the fan-out this cache exists to remove,
+ * restored exactly by the second pane.
+ *
+ * Within a generation the key is document IDENTITY, because git-diff mounts two different documents
+ * under one generation and each gets its own entry. `tabId` rides along because `editableTags` is
+ * derived from it; a mismatch re-prepares rather than reusing.
  */
-let preparedPass: {
-  gen: number;
-  byDoc: Map<JxMutableNode, { tabId: string | null; payload: Promise<PreparedRender> }>;
-} | null = null;
+const preparedPasses = new Map<number, PreparedDocs>();
+
+/**
+ * This generation's prepared documents, created on first mention and touched to the front.
+ *
+ * Insertion order is the LRU order: re-inserting on every access is what keeps two interleaved
+ * passes both live no matter how long they alternate, while a pass nobody has touched for four
+ * generations falls off the end.
+ */
+function preparedDocsFor(gen: number): PreparedDocs {
+  const existing = preparedPasses.get(gen);
+  if (existing) {
+    preparedPasses.delete(gen);
+    preparedPasses.set(gen, existing);
+    return existing;
+  }
+  const fresh: PreparedDocs = new Map();
+  preparedPasses.set(gen, fresh);
+  for (const stale of preparedPasses.keys()) {
+    if (preparedPasses.size <= PREPARED_PASS_LIMIT) {
+      break;
+    }
+    preparedPasses.delete(stale);
+  }
+  return fresh;
+}
 
 /**
  * Resolve + serialize `doc` for the wire, once per render pass.
@@ -2377,10 +2420,8 @@ function preparePassRender(
   doc: JxMutableNode,
   tabId: string | null,
 ): Promise<PreparedRender> {
-  if (preparedPass?.gen !== gen) {
-    preparedPass = { byDoc: new Map(), gen };
-  }
-  const cached = preparedPass.byDoc.get(doc);
+  const byDoc = preparedDocsFor(gen);
+  const cached = byDoc.get(doc);
   if (cached && cached.tabId === tabId) {
     return cached.payload;
   }
@@ -2421,7 +2462,7 @@ function preparePassRender(
       ...(allowAutoRequests ? { allowAutoRequests: true } : {}),
     };
   });
-  preparedPass.byDoc.set(doc, { payload, tabId });
+  byDoc.set(doc, { payload, tabId });
   return payload;
 }
 

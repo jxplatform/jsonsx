@@ -1,5 +1,6 @@
-import { standUpPaneGrid } from "./harness";
-import { afterEach, describe, expect, test } from "bun:test";
+import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { render as litRender } from "lit-html";
 import {
   REGION_ATTR,
   SHELL_REGION_HOSTS,
@@ -7,18 +8,39 @@ import {
   paneRegion,
   paneStripRegion,
   resolveAllRegions,
+  resolveRegion,
+  stampShellRegions,
 } from "../src/ui/regions";
 import { allCanvasSurfaces, unregisterCanvasSurface } from "../src/canvas/surface-registry";
 import {
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  closeAllTabs,
+  openTab,
+  splitRight,
+} from "../src/workspace/workspace";
+import * as paneGrid from "../src/panels/pane-grid";
+import * as paneContext from "../src/panels/pane-context";
+import * as frontmatter from "../src/panels/frontmatter-panel";
+import { renderFieldRow } from "../src/ui/field-row";
+import { invalidateMediaCache, renderMediaPicker } from "../src/ui/media-picker";
+import { resetShellSurfaces } from "../src/shell";
+import {
   ALLOWED_ACTIVE_TAB_READS,
+  ALLOWED_FOCUS_IN_PANE_SCOPE,
   ALLOWED_SINGLE_INSTANCE,
   ALLOWED_VIEW_READS,
   BANNED_VIEW_FIELDS,
   checkPaneSingletons,
+  countFocusInPaneScope,
   countPerFile,
   diffAgainstAllowed,
+  focusReadsInPaneScope,
   report,
 } from "../scripts/check-pane-singletons";
+
+const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
+happyDOM.setURL("http://localhost:3000/");
 
 /**
  * The region grammar's fourth derived family, and the guard that keeps it derived.
@@ -34,7 +56,15 @@ import {
  * byte-identical to the literal it replaces.
  */
 
+beforeEach(() => {
+  resetStudioState();
+  installMockPlatform();
+  invalidateMediaCache();
+  closeAllTabs();
+});
+
 afterEach(() => {
+  resetShellSurfaces();
   for (const surface of allCanvasSurfaces()) {
     unregisterCanvasSurface(surface.paneId);
   }
@@ -80,45 +110,151 @@ describe("the shell host table", () => {
 
 describe("uniqueness with two stages standing", () => {
   /*
-   * The highest-value assertion in the workstream, and it fails on the literal stamps by
-   * construction: it stands up two stages, has each of them emit the SAME part, and demands that
-   * every non-overlay id in the document resolve to exactly one element.
+   * The highest-value assertion in the workstream, and until now it was true BY CONSTRUCTION.
    *
-   * It converts a silent screenshot regression — the `screenshots` lane produces a bot commit, not
-   * a red X — into a red unit test in the PR that causes it.
+   * It stood up two divs and stamped them with ids it minted by calling `paneRegion(paneId, part)`
+   * itself, so "every id resolves to one element" was a restatement of "`paneRegion` returns
+   * different strings for different panes" — which the block above already proves. No renderer was
+   * imported, so nothing it could observe was capable of emitting a literal `pane.primary/…`, which
+   * is the regression its own docstring describes. `ui/media-picker.ts` then stamped
+   * `inspector/field:${prop}/browse` on a control the Document Header card draws inside EVERY
+   * pane's stage, and this file was green through all of it.
+   *
+   * So the DOM comes from the app: the real pane grid builds the cells, the real context bar draws
+   * ⑦ and ⑩ into each, and the real Document Header card draws into each stage. Every id in the
+   * document is then one some renderer actually emitted.
    */
-  function stamp(host: HTMLElement, paneId: string, part: string): void {
-    const el = document.createElement("div");
-    el.setAttribute(REGION_ATTR, paneRegion(paneId, part));
-    host.append(el);
+  const paneCtx = {
+    exportFile: () => {},
+    parseMediaEntries: () => ({ baseWidth: 1280, featureQueries: [], sizeBreakpoints: [] }),
+    setCanvasMode: () => {},
+  } as unknown as Parameters<typeof paneContext.mount>[1];
+
+  /** A tab with enough head material that the Document Header card draws its SEO block. */
+  function openDocTab(id: string, path: string) {
+    return openTab({
+      document: {
+        $head: [
+          { attributes: { href: "/favicon.png", rel: "icon" }, tag: "link" },
+          { attributes: { content: "/og.png", property: "og:image" }, tag: "meta" },
+        ],
+        children: [],
+        tagName: "div",
+        title: "A page",
+      },
+      documentPath: path,
+      id,
+    });
   }
 
-  test("every pane-surface id resolves to exactly one element", () => {
-    const primary = standUpPaneGrid("primary");
-    const secondary = standUpPaneGrid("secondary");
-    primary.wrap.setAttribute(REGION_ATTR, paneRegion("primary"));
-    secondary.wrap.setAttribute(REGION_ATTR, paneRegion("secondary"));
-    // The seven manifest-named ids that stage CONTENT emits, drawn in both panes at once.
-    for (const part of [
-      "library",
-      "library/dropZone",
-      "entry",
-      "entry/fields",
-      "editor",
-      "frontmatter",
-      "prop:count",
-    ]) {
-      stamp(primary.wrap, "primary", part);
-      stamp(secondary.wrap, "secondary", part);
-    }
+  /** The whole shell, both panes, every renderer that stamps a pane-scoped id. */
+  async function twoRealPanes() {
+    document.body.innerHTML = `<div id="app"><div id="pane-grid"></div><div id="right-panel"></div></div>`;
+    stampShellRegions();
+    paneGrid.mount();
+    openDocTab("regions-left", "pages/left.json");
+    openDocTab("regions-right", "pages/right.json");
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    await flush();
 
-    const ambiguous = listRegions().filter(
+    paneContext.mount(paneGrid.cellForPane(PRIMARY_PANE)!.chrome, paneCtx);
+    frontmatter.mount();
+    for (const paneId of [PRIMARY_PANE, SECONDARY_PANE]) {
+      const cell = paneGrid.cellForPane(paneId)!;
+      if (paneId !== PRIMARY_PANE) {
+        paneContext.attachPaneChromeHost(paneId, cell.chrome);
+      }
+      /* Only if the stage's own render has not already handed the card a host. The canvas render
+         a new cell schedules mounts one for itself, and attaching a second is how a FIXTURE mints
+         the very ambiguity this file is here to detect. */
+      if (!frontmatter.documentHeaderHost(paneId)) {
+        const card = document.createElement("div");
+        cell.stage.append(card);
+        frontmatter.attachDocumentHeaderHost(paneId, card);
+      }
+    }
+    frontmatter.render();
+    await flush(4);
+  }
+
+  afterEach(() => {
+    frontmatter.unmount();
+    paneContext.unmount();
+    paneGrid.unmount();
+    closeAllTabs();
+  });
+
+  test("every region id the app emits resolves to exactly one element", async () => {
+    await twoRealPanes();
+    const ids = listRegions();
+    const ambiguous = ids.filter(
       (id) => !id.startsWith("overlay") && resolveAllRegions(id).length !== 1,
     );
+    console.log(
+      `[pane regions] two real panes emitted ${ids.length} region id(s); ` +
+        `ambiguous: ${JSON.stringify(ambiguous)}`,
+    );
     expect(ambiguous).toEqual([]);
-    // And both panes really are addressable, so the test is not passing by drawing nothing.
-    expect(listRegions()).toContain("pane.secondary/library");
-    expect(listRegions()).toContain("pane.primary/library");
+    // And it is not passing by drawing nothing: both panes' stages, strips and bars are addressable.
+    for (const id of [
+      "pane.primary",
+      "pane.secondary",
+      "pane.primary/tabs",
+      "pane.secondary/tabs",
+      "pane.primary/context",
+      "pane.secondary/context",
+      "pane.primary/frontmatter",
+      "pane.secondary/frontmatter",
+    ]) {
+      expect(ids).toContain(id);
+    }
+  });
+
+  test("the Document Header's media pickers claim no `inspector/…` id", async () => {
+    /* `ui/media-picker.ts` stamped `inspector/field:<prop>/browse` on its Browse button, and the
+       Document Header card draws that picker for Icon and og:image inside each pane's STAGE. Two
+       panes, two cards, four buttons — and `resolveRegion` takes the LAST, so the id answered with
+       the SIDE pane's control, for a field that is not in the Inspector at all. `paneRegion` was
+       never going to reach it: an `inspector/…` id on an element outside the Inspector is a wrong
+       id, not a wrongly-scoped one. */
+    await twoRealPanes();
+    const cards = [...document.querySelectorAll(".doc-header")];
+    expect(cards).toHaveLength(2);
+    const browseButtons = [...document.querySelectorAll(".pane-stage .media-picker-browse")];
+    expect(browseButtons.length).toBeGreaterThanOrEqual(4);
+    // Not one of them carries a region id, and none of them answers to the Inspector's.
+    for (const button of browseButtons) {
+      expect(button.getAttribute(REGION_ATTR)).toBeNull();
+    }
+    expect(listRegions().filter((id) => id.startsWith("inspector/field:"))).toEqual([]);
+    expect(resolveRegion("inspector/field:icon/browse")).toBeNull();
+    console.log(
+      `[pane regions] ${browseButtons.length} Document Header Browse control(s) across 2 panes, ` +
+        `0 of them stamped; resolveRegion("inspector/field:icon/browse") = ` +
+        `${String(resolveRegion("inspector/field:icon/browse"))}`,
+    );
+  });
+
+  test("`inspector/field:<prop>/browse` is DERIVED, and finds the Inspector's own control", async () => {
+    await twoRealPanes();
+    // The Inspector's row, built by the same two functions the properties panel uses.
+    const inspector = document.querySelector("#right-panel") as HTMLElement;
+    litRender(
+      renderFieldRow({
+        hasValue: true,
+        label: "Image",
+        prop: "image",
+        widget: renderMediaPicker("image", "/hero.png", () => {}),
+      }),
+      inspector,
+    );
+    const own = inspector.querySelector<HTMLElement>(".media-picker-browse");
+    expect(own).not.toBeNull();
+    expect(resolveRegion("inspector/field:image/browse")).toBe(own);
+    // The bare field id still answers with the row, exactly as it always has.
+    expect(resolveRegion("inspector/field:image")?.dataset.prop).toBe("image");
+    // A prop the Inspector is not showing resolves to nothing rather than to a card's control.
+    expect(resolveRegion("inspector/field:icon/browse")).toBeNull();
   });
 });
 
@@ -166,11 +302,82 @@ describe("the singleton guard", () => {
     expect(await checkPaneSingletons()).toEqual([]);
   });
 
+  test("the fourth rule is the general one: a function GIVEN a pane may not ask for the focus", () => {
+    /* Rules 1 and 2 are lists of names, rule 3 is a list of files, and each was written after a
+       failure the next one walked straight past. This is the sentence all four were reaching for:
+       a function that has been told which pane it is about does not get to consult the focus. */
+    expect(ALLOWED_FOCUS_IN_PANE_SCOPE).toEqual({});
+  });
+
+  test("it counts a focus read in the BODY of a pane-scoped function, and only there", () => {
+    // The shape the pane context bar had: drawn per pane, resolving through the focused tab.
+    expect(
+      focusReadsInPaneScope(`
+        function renderPane(paneId: string, host: HTMLElement) {
+          const tab = activeTab.value;
+          host.textContent = tab?.id ?? "";
+        }
+      `),
+    ).toBe(1);
+    // The shape `renderStylebookMode` had — a surface in, the focused tab consulted anyway.
+    expect(
+      focusReadsInPaneScope(`
+        export function renderStylebookMode(surface: CanvasSurface, ctx: StylebookCtx) {
+          const tab = activeTab.value;
+          return tab;
+        }
+      `),
+    ).toBe(1);
+    // And the mode read, which is the same defect one layer down.
+    expect(
+      focusReadsInPaneScope(`
+        function exportTpl(paneId: string, ctx: Ctx) {
+          return ctx.getCanvasMode() === "source";
+        }
+      `),
+    ).toBe(1);
+  });
+
+  test("a DEFAULT is the opposite of the defect, and is not counted", () => {
+    /* `surface: CanvasSurface = activeCanvasSurface()` is a signature saying, in public, "the
+       focused pane when you do not say" — eleven of the geometry verbs are written that way on
+       purpose, and a rule that fired on them would be one nobody could keep green. */
+    expect(
+      focusReadsInPaneScope(`
+        export function resetZoom(surface: CanvasSurface = activeCanvasSurface()) {
+          surface.panX = 0;
+        }
+      `),
+    ).toBe(0);
+  });
+
+  test("a function that takes only a TAB is not pane-scoped — it may ask whether it is focused", () => {
+    expect(
+      focusReadsInPaneScope(`
+        export function isTabActive(tab: Tab | null): boolean {
+          return tab !== null && activeTab.value === tab;
+        }
+      `),
+    ).toBe(0);
+  });
+
+  test("the module that OWNS focus is excluded rather than allow-listed", async () => {
+    /* `focusPane` and `closePane` both take a `paneId` and both WRITE `workspace.activePaneId` —
+       that is the definition of moving focus. Putting the one legitimate writer in a table of
+       things that must not come back would be a lie about what the table is. */
+    const owner = await Bun.file("src/workspace/workspace.ts").text();
+    expect(focusReadsInPaneScope(owner)).toBeGreaterThan(0);
+    const counted = await countFocusInPaneScope(["src/workspace/workspace.ts"]);
+    expect(counted.size).toBe(0);
+  });
+
   test("a path that no longer exists counts as zero, not as a crash", async () => {
     /* Both lists name PATHS. A checker that threw on a renamed file would be one nobody could run
        to find out whether the rule still holds — which is the state it would be reporting on. */
     const counts = await countPerFile(["src/does/not/exist.ts"], /let active\b/g);
     expect([...counts]).toEqual([]);
+    // The fourth rule reads the same files and owes the same answer.
+    expect([...(await countFocusInPaneScope(["src/does/not/exist.ts"]))]).toEqual([]);
   });
 
   test("`report` says which rule broke and hands back an exit code", () => {

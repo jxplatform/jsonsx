@@ -18,6 +18,7 @@ import {
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxPath } from "../src/state";
+import type { Tab } from "../src/tabs/tab";
 import { surfaceForPane } from "../src/canvas/surface-registry";
 
 type AnyRec = Record<string, any>;
@@ -151,9 +152,8 @@ describe("pane-context interaction gaps", () => {
   function makePaneCtx(overrides: Partial<Parameters<typeof paneContext.mount>[1]> = {}) {
     return {
       exportFile: mock(() => {}),
-      getCanvasMode: mock(() => "design"),
       parseMediaEntries: () => ({ baseWidth: 1280, featureQueries: [], sizeBreakpoints: [] }),
-      setCanvasMode: mock((_mode: string) => {}),
+      setCanvasMode: mock((_tab: Tab | null, _mode: string) => {}),
       ...overrides,
     };
   }
@@ -209,10 +209,11 @@ describe("pane-context render failure", () => {
     expect(() => {
       paneContext.mount(host, {
         exportFile: () => {},
-        getCanvasMode: () => {
-          throw new Error("mode exploded");
+        // `getCanvasMode` used to be the thrower, and it is gone from the ctx — the bar asks its own
+        // Pane's tab. `parseMediaEntries` is the remaining injected call on the render path.
+        parseMediaEntries: () => {
+          throw new Error("media exploded");
         },
-        parseMediaEntries: () => ({ baseWidth: 1280, featureQueries: [], sizeBreakpoints: [] }),
         setCanvasMode: () => {},
       });
     }).not.toThrow();

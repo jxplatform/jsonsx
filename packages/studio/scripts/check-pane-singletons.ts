@@ -13,7 +13,7 @@
  * `unknown` read that `as number` makes compile. And a module-level `let active` is perfectly
  * well-typed; it is only wrong because there are two stages.
  *
- * Three rules, all in this package's own idiom (`scripts/check-styles.ts`'s `ALLOWED_ORPHANS`), and
+ * Four rules, all in this package's own idiom (`scripts/check-styles.ts`'s `ALLOWED_ORPHANS`), and
  * all failing BOTH ways: a new occurrence fails, and a stale allow-list entry fails too, so the
  * lists can only ratchet down.
  *
@@ -32,6 +32,12 @@
  * FOCUSED tab is not an input. `activeTab` there means "whatever pane the keyboard is in", which is
  * never what a transform, a fit or a content zoom is about. The residue in the allow-list is the
  * command verbs, where "the active pane" is the whole meaning of the request.
+ *
+ * **The FOURTH rule is the general form of the third, and it exists because the third was a list of
+ * FILES.** See {@link focusReadsInPaneScope}: a function that has been handed a `paneId` or a
+ * `CanvasSurface` may not consult the focus in its body, wherever in `src/` it lives. Rule 3 named
+ * one module; the pane context bar was in another, and wrote nine controls through
+ * `activeTab.value` for a pane it was not drawing.
  *
  * Run: bun scripts/check-pane-singletons.ts
  */
@@ -128,6 +134,112 @@ const INSTANCE_SCAN = [
  */
 const INSTANCE_RE = /^let (active|_active|_host|_scheduler|sourceCollabCleanup)\b/gm;
 
+// ─── Rule 4 · a function given a pane does not consult the focus ──────────────
+
+/**
+ * **The general form of rule 3, and the reason rule 3 kept missing things.**
+ *
+ * Rules 1 and 2 are lists of NAMES; rule 3 is a list of FILES. Each was written after a failure and
+ * each was silent about the next one, because per-stage state does not announce itself by name and
+ * the modules that hold it are not a fixed set. Four instances landed in one session, all the same
+ * shape and none of them catchable:
+ *
+ * - The Document Header card, drawn for `tab`, mutating `activeTab.value`;
+ * - The zoom axis, handed a surface, writing `activeTab.value.session.ui.zoom`;
+ * - The debounced Monaco commit, reading one tab's buffer and writing `activeTab.value`;
+ * - The whole pane context bar — drawn per pane, from `tabOfPane(paneId)` — writing every one of its
+ *   seven axes, its editor picker and its view control through the FOCUSED pane.
+ *
+ * The rule they all break is one sentence: **a function that has been told which pane it is about
+ * does not get to ask which pane has focus.** That is what is checked, and it is checked per
+ * FUNCTION rather than per file, because "this module is pane-scoped" is not true of any real
+ * module — `panels/stylebook-panel.ts` has one function that takes a surface and another whose
+ * subject genuinely is the focused pane, and a file-level rule can only be wrong about one of
+ * them.
+ *
+ * The pane context bar would not have been caught by this on the day it landed, and that is the
+ * other half of the fix: every one of those writes went through `store.ts`'s `updateUi(field,
+ * value)`, which resolved `activeTab.value` on the caller's behalf. So `store.ts`'s session
+ * dispatchers take their target now — there is no `activeTab` in that file — and a pane-scoped
+ * caller that wants the focused tab has to spell it, where this rule can see it.
+ */
+const FOCUS_RE =
+  /\bactiveTab\b|\bactivePaneId\b|\bactivePane\s*\(|\bactiveCanvasSurface\s*\(|\bgetCanvasMode\s*\(/g;
+
+/**
+ * A parameter list that names a pane or a stage. `Tab` is deliberately NOT here: plenty of
+ * functions take a tab AND legitimately ask whether it is the focused one ({@link isTabActive}'s
+ * callers). A `paneId` or a `CanvasSurface` is a different promise — it says the caller has already
+ * decided which pane this is about.
+ */
+const PANE_PARAM_RE = /\bpaneId\b|\bsurface\b|\bCanvasSurface\b/;
+
+/**
+ * Function headers, as they appear in this package: `function name(params) {`, a method, or an
+ * arrow with a block body. The regex tolerates one level of nested parens in the parameter list (a
+ * callback type, a destructured default) which is as deep as anything here goes.
+ */
+const FUNCTION_HEADER_RE =
+  /(?:function\s+(?<name>[A-Za-z_$][\w$]*)\s*)?\((?<params>[^()]*(?:\([^()]*\)[^()]*)*)\)\s*(?::[^{=;]*)?(?:=>\s*)?\{/g;
+
+/**
+ * The module that OWNS focus, excluded by name.
+ *
+ * `focusPane` and `closePane` both take a `paneId` and both write `workspace.activePaneId` — that
+ * IS the definition of moving focus. A rule that fired on its own definition site would be one
+ * nobody could satisfy, and silencing it with an allow-list entry would put the one legitimate
+ * writer in a table of things that must not come back.
+ */
+const FOCUS_OWNER = "src/workspace/workspace.ts";
+
+/** Everywhere the rule applies. */
+const FOCUS_SCOPE_SCAN = ["src/**/*.ts"];
+
+/**
+ * Functions still allowed to consult the focus while holding a pane. Empty: none do.
+ *
+ * Keyed by file, counted like every other list here, and failing both ways.
+ */
+export const ALLOWED_FOCUS_IN_PANE_SCOPE: Readonly<Record<string, number>> = {};
+
+/**
+ * Count focus reads that appear in the BODY of a pane-scoped function, per file.
+ *
+ * The body only — a default such as `surface: CanvasSurface = activeCanvasSurface()` is the
+ * opposite of the defect: it is a signature saying, in public, "the focused pane when you do not
+ * say". Eleven of the geometry verbs are written that way on purpose.
+ *
+ * @param {string} source A module's text, comments already stripped.
+ * @returns {number}
+ */
+export function focusReadsInPaneScope(source: string): number {
+  let found = 0;
+  const headers = new RegExp(FUNCTION_HEADER_RE.source, FUNCTION_HEADER_RE.flags);
+  let header: RegExpExecArray | null;
+  while ((header = headers.exec(source)) !== null) {
+    if (!PANE_PARAM_RE.test(header.groups?.params ?? "")) {
+      continue;
+    }
+    const open = header.index + header[0].length - 1;
+    let depth = 0;
+    let close = source.length;
+    for (let i = open; i < source.length; i += 1) {
+      if (source[i] === "{") {
+        depth += 1;
+      } else if (source[i] === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          close = i;
+          break;
+        }
+      }
+    }
+    const body = source.slice(open + 1, close);
+    found += body.match(new RegExp(FOCUS_RE.source, FOCUS_RE.flags))?.length ?? 0;
+  }
+  return found;
+}
+
 /** A `view.<banned>` read, as it appears in code rather than in prose. */
 const viewReadRe = new RegExp(String.raw`\bview\.(${BANNED_VIEW_FIELDS.join("|")})\b`, "g");
 
@@ -200,6 +312,28 @@ export function diffAgainstAllowed(
   return failures;
 }
 
+/**
+ * Rule 4's counts, per file. Same shape as {@link countPerFile}, but the unit is a function body
+ * rather than a match, so it cannot reuse it.
+ */
+export async function countFocusInPaneScope(patterns: string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  for (const file of await filesFor(patterns)) {
+    const path = relative(ROOT, file);
+    if (path === FOCUS_OWNER) {
+      continue;
+    }
+    const text = await Bun.file(file)
+      .text()
+      .catch(() => "");
+    const found = focusReadsInPaneScope(code(text));
+    if (found > 0) {
+      counts.set(path, found);
+    }
+  }
+  return counts;
+}
+
 export async function checkPaneSingletons(): Promise<string[]> {
   const viewFailures = diffAgainstAllowed(
     await countPerFile(VIEW_SCAN, viewReadRe),
@@ -216,7 +350,12 @@ export async function checkPaneSingletons(): Promise<string[]> {
     ALLOWED_ACTIVE_TAB_READS,
     "focused-tab read(s) in stage geometry",
   );
-  return [...viewFailures, ...instanceFailures, ...focusFailures];
+  const paneScopeFailures = diffAgainstAllowed(
+    await countFocusInPaneScope(FOCUS_SCOPE_SCAN),
+    ALLOWED_FOCUS_IN_PANE_SCOPE,
+    "focus read(s) inside a function that was given a pane",
+  );
+  return [...viewFailures, ...instanceFailures, ...focusFailures, ...paneScopeFailures];
 }
 
 /**
@@ -236,13 +375,17 @@ export function report(failures: string[]): number {
     console.error(
       "\n   Per-stage state belongs on `CanvasSurface` (src/canvas/surface-registry.ts);\n" +
         "   per-pane content belongs in a Map keyed by pane id; and stage geometry reaches\n" +
-        "   both through the surface it was given — never through `activeTab`.",
+        "   both through the surface it was given — never through `activeTab`.\n" +
+        "   A function handed a `paneId` or a `CanvasSurface` has already been told which pane\n" +
+        "   it is about: ask `tabOfPane(paneId)` / `canvasModeOfTab(tab)`, and pass the tab on\n" +
+        "   to `updateUi` / `setCanvasMode`, which take one.",
     );
     return 1;
   }
   console.log(
     "✓ check-pane-singletons: no per-stage state on `view`, no stage-content singletons, " +
-      "stage geometry reaches per-pane state through a surface",
+      "stage geometry reaches per-pane state through a surface, and no function handed a " +
+      "pane consults the focus",
   );
   return 0;
 }

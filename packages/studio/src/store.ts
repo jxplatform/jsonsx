@@ -9,9 +9,9 @@
 
 // ─── Re-exports from state.js ────────────────────────────────────────────────
 
-import { activeTab } from "./workspace/workspace";
 import { INPUT_DEBOUNCE } from "./ui/timing";
 import type { JxPath } from "./state";
+import type { Tab } from "./tabs/tab";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 export {
@@ -205,20 +205,37 @@ export function renderOnly(...names: string[]) {
 
 // ─── Session dispatch ──────────────────────────────────────────────────────
 
+/* **Every dispatcher below takes the tab it writes, and none of them can find one on its own.**
+   All three used to open with `const tab = activeTab.value`, which made "the document this
+   control is about" and "the document the keyboard happens to be in" the same expression — the
+   defect that produced the Document Header card writing through focus, the zoom axis writing
+   through focus, the debounced Monaco commit writing through focus, and the whole pane context
+   bar writing through focus. Four instances, four audits, no gate: while the shell had one stage
+   the two readings could not disagree, so nothing could observe the difference.
+
+   `store.ts` is where they could not disagree, so `store.ts` is where the shape is fixed. There is
+   no `activeTab` import in this file and no zero-argument variant of any of these: a caller that
+   means the focused pane spells `activeTab.value` at its own call site, where a reviewer and
+   `scripts/check-pane-singletons.ts` can both see it, and a caller drawn FOR a pane passes the tab
+   it was drawn for. */
+
 /**
- * Dispatch a session-only state update (selection, hover, ui). Writes directly to reactive tab.
+ * Dispatch a session-only state update (selection, hover, ui) into `tab`.
  *
+ * @param {Tab | null} tab — the tab this update is about. `null` is a no-op.
  * @param {object} patch — partial session object, e.g. { ui: { zoom: 2 } }
  */
-export function updateSession(patch: {
-  /** The whole selection SET — `[]` clears it. Widened with `session.selection` itself (§6.5). */
-  selection?: JxPath[];
-  hover?: JxPath | null;
-  clipboard?: JxMutableNode | null;
-  ui?: Record<string, unknown>;
-  canvas?: Record<string, unknown>;
-}) {
-  const tab = activeTab.value;
+export function updateSession(
+  tab: Tab | null,
+  patch: {
+    /** The whole selection SET — `[]` clears it. Widened with `session.selection` itself (§6.5). */
+    selection?: JxPath[];
+    hover?: JxPath | null;
+    clipboard?: JxMutableNode | null;
+    ui?: Record<string, unknown>;
+    canvas?: Record<string, unknown>;
+  },
+) {
   if (tab) {
     if (patch.selection !== undefined) {
       tab.session.selection = patch.selection;
@@ -243,25 +260,25 @@ export function updateSession(patch: {
 }
 
 /**
- * Update a single UI field.
+ * Update a single UI field on `tab`.
  *
+ * @param {Tab | null} tab — the tab this field belongs to. `null` is a no-op.
  * @param {string} field
  * @param {unknown} value
  */
-export function updateUi(field: string, value: unknown) {
-  const tab = activeTab.value;
+export function updateUi(tab: Tab | null, field: string, value: unknown) {
   if (tab) {
     (tab.session.ui as unknown as Record<string, unknown>)[field] = value;
   }
 }
 
 /**
- * Update the canvas async state (status, scope, error).
+ * Update `tab`'s canvas async state (status, scope, error).
  *
+ * @param {Tab | null} tab — the tab whose stage produced this state. `null` is a no-op.
  * @param {object} patch
  */
-export function updateCanvas(patch: Record<string, unknown>) {
-  const tab = activeTab.value;
+export function updateCanvas(tab: Tab | null, patch: Record<string, unknown>) {
   if (tab) {
     for (const [k, v] of Object.entries(patch)) {
       (tab.session.canvas as Record<string, unknown>)[k] = v;

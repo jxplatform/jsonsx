@@ -25,7 +25,16 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Tab } from "../src/tabs/tab";
 
 const paneContext = await import("../src/panels/pane-context");
-const { activeTab, closeAllTabs } = await import("../src/workspace/workspace");
+const {
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  activeTab,
+  closeAllTabs,
+  focusPane,
+  openTab,
+  splitRight,
+  workspace,
+} = await import("../src/workspace/workspace");
 const { getFit, hasDeclaredFit, resetFits } = await import("../src/canvas/canvas-utils");
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { makeContext } = await import("../src/commands/context");
@@ -36,27 +45,45 @@ const { collabState } = await import("../src/collab/collab-state");
 
 type Ctx = Parameters<typeof paneContext.mount>[1];
 
+/**
+ * The ctx, with a `setCanvasMode` double that RECORDS ITS TARGET and writes through it.
+ *
+ * Both halves matter, and both were missing. The double used to be `(_mode: string) => {}`, holding
+ * no tab and changing nothing — so `toHaveBeenCalledWith("source")` could not distinguish "the
+ * bar's own tab moved" from "some other pane's tab moved", which is exactly the defect the Editor
+ * picker had. It writes through now, so a second pane's bar drawn from the same fixture disagrees
+ * visibly when the wrong tab is written.
+ *
+ * There is no `getCanvasMode` double either, because there is no `getCanvasMode` in the ctx: it
+ * answered for the FOCUSED pane and this bar is drawn per pane. Every mode question the bar asks is
+ * now asked of a real tab, so a fixture can no longer describe a state the app cannot be in.
+ */
 function makeCtx(overrides: Partial<Ctx> = {}): Ctx {
   return {
     exportFile: mock(() => {}),
-    getCanvasMode: mock(() => "edit"),
     parseMediaEntries: mock(() => ({
       baseWidth: 1200,
       featureQueries: [] as { name: string; query: string }[],
       sizeBreakpoints: [] as { name: string; query: string; width: number; type: string }[],
     })),
-    setCanvasMode: mock((_mode: string) => {}),
+    setCanvasMode: mock((tab: Tab | null, mode: string) => {
+      if (tab) {
+        tab.session.ui.canvasMode = mode;
+      }
+    }),
     ...overrides,
   } as Ctx;
 }
 
 /**
- * A ctx in `mode`, with the focused pane's tab put into it too.
+ * A ctx for a pane whose tab is in `mode`. The MODE is a fact about the tab, and only about the
+ * tab.
  *
- * Both, because both are now read. The zoom pod asks `canvasModeOfPane` — THIS pane's effective
- * mode — rather than `ctx.getCanvasMode()`, which answers for whichever pane has focus and so drew
- * an `editZoom` control over a stage rendering Design the moment two panes existed. A fixture that
- * set only the ctx was describing a state the app cannot be in.
+ * This used to set the tab's mode AND hand back a `getCanvasMode` double returning the same string,
+ * with a docstring defending the pair as "both, because both are now read". They cannot disagree in
+ * a fixture, which is the whole reason they disagreed in the app: `exportTpl` asked the ctx and got
+ * the focused pane's answer, so a Code document in either pane put an Export button in both bars.
+ * One source of truth, so the fixture can no longer hide the difference.
  */
 function ctxInMode(mode: string, overrides: Partial<Ctx> = {}): Ctx {
   const tab = activeTab.value;
@@ -64,7 +91,7 @@ function ctxInMode(mode: string, overrides: Partial<Ctx> = {}): Ctx {
     tab.session.ui.canvasMode = mode;
     tab.session.ui.preview = false;
   }
-  return makeCtx({ getCanvasMode: mock(() => mode), ...overrides });
+  return makeCtx(overrides);
 }
 
 function openTestTab(): Tab {
@@ -310,7 +337,7 @@ describe("editor kind", () => {
     picker.value = "code";
     picker.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
-    expect(ctx.setCanvasMode).toHaveBeenCalledWith("source");
+    expect(ctx.setCanvasMode).toHaveBeenCalledWith(tab, "source");
     expect(tab.session.ui.preview).toBe(false);
   });
 
@@ -365,7 +392,7 @@ describe("canvas view", () => {
     pointer(btn("Design"), "click");
     await flush();
     expect(tab.session.ui.preview).toBe(false);
-    expect(ctx.setCanvasMode).toHaveBeenCalledWith("design");
+    expect(ctx.setCanvasMode).toHaveBeenCalledWith(tab, "design");
   });
 
   test("offers only the views the document declares", async () => {
@@ -791,5 +818,142 @@ describe("export", () => {
     paneContext.mount(root, ctxInMode("design"));
     await flush();
     expect(hasBtn("Export")).toBe(false);
+  });
+});
+
+// ─── Two bars, two panes ──────────────────────────────────────────────────────
+
+/**
+ * The bar is drawn ONCE PER PANE, and every control in it must write the pane it was drawn for.
+ *
+ * Every case above mounts one host, and one host is precisely the configuration in which "this
+ * pane's tab" and "the focused tab" cannot disagree. Nine controls resolved their target through
+ * `updateUi`/`ctx.setCanvasMode`, both of which opened with `activeTab.value`, so the unfocused bar
+ * was a fully live remote control for the OTHER pane's document — and nothing in the suite, the
+ * type checker or the pane-singleton guard could see it.
+ */
+describe("two bars, two panes", () => {
+  let sideHost: HTMLElement;
+
+  const WITH_MD = {
+    baseWidth: 1200,
+    featureQueries: [] as { name: string; query: string }[],
+    sizeBreakpoints: [{ name: "md", query: "(min-width: 768px)", type: "min", width: 768 }],
+  };
+
+  /** One tab per pane, both bars attached. `[primaryTab, sideTab]`; focus lands on the side. */
+  async function twoBars(ctx: Ctx): Promise<[Tab, Tab]> {
+    const home = openTestTab();
+    const away = openTab({
+      capabilities: { modes: ["edit", "design", "preview", "source"] },
+      document: { children: [{ tagName: "p", textContent: "Away" }], tagName: "div" },
+      documentPath: "/project/away.json",
+      id: "pane-context-away",
+    });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    paneContext.mount(root, ctx);
+    paneContext.attachPaneChromeHost(SECONDARY_PANE, sideHost);
+    await flush();
+    return [home, away];
+  }
+
+  function btnIn(host: HTMLElement, label: string): HTMLElement {
+    const match = [...host.querySelectorAll("sp-action-button")].find(
+      (b) => (b.textContent || "").trim() === label,
+    );
+    if (!match) {
+      const have = [...host.querySelectorAll("sp-action-button")]
+        .map((b) => (b.textContent || "").trim())
+        .join(", ");
+      throw new Error(`no button labelled "${label}" in that bar — have: ${have}`);
+    }
+    return match as HTMLElement;
+  }
+
+  beforeEach(() => {
+    sideHost = document.createElement("div");
+    document.body.append(sideHost);
+  });
+
+  afterEach(() => {
+    sideHost.remove();
+  });
+
+  test("the SIDE bar's size control writes the side pane's tab, not the focused one", async () => {
+    const [home, away] = await twoBars(makeCtx({ parseMediaEntries: mock(() => WITH_MD) }));
+    // Focus is the side pane after the split, so this is the case that used to look right. Move
+    // It to the primary: the bar being clicked is then the one the keyboard is NOT in.
+    focusPane(PRIMARY_PANE);
+    await flush();
+
+    pointer(btnIn(sideHost, "Md"), "click");
+    await flush();
+
+    expect(away.session.ui.activeMedia).toBe("md");
+    expect(home.session.ui.activeMedia ?? null).toBeNull();
+    console.log(
+      `[pane-context] clicked "Md" in the SIDE bar: primary.activeMedia=` +
+        `${JSON.stringify(home.session.ui.activeMedia ?? null)} ` +
+        `side.activeMedia=${JSON.stringify(away.session.ui.activeMedia)} ` +
+        `(focus=${workspace.activePaneId})`,
+    );
+  });
+
+  test("the SIDE bar's Editor picker moves the side pane's tab", async () => {
+    const [home, away] = await twoBars(makeCtx());
+    focusPane(PRIMARY_PANE);
+    await flush();
+
+    const picker = sideHost.querySelector("sp-picker.pc-editor-kind") as HTMLElement & {
+      value: string;
+    };
+    picker.value = "code";
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+
+    expect(away.session.ui.canvasMode).toBe("source");
+    expect(home.session.ui.canvasMode).not.toBe("source");
+    console.log(
+      `[pane-context] chose Code in the SIDE Editor picker: primary.canvasMode=` +
+        `${home.session.ui.canvasMode} side.canvasMode=${away.session.ui.canvasMode}`,
+    );
+  });
+
+  test("Export appears in the bar of the pane that is in Code — and in no other", async () => {
+    const [home, away] = await twoBars(makeCtx());
+    home.session.ui.canvasMode = "source";
+    away.session.ui.canvasMode = "design";
+    paneContext.render();
+    await flush();
+
+    expect(root.querySelector(".pc-export")).not.toBeNull();
+    expect(sideHost.querySelector(".pc-export")).toBeNull();
+    console.log(
+      `[pane-context] primary=source side=design → Export in primary bar: ` +
+        `${root.querySelector(".pc-export") !== null}, in side bar: ` +
+        `${sideHost.querySelector(".pc-export") !== null}`,
+    );
+
+    // And the other way round, with focus left where it is: the answer follows the DOCUMENT.
+    home.session.ui.canvasMode = "design";
+    away.session.ui.canvasMode = "source";
+    paneContext.render();
+    await flush();
+    expect(root.querySelector(".pc-export")).toBeNull();
+    expect(sideHost.querySelector(".pc-export")).not.toBeNull();
+  });
+
+  test("the SIDE bar's Design segment leaves the primary's mode alone", async () => {
+    const [home, away] = await twoBars(makeCtx());
+    home.session.ui.canvasMode = "edit";
+    away.session.ui.canvasMode = "edit";
+    paneContext.render();
+    await flush();
+
+    pointer(btnIn(sideHost, "Design"), "click");
+    await flush();
+
+    expect(away.session.ui.canvasMode).toBe("design");
+    expect(home.session.ui.canvasMode).toBe("edit");
   });
 });

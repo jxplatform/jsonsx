@@ -19,8 +19,7 @@ import { deriveSecretEnvName } from "../services/data-service";
 import { validateProjectConfig } from "../services/jx-validate";
 import { notify } from "../services/notify";
 import { paneRegion } from "../ui/regions";
-import { stageContaining } from "../canvas/canvas-surface";
-import { PRIMARY_PANE } from "../workspace/workspace";
+import { paneOfContainer } from "../canvas/canvas-surface";
 
 import type { TemplateResult } from "lit-html";
 import type { JsonSchema, SchemaFormContext } from "../ui/schema-form";
@@ -310,18 +309,10 @@ function sectionValue(key: string): Record<string, unknown> | null {
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
-/**
- * Which pane a section is being drawn into, DERIVED from the container it was handed.
- *
- * The settings-section registry is an extension-facing contract — a contribution's `render(host)`
- * takes an element and nothing else — so a pane id cannot be threaded through it without widening
- * that contract for every extension. It does not need to be: the container is inside a stage, and
- * the stage knows whose it is. Falls back to the primary for a detached container (the tests, and a
- * section rendered outside the pane grid entirely).
- */
-function paneOfContainer(container: HTMLElement): string {
-  return stageContaining(container)?.paneId ?? PRIMARY_PANE;
-}
+/* There is no `paneOfContainer` here. It moved to `canvas/canvas-surface.ts`, beside the other
+   "which pane is this about" answers, because it is not a settings idea: any stage content handed
+   only a host needs it, and `settings/general-settings.ts` and `settings/project-sections.ts` are
+   two more that do — both write a canvas mode, and both used to write the FOCUSED pane's. */
 
 /**
  * Render a contributed settings section into the settings document's content area.

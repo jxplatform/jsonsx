@@ -35,7 +35,7 @@ import type { CommandContext } from "../commands/context";
 import type { GitDiffState } from "../types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxPath } from "../state";
-import type { TabUi } from "../tabs/tab";
+import type { Tab, TabUi } from "../tabs/tab";
 import type { nothing, TemplateResult } from "lit-html";
 import type { renderDataExplorerTemplate } from "./data-explorer";
 import type { renderGitPanel } from "./git-panel";
@@ -62,7 +62,7 @@ export type PanelDock = "navigator" | "inspector" | "bottom";
  */
 export interface NavigatorPanelDeps {
   getCanvasMode: () => string;
-  setCanvasMode: (mode: string) => void;
+  setCanvasMode: (tab: Tab | null, mode: string) => void;
   // Typed against their implementations so every call site stays checked. These are type-only
   // Imports, so they are erased — the modules themselves are never pulled in through this file.
   renderImportsTemplate: typeof renderImportsTemplate;

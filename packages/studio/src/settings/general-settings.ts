@@ -14,6 +14,7 @@ import { live } from "lit-html/directives/live.js";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { projectState, updateUi } from "../store";
 import { updateSiteConfig } from "../site-context";
+import { tabOfContainer } from "../canvas/canvas-surface";
 import { getPlatform } from "../platform";
 
 import type { JxHeadEntry, ProjectConfig } from "@jxsuite/schema/types";
@@ -170,7 +171,9 @@ export function renderGeneralSettings(container: HTMLElement) {
    * P6 removes. Nothing closes now, because nothing was covering anything.
    */
   const onEditGlobalStyles = () => {
-    updateUi("canvasMode", "stylebook");
+    // THIS pane's tab. The Project Settings editor is stage content, so a settings document
+    // Open in the side pane used to send the PRIMARY into the Stylebook.
+    updateUi(tabOfContainer(container), "canvasMode", "stylebook");
   };
 
   const currentFavicon = config.favicon;

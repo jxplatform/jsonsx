@@ -18,6 +18,7 @@ import {
   activeCanvasSurface,
   registerCanvasSurface,
   surfaceForPane,
+  unregisterCanvasSurface,
 } from "../src/canvas/canvas-surface";
 import {
   activateTab,
@@ -310,7 +311,9 @@ function openSyncedTab(
 const ctx = {
   gitDiffState: null as Record<string, unknown> | null,
   openFileFromTree: mock(() => {}),
-  setCanvasMode: mock((m: string) => {
+  /* Takes the tab. `renderCanvas` is per-PANE, so its git-diff fallback names the tab of the pane
+     it is drawing rather than whichever one has focus. */
+  setCanvasMode: mock((_tab: unknown, m: string) => {
     setMode(m);
   }),
   setGitDiffState: mock(() => {}),
@@ -1228,10 +1231,15 @@ describe("source mode", () => {
 
 describe("git-diff mode", () => {
   test("falls back to design mode when no diff state is set", () => {
-    openSyncedTab();
+    const tab = openSyncedTab();
     setMode("git-diff");
     renderCanvas();
-    expect(ctx.setCanvasMode).toHaveBeenCalledWith("design");
+    /* Positionally, not `toHaveBeenCalledWith`: the first argument is a reactive Tab proxy and
+       bun's matcher serializes its arguments, which on a document graph is a cyclic structure. The
+       identity check is the stronger assertion anyway — it names WHICH tab. */
+    const [target, mode] = ctx.setCanvasMode.mock.calls.at(-1) as [unknown, string];
+    expect(mode).toBe("design");
+    expect(toRaw(target as object)).toBe(toRaw(tab as unknown as object));
     expect(canvasPanels.length).toBe(1);
   });
 
@@ -1727,6 +1735,69 @@ describe("stylebook mode", () => {
     shell.stylebook.customizedOnly = true;
     renderCanvas();
     expect(renderStylebookMode).toHaveBeenCalledTimes(2);
+  });
+
+  test("two Stylebook panes BOTH rebuild on a filter change — neither evicts the other", () => {
+    /* `shell.stylebook.filter` is an application-level render input, so a change to it renders
+       every pane in one frame. The "have the filters changed" memory was ONE module slot: the
+       first pane to render stored the new filter and rebuilt, and the second compared against a
+       slot the first had already advanced, concluded nothing had changed, and returned through the
+       cheap `postStyleUpdateToStylebookHosts` path — with a catalogue still listing the PREVIOUS
+       filter's specimens. Which pane lost was decided by render order, and it stayed wrong until a
+       mode change. The memory is a field of each pane's `CanvasSurface` now. */
+    const left = openSyncedTab({ children: [], tagName: "div" });
+    const right = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "/project/sb-right.json",
+      id: "stylebook-right",
+    });
+    left.session.ui.canvasMode = "stylebook";
+    right.session.ui.canvasMode = "stylebook";
+    workspace.panes[0]!.tabOrder = [left.id];
+    workspace.panes[0]!.activeTabId = left.id;
+    workspace.panes.push({ activeTabId: right.id, id: SECONDARY_PANE, tabOrder: [right.id] });
+    const secondWrap = document.createElement("div");
+    document.body.append(secondWrap);
+    registerCanvasSurface(SECONDARY_PANE, secondWrap);
+    // A live stylebook host in each pane, so the cheap path is available to both.
+    styleUpdateImpl = () => 1;
+
+    const rebuilt = () =>
+      renderStylebookMode.mock.calls.map((call) => (call[0] as { paneId: string }).paneId);
+
+    // Pass one: both panes build their catalogue for the empty filter.
+    shell.stylebook.filter = "button";
+    renderCanvas(PRIMARY_PANE);
+    renderCanvas(SECONDARY_PANE);
+    expect(rebuilt()).toEqual([PRIMARY_PANE, SECONDARY_PANE]);
+    renderStylebookMode.mockClear();
+
+    // Pass two: ONE filter change, both stages in the same frame.
+    shell.stylebook.filter = "card";
+    renderCanvas(PRIMARY_PANE);
+    renderCanvas(SECONDARY_PANE);
+    console.log(
+      `[canvas-render] filter "button" → "card" with two Stylebook panes: rebuilt ` +
+        `${JSON.stringify(rebuilt())}`,
+    );
+    expect(rebuilt()).toEqual([PRIMARY_PANE, SECONDARY_PANE]);
+
+    // And with the SECOND pane rendering first, which is the ordering that used to lose.
+    renderStylebookMode.mockClear();
+    shell.stylebook.filter = "list";
+    renderCanvas(SECONDARY_PANE);
+    renderCanvas(PRIMARY_PANE);
+    expect(rebuilt()).toEqual([SECONDARY_PANE, PRIMARY_PANE]);
+
+    // Nothing changed: BOTH panes take the cheap path, which is the behaviour being protected.
+    renderStylebookMode.mockClear();
+    renderCanvas(PRIMARY_PANE);
+    renderCanvas(SECONDARY_PANE);
+    expect(rebuilt()).toEqual([]);
+
+    surfaceForPane(SECONDARY_PANE).panels.length = 0;
+    unregisterCanvasSurface(SECONDARY_PANE);
+    secondWrap.remove();
   });
 });
 

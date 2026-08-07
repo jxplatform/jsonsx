@@ -23,6 +23,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { projectState, updateUi } from "../store";
 import { serializeProjectConfig } from "../tabs/project-config";
+import { tabOfContainer } from "../canvas/canvas-surface";
 import { updateSiteConfig } from "../site-context";
 
 import type { ProjectConfig } from "@jxsuite/schema/types";
@@ -248,7 +249,7 @@ export function renderRawJsonSection(container: HTMLElement): void {
       <sp-action-button
         size="s"
         class="settings-edit-as-code"
-        @click=${() => updateUi("canvasMode", CODE_MODE)}
+        @click=${() => updateUi(tabOfContainer(container), "canvasMode", CODE_MODE)}
       >
         Edit as code
       </sp-action-button>

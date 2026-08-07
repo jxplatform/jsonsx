@@ -1005,7 +1005,7 @@ function styleSidebarTemplate(
         inheritedInfo[p] = {
           value: (v as string | number) ?? "",
           donor: "Base",
-          jump: () => updateUi("previewColorScheme", "auto"),
+          jump: () => updateUi(activeTab.value, "previewColorScheme", "auto"),
         };
       }
     }
@@ -1016,7 +1016,7 @@ function styleSidebarTemplate(
       inheritedInfo[p] = {
         value: source.value,
         donor: source.donor === null ? "Base" : mediaDisplayName(source.donor),
-        jump: () => updateUi("activeMedia", source.donor),
+        jump: () => updateUi(activeTab.value, "activeMedia", source.donor),
       };
     }
   }

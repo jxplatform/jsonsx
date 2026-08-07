@@ -358,7 +358,7 @@ export async function closeFunctionEditor(): Promise<void> {
     // Runs, because a target with no editor is precisely the state nothing else resolves.
     disposeFunctionEditor();
   }
-  updateUi("editingFunction", null);
+  updateUi(activeTab.value, "editingFunction", null);
 }
 
 /**

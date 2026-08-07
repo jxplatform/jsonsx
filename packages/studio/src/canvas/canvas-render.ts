@@ -101,16 +101,13 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../tabs/tab.js";
 
 interface CanvasRenderCtx {
-  setCanvasMode: (mode: string) => void;
+  setCanvasMode: (tab: Tab | null, mode: string) => void;
   openFileFromTree: (path: string) => void;
   gitDiffState: GitDiffState | null;
   setGitDiffState: (state: GitDiffState | null) => void;
 }
 
 let _ctx: CanvasRenderCtx | null = null;
-
-let _prevStylebookFilter = "";
-let _prevStylebookCustomizedOnly = false;
 
 /**
  * Initialize the canvas render module.
@@ -796,10 +793,15 @@ function renderCanvasImpl(surface: CanvasSurface) {
   // Filter/Customized changes fall through to the full rebuild (they change which specimens exist),
   // As does a zero-host post (no stylebook iframe live yet).
   if (canvasMode === "stylebook" && !modeChanged) {
+    /* THIS stage's last catalogue, not the module's. Both panes render in the same frame when
+       `shell.stylebook.filter` changes, so a single slot was advanced by whichever stage went
+       first and the second one then saw `filterChanged === false` — returning through the cheap
+       style-post path with a catalogue built for the PREVIOUS filter. */
     const curFilter = shell.stylebook.filter;
     const curCustomized = shell.stylebook.customizedOnly;
     const filterChanged =
-      curFilter !== _prevStylebookFilter || curCustomized !== _prevStylebookCustomizedOnly;
+      curFilter !== surface.prevStylebookFilter ||
+      curCustomized !== surface.prevStylebookCustomizedOnly;
     if (!filterChanged) {
       const style = transposeStylebookStyle(getEffectiveStyle(tab.doc.document?.style));
       if (postStyleUpdateToStylebookHosts(style as Record<string, unknown>) > 0) {
@@ -879,8 +881,8 @@ function renderCanvasImpl(surface: CanvasSurface) {
 
   // Stylebook mode: render element catalog with panzoom surface
   if (canvasMode === "stylebook") {
-    _prevStylebookFilter = shell.stylebook.filter;
-    _prevStylebookCustomizedOnly = shell.stylebook.customizedOnly;
+    surface.prevStylebookFilter = shell.stylebook.filter;
+    surface.prevStylebookCustomizedOnly = shell.stylebook.customizedOnly;
     renderStylebookMode(surface, {
       applyTransform,
       canvasPanelTemplate,
@@ -981,7 +983,7 @@ function renderCanvasImpl(surface: CanvasSurface) {
   // Git diff mode — render original (left) and current (right) side-by-side on panzoom surface
   if (canvasMode === "git-diff") {
     if (!ctx.gitDiffState) {
-      ctx.setCanvasMode("design");
+      ctx.setCanvasMode(tab, "design");
       renderCanvas(surface.paneId);
       return;
     }
@@ -1309,7 +1311,7 @@ function renderCanvasIntoPanel(
         // So classifyOps admits surgical patches; the iframe holds the render context, so this
         // Panel needs no parent-side render scope.
         panel.ready = !docOverride;
-        updateCanvas({ error: null, scope: null, status: "ready" });
+        updateCanvas(tab, { error: null, scope: null, status: "ready" });
         // A successful render used to announce itself as "Iframe render OK" — a debug string
         // Shipped to end users and legible in a published docs screenshot. A render that worked is
         // The canvas you are looking at; it says so itself.
