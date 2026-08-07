@@ -13,6 +13,25 @@
  */
 
 import type { editor } from "monaco-editor";
+import type { BufferWrites } from "./services/monaco-buffer";
+import type { Tab } from "./tabs/tab";
+
+/**
+ * What both of Studio's Monaco surfaces hang off their editor instance.
+ *
+ * ONE shape, because there is one rule. The source view and the function editor are mounted by
+ * different modules, torn down by different events and written into by different continuations —
+ * and each of those differences used to justify its own spelling of the same two ideas ("ignore the
+ * change my own `setValue` is about to fire" and "cancel the work armed over this buffer"). The
+ * function editor got a canceller in P8 and the source view did not, which is exactly how a 600ms
+ * timer survived three disposal sites and stayed able to replace a page with an empty parse.
+ * `services/monaco-buffer.ts` owns the rule; this is the storage it needs.
+ */
+type MonacoSurface = editor.IStandaloneCodeEditor & {
+  _ignoreNextChange?: boolean;
+  /** The debounced work armed over this buffer, with this editor's exact lifetime. */
+  _writes?: BufferWrites;
+};
 
 interface ViewState {
   panzoomWrap: HTMLElement | null;
@@ -21,16 +40,25 @@ interface ViewState {
   needsCenter: boolean;
   panX: number;
   panY: number;
-  prevCanvasMode: string | null;
-  monacoEditor:
-    | (editor.IStandaloneCodeEditor & {
-        _ignoreNextChange?: boolean;
-      })
-    | null;
+  monacoEditor: MonacoSurface | null;
+  /**
+   * The dock's code editor, plus what it was mounted FOR.
+   *
+   * The target string alone was not an answer. `{"eventKey":"onclick","path":["children",0],"type":
+   * "event"}` is the SAME string for the first button on any two pages, so a re-sync could match
+   * across a tab switch and hand one document's buffer to another. `_editingTab` is the missing
+   * half, held by identity rather than by id so a commit can ask `tabIsLive` whether the document
+   * it was promised to still exists.
+   *
+   * `_commitBody` is the one writer for both of them: a closure built at mount over that tab and
+   * that target, so the debounce and the Close cannot disagree about where a body goes — and
+   * neither can resolve it through whichever tab happens to be focused when they run.
+   */
   functionEditor:
-    | (editor.IStandaloneCodeEditor & {
-        _ignoreNextChange?: boolean;
+    | (MonacoSurface & {
         _editingTarget?: string | null;
+        _editingTab?: Tab | null;
+        _commitBody?: (body: string) => void;
       })
     | null;
   blockActionBarEl: HTMLElement | null;
@@ -57,7 +85,6 @@ export const view: ViewState = {
   needsCenter: true,
   panX: 0,
   panY: 0,
-  prevCanvasMode: null,
 
   // Editor instances
   monacoEditor: null,

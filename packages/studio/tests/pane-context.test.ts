@@ -39,12 +39,8 @@ type Ctx = Parameters<typeof paneContext.mount>[1];
 
 function makeCtx(overrides: Partial<Ctx> = {}): Ctx {
   return {
-    closeFormulaWorkspace: mock(() => {}),
-    closeFunctionEditor: mock(() => {}),
     exportFile: mock(() => {}),
     getCanvasMode: mock(() => "edit"),
-    navigateBack: mock(() => {}),
-    navigateToLevel: mock((_level: number) => {}),
     parseMediaEntries: mock(() => ({
       baseWidth: 1200,
       featureQueries: [] as { name: string; query: string }[],
@@ -207,7 +203,7 @@ describe("the bar", () => {
     expect(root.querySelector(".jx-collab-banner")).toBeNull();
   });
 
-  test("a takeover editor keeps the banner — a frozen guest is still a guest", async () => {
+  test("a logic editor keeps the banner — a frozen guest is still a guest", async () => {
     const tab = openTestTab();
     paneContext.mount(root, makeCtx());
     const state = collabState(tab);
@@ -215,18 +211,54 @@ describe("the bar", () => {
     state.readOnly = true;
     tab.session.ui.editingFunction = { defName: "greet", type: "def" };
     await flush();
-    expect(axes()).toEqual([]);
     expect(root.querySelector(".jx-collab-banner")).not.toBeNull();
   });
+});
 
-  test("a takeover editor suppresses the axes and the pod, keeping only the way out", async () => {
+// ─── There is no takeover ─────────────────────────────────────────────────────
+
+describe("a logic editor open in the dock", () => {
+  // The bar used to blank itself the moment `editingFunction` or `editingFormula` was set, on the
+  // Grounds that a full-screen sub-editor owned the stage. P8 put both in the Bottom dock's Logic
+  // Tab and left the page rendering underneath, so the axes describe the document that is still on
+  // Screen and the pod still has something to zoom. Suppressing them removed the controls for the
+  // Document the reader could see.
+  test("leaves all three axes and the zoom pod exactly where they were", async () => {
+    const tab = openTestTab();
+    paneContext.mount(root, makeCtx());
+    await flush();
+    const before = axes();
+    expect(before).toEqual(["Editor", "View", "Context"]);
+
+    tab.session.ui.editingFunction = { defName: "greet", type: "def" };
+    await flush();
+    expect(axes()).toEqual(before);
+    expect(root.querySelector(".pane-zoom")).not.toBeNull();
+
+    tab.session.ui.editingFunction = null;
+    tab.session.ui.editingFormula = { defName: "total", type: "def" };
+    await flush();
+    expect(axes()).toEqual(before);
+    expect(root.querySelector(".pane-zoom")).not.toBeNull();
+  });
+
+  test("draws no Back and no breadcrumb — the dock header and the jump bar own both", async () => {
+    // Two exits and two trails, side by side, for one sub-document. The Logic tab's header carries
+    // The real Close (P8.5) and ⑥ carries the address; this bar drew a second of each.
     const tab = openTestTab();
     paneContext.mount(root, makeCtx());
     tab.session.ui.editingFunction = { defName: "greet", type: "def" };
     await flush();
-    expect(axes()).toEqual([]);
-    expect(root.querySelector(".pane-zoom")).toBeNull();
-    expect(hasBtn("Back")).toBe(true);
+    expect(root.querySelector(".breadcrumb")).toBeNull();
+    expect(hasBtn("Back")).toBe(false);
+  });
+
+  test("the Export control survives too, in the view that owns it", async () => {
+    const tab = openTestTab();
+    paneContext.mount(root, makeCtx({ getCanvasMode: mock(() => "source") }));
+    tab.session.ui.editingFormula = { eventKey: "onclick", type: "event" };
+    await flush();
+    expect(hasBtn("Export")).toBe(true);
   });
 });
 
@@ -732,93 +764,6 @@ describe("zoom pod", () => {
     paneContext.mount(root, makeCtx({ getCanvasMode: mock(() => "source") }));
     await flush();
     expect(root.querySelector(".pane-zoom")).toBeNull();
-  });
-});
-
-// ─── ⑥ Navigation context ─────────────────────────────────────────────────────
-
-describe("breadcrumb", () => {
-  test("a document stack shows Back plus a clickable trail", async () => {
-    const tab = openTestTab();
-    const ctx = makeCtx();
-    paneContext.mount(root, ctx);
-    await flush();
-    expect(root.querySelector(".breadcrumb")).toBeNull();
-
-    tab.session.documentStack.push({ documentPath: "/project/parent.json" } as never);
-    await flush();
-    const clickable = root.querySelector(".breadcrumb-item.clickable")!;
-    expect(clickable.textContent).toBe("parent.json");
-    expect(root.querySelector(".breadcrumb-item.current")?.textContent).toContain("index.json");
-
-    pointer(btn("Back"), "click");
-    expect(ctx.navigateBack).toHaveBeenCalledTimes(1);
-    pointer(clickable, "click");
-    expect(ctx.navigateToLevel).toHaveBeenCalledWith(0);
-  });
-
-  test("a frame without a path reads 'untitled'", async () => {
-    const tab = openTestTab();
-    paneContext.mount(root, makeCtx());
-    tab.session.documentStack.push({} as never);
-    await flush();
-    expect(root.querySelector(".breadcrumb-item.clickable")?.textContent).toBe("untitled");
-  });
-
-  test("the function editor takes precedence and closes through its own callback", async () => {
-    const tab = openTestTab();
-    const ctx = makeCtx();
-    paneContext.mount(root, ctx);
-    tab.session.documentStack.push({ documentPath: "/project/parent.json" } as never);
-    tab.session.ui.editingFormula = { defName: "total", type: "def" };
-    tab.session.ui.editingFunction = { defName: "greet", type: "def" };
-    await flush();
-
-    expect(root.querySelector(".breadcrumb-item.current")?.textContent).toBe("ƒ greet");
-    expect(root.querySelector(".breadcrumb-item.clickable")).toBeNull();
-    pointer(btn("Back"), "click");
-    expect(ctx.closeFunctionEditor).toHaveBeenCalledTimes(1);
-    expect(ctx.navigateBack).not.toHaveBeenCalled();
-  });
-
-  test("an event handler's breadcrumb reads its event key", async () => {
-    const tab = openTestTab();
-    paneContext.mount(root, makeCtx());
-    tab.session.ui.editingFunction = { eventKey: "onclick", type: "event" };
-    await flush();
-    expect(root.querySelector(".breadcrumb-item.current")?.textContent).toBe("ƒ onclick");
-  });
-
-  test("the formula workspace closes through its own callback", async () => {
-    const tab = openTestTab();
-    const ctx = makeCtx();
-    paneContext.mount(root, ctx);
-    tab.session.ui.editingFormula = { defName: "total", type: "def" };
-    await flush();
-
-    expect(root.querySelector(".breadcrumb-item.current")?.textContent).toBe("fx total");
-    pointer(btn("Back"), "click");
-    expect(ctx.closeFormulaWorkspace).toHaveBeenCalledTimes(1);
-    expect(ctx.closeFunctionEditor).not.toHaveBeenCalled();
-  });
-
-  test("a formula event's breadcrumb reads its event key", async () => {
-    const tab = openTestTab();
-    paneContext.mount(root, makeCtx());
-    tab.session.ui.editingFormula = { eventKey: "onclick", type: "event" };
-    await flush();
-    expect(root.querySelector(".breadcrumb-item.current")?.textContent).toBe("fx onclick");
-  });
-
-  test("a tab with no path falls back to the document's tag name", async () => {
-    const tab = resetWorkspaceWithTab(
-      { children: [], tagName: "section" },
-      { documentPath: "", id: "no-path" },
-    );
-    paneContext.mount(root, makeCtx());
-    tab.session.ui.editingFunction = { defName: "greet", type: "def" };
-    await flush();
-    expect([...root.querySelectorAll(".breadcrumb-item")][0]?.textContent).toBe("section");
   });
 });
 

@@ -196,11 +196,16 @@ describe("statusbar/selection", () => {
     renderStatusbar();
     expect(resolveRegion("statusbar/selection")).toBeNull();
 
-    tab.session.selection = [["children", 0]];
+    // A BATCH: since region ⑥ took the ancestor trail, a single selection leaves this field empty
+    // (`statusbar.test.ts` states why), and the COUNT is what still renders it.
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
     renderStatusbar();
     const field = resolveRegion("statusbar/selection");
     expect(field).not.toBeNull();
-    expect(field!.textContent).toContain("p — Hello");
+    expect(field!.textContent).toContain("2 selected");
     expect(resolveRegion("statusbar")!.contains(field)).toBe(true);
   });
 

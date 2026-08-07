@@ -1,12 +1,12 @@
 /**
  * Coverage for src/files/files.ts — project/directory loading and tab-oriented file flows
- * (loadDirectory, loadProject, openProject, openHomePage, openFileFromTree, openFileInTab,
- * reloadFileInTab). Tree rendering, keyboard, context menu, and DnD live in files-tree.test.ts.
+ * (loadDirectory, loadProject, openProject, openHomePage, openFileInTab, reloadFileInTab). Tree
+ * rendering, keyboard, context menu, and DnD live in files-tree.test.ts.
  */
 import { flush, installMockPlatform } from "./harness";
 import type { MockPlatformState } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { createState, requireProjectState, setProjectState, projectState } from "../src/store";
+import { requireProjectState, setProjectState, projectState } from "../src/store";
 import { activeTab, closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import {
@@ -14,7 +14,6 @@ import {
   initProjectRepo,
   loadDirectory,
   loadProject,
-  openFileFromTree,
   openFileInTab,
   openHomePage,
   openProject,
@@ -22,7 +21,6 @@ import {
 } from "../src/files/files";
 import { shell } from "../src/shell";
 import type { DirEntry, StudioPlatform } from "../src/types";
-import type { StudioState } from "../src/state";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -447,130 +445,6 @@ describe("openProject", () => {
     await openProject(ctx);
 
     expect(ctx.calls).toEqual([]);
-  });
-});
-
-// ─── openFileFromTree ─────────────────────────────────────────────────────────
-
-describe("openFileFromTree", () => {
-  function makeCtx(init: Partial<StudioState> = {}) {
-    const S = createState({ children: [], tagName: "div" });
-    Object.assign(S, init);
-    const commits: StudioState[] = [];
-    const renders: number[] = [];
-    const mdLoads: [string, unknown][] = [];
-    return {
-      S,
-      commit: (s: StudioState) => commits.push(s),
-      commits,
-      loadMarkdown: (source: string, handle: unknown) => {
-        mdLoads.push([source, handle]);
-      },
-      mdLoads,
-      render: () => renders.push(1),
-      renders,
-    };
-  }
-
-  test("opens a JSON document and commits fresh state", async () => {
-    installFsPlatform({
-      "pages/a.json": JSON.stringify({ children: [], tagName: "article" }),
-    });
-    siteState();
-    const ctx = makeCtx();
-
-    await openFileFromTree(ctx, "pages/a.json");
-
-    expect(ctx.commits).toHaveLength(1);
-    expect(ctx.commits[0]!.documentPath).toBe("pages/a.json");
-    expect(ctx.commits[0]!.dirty).toBe(false);
-    expect(ctx.commits[0]!.document.tagName).toBe("article");
-    expect(requireProjectState().selectedPath).toBe("pages/a.json");
-    expect(ctx.renders).toHaveLength(1);
-  });
-
-  test("routes format files through loadMarkdown", async () => {
-    installFsPlatform({ "post.md": "# Hello\n" });
-    siteState();
-    const ctx = makeCtx();
-
-    await openFileFromTree(ctx, "post.md");
-
-    expect(ctx.mdLoads).toEqual([["# Hello\n", null]]);
-    expect(ctx.S.documentPath).toBe("post.md");
-    expect(ctx.S.dirty).toBe(false);
-    expect(ctx.commits).toEqual([ctx.S]);
-  });
-
-  test("auto-saves the current dirty document before switching", async () => {
-    const { state } = installFsPlatform({
-      "pages/next.json": JSON.stringify({ tagName: "div" }),
-    });
-    siteState();
-    const ctx = makeCtx({
-      dirty: true,
-      document: { children: [], tagName: "section" },
-      documentPath: "pages/old.json",
-    });
-
-    await openFileFromTree(ctx, "pages/next.json");
-
-    expect(JSON.parse(state.files.get("pages/old.json")!)).toEqual({
-      children: [],
-      tagName: "section",
-    });
-    expect(ctx.commits[0]!.documentPath).toBe("pages/next.json");
-  });
-
-  test("auto-save failure still opens the new file", async () => {
-    installFsPlatform(
-      { "pages/next.json": JSON.stringify({ tagName: "div" }) },
-      {
-        writeFile: async () => {
-          throw new Error("read-only fs");
-        },
-      },
-    );
-    siteState();
-    const ctx = makeCtx({ dirty: true, documentPath: "pages/old.json" });
-
-    await openFileFromTree(ctx, "pages/next.json");
-
-    expect(ctx.commits).toHaveLength(1);
-    expect(ctx.commits[0]!.documentPath).toBe("pages/next.json");
-  });
-
-  test("empty content aborts without committing", async () => {
-    installFsPlatform({ "empty.json": "" });
-    siteState({ selectedPath: "before" });
-    const ctx = makeCtx();
-
-    await openFileFromTree(ctx, "empty.json");
-
-    expect(ctx.commits).toHaveLength(0);
-    expect(requireProjectState().selectedPath).toBe("before");
-  });
-
-  test("unknown extension surfaces a no-format error", async () => {
-    installFsPlatform({ "data.toml": "a = 1" });
-    siteState({ selectedPath: null });
-    const ctx = makeCtx();
-
-    await openFileFromTree(ctx, "data.toml");
-
-    expect(ctx.commits).toHaveLength(0);
-    expect(ctx.renders).toHaveLength(0);
-    expect(requireProjectState().selectedPath).toBeNull();
-  });
-
-  test("read failure is reported without committing", async () => {
-    installFsPlatform({});
-    siteState();
-    const ctx = makeCtx();
-
-    await openFileFromTree(ctx, "missing.json");
-
-    expect(ctx.commits).toHaveLength(0);
   });
 });
 

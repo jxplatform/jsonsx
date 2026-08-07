@@ -1,6 +1,7 @@
 import { computed, reactive, toRaw } from "../reactivity";
 import { ensureCollab, rekeyCollab } from "../collab/collab-session";
 import { createTab, disposeTab, editorKindOf, editorKindsOf, modeForEditorKind } from "../tabs/tab";
+import { editorKindForMode } from "../commands/context";
 import { projectState } from "../state";
 import { argsSchema, booleanArg, booleanProperty } from "../commands/command-args";
 import type { Tab, TabOrigin } from "../tabs/tab";
@@ -84,8 +85,6 @@ export interface Workspace {
   panes: Pane[];
   /** Which pane the keyboard and every "the active document" read resolve through. */
   activePaneId: string;
-  /** The pane filling the grid on its own, or null. `pane.toggleZoom` writes it. */
-  zoomedPaneId: string | null;
   /**
    * Most-recently-used order, newest first, ACROSS panes. `⌃Tab` walks this, NOT
    * {@link Pane.tabOrder} — "the tab I was just in" is the one people reach for, and it is rarely
@@ -129,7 +128,6 @@ export const workspace: Workspace = reactive({
   ui: {
     activityBar: "files",
   },
-  zoomedPaneId: null as string | null,
   // The two derived reads. Defined as getters on the object reactive() wraps, so a consumer that
   // Reads `workspace.activeTabId` inside an effect tracks `panes` and `activePaneId` — the same
   // Dependency it used to have on the field these replace, with no second source of truth.
@@ -208,6 +206,22 @@ export function focusOtherPane() {
 }
 
 /**
+ * THE cap, as one predicate: whether a pane may host an editor kind.
+ *
+ * Every enforcement point below reads this and nothing else — the split ({@link capToPaneKind}),
+ * the later mode switch ({@link paneOfTabCanHostMode}) and the controls that offer either ({@link
+ * hostableKindsOf}). A second copy of "is it in the set" is how the two ends of a cap start
+ * disagreeing.
+ *
+ * @param {string} paneId
+ * @param {EditorKind} kind
+ * @returns {boolean}
+ */
+export function paneCanHostKind(paneId: string, kind: EditorKind): boolean {
+  return paneId === PRIMARY_PANE || SECONDARY_PANE_KINDS.has(kind);
+}
+
+/**
  * Whether `tab` can be hosted outside the primary pane — i.e. whether it supports any of
  * {@link SECONDARY_PANE_KINDS}.
  *
@@ -215,24 +229,59 @@ export function focusOtherPane() {
  * @returns {boolean}
  */
 export function canOpenInSecondPane(tab: Tab): boolean {
-  return editorKindsOf(tab).some((kind) => SECONDARY_PANE_KINDS.has(kind));
+  return editorKindsOf(tab).some((kind) => paneCanHostKind(SECONDARY_PANE, kind));
 }
 
 /**
- * Force a tab that has landed in a non-primary pane onto a kind that pane may host.
+ * The editor kinds `tab` may show WHERE IT IS — {@link editorKindsOf} narrowed by its pane's cap.
  *
- * The cap is enforced HERE rather than at the split, because a tab in the second pane can also be
- * switched back to Canvas from the context bar. One rule, one place.
+ * What a control offers has to be what the app will accept, or the segment is dead: the pane
+ * context bar's Editor dropdown and Canvas view group both draw from this, so a tab in the side
+ * pane is never offered the Design its pane would refuse.
  *
  * @param {Tab} tab
+ * @returns {EditorKind[]}
+ */
+export function hostableKindsOf(tab: Tab): EditorKind[] {
+  const pane = paneOfTab(tab.id);
+  const kinds = editorKindsOf(tab);
+  return pane ? kinds.filter((kind) => paneCanHostKind(pane.id, kind)) : kinds;
+}
+
+/**
+ * Whether the pane currently holding `tab` may host `mode`. A tab no pane holds is unconstrained.
+ *
+ * This is the half of the cap the split cannot enforce: a tab already in the side pane can be
+ * switched back to Canvas from the context bar, from `canvas.setMode`, or by any other writer of
+ * `session.ui.canvasMode`. Enforcing only at the split left that open, and it stays harmless only
+ * for as long as the shell has ONE stage that follows focus — which P8 workstream 2 ends.
+ *
+ * @param {Tab} tab
+ * @param {string} mode
+ * @returns {boolean}
+ */
+export function paneOfTabCanHostMode(tab: Tab, mode: string): boolean {
+  const pane = paneOfTab(tab.id);
+  return !pane || paneCanHostKind(pane.id, editorKindForMode(mode));
+}
+
+/**
+ * Force a tab that is MOVING into a non-primary pane onto a kind that pane may host.
+ *
+ * The split is one of the two enforcement points, not the only one — it is the only one that can
+ * pick a replacement kind, because it runs before the tab is in the target pane. Once it is there,
+ * {@link paneOfTabCanHostMode} refuses a switch back out of the capped set.
+ *
+ * @param {Tab} tab
+ * @param {string} paneId — the pane the tab is moving INTO
  * @returns {boolean} Whether the tab is (now) hostable there
  */
-function capToSecondaryKind(tab: Tab): boolean {
-  if (SECONDARY_PANE_KINDS.has(editorKindOf(tab))) {
+function capToPaneKind(tab: Tab, paneId: string): boolean {
+  if (paneCanHostKind(paneId, editorKindOf(tab))) {
     return true;
   }
   for (const kind of editorKindsOf(tab)) {
-    if (!SECONDARY_PANE_KINDS.has(kind)) {
+    if (!paneCanHostKind(paneId, kind)) {
       continue;
     }
     const mode = modeForEditorKind(tab, kind);
@@ -260,29 +309,48 @@ export function splitRight(): Pane | null {
   if (!tabId || !tab) {
     return null;
   }
-  const target =
-    workspace.panes.find((pane) => pane.id !== source.id) ??
-    (workspace.panes.length < MAX_PANES
-      ? { activeTabId: null as string | null, id: SECONDARY_PANE, tabOrder: [] as string[] }
-      : null);
-  if (!target) {
+  const existing = workspace.panes.find((pane) => pane.id !== source.id) ?? null;
+  if (!existing && workspace.panes.length >= MAX_PANES) {
     return null;
   }
+  const targetId = existing?.id ?? SECONDARY_PANE;
   // The primary keeps the Canvas; whichever pane is NOT primary takes the capped kind.
-  const capped = target.id === PRIMARY_PANE ? tab : capToSecondaryKind(tab) ? tab : null;
-  if (!capped) {
+  if (!capToPaneKind(tab, targetId)) {
     return null;
   }
-  if (!workspace.panes.includes(target)) {
-    workspace.panes.push(target);
-  }
+  const target = existing ?? addPane(targetId);
   detachTab(tabId);
   insertIntoPane(target, tabId);
-  workspace.activePaneId = target.id;
+  /* Focus moves LAST, and every write above went through {@link addPane}'s reactive record.
+     Publishing the focus first made the pane observable while it still showed nothing: the
+     `activeTab` computed re-ran, cached null, and the jump bar, the Inspector and the toolbar all
+     printed "no document" over a stage that was drawing one. The write that should have corrected
+     them notified nobody, because it went through the raw literal this used to push. */
   target.activeTabId = tabId;
+  workspace.activePaneId = target.id;
   resetTabCycle();
   promoteMru(tabId);
   return target;
+}
+
+/**
+ * Publish a new pane and hand back the REACTIVE record.
+ *
+ * The pane is constructed HERE so no caller can hold the raw literal. `reactive()` wraps on READ:
+ * an object pushed into the array is still the plain object the caller has a reference to, and a
+ * write through that reference reaches the same fields while notifying no effect at all. Building
+ * the record inside the one function that publishes it is what makes that mistake unavailable
+ * rather than merely absent — see the same failure recorded for nested reactive collections.
+ *
+ * @param {string} paneId
+ * @returns {Pane}
+ */
+function addPane(paneId: string): Pane {
+  workspace.panes = [
+    ...workspace.panes,
+    { activeTabId: null as string | null, id: paneId, tabOrder: [] as string[] },
+  ];
+  return paneById(paneId)!;
 }
 
 /**
@@ -302,30 +370,33 @@ export function closePane(paneId: string) {
   if (!pane || !survivor) {
     return;
   }
+  /* The ORDER is the whole of this function.
+     "The active pane does not exist" must never be observable. Every reader resolves through
+     `workspace.activePaneId` — the stage, `tabOfPane`, the jump bar, the Inspector — so removing
+     the pane while the focus still names it publishes, for one synchronous instant, a workspace
+     whose focused pane has no tab. A render scheduled in that instant tore the canvas down to its
+     welcome state and NOTHING scheduled another: the focus flip that followed changed no
+     `activeTab`, so both canvas effects stayed quiet and the editor was gone until a reload.
+     So: the survivor takes the tabs and the focus while both panes are still in the grid, and only
+     then does the closing pane leave it. */
   for (const tabId of pane.tabOrder) {
     insertIntoPane(survivor, tabId);
   }
   survivor.activeTabId = pane.activeTabId ?? survivor.activeTabId;
-  workspace.panes = workspace.panes.filter((candidate) => candidate.id !== paneId);
   workspace.activePaneId = survivor.id;
-  if (workspace.zoomedPaneId === paneId) {
-    workspace.zoomedPaneId = null;
-  }
+  workspace.panes = workspace.panes.filter((candidate) => candidate.id !== paneId);
   resetTabCycle();
 }
 
-/**
- * Fill the grid with one pane, or restore both. Zooming is a VIEW of the pane grid — no tab moves
- * and nothing closes, so the toggle is always safe.
- *
- * @param {string} [paneId] — defaults to the focused pane
- */
-export function togglePaneZoom(paneId: string = workspace.activePaneId) {
-  workspace.zoomedPaneId = workspace.zoomedPaneId === paneId ? null : paneId;
-}
+/* No `togglePaneZoom`. Zoom is a view of a GRID, and there is no grid: §18.3 hands the one stage
+   between panes, so the focused pane already fills the shell and the other one is not on screen to
+   be zoomed away from. The state existed, both commands wrote it, and nothing that draws ever read
+   it — a control whose only observable effect is on itself. It comes back with the second live
+   host, and not one release earlier. */
 
 /** Remove a tab id from whichever pane holds it, without touching the tab itself. */
 function detachTab(tabId: string) {
+  const emptied: string[] = [];
   for (const pane of workspace.panes) {
     if (!pane.tabOrder.includes(tabId)) {
       continue;
@@ -334,6 +405,18 @@ function detachTab(tabId: string) {
     if (pane.activeTabId === tabId) {
       pane.activeTabId = pane.tabOrder.at(-1) ?? null;
     }
+    if (pane.id !== PRIMARY_PANE && pane.tabOrder.length === 0) {
+      emptied.push(pane.id);
+    }
+  }
+  // The same rule `closeTab` applies, applied wherever a pane empties: a pane with nothing in it is
+  // A hole in the grid. `splitRight` from the side pane moves the tab back to the primary and used
+  // To leave the empty pane standing with `pane.focusSecondary` still enabled on it — three
+  // Keystrokes to a shell with no stage, no strip, no jump bar and two documents still open. It was
+  // Not `closePane`'s ordering bug, which is fixed: "the active pane exists and has no tab"
+  // Produces the identical empty shell, and only this stops it being mintable.
+  for (const paneId of emptied) {
+    closePane(paneId);
   }
 }
 
@@ -391,6 +474,28 @@ export function isTabActive(tab: Tab | null): boolean {
   return (
     tab !== null && active !== null && toRaw(active as object) === toRaw(tab as unknown as object)
   );
+}
+
+/**
+ * Whether `tab` is still open.
+ *
+ * The question a CAPTURED tab owes before anything is written into it. Both Monaco surfaces commit
+ * on a debounce, and a debounce is a promise to write into the document a tab held half a second
+ * ago — by which time the tab may have been closed, so `workspace.tabs` no longer holds it and
+ * nothing else will ever look at what was written. Deliberately not `isTabActive`: a commit belongs
+ * to the tab its editor was mounted for whether or not that tab is the one on screen when the timer
+ * fires, and resolving it through the FOCUSED tab is precisely the cross-document write this
+ * replaces.
+ *
+ * @param {Tab | null | undefined} tab
+ * @returns {boolean}
+ */
+export function tabIsLive(tab: Tab | null | undefined): boolean {
+  if (!tab) {
+    return false;
+  }
+  const held = workspace.tabs.get(tab.id);
+  return held !== undefined && toRaw(held as object) === toRaw(tab as unknown as object);
 }
 
 /**
@@ -648,7 +753,6 @@ export function closeAllTabs() {
 function resetPanes() {
   workspace.panes = [{ activeTabId: null, id: PRIMARY_PANE, tabOrder: [] }];
   workspace.activePaneId = PRIMARY_PANE;
-  workspace.zoomedPaneId = null;
 }
 
 // ─── Reopen closed ────────────────────────────────────────────────────────────
@@ -988,7 +1092,11 @@ export function paneCommands(): AnyCommand[] {
         }
         return canOpenInSecondPane(tab);
       },
-      requires: "a document that can open as Code, Config, Diff, Grid or Library beside the canvas",
+      // Not "beside the canvas": §18.3 has one stage, handed to whichever pane has focus. The side
+      // Pane is a second place to BE, not a second thing on screen — and a `requires` string is
+      // Printed verbatim in every refusal, tooltip and palette row, so it may only promise what a
+      // Reader will actually see.
+      requires: "a document that can open as Code, Config, Diff, Grid or Library in a second pane",
       undo: "none",
       run: () => {
         splitRight();
@@ -1021,41 +1129,6 @@ export function paneCommands(): AnyCommand[] {
       undo: "none",
       run: () => {
         focusPane(SECONDARY_PANE);
-      },
-    },
-    {
-      id: "pane.toggleZoom",
-      title: "Toggle Pane Zoom",
-      category: "View",
-      level: "document",
-      menus: ["context/pane", "palette"],
-      group: "5_pane",
-      enablement: twoPanes,
-      requires: "a split pane grid",
-      undo: "none",
-      run: () => {
-        togglePaneZoom();
-      },
-    },
-    {
-      args: argsSchema({
-        zoomed: booleanProperty(
-          "True to fill the grid with the focused pane, false to restore both.",
-        ),
-      }),
-      id: "pane.setZoomed",
-      title: "Set Pane Zoom",
-      category: "View",
-      level: "document",
-      menus: ["palette"],
-      group: "5_pane",
-      enablement: twoPanes,
-      requires: "a split pane grid",
-      undo: "none",
-      run: (_ctx, args) => {
-        workspace.zoomedPaneId = booleanArg("pane.setZoomed", args, "zoomed")
-          ? workspace.activePaneId
-          : null;
       },
     },
     {

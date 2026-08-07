@@ -15,7 +15,7 @@ import { errorMessage } from "@jxsuite/schema/parse";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ref } from "lit-html/directives/ref.js";
 import { renderPopover, showPromptDialog } from "../ui/layers";
-import { createState, projectState, requireProjectState, setProjectState } from "../store";
+import { projectState, requireProjectState, setProjectState } from "../store";
 import { getPlatform } from "../platform";
 import { notify } from "../services/notify";
 import { loadComponentRegistry } from "./components";
@@ -44,12 +44,7 @@ import { openCsvGridTab, openPagesGrid } from "../grid/grid-open";
 import { collectionDirs } from "../grid/sources/content-source";
 import { activeRegistry } from "../commands/active-registry";
 import { collectionOfPath } from "../content/entry-model";
-import {
-  confirmFileDelete,
-  parseSourceForPath,
-  renamePromptMessage,
-  serializeDocument,
-} from "./file-ops";
+import { confirmFileDelete, parseSourceForPath, renamePromptMessage } from "./file-ops";
 import { invalidateUsages } from "../services/references";
 import {
   documentExtensions,
@@ -64,8 +59,6 @@ import { cleanupGitPanel } from "../panels/git-panel";
 import { addRecentProject, trackRecentFile } from "../recent-projects";
 import type { TemplateResult } from "lit-html";
 import type { JxMutableNode } from "@jxsuite/schema/types";
-import type { StudioState } from "../state.js";
-import type { Tab } from "../tabs/tab.js";
 import type { DirEntry, RenameResult } from "../types";
 import { rectOf } from "../utils/geometry";
 
@@ -1296,89 +1289,6 @@ async function deleteFile(
       detail: errorMessage(error),
       path: entry.path,
       source: "Files",
-    });
-  }
-}
-
-// ─── Open file from tree ──────────────────────────────────────────────────────
-
-/**
- * Open a file from the file tree — auto-saves current dirty doc, then loads the new one.
- *
- * @param {{
- *   S: import("../state.js").StudioState;
- *   commit: (s: import("../state.js").StudioState) => void;
- *   render: () => void;
- *   loadMarkdown: (source: string, handle: unknown) => void;
- * }} ctx
- * @param {string} path
- */
-export async function openFileFromTree(
-  ctx: {
-    S: StudioState;
-    commit: (s: StudioState) => void;
-    render: () => void;
-    loadMarkdown: (source: string, handle: unknown) => void;
-  },
-  path: string,
-) {
-  const platform = getPlatform();
-  await loadFormats();
-  // Auto-save current dirty document
-  if (ctx.S.dirty && ctx.S.documentPath) {
-    try {
-      const tabLike = {
-        doc: {
-          content: ctx.S.content,
-          document: ctx.S.document,
-          mode: ctx.S.mode,
-          sourceFormat: formatForPath(ctx.S.documentPath)?.name ?? null,
-        },
-      } as unknown as Tab;
-      const output = await serializeDocument(tabLike);
-      await platform.writeFile(ctx.S.documentPath, output);
-    } catch (error) {
-      notify.error(`Could not save ${ctx.S.documentPath}.`, {
-        action: "file.save",
-        detail: errorMessage(error),
-        key: `save:${ctx.S.documentPath}`,
-        path: ctx.S.documentPath,
-        source: "Save",
-      });
-    }
-  }
-
-  // Fetch the file
-  try {
-    const content = await platform.readFile(path);
-    if (!content) {
-      return;
-    }
-
-    if (formatForPath(path)) {
-      ctx.loadMarkdown(content, null);
-      ctx.S.documentPath = path;
-      ctx.S.dirty = false;
-      ctx.commit(ctx.S);
-    } else if (path.endsWith(".json")) {
-      const doc = JSON.parse(content) as JxMutableNode;
-      const newS = createState(doc);
-      newS.documentPath = path;
-      newS.dirty = false;
-      ctx.commit(newS);
-    } else {
-      throw noFormatError(path);
-    }
-
-    // Update tree selection
-    requireProjectState().selectedPath = path;
-
-    ctx.render();
-  } catch (error) {
-    notify.error(`Could not open ${path}.`, {
-      detail: errorMessage(error),
-      path,
-      source: "Open File",
     });
   }
 }

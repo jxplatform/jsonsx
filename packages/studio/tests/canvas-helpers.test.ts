@@ -6,9 +6,14 @@ import {
   getActivePanel,
   panelMediaToActiveMedia,
 } from "../src/canvas/canvas-helpers";
-import { canvasPanels } from "../src/store";
+import { activeCanvasSurface } from "../src/canvas/canvas-surface";
 import { closeAllTabs } from "../src/workspace/workspace";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const canvasPanels = activeCanvasSurface().panels;
 
 beforeEach(() => {
   resetStudioState();

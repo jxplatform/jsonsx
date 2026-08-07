@@ -1,13 +1,21 @@
 import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { flush, resetStudioState, resetWorkspaceWithTab, stubRect } from "./harness";
-import { activeTab } from "../src/workspace/workspace";
+import { activateTab, activeTab, PRIMARY_PANE, SECONDARY_PANE } from "../src/workspace/workspace";
 import { reactive } from "../src/reactivity";
 import { resetProjectShell, shell } from "../src/shell";
-import { canvasPanels, canvasWrap, initShellRefs, registerRenderer } from "../src/store";
+import { canvasWrap, initShellRefs, registerRenderer } from "../src/store";
+import { activeCanvasSurface, surfaceForPane } from "../src/canvas/canvas-surface";
+import { canvasPerf, resetCanvasPerf } from "../src/canvas/canvas-perf";
 import { clearDragGhost, setDragGhost } from "../src/panels/drag-ghost";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
 import type { CanvasPanel } from "../src/types";
+import type { Tab } from "../src/tabs/tab";
+
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const canvasPanels = activeCanvasSurface().panels;
 
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 happyDOM.setURL("http://localhost:3000/");
@@ -80,7 +88,6 @@ const {
   commitActiveEditSession,
   currentDragSession,
   endDragSession,
-  getActiveEditHost,
   getEditBarAnchorRect,
   getEditSnapshot,
   hostDragGeometry,
@@ -212,6 +219,118 @@ describe("mountIframeCanvas", () => {
       unknown
     >[];
     expect(after.at(-1)!.allowAutoRequests).toBeUndefined();
+  });
+
+  /*
+   * The P8 fan-out. A design canvas draws one artboard per breakpoint and every one of them renders
+   * the SAME document; resolving it per artboard cost N layout merges, 2N whole-document JSON round
+   * trips, and — on a dynamic route — N POSTs to `/__jx_resolve__`. A render pass is one generation,
+   * so the generation is what says "these mounts are the same render".
+   */
+  describe("render fan-out across the hosts of one pass", () => {
+    /** Three artboards of one pass, mounted the way canvas-render mounts them. */
+    async function mountPass(gen: number, doc: unknown, tabId: string | null = null) {
+      const els: HTMLElement[] = [];
+      for (let i = 0; i < 3; i++) {
+        const el = document.createElement("div");
+        document.body.append(el);
+        els.push(el);
+        await mountIframeCanvas(gen, doc as never, el, 360 + i * 360, tabId);
+      }
+      for (const channel of channels) {
+        channel.deliver({ kind: "ready" });
+      }
+      return els;
+    }
+
+    test("resolves the document once and posts it to every host", async () => {
+      resetCanvasPerf();
+      const doc = { tagName: "div" };
+      await mountPass(7, doc);
+
+      expect(resolveCalls).toBe(1);
+      expect(canvasPerf.renderPreparations).toBe(1);
+      expect(canvasPerf.hostRenderPosts).toBe(3);
+      // Every host got a real render at the pass's generation — the shared resolution is fanned
+      // Out, not swallowed by the first artboard.
+      expect(channels).toHaveLength(3);
+      for (const channel of channels) {
+        expect(channel.posts.filter((p) => p.kind === "render")).toHaveLength(1);
+        expect(channel.posts.at(-1)).toMatchObject({ gen: 7, kind: "render", mode: "design" });
+      }
+      // `prepareRender` is what a profiling run reads: passes, not panels.
+      expect(canvasPerf.timings.prepareRender?.count).toBe(1);
+    });
+
+    test("the next generation resolves again — a pass is never reused across renders", async () => {
+      const doc = { tagName: "div" };
+      await mountPass(1, doc);
+      expect(resolveCalls).toBe(1);
+      await mountPass(2, doc);
+      expect(resolveCalls).toBe(2);
+    });
+
+    test("two documents under one generation (git-diff) each resolve", async () => {
+      const before = { tagName: "section" };
+      const after = { tagName: "article" };
+      const el = document.createElement("div");
+      const el2 = document.createElement("div");
+      document.body.append(el, el2);
+      await mountIframeCanvas(4, before as never, el, 800, null);
+      await mountIframeCanvas(4, after as never, el2, 800, null);
+      // Identity, not generation, is what distinguishes them — the diff stage renders two different
+      // Documents side by side in one pass.
+      expect(resolveCalls).toBe(2);
+    });
+
+    test("the same document mounted for a different tab resolves again", async () => {
+      // `editableTags` is derived from the tab's source format, so a payload prepared for one tab
+      // Must never be handed to another.
+      const doc = { tagName: "div" };
+      const el = document.createElement("div");
+      const el2 = document.createElement("div");
+      document.body.append(el, el2);
+      await mountIframeCanvas(5, doc as never, el, null, "tab-a");
+      await mountIframeCanvas(5, doc as never, el2, null, "tab-b");
+      expect(resolveCalls).toBe(2);
+    });
+
+    test("Refresh's allowAutoRequests reaches every artboard of the pass, then nothing", async () => {
+      resetWorkspaceWithTab();
+      // Armed once, "the next render" means the whole pass. Consuming the flag per host meant
+      // Whichever artboard mounted first swallowed it and the rest kept auto-requests suppressed —
+      // The Data activity's Refresh refreshed one artboard out of N.
+      allowAutoRequestsOnNextRender();
+      await mountPass(11, { tagName: "div" });
+      for (const channel of channels) {
+        expect(channel.posts.at(-1)).toMatchObject({ allowAutoRequests: true, kind: "render" });
+      }
+
+      // Still one-shot: the pass after it carries nothing.
+      channels.length = 0;
+      await mountPass(12, { tagName: "div" });
+      for (const channel of channels) {
+        expect((channel.posts.at(-1) as Record<string, unknown>).allowAutoRequests).toBeUndefined();
+      }
+    });
+
+    test("a colour-scheme flip between artboards is not baked into the shared payload", async () => {
+      resetWorkspaceWithTab();
+      const doc = { tagName: "div" };
+      const first = document.createElement("div");
+      const second = document.createElement("div");
+      document.body.append(first, second);
+      await mountIframeCanvas(9, doc as never, first, null, null);
+      activeTab.value!.session.ui.previewColorScheme = "dark";
+      await mountIframeCanvas(9, doc as never, second, null, null);
+      for (const channel of channels) {
+        channel.deliver({ kind: "ready" });
+      }
+      // One resolution, but the scheme is read per post.
+      expect(resolveCalls).toBe(1);
+      expect(channels[0]!.posts.at(-1)).toMatchObject({ colorScheme: null });
+      expect(channels[1]!.posts.at(-1)).toMatchObject({ colorScheme: "dark" });
+    });
   });
 
   test("the render message carries the active tab's forced preview scheme (auto → null)", async () => {
@@ -881,14 +1000,30 @@ describe("iframe canvas patch bridge", () => {
     expect(channels[0]!.posts.some((p) => p.kind === "measure")).toBe(true);
   });
 
-  test("patchError escalates to a full render via the injected fallback", async () => {
-    let escalated = 0;
-    setIframePatchEscalation(() => {
-      escalated += 1;
+  test("patchError escalates the PANE whose frame reported it", async () => {
+    const escalated: string[] = [];
+    setIframePatchEscalation((paneId) => {
+      escalated.push(paneId);
+    });
+    const canvasEl = await mountReady();
+    // In the app this artboard is always in some pane's stage — that is what names the pane.
+    canvasPanels.push({ canvas: canvasEl, mediaName: "base" } as unknown as CanvasPanel);
+
+    channels[0]!.deliver({ gen: 1, kind: "patchError", message: "nope" });
+    expect(escalated).toEqual([PRIMARY_PANE]);
+    canvasPanels.length = 0;
+  });
+
+  test("patchError from a frame no pane still claims escalates nothing", async () => {
+    // The panel list was already replaced by a newer pass, so that pass IS the full render — a
+    // Global schedule here would rebuild a stage that is not stale.
+    const escalated: string[] = [];
+    setIframePatchEscalation((paneId) => {
+      escalated.push(paneId);
     });
     await mountReady();
     channels[0]!.deliver({ gen: 1, kind: "patchError", message: "nope" });
-    expect(escalated).toBe(1);
+    expect(escalated).toEqual([]);
   });
 
   test("forwardKey re-dispatches a synthetic keydown on the editor document", async () => {
@@ -1227,12 +1362,9 @@ describe("iframe canvas format-toolbar bridge", () => {
 
   /** End any active edit session so module-global `activeEditHost` starts clean per test. */
   function endActiveSession() {
-    const host = getActiveEditHost();
-    if (host) {
-      // Find this host's channel and deliver an editEnd through it.
-      for (const ch of channels) {
-        ch.deliver({ kind: "editEnd" });
-      }
+    // An editEnd delivered to a channel with no session is a no-op, so this needs no guard.
+    for (const ch of channels) {
+      ch.deliver({ kind: "editEnd" });
     }
   }
 
@@ -1242,7 +1374,7 @@ describe("iframe canvas format-toolbar bridge", () => {
 
     channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
     expect(getEditSnapshot().editing).toBe(true);
-    expect(getActiveEditHost()).not.toBeNull();
+    expect(getEditSnapshot().editing).toBe(true);
     expect(refreshCount).toBeGreaterThan(0);
     endActiveSession();
   });
@@ -1285,7 +1417,7 @@ describe("iframe canvas format-toolbar bridge", () => {
 
     channels[0]!.deliver({ kind: "editEnd" });
     expect(getEditSnapshot().editing).toBe(false);
-    expect(getActiveEditHost()).toBeNull();
+    expect(getEditSnapshot().editing).toBe(false);
 
     // A second (superseded) editEnd is a no-op (does not throw, stays cleared).
     refreshCount = 0;
@@ -1376,7 +1508,7 @@ describe("iframe canvas format-toolbar bridge", () => {
       kind: "hit",
     });
 
-    expect(getActiveEditHost()).toBeNull();
+    expect(getEditSnapshot().editing).toBe(false);
     expect(getEditBarAnchorRect()).toEqual({ height: 14, left: 205, top: 69, width: 40 });
     canvasPanels.length = 0;
   });
@@ -2079,6 +2211,9 @@ describe("hit → activeMedia", () => {
     document.body.append(canvasB);
     await mountIframeCanvas(1, {} as never, canvasB, null, activeTab.value!.id);
     channels[1]!.deliver({ kind: "ready" });
+    // Ack the render for the same reason `mountReady` does: the breakpoint a hit activates is
+    // Written onto the tab THIS host renders, and a host adopts that identity on `renderComplete`.
+    channels[1]!.deliver({ gen: 1, kind: "renderComplete" });
     canvasPanels.push(
       { canvas: canvasA, mediaName: "base" } as unknown as CanvasPanel,
       { canvas: canvasB, mediaName: "sm" } as unknown as CanvasPanel,
@@ -2112,6 +2247,96 @@ describe("hit → activeMedia", () => {
     });
     expect(activeTab.value!.session.ui.activeMedia).toBe("sm");
     canvasPanels.length = 0;
+  });
+});
+
+// ─── A hit in an UNFOCUSED pane writes to that pane's document ──────────────────
+
+/* The moment two panes exist, "the tab" stops being one thing. Every doc-touching branch of the
+   host's message switch already resolved its target from `state.tabId` — the tab whose document
+   THIS iframe's DOM reflects — but three did not: the breakpoint a hit activates, the selection a
+   hit sets, and the selection a layoutHit clears. Those three read `activeTab`, so a click in the
+   pane the keyboard is NOT in wrote to the other pane's document. That is a data bug, not a layout
+   one: the Style panel then edits a compound block belonging to a page nobody clicked. */
+describe("hit routing across panes", () => {
+  const secondaryPanels = surfaceForPane(SECONDARY_PANE).panels;
+
+  beforeEach(() => {
+    resetWorkspaceWithTab({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" });
+    secondaryPanels.length = 0;
+  });
+
+  /** A live host in the side pane rendering its own tab, with the primary's tab still focused. */
+  async function mountBackgroundHost(): Promise<{ tabA: Tab; tabB: Tab; canvasEl: HTMLElement }> {
+    const { openTab } = await import("../src/workspace/workspace");
+    const tabA = activeTab.value!;
+    const tabB = openTab({
+      document: { children: [{ tagName: "p", textContent: "B" }], tagName: "div" },
+      id: "tab-side-pane",
+    });
+    // `openTab` focuses what it opens; the point of the test is that the keyboard is elsewhere.
+    activateTab(tabA.id);
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, {} as never, canvasEl, null, tabB.id);
+    channels[0]!.deliver({ kind: "ready" });
+    channels[0]!.deliver({ gen: 1, kind: "renderComplete" });
+    return { canvasEl, tabA, tabB };
+  }
+
+  test("the breakpoint follows the clicked pane, not the focused one", async () => {
+    const { canvasEl, tabA, tabB } = await mountBackgroundHost();
+    secondaryPanels.push({ canvas: canvasEl, mediaName: "sm" } as unknown as CanvasPanel);
+    // A distinct value rather than the default, so "untouched" cannot be confused with "written
+    // The same null the hit would have written".
+    tabA.session.ui.activeMedia = "lg";
+
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 1, width: 1, x: 0, y: 0 } },
+      kind: "hit",
+    });
+
+    expect(tabB.session.ui.activeMedia).toBe("sm");
+    expect(tabA.session.ui.activeMedia).toBe("lg");
+  });
+
+  test("the selection a hit sets lands on the host's tab, never on the focused tab", async () => {
+    const { tabA, tabB } = await mountBackgroundHost();
+
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 1, width: 1, x: 0, y: 0 } },
+      kind: "hit",
+    });
+
+    expect(tabB.session.selection).toEqual([["children", 0]]);
+    expect(tabA.session.selection).toEqual([]);
+  });
+
+  test("a layoutHit clears the host tab's selection and leaves the focused tab's alone", async () => {
+    const { tabA, tabB } = await mountBackgroundHost();
+    tabA.session.selection = [["children", 0]];
+    tabB.session.selection = [["children", 0]];
+
+    channels[0]!.deliver({
+      hit: {
+        layoutFile: "layouts/base.json",
+        path: ["$layout", "children", 0],
+        rect: { height: 1, width: 1, x: 0, y: 0 },
+      },
+      kind: "layoutHit",
+    });
+
+    expect(tabB.session.selection).toEqual([]);
+    expect(tabA.session.selection).toEqual([["children", 0]]);
+  });
+
+  test("a dataScope snapshot is filed under the tab the host rendered", async () => {
+    const { tabA, tabB } = await mountBackgroundHost();
+
+    channels[0]!.deliver({ gen: 1, kind: "dataScope", scope: { posts: "3 items" } });
+
+    expect(tabB.session.canvas.scope).toEqual({ posts: "3 items" });
+    expect(tabA.session.canvas.scope).toBeNull();
   });
 });
 

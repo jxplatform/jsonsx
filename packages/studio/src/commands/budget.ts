@@ -57,7 +57,7 @@ export interface DockDeclaration {
  */
 export const DECLARED_DOCK_TABS: readonly DockDeclaration[] = [
   { dock: "inspector", tabs: INSPECTOR_TABS.map((tab) => tab.title) },
-  { dock: "bottom", tabs: ["Problems", "Diff", "Logic", "Activity"] },
+  { dock: "bottom", tabs: ["Problems", "Logic", "Activity"] },
 ];
 
 /**

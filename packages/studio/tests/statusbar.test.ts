@@ -12,12 +12,10 @@ import { initShellRefs, setProjectState, statusbarEl } from "../src/store";
 import { closeAllTabs } from "../src/workspace/workspace";
 import {
   aheadBehindLabel,
-  documentLabel,
   forgetSavedTimes,
   mountStatusbar,
   noteDocumentSaved,
   renderStatusbar,
-  selectionCrumbs,
   unmountStatusbar,
   viewLabel,
 } from "../src/panels/statusbar";
@@ -128,54 +126,6 @@ describe("viewLabel", () => {
 
   test("no editor means no label", () => {
     expect(viewLabel("none", "design")).toBe("");
-  });
-});
-
-describe("documentLabel", () => {
-  test("strips the project root, which is already field one", () => {
-    resetStudioState({ name: "Site", projectRoot: "/home/k/site" });
-    expect(documentLabel("/home/k/site/pages/index.json")).toBe("pages/index.json");
-  });
-
-  test("leaves a path outside the root alone, and names an unsaved document", () => {
-    resetStudioState({ name: "Site", projectRoot: "/home/k/site" });
-    expect(documentLabel("/elsewhere/x.json")).toBe("/elsewhere/x.json");
-    expect(documentLabel(null)).toBe("Untitled");
-  });
-});
-
-describe("selectionCrumbs", () => {
-  test("one crumb per NODE, with the path that selects it", () => {
-    const doc = {
-      children: [{ children: [{ tagName: "li" }], tagName: "ul" }],
-      tagName: "div",
-    };
-    expect(selectionCrumbs(doc, ["children", 0, "children", 0])).toEqual([
-      { label: "ul", path: ["children", 0] },
-      { label: "li", path: ["children", 0, "children", 0] },
-    ]);
-  });
-
-  test("a repeater's lone `map` segment does not break the pairing", () => {
-    const doc = {
-      children: [{ $prototype: "Array", map: { tagName: "article" } }],
-      tagName: "div",
-    };
-    expect(selectionCrumbs(doc, ["children", 0, "map"]).map((c) => c.label)).toEqual([
-      "Repeater",
-      "article",
-    ]);
-  });
-
-  test("falls back to `tag`, then to a bracketed index", () => {
-    const doc = { children: [{ tag: "h2" }, {}], tagName: "div" };
-    expect(selectionCrumbs(doc, ["children", 0])[0]!.label).toBe("h2");
-    expect(selectionCrumbs(doc, ["children", 1])[0]!.label).toBe("[1]");
-  });
-
-  test("a `cases` step is named by its case key", () => {
-    const doc = { cases: { warm: {} }, tagName: "div" };
-    expect(selectionCrumbs(doc, ["cases", "warm"])[0]!.label).toBe("warm");
   });
 });
 
@@ -313,43 +263,35 @@ describe("the SELECTION field", () => {
     expect(field("selection")).toBeNull();
   });
 
-  test("renders the node label and one command per ancestor crumb", () => {
+  test("holds NO ancestor trail — the address is the jump bar's, and one copy is the point", () => {
     const tab = resetWorkspaceWithTab({
       children: [{ children: [{ tagName: "li", textContent: "Item" }], tagName: "ul" }],
-      tagName: "div",
-    });
-    tab.session.selection = [["children", 0, "children", 0]];
-    renderStatusbar();
-    const selection = field("selection")!;
-    expect(selection.querySelector(".sb-state")?.textContent).toContain("li");
-    expect([...selection.querySelectorAll("button")].map((b) => b.textContent?.trim())).toEqual([
-      "ul",
-      "li",
-    ]);
-    expect(selection.querySelectorAll(".sb-sep")).toHaveLength(1);
-  });
-
-  test("a crumb click is `selection.set` with the crumb's path — no bespoke handler", () => {
-    const tab = resetWorkspaceWithTab({
-      children: [{ children: [{ tagName: "li" }], tagName: "ul" }],
       tagName: "div",
     });
     ctx = makeContext({ document: { open: true } });
     tab.session.selection = [["children", 0, "children", 0]];
     renderStatusbar();
-    (field("selection")!.querySelector("button") as HTMLElement).click();
-    expect(ran).toEqual([{ args: { path: ["children", 0] }, id: "selection.set" }]);
+    // A single selection leaves the field empty: the jump bar's leaf segment states it, with its
+    // Ancestors, and the bar that carries ambient state has nothing left to add.
+    expect(field("selection")).toBeNull();
+    expect(statusbarEl.querySelectorAll(".sb-sep")).toHaveLength(0);
+    expect(items()).not.toContain("ul");
+    expect(items()).not.toContain("li");
   });
 
-  test("escaping is lit's job now, not a three-character escaper's", () => {
+  test("a batch says its SIZE, which is the one selection fact an address cannot state", () => {
     const tab = resetWorkspaceWithTab({
-      children: [{ tagName: "p", textContent: "<b>&hi" }],
+      children: [{ tagName: "p" }, { tagName: "p" }, { tagName: "p" }],
       tagName: "div",
     });
-    tab.session.selection = [["children", 0]];
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 2],
+    ];
     renderStatusbar();
-    expect(statusbarEl.querySelector("b")).toBeNull();
-    expect(field("selection")?.textContent).toContain("<b>&hi");
+    expect(field("selection")?.textContent?.trim()).toBe("2 selected");
+    // A count is a readout, not a control: there is no command that "selects two things".
+    expect(field("selection")?.querySelectorAll("button")).toHaveLength(0);
   });
 
   test("the stylebook selector is the field's content when no node is picked", () => {
@@ -359,12 +301,14 @@ describe("the SELECTION field", () => {
     expect(field("selection")?.textContent?.trim()).toBe("ul › li");
   });
 
-  test("a node selection wins over the stylebook selector", () => {
+  test("a node selection wins over the stylebook selector, even printing nothing", () => {
     const tab = resetWorkspaceWithTab({ children: [{ tagName: "p" }], tagName: "div" });
     shell.stylebook.selection = "h1";
     tab.session.selection = [["children", 0]];
     renderStatusbar();
-    expect(field("selection")?.textContent).not.toContain("h1");
+    // Two answers to "what is selected" is the defect; the document's answer wins, and when it has
+    // Nothing ambient to add the field is absent rather than falling through to the other one.
+    expect(field("selection")).toBeNull();
   });
 });
 
@@ -424,7 +368,10 @@ describe("mountStatusbar", () => {
     mountStatusbar();
     await flush();
     expect(field("selection")).toBeNull();
-    tab.session.selection = [["children", 0]];
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
     await flush();
     expect(field("selection")).not.toBeNull();
   });
@@ -439,7 +386,7 @@ describe("mountStatusbar", () => {
     expect(items()).toContain("⚠ 1");
   });
 
-  test("a multi-selection says its SIZE before the trail to the primary (§6.5)", async () => {
+  test("a multi-selection says its SIZE — the one selection fact this bar still owns (§6.5)", async () => {
     const tab = resetWorkspaceWithTab();
     mountStatusbar();
     await flush();
@@ -459,7 +406,10 @@ describe("mountStatusbar", () => {
     mountStatusbar();
     mountStatusbar();
     await flush();
-    tab.session.selection = [["children", 0]];
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
     await flush();
     expect(statusbarEl.querySelectorAll('[data-jx-region="statusbar/selection"]')).toHaveLength(1);
   });
@@ -470,36 +420,13 @@ describe("mountStatusbar", () => {
     await flush();
     expect(field("selection")).toBeNull();
     unmountStatusbar();
-    tab.session.selection = [["children", 0]];
+    // A BATCH, not a single node: a single selection leaves this field empty either way, so it
+    // Could not tell a stopped effect from a live one.
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
     await flush();
     expect(field("selection")).toBeNull();
-  });
-});
-
-describe("the selection field does not say the same thing twice", () => {
-  test("an element whose $id matches its tag is named once, by its crumb", () => {
-    // The standalone label prefers `$id`; a crumb prints the TAG. Usually different, so both earn
-    // Their place — but `<re-hero $id="re-hero">` rendered "re-hero  re-hero" in every published
-    // Screenshot of the status bar until this dropped the duplicate.
-    const tab = resetWorkspaceWithTab({
-      children: [{ $id: "re-hero", children: [], tagName: "re-hero" }],
-      tagName: "div",
-    } as never);
-    tab.session.selection = [["children", 0]];
-    renderStatusbar();
-    const text = field("selection")!.textContent!.replaceAll(/\s+/g, " ").trim();
-    expect(text).toBe("re-hero");
-  });
-
-  test("an $id that differs from the tag is still shown beside the crumb", () => {
-    const tab = resetWorkspaceWithTab({
-      children: [{ $id: "masthead", children: [], tagName: "header" }],
-      tagName: "div",
-    } as never);
-    tab.session.selection = [["children", 0]];
-    renderStatusbar();
-    const text = field("selection")!.textContent!.replaceAll(/\s+/g, " ").trim();
-    expect(text).toContain("masthead");
-    expect(text).toContain("header");
   });
 });

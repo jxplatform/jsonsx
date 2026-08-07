@@ -7,10 +7,12 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import type * as monaco from "monaco-editor";
-import { loadedMonaco, loadMonaco } from "../services/monaco-lazy";
+import { loadedMonaco, loadMonaco, mountStillWanted } from "../services/monaco-lazy";
 
-import { canvasPanels, canvasWrap, getNodeAtPath, updateCanvas } from "../store";
-import { activeTab } from "../workspace/workspace";
+import { getNodeAtPath, updateCanvas } from "../store";
+import { activeTab, tabIsLive, workspace } from "../workspace/workspace";
+import { canvasModeOfPane, moveCanvasStage, surfaceForPane, tabOfPane } from "./canvas-surface";
+import type { CanvasSurface } from "./canvas-surface";
 import { primarySelection, uniquePaths } from "../tabs/selection";
 import {
   argsSchema,
@@ -36,6 +38,13 @@ import {
   settingsPaneMounted,
 } from "../panels/settings-pane";
 import { formatByName, formatForPath } from "../format/format-host";
+import {
+  BUFFER_COMMIT,
+  bufferIsLive,
+  bufferMovedOn,
+  bufferWrites,
+  commitBufferWrites,
+} from "../services/monaco-buffer";
 import { modelUriFor } from "../services/model-uri";
 import { renderWelcome } from "../panels/welcome-screen";
 import {
@@ -75,8 +84,6 @@ import { transposeStylebookStyle } from "../panels/stylebook-doc";
 import { dismissBlockActionBar, dismissLinkPopover } from "../panels/block-action-bar";
 import { dismissContextMenu } from "../editor/context-menu";
 import { dismissSlashMenu } from "../editor/slash-menu";
-import { renderFunctionEditor } from "../panels/editors";
-import { renderFormulaWorkspace } from "../panels/formula-workspace";
 import { mediaDisplayName } from "../panels/shared";
 import { notify } from "../services/notify";
 import * as overlaysPanel from "../panels/overlays";
@@ -88,7 +95,6 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../tabs/tab.js";
 
 interface CanvasRenderCtx {
-  getCanvasMode: () => string;
   setCanvasMode: (mode: string) => void;
   openFileFromTree: (path: string) => void;
   gitDiffState: GitDiffState | null;
@@ -138,29 +144,64 @@ async function sourceContent(tab: Tab, lang: string) {
    Panels have since grown their own rAF scheduler (see panel-scheduler.ts), so the second frame
    bought nothing and put a hard ~32 ms floor under every escalated edit — canvas-patcher's
    escalateToFullRender routes through here. */
-let _canvasRafId = 0;
-export function scheduleCanvasRender() {
-  if (_canvasRafId) {
+/*
+ * One pending frame PER PANE. A shared id would have let the pane that scheduled first swallow the
+ * other pane's render for that frame — the dedupe has to be scoped to the surface it dedupes.
+ */
+const _canvasRafIds = new Map<string, number>();
+
+/**
+ * Schedule a full render of one pane's stage.
+ *
+ * @param {string} [paneId] — defaults to the focused pane
+ */
+export function scheduleCanvasRender(paneId: string = workspace.activePaneId) {
+  if (_canvasRafIds.has(paneId)) {
     return;
   }
-  _canvasRafId = requestAnimationFrame(() => {
-    _canvasRafId = 0;
-    try {
-      renderCanvas();
-    } catch (error) {
-      console.error("renderCanvas error:", error);
-    }
-  });
+  _canvasRafIds.set(
+    paneId,
+    requestAnimationFrame(() => {
+      _canvasRafIds.delete(paneId);
+      try {
+        renderCanvas(paneId);
+      } catch (error) {
+        console.error("renderCanvas error:", error);
+      }
+    }),
+  );
 }
 
 /**
- * Eject canvasWrap's DOM and Lit render part together. Setting textContent/innerHTML removes the
+ * Hand the shell's single stage to a pane, and repaint it.
+ *
+ * The repaint is not a precaution, it is the other half of the handover. {@link moveCanvasStage}
+ * releases what the losing pane mounted — the panel records, their render scopes and the mode it
+ * last drew — so the instant the stage changes hands, the DOM standing in it belongs to a pane that
+ * no longer owns it and no surface describes it.
+ *
+ * Nothing else schedules that render. Both canvas effects are keyed on `activeTab`, and the two
+ * handovers that matter do not change which tab is active: `⌘\` moves the SAME tab into the new
+ * pane, and `View: Unsplit` moves it back. Unsplit is where that showed — `#canvas-wrap` was left
+ * empty, clicking the tab did not even count a full render, and only a reload brought the editor
+ * back.
+ *
+ * @param {string} paneId
+ * @param {HTMLElement} wrap
+ */
+export function handOverCanvasStage(paneId: string, wrap: HTMLElement): void {
+  moveCanvasStage(paneId, wrap);
+  scheduleCanvasRender(paneId);
+}
+
+/**
+ * Eject a stage's DOM and Lit render part together. Setting textContent/innerHTML removes the
  * comment nodes Lit uses as a ChildPart's markers; if the private `_$litPart$` reference is left
  * behind, the next litRender() reuses a part whose markers are detached from the DOM and throws
  * "This `ChildPart` has no `parentNode`…". Always eject the markers through this helper so the two
  * operations can never drift apart.
  */
-function hardClearCanvasWrap() {
+function hardClearCanvasWrap(canvasWrap: HTMLElement) {
   canvasWrap.textContent = "";
   // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
   delete canvasWrap["_$litPart$"];
@@ -243,20 +284,59 @@ async function createSourceCollabBinding(
   };
 }
 
-function resetCanvasView() {
-  if (view.functionEditor) {
-    view.functionEditor.dispose();
-    view.functionEditor = null;
+/*
+ * There is no `view.functionEditor` teardown in here, and that is deliberate.
+ *
+ * Every other disposal below is a surface this module CREATED — the grid panel, the source-mode
+ * Monaco and its collab binding, the centering observer. The function editor is not: the Bottom
+ * dock's Logic tab creates it and `panels/editors.ts`'s `syncFunctionEditor` disposes it, from an
+ * `afterRender` that `panels/bottom-dock.ts` runs for every registered tab whether or not it is
+ * showing — precisely so a surface that outlives its own markup can release it. Losing the last tab
+ * is one of the state changes that hook already covers.
+ *
+ * Reaching in from here was also wrong per PANE. `resetCanvasView` runs for a pane with no tab
+ * while `view.functionEditor` is app-wide, so a stage-holding pane going empty disposed an editor
+ * the dock was still showing for another pane's tab — and, having cleared the handle, left nothing
+ * to rebuild it until the next dock repaint.
+ */
+/**
+ * Drop the source-mode Monaco, its model, and the debounced work armed over it.
+ *
+ * The three sites below used to inline the same four lines, and the four lines were incomplete in
+ * the same way at all three: they never cancelled the 600ms sync timer. That timer reads
+ * `getValue()` off the editor it closes over, a disposed Monaco answers the empty string, and for a
+ * format-backed document the callback then runs `parseSourceForPath(path, "")` and assigns the
+ * result — **the page's body replaced with an empty parse, 600ms after the user left Code view,
+ * with the tab marked dirty so the next ⌘S writes it to disk.** For a `.json` tab the same path
+ * threw inside `JSON.parse("")` and was swallowed by the catch, which is luck rather than design
+ * and is why only one of the two shapes was ever reported.
+ *
+ * One function, so there is one place for the teardown to be and no fourth site can omit it.
+ *
+ * **And it commits before it cancels.** Cancelling alone traded a dead buffer's `""` for the user's
+ * last 600ms of typing, which is still lost work and is now silent: `doc.dirty` stays `false`, so
+ * nothing says the edit went missing. {@link commitBufferWrites} runs the armed parse WHILE the
+ * model is still attached — `getValue()` is read before its first `await` — and only then drops
+ * what is left, so leaving Code view saves the edit instead of choosing which way to discard it.
+ */
+function disposeSourceEditor(): void {
+  const editor = view.monacoEditor;
+  if (!editor) {
+    return;
   }
+  commitBufferWrites(editor);
+  editor.getModel()?.dispose();
+  editor.dispose();
+  view.monacoEditor = null;
+}
+
+function resetCanvasView(surface: CanvasSurface) {
+  const canvasWrap = surface.wrap;
   detachGridPanel();
   detachLibraryPane();
   detachEntryPane();
   disposeSourceCollab();
-  if (view.monacoEditor) {
-    view.monacoEditor.getModel()?.dispose();
-    view.monacoEditor.dispose();
-    view.monacoEditor = null;
-  }
+  disposeSourceEditor();
   if (view.centerObserver) {
     view.centerObserver.disconnect();
     view.centerObserver = null;
@@ -269,13 +349,13 @@ function resetCanvasView() {
     fn();
   }
   view.canvasEventCleanups = [];
-  for (const p of canvasPanels) {
+  for (const p of surface.panels) {
     p.renderScope?.stop();
     p.renderScope = null;
   }
-  canvasPanels.length = 0;
+  surface.panels.length = 0;
 
-  hardClearCanvasWrap();
+  hardClearCanvasWrap(canvasWrap);
 
   view.panzoomWrap = null;
   canvasWrap.style.padding = "";
@@ -287,7 +367,7 @@ function resetCanvasView() {
   dismissLinkPopover();
   dismissContextMenu();
   dismissSlashMenu();
-  view.prevCanvasMode = null;
+  surface.prevCanvasMode = null;
 }
 
 /**
@@ -297,14 +377,33 @@ function resetCanvasView() {
  * before this runs, and every continuation below re-checks `view.monacoEditor`, so a teardown or a
  * mode switch while the module loads is handled the same way a teardown mid-y-monaco-load already
  * was.
+ *
+ * **The mount ITSELF owed the same re-check and did not make it.** This was the fourth Monaco mount
+ * path and the only one with no post-await guard: `renderCanvasImpl` sets `surface.prevCanvasMode`
+ * BEFORE it reaches here, so a second synchronous `renderCanvas()` inside the cold load sees
+ * `modeChanged === false` and a still-null `view.monacoEditor`, skips the source fast path and
+ * falls through to mount again. `store.ts`'s `render()`/`renderOnly()` coalesce nothing, so two
+ * mounts is a plain sequence of two renders. {@link mountStillWanted} is asked before `createModel`
+ * rather than after, because the duplicate is not just a wasted editor — the second `createModel`
+ * claims a URI the first already registered, which real Monaco throws on.
  */
 async function mountSourceEditor(
   tab: Tab,
+  paneId: string,
   editorContainer: Element,
   filePath: string,
   lang: string,
 ): Promise<void> {
   const monaco = await loadMonaco();
+  if (
+    !mountStillWanted(
+      editorContainer,
+      view.monacoEditor,
+      () => tabOfPane(paneId) === tab && canvasModeOfPane(paneId) === "source",
+    )
+  ) {
+    return;
+  }
   const modelUri = monaco.Uri.parse(modelUriFor(filePath));
   const model = monaco.editor.createModel("", lang, modelUri);
   // Co-edited tabs bind the buffer to the shared Y.Text instead of a local serialization: the
@@ -337,73 +436,106 @@ async function mountSourceEditor(
     sourceContent(tab, lang)
       .then((content) => {
         const editor = view.monacoEditor;
-        if (editor && editor.getModel() === model) {
+        // The model identity says "this load is still for this buffer"; `bufferMovedOn` says "and
+        // The buffer is still the empty one it was created as". Serializing a document is a round
+        // Trip through the format host, and a user who starts typing into the empty box before it
+        // Returns had their first words replaced by the file they were already looking at.
+        if (editor && editor.getModel() === model && !bufferMovedOn(editor, "")) {
           editor._ignoreNextChange = true;
           model.setValue(content);
+          // The buffer took the DOCUMENT's own text, so the two agree — stated, because clause 3 is
+          // A fact each programmatic write owns rather than something a timer can be read for.
+          editor._writes?.markSettled();
         }
       })
       .catch(() => {
         // Serialization unavailable — leave the buffer empty rather than crash the render
       });
   }
-  view.monacoEditor = monaco.editor.create(editorContainer as unknown as HTMLElement, {
-    automaticLayout: true,
-    fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace",
-    fontSize: 12,
-    lineNumbers: "on",
-    minimap: { enabled: false },
-    model,
-    scrollBeyondLastLine: false,
-    tabSize: 2,
-    theme: "vs-dark",
-    wordWrap: "on",
-  });
+  // Typed as the surface `view` declares (the editor plus `_ignoreNextChange` / `_writes`), because
+  // The instance is HELD here now rather than re-read off `view.monacoEditor` in every callback.
+  const sourceEditor: NonNullable<typeof view.monacoEditor> = monaco.editor.create(
+    editorContainer as unknown as HTMLElement,
+    {
+      automaticLayout: true,
+      fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace",
+      fontSize: 12,
+      lineNumbers: "on",
+      minimap: { enabled: false },
+      model,
+      scrollBeyondLastLine: false,
+      tabSize: 2,
+      theme: "vs-dark",
+      wordWrap: "on",
+    },
+  );
+  view.monacoEditor = sourceEditor;
+
+  // The debounce holder goes on the editor, not in this closure. A closure variable is reachable
+  // Only from inside `mountSourceEditor`, which is why `disposeSourceEditor` had nothing to cancel
+  // And a timer outlived every teardown; hanging it off the instance gives it the instance's
+  // Lifetime. Installed before the collab early-return so the canceller exists either way.
+  const writes = bufferWrites(sourceEditor);
 
   // Debounced sync back to state (solo tabs only: co-edited buffers flow through the shared
   // Y.Text and the source reconciler's parse mirror instead of a whole-doc replace).
   if (collabCtx) {
     return;
   }
-  let debounce: ReturnType<typeof setTimeout> | undefined;
-  view.monacoEditor.onDidChangeModelContent(() => {
-    const editor = view.monacoEditor;
-    if (!editor) {
+  sourceEditor.onDidChangeModelContent(() => {
+    // Identity, not existence: a change fired after this instance stopped being the mounted one has
+    // Nothing to say, and asking `view.monacoEditor` for the editor instead of holding it is how
+    // The callback below came to address a tab it was never mounted for.
+    if (view.monacoEditor !== sourceEditor) {
       return;
     }
-    if (editor._ignoreNextChange) {
-      editor._ignoreNextChange = false;
+    if (sourceEditor._ignoreNextChange) {
+      sourceEditor._ignoreNextChange = false;
       return;
     }
-    clearTimeout(debounce);
-    debounce = setTimeout(async () => {
-      const tabNow = activeTab.value;
-      if (!tabNow) {
+    // A keystroke: the buffer is ahead of the document until the commit lands.
+    writes.markAhead();
+    writes.arm(BUFFER_COMMIT, 600, async () => {
+      /* `tab` is the tab this editor was MOUNTED for, captured above and never re-read. It used to
+         be `activeTab.value` — whatever was focused when the timer fired — which is the same
+         cross-document write the dock's commit had, surviving here only because the model-URI swap
+         happens to dispose this editor on a source→source tab change. A coincidence in one caller
+         is not a rule, and the tab still has to be OPEN: a closed tab is not in `workspace.tabs`,
+         so a parse written into it is a parse nothing will ever read. */
+      if (!tabIsLive(tab) || !bufferIsLive(sourceEditor)) {
         return;
       }
-      if (formatByName(tabNow.doc.sourceFormat) && tabNow.documentPath) {
+      if (formatByName(tab.doc.sourceFormat) && tab.documentPath) {
         try {
           // Parse the full source back into body + frontmatter (title, $head, etc.).
           const { document, frontmatter } = await parseSourceForPath(
-            tabNow.documentPath,
-            editor.getValue(),
+            tab.documentPath,
+            sourceEditor.getValue(),
           );
-          tabNow.doc.document = document as JxMutableNode;
-          tabNow.doc.content.frontmatter = frontmatter;
-          tabNow.doc.dirty = true;
+          tab.doc.document = document as JxMutableNode;
+          tab.doc.content.frontmatter = frontmatter;
+          tab.doc.dirty = true;
+          writes.markSettled();
         } catch {
-          // Unparseable source — don't update state
+          // Unparseable source — don't update state. And do NOT settle: the buffer really is ahead
+          // Of the document, so a repaint must go on refusing to overwrite the half-typed heading.
         }
       } else if (lang === "json") {
         try {
-          tabNow.doc.document = JSON.parse(editor.getValue()) as JxMutableNode;
-          tabNow.doc.dirty = true;
+          tab.doc.document = JSON.parse(sourceEditor.getValue()) as JxMutableNode;
+          tab.doc.dirty = true;
+          writes.markSettled();
         } catch {
-          // Invalid JSON — don't update state
+          // Invalid JSON — same: unparseable is a reason to keep the buffer, not to resync over it.
         }
       } else {
-        tabNow.doc.dirty = true;
+        // A language with no parse back (a handlers `.js` file): the tab is dirty because the
+        // Buffer changed, and the DOCUMENT still has no representation of what it says. So this is
+        // The one commit that leaves the buffer ahead on success — a re-sync here would replace the
+        // Author's JavaScript with `String(document)`, which is not the same text and never was.
+        tab.doc.dirty = true;
       }
-    }, 600);
+    });
   });
 }
 
@@ -412,18 +544,35 @@ async function mountSourceEditor(
  * several early returns, so the span is closed by {@link timeSpan}'s `finally` rather than by
  * hand.
  */
-export function renderCanvas() {
-  timeSpan(SPAN_FULL_RENDER, renderCanvasImpl);
+export function renderCanvas(paneId: string = workspace.activePaneId) {
+  const surface = surfaceForPane(paneId);
+  timeSpan(SPAN_FULL_RENDER, () => {
+    renderCanvasImpl(surface);
+  });
 }
 
-function renderCanvasImpl() {
-  const tab = activeTab.value;
+function renderCanvasImpl(surface: CanvasSurface) {
+  /* Every read below is scoped to ONE pane. The stage, the panels it mounted and the mode it draws
+     are the surface's; the document is whatever tab that pane is showing, which is `activeTab` only
+     when the pane is the focused one. */
+  const canvasWrap = surface.wrap;
+  /* A pane with no stage renders nothing — it is not an error and it is not a fallback to some
+     other pane's stage. Two schedulers can name a stage-less pane: a frame queued for a pane that
+     lost the shell's single stage between the schedule and the rAF, and `escalateToFullRender` on
+     a tab whose pane is not the one on screen. Both mean the same thing — there is no surface to
+     repaint — and rendering "the canvas" instead is how one pane's escalation used to redraw the
+     other. Left unguarded this threw on Lit's render part, which is what `⌘\` did. */
+  if (!canvasWrap) {
+    return;
+  }
+  const canvasPanels = surface.panels;
+  const tab = tabOfPane(surface.paneId);
   if (!tab) {
     // No active tab — reset every piece of canvas view state so reopening a file can never inherit
     // A stale Lit part, a dead Monaco editor, or a mismatched prevCanvasMode (the toxic states that
     // Previously left the canvas unrenderable until a full reload).
     attachDocumentHeaderHost(null);
-    resetCanvasView();
+    resetCanvasView(surface);
     // Nothing is open. A dev-server root that is only a workspace/monorepo (no project.json) still
     // Populates projectState, but it is not an open project — the file tree prompts to open one and
     // The canvas must keep showing the welcome screen rather than going blank.
@@ -442,20 +591,21 @@ function renderCanvasImpl() {
   // Preview stage). Preview is its own surface — a real, viewport-sized iframe that scrolls its own
   // Document — so flipping the toggle IS a mode transition and rebuilds the surface, rather than
   // Re-rendering the previous mode's panels in place.
-  const canvasMode = ctx.getCanvasMode();
+  const canvasMode = canvasModeOfPane(surface.paneId);
 
   /* The Document Header card (§3.2 ⑧) is drawn by the STAGE, not by a band above it. Two surfaces
      draw a page you can author: the centered Edit column, where the card goes INSIDE the document
      column and scrolls with the artefact, and the Design artboards, where it is pinned above the
      panzoom surface because a form drawn at the artboard's scale is a picture of a form, not a
      control. `hasDocumentHeader` is the only remaining predicate and it is a fact about the
-     DOCUMENT; the sub-editors (function body, formula workspace) take the whole stage, so there is
-     no document on it to head. */
+     DOCUMENT — the one condition left, because the mode is the only other thing that decides
+     whether a page is being authored. It used to carry two more clauses, suppressing the card while
+     a function body or a formula was open on the grounds that those sub-editors took the whole
+     stage. They open in the dock's Logic tab now (P8) and the page is still on screen behind it, so
+     those clauses only DETACHED the visible card: it stopped re-rendering and quietly showed
+     frontmatter from before the edit. */
   const wantsDocHeader =
-    !S.ui.editingFunction &&
-    !S.ui.editingFormula &&
-    (canvasMode === "edit" || canvasMode === "design") &&
-    hasDocumentHeader(tab);
+    (canvasMode === "edit" || canvasMode === "design") && hasDocumentHeader(tab);
   if (!wantsDocHeader) {
     attachDocumentHeaderHost(null);
   }
@@ -465,7 +615,7 @@ function renderCanvasImpl() {
   canvasPerf.fullRenders += 1;
 
   // Detect whether this is a mode transition or a content-only re-render
-  const modeChanged = canvasMode !== view.prevCanvasMode;
+  const modeChanged = canvasMode !== surface.prevCanvasMode;
 
   // Only clear Lit's internal state on mode transitions (structural panel changes).
   // For content re-renders in the same mode, Lit's template diffing preserves
@@ -473,27 +623,16 @@ function renderCanvasImpl() {
   // RenderCanvasLive uses atomic clear (innerHTML = "" right before appendChild).
   // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
   if (modeChanged && canvasWrap["_$litPart$"]) {
-    hardClearCanvasWrap();
+    hardClearCanvasWrap(canvasWrap);
   }
 
-  // Function editor mode: editing a function body in Monaco (JS)
-  if (S.ui.editingFunction) {
-    renderFunctionEditor();
-    return;
-  }
-
-  // Dispose function editor if switching away
-  if (view.functionEditor) {
-    view.functionEditor.dispose();
-    view.functionEditor = null;
-  }
-
-  // Formula workspace mode: full-screen structured editing of an $expression (the function editor
-  // Takes precedence when both targets are set).
-  if (S.ui.editingFormula) {
-    renderFormulaWorkspace();
-    return;
-  }
+  /* There are no `editingFunction` / `editingFormula` branches here, and that is the point.
+     Both used to RETURN from this function, which is what made the logic editors a takeover: the
+     stage kept whatever DOM it was last painted with and stopped tracking the document. P8 moved
+     both into the dock's Logic tab, `panels/bottom-dock.ts` reveals it from its own effect, and
+     `panels/editors.ts`'s `syncFunctionEditor` owns the Monaco instance from the panel's
+     `afterRender` — including disposing it. Nothing about the canvas render depends on a logic
+     target any more, so the page underneath the dock keeps rendering while you edit a formula. */
 
   /* Source mode across a TAB switch: the buffer swap below reuses the existing model, and a model
      carries the file identity Monaco validates against — its URI is what the JSON language service
@@ -509,25 +648,42 @@ function renderCanvasImpl() {
     );
     if (view.monacoEditor.getModel()?.uri.toString() !== expectedUri.toString()) {
       disposeSourceCollab();
-      view.monacoEditor.getModel()?.dispose();
-      view.monacoEditor.dispose();
-      view.monacoEditor = null;
+      disposeSourceEditor();
     }
   }
 
-  // Source mode: update existing Monaco editor without recreating. Don't replace the buffer while
-  // The user is actively typing in it — that would reformat under the cursor (the source view is
-  // The editing surface here, mirroring the panel draft-state behaviour).
-  if (canvasMode === "source" && view.monacoEditor) {
+  /* THE FAST PATHS, and the one condition every one of them owes.
+     Each says "the structure this mode needs is already standing on the stage, so there is nothing
+     to build". None of them can see the stage: they ask a MODULE whether it mounted (`view
+     .monacoEditor`, `gridPanelMounted`, …), and that answer outlives the DOM. `modeChanged` is
+     exactly "the structure on this stage is not mine" — a real mode transition, or a surface whose
+     `prevCanvasMode` was released because the stage changed hands — and the mode-transition clear
+     ABOVE has already emptied the wrap by the time any of them is reached.
+     Unguarded, this is what survived the Unsplit fix: the stage came back to the primary pane,
+     `prevCanvasMode` was null, the wrap was cleared, and the source fast path then returned on the
+     strength of a Monaco editor whose container had just been thrown away. An empty stage, a live
+     editor nobody could see, and only a reload to get it back. */
+
+  /* Source mode: update the existing Monaco editor without recreating it. Don't replace the buffer
+     while it has moved on — that would reformat under the cursor (the source view is the editing
+     surface here, mirroring the panel draft-state behaviour). This branch is where the rule was
+     first written, as a bare `!editor.hasTextFocus()`; `services/monaco-buffer.ts` is where it
+     lives now, and it gained the two clauses this spelling was missing — a buffer holding text the
+     document has not been given (the user typed, then clicked away; or a `.js` buffer the document
+     has no parse for at all) and an editor disposed inside the round trip. */
+  if (canvasMode === "source" && view.monacoEditor && !modeChanged) {
     const editor = view.monacoEditor;
     sourceContent(tab, sourceLang(tab))
       .then((newVal) => {
         if (view.monacoEditor !== editor) {
           return;
         }
-        if (!editor.hasTextFocus() && editor.getValue() !== newVal) {
+        if (!bufferMovedOn(editor) && editor.getValue() !== newVal) {
           editor._ignoreNextChange = true;
           editor.setValue(newVal);
+          // Buffer and document agree again, by the document's text winning. Same declaration the
+          // Dock's re-sync makes, for the same reason: clause 3 belongs to whoever writes.
+          editor._writes?.markSettled();
         }
       })
       .catch(() => {
@@ -538,25 +694,25 @@ function renderCanvasImpl() {
 
   // Grid fast-path: the grid panel runs its own effect scope (toolbar + engine stay live), so a
   // Same-tab re-render while the panel is mounted needs nothing from the canvas pipeline.
-  if (canvasMode === "grid" && gridPanelMounted(tab)) {
+  if (canvasMode === "grid" && gridPanelMounted(tab) && !modeChanged) {
     return;
   }
 
   // Library fast-path, same shape: the Library pane owns its own reactivity (view state, scan,
   // Window), so a same-tab re-render while it is mounted needs nothing from the canvas pipeline.
-  if (canvasMode === "manage" && libraryPaneMounted(tab)) {
+  if (canvasMode === "manage" && libraryPaneMounted(tab) && !modeChanged) {
     return;
   }
 
   // Entry fast-path, same shape: the entry form owns its own effect over the tab's frontmatter, so
   // A field commit repaints the form and nothing reaches the canvas pipeline.
-  if (canvasMode === "entry" && entryPaneMounted(tab)) {
+  if (canvasMode === "entry" && entryPaneMounted(tab) && !modeChanged) {
     return;
   }
 
   // Settings fast-path, same shape: the Project Settings editor subscribes to the section registry
   // And to its own chosen section, so a mounted editor needs nothing from the canvas pipeline.
-  if (canvasMode === "settings" && settingsPaneMounted(canvasWrap)) {
+  if (canvasMode === "settings" && settingsPaneMounted(canvasWrap) && !modeChanged) {
     return;
   }
 
@@ -578,7 +734,7 @@ function renderCanvasImpl() {
   }
 
   // Detect whether this is a mode transition or a content-only re-render
-  view.prevCanvasMode = canvasMode;
+  surface.prevCanvasMode = canvasMode;
 
   // Best-effort commit of a live inline-edit session BEFORE lit rebuilds the panel DOM. Covers
   // Keyboard-driven tab switches / mode changes where no parent pointerdown preceded the render —
@@ -632,11 +788,7 @@ function renderCanvasImpl() {
 
     // Dispose Monaco editor if switching away from source mode
     disposeSourceCollab();
-    if (view.monacoEditor) {
-      view.monacoEditor.getModel()?.dispose();
-      view.monacoEditor.dispose();
-      view.monacoEditor = null;
-    }
+    disposeSourceEditor();
 
     litRender(nothing, canvasWrap);
     view.panzoomWrap = null;
@@ -686,7 +838,7 @@ function renderCanvasImpl() {
     const { tpl: panelTpl, panel } = canvasPanelTemplate(null, null, true);
     litRender(html`<div class="preview-stage">${panelTpl}</div>`, canvasWrap);
     canvasPanels.push(panel as unknown as CanvasPanel);
-    renderCanvasIntoPanel(panel as unknown as CanvasPanel, S.ui.featureToggles);
+    renderCanvasIntoPanel(surface, panel as unknown as CanvasPanel, S.ui.featureToggles);
     return;
   }
 
@@ -752,7 +904,13 @@ function renderCanvasImpl() {
 
     const filePath = tab.documentPath || "document.json";
     const lang = sourceLang(tab);
-    void mountSourceEditor(tab, editorContainer as unknown as Element, filePath, lang);
+    void mountSourceEditor(
+      tab,
+      surface.paneId,
+      editorContainer as unknown as Element,
+      filePath,
+      lang,
+    );
     return;
   }
 
@@ -760,7 +918,7 @@ function renderCanvasImpl() {
   if (canvasMode === "git-diff") {
     if (!ctx.gitDiffState) {
       ctx.setCanvasMode("design");
-      renderCanvas();
+      renderCanvas(surface.paneId);
       return;
     }
 
@@ -823,21 +981,28 @@ function renderCanvasImpl() {
     };
 
     const { featureToggles } = S.ui;
+    // Both sides mount after an await, so the pass's generation is captured now — see the note on
+    // `passGen` at the design-mode artboard loop.
+    const diffGen = view.renderGeneration;
     void Promise.all([
       parseContent(gitDiffState.originalContent || ""),
       parseContent(gitDiffState.currentContent || ""),
     ]).then(([originalDoc, currentDoc]) => {
       renderCanvasIntoPanel(
+        surface,
         origPanel as unknown as CanvasPanel,
         featureToggles,
         originalDoc,
         gitDiffState,
+        diffGen,
       );
       renderCanvasIntoPanel(
+        surface,
         currPanel as unknown as CanvasPanel,
         featureToggles,
         currentDoc,
         gitDiffState,
+        diffGen,
       );
     });
 
@@ -877,7 +1042,7 @@ function renderCanvasImpl() {
     `;
     litRender(editTpl, canvasWrap);
     canvasPanels.push(panel as unknown as CanvasPanel);
-    renderCanvasIntoPanel(panel as unknown as CanvasPanel, S.ui.featureToggles);
+    renderCanvasIntoPanel(surface, panel as unknown as CanvasPanel, S.ui.featureToggles);
     // The column must exist in the DOM before the zoom's live width measurement — so the zoom is
     // Applied after the render rather than baked into the template (the panel mounts fluid and is
     // Immediately re-fitted; the iframe hasn't painted yet, so nothing visibly jumps).
@@ -936,7 +1101,7 @@ function renderCanvasImpl() {
       canvasWrap,
     );
     canvasPanels.push(panel as unknown as CanvasPanel);
-    renderCanvasIntoPanel(panel as unknown as CanvasPanel, featureToggles);
+    renderCanvasIntoPanel(surface, panel as unknown as CanvasPanel, featureToggles);
     applyTransform();
     if (modeChanged) {
       // Fit BEFORE centering: the fit picks the zoom, centerCanvas then places the artboard at that
@@ -989,14 +1154,23 @@ function renderCanvasImpl() {
     canvasWrap,
   );
 
+  /* Every artboard of this pass mounts under the generation the pass opened with, captured HERE
+     rather than read inside each deferred callback. Two things depend on it. The iframe drops a
+     render whose gen is older than the one it last accepted, so a pass that has been superseded
+     while its artboards were still queued is discarded by the frame instead of posting a duplicate
+     render under the NEW pass's number. And the host resolves the document once per generation
+     (`preparePassRender`), which only fans out if the pass has one. */
+  const passGen = view.renderGeneration;
   for (let i = 0; i < panelEntries.length; i++) {
     const { panel } = panelEntries[i]!;
     const p = panel as CanvasPanel;
     canvasPanels.push(p);
     if (i === 0) {
-      renderCanvasIntoPanel(p, featureToggles);
+      renderCanvasIntoPanel(surface, p, featureToggles);
     } else {
-      setTimeout(() => renderCanvasIntoPanel(p, featureToggles), 0);
+      // Yield between artboards so the first one paints before the rest mount. They no longer pay
+      // For the document — the pass already resolved it — but each is still a live iframe render.
+      setTimeout(() => renderCanvasIntoPanel(surface, p, featureToggles, null, null, passGen), 0);
     }
   }
 
@@ -1018,6 +1192,8 @@ function renderCanvasImpl() {
  * `data-jx-path`/`data-jx-layout`, and draws its own overlays). Git-diff/preview overrides render
  * but stay un-patchable (`ready` only flips for the real tab document).
  *
+ * @param {CanvasSurface} surface - The pane's stage this panel belongs to. The document rendered
+ *   and the preview flag both come from THAT pane, never from "the active tab".
  * @param {CanvasPanel} panel
  * @param {Record<string, boolean>} _featureToggles - Accepted for call-site symmetry (the iframe
  *   render needs no structural-preview fallback); unused.
@@ -1025,15 +1201,21 @@ function renderCanvasImpl() {
  *   active tab doc if not provided.
  * @param {GitDiffState | null} [_gitDiffState] - Accepted for call-site symmetry; the iframe path
  *   does not apply parent-side diff highlighting.
+ * @param {number | null} [passGen] - The generation of the render pass this panel belongs to.
+ *   Passed explicitly by a DEFERRED mount, whose callback would otherwise read whatever generation
+ *   is current when the timer fires — a later pass's number, stamped on an earlier pass's
+ *   artboard.
  */
 function renderCanvasIntoPanel(
+  surface: CanvasSurface,
   panel: CanvasPanel,
   _featureToggles: Record<string, boolean>,
   docOverride: JxMutableNode | null = null,
   _gitDiffState: GitDiffState | null = null,
+  passGen: number | null = null,
 ) {
-  const gen = view.renderGeneration;
-  const tab = activeTab.value;
+  const gen = passGen ?? view.renderGeneration;
+  const tab = tabOfPane(surface.paneId);
   const docToRender = docOverride || (tab?.doc.document as JxMutableNode);
   const canvas = panel.canvas as HTMLElement;
 
@@ -1044,7 +1226,7 @@ function renderCanvasIntoPanel(
   // Learns that after it has awaited the resolved document — one await during which the iframe can
   // Post a contentHeight that the OUTGOING mode would answer. Declare it here, before the await,
   // Where it is already known: this is the mode whose surface was just built.
-  adoptCanvasPreviewMode(canvas, _ctx?.getCanvasMode() === "preview");
+  adoptCanvasPreviewMode(canvas, canvasModeOfPane(surface.paneId) === "preview");
 
   // Overrides (git-diff docs) mount with a null tab identity: their iframes must never route doc
   // Mutations anywhere. The real doc carries its tab id so edit/drop messages route to THAT tab.

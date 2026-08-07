@@ -173,6 +173,7 @@ export async function bootStudio(opts: {
   }));
 
   void mock.module("../src/canvas/canvas-render.ts", () => ({
+    handOverCanvasStage: mock(() => {}),
     initCanvasRender: (ctx: unknown) => {
       captured.canvasRenderCtx = ctx;
     },

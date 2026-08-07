@@ -27,7 +27,7 @@ import { validateComponentSlots } from "../services/cem-export";
 import { getPlatform } from "../platform";
 import { getGridController } from "../grid/grid-controller";
 import { activeTab, openTab } from "../workspace/workspace";
-import { collabSave } from "../collab/collab-session";
+import { collabReadOnly, collabSave } from "../collab/collab-session";
 import { flushCanvasEdits } from "../canvas/iframe-host";
 import {
   defaultContentFormat,
@@ -180,11 +180,29 @@ function reportSaved(tab: Tab) {
   }
 }
 
-/** Save the current document back to its source location. */
-export async function saveFile() {
-  const tab = activeTab.value;
+/**
+ * Save a document back to its source location. Defaults to the focused tab.
+ *
+ * Two things here are for the tab strip's Save-on-close, and both are what a caller that must
+ * decide something afterwards needs:
+ *
+ * - `tab` is a PARAMETER. The × on a tab closes that tab, focused or not, and reading
+ *   `activeTab.value` would have saved a different document than the one being closed.
+ * - The return value says whether the work reached disk. Every failure in here is reported to the
+ *   user and swallowed, which is right for ⌘S and useless to a caller that would otherwise close
+ *   the tab on top of the failure.
+ *
+ * **A read-only collaborator has no save target, and that is a refusal rather than a fallback.**
+ * Their edits never reached the Y-doc, so there is nothing for the provider to flush; and the local
+ * file is the ROOM's file, so writing it here would fork the shared document behind the owner's
+ * back. Both "saved" and "written anyway" are wrong answers, so the answer is `false` with the
+ * reason said out loud.
+ *
+ * @returns Whether the document was persisted.
+ */
+export async function saveFile(tab: Tab | null = activeTab.value): Promise<boolean> {
   if (!tab) {
-    return;
+    return false;
   }
   // Text reaches the document on an idle tick, so the words still sitting in the caret's block have
   // To be committed before anything serializes it. This used to be `if (isEditing()) stopEditing()`,
@@ -192,17 +210,40 @@ export async function saveFile() {
   // Realm's copy of that module, where a session never starts. Saving mid-sentence silently wrote
   // The file without the sentence.
   await flushCanvasEdits(tab.id);
+  /* THE REFUSAL COMES FIRST, and it used to come second.
+     `ensureCollab` attaches a session to every tab with a `documentPath` except `project.json` —
+     `.csv` included, and a `.csv` tab is exactly the kind `grid-panel.ts` provisions a controller
+     for. So a read-only collaborator on a co-edited sheet took the grid branch above this line,
+     `grid.save()` wrote the ROOM's file to disk behind the owner's back, and `!tab.doc.dirty`
+     reported it as a save — the precise outcome the paragraph above says this function prevents.
+     A refusal that any earlier branch can step in front of is not a refusal, so nothing may
+     precede it except `flushCanvasEdits`, which commits the caret's block and writes nothing. */
+  if (collabReadOnly(tab)) {
+    notify.warn(
+      `You have read access to this session — changes to ${tab.documentPath ?? "this document"} ` +
+        `stay in your browser and cannot be saved.`,
+      {
+        action: "file.save",
+        key: `save.readOnly:${tab.documentPath ?? tab.id}`,
+        ...(tab.documentPath === null ? {} : { path: tab.documentPath }),
+        source: "Collaboration",
+      },
+    );
+    return false;
+  }
   // Grid tabs batch-save through their controller (per-source commit semantics, not a doc write).
   const grid = getGridController(tab);
   if (grid) {
     await grid.save();
-    return;
+    // A batch commit keeps failed rows dirty and mirrors that onto the tab, so the buffer's own
+    // Verdict is the answer — there is nothing more honest to report here.
+    return !tab.doc.dirty;
   }
   try {
     // A co-edited tab persists through its provider (a direct file write would reset the room).
     if (await collabSave(tab)) {
       reportSaved(tab);
-      return;
+      return true;
     }
     const output = await serializeDocument(tab);
 
@@ -211,7 +252,9 @@ export async function saveFile() {
       await platform.writeFile(tab.documentPath, output);
       tab.doc.dirty = false;
       reportSaved(tab);
-    } else if (tab.fileHandle && "createWritable" in tab.fileHandle) {
+      return true;
+    }
+    if (tab.fileHandle && "createWritable" in tab.fileHandle) {
       const writable =
         await /**
          * @type {{
@@ -225,9 +268,9 @@ export async function saveFile() {
       await writable.close();
       tab.doc.dirty = false;
       reportSaved(tab);
-    } else {
-      notify.warn("This document has no save target — use Export.", { key: "save.noTarget" });
+      return true;
     }
+    notify.warn("This document has no save target — use Export.", { key: "save.noTarget" });
   } catch (error) {
     if (!(error instanceof Error && error.name === "AbortError")) {
       notify.error(`Could not save ${tab.documentPath ?? tab.id}.`, {
@@ -239,6 +282,7 @@ export async function saveFile() {
       });
     }
   }
+  return false;
 }
 
 /** The output format for a tab: its source format, or the default content format. */

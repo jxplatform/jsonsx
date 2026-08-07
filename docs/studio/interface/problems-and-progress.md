@@ -6,6 +6,7 @@ code:
   - packages/studio/src/services/notify.ts
   - packages/studio/src/panels/bottom-dock.ts
   - packages/studio/src/panels/problems-panel.ts
+  - packages/studio/src/panels/formula-workspace.ts
   - packages/studio/src/panels/activity-panel.ts
   - packages/studio/src/ui/progress-modal.ts
   - packages/studio/src/ui/field-row.ts
@@ -62,10 +63,20 @@ Problems belong to the project you have open. Closing the project clears them, s
 
 :kbd[⌘J] / :kbd[Ctrl+J] opens a dock across the bottom of the working area. It sits **under the canvas and the panes only** — opening it never narrows the Navigator or the Inspector — and it starts out closed, because an empty list shouldn't spend a fifth of your canvas saying nothing. The **×** at the right of its tab strip closes it again.
 
-Its tab strip is **Problems · Diff · Logic · Activity**.
+Its tab strip is **Problems** and **Activity**, with **Logic** between them whenever a formula or a function is open.
+
+## Logic
+
+**Logic** holds the two editors that compute values: the **[formula workspace](/docs/studio/logic/formula-workspace)** for a structured `$expression`, and the **[function editor](/docs/studio/logic/code)** for a JavaScript body. Open either one — from the State panel, or from an event binding in the Inspector's Logic tab — and the dock reveals itself on this tab.
+
+Being a dock tab rather than a full-screen surface is the whole point: **the page stays on the stage while you author its logic**, so the value you are computing and the element that shows it are on screen together. The rest follows from that:
+
+- The tab is there while something is open in it and **leaves the strip when you close it**. **Close**, in the editor's own header, is the only thing that clears it — collapsing the dock, switching to Problems and coming back, or leaving the document and returning all keep your place.
+- The target belongs to the **document**, so each open document has its own: switch documents and Logic goes with them.
+- The dock reveals itself **once per thing you open**. Close the dock over an open formula and it stays closed until you open another.
 
 :::doc-note
-**Diff and Logic are named but not built yet.** They're part of the dock's design and they don't appear in the strip today, so what you'll see is Problems and Activity. Reviewing changes lives in [Source control](/docs/studio/publish/source-control) and editing formulas in the [formula workspace](/docs/studio/logic/formula-workspace) until they arrive.
+There is no **Diff** tab here. Reviewing a change is a **Diff** editor on a document at full pane size — see [Source control](/docs/studio/publish/source-control) — rather than a panel in a strip along the bottom.
 :::
 
 ## Activity
@@ -77,6 +88,8 @@ Its tab strip is **Problems · Diff · Logic · Activity**.
 - **its steps**, in order, each ticked off as it completes;
 - **its log**, behind a **Show log** disclosure — the same output the operation printed;
 - **Cancel**, when the operation can honestly be stopped. An operation that can't be stopped doesn't offer a button that pretends otherwise.
+
+The tab also carries the **[Deploy checklist](/docs/studio/publish)** above the run log — a deploy is a long operation with a log, so it belongs with the others, and the checklist is readable before anything has started because its job is to say what is missing _first_.
 
 **A finished operation stays on the list**, with its log, so "what did that import actually do?" is a question you can answer afterward rather than only while it's running. **Clear n finished** tidies them away; anything still running is kept.
 
@@ -107,9 +120,9 @@ If a panel is showing a yellow **New changes — applied when you finish editing
 
 ## What the status bar does instead
 
-The status bar along the bottom carries **ambient state only** — three fields in scope order: your project, then the document, then the selection. It's the project name and branch, the document's path and save state, the trail of ancestors above what you've selected. Every item is clickable and runs a command.
+The status bar along the bottom carries **ambient state only** — three fields in scope order: your project, then the document, then the selection. It's the project name and branch, the document's path and save state. Every item is clickable and runs a command.
 
-With more than one element selected, the selection field leads with a count — **3 selected** — before the trail. The trail names the _primary_ element, the one the inspector and the block action bar are pointed at, so the count is what stops that trail reading as though it described everything you have selected.
+The selection field carries what an address can't state: **3 selected** when more than one element is picked, or the style rule the Style panel is editing. Where you are — the element and the chain above it — is the [jump bar](/docs/studio/interface#the-jump-bar)'s job, one line above the pane, and it names the _primary_ element, the one the Inspector and the block action bar are pointed at. The count is what stops that address reading as though it described everything you have selected.
 
 **No message ever flashes past down there.** Outcomes go to toasts and Problems, which are readable for as long as you need and can be acted on; the status bar answers "where am I and what state is this in?", which stays true until something changes it.
 

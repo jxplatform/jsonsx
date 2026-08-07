@@ -85,9 +85,10 @@ export function isSelected(
 /**
  * Copy a selection, so nothing can mutate one through the array it was handed.
  *
- * History entries, sub-document frames and the collab awareness payload all take a copy for the
- * same reason they always did: `session.selection` is a reactive proxy, and a stored reference to
- * it would follow the live selection instead of recording where it was.
+ * History entries and the collab awareness payload both take a copy for the same reason they always
+ * did: `session.selection` is a reactive proxy, and a stored reference to it would follow the live
+ * selection instead of recording where it was. (A third caller, the sub-document stack's frames,
+ * went with the stack — nothing pushes one any more.)
  *
  * @param {readonly JxPath[]} paths
  * @returns {JxPath[]}

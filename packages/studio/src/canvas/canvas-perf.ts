@@ -17,10 +17,13 @@ const SAMPLE_LIMIT = 128;
 
 /** Span names, so producers and the profiling gate agree on the keys. */
 export const SPAN_FULL_RENDER = "fullRender";
-export const SPAN_PANEL_RENDER = "panelRender";
 export const SPAN_MOUNT_CANVAS = "mountCanvas";
 export const SPAN_PATCH_BATCH = "patchBatch";
-export const SPAN_SUBTREE_RENDER = "subtreeRender";
+/**
+ * The parent-side render payload — resolve the document, then serialize it for the wire. Built ONCE
+ * per render pass and shared by every host in it, so this span's `count` is passes, not panels.
+ */
+export const SPAN_PREPARE_RENDER = "prepareRender";
 
 export interface SpanStats {
   /** Completed spans recorded under this name. */
@@ -40,12 +43,20 @@ export interface CanvasPerf {
   fullRenders: number;
   /** Individual panel renders (one per breakpoint panel per full render). */
   panelRenders: number;
+  /**
+   * Parent-side render payloads built — one document resolution plus one wire serialization.
+   *
+   * This is the fan-out denominator. Divide {@link CanvasPerf.hostRenderPosts} by it: the quotient
+   * is how many canvas iframes one render pass fed from a single resolution, and a quotient of 1
+   * when more than one host is live means the fan-out is not happening.
+   */
+  renderPreparations: number;
+  /** Render messages posted to canvas iframe hosts (the fan-out numerator). */
+  hostRenderPosts: number;
   /** Doc-effect triggers skipped because the change was consumed by the patcher. */
   skippedFullRenders: number;
-  /** Patch ops applied surgically to the live canvas DOM. */
+  /** Patch ops posted to the live canvas hosts instead of escalating to a render. */
   patchedOps: number;
-  /** Isolated subtree re-renders (structural patches). */
-  subtreeRenders: number;
   /** Patch batches that escalated to a full render. */
   escalations: number;
   lastEscalationReason: string;
@@ -60,13 +71,14 @@ export interface CanvasPerf {
 export const canvasPerf: CanvasPerf = {
   escalations: 0,
   fullRenders: 0,
+  hostRenderPosts: 0,
   lastEscalationReason: "",
   lastFullRenderMs: 0,
   p95FullRenderMs: 0,
   panelRenders: 0,
   patchedOps: 0,
+  renderPreparations: 0,
   skippedFullRenders: 0,
-  subtreeRenders: 0,
   timings: {},
 };
 
@@ -206,9 +218,10 @@ export async function timeSpanAsync<T>(name: string, body: () => Promise<T>): Pr
 export function resetCanvasPerf() {
   canvasPerf.fullRenders = 0;
   canvasPerf.panelRenders = 0;
+  canvasPerf.renderPreparations = 0;
+  canvasPerf.hostRenderPosts = 0;
   canvasPerf.skippedFullRenders = 0;
   canvasPerf.patchedOps = 0;
-  canvasPerf.subtreeRenders = 0;
   canvasPerf.escalations = 0;
   canvasPerf.lastEscalationReason = "";
   canvasPerf.lastFullRenderMs = 0;

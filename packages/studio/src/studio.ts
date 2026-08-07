@@ -15,7 +15,6 @@ import { errorMessage } from "@jxsuite/schema/parse";
 
 import {
   canvasWrap,
-  getNodeAtPath,
   initShellRefs,
   projectState,
   registerRenderer,
@@ -24,19 +23,17 @@ import {
   setProjectState,
   toolbarEl,
   updateSession,
-  updateUi,
 } from "./store";
 
 import {
   activeTab,
   closeAllTabs,
   openTab,
+  paneOfTabCanHostMode,
   registerTabCommands,
   setWorkspaceProject,
   workspace,
 } from "./workspace/workspace";
-import { mutateUpdateDef, mutateUpdateProperty, transactDoc } from "./tabs/transact";
-import { popSubDocument, popToSubDocument } from "./tabs/tab";
 import { effect } from "./reactivity";
 
 import { view } from "./view";
@@ -51,12 +48,14 @@ import {
 import { isEditing } from "./editor/inline-edit";
 import { applyTransform, initCanvasUtils, registerCanvasViewCommands } from "./canvas/canvas-utils";
 import {
+  handOverCanvasStage,
   initCanvasRender,
   registerSelectionSetCommand,
   renderCanvas,
   renderOverlays,
   scheduleCanvasRender,
 } from "./canvas/canvas-render";
+import { canvasModeOfPane } from "./canvas/canvas-surface";
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
 import {
   commitActiveEditSession,
@@ -77,6 +76,7 @@ import { canvasSlashHandler } from "./editor/canvas-slash-bridge";
 import { makeCanvasContextMenuHandler } from "./editor/canvas-context-menu";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import { mountStatusbar, renderStatusbar } from "./panels/statusbar";
+import { mountJumpBar } from "./panels/jump-bar";
 import { notify } from "./services/notify";
 import { beginActivity } from "./panels/activity-panel";
 import { exportFile, parseSourceForPath, saveFile, serializeDocument } from "./files/file-ops";
@@ -99,13 +99,14 @@ import {
   setupTreeKeyboard,
 } from "./files/files";
 import { startFsSync } from "./files/fs-events";
+import { invalidateParamValues } from "./page-params";
 import {
   configureCollabNotifier,
   configureCollabParser,
   configureCollabSerializer,
 } from "./collab/collab-session";
 import { renderImportsTemplate } from "./panels/imports-panel";
-import { renderHeadTemplate } from "./panels/head-panel";
+import { invalidateLayoutPickerCache, renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
 import { installAutomationHook } from "./services/automation";
 import { invalidateLibrary } from "./browse/library-pane";
@@ -119,7 +120,6 @@ import { getPlatform, hasPlatform, registerPlatform } from "./platform";
 import { parseMediaEntries } from "./utils/canvas-media";
 import { resolveDefaultPlatform } from "./platforms/default-platform";
 import { mountResizeEdges } from "./resize-edges";
-import { codeService } from "./services/code-services";
 import {
   defBadgeLabel,
   defCategory,
@@ -149,7 +149,7 @@ import { components as _swc } from "./ui/spectrum";
 import "./ui/panel-resize.js";
 // Built-in schema-form controls (schema-builder, secret) register on import
 import "./ui/form-controls.js";
-import { initLayers, isModalOpen, showSaveDiscardDialog } from "./ui/layers";
+import { initLayers, isModalOpen } from "./ui/layers";
 import { initShortcuts, registerStudioCommands } from "./editor/shortcuts";
 import { createCommandRegistry } from "./commands/registry";
 import { createLiveContext } from "./commands/live-context";
@@ -168,7 +168,8 @@ import { selectStylebookTag } from "./panels/stylebook-panel";
 import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from "./panels/dnd";
 import { registerCanvasDndBridge } from "./panels/canvas-dnd-bridge";
 import { defaultDef } from "./panels/shared";
-import { closeFormulaWorkspace, registerFormulaEditorCommands } from "./panels/formula-workspace";
+import { registerFormulaEditorCommands } from "./panels/formula-workspace";
+import { closeFunctionEditor } from "./panels/editors";
 import {
   initBlockActionBar,
   isEditChromeTarget,
@@ -188,7 +189,7 @@ import {
   platformUsesRepoPicker,
 } from "./new-project/add-repo-modal";
 import { openNewProjectModal, registerNewProjectCommands } from "./new-project/new-project-modal";
-import { registerInspectorCommands } from "./panels/properties-panel";
+import { invalidatePageRouteCache, registerInspectorCommands } from "./panels/properties-panel";
 import { registerStyleCommands } from "./panels/style-panel";
 import { registerGridCommands } from "./grid/grid-open";
 import { registerSettingsCommands } from "./settings/settings-document";
@@ -202,8 +203,6 @@ import { registerRedirectsCommands } from "./grid/redirects-grid";
 import { registerContentCommands } from "./content/entry-commands";
 import { convertToComponent } from "./editor/convert-to-component";
 import type { GitDiffState } from "./types";
-import type { Tab } from "./tabs/tab";
-import type { JxPath } from "./state";
 import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
 
 void _swc;
@@ -212,25 +211,34 @@ void _swc;
 // These mutable variables are local to studio.js for now. As sections are extracted
 // Into their own modules, they will migrate to ctx in store.js.
 
-// Effective canvas mode: the per-tab preview toggle composes with an edit/design base mode and
-// Presents as "preview" to every downstream gate (doc resolution, iframe flags, interaction
-// Surfaces). Consumers needing the base mode (toolbar switcher selection, canvas host layout)
-// Read tab.session.ui.canvasMode directly.
+// The FOCUSED pane's effective canvas mode. The composition itself (the per-tab preview toggle over
+// An edit/design base) lives in `canvas/canvas-surface.ts`, beside the panes, because the answer is
+// A property of a pane's tab and every other pane has its own — this is just the focused one, which
+// Is what a panel drawn once for the whole shell means by "the canvas mode".
 function getCanvasMode() {
-  const ui = activeTab.value?.session.ui;
-  const base = ui?.canvasMode ?? "design";
-  return ui?.preview && (base === "edit" || base === "design") ? "preview" : base;
+  return canvasModeOfPane(workspace.activePaneId);
 }
 
-/** @param {string} mode */
+/**
+ * Write the focused pane's BASE canvas mode.
+ *
+ * Refuses a mode the tab's PANE may not host (`paneOfTabCanHostMode`) — the side pane is capped to
+ * the cheap editor kinds, and a cap enforced only at the split is a cap a context-bar click walks
+ * straight back out of. Silent because no control offers a refused mode: the pane context bar draws
+ * `hostableKindsOf`, and `canvas.setMode` — the one caller that can be handed an arbitrary string —
+ * refuses it by name before it gets here.
+ *
+ * @param {string} mode
+ */
 function setCanvasMode(mode: string) {
+  const tab = activeTab.value;
+  if (!tab || !paneOfTabCanHostMode(tab, mode)) {
+    return;
+  }
   if (getCanvasMode() === "git-diff" && mode !== "git-diff") {
     shell.git.diffState = null;
   }
-  const tab = activeTab.value;
-  if (tab) {
-    tab.session.ui.canvasMode = mode;
-  }
+  tab.session.ui.canvasMode = mode;
 }
 
 // ─── Component registry ───────────────────────────────────────────────────────
@@ -261,104 +269,11 @@ async function navigateToComponent(componentPath: string) {
   setActivityTab("layers");
 }
 
-/**
- * Leaving a drilled-in component discards its edits (the pop restores the parent). Because saving
- * is explicit, prompt when the child is dirty: Save writes it, Discard drops it, Cancel stays.
- * Returns false to abort navigation.
- *
- * @param {Tab} tab
- */
-async function confirmLeaveDirtyChild(tab: Tab): Promise<boolean> {
-  if (!tab.doc.dirty || !tab.documentPath) {
-    return true;
-  }
-  const name = tab.documentPath.split("/").pop() || "component";
-  const choice = await showSaveDiscardDialog("Unsaved Changes", `"${name}" has unsaved changes.`);
-  if (choice === "cancel") {
-    return false;
-  }
-  if (choice === "save") {
-    try {
-      await getPlatform().writeFile(tab.documentPath, await serializeDocument(tab));
-    } catch (error) {
-      notify.error(`Could not save ${tab.documentPath}.`, {
-        action: "file.save",
-        detail: (error as Error).message,
-        key: `save:${tab.documentPath}`,
-        path: tab.documentPath,
-        source: "Save",
-      });
-      return false;
-    }
-  }
-  // "discard": leave without writing — the child's edits are dropped with the popped frame.
-  return true;
-}
-
-/** Leave the innermost sub-document ($map template, function body) and restore the frame beneath. */
-async function navigateBack() {
-  const tab = activeTab.value;
-  if (!tab || tab.session.documentStack.length === 0) {
-    return;
-  }
-  if (!(await confirmLeaveDirtyChild(tab))) {
-    return;
-  }
-  popSubDocument(tab);
-  setActivityTab("layers");
-
-  render();
-  // No notification: the pane jump bar and the tab strip both name the document you are now in,
-  // And an outcome a surface already states is not an outcome worth interrupting for.
-}
-
-/** @param {number} targetIndex */
-async function navigateToLevel(targetIndex: number) {
-  const tab = activeTab.value;
-  const stack = tab?.session.documentStack;
-  if (!tab || !stack || targetIndex < 0 || targetIndex >= stack.length) {
-    return;
-  }
-  if (!(await confirmLeaveDirtyChild(tab))) {
-    return;
-  }
-  popToSubDocument(tab, targetIndex);
-  setActivityTab("layers");
-
-  render();
-  // As above — where you are is stated by the chrome, permanently, rather than for three seconds.
-}
-
-async function closeFunctionEditor() {
-  const tab = activeTab.value;
-  const editing =
-    /** @type {{ type: string; defName?: string; path?: JxPath; eventKey?: string } | null} */ tab
-      ?.session.ui.editingFunction;
-  if (!editing || !tab) {
-    return;
-  }
-  if (view.functionEditor) {
-    const currentCode = view.functionEditor.getValue();
-    const minResult = await codeService("minify", { code: currentCode });
-    const bodyToStore = minResult?.code ?? currentCode;
-    if (editing.type === "def") {
-      transactDoc(tab, (t) => mutateUpdateDef(t, editing.defName as string, { body: bodyToStore }));
-    } else if (editing.type === "event") {
-      const node = getNodeAtPath(tab.doc.document, editing.path as JxPath);
-      const current = node?.[editing.eventKey as string] || {};
-      transactDoc(tab, (t) =>
-        mutateUpdateProperty(t, editing.path as JxPath, editing.eventKey as string, {
-          .../** @type {object} */ current,
-          $prototype: "Function",
-          body: bodyToStore,
-        }),
-      );
-    }
-    view.functionEditor.dispose();
-    view.functionEditor = null;
-  }
-  updateUi("editingFunction", null);
-}
+// There is no `navigateBack` / `navigateToLevel` here any more, and no `confirmLeaveDirtyChild`
+// Beneath them. All three served the sub-document stack, which nothing could push onto — see
+// `tabs/tab.ts`. The dirty prompt they shared was about a POPPED frame discarding a child's edits;
+// A drilled-in component is a real tab now, and `panels/tab-strip.ts` owns the prompt for closing
+// One. That prompt is two-way where this was three-way — see `showSaveDiscardDialog`'s ledger entry.
 
 // ─── Webdata: datalists for autocomplete ──────────────────────────────────────
 
@@ -428,12 +343,8 @@ initQuickSearch({ openRecentProject: (root: string) => openRecentProject(root) }
 tabStrip.mount(document.querySelector("#tab-strip") as HTMLElement);
 
 paneContext.mount(document.querySelector("#pane-chrome") as HTMLElement, {
-  closeFormulaWorkspace: () => closeFormulaWorkspace(),
-  closeFunctionEditor: () => closeFunctionEditor(),
   exportFile,
   getCanvasMode,
-  navigateBack: () => navigateBack(),
-  navigateToLevel: (i: number) => navigateToLevel(i),
   parseMediaEntries,
   setCanvasMode,
 });
@@ -523,7 +434,6 @@ initCanvasLiveRender({
   getCanvasMode,
 });
 initCanvasPatcher({
-  getCanvasMode,
   renderOverlays,
   scheduleCanvasRender,
 });
@@ -532,7 +442,6 @@ setIframePatchEscalation(scheduleCanvasRender);
 // One global coordinator monitor drives cross-frame palette→canvas drops (Phase 4c).
 registerCanvasDndBridge();
 initCanvasRender({
-  getCanvasMode,
   get gitDiffState() {
     return shell.git.diffState;
   },
@@ -563,6 +472,25 @@ initWelcome({
   },
   openProject: () => openProject(),
   openRecentProject: (root: string) => openRecentProject(root),
+});
+
+/* The shell's single stage follows the focus. A pane is the unit of render (see
+   `canvas/canvas-surface.ts`), but `index.html` has one `#canvas-wrap` — so the pane that owns it
+   is whichever pane the keyboard is in, and the handover has to happen the moment focus moves
+   rather than at boot. `⌘\` is the case that proves it: `splitRight` focuses the pane it creates,
+   and until this effect existed the moved tab's next render addressed a pane with no stage.
+
+   Registered BEFORE the two render effects only for readability — a render is an rAF, so it lands
+   after every synchronous effect this focus change fires either way.
+
+   `handOverCanvasStage` repaints as part of taking the stage, because neither render effect below
+   can: both are keyed on `activeTab`, and a handover moves a pane, not a document — `⌘\` and
+   `View: Unsplit` both leave the same tab active.
+
+   This effect is deleted by P8 workstream 2, not extended: with a host per pane, each registers
+   its own stage and none of them moves. */
+effect(() => {
+  handOverCanvasStage(workspace.activePaneId, canvasWrap);
 });
 
 // Effect-driven canvas rendering, split into two triggers so document changes can be
@@ -670,6 +598,10 @@ registerRenderer("chatPanel", () => chatPanelMod.render());
 registerRenderer("overlays", () => overlaysPanel.render());
 renderStatusbar();
 mountStatusbar();
+// ⑥ The jump bar, in the pane's own grid cell above the context bar. It renders the whole address
+// — project › file › node › node — and it is the only breadcrumb in the shell: the pane context
+// Bar drew a second one, and it named a sub-document stack nothing could push onto.
+mountJumpBar(document.querySelector("#jump-bar") as HTMLElement);
 mountActivityBar();
 
 // Clicking on the canvas-wrap background (outside any canvas panel) deselects the current element
@@ -711,7 +643,19 @@ let fsUnsub: (() => void) | null = null;
 /** (Re)subscribe the sidebar to backend filesystem events for the active project. */
 function ensureFsSync() {
   fsUnsub?.();
-  fsUnsub = startFsSync({ onContentChange: reloadCleanTab, renderLeftPanel });
+  fsUnsub = startFsSync({
+    // The three caches keyed on the project's file listing. Each one is derived — the pages tree
+    // Behind the Link-target picker, the layouts listing plus the effective layout's `$head`, and
+    // The `$paths` value enumerations — so a file appearing or disappearing is the only event that
+    // Can make any of them wrong, and it is the same event for all three.
+    invalidateDerivedCaches: () => {
+      invalidatePageRouteCache();
+      invalidateLayoutPickerCache();
+      invalidateParamValues();
+    },
+    onContentChange: reloadCleanTab,
+    renderLeftPanel,
+  });
 }
 
 const _urlParams = new URLSearchParams(location.search);
@@ -1090,16 +1034,18 @@ const commandRegistry = createCommandRegistry({
 registerStudioCommands(
   commandRegistry,
   {
-    openInBrowser: () => {
-      const target = toolbarPanel.openInBrowserTarget(activeTab.value ?? null);
-      if ("url" in target) {
-        window.open(target.url, "_blank", "noopener,noreferrer");
-        return;
-      }
-      notify.warn(target.reason, { key: "view.openInBrowser", source: "Preview" });
-    },
+    // The toolbar owns this, and the difference matters on the desktop: its `openUrlExternally`
+    // Hands the URL to the launcher's preview-navigate handler — the OS browser — where a bare
+    // `window.open` would open a webview with no address bar. The browser build falls back to a
+    // New tab either way.
+    openInBrowser: () => toolbarPanel.runOpenInBrowser(),
     openProject,
-    saveDocument: saveFile,
+    // Wrapped rather than passed by reference: `saveFile` takes an optional tab and reports
+    // Whether the bytes landed, and a hook that neither supplies one nor reads the answer must not
+    // Silently forward its own first argument as the tab to save.
+    saveDocument: async () => {
+      await saveFile();
+    },
   },
   pointerContext,
 );
@@ -1124,11 +1070,8 @@ registerCanvasViewCommands(commandRegistry, { getCanvasMode, setCanvasMode });
 registerSelectionSetCommand(commandRegistry);
 registerInspectorCommands(commandRegistry);
 registerDataExplorerCommands(commandRegistry, { renderLeftPanel });
-registerSignalsCommands(commandRegistry, {
-  renderCanvas: () => renderCanvas(),
-  renderLeftPanel,
-});
-registerFormulaEditorCommands(commandRegistry, { renderCanvas: () => renderCanvas() });
+registerSignalsCommands(commandRegistry, { renderLeftPanel });
+registerFormulaEditorCommands(commandRegistry);
 registerGridCommands(commandRegistry);
 registerSettingsCommands(commandRegistry);
 registerPreferencesCommands(commandRegistry);

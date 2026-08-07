@@ -76,6 +76,36 @@ itself), and a failed scan retried by the very repaint its failure caused.
 shipped long ago. A status table that has to be re-derived from the code is worse than none, because
 it is the one artifact a reader consults _instead of_ reading the code.
 
+**I · What P8 changed about the plan itself** (added on landing). **A green gate is evidence about
+the gate.** P8 built a compiler-resolved reachability check over the whole package and it found
+what eight phases of unit tests could not: twelve-plus surfaces built, tested and wired to nothing.
+Three caches with an invalidator and no caller. `activityIdleBlockers`, named in a docstring as a
+`probe.idle()` source and never registered as one, so the screenshot lane could photograph a
+half-finished install. `view.openInBrowser` bypassing the desktop seam with an inlined `window.open`
+beside the function that routes it properly. The **entire sub-document stack** — push, pop,
+jump-to-level, a palette command, a breadcrumb, a collab guard — whose only entrance had zero
+callers, so it could never hold a frame. The rule this plan should have carried from §1: **a stack
+needs a push, and the push is the part to specify.**
+
+**Moving a surface leaves believers behind, and they are not comments.** Putting the function editor
+and the formula workspace in the Bottom dock made four other places wrong at once. Two were prose.
+The third suppressed the pane context bar's three axes and the zoom pod, on the reasoning that the
+axes "describe a document that is not the one on screen" — true of a takeover, false of a dock. The
+fourth was the takeover itself, still returning early out of `renderCanvasContent`, so the stage
+froze on whatever it had last painted while the dock claimed to be rendering beside a live page. A
+move is not done when the new host works; it is done when nothing still believes in the old one.
+
+**A control that does nothing is worse than an absent one.** `pane.toggleZoom` and `pane.setZoomed`
+wrote `zoomedPaneId`; nothing that draws ever read it. A reserved `diff` Bottom-dock tab sat behind
+a permanently-false predicate for four phases, held by a comment that argued against its own
+reservation. Both are deleted. A reservation is honest only while the capability exists nowhere
+else — which is why the Navigator's Search slot stays.
+
+**Two literal NUL bytes** in `panels/jump-bar.ts` (a path separator written as the
+byte instead of the `\u0000` escape) made git, grep, oxfmt and GitHub classify a 22 KB source
+file as **binary**. Three searches for text plainly in it returned nothing before anyone ran `file` on it. Neither the
+separator nor the joined key was needed: `pathsEqual` already answered the question.
+
 **C · Facts and dropped surfaces.** 36 `project.json` write sites → **42**, across eight files. `"stylebook"` is a wire-protocol value (`iframe-protocol.ts:25`), so it stays one. The Layout show/hide toggle, the GitHub-App install prompt, the per-recent remove affordance and the `?project=` deep link all get an explicit home in §11. The New Project wizard rework is scheduled in P1, the Insert command family in P3. Six owner-less findings — the 158 silent catch blocks, `leftTab`/`rightTab`, the three `$elements` writers, the unvirtualized trees, the panel scheduler's silent deferral, and inline formatting's level — each get a phase and a decision.
 
 ---

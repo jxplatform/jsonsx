@@ -7,11 +7,16 @@
 import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
-import { canvasPanels } from "../src/store";
+import { activeCanvasSurface } from "../src/canvas/canvas-surface";
 import { collabState } from "../src/collab/collab-state";
 import { shell } from "../src/shell";
 import type { CanvasPanel } from "../src/types";
 import type { Tab } from "../src/tabs/tab";
+
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const canvasPanels = activeCanvasSurface().panels;
 
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 happyDOM.setURL("http://localhost:3000/");

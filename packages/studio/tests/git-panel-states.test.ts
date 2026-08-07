@@ -14,10 +14,17 @@ void mock.module("../src/workspace/workspace.js", () => ({
   activeTab: { value: null },
   closeTab: () => {},
   openTab: () => {},
+  // `store.ts` registers the primary pane's canvas stage at `initShellRefs`, and
+  // `canvas/canvas-surface.ts` resolves a pane through `paneById` — both reached transitively
+  // From this panel's imports, neither called by it.
+  paneById: () => {},
+  PRIMARY_PANE: "primary",
   renameTab: () => {},
+  setWorkspaceProject: () => {},
   // `shell.ts` reads the project root from this store to load that project's named layouts, so
   // The stand-in has to carry it — an absent export is a module-resolution error, not a null.
-  workspace: { projectRoot: null },
+  // `panes`/`activePaneId` are here for the same reason: a canvas surface addresses a pane.
+  workspace: { activePaneId: "primary", panes: [], projectRoot: null },
 }));
 
 void mock.module("../src/ui/layers.js", () => ({

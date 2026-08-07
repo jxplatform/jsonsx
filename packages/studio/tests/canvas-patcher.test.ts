@@ -5,8 +5,15 @@
  */
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { canvasPanels } from "../src/store";
-import { closeAllTabs, openTab } from "../src/workspace/workspace";
+import { activeCanvasSurface, surfaceForPane } from "../src/canvas/canvas-surface";
+import {
+  closeAllTabs,
+  openTab,
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  splitRight,
+  workspace,
+} from "../src/workspace/workspace";
 import { getPatchConsumer, setPatchConsumer } from "../src/tabs/patch-ops";
 import {
   applyPatchBatch,
@@ -18,9 +25,15 @@ import {
 import { canvasPerf, resetCanvasPerf } from "../src/canvas/canvas-perf";
 import { toRaw } from "../src/reactivity";
 
+import type { CanvasSurface } from "../src/canvas/canvas-surface";
 import type { CanvasPanel } from "../src/types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../src/tabs/tab";
+
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const canvasPanels = activeCanvasSurface().panels;
 
 let tab: Tab;
 let tabCount = 0;
@@ -30,10 +43,12 @@ let pEl: HTMLElement;
 let spanEl: HTMLElement;
 let divEl: HTMLElement;
 let emEl: HTMLElement;
+/** Written onto the tab under test — the pane's mode IS its tab's mode now. */
 let canvasMode = "design";
 const ctxCalls = {
   overlays: 0,
   scheduled: 0,
+  lastPaneId: "",
 };
 
 function doc(): JxMutableNode {
@@ -86,13 +101,15 @@ beforeEach(() => {
   } as unknown as CanvasPanel;
   canvasPanels.push(panel);
 
+  tab.session.ui.canvasMode = canvasMode;
+
   initCanvasPatcher({
-    getCanvasMode: () => canvasMode,
     renderOverlays: () => {
       ctxCalls.overlays += 1;
     },
-    scheduleCanvasRender: () => {
+    scheduleCanvasRender: (paneId: string) => {
       ctxCalls.scheduled += 1;
+      ctxCalls.lastPaneId = paneId;
     },
   });
 });
@@ -100,6 +117,9 @@ beforeEach(() => {
 afterEach(() => {
   setPatchConsumer(null);
   canvasPanels.length = 0;
+  // `closeAllTabs` resets the pane model but not the stages the panes had; a surface outliving its
+  // Pane is exactly the leak the per-pane tests would otherwise carry into the next file.
+  surfaceForPane(SECONDARY_PANE).panels.length = 0;
   document.body.innerHTML = "";
   for (const s of document.head.querySelectorAll("style")) {
     s.remove();
@@ -119,6 +139,7 @@ describe("classifyOps", () => {
 
   test("rejects outside design/edit modes", () => {
     canvasMode = "preview";
+    tab.session.ui.canvasMode = "preview";
     const verdict = classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]);
     expect(verdict.patchable).toBe(false);
     expect(verdict.reason).toBe("mode-preview");
@@ -224,11 +245,86 @@ describe("consumed-document handshake", () => {
     expect(consumePatchedDocument(tab.doc.document)).toBe(false);
   });
 
-  test("escalateToFullRender schedules a render and records the reason", () => {
-    escalateToFullRender("test-reason");
+  test("escalateToFullRender schedules the showing pane's render and records the reason", () => {
+    escalateToFullRender("test-reason", tab);
     expect(ctxCalls.scheduled).toBe(1);
+    expect(ctxCalls.lastPaneId).toBe(PRIMARY_PANE);
     expect(canvasPerf.escalations).toBe(1);
     expect(canvasPerf.lastEscalationReason).toBe("test-reason");
+  });
+});
+
+// ─── Per-pane gating (P8): every question is asked of the pane showing the tab ───────
+
+describe("the gate is per pane, not per app", () => {
+  /**
+   * Put `tab` in the primary pane and a second document in the secondary, with the SECOND pane
+   * focused. This is the shape the whole section is about: the edit under test belongs to a stage
+   * nobody is looking at.
+   */
+  function splitWithSecondPaneFocused(): { otherTab: Tab; otherSurface: CanvasSurface } {
+    const otherTab = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "/p/other.js",
+      id: `patcher-other-${tabCount}`,
+    }) as Tab;
+    otherTab.session.ui.canvasMode = "source";
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+    return { otherSurface: surfaceForPane(SECONDARY_PANE), otherTab };
+  }
+
+  test("a tab on screen in the UNFOCUSED pane still patches", () => {
+    splitWithSecondPaneFocused();
+    // Before this, the gate asked `isTabActive(tab)` — the keyboard's pane — and refused.
+    expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).patchable).toBe(true);
+  });
+
+  test("the other pane's mid-mount canvas cannot refuse this pane's edit", () => {
+    const { otherSurface } = splitWithSecondPaneFocused();
+    otherSurface.panels.push({ canvas: document.createElement("div"), ready: false } as never);
+    // The readiness test used to run over one global panel list, so an artboard still mounting in
+    // The OTHER pane escalated an edit typed into this one.
+    expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).patchable).toBe(true);
+    // This pane's own un-ready artboard still refuses, which is the rule that was always right.
+    panel.ready = false;
+    expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).reason).toBe(
+      "panels-not-ready",
+    );
+  });
+
+  test("the mode read is the showing pane's, not the focused pane's", () => {
+    const { otherTab } = splitWithSecondPaneFocused();
+    // The focused pane is in Code; the pane showing `tab` is in Design and patches.
+    expect(otherTab.session.ui.canvasMode).toBe("source");
+    expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).patchable).toBe(true);
+    // Flip only the SHOWING pane's tab and the same batch is refused, naming that mode.
+    tab.session.ui.canvasMode = "source";
+    expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).reason).toBe(
+      "mode-source",
+    );
+  });
+
+  test("an escalation rebuilds only the pane whose stage fell behind", () => {
+    splitWithSecondPaneFocused();
+    escalateToFullRender("boom", tab);
+    expect(ctxCalls.scheduled).toBe(1);
+    expect(ctxCalls.lastPaneId).toBe(PRIMARY_PANE);
+  });
+
+  test("a tab no pane is showing rejects, and its escalation schedules nothing", () => {
+    const background = tab;
+    openTab({ document: { children: [], tagName: "div" }, id: `patcher-fg-${tabCount}` });
+    expect(classifyOps(background, [{ op: "set-style", path: ["children", 0] }])).toEqual({
+      patchable: false,
+      reason: "inactive-tab",
+    });
+    // The reason is still counted — a swallowed escalation no counter saw is the bug
+    // `__jxCanvasPerf` exists to prevent.
+    const before = canvasPerf.escalations;
+    escalateToFullRender("off-screen", background);
+    expect(canvasPerf.escalations).toBe(before + 1);
+    expect(ctxCalls.scheduled).toBe(0);
   });
 });
 

@@ -17,6 +17,10 @@
       <div id="app">
         <div id="toolbar"></div>
         <div id="tab-strip"></div>
+        <!-- ⑥ The pane's jump bar: project › file › node › node, every segment a command. Like
+             #pane-chrome it lives in the PANE's grid cell, not in a row of the application grid,
+             because the second pane must be able to have one too. -->
+        <div id="jump-bar"></div>
         <!-- The pane's own chrome (spec §12 regions ⑦ and ⑩): the context bar and the floating
              zoom pod, stacked over the stage in the pane's grid cell. #tab-bar was a row of the
              APPLICATION grid, which a per-pane surface can never be. -->

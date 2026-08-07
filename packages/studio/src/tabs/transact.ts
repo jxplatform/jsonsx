@@ -247,6 +247,7 @@ export function transactDoc(
     } catch (error) {
       consumer!.escalate(
         `patch-apply-failed: ${error instanceof Error ? error.message : String(error)}`,
+        tab,
       );
     }
   }

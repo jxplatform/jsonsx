@@ -585,32 +585,6 @@
 .head-add-form sp-picker {
   min-width: 70px;
 }
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  font-size: var(--spectrum-font-size-50, 11px);
-  margin-left: 8px;
-}
-.breadcrumb-item {
-  color: var(--fg-dim);
-  cursor: default;
-  white-space: nowrap;
-}
-.breadcrumb-item.clickable {
-  cursor: pointer;
-}
-.breadcrumb-item.clickable:hover {
-  color: var(--fg);
-  text-decoration: underline;
-}
-.breadcrumb-item.current {
-  color: var(--fg);
-  font-weight: 600;
-}
-.breadcrumb-sep {
-  color: var(--fg-dim);
-}
 .element-card {
   cursor: grab;
   display: flex;
@@ -746,20 +720,6 @@
   border: 2px solid var(--accent);
   background: var(--accent-8);
   border-radius: var(--radius);
-}
-
-/* ─── Git diff highlighting ──────────────────── */
-.element-diff-added {
-  background-color: color-mix(in srgb, var(--success) 15%, transparent);
-  outline: 1px solid var(--success);
-}
-.element-diff-removed {
-  background-color: color-mix(in srgb, var(--danger) 15%, transparent);
-  outline: 1px solid var(--danger);
-}
-.element-diff-modified {
-  background-color: color-mix(in srgb, var(--signal) 15%, transparent);
-  outline: 1px solid var(--signal);
 }
 
 /* ─── Insertion helper ─────────────────────────── */
@@ -1430,4 +1390,134 @@
   flex: 0 0 auto;
   font-family: var(--font-mono);
   color: var(--warning);
+}
+
+/* ─── ⑪ · Logic — the formula workspace and the function editor ──────── */
+/* Both surfaces moved out of their canvas takeovers into the Bottom dock (plan §12 P8.5), and a
+   dock is not a stage: the whole surface has to fit ~240px with the page still rendering above it.
+   So the header, the chip pipeline and the result are one line each, and only the two middle
+   columns scroll. These rules replace the inline `style=` attributes the takeover carried, which
+   is why seventeen `fw-*` classes have left check-styles.ts's orphan list. */
+.formula-workspace {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--bg-panel);
+}
+.fw-header {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.fw-title {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.fw-kind {
+  flex-shrink: 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.fw-header-gap {
+  flex: 1;
+  min-width: 0;
+}
+.fw-chips {
+  flex-shrink: 0;
+  overflow-x: auto;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+/* The two columns, and the only thing in the tab that scrolls vertically. */
+.fw-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.fw-editor {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 8px 10px;
+}
+.fw-selected {
+  padding-bottom: 6px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.fw-selected-node {
+  font-family: var(--font-mono);
+}
+/* Narrower than the takeover's 280px slab: at dock height it is a reference column beside the
+   editor, and the live values it used to be the only source of are on the canvas now. */
+.fw-context {
+  flex: 0 0 200px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-left: 1px solid var(--border);
+}
+.fw-context-title {
+  padding-bottom: 6px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  letter-spacing: 0.5px;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+}
+.fw-context-entry {
+  margin-bottom: 8px;
+}
+.fw-context-head {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.fw-context-name {
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+}
+.fw-context-type {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.fw-result {
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--success);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.fw-result--error {
+  color: var(--danger);
+}
+.fw-result--pending {
+  font-family: inherit;
+  color: var(--fg-dim);
+}
+.fw-result-note {
+  color: var(--fg-dim);
+}
+/* Monaco's host. It must have a real height of its own — the editor measures its container, and a
+   flex item with `auto` minimum would report the editor's own content height back at itself. */
+.fw-code {
+  flex: 1;
+  min-height: 0;
+}
+/* The code surface has no chip strip, no rail and no result line, so the editor takes the height
+   the formula surface spends on all three. */
+.formula-workspace--code {
+  overflow: hidden;
 }

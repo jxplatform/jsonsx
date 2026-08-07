@@ -30,6 +30,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { renderDeployChecklist } from "../publish/deploy-checklist";
 import { repeat } from "lit-html/directives/repeat.js";
 import { reactive } from "../reactivity";
 import { now } from "../services/clock";
@@ -417,14 +418,20 @@ function activityTpl(entry: ActivityEntry): TemplateResult {
  * that is already running must not push it off the top.
  */
 export function renderActivityList(): PanelBody {
+  // The Deploy checklist lives here because a deploy IS a long operation with a log — which is why
+  // P4 folded Deploy into Activity rather than giving it a fifth dock tab. It renders above the
+  // Run log and before any operation has started, because its whole job is to say what is missing
+  // BEFORE you begin.
+  const checklist = renderDeployChecklist();
   if (activities.length === 0) {
-    return renderEmptyState({
+    return html`${checklist}${renderEmptyState({
       detail: "Installs, clones, publishes and imports report here while they run.",
       message: "Long operations show their progress, their log and their Cancel button here.",
-    });
+    })}`;
   }
   const finished = activities.filter((entry) => isFinished(entry)).length;
   return html`
+    ${checklist}
     <div class="activity-panel">
       ${
         finished > 0

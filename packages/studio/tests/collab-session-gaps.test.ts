@@ -48,6 +48,7 @@ const {
   flushAllCollab,
   rekeyCollab,
   resetCollabForTests,
+  setCollabEnabled,
 } = await import("../src/collab/collab-session");
 
 const DOC: JxMutableNode = {
@@ -634,20 +635,13 @@ describe("identity fallbacks", () => {
 // ─── Attach lifecycle races ──────────────────────────────────────────────────
 
 describe("attach lifecycle races", () => {
-  test("a drill-and-return during the initial attach abandons the stale attempt", async () => {
+  test("a leave-and-rejoin during the initial attach abandons the stale attempt", async () => {
     const hub = createMockCollabHub();
     const tab = openCollabTab(hub);
-    // Drill in and back BEFORE the attach settles: the detach bumps the generation, so the
-    // In-flight attempt destroys its handle; the return finds the attempt still pending → no-op.
-    tab.session.documentStack.push({
-      dirty: false,
-      document: tab.doc.document,
-      documentPath: tab.documentPath,
-      mode: tab.doc.mode,
-      selection: null,
-      sourceFormat: null,
-    } as never);
-    tab.session.documentStack.pop();
+    // Leave and rejoin BEFORE the attach settles: the detach bumps the generation, so the
+    // In-flight attempt destroys its handle; the rejoin finds the attempt still pending → no-op.
+    setCollabEnabled(tab, false);
+    setCollabEnabled(tab, true);
     await settleCollab();
     expect(collabState(tab).active).toBe(false);
     expect(hub.connectionCount(PATH)).toBe(0);
@@ -679,15 +673,8 @@ describe("attach lifecycle races", () => {
     await settleCollab();
     expect(collabState(tab).status).toBe("connecting");
 
-    // Drill in mid-sync: generation moves, so the sync completion must abandon.
-    tab.session.documentStack.push({
-      dirty: false,
-      document: tab.doc.document,
-      documentPath: tab.documentPath,
-      mode: tab.doc.mode,
-      selection: null,
-      sourceFormat: null,
-    } as never);
+    // Leave mid-sync: generation moves, so the sync completion must abandon.
+    setCollabEnabled(tab, false);
     releaseSync();
     await settleCollab();
     expect(collabState(tab).active).toBe(false);

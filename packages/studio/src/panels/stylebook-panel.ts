@@ -18,7 +18,8 @@ import { ref } from "lit-html/directives/ref.js";
 import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
 
-import { canvasPanels, canvasWrap, projectState, updateSession } from "../store";
+import { canvasWrap, projectState, updateSession } from "../store";
+import { activeCanvasSurface } from "../canvas/canvas-surface";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { shell } from "../shell";
@@ -180,8 +181,9 @@ export function renderStylebookMode(ctx: StylebookCtx) {
     projectRoot: projectState?.projectRoot ?? null,
   });
 
+  const { panels } = activeCanvasSurface();
   for (const { panel } of panelEntries) {
-    canvasPanels.push(panel);
+    panels.push(panel);
     mountStylebookCanvas(
       view.renderGeneration,
       generated,

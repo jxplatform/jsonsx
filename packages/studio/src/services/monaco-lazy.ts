@@ -109,6 +109,42 @@ export function loadedMonaco(): Monaco | null {
   return _monaco;
 }
 
+/**
+ * Whether the mount started before {@link loadMonaco} is still the one the app wants.
+ *
+ * **The question you owe on the far side of the load, which is why it lives beside the load.** A
+ * cold `loadMonaco()` is a 12.6 MB dynamic import; the user has hundreds of milliseconds inside it
+ * to close the surface, retarget it, or leave the mode — and a second render has the same window to
+ * start a mount of its own. Both surfaces need it and each had its own spelling of it, so the
+ * source view simply did without: `renderCanvasImpl` assigns `surface.prevCanvasMode` BEFORE it
+ * reaches the mount, so a second synchronous `renderCanvas()` during the load sees `modeChanged ===
+ * false` and a null `view.monacoEditor`, skips the fast path and mounts again. The second mount
+ * then calls `createModel` with a URI the first already registered, which real Monaco throws on
+ * ("ERR: Another model with the same URI"), and `store.ts`'s `render()`/`renderOnly()` coalesce
+ * nothing.
+ *
+ * Returning false means creating NOTHING — no model, no editor, no `automaticLayout` observer. That
+ * is strictly better than creating and disposing: there is no window in which a doomed editor is
+ * attached to anything, and no URI briefly claimed by a model nobody holds.
+ *
+ * @param {Element | null | undefined} container Where the editor was going to be created.
+ * @param {unknown} existing The surface's editor handle (`view.monacoEditor` /
+ *   `view.functionEditor`). Non-null means another mount already won this race.
+ * @param {() => boolean} stillTargeted Whether the app still wants exactly THIS mount — the same
+ *   tab, the same mode, the same editing target. Lazy: the two cheap clauses above answer first.
+ * @returns {boolean}
+ */
+export function mountStillWanted(
+  container: Element | null | undefined,
+  existing: unknown,
+  stillTargeted: () => boolean,
+): boolean {
+  if (!container?.isConnected || existing) {
+    return false;
+  }
+  return stillTargeted();
+}
+
 /** Whether Monaco has been loaded (tests, and the odd diagnostic). */
 export function isMonacoLoaded(): boolean {
   return _monaco !== null;

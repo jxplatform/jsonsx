@@ -51,7 +51,7 @@ describe("the set", () => {
       // Each a record, so the palette and the assistant can reach what only its own buttons could.
       "library",
       "palette",
-      // `pane.toggleZoom` — the pane model (a parallel workstream).
+      // `pane.splitRight` — the pane model (a parallel workstream).
       "pane",
       // One `panel.focus.<id>` per Navigator panel, generated from the panel registry's own roster.
       "panel",
@@ -98,16 +98,15 @@ describe("the set", () => {
       "view.toggleNavigator",
       "view.toggleInspector",
       "document.togglePinned",
-      "pane.toggleZoom",
       "view.toggleBottomDock",
     ]);
     const ids = new Set(COMMANDS.map((c) => c.id));
     expect(ids.has("view.setNavigator")).toBe(true);
     expect(ids.has("view.setRightPanel")).toBe(true);
-    // Pin and pane-zoom are the same bargain: ⌘-chords a human presses while looking at the tab or
-    // The grid, each paired with the setter a script uses because a script cannot see that state.
+    // Pin is the bargain: a ⌘-chord a human presses while looking at the tab, paired with the
+    // Setter a script uses because a script cannot see that state. `pane.toggleZoom` was the
+    // Fourth such pair and is gone with the state it wrote — nothing that draws ever read it.
     expect(ids.has("document.setPinned")).toBe(true);
-    expect(ids.has("pane.setZoomed")).toBe(true);
     // P4.2 discharged the handoff: the bottom dock is on the `shell` record, `DOCK_IDS` is
     // Left/right/bottom, and ⌘J's setter landed with it.
     expect(ids.has("view.setBottomDock")).toBe(true);

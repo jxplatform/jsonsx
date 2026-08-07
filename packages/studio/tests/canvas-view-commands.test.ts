@@ -13,7 +13,14 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { createCommandRegistry } from "../src/commands/registry";
 import { makeContext } from "../src/commands/context";
 import { checkPlacements } from "../src/commands/levels";
-import { activeTab, closeAllTabs, openTab } from "../src/workspace/workspace";
+import {
+  activeTab,
+  closeAllTabs,
+  openTab,
+  SECONDARY_PANE,
+  splitRight,
+  workspace,
+} from "../src/workspace/workspace";
 import { view } from "../src/view";
 import type { CommandContext } from "../src/commands/context";
 import type { CommandRegistry } from "../src/commands/registry";
@@ -67,7 +74,11 @@ void mock.module("../src/panels/editors.js", () => ({
 void mock.module("../src/panels/formula-workspace.js", () => ({
   closeFormulaWorkspace: () => {},
   formulaRoot: () => null,
+  /* The Logic openers go through this: it sets the target AND reveals the tab. */
+  openLogicTarget: () => {},
   renderFormulaWorkspace: () => {},
+  /* The State panel's `formula.openWorkspace` reveals the dock tab instead of repainting. */
+  revealLogicPanel: () => {},
 }));
 void mock.module("../src/panels/statusbar.js", () => ({
   forgetSavedTimes: () => {},
@@ -92,6 +103,8 @@ void mock.module("../src/files/file-ops.js", () => ({
      partial mock has to cover what that path imports — see the iframe-host note above. */
   confirmFileDelete: () => Promise.resolve(false),
   renamePromptMessage: () => Promise.resolve(""),
+  /* And one the TAB STRIP reads: its close offers to save first (§8.7's three-way dialog). */
+  saveFile: () => Promise.resolve(true),
 }));
 
 const {
@@ -232,6 +245,25 @@ describe("canvas.setMode", () => {
     expect(() => registry.run("canvas.setMode", { mode: "edit" })).toThrow(
       "needs an open document; no tab is active",
     );
+  });
+
+  /*
+   * The document declares the mode; the PANE may still refuse it. The side pane is capped to the
+   * cheap editor kinds because a second live Canvas host is the expensive part, and enforcing that
+   * only at the split left the way back in wide open — `canvas.setMode { mode: "design" }` (and
+   * the context bar behind it) put a Canvas in a pane that must not host one.
+   */
+  test("refuses a Canvas mode for a document sitting in the side pane", () => {
+    openWith(["edit", "design", "source"]);
+    splitRight();
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+    expect(() => registry.run("canvas.setMode", { mode: "design" })).toThrow(
+      'command "canvas.setMode" argument "mode": "design" is a Canvas mode and this document ' +
+        "is in the side pane",
+    );
+    // The kinds that pane DOES host still go through.
+    void registry.run("canvas.setMode", { mode: "source" });
+    expect(setCanvasMode).toHaveBeenCalledWith("source");
   });
 });
 

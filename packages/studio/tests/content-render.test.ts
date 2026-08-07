@@ -1,6 +1,6 @@
 import "./with-dom.js";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { createState, setProjectState } from "../src/state";
+import { setProjectState } from "../src/state";
 import { getEffectiveElements, getEffectiveMedia, getEffectiveStyle } from "../src/site-context";
 import { computeRelativePath } from "../src/files/components";
 import { parseSourceForPath } from "../src/files/file-ops";
@@ -362,63 +362,6 @@ describe("loadMarkdown state", () => {
     const result = await loadMarkdown("# Hello");
     // LoadMarkdown doesn't set documentPath — that's the caller's responsibility
     expect(result.document).toBeDefined();
-  });
-});
-
-// ─── ctx getter pattern ─────────────────────────────────────────────────────
-
-describe("ctx getter pattern for S reference", () => {
-  test("getter-based ctx reflects S changes from loadMarkdown", () => {
-    // Simulate the studio's local S variable and ctx pattern
-    let S = createState({ tagName: "div" });
-    S.documentPath = "pages/index.json";
-
-    // Old pattern (broken): captures S by value
-    const badCtx = { S };
-
-    // New pattern (fixed): uses getter/setter
-    const goodCtx = {
-      get S() {
-        return S;
-      },
-      set S(v) {
-        S = v;
-      },
-    };
-
-    // LoadMarkdown replaces S entirely
-    function loadMarkdownState() {
-      const newState = createState({ tagName: "article" });
-      newState.mode = "content";
-      S = newState;
-    }
-
-    loadMarkdownState();
-
-    // After loadMarkdown, the old ctx.S still references the OLD state
-    expect(badCtx.S.documentPath).toBe("pages/index.json");
-    expect(badCtx.S.document.tagName).toBe("div");
-
-    // The good ctx.S reflects the NEW state
-    expect(goodCtx.S.document.tagName).toBe("article");
-    expect(goodCtx.S.mode).toBe("content");
-    expect(goodCtx.S.documentPath).toBeNull();
-
-    // Setting documentPath on goodCtx.S persists to the real S
-    goodCtx.S.documentPath = "content/pages/home.md";
-    expect(S.documentPath).toBe("content/pages/home.md");
-  });
-
-  test("value-based ctx loses documentPath after S replacement", () => {
-    let S = createState({ tagName: "div" });
-    const ctx = { S };
-
-    // Replace S
-    S = createState({ tagName: "article" });
-
-    // Ctx.S still points to old state
-    ctx.S.documentPath = "content/pages/home.md";
-    expect(S.documentPath).toBeNull(); // DocumentPath set on wrong object!
   });
 });
 

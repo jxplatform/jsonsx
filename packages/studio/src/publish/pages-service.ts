@@ -40,7 +40,16 @@ export interface ConnectOptions {
 
 /** True when the active platform can reach the Cloudflare API. */
 export function platformSupportsPublish(): boolean {
-  return typeof getPlatform().cfApi === "function";
+  // Answers false before a platform is registered rather than throwing. This is read by ambient
+  // Surfaces — the status bar's deploy item, the Activity tab's checklist — which paint during boot
+  // And in tests that register no platform, and neither has any business crashing because
+  // Publishing is not available yet. "Can this host publish?" has a truthful answer before the host
+  // Exists, and it is no.
+  try {
+    return typeof getPlatform().cfApi === "function";
+  } catch {
+    return false;
+  }
 }
 
 async function cfApi<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {

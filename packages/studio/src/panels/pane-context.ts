@@ -8,12 +8,14 @@
  * colour-scheme switch and feature toggles (rendering state), and Export (a mode action). Plan §3.2
  * ⑦ replaces them with three axes that each say what they are:
  *
- * - **Editor kind** — `Canvas ⌄`, offering only the kinds this document declares
- *   ({@link editorKindsOf}), so the control can never contain a permanently dead entry. A document
- *   with one kind renders the name as text rather than as a dropdown that cannot go anywhere.
+ * - **Editor kind** — `Canvas ⌄`, offering only the kinds this document declares AND its pane can
+ *   host ({@link hostableKindsOf}), so the control can never contain a permanently dead entry. A
+ *   document with one kind renders the name as text rather than as a dropdown that cannot go
+ *   anywhere.
  * - **Canvas view** — `Edit │ Design │ Preview` as ONE segmented control with three values
- *   ({@link canvasViewsFor}). Preview stops being a toggle on a different bar with different visual
- *   grammar that silently composed with a base mode the switcher still showed as selected.
+ *   ({@link canvasViewsFor}), and none at all in a pane that may not host the Canvas. Preview stops
+ *   being a toggle on a different bar with different visual grammar that silently composed with a
+ *   base mode the switcher still showed as selected.
  * - **Rendering context** — `md ⌄ Light ⌄`, folding the size breakpoint, the colour scheme, the
  *   feature queries and the layout show/hide switch into one popover, with the document data a
  *   render resolves against — route params, component test props — labelled "resolving with" beside
@@ -39,7 +41,7 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { projectState, updateUi } from "../store";
 import { effect, effectScope } from "../reactivity";
-import { activeTab } from "../workspace/workspace";
+import { activeTab, hostableKindsOf, paneOfTabCanHostMode } from "../workspace/workspace";
 import {
   canvasViewOf,
   canvasViewsFor,
@@ -51,7 +53,7 @@ import {
   setFit,
   setUserZoom,
 } from "../canvas/canvas-utils";
-import { editorKindOf, editorKindsOf, modeForEditorKind } from "../tabs/tab";
+import { editorKindOf, modeForEditorKind } from "../tabs/tab";
 import { collabState } from "../collab/collab-state";
 import { readOnlyBannerTemplate } from "../collab/presence-chips";
 import { activeRegistry } from "../commands/active-registry";
@@ -65,7 +67,7 @@ import { EDITOR_KIND_LABELS } from "../commands/context";
 import type { EditorKind } from "../commands/context";
 import type { ParamValues } from "../page-params";
 import type { Tab } from "../tabs/tab";
-import type { DocumentStackEntry, FormulaEditDef, FunctionEditDef, JsonValue } from "../types";
+import type { JsonValue } from "../types";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
 
@@ -82,10 +84,6 @@ export const PANE_CONTEXT_VAR = "--pane-context-h";
 const PANE_CONTEXT_HEIGHT = 28;
 
 export interface PaneContextCtx {
-  navigateBack: () => void;
-  navigateToLevel: (level: number) => void;
-  closeFunctionEditor: () => void;
-  closeFormulaWorkspace: () => void;
   exportFile: () => void;
   /** The EFFECTIVE canvas mode, `ui.preview` composed in. */
   getCanvasMode: () => string;
@@ -143,12 +141,9 @@ export function mount(host: HTMLElement, ctx: PaneContextCtx) {
         void tab.doc.mode;
         void tab.documentPath;
         void tab.capabilities.modes;
-        void tab.session.documentStack.length;
         void tab.session.ui.activeMedia;
         void tab.session.ui.canvasMode;
         void tab.session.ui.editZoom;
-        void tab.session.ui.editingFormula;
-        void tab.session.ui.editingFunction;
         void tab.session.ui.featureToggles;
         void tab.session.ui.preview;
         void tab.session.ui.previewColorScheme;
@@ -240,105 +235,38 @@ function axisTpl(label: string, control: TemplateResult): TemplateResult {
   `;
 }
 
+/**
+ * The bar, always the same three axes.
+ *
+ * There is no takeover branch. Opening a function body or a formula reveals the dock's Logic tab
+ * (P8) and leaves the canvas standing underneath it, so the axes still describe the document on the
+ * stage and the zoom pod still has something to zoom. Suppressing them while the dock was open
+ * removed the controls for the very document the reader could still see.
+ *
+ * **There is no breadcrumb either.** The address is ⑥'s job — `panels/jump-bar.ts`, one row above —
+ * and the Logic tab's own header carries the Close. This bar drew a second Back and a second trail
+ * beside both of them.
+ */
 function paneChromeTemplate(tab: Tab, ctx: PaneContextCtx): TemplateResult {
-  const { ui } = tab.session;
-  const editing = ui.editingFunction as FunctionEditDef | null;
-  const formulaEditing = ui.editingFormula as FormulaEditDef | null;
-  // A full-screen canvas takeover (function editor or formula workspace) owns the stage: the axes
-  // Describe a document that is not the one on screen, and the zoom pod has nothing to zoom.
-  const takeover = Boolean(editing) || Boolean(formulaEditing);
   const kind = editorKindOf(tab);
 
   return html`
     <div class="pc-band">
       <div class="pane-context" data-jx-region="pane.primary/context">
-        ${navTpl(tab, ctx, editing, formulaEditing)}
         <div class="pc-spacer"></div>
-        ${
-          takeover
-            ? nothing
-            : html`
-                ${editorKindTpl(tab, ctx)} ${kind === "canvas" ? viewTpl(tab, ctx) : nothing}
-                ${renderingContextTpl(tab, ctx)} ${exportTpl(ctx)}
-              `
-        }
+        ${editorKindTpl(tab, ctx)} ${kind === "canvas" ? viewTpl(tab, ctx) : nothing}
+        ${renderingContextTpl(tab, ctx)} ${exportTpl(ctx)}
       </div>
       ${readOnlyBannerTemplate(tab)}
     </div>
-    ${takeover ? nothing : zoomPodTpl(tab, ctx)}
-  `;
-}
-
-// ─── ⑥ The navigation context (a jump bar's ancestor) ────────────────────────
-// Still a Back button plus a breadcrumb: §3.2 ⑥ turns each segment into a dropdown, and that is a
-// Surface of its own, not a detail of this one. It stays here, above the axes, so the takeover
-// Editors keep the only exit they have.
-
-function navTpl(
-  tab: Tab,
-  ctx: PaneContextCtx,
-  editing: FunctionEditDef | null,
-  formulaEditing: FormulaEditDef | null,
-): TemplateResult | typeof nothing {
-  const docName =
-    tab.documentPath?.split("/").pop() || (tab.doc.document?.tagName as string) || "document";
-  if (editing) {
-    const funcLabel = editing.type === "def" ? `ƒ ${editing.defName}` : `ƒ ${editing.eventKey}`;
-    return crumbTpl("Close editor", ctx.closeFunctionEditor, docName, funcLabel);
-  }
-  if (formulaEditing) {
-    const formulaLabel =
-      formulaEditing.type === "def"
-        ? `fx ${formulaEditing.defName}`
-        : `fx ${formulaEditing.eventKey}`;
-    return crumbTpl("Close formula workspace", ctx.closeFormulaWorkspace, docName, formulaLabel);
-  }
-  const stack = tab.session.documentStack;
-  if (!stack || stack.length === 0) {
-    return nothing;
-  }
-  return html`
-    <div class="breadcrumb">
-      <sp-action-button size="s" title="Return to parent document" @click=${ctx.navigateBack}>
-        <sp-icon-back slot="icon"></sp-icon-back>
-        Back
-      </sp-action-button>
-      ${stack.map(
-        (frame: DocumentStackEntry, i: number) => html`
-          <span class="breadcrumb-item clickable" @click=${() => ctx.navigateToLevel(i)}
-            >${frame.documentPath?.split("/").pop() || "untitled"}</span
-          >
-          <span class="breadcrumb-sep"> › </span>
-        `,
-      )}
-      <span class="breadcrumb-item current">${docName}</span>
-    </div>
-  `;
-}
-
-function crumbTpl(
-  closeTitle: string,
-  close: () => void,
-  docName: string,
-  leaf: string,
-): TemplateResult {
-  return html`
-    <div class="breadcrumb">
-      <sp-action-button size="s" title=${closeTitle} @click=${close}>
-        <sp-icon-back slot="icon"></sp-icon-back>
-        Back
-      </sp-action-button>
-      <span class="breadcrumb-item">${docName}</span>
-      <span class="breadcrumb-sep"> › </span>
-      <span class="breadcrumb-item current">${leaf}</span>
-    </div>
+    ${zoomPodTpl(tab, ctx)}
   `;
 }
 
 // ─── Axis 1 · Editor kind ────────────────────────────────────────────────────
 
 function editorKindTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult {
-  const kinds = editorKindsOf(tab);
+  const kinds = hostableKindsOf(tab);
   const current = editorKindOf(tab);
   if (kinds.length < 2) {
     // One kind is not a choice. Rendering it as a dropdown would be a control that cannot move —
@@ -375,7 +303,9 @@ function editorKindTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult {
 // ─── Axis 2 · Canvas view ────────────────────────────────────────────────────
 
 function viewTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult | typeof nothing {
-  const views = canvasViewsFor(tab);
+  // A view its pane cannot host is a dead segment, which is the defect this axis exists to remove:
+  // The side pane hosts Code, Diff, Config, Grid and Library, so it draws no Canvas view group.
+  const views = canvasViewsFor(tab).filter((value) => paneOfTabCanHostMode(tab, value));
   if (views.length === 0) {
     return nothing;
   }

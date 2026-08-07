@@ -156,6 +156,35 @@ describe("startFsSync", () => {
     stop();
   });
 
+  test("drops the derived caches on every event, echoes included", () => {
+    let handler: (events: FsEvent[]) => void = () => {};
+    installMockPlatform({
+      subscribeFileEvents: (h) => {
+        handler = h;
+        return () => {};
+      },
+    });
+    resetStudioState({ dirs: new Map(), expanded: new Set() });
+    let drops = 0;
+    const stop = startFsSync({
+      invalidateDerivedCaches: () => {
+        drops += 1;
+      },
+      renderLeftPanel: () => {},
+    });
+
+    // Same argument as the usage counts above, and the same placement — BEFORE the echo filter.
+    // The page-route list, the layout picker and the `$paths` enumerations are all derived from
+    // Which files exist, and Studio's own write changes that as much as anyone else's does.
+    markLocalMutation("pages/new.md");
+    handler([{ isDir: false, path: "pages/new.md", type: "add" }]);
+    expect(drops).toBe(1);
+
+    handler([{ isDir: false, path: "layouts/base.json", type: "unlink" }]);
+    expect(drops).toBe(2);
+    stop();
+  });
+
   test("suppresses echoes of recent local mutations", async () => {
     let handler: (events: FsEvent[]) => void = () => {};
     installMockPlatform({

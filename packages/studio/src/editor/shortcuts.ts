@@ -38,7 +38,7 @@ import {
   parentElementPath,
   projectState,
 } from "../store";
-import { activeTab, closeTab, workspace } from "../workspace/workspace";
+import { activeTab, workspace } from "../workspace/workspace";
 import { primarySelection } from "../tabs/selection";
 import {
   mutateDuplicateNodes,
@@ -56,8 +56,8 @@ import {
 } from "../canvas/canvas-utils";
 import { openQuickSearch } from "../panels/quick-search";
 import { inspectorTab } from "../panels/right-panel";
-import { shouldWarnOnClose, tabLabel } from "../panels/tab-strip";
-import { showConfirmDialog, showDialog } from "../ui/layers";
+import { requestClose } from "../panels/tab-strip";
+import { showDialog } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
 import { DOCK_IDS, setActivityTab, setBottomTab, setDockCollapsed, shell } from "../shell";
 import { REGION_FOR_FOCUS, resolveRegion } from "../ui/regions";
@@ -240,32 +240,18 @@ function deleteSelection(): void {
  *
  * The old chord refused to close the last tab (`shortcuts.ts:192`) while the tab strip's × closed
  * it happily (`tab-strip.ts:182`): two implementations of one action, disagreeing for a release
- * cycle. This is the ×'s behaviour, and it is now the only one — including its `tabLabel` wording,
- * so the confirm dialog reads identically whichever way the document is closed.
+ * cycle. It was then rewritten to MATCH the ×, by copying the ×'s wording into this file — which is
+ * the same defect wearing a shirt, and it duly went stale the moment the × grew a Save button. It
+ * calls the × now. One implementation, so there is nothing left to disagree.
  *
- * The tab id is captured BEFORE the dialog opens. The old code re-read `workspace.activeTabId` in
- * the `.then`, so confirming after switching tabs closed whichever document happened to be focused
- * by then.
+ * The tab id is read once, before anything can await: `requestClose` captures it as an argument, so
+ * confirming after switching tabs still closes the document the chord was pressed on.
  */
 function closeDocument(): void {
   const id = workspace.activeTabId;
-  const tab = id ? workspace.tabs.get(id) : undefined;
-  if (!id || !tab) {
-    return;
+  if (id) {
+    void requestClose(id);
   }
-  if (!shouldWarnOnClose(tab)) {
-    closeTab(id);
-    return;
-  }
-  void showConfirmDialog(
-    "Unsaved Changes",
-    `"${tabLabel(tab)}" has unsaved changes. Close without saving?`,
-    { confirmLabel: "Close", destructive: true },
-  ).then((confirmed) => {
-    if (confirmed) {
-      closeTab(id);
-    }
-  });
 }
 
 function undoDocument(): void {

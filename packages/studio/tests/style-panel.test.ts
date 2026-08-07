@@ -34,8 +34,7 @@ void mock.module("../src/commands/active-registry", () => ({
   activeRegistry: () => ({ run: runMock }),
 }));
 
-const { _fieldRow, renderStylePanelTemplate, resetSelectorMenu } =
-  await import("../src/panels/style-panel");
+const { renderStylePanelTemplate, resetSelectorMenu } = await import("../src/panels/style-panel");
 const { openSelectorMenu } = await import("../src/panels/target-line");
 const { initCssData } = await import("../src/panels/style-utils");
 const { initLayers } = await import("../src/ui/layers");
@@ -964,30 +963,5 @@ describe("relative styling section", () => {
     c = await renderPanel();
     toggleAccordion(accordionItem(c, "Relative Styling"), true);
     expect(tab2.session.ui.styleSections.nested).toBe(true);
-  });
-});
-
-// ─── _fieldRow helper ────────────────────────────────────────────────────────
-
-describe("_fieldRow", () => {
-  test("text type renders a textfield with the live value", async () => {
-    const c = await renderInto(_fieldRow("Name", "text", "hello", () => {}, "dl-1"));
-    const field = c.querySelector("sp-textfield") as HTMLInputElement;
-    expect(field.value).toBe("hello");
-    expect(c.querySelector("sp-field-label")?.textContent).toContain("Name");
-  });
-
-  test("textarea type renders a multiline textfield", async () => {
-    const c = await renderInto(_fieldRow("Body", "textarea", "line", () => {}, "dl-2"));
-    expect(c.querySelector("sp-textfield[multiline]")).not.toBeNull();
-  });
-
-  test("checkbox type commits the checked state synchronously", async () => {
-    const seen: (string | boolean)[] = [];
-    const c = await renderInto(_fieldRow("Flag", "checkbox", "yes", (v) => seen.push(v), "dl-3"));
-    const box = c.querySelector("sp-checkbox") as unknown as HTMLElement & { checked: boolean };
-    box.checked = true;
-    box.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(seen).toEqual([true]);
   });
 });

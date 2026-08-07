@@ -3,6 +3,7 @@ title: "Code editing"
 description: "Drop down to real code when you need it — Monaco for function bodies, sidecar files, and Code mode for a document's raw source."
 code:
   - packages/studio/src/panels/editors.ts
+  - packages/studio/src/panels/formula-workspace.ts
   - packages/studio/src/canvas/canvas-render.ts
   - packages/studio/src/services/code-services.ts
   - packages/studio/src/settings/project-sections.ts
@@ -22,7 +23,7 @@ There are two distinct code surfaces, for two different jobs.
 
 ## The function editor
 
-A function body in **Code** mode (the **Statements**/**Code** toggle) is JavaScript. The small text field in the panel is fine for one line; for anything more, click the code icon — **Open in code editor** on a State-panel function, **Open in editor** on an inline event handler. The editor takes over the canvas, and the context bar shows a breadcrumb — the file's name, then _ƒ_ and the function's name — with a **Back** button to return.
+A function body in **Code** mode (the **Statements**/**Code** toggle) is JavaScript. The small text field in the panel is fine for one line; for anything more, click the code icon — **Open in code editor** on a State-panel function, **Open in editor** on an inline event handler. The body opens in the **Logic** tab of the **[Bottom dock](/docs/studio/interface#bottom-dock)**, under the pane, so the page the handler belongs to stays on screen while you write it.
 
 What you get:
 
@@ -30,6 +31,8 @@ What you get:
 - **Live linting** — problems are underlined as you type, with the message on hover.
 - **Completions** — type `state.` to see every entry from the **[State panel](/docs/studio/logic/state)** (your values, data sources, and functions), and `window.` for the standard library (`Math`, `JSON`, …). Named formulas carry their descriptions into the suggestions.
 - **Automatic write-back** — edits flow into the document as you type; there is no separate apply step. Save the file as usual when you're done.
+
+**Close**, in the editor's header, writes the body back one last time — minified — and takes the tab off the dock's strip. Until then the editor keeps its place: collapsing the dock or switching to another document and back leaves it exactly as it was. The same tab carries the **[formula workspace](/docs/studio/logic/formula-workspace)** when what you're editing is a structured expression rather than code.
 
 Inside a body, `state` holds your entries (`state.$count += 1` is the code twin of a **Set state** statement), event handlers also receive `event`, and a function's declared parameters are available by name.
 

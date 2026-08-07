@@ -50,6 +50,7 @@ import {
   setInspectorSection,
 } from "./properties-panel";
 import { collectCssParts } from "./signals-panel";
+import { openLogicTarget } from "./formula-workspace";
 import {
   getEventBinding,
   isExpressionDef,
@@ -585,11 +586,10 @@ function renderEventsBody(
                                   quiet
                                   title="Open in editor"
                                   @click=${() => {
-                                    tab.session.ui.editingFunction = {
-                                      eventKey: evKey,
-                                      path: selection,
-                                      type: "event",
-                                    };
+                                    openLogicTarget({
+                                      editing: { eventKey: evKey, path: selection, type: "event" },
+                                      surface: "function",
+                                    });
                                   }}
                                 >
                                   <sp-icon-code slot="icon"></sp-icon-code>
@@ -636,14 +636,13 @@ function renderEventsBody(
                             quiet
                             title="Open in formula workspace"
                             @click=${() => {
-                              tab.session.ui.editingFormula = {
-                                eventKey: evKey,
-                                path: selection,
-                                type: "event",
-                              };
+                              openLogicTarget({
+                                editing: { eventKey: evKey, path: selection, type: "event" },
+                                surface: "formula",
+                              });
                             }}
                           >
-                            <sp-icon-full-screen slot="icon"></sp-icon-full-screen>
+                            <sp-icon-align-bottom slot="icon"></sp-icon-align-bottom>
                           </sp-action-button>
                         </div>
                       `

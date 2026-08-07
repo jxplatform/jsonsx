@@ -1420,67 +1420,7 @@ export function renderStylePanelTemplate(ctx: { getCanvasMode: () => string }) {
   return styleSidebarTemplate(node, tab.session.ui.activeMedia, tab.session.ui.activeSelector);
 }
 
-/** Single property input row (generic field row helper) */
-export function _fieldRow(
-  label: string,
-  type: string,
-  value: string,
-  onChange: (v: string | boolean) => void,
-  _datalistId: string | undefined,
-) {
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  const onInput = (e: Event) => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => onChange((e.target as HTMLInputElement).value), 400);
-  };
-  const inputTpl =
-    type === "textarea"
-      ? html`<sp-textfield
-          multiline
-          size="s"
-          .value=${live(value ?? "")}
-          @input=${onInput}
-        ></sp-textfield>`
-      : type === "checkbox"
-        ? html`<sp-checkbox
-            ?checked=${Boolean(value)}
-            @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
-          ></sp-checkbox>`
-        : html`<sp-textfield
-            size="s"
-            .value=${live(value ?? "")}
-            @input=${onInput}
-          ></sp-textfield>`;
-  return html`
-    <div class="field-row">
-      <sp-field-label size="s">${label}</sp-field-label>
-      ${inputTpl}
-    </div>
-  `;
-}
-
 // ─── Commands ─────────────────────────────────────────────────────────────────
-
-/**
- * The style-context selectors addressable right now: the common set plus whatever the selected
- * element already declares, plus the active one. Mirrors the picker's own menu, from the same
- * data.
- */
-export function availableSelectors(): string[] {
-  const tab = activeTab.value;
-  const declared: string[] = [];
-  const selected = primarySelection(tab?.session.selection);
-  if (tab && selected) {
-    const node = getNodeAtPath(tab.doc.document, selected);
-    for (const key of Object.keys(node?.style ?? {})) {
-      if (isNestedSelector(key)) {
-        declared.push(key);
-      }
-    }
-  }
-  const active = tab?.session.ui.activeSelector;
-  return [...new Set([...COMMON_SELECTORS, ...declared, ...(active ? [active] : [])])];
-}
 
 /**
  * The Style tab's selector verbs.

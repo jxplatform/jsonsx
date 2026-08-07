@@ -13,15 +13,18 @@ import type { WireDocOp } from "../src/canvas/iframe-protocol";
 
 // Capture what the parent posts to the bridge instead of reaching a real (cross-origin) iframe host.
 let captured: { forwardOps: WireDocOp[]; gen: number } | null = null;
+/** How many ready hosts the fake bridge reports having fanned the patch out to. */
+let readyHosts = 1;
 void mock.module("../src/canvas/iframe-host", () => ({
   postPatchToHosts: (forwardOps: WireDocOp[], gen: number) => {
     captured = { forwardOps, gen };
-    return 1; // Pretend one ready host received it.
+    return readyHosts;
   },
   setIframePatchEscalation: () => {},
 }));
 
 const { applyPatchBatch } = await import("../src/canvas/canvas-patcher");
+const { canvasPerf, resetCanvasPerf } = await import("../src/canvas/canvas-perf");
 
 describe("parent → iframe patch wire format", () => {
   test("posts value-carrying forward ops — the values cross, not just paths", () => {
@@ -77,5 +80,41 @@ describe("parent → iframe patch wire format", () => {
       ops: [{ op: "set-text", path: ["children", 0] }],
     });
     expect(captured!.forwardOps).toEqual([]);
+  });
+
+  test("a patch counts once however many artboards it reaches", () => {
+    // `patchedOps` versus `escalations` is how much of a session avoided a render at all, so it
+    // Must count MUTATIONS. Counting the fan-out would make a six-breakpoint canvas look six times
+    // Busier than a single-artboard one for exactly the same edit.
+    resetCanvasPerf();
+    const batch = (): [Tab, TransactionRecord["ops"], TransactionRecord] => [
+      {} as Tab,
+      [{ op: "set-text", path: ["children", 0] }],
+      {
+        docOps: [
+          {
+            forward: { key: "textContent", op: "set-key", path: ["children", 0], value: "X" },
+            inverse: { key: "textContent", op: "set-key", path: ["children", 0], value: "y" },
+          },
+        ],
+        fmOps: [],
+        invertible: true,
+        ops: [{ op: "set-text", path: ["children", 0] }],
+      },
+    ];
+
+    readyHosts = 1;
+    applyPatchBatch(...batch());
+    expect(canvasPerf.patchedOps).toBe(1);
+
+    readyHosts = 6;
+    applyPatchBatch(...batch());
+    expect(canvasPerf.patchedOps).toBe(2);
+
+    // No host could take it: the batch escalates, and nothing is recorded as patched.
+    readyHosts = 0;
+    expect(() => applyPatchBatch(...batch())).toThrow(/no-ready-iframe-host/);
+    expect(canvasPerf.patchedOps).toBe(2);
+    readyHosts = 1;
   });
 });

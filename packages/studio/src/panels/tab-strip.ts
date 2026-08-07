@@ -49,7 +49,9 @@ import { collectionOfPath } from "../content/entry-model";
 import { activeRegistry } from "../commands/active-registry";
 import type { Pane } from "../workspace/workspace";
 import type { Tab } from "../tabs/tab";
-import { renderPopover, showConfirmDialog } from "../ui/layers";
+import { renderPopover, showConfirmDialog, showSaveDiscardDialog } from "../ui/layers";
+import { saveFile } from "../files/file-ops";
+import { collabReadOnly } from "../collab/collab-session";
 import { collabState } from "../collab/collab-state";
 import { rectOf } from "../utils/geometry";
 import { resolveRegion } from "../ui/regions";
@@ -68,6 +70,9 @@ let _scope: EffectScope | null = null;
 /** Last-rendered active tab per pane — decides when to scroll a chip into view. */
 const _lastActive = new Map<string, string | null>();
 
+/** The host each pane last drew into, so a strip can be blanked when the pane stops owning it. */
+const _hosts = new Map<string, HTMLElement>();
+
 /** Whether each pane's strip overflows — decides its chevron. Measured after each render. */
 const _overflowing = new Map<string, boolean>();
 
@@ -82,14 +87,21 @@ export function paneStripRegion(paneId: string): string {
 }
 
 /**
- * Where a pane's strip renders.
+ * Where a pane's strip renders, or null when the shell gives it nowhere.
  *
- * The primary falls back to the host the shell passed in, because that div is stamped
- * `pane.primary/tabs` by `stampShellRegions()` only once the DOM is up — and the tests mount a
- * detached node.
+ * A pane with a region host of its own renders there. A pane WITHOUT one borrows the host the shell
+ * handed over — the primary's — because that div is the shell's single strip exactly as
+ * `#canvas-wrap` is its single stage. Two panes then name the same element, and {@link render}
+ * gives it to the FOCUSED one, the same handover `canvas/canvas-render.ts`'s `handOverCanvasStage`
+ * makes with the stage. Without it the strip printed a document that was not on screen: `⌘\` moved
+ * the tab into the side pane, the stage showed it, and the strip went on drawing the primary's tabs
+ * with the primary's chip marked active.
+ *
+ * The fallback is also what makes the primary work before `stampShellRegions()` has run — and in
+ * the tests, which mount an unstamped node.
  */
 function hostFor(pane: Pane): HTMLElement | null {
-  return resolveRegion(paneStripRegion(pane.id)) ?? (pane.id === "primary" ? _primaryHost : null);
+  return resolveRegion(paneStripRegion(pane.id)) ?? _primaryHost;
 }
 
 /**
@@ -101,6 +113,7 @@ export function mount(host: HTMLElement) {
   _primaryHost = host;
   _lastActive.clear();
   _overflowing.clear();
+  _hosts.clear();
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -137,33 +150,45 @@ export function unmount() {
   _dragging = null;
   _lastActive.clear();
   _overflowing.clear();
+  _hosts.clear();
 }
 
 function render() {
-  const seen = new Set<string>();
+  /* One host draws ONE pane. While the shell has a single strip, both panes resolve to the same
+     div — and the one whose tabs are on screen is the focused one, so it wins the tie. Without
+     that rule the answer was render order, which is how the strip came to mark a tab active in a
+     pane the stage was not showing. When each pane has a host of its own there are no ties. */
+  const claims = new Map<HTMLElement, Pane>();
   for (const pane of workspace.panes) {
-    seen.add(pane.id);
-    renderPane(pane);
+    const host = hostFor(pane);
+    if (host && (!claims.has(host) || pane.id === workspace.activePaneId)) {
+      claims.set(host, pane);
+    }
   }
-  // A pane that has gone away leaves a host behind only when the shell keeps the div; blank it so
-  // No strip outlives its pane.
-  const stalePanes = [..._lastActive.keys()].filter((paneId) => !seen.has(paneId));
-  for (const paneId of stalePanes) {
+  const drawn = new Set<string>();
+  for (const [host, pane] of claims) {
+    renderPane(pane, host);
+    _hosts.set(pane.id, host);
+    drawn.add(pane.id);
+  }
+  // A pane that has gone away — or that has lost the shared host to the pane now focused — leaves
+  // Its last host behind. Blank it, unless someone else has just drawn there, so no strip outlives
+  // The pane it belongs to.
+  // Deleting the entry the loop is standing on is defined behaviour for a Map iterator.
+  for (const [paneId, host] of _hosts) {
+    if (drawn.has(paneId)) {
+      continue;
+    }
+    _hosts.delete(paneId);
     _lastActive.delete(paneId);
     _overflowing.delete(paneId);
-    const stale = resolveRegion(paneStripRegion(paneId));
-    if (stale) {
-      litRender(nothing, stale);
+    if (!claims.has(host)) {
+      litRender(nothing, host);
     }
   }
 }
 
-function renderPane(pane: Pane) {
-  const host = hostFor(pane);
-  if (!host) {
-    return;
-  }
-
+function renderPane(pane: Pane, host: HTMLElement) {
   if (pane.tabOrder.length === 0) {
     _lastActive.set(pane.id, null);
     _overflowing.set(pane.id, false);
@@ -336,7 +361,7 @@ function syncOverflow(pane: Pane, host: HTMLElement) {
   const overflowing = strip.scrollWidth > strip.clientWidth;
   if (overflowing !== (_overflowing.get(pane.id) === true)) {
     _overflowing.set(pane.id, overflowing);
-    renderPane(pane);
+    renderPane(pane, host);
   }
 }
 
@@ -372,7 +397,9 @@ function onWheel(e: WheelEvent) {
  */
 export function hiddenTabIds(paneId: string = workspace.activePaneId): string[] {
   const pane = workspace.panes.find((candidate) => candidate.id === paneId);
-  const host = pane ? hostFor(pane) : null;
+  // The host the pane actually DREW into, not the one it would resolve: a pane with no strip on
+  // Screen has no chips out of view, and measuring another pane's strip would invent some.
+  const host = _hosts.get(paneId);
   const strip = host?.querySelector(".tab-strip") as HTMLElement | null;
   if (!pane || !strip) {
     return [];
@@ -818,29 +845,76 @@ export function shouldWarnOnClose(tab: Tab): boolean {
   if (!state.active) {
     return true;
   }
+  // "Peers remain, so the edits are still on the server" holds only for a client whose edits REACH
+  // The server. A read-only client publishes nothing (`collabReadOnly`), so its work is in this
+  // Browser and nowhere else, and the room being busy is no comfort at all.
+  if (collabReadOnly(tab)) {
+    return true;
+  }
   const peersHere = state.peers.filter((p) => p.state?.focusedPath === tab.documentPath);
   return peersHere.length === 0;
 }
 
 /**
- * Close a tab, prompting if closing would lose unsaved work.
+ * Ask what to do about a tab that is about to close over unsaved work. True means go ahead.
+ *
+ * **Two dialogs, because there are two situations and only one of them has three answers.** Save /
+ * Discard / Cancel is right when a save would do something. For a read-only collaborator it would
+ * not: the edits never left the browser, `saveFile` refuses the tab outright, and offering the
+ * button anyway would put a control that cannot work on the one dialog whose entire job is to be
+ * trusted about unsaved work. That case gets the honest pair — discard, or keep editing.
+ */
+async function confirmClose(tab: Tab): Promise<boolean> {
+  if (collabReadOnly(tab)) {
+    return showConfirmDialog(
+      "Changes Cannot Be Saved",
+      `You have read access to this session, so "${tabLabel(tab)}" has changes that were never ` +
+        `published and have nowhere to be saved. Closing discards them.`,
+      { cancelLabel: "Keep Editing", confirmLabel: "Close Without Saving", destructive: true },
+    );
+  }
+  const answer = await showSaveDiscardDialog(
+    "Unsaved Changes",
+    `"${tabLabel(tab)}" has unsaved changes.`,
+    { discardLabel: "Close Without Saving" },
+  );
+  if (answer === "cancel") {
+    return false;
+  }
+  // A failed save must not close the tab: treating "Save" as "save and then close regardless" turns
+  // A write error the user just watched into the loss the prompt existed to prevent.
+  return answer === "discard" || (await saveFile(tab));
+}
+
+/**
+ * Close a tab, offering to save first when closing would lose unsaved work.
+ *
+ * **Three ways out, not two.** This asked "Close without saving?" over a two-way confirm, so the
+ * only buttons were the one that threw the work away and the one that did nothing — a dialog that
+ * cannot do the thing the user most likely wants. §8.7's table assigns "Unsaved-work decisions" to
+ * `showSaveDiscardDialog`, and this is that decision — except when a save is not one of the ways
+ * out at all, which is {@link confirmClose}'s job to tell apart.
+ *
+ * **A failed save must not close the tab.** `saveFile` reports its own failures and returns whether
+ * the bytes landed; treating "Save" as "save and then close regardless" would turn a write error
+ * the user just watched into the loss the prompt existed to prevent. It stays open, still dirty,
+ * with the error in Problems.
+ *
+ * The tab is passed to `saveFile` explicitly: a × is clicked on tabs that are not focused, and the
+ * default target is the focused one.
+ *
+ * Exported because ⌘W is the same action. `editor/shortcuts.ts` used to re-implement it — down to
+ * copying the wording out of this file — which is exactly how the two drifted apart the last time.
  *
  * @param {string} id
  */
-async function requestClose(id: string) {
+export async function requestClose(id: string) {
   const tab = workspace.tabs.get(id);
   if (!tab) {
     return;
   }
-  if (shouldWarnOnClose(tab)) {
-    const confirmed = await showConfirmDialog(
-      "Unsaved Changes",
-      `"${tabLabel(tab)}" has unsaved changes. Close without saving?`,
-      { confirmLabel: "Close", destructive: true },
-    );
-    if (!confirmed) {
-      return;
-    }
+  if (shouldWarnOnClose(tab) && !(await confirmClose(tab))) {
+    return;
   }
   closeTab(id);
 }

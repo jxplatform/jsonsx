@@ -19,18 +19,21 @@ import {
   focusPane,
   moveTab,
   openTab,
+  activeTab,
+  hostableKindsOf,
   paneById,
   paneCommands,
+  paneOfTabCanHostMode,
   paneOfTab,
   promoteDirtyPreviewTabs,
   promoteTab,
   setTabPinned,
   splitRight,
   tabCommands,
-  togglePaneZoom,
   workspace,
 } from "../src/workspace/workspace";
 import { editorKindOf, editorKindsOf, modeForEditorKind } from "../src/tabs/tab";
+import { effect, effectScope } from "../src/reactivity";
 import { createCommandRegistry } from "../src/commands/registry";
 import { emptyContext, makeContext } from "../src/commands/context";
 
@@ -132,14 +135,108 @@ describe("splitting", () => {
     expect(workspace.panes.length).toBe(1);
   });
 
-  test("splitting back from the side pane returns the tab to the primary unchanged", () => {
+  /*
+   * The pane published by a split has to be COMPLETE before it is focused, and it has to be the
+   * reactive record — two halves of one rule, and the split broke both.
+   *
+   * `workspace.activePaneId = target.id` ran first, so every `activeTab` reader re-ran against a
+   * pane that was showing nothing and cached null: the jump bar rendered empty, the Inspector and
+   * the toolbar said "no document", over a stage that was drawing the document perfectly. The
+   * correction on the next line notified nobody, because `target` was still the raw literal that
+   * had been pushed into the reactive array — a write through it reaches the fields and skips every
+   * effect, which is the pitfall this codebase has already been bitten by once with nested
+   * reactive collections.
+   */
+  test("the pane is complete and reactive before the focus moves to it", () => {
+    open("a");
+    open("b");
+    const seen: (string | null)[] = [];
+    const scope = effectScope();
+    scope.run(() => {
+      effect(() => {
+        seen.push(activeTab.value?.id ?? null);
+      });
+    });
+    seen.length = 0;
+
+    splitRight();
+
+    // What every activeTab reader saw, at every step of the split — never "no document".
+    expect(seen).not.toContain(null);
+    expect(seen.at(-1)).toBe("b");
+    // And the computed is not left holding a stale null that nothing will ever invalidate.
+    expect(activeTab.value?.id).toBe("b");
+    scope.stop();
+  });
+
+  test("the pane it hands back is the reactive record, never the literal it published", () => {
+    open("a");
+    open("b");
+    const target = splitRight()!;
+    let runs = 0;
+    const scope = effectScope();
+    scope.run(() => {
+      effect(() => {
+        void paneById(SECONDARY_PANE)?.activeTabId;
+        runs += 1;
+      });
+    });
+    const before = runs;
+
+    // A write through the record the API returned. `reactive()` wraps on READ, so if a caller can
+    // Hold the object that was pushed into the array, this reaches the field and notifies nobody.
+    target.activeTabId = "a";
+
+    expect(runs).toBeGreaterThan(before);
+    expect(paneById(SECONDARY_PANE)!.activeTabId).toBe("a");
+    scope.stop();
+  });
+
+  test("splitting back from the side pane returns the tab AND collapses the emptied pane", () => {
     open("a");
     open("b");
     splitRight();
     const back = splitRight();
     expect(back?.id).toBe(PRIMARY_PANE);
     expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["a", "b"]);
-    expect(workspace.panes.find((p) => p.id === SECONDARY_PANE)?.tabOrder).toEqual([]);
+    // This assertion used to read `?.tabOrder).toEqual([])` — it asserted that the emptied pane
+    // STAYED in the grid, which is three keystrokes from a shell with no stage, no strip and no
+    // Jump bar while two documents are open: `pane.focusSecondary` remains enabled on a pane whose
+    // `tabOfPane` is null, and that null is the exact input `hardClearCanvasWrap` takes. `closeTab`
+    // Had the rule already — a pane with nothing in it is a hole in the grid — and every path that
+    // Empties a pane now applies it.
+    expect(workspace.panes.map((p) => p.id)).toEqual([PRIMARY_PANE]);
+  });
+});
+
+describe("the cap on the side pane", () => {
+  /*
+   * The cap used to be enforced at the SPLIT and nowhere else, while claiming "one rule, one
+   * place". A tab already in the side pane could be switched straight back to Canvas — from the
+   * context bar, from `canvas.setMode`, from anything that writes `ui.canvasMode` — which is the
+   * second live Canvas host the cap exists to prevent. The rule is now one predicate, asked at
+   * every point that offers or performs a switch.
+   */
+  test("what a pane may host is asked of the pane the tab is IN", () => {
+    open("a", { capabilities: { modes: ["edit", "design", "source"] } });
+    const tab = workspace.tabs.get("a")!;
+    // In the primary, every kind the document declares is on offer.
+    expect(hostableKindsOf(tab)).toEqual(["canvas", "code"]);
+    expect(paneOfTabCanHostMode(tab, "design")).toBe(true);
+
+    open("b");
+    activateTab("a");
+    splitRight();
+
+    // In the side pane, the Canvas kind is neither offered nor accepted.
+    expect(hostableKindsOf(tab)).toEqual(["code"]);
+    expect(paneOfTabCanHostMode(tab, "design")).toBe(false);
+    expect(paneOfTabCanHostMode(tab, "source")).toBe(true);
+
+    // A tab no pane holds is unconstrained — nothing is capping it.
+    closePane(SECONDARY_PANE);
+    workspace.panes[0]!.tabOrder = [];
+    expect(paneOfTabCanHostMode(tab, "design")).toBe(true);
   });
 });
 
@@ -165,17 +262,6 @@ describe("focus and zoom", () => {
     focusOtherPane();
     expect(workspace.activePaneId).toBe(PRIMARY_PANE);
   });
-
-  test("zoom is a view of the grid — it moves no tab and closes nothing", () => {
-    open("a");
-    open("b");
-    splitRight();
-    togglePaneZoom();
-    expect(workspace.zoomedPaneId).toBe(SECONDARY_PANE);
-    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual(["b"]);
-    togglePaneZoom();
-    expect(workspace.zoomedPaneId).toBeNull();
-  });
 });
 
 describe("collapsing", () => {
@@ -183,12 +269,46 @@ describe("collapsing", () => {
     open("a");
     open("b");
     splitRight();
-    togglePaneZoom();
     closePane(SECONDARY_PANE);
     expect(workspace.panes.length).toBe(1);
     expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["a", "b"]);
     expect(workspace.tabs.size).toBe(2);
-    expect(workspace.zoomedPaneId).toBeNull();
+  });
+
+  /*
+   * "The active pane does not exist" must never be observable.
+   *
+   * `closePane` removed the pane from the grid while `activePaneId` still named it, so for one
+   * synchronous instant every reader that resolves through the focused pane — the stage, the jump
+   * bar, the Inspector — saw a pane with no tab. A canvas render scheduled in that instant tore the
+   * stage down to nothing, and the focus flip that followed scheduled no repaint, because it
+   * changed no `activeTab`. `⌘\` then Unsplit left an editor that only a reload brought back.
+   */
+  test("unsplit never publishes a focused pane that is not in the grid", () => {
+    open("a");
+    open("b");
+    splitRight();
+    const holes: string[] = [];
+    const tabless: string[] = [];
+    const scope = effectScope();
+    scope.run(() => {
+      effect(() => {
+        const focused = workspace.panes.find((pane) => pane.id === workspace.activePaneId);
+        if (!focused) {
+          holes.push(workspace.activePaneId);
+        } else if (!focused.activeTabId) {
+          tabless.push(workspace.activePaneId);
+        }
+      });
+    });
+
+    closePane(SECONDARY_PANE);
+
+    expect(holes).toEqual([]);
+    expect(tabless).toEqual([]);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.activeTabId).toBe("b");
+    scope.stop();
   });
 
   test("closing the last tab in the side pane collapses it", () => {
@@ -301,43 +421,21 @@ describe("activation across panes", () => {
 });
 
 describe("the pane commands", () => {
-  test("all six are declared at document level in the View category", () => {
+  test("all four are declared at document level in the View category", () => {
+    // Four, not six. `pane.toggleZoom` and `pane.setZoomed` wrote `zoomedPaneId` and nothing that
+    // Draws ever read it — §18.3 hands one stage between panes, so the focused pane already fills
+    // The shell. They return with the second live host.
     const ids = paneCommands().map((c) => c.id);
     expect(ids).toEqual([
       "pane.splitRight",
       "pane.focusPrimary",
       "pane.focusSecondary",
-      "pane.toggleZoom",
-      "pane.setZoomed",
       "pane.unsplit",
     ]);
     for (const command of paneCommands()) {
       expect(command.level).toBe("document");
       expect(command.category).toBe("View");
     }
-  });
-
-  test("pane.setZoomed is idempotent where pane.toggleZoom is a delta", () => {
-    // The pairing the app-commands guard asserts, exercised: a script says what it wants and can
-    // Say it twice; the chord flips whatever is there because a human can see which state that is.
-    const byId = new Map(paneCommands().map((c) => [c.id, c]));
-    const setZoomed = byId.get("pane.setZoomed")!;
-    const ctx = emptyContext();
-    open("a");
-    splitRight();
-
-    setZoomed.run(ctx, { zoomed: true } as never);
-    const zoomed = workspace.zoomedPaneId;
-    expect(zoomed).not.toBeNull();
-    setZoomed.run(ctx, { zoomed: true } as never);
-    expect(workspace.zoomedPaneId).toBe(zoomed);
-
-    setZoomed.run(ctx, { zoomed: false } as never);
-    expect(workspace.zoomedPaneId).toBeNull();
-    setZoomed.run(ctx, { zoomed: false } as never);
-    expect(workspace.zoomedPaneId).toBeNull();
-
-    expect(() => setZoomed.run(ctx, { zoomed: "yes" } as never)).toThrow(/expected a boolean/);
   });
 
   test(String.raw`⌘\ is the split chord and ⌘⌥0 focuses the side pane`, () => {
@@ -348,15 +446,10 @@ describe("the pane commands", () => {
     expect(byId.get("pane.focusPrimary")!.keybinding).toBeUndefined();
   });
 
-  test("the four grid commands refuse with a sentence until the grid is split", () => {
+  test("the three grid commands refuse with a sentence until the grid is split", () => {
     const registry = registryWith(paneCommands());
     open("a");
-    for (const id of [
-      "pane.focusPrimary",
-      "pane.focusSecondary",
-      "pane.toggleZoom",
-      "pane.unsplit",
-    ]) {
+    for (const id of ["pane.focusPrimary", "pane.focusSecondary", "pane.unsplit"]) {
       expect(registry.isEnabled(id)).toBe(false);
       expect(registry.disabledReason(id)).toBe("a split pane grid");
     }
@@ -370,7 +463,7 @@ describe("the pane commands", () => {
     openCanvasOnly("only");
     expect(registry.isEnabled("pane.splitRight")).toBe(false);
     expect(registry.disabledReason("pane.splitRight")).toBe(
-      "a document that can open as Code, Config, Diff, Grid or Library beside the canvas",
+      "a document that can open as Code, Config, Diff, Grid or Library in a second pane",
     );
   });
 
@@ -384,8 +477,6 @@ describe("the pane commands", () => {
     expect(workspace.activePaneId).toBe(PRIMARY_PANE);
     await registry.run("pane.focusSecondary");
     expect(workspace.activePaneId).toBe(SECONDARY_PANE);
-    await registry.run("pane.toggleZoom");
-    expect(workspace.zoomedPaneId).toBe(SECONDARY_PANE);
     await registry.run("pane.unsplit");
     expect(workspace.panes.length).toBe(1);
   });

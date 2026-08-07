@@ -290,6 +290,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.7.0-draft** (2026-08-06) — §18 Panes — the two-pane cap as one predicate, the three lifecycle rules each defect taught, what a second pane costs and what no fan-out removes, and the single stage handed between panes.
 - **0.6.0-draft** (2026-08-05) — §7 Stylebook becomes Project Styles (name only — "stylebook" stays the wire value) and §17 Project Documents: project.json as a Tab under the transaction log, one write chokepoint, a no-op edit that writes nothing, and the collab exclusion.
 - **0.5.2-draft** (2026-08-05) — §5.2 the move buttons follow the primary selection and stay single-target under a multiple selection.
 - **0.5.1-draft** (2026-08-05) — §6.2 corrects the Target Line illustration — the selector is the last segment and a scheme variant appears only at Base — and retires the breakpoint-tabs, inline-selector-picker and Active-toggle subsections the Target Line replaced.

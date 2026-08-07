@@ -6,7 +6,7 @@
  */
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { canvasPanels } from "../src/store";
+import { activeCanvasSurface } from "../src/canvas/canvas-surface";
 import { closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
 import { setPatchConsumer } from "../src/tabs/patch-ops";
 import { classifyOps, initCanvasPatcher } from "../src/canvas/canvas-patcher";
@@ -17,6 +17,11 @@ import type { CanvasPanel } from "../src/types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxPatchOp } from "../src/tabs/patch-ops";
 import type { Tab } from "../src/tabs/tab";
+
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const canvasPanels = activeCanvasSurface().panels;
 
 let tab: Tab;
 let tabCount = 0;
@@ -51,7 +56,6 @@ beforeEach(() => {
   } as unknown as CanvasPanel);
 
   initCanvasPatcher({
-    getCanvasMode: () => "design",
     renderOverlays: () => {},
     scheduleCanvasRender: () => {},
   });

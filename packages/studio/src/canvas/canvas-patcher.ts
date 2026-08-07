@@ -11,10 +11,15 @@
  * Patching is only attempted in design/edit canvas modes, where the canvas renders through
  * prepareForEditMode: runtime reactive bindings are inert there, so the patcher is the only writer
  * to the patched DOM.
+ *
+ * Every question here is asked of ONE PANE — the one showing the edited tab (`canvas-surface.ts`).
+ * The mode, the panel list, the readiness test and the render an escalation schedules are all
+ * properties of a stage, and reading them globally is how a second pane mid-mount would refuse an
+ * edit typed into the first, and how one failed patch would rebuild both.
  */
 
-import { canvasPanels, getNodeAtPath, parentElementPath } from "../store";
-import { isTabActive } from "../workspace/workspace";
+import { getNodeAtPath, parentElementPath } from "../store";
+import { canvasModeOfPane, surfaceShowingTab } from "./canvas-surface";
 import { view } from "../view";
 import { toRaw } from "../reactivity";
 import { postPatchToHosts } from "./iframe-host";
@@ -27,8 +32,8 @@ import type { JxPath } from "../state";
 
 /** Render-side callbacks injected at init so this module stays free of heavy canvas imports. */
 interface CanvasPatcherCtx {
-  getCanvasMode: () => string;
-  scheduleCanvasRender: () => void;
+  /** Schedule ONE pane's full render — never "the canvas". See {@link escalateToFullRender}. */
+  scheduleCanvasRender: (paneId: string) => void;
   renderOverlays: () => void;
 }
 
@@ -71,10 +76,28 @@ export function consumePatchedDocument(doc: object): boolean {
   return false;
 }
 
-/** Schedule the fallback full render and record why. */
-export function escalateToFullRender(reason: string) {
+/**
+ * Schedule the fallback full render of ONE pane and record why.
+ *
+ * The pane is the one showing `tab`. An escalation is a statement about a stage whose DOM no longer
+ * matches its document, and only the stage that was handed the patch can be in that state — a
+ * global schedule would rebuild the other pane's iframes (reloading them, losing their scroll and
+ * any live edit) because a document it is not showing failed to patch.
+ *
+ * With no tab (a `patchError` arriving after the pane's tab changed, or an apply failure on a tab
+ * no pane is showing) there is nothing to re-render, so nothing is scheduled — the reason is still
+ * recorded, because a swallowed escalation that no counter saw is exactly the class of bug
+ * `__jxCanvasPerf` exists to make visible.
+ *
+ * @param {string} reason
+ * @param {Tab | null} tab
+ */
+export function escalateToFullRender(reason: string, tab: Tab | null = null) {
   recordEscalation(reason);
-  _ctx?.scheduleCanvasRender();
+  const surface = surfaceShowingTab(tab);
+  if (surface) {
+    _ctx?.scheduleCanvasRender(surface.paneId);
+  }
 }
 
 // ─── Classification ──────────────────────────────────────────────────────────
@@ -271,19 +294,30 @@ export function classifyOps(tab: Tab, ops: JxPatchOp[]): { patchable: boolean; r
     return { patchable: false, reason };
   };
 
-  if (!isTabActive(tab)) {
+  /*
+   * Every gate below is asked of the ONE pane showing this tab — not of the app.
+   *
+   * A tab lives in exactly one pane, so there is exactly one stage that could apply the patch, and
+   * its readiness, its mode and its panel list are the only ones that can decide the question. Read
+   * globally, the readiness test made the other pane's mid-mount canvas refuse an edit typed into
+   * this one, and the mode test asked what the FOCUSED pane was doing about a document it may not
+   * even be showing.
+   */
+  const surface = surfaceShowingTab(tab);
+  if (!surface) {
     return reject("inactive-tab");
   }
-  const canvasMode = _ctx ? _ctx.getCanvasMode() : "";
+  const canvasMode = canvasModeOfPane(surface.paneId);
   if (canvasMode !== "design" && canvasMode !== "edit") {
     return reject(`mode-${canvasMode || "unknown"}`);
   }
-  if (canvasPanels.length === 0) {
+  const { panels } = surface;
+  if (panels.length === 0) {
     return reject("no-panels");
   }
   // The iframe canvas keeps its render context inside the iframe, so a panel is patchable as soon as
   // It has rendered (`ready`) — there is no parent-side `liveCtx`.
-  if (!canvasPanels.every((p) => p.ready)) {
+  if (!panels.every((p) => p.ready)) {
     return reject("panels-not-ready");
   }
   // A `set-text` on a node whose CHILDREN are replaced in the same batch is subsumed by that
@@ -335,8 +369,14 @@ export function applyPatchBatch(tab: Tab, _ops: JxPatchOp[], record?: Transactio
   // Render then runs), so an edit is never dropped.
   timeSpan(SPAN_PATCH_BATCH, () => {
     const forwardOps = (record?.docOps ?? []).map((pair) => pair.forward);
-    if (postPatchToHosts(forwardOps, view.renderGeneration, tab.id) === 0) {
+    const hosts = postPatchToHosts(forwardOps, view.renderGeneration, tab.id);
+    if (hosts === 0) {
       throw new Error("no-ready-iframe-host");
     }
+    // The counter the escalation count is read against: `patchedOps` versus `escalations` is how
+    // Much of an authoring session avoided a render at all. It is the OPS, not ops×hosts — one
+    // Mutation posted to six artboards is one mutation, and counting the fan-out here would make
+    // A wide canvas look like it was doing more work than a narrow one.
+    canvasPerf.patchedOps += forwardOps.length;
   });
 }

@@ -719,7 +719,6 @@ function mountExternal(
     ...(opts.documentPath != null && { documentPath: opts.documentPath }),
   } as never;
   const ctx = {
-    renderCanvas: () => {},
     renderLeftPanel: () => {
       calls.left += 1;
       render(
@@ -727,7 +726,6 @@ function mountExternal(
         container,
       );
     },
-    updateSession: () => {},
   };
   const rerender = () =>
     render(

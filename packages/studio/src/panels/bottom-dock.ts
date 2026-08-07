@@ -11,18 +11,24 @@
  * opening it never narrows the Navigator or the Inspector — which is the difference between a dock
  * that is cheap to open and one that rearranges your whole workspace to show you two warnings.
  *
- * **Four tabs, at the documented cap.** `scripts/check-chrome-budget.ts` caps a dock at four, and
- * §12's P4 entry spends them: **Problems · Diff · Logic · Activity**, with Deploy folded into
- * Activity because a deploy is a long operation with a log. `shell.ts` declares the ids
- * ({@link BOTTOM_TAB_IDS}) so a bare Bun process can read `view.setBottomTab`'s enum; this module
- * turns them into records.
+ * **Three tabs, under a cap of four.** `scripts/check-chrome-budget.ts` caps a dock at four, and
+ * this spends three: **Problems · Logic · Activity**, with Deploy folded into Activity because a
+ * deploy is a long operation with a log. Diff was the fourth until P8 gave it a pane to open into
+ * instead — see {@link registerBottomPanels}. `shell.ts` declares the ids ({@link BOTTOM_TAB_IDS})
+ * so a bare Bun process can read `view.setBottomTab`'s enum; this module turns them into records.
  *
  * **The tabs are panel records, so they inherit everything.** `dock: "bottom"` was already admitted
  * by `registerPanel()` and by the level × placement matrix, and `ui/regions.ts` has parsed
  * `dock.bottom` since P3 — it simply resolved to nothing, because there was no host. This is the
- * host. Every tab gets `dock.bottom/panel:<id>` for free, its title comes from the record, and
- * `when` hides the two that P8 builds (Diff and Logic) exactly the way it held the rail's Problems
- * slot through P3.
+ * host. Every tab gets `dock.bottom/panel:<id>` for free and its title comes from the record.
+ *
+ * **Logic is built, and it is why this dock exists.** P8.5 moves the formula workspace and the
+ * Monaco function editor out of their canvas takeovers and into this tab, so the page whose values
+ * they compute stays on screen beside them. Its record is defined beside the surface
+ * (`panels/formula-workspace.ts`) and registered from here, like Problems and Activity. Because a
+ * takeover reveals itself by definition and a dock tab does not, {@link mountBottomDock} watches
+ * for a Logic target appearing and opens the dock on it — once per target, so closing the dock over
+ * an open formula keeps it closed until you open another.
  *
  * **Problems is one of them.** §7.2's table places it here ("Problems | Bottom dock ⑪, badge on the
  * rail") and this dock is its only host. It keeps a rail button and a badge — the rail groups by
@@ -43,15 +49,10 @@ import {
   shell,
 } from "../shell";
 import { bottomPanelRegion, REGION_ATTR } from "../ui/regions";
-import {
-  getPanel,
-  isPanelVisible,
-  listPanels,
-  panelContext,
-  registerPanel,
-} from "./panel-registry";
+import { getPanel, isPanelVisible, listPanels, panelContext } from "./panel-registry";
 import { registerActivityPanel } from "./activity-panel";
 import { registerProblemsPanel } from "./problems-panel";
+import { logicTarget, registerLogicPanel, revealLogicPanel } from "./formula-workspace";
 import { renderEmptyState } from "./empty-state";
 import type { CommandContext } from "../commands/context";
 import type { NavigatorPanelContext, NavigatorPanelDeps, PanelRecord } from "./panel-registry";
@@ -61,55 +62,30 @@ import type { TemplateResult } from "lit-html";
 /** The dock's host — a bare `<div id>` in index.html, like every other shell host. */
 export const BOTTOM_DOCK_SELECTOR = "#bottom-dock";
 
-/** Surfaces the design has declared and the app has not built. Registered, hidden, budgeted. */
-const NOT_YET_BUILT = () => false;
+// No `NOT_YET_BUILT` placeholder here. The Navigator keeps one (`panels/navigator-panels.ts`, for
+// Search) because Search exists nowhere else and a reserved rail slot is an honest promise. This
+// Dock's reservation was for Diff, and Diff shipped somewhere better — see `registerBottomPanels`.
 
 /**
- * The body a declared-but-unbuilt tab would draw.
+ * Register the Bottom dock's three panels. Idempotent — a second call is a no-op.
  *
- * Unreachable while `when` is false — it exists so the record is complete rather than carrying an
- * `undefined` render that would throw the first time someone deleted the predicate without reading
- * this file. The same shape `panels/navigator-panels.ts` uses, for the same reason.
- */
-function nothingYet(): never {
-  throw new Error(
-    "This Bottom dock tab is declared but not built — its `when` predicate should have hidden it.",
-  );
-}
-
-/**
- * Register the Bottom dock's four panels. Idempotent — a second call is a no-op.
+ * Problems first, because it is the tab the dock opens itself for.
  *
- * Problems first, because it is the tab the dock opens itself for. Diff and Logic are declared and
- * hidden, because P8 is the phase that moves the git diff and the formula workspace out of their
- * canvas takeovers — until then the ids are reserved, the budget counts them, and the day they ship
- * the only edit is deleting one predicate.
+ * **Diff is not among them, and its reserved id is gone.** It was held here through P4–P7 with a
+ * `when: () => false`, and the comment that held it said why it should not be here: `git-diff` is
+ * the `diff` EDITOR KIND (`commands/context.ts`), a pane hosts it at pane size, and folding it into
+ * a 240px dock would be a downgrade. What it owed was a pane to open into — and P8 shipped that
+ * (`pane.splitRight`, `canOpenInSecondPane`), so Source Control opens a changed file as a Diff
+ * editor in the side pane. A reservation whose capability shipped elsewhere is not a reservation;
+ * it is an id in `view.setBottomTab`'s enum that can only ever select a hidden tab. The dock spends
+ * three of its four budgeted slots and the fourth is genuinely free.
  */
 export function registerBottomPanels(): void {
   if (listPanels("bottom").length > 0) {
     return;
   }
   registerProblemsPanel();
-  registerPanel({
-    id: "diff",
-    title: "Diff",
-    level: "document",
-    dock: "bottom",
-    icon: "sp-icon-brackets",
-    rail: false,
-    when: NOT_YET_BUILT,
-    render: () => nothingYet(),
-  });
-  registerPanel({
-    id: "logic",
-    title: "Logic",
-    level: "document",
-    dock: "bottom",
-    icon: "sp-icon-event",
-    rail: false,
-    when: NOT_YET_BUILT,
-    render: () => nothingYet(),
-  });
+  registerLogicPanel();
   registerActivityPanel();
 }
 
@@ -153,11 +129,14 @@ export function activeBottomPanel(ctx: CommandContext = panelContext()): PanelRe
 /**
  * The context a Bottom dock panel's `render` is called with.
  *
- * `doc` is `null` and `deps` is empty, and neither is an oversight: every tab this dock hosts is a
- * PROJECT-level surface (a list of problems, a log of operations), and the Navigator's `deps` are
- * that dock's own injections — the file-tree renderer, the drag registrations, the canvas hooks. A
- * Bottom dock tab that needed one would be a document-level surface in a project-level dock, which
- * is the design error the level × placement matrix exists to catch, not a gap to fill here.
+ * `doc` is `null` and `deps` is empty, and neither is an oversight. `deps` are the NAVIGATOR's own
+ * injections — the file-tree renderer, the drag registrations, the canvas hooks — and a Bottom dock
+ * tab that needed one would be reaching across docks for a surface it does not host.
+ *
+ * `doc` is null because this dock has no no-document empty state to drive: Problems and Activity
+ * are project-level lists, and Logic is document-level but addresses a document POSITION rather
+ * than the focused document — it reads `activeTab` itself, and its `when` is what takes it off the
+ * strip when there is nothing open in it.
  */
 function bottomContext(): NavigatorPanelContext {
   return {
@@ -222,6 +201,28 @@ let _scope: EffectScope | null = null;
 let _host: HTMLElement | null = null;
 
 /**
+ * The Logic target the dock has already revealed itself for.
+ *
+ * This effect answers ONE of the two events that put Logic on screen: **a target appeared** — a tab
+ * switch, a restored session, anything that changes what Logic would show without anyone asking to
+ * see it. It fires when the target appears or changes and never again, because collapsing the dock
+ * over an open formula must leave it closed (§16.3) and a dock you cannot shut is worse than the
+ * takeover it replaced.
+ *
+ * The other event is **the user asked for this surface**, and it cannot be derived from this one: a
+ * second click on the same button changes no target at all, so a key comparison sees nothing to do
+ * and the collapsed dock stayed shut under a button that looked broken. That event belongs to the
+ * gesture, and `formula-workspace.ts`'s `openLogicTarget` is where every opener says it.
+ */
+let _revealedLogicKey: string | null = null;
+
+/** A stable identity for the open formula/function, or `null` when the Logic tab has no target. */
+function logicKey(): string | null {
+  const target = logicTarget();
+  return target ? `${target.surface} ${JSON.stringify(target.editing)}` : null;
+}
+
+/**
  * Paint the dock, and stamp the region iff it is on screen.
  *
  * The stamp is conditional on purpose. `REGION_FOR_FOCUS.dock` has pointed at `dock.bottom` since
@@ -237,10 +238,31 @@ export function renderBottomDock(): void {
   if (shell.docks.bottom.collapsed) {
     _host.removeAttribute(REGION_ATTR);
     litRender(nothing, _host);
+    runAfterRender(_host);
     return;
   }
   _host.setAttribute(REGION_ATTR, "dock.bottom");
   litRender(bottomDockTemplate(), _host);
+  runAfterRender(_host.querySelector<HTMLElement>(".bd-body") ?? _host);
+}
+
+/**
+ * Run every tab's `afterRender` against whatever was just painted — showing or not.
+ *
+ * `panels/left-panel.ts` runs the hook for the ACTIVE panel only, and can: no Navigator panel owns
+ * anything that outlives its own markup. Logic does — a live Monaco instance — and the three ways
+ * to stop showing it (select another tab, collapse the dock, close the target) all leave that
+ * instance attached to DOM lit has already thrown away. Handing every tab the painted element turns
+ * "am I still on screen?" into a question each surface can answer for itself, which is what
+ * `syncFunctionEditor` does with it, and keeps the dock from having to know that Logic is special.
+ *
+ * @param {HTMLElement} painted The dock body, or the host itself when the dock is collapsed.
+ */
+function runAfterRender(painted: HTMLElement): void {
+  const ctx = bottomContext();
+  for (const panel of bottomPanelSet()) {
+    panel.afterRender?.(ctx, painted);
+  }
 }
 
 /**
@@ -260,6 +282,16 @@ export function mountBottomDock(): void {
   }
   _scope = effectScope();
   _scope.run(() => {
+    // Reveal BEFORE the render effect, and in an effect of its own: it reads the Logic target and
+    // Writes `shell.bottomTab`, which the render effect reads — one effect doing both would
+    // Re-enter itself on every reveal.
+    effect(() => {
+      const key = logicKey();
+      if (key !== null && key !== _revealedLogicKey) {
+        revealLogicPanel();
+      }
+      _revealedLogicKey = key;
+    });
     effect(() => {
       // Tracked: whether the dock is open, which tab it shows, and the two reactive stores its
       // Tabs render — so a problem raised or an operation started repaints the strip's badge
@@ -280,13 +312,26 @@ export function mountBottomDock(): void {
  */
 registerShellSurface({ mount: mountBottomDock, unmount: unmountBottomDock });
 
-/** Release the effect and clear the host. Tests and a window teardown both need this. */
+/**
+ * Release the effect and clear the host. Tests and a window teardown both need this.
+ *
+ * The `runAfterRender` is not symmetry for its own sake. Blanking the host is the fourth way the
+ * Logic tab stops being on screen, and it is the one nothing else covers: `renderBottomDock`'s
+ * collapsed branch runs the hook, a tab switch runs it, closing the target runs it — this path used
+ * to `litRender(nothing)` and stop, leaving a live Monaco instance (a text model, its change
+ * listeners and an `automaticLayout` ResizeObserver) parked on `view.functionEditor` and attached
+ * to DOM that no longer exists. The canvas-side dispose that used to mop it up went away with the
+ * takeover; handing the emptied host to every tab is what replaces it, and it keeps the dock from
+ * having to know that Logic is the special one.
+ */
 export function unmountBottomDock(): void {
   _scope?.stop();
   _scope = null;
+  _revealedLogicKey = null;
   if (_host) {
     _host.removeAttribute(REGION_ATTR);
     litRender(nothing, _host);
+    runAfterRender(_host);
     _host = null;
   }
 }

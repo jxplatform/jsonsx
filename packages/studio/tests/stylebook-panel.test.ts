@@ -41,7 +41,10 @@ void mock.module("../src/canvas/iframe-host", () => ({
 }));
 
 const { renderStylebookMode, selectStylebookTag } = await import("../src/panels/stylebook-panel");
-const { canvasPanels, initShellRefs } = await import("../src/store");
+const { initShellRefs } = await import("../src/store");
+const { activeCanvasSurface } = await import("../src/canvas/canvas-surface");
+/* Panels belong to a pane's stage now (`src/canvas/canvas-surface.ts`), not to the app. */
+const canvasPanels = activeCanvasSurface().panels;
 const { componentRegistry } = await import("../src/files/components");
 const { view } = await import("../src/view");
 const { closeAllTabs } = await import("../src/workspace/workspace");
@@ -137,7 +140,7 @@ describe("renderStylebookMode", () => {
   test("$media breakpoints → base + one panel per breakpoint, SAME generated doc for all", () => {
     makeTab({ $media: { "--": "320px", md: "(min-width: 768px)" } });
     renderStylebookMode(ctx);
-    expect(canvasPanels.map((p) => p.mediaName)).toEqual(["base", "md"]);
+    expect(canvasPanels.map((panel) => panel.mediaName)).toEqual(["base", "md"]);
     expect(mounts).toHaveLength(2);
     expect(mounts[0]!.generated).toBe(mounts[1]!.generated);
     expect(mounts[1]!.widthPx).toBe(768);

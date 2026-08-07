@@ -191,7 +191,7 @@ export function isMacPlatform(
 }
 
 /**
- * The chord a keyboard event represents, in canonical form.
+ * The chord a keyboard event represents, in canonical form — or `""` for a bare modifier press.
  *
  * `mod` is the platform's primary modifier: ⌘ on mac (where a separate ⌃ can still be held and
  * reads as `ctrl`), Ctrl elsewhere (where Ctrl is `mod` and never also `ctrl`).
@@ -204,6 +204,14 @@ function digitFromCode(code: string | undefined): string | undefined {
 
 export function chordFromEvent(event: KeyChordEvent, mac: boolean): string {
   const key = digitFromCode(event.code) ?? event.key.toLowerCase();
+  /* A modifier ALONE is not a chord, and holding one is how every chord starts. Serializing the
+     keydown for a lone Ctrl produced "mod+control", which `parseChord` refuses by contract ("a
+     chord needs more than modifiers") — so every bare modifier press threw out of `resolveEvent`,
+     into the keydown listener, and onto the console. `""` is the honest answer, and
+     {@link Keymap.resolveEvent} reads it as "no chord yet". */
+  if (MODIFIER_ALIASES[key]) {
+    return "";
+  }
   const parsed: ParsedChord = {
     mod: mac ? event.metaKey : event.ctrlKey,
     ctrl: mac ? event.ctrlKey : false,
@@ -492,7 +500,9 @@ export function createKeymap(options: { mac?: boolean } = {}): Keymap {
         : { chord: normalized, commandId: held.id, scope };
     },
     resolveEvent(event, scopeStack) {
-      return this.resolveChord(chordFromEvent(event, mac), scopeStack);
+      const chord = chordFromEvent(event, mac);
+      // A bare modifier press resolves to nothing rather than throwing on a keyless chord.
+      return chord === "" ? undefined : this.resolveChord(chord, scopeStack);
     },
     entries() {
       const all: KeymapMatch[] = [];

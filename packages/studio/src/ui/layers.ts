@@ -252,7 +252,9 @@ export function showConfirmDialog(
   } = {},
 ) {
   const { confirmLabel = "Confirm", cancelLabel = "Cancel", destructive = false } = opts;
-  return showDialog(
+  // Explicit, because `done(true)` gives the generic nothing to infer from and it landed on
+  // `unknown` — which every caller happened to survive by using the answer in a truthy position.
+  return showDialog<boolean>(
     (done) => html`
       <sp-dialog-wrapper
         open

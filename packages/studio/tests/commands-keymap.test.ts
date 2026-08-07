@@ -101,6 +101,19 @@ describe("chordFromEvent", () => {
     expect(chordFromEvent(keyEvent("ArrowUp", { alt: true }), true)).toBe("alt+arrowup");
     expect(chordFromEvent(keyEvent("Escape"), true)).toBe("escape");
   });
+
+  /*
+   * Holding a modifier is how every chord STARTS, so it cannot be an error. A lone Ctrl serialized
+   * to "mod+control" — a chord `parseChord` refuses by contract — and every bare modifier keydown
+   * therefore threw `keybinding "mod+control" has no key` straight out of `resolveEvent` and onto
+   * the console.
+   */
+  test("a bare modifier press is not a chord", () => {
+    expect(chordFromEvent(keyEvent("Control", { ctrl: true }), false)).toBe("");
+    expect(chordFromEvent(keyEvent("Meta", { meta: true }), true)).toBe("");
+    expect(chordFromEvent(keyEvent("Shift", { shift: true }), false)).toBe("");
+    expect(chordFromEvent(keyEvent("Alt", { alt: true }), true)).toBe("");
+  });
 });
 
 describe("formatChord", () => {
@@ -281,6 +294,14 @@ describe("resolution through the scope stack", () => {
     });
     // On a mac keymap a raw Ctrl+S is a different chord and must not fire Save.
     expect(keymap.resolveEvent(keyEvent("s", { ctrl: true }), ["global"])).toBeUndefined();
+  });
+
+  test("a bare modifier press resolves to nothing rather than throwing", () => {
+    const keymap = build();
+    expect(() =>
+      keymap.resolveEvent(keyEvent("Control", { ctrl: true }), ["canvas", "global"]),
+    ).not.toThrow();
+    expect(keymap.resolveEvent(keyEvent("Control", { ctrl: true }), ["global"])).toBeUndefined();
   });
 });
 

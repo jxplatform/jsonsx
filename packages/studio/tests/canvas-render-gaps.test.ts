@@ -6,12 +6,19 @@
  */
 import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { canvasPanels, initShellRefs } from "../src/store";
+import { initShellRefs } from "../src/store";
+import { activeCanvasSurface } from "../src/canvas/canvas-surface";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
 import { setFormats } from "../src/format/format-host";
 import { initCanvasUtils } from "../src/canvas/canvas-utils";
 import type { Tab } from "../src/tabs/tab";
+
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const surface = activeCanvasSurface();
+const canvasPanels = surface.panels;
 
 // ─── Controllable mock behavior ───────────────────────────────────────────────
 
@@ -42,7 +49,11 @@ void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
       const ed: FakeEditor = {
         _ignoreNextChange: false,
         _model: opts?.model ?? null,
-        dispose: mock(() => {}),
+        // Mirrors Monaco: `dispose()` runs `_detachModel()`, so `getModel()` is null and
+        // `getValue()` is `""` afterwards. See `tests/canvas-render.test.ts` for why that matters.
+        dispose: mock(() => {
+          ed._model = null;
+        }),
         getModel: () => ed._model,
         getValue: () => ed._model?._value ?? "",
         hasTextFocus: () => false,
@@ -110,7 +121,11 @@ void mock.module("../src/panels/editors.js", () => ({
 void mock.module("../src/panels/formula-workspace.js", () => ({
   closeFormulaWorkspace: () => {},
   formulaRoot: () => null,
+  /* The Logic openers go through this: it sets the target AND reveals the tab. */
+  openLogicTarget: () => {},
   renderFormulaWorkspace: () => {},
+  /* The State panel's `formula.openWorkspace` reveals the dock tab instead of repainting. */
+  revealLogicPanel: () => {},
 }));
 
 void mock.module("../src/panels/statusbar.js", () => ({
@@ -138,6 +153,8 @@ void mock.module("../src/files/file-ops.js", () => ({
      partial mock has to cover what that path imports — see the iframe-host note above. */
   confirmFileDelete: () => Promise.resolve(false),
   renamePromptMessage: () => Promise.resolve(""),
+  /* And one the TAB STRIP reads: its close offers to save first (§8.7's three-way dialog). */
+  saveFile: () => Promise.resolve(true),
 }));
 
 // Grid panel: controllable mounted-state + render spy (the real panel needs tabulator).
@@ -239,7 +256,7 @@ beforeEach(() => {
   renderGridMode.mockClear();
   detachGridPanel.mockClear();
   canvasPanels.length = 0;
-  view.prevCanvasMode = null;
+  surface.prevCanvasMode = null;
   view.panzoomWrap = null;
   view.monacoEditor = null;
   view.functionEditor = null;

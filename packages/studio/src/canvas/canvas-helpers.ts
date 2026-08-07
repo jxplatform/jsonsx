@@ -5,8 +5,9 @@
  * multiple canvas-related modules: element lookup, zoom, panel resolution, inline bubbling.
  */
 
-import { canvasPanels, getNodeAtPath, parentElementPath } from "../store";
+import { getNodeAtPath, parentElementPath } from "../store";
 import { activeTab } from "../workspace/workspace";
+import { activeCanvasSurface } from "./canvas-surface";
 import { isInlineInContext } from "../editor/inline-edit";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -22,8 +23,14 @@ export function panelMediaToActiveMedia(mediaName: string | null | undefined) {
   return !mediaName || mediaName === "base" ? null : mediaName;
 }
 
-/** Return the active canvas panel based on the current activeMedia setting. */
+/**
+ * Return the active canvas panel of the FOCUSED pane, based on its activeMedia setting.
+ *
+ * Panels belong to a pane's stage (`canvas-surface.ts`), so "the active panel" is only answerable
+ * relative to one — this is the pane whose artboards the person is looking at.
+ */
 export function getActivePanel() {
+  const { panels: canvasPanels } = activeCanvasSurface();
   if (canvasPanels.length === 0) {
     return null;
   }

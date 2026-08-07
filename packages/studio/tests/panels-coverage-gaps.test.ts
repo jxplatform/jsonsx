@@ -143,12 +143,8 @@ describe("buildStylebookDoc component filtering", () => {
 describe("pane-context interaction gaps", () => {
   function makePaneCtx(overrides: Partial<Parameters<typeof paneContext.mount>[1]> = {}) {
     return {
-      closeFormulaWorkspace: mock(() => {}),
-      closeFunctionEditor: mock(() => {}),
       exportFile: mock(() => {}),
       getCanvasMode: mock(() => "design"),
-      navigateBack: mock(() => {}),
-      navigateToLevel: mock((_level: number) => {}),
       parseMediaEntries: () => ({ baseWidth: 1280, featureQueries: [], sizeBreakpoints: [] }),
       setCanvasMode: mock((_mode: string) => {}),
       ...overrides,
@@ -186,22 +182,6 @@ describe("pane-context interaction gaps", () => {
     expect(tab.session.ui.zoom).toBeCloseTo(2); // Guarded no-ops without a panzoom surface.
   });
 
-  test("document-stack breadcrumbs navigate to their level", async () => {
-    resetStudioState();
-    const tab = resetWorkspaceWithTab(undefined, { documentPath: "components/card.json" });
-    tab.session.documentStack = [{ documentPath: "pages/index.json" }] as never;
-    const ctx = makePaneCtx();
-    const root = document.createElement("div");
-    document.body.append(root);
-    paneContext.mount(root, ctx as never);
-    await flush();
-
-    const crumb = root.querySelector(".breadcrumb-item.clickable") as HTMLElement;
-    expect(crumb.textContent?.trim()).toBe("index.json");
-    crumb.click();
-    expect(ctx.navigateToLevel).toHaveBeenCalledWith(0);
-  });
-
   test("render after unmount is a guarded no-op", () => {
     expect(() => {
       paneContext.render();
@@ -217,14 +197,10 @@ describe("pane-context render failure", () => {
     document.body.append(host);
     expect(() => {
       paneContext.mount(host, {
-        closeFormulaWorkspace: () => {},
-        closeFunctionEditor: () => {},
         exportFile: () => {},
         getCanvasMode: () => {
           throw new Error("mode exploded");
         },
-        navigateBack: () => {},
-        navigateToLevel: () => {},
         parseMediaEntries: () => ({ baseWidth: 1280, featureQueries: [], sizeBreakpoints: [] }),
         setCanvasMode: () => {},
       });

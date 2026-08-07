@@ -51,7 +51,7 @@ Click **Add Event**. Studio creates a binding on the first free event name and p
 
 **Existing function — call something you already declared.** A picker lists the functions declared in the **[State panel](/docs/studio/logic/state)**; pick one and the event runs it. This is the tidiest option when the same behavior is used in more than one place.
 
-**Expression — an inline formula.** The event runs a single formula, edited right in the tab with live value badges — ideal for one-step reactions like `$count += 1` or `$menuOpen = true`. Inside a repeater template it previews against the first item, so the badges show real values. The full-screen icon opens it in the **[formula workspace](/docs/studio/logic/formula-workspace)**.
+**Expression — an inline formula.** The event runs a single formula, edited right in the tab with live value badges — ideal for one-step reactions like `$count += 1` or `$menuOpen = true`. Inside a repeater template it previews against the first item, so the badges show real values. The **open below** icon moves it into the **[formula workspace](/docs/studio/logic/formula-workspace)** in the Bottom dock, where the page keeps rendering behind it.
 
 **Inline code — a handler written on the element itself.** A **Statements** / **Code** toggle picks how you write it: as visual **[statement](/docs/studio/logic/statements)** cards, or as JavaScript in a small text field with an **Open in editor** button for the real **[code editor](/docs/studio/logic/code)**.
 

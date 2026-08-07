@@ -11,8 +11,9 @@ import { classMap } from "lit-html/directives/class-map.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 
-import { canvasPanels, canvasWrap, renderOnly, updateUi } from "../store";
-import { activeTab } from "../workspace/workspace";
+import { canvasWrap, renderOnly } from "../store";
+import { activeCanvasSurface, tabOfMountedPanel } from "./canvas-surface";
+import { SECONDARY_PANE_KINDS, activeTab, paneOfTabCanHostMode } from "../workspace/workspace";
 import { view } from "../view";
 import { findCanvasElement, getActivePanel, panelMediaToActiveMedia } from "./canvas-helpers";
 import { rectOf } from "../utils/geometry";
@@ -91,7 +92,15 @@ export function canvasPanelTemplate(
               <div
                 class="canvas-panel-header"
                 @click=${() => {
-                  updateUi("activeMedia", panelMediaToActiveMedia(mediaName));
+                  // The breakpoint belongs to the tab of the pane that MOUNTED this artboard — the
+                  // Parent-side twin of the iframe's `hit` message, resolved the same way.
+                  // `updateUi` writes to `activeTab`, which is the FOCUSED pane's tab, so clicking
+                  // A header in an unfocused pane set another document's breakpoint and the Style
+                  // Panel then edited a compound block the person never opened.
+                  const tab = tabOfMountedPanel(panel);
+                  if (tab) {
+                    tab.session.ui.activeMedia = panelMediaToActiveMedia(mediaName);
+                  }
                 }}
               >
                 ${label}
@@ -212,7 +221,7 @@ export function applyEditZoom() {
   if (_ctx.getCanvasMode() !== "edit") {
     return;
   }
-  const [panel] = canvasPanels;
+  const [panel] = activeCanvasSurface().panels;
   if (!panel?.canvas || !panel.viewport) {
     return;
   }
@@ -306,10 +315,11 @@ function applyGeometricFit(axis: "width" | "page", maxZoom: number): void {
   const gap = 24;
   const padding = 32;
   let totalPanelWidth = 0;
-  for (const p of canvasPanels) {
+  const { panels } = activeCanvasSurface();
+  for (const p of panels) {
     totalPanelWidth += p._width || 800;
   }
-  totalPanelWidth += gap * Math.max(0, canvasPanels.length - 1) + padding;
+  totalPanelWidth += gap * Math.max(0, panels.length - 1) + padding;
 
   const zoom = _ctx.getZoom();
   const wrapRect = rectOf(view.panzoomWrap);
@@ -790,6 +800,17 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
               `supports — it declares: ${modes.join(", ")}`,
           );
         }
+        // The document supports it; the PANE may not. The side pane is capped to the cheap editor
+        // Kinds, and a refusal that names the pane is the difference between "this is not
+        // Available here" and a setter that reports success and does nothing.
+        if (!paneOfTabCanHostMode(tab, mode)) {
+          throw new RangeError(
+            `command "canvas.setMode" argument "mode": "${mode}" is a Canvas mode and this ` +
+              `document is in the side pane, which hosts ` +
+              `${[...SECONDARY_PANE_KINDS].join(", ")}. Unsplit, or move it back to the primary ` +
+              `pane first`,
+          );
+        }
         if (mode === "preview") {
           const base = tab.session.ui.canvasMode;
           if (!PREVIEWABLE_BASE_MODES.has(base)) {
@@ -894,7 +915,7 @@ export function registerCanvasViewCommands(
 /** Toggle "active" class on canvas panel headers based on activeMedia. */
 export function updateActivePanelHeaders() {
   const activeMedia = activeTab.value?.session.ui.activeMedia ?? null;
-  for (const p of canvasPanels) {
+  for (const p of activeCanvasSurface().panels) {
     const header = p.element?.querySelector(".canvas-panel-header");
     if (header) {
       const isActive =

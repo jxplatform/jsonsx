@@ -11,6 +11,7 @@ import { postMessageChannel } from "./iframe-channel";
 import { canvasBaseOrigin } from "./canvas-origin";
 import { getPreviewNavigateHandler } from "./preview-navigate";
 import { resolveCanvasDocument } from "./canvas-live-render";
+import { canvasPerf, SPAN_PREPARE_RENDER, timeSpanAsync } from "./canvas-perf";
 import {
   applyBlockMerge,
   applyInlineCommit,
@@ -28,16 +29,9 @@ import { applyDropInstruction } from "../panels/dnd";
 import { rectOf } from "../utils/geometry";
 import { notify } from "../services/notify";
 import { effect, effectScope } from "../reactivity";
-import {
-  canvasPanels,
-  canvasWrap,
-  pathsEqual,
-  projectState,
-  renderOnly,
-  updateCanvas,
-  updateUi,
-} from "../store";
+import { canvasWrap, pathsEqual, projectState, renderOnly } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
+import { panelHostingCanvas } from "./canvas-surface";
 import { cloneSelection, primarySelection, toggleSelected } from "../tabs/selection";
 import type { JxPath } from "../state";
 import { setLayoutSelection, shell } from "../shell";
@@ -1087,10 +1081,15 @@ export function setToolbarRefresh(fn: () => void): void {
 let selectionWatch: { stop: () => void } | null = null;
 
 /** Full-render escalation, injected by studio init (a patchError can't apply surgically). */
-let patchEscalation: (() => void) | null = null;
+let patchEscalation: ((paneId: string) => void) | null = null;
 
-/** Register the full-render fallback the host invokes when the iframe reports a `patchError`. */
-export function setIframePatchEscalation(fn: () => void): void {
+/**
+ * Register the full-render fallback the host invokes when the iframe reports a `patchError`.
+ *
+ * Takes the PANE whose frame reported it: only that stage's DOM has fallen behind its document, and
+ * re-rendering the other pane would reload iframes that applied their patch perfectly well.
+ */
+export function setIframePatchEscalation(fn: (paneId: string) => void): void {
   patchEscalation = fn;
 }
 
@@ -1378,7 +1377,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
   }
   const overlay = createOverlayLayer(document);
   canvasEl.replaceChildren(iframe, overlay.root);
-  registerCanvasGutterDrop(canvasEl, () => hosts.get(canvasEl) ?? null);
+  registerCanvasGutterDrop(canvasEl, () => hostForCanvas(canvasEl));
   const channel = postMessageChannel<ParentToIframe, IframeToParent>({
     acceptOrigin: iframeOrigin,
     source: window,
@@ -1567,13 +1566,16 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // Header highlighting, and the style panel's breakpoint context all follow the click — and the
       // Block action bar anchors to the panel the selection was actually made in, not panel 0.
       let panelMedia: string | null = null;
-      for (const p of canvasPanels) {
-        if (hosts.get(p.canvas as HTMLElement) === state) {
-          if (!p.mediaName?.startsWith("git-diff")) {
-            panelMedia = panelMediaToActiveMedia(p.mediaName);
-            updateUi("activeMedia", panelMedia);
-          }
-          break;
+      const clicked = panelHostingCanvas(state.canvasEl)?.panel;
+      if (clicked && !clicked.mediaName?.startsWith("git-diff")) {
+        panelMedia = panelMediaToActiveMedia(clicked.mediaName);
+        // The breakpoint belongs to the tab THIS host renders, resolved the same way every other
+        // Doc-touching message in this switch resolves it. `updateUi` writes to `activeTab`, which
+        // Is the focused pane's tab — so a click in an unfocused pane set the wrong document's
+        // Breakpoint, and the Style panel then edited a compound block the person never opened.
+        const hitTab = hostTab(state);
+        if (hitTab) {
+          hitTab.session.ui.activeMedia = panelMedia;
         }
       }
       // A canvas left-click closes an open context menu — its parent-realm outside-click listener
@@ -1600,7 +1602,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // What every canvas click has always been.
       state.selectionPath = msg.hit.path;
       state.selectionPaths = [msg.hit.path];
-      const tab = activeTab.value;
+      const tab = hostTab(state);
       if (tab) {
         tab.session.selection = msg.additive
           ? toggleSelected(tab.session.selection, msg.hit.path)
@@ -1627,7 +1629,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // Mutually exclusive with a document selection: the inspector renders one panel or the other.
       state.selectionPath = null;
       state.selectionPaths = [];
-      const tab = activeTab.value;
+      const tab = hostTab(state);
       if (tab) {
         tab.session.selection = [];
       }
@@ -1799,7 +1801,13 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       if (msg.gen !== state.lastRenderedGen) {
         return;
       }
-      updateCanvas({ scope: msg.scope });
+      // Onto the tab this host rendered, not the focused one: the snapshot describes THAT
+      // Document's `$defs`, and `updateCanvas` would have filed a background pane's data under the
+      // Foreground pane's tab — the Data panel then explains a document that is not on screen.
+      const scoped = hostTab(state);
+      if (scoped) {
+        scoped.session.canvas.scope = msg.scope;
+      }
       renderOnly("leftPanel");
       return;
     }
@@ -1905,7 +1913,10 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // The patch is no longer outstanding either way; a counter that only went up would wedge
       // Every later idle() behind a message the host already handled.
       state.pendingPatches = Math.max(0, state.pendingPatches - 1);
-      patchEscalation?.();
+      const failed = panelHostingCanvas(state.canvasEl)?.surface;
+      if (failed) {
+        patchEscalation?.(failed.paneId);
+      }
       return;
     }
     case "forwardKey": {
@@ -2187,8 +2198,102 @@ function drawHover(state: HostState, hit: NodeHit | null): void {
 }
 
 /**
- * Render `doc` into the iframe canvas mounted in `canvasEl`: resolve the document parent-side and
- * post it (queued until the iframe is `ready`).
+ * The part of a `render` message that is a fact about the DOCUMENT rather than about a host: the
+ * resolved and wire-serialized document, its base, the path-mapper context, the mode and the site
+ * style. Everything a host contributes — its width, its preview flag, its tab-id bookkeeping —
+ * stays outside.
+ */
+type PreparedRender = Omit<
+  Extract<ParentToIframe, { kind: "render" }>,
+  "colorScheme" | "gen" | "kind"
+>;
+
+/**
+ * The prepared payload for the render pass currently in flight, keyed by the source document.
+ *
+ * A design-mode canvas draws one artboard per breakpoint, and every one of them renders the SAME
+ * document at a different viewport width. Resolving it per artboard meant N layout merges, N
+ * edit-mode transforms, 2N whole-document JSON round trips — and, on a dynamic-route page, N
+ * backend round trips, because `resolveParamBoundState` POSTs each param-bound state entry to
+ * `/__jx_resolve__` and that ran once per host. The pass resolves once and every host is fed from
+ * the result.
+ *
+ * Keyed by `gen` (a render pass is exactly one generation, so the map is dropped whole when the
+ * next pass starts, and nothing accumulates) and within it by document IDENTITY — git-diff mounts
+ * two different documents under one generation and each gets its own entry. `tabId` rides along
+ * because `editableTags` is derived from it; a mismatch re-prepares rather than reusing.
+ */
+let preparedPass: {
+  gen: number;
+  byDoc: Map<JxMutableNode, { tabId: string | null; payload: Promise<PreparedRender> }>;
+} | null = null;
+
+/**
+ * Resolve + serialize `doc` for the wire, once per render pass.
+ *
+ * Returns the SAME promise to every host in the pass, so the second artboard awaits the first one's
+ * work instead of repeating it. The payload objects it yields are shared by reference across the
+ * messages posted to each host: `postMessage` structured-clones on the way into each frame, so
+ * every iframe still folds patches into a shadow doc that is its own. Nothing may mutate a
+ * `PreparedRender` after it is built.
+ */
+function preparePassRender(
+  gen: number,
+  doc: JxMutableNode,
+  tabId: string | null,
+): Promise<PreparedRender> {
+  if (preparedPass?.gen !== gen) {
+    preparedPass = { byDoc: new Map(), gen };
+  }
+  const cached = preparedPass.byDoc.get(doc);
+  if (cached && cached.tabId === tabId) {
+    return cached.payload;
+  }
+  // One-shot per PASS, not per host. `allowAutoRequestsOnNextRender` arms "the next render", and
+  // Consuming it inside the per-host mount meant whichever artboard mounted first swallowed it and
+  // The rest re-rendered with automatic `Request` entries still suppressed — the Data activity's
+  // Refresh visibly refreshed one artboard out of N.
+  const allowAutoRequests = consumeAllowAutoRequests();
+  const payload = timeSpanAsync(SPAN_PREPARE_RENDER, async (): Promise<PreparedRender> => {
+    canvasPerf.renderPreparations += 1;
+    const resolved = await resolveCanvasDocument(doc);
+    // The doc must be structured-cloneable to cross postMessage. A Jx document is JSON by contract,
+    // So a JSON round-trip (NOT structuredClone, which would throw) drops residual functions /
+    // Reactive proxy artifacts that would otherwise raise DataCloneError and silently drop the
+    // Entire message.
+    // oxlint-disable-next-line unicorn/prefer-structured-clone
+    const cloneableDoc = JSON.parse(JSON.stringify(resolved.renderDoc)) as unknown;
+    // The RAW page doc (forward-op + data-jx-path coordinate space) crosses as the shadow doc.
+    // oxlint-disable-next-line unicorn/prefer-structured-clone
+    const cloneableShadow = JSON.parse(JSON.stringify(doc)) as unknown;
+    // Which tags can hold a caret depends on the document's vocabulary, so the format's verdicts
+    // Ride with the render rather than being baked into the frame. Absent for a native document,
+    // Where the studio's own element metadata answers on its own.
+    // Resolve from THIS render's tab, not any host's `tabId` — that is only adopted when a render is
+    // Acknowledged, so at post time it still names the previous render's document (null on first
+    // Mount, which is exactly the render that matters).
+    const renderTab = tabId ? (workspace.tabs.get(tabId) ?? null) : null;
+    const formatElements = formatByName(renderTab?.doc.sourceFormat)?.studio?.elements;
+    const editableTags = formatElements ? formatEditableVerdicts(formatElements) : undefined;
+    return {
+      doc: cloneableDoc,
+      docBase: resolved.docBase ?? `${canvasBaseOrigin()}/`,
+      mapperCtx: resolved.mapperCtx,
+      mode: resolved.mapperCtx.canvasMode as CanvasMode,
+      shadowDoc: cloneableShadow,
+      siteStyle: resolved.siteStyle,
+      ...(editableTags ? { editableTags } : {}),
+      ...(allowAutoRequests ? { allowAutoRequests: true } : {}),
+    };
+  });
+  preparedPass.byDoc.set(doc, { payload, tabId });
+  return payload;
+}
+
+/**
+ * Render `doc` into the iframe canvas mounted in `canvasEl`: resolve the document once for the
+ * whole render pass ({@link preparePassRender}) and post it to this host (queued until the iframe
+ * is `ready`).
  *
  * `widthPx` makes the panel's breakpoint width an EXPLICIT lever on the iframe element itself (only
  * `style.width` is touched — the rest of cssText, incl. `min-height:480px; height:100%`, is kept).
@@ -2219,36 +2324,14 @@ export async function mountIframeCanvas(
   // Own `latestGen`), so the parent must NOT gate on `view.renderGeneration`: during boot many
   // Renders fire and the generation is usually stale by the time resolution finishes, which would
   // Otherwise drop every post.
-  const resolved = await resolveCanvasDocument(doc);
-  // The doc must be structured-cloneable to cross postMessage. A Jx document is JSON by contract, so
-  // A JSON round-trip (NOT structuredClone, which would throw) drops residual functions / reactive
-  // Proxy artifacts that would otherwise raise DataCloneError and silently drop the entire message.
-  // oxlint-disable-next-line unicorn/prefer-structured-clone
-  const cloneableDoc = JSON.parse(JSON.stringify(resolved.renderDoc)) as unknown;
-  // The RAW page doc (forward-op + data-jx-path coordinate space) crosses as the iframe's shadow doc.
-  // oxlint-disable-next-line unicorn/prefer-structured-clone
-  const cloneableShadow = JSON.parse(JSON.stringify(doc)) as unknown;
-  // Which tags can hold a caret depends on the document's vocabulary, so the format's verdicts ride
-  // With the render rather than being baked into the frame. Absent for a native document, where the
-  // Studio's own element metadata answers on its own.
-  // Resolve from THIS render's tab, not `state.tabId` — that is only adopted when the render is
-  // Acknowledged, so at post time it still names the previous render's document (null on first
-  // Mount, which is exactly the render that matters).
-  const renderTab = tabId ? (workspace.tabs.get(tabId) ?? null) : null;
-  const formatElements = formatByName(renderTab?.doc.sourceFormat)?.studio?.elements;
-  const editableTags = formatElements ? formatEditableVerdicts(formatElements) : undefined;
+  const prepared = await preparePassRender(gen, doc, tabId);
   const message: ParentToIframe = {
+    ...prepared,
+    // Per-host, and cheap: read at POST time so a scheme flip that raced the shared resolution is
+    // Not baked into the payload every host shares.
     colorScheme: activeSchemeWire(),
-    doc: cloneableDoc,
-    docBase: resolved.docBase ?? `${canvasBaseOrigin()}/`,
     gen,
     kind: "render",
-    mapperCtx: resolved.mapperCtx,
-    mode: resolved.mapperCtx.canvasMode as CanvasMode,
-    shadowDoc: cloneableShadow,
-    siteStyle: resolved.siteStyle,
-    ...(editableTags ? { editableTags } : {}),
-    ...(consumeAllowAutoRequests() ? { allowAutoRequests: true } : {}),
   };
   // Preview is the fidelity view: no editing messages are honoured from it, no overlay is painted
   // Over it, and the frame stays viewport-sized so it scrolls for real. A mode switch to preview
@@ -2256,6 +2339,16 @@ export async function mountIframeCanvas(
   // Box move together (setHostPreview) — this assignment sits AFTER an await, so any contentHeight
   // That landed while the document resolved was answered under the previous mode's rule.
   setHostPreview(state, message.mode === "preview");
+  deliverRender(state, message);
+}
+
+/**
+ * Hand a host its render — straight down the channel when the iframe is up, queued as `pending`
+ * until it says `ready`. Counted either way: the message is this pass's work for this host whether
+ * or not the frame has finished loading.
+ */
+function deliverRender(state: HostState, message: ParentToIframe): void {
+  canvasPerf.hostRenderPosts += 1;
   if (state.ready) {
     state.channel.post(message);
   } else {
@@ -2311,11 +2404,7 @@ export function mountStylebookCanvas(
     // SiteStyle too would double-apply it.
     siteStyle: null,
   };
-  if (state.ready) {
-    state.channel.post(message);
-  } else {
-    state.pending = message;
-  }
+  deliverRender(state, message);
 }
 
 /** The active tab's forced preview scheme as wire data (auto → null). */
@@ -2400,8 +2489,7 @@ export function postStyleUpdateToStylebookHosts(style: Record<string, unknown>):
  * converted parent-viewport rect (see the `geometry` handler's panReqId branch).
  */
 export function panToStylebookTag(tag: string): void {
-  const panel = getActivePanel();
-  const host = panel ? (hosts.get(panel.canvas as HTMLElement) ?? null) : null;
+  const host = hostForActivePanel();
   if (!host?.stylebook || !host.ready) {
     return;
   }
@@ -2415,11 +2503,6 @@ export function panToStylebookTag(tag: string): void {
 }
 
 // ─── Format-toolbar bridge (Phase 4b-2) ─────────────────────────────────────────
-
-/** The host whose iframe currently owns the inline-edit session (or null). */
-export function getActiveEditHost(): HostState | null {
-  return activeEditHost;
-}
 
 /** The current edit session's editing flag + latest selection snapshot, for the parent toolbar. */
 export function getEditSnapshot(): {
@@ -2463,7 +2546,7 @@ export function commitActiveEditSession(): void {
 /** The live host backing the active panel's canvas (for non-edit selection-bar positioning). */
 function hostForActivePanel(): HostState | null {
   const panel = getActivePanel();
-  return panel ? (hosts.get(panel.canvas as HTMLElement) ?? null) : null;
+  return panel ? hostForCanvas(panel.canvas as HTMLElement) : null;
 }
 
 /**

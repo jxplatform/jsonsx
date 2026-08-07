@@ -2,13 +2,7 @@
 import { effectScope, reactive } from "../reactivity";
 import { formatByName, formatForPath } from "../format/format-host";
 import { normalizeArrayChildren } from "../state";
-import type {
-  DocumentStackEntry,
-  FormulaEditDef,
-  FunctionEditDef,
-  InlineEditDef,
-  JsonValue,
-} from "../types";
+import type { FormulaEditDef, FunctionEditDef, InlineEditDef, JsonValue } from "../types";
 import { editorKindForMode } from "../commands/context";
 import type { EditorKind } from "../commands/context";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -46,7 +40,7 @@ export interface TabUi {
   activeMedia: string | null;
   activeSelector: string | null;
   editingFunction: FunctionEditDef | null;
-  /** Full-screen formula workspace target ($expression editing); editingFunction wins if both set. */
+  /** Logic-tab formula target ($expression editing); editingFunction wins if both are set. */
   editingFormula: FormulaEditDef | null;
   featureToggles: Record<string, boolean>;
   /**
@@ -112,29 +106,6 @@ export interface TabOrigin {
   documentPath: string | null;
 }
 
-/**
- * A per-tab UI context snapshot, taken when a genuine SUB-DOCUMENT is pushed.
- *
- * The whole {@link TabUi} is captured, not just the document coordinates: popping back has to
- * restore WHERE YOU WERE — the breakpoint you were previewing (`activeMedia`), the pseudo-selector
- * you were styling (`activeSelector`), the inspector tab you had open (`rightTab`) and your `zoom`
- * — not merely which document you were looking at.
- */
-export type TabUiSnapshot = TabUi;
-
-/** One frame of the sub-document stack: the parent's document coordinates AND its UI context. */
-export interface SubDocumentFrame extends DocumentStackEntry {
-  ui: TabUiSnapshot;
-}
-
-/** The sub-document being entered. `$map` templates and function editors are the real cases. */
-export interface SubDocument {
-  document: JxMutableNode;
-  documentPath: string | null;
-  mode?: string | null;
-  sourceFormat?: string | null;
-}
-
 export interface Tab {
   id: string;
   documentPath: string | null;
@@ -174,11 +145,6 @@ export interface Tab {
     selection: (string | number)[][];
     hover: (string | number)[] | null;
     clipboard: JxMutableNode | null;
-    /**
-     * Genuine sub-documents only — `$map` templates and function editors. Drilling into a component
-     * is NOT one of them: it opens its own tab.
-     */
-    documentStack: SubDocumentFrame[];
     /** The document this tab was drilled in from, if any. Rendered by the tab strip. */
     openedFrom: TabOrigin | null;
     ui: TabUi;
@@ -312,7 +278,6 @@ export function createTab({
         status: "idle",
       },
       clipboard: null,
-      documentStack: [],
       hover: null,
       openedFrom,
       selection: [],
@@ -419,124 +384,19 @@ export function modeForEditorKind(tab: Tab, kind: EditorKind): string | undefine
   );
 }
 
-// ─── Sub-documents ────────────────────────────────────────────────────────────
-// A sub-document is a document that has no file of its own — a `$map` template, a function body —
-// So it cannot become a tab. Everything that DOES have a file (a component, a layout) opens a real
-// Tab instead; see `workspace/workspace.ts`. That split is the whole point: the stack used to be
-// How drill-in worked, which is why it rewrote `tab.documentPath` and left `tab.id` behind.
-
-/**
- * Copy a UI context out of a (reactive) tab.
- *
- * The nested records are copied too. A shallow spread would hand the frame the LIVE `previewParams`
- * / `featureToggles` objects, so editing a breakpoint toggle inside the sub-document would silently
- * rewrite the parent's snapshot — the restore would then be a no-op and the bug would read as
- * "popping back forgot my breakpoint".
- *
- * @param {TabUi} ui
- * @returns {TabUiSnapshot}
- */
-export function captureTabUi(ui: TabUi): TabUiSnapshot {
-  return {
-    ...ui,
-    featureToggles: { ...ui.featureToggles },
-    inspectorSections: { ...ui.inspectorSections },
-    previewParams: { ...ui.previewParams },
-    previewProps: ui.previewProps ? { ...ui.previewProps } : null,
-    styleSections: { ...ui.styleSections },
-    styleShorthands: { ...ui.styleShorthands },
-  };
-}
-
-/**
- * Write a UI snapshot back onto a tab.
- *
- * Assigns INTO the existing reactive object rather than replacing it, so every effect already
- * tracking `session.ui` sees the change.
- *
- * @param {Tab} tab
- * @param {TabUiSnapshot} snapshot
- */
-export function restoreTabUi(tab: Tab, snapshot: TabUiSnapshot) {
-  Object.assign(tab.session.ui, captureTabUi(snapshot));
-}
-
-/**
- * Enter a sub-document: push the current document AND UI context, then load `next`.
- *
- * @param {Tab} tab
- * @param {SubDocument} next
- * @returns {SubDocumentFrame} The frame that was pushed
- */
-export function pushSubDocument(tab: Tab, next: SubDocument): SubDocumentFrame {
-  const frame: SubDocumentFrame = {
-    dirty: tab.doc.dirty,
-    document: tab.doc.document,
-    documentPath: tab.documentPath,
-    mode: tab.doc.mode,
-    selection: tab.session.selection.map((path) => [...path]),
-    sourceFormat: tab.doc.sourceFormat,
-    ui: captureTabUi(tab.session.ui),
-  };
-  tab.session.documentStack.push(frame);
-  tab.doc.document = next.document;
-  tab.doc.dirty = false;
-  tab.doc.mode = (next.mode ?? null) as unknown as string;
-  tab.doc.sourceFormat = next.sourceFormat ?? null;
-  tab.documentPath = next.documentPath;
-  tab.session.selection = [];
-  return frame;
-}
-
-/**
- * Put a frame's document coordinates and UI context back on the tab.
- *
- * @param {Tab} tab
- * @param {SubDocumentFrame} frame
- */
-function restoreFrame(tab: Tab, frame: SubDocumentFrame) {
-  tab.doc.document = frame.document;
-  tab.doc.dirty = Boolean(frame.dirty);
-  tab.doc.mode = frame.mode as string;
-  tab.doc.sourceFormat = frame.sourceFormat ?? null;
-  tab.documentPath = frame.documentPath;
-  tab.session.selection = frame.selection.map((path) => [...path]);
-  restoreTabUi(tab, frame.ui);
-}
-
-/**
- * Leave the innermost sub-document, restoring the frame beneath it.
- *
- * @param {Tab} tab
- * @returns {SubDocumentFrame | undefined} The restored frame, or undefined when the stack is empty
- */
-export function popSubDocument(tab: Tab): SubDocumentFrame | undefined {
-  const frame = tab.session.documentStack.pop();
-  if (!frame) {
-    return undefined;
-  }
-  restoreFrame(tab, frame);
-  return frame;
-}
-
-/**
- * Jump straight to a breadcrumb level, discarding every frame above it.
- *
- * @param {Tab} tab
- * @param {number} index
- * @returns {SubDocumentFrame | undefined} The restored frame, or undefined when `index` is out of
- *   range
- */
-export function popToSubDocument(tab: Tab, index: number): SubDocumentFrame | undefined {
-  const stack = tab.session.documentStack;
-  if (index < 0 || index >= stack.length) {
-    return undefined;
-  }
-  const frame = stack[index]!;
-  tab.session.documentStack = stack.slice(0, index);
-  restoreFrame(tab, frame);
-  return frame;
-}
+// ─── There is no sub-document stack ───────────────────────────────────────────
+// A tab held one, and it was scaffolding for a navigation model the tab model replaced. `studio.md`
+// §14.3 justified it for exactly two cases and both moved: a function body opens in the Bottom
+// Dock's Logic tab (P8), and a `$map` template is a subtree of its parent document, selected in
+// Place on the canvas rather than loaded as a document of its own. Everything with a file of its
+// Own — a component, a layout — opens a REAL TAB with an `openedFrom` relationship (§14.1–2):
+// {@link TabOrigin}, above, which nothing pops and nothing restores from.
+//
+// So `pushSubDocument` had no caller in `src/`, the stack was permanently `[]`, and every reader
+// Below it — `popSubDocument`, `popToSubDocument`, the UI capture/restore pair, the pane-context
+// Breadcrumb, the jump bar's `subdocument` segment, `document.setStackLevel`, collab's `drilled`
+// Guard — was live code that could only ever take its empty branch. They are gone together: a
+// Stack with no way in is not an unfinished feature, it is a shape the design moved past.
 
 /**
  * Dispose a tab — stops its effectScope, killing all effects created within it.

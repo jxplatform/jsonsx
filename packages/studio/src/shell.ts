@@ -181,7 +181,7 @@ export function isInspectorTabId(value: unknown): value is InspectorTabId {
  * templates. `panels/bottom-dock.ts` builds its strip from this list and
  * `tests/bottom-dock.test.ts` asserts the two agree, exactly as the rail's do.
  */
-export const BOTTOM_TAB_IDS = ["problems", "diff", "logic", "activity"] as const;
+export const BOTTOM_TAB_IDS = ["problems", "logic", "activity"] as const;
 
 export type BottomTabId = (typeof BOTTOM_TAB_IDS)[number];
 

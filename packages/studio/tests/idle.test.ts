@@ -17,6 +17,7 @@ import {
 } from "../src/services/idle";
 import { registerRenderer, render } from "../src/store";
 import { createPanelScheduler } from "../src/panels/panel-scheduler";
+import { beginActivity, resetActivities } from "../src/panels/activity-panel";
 import { registerPlatform } from "../src/platform";
 import type { IdleSource } from "../src/services/idle";
 import type { StudioPlatform } from "../src/types";
@@ -135,15 +136,29 @@ describe("probeIdle", () => {
 });
 
 describe("defaultIdleSources", () => {
-  test("names the five subsystems and is quiet in a bare page", () => {
+  test("names the six subsystems and is quiet in a bare page", () => {
     expect(defaultIdleSources().map((s) => s.name)).toEqual([
       "render",
       "panels",
       "canvas",
       "platform",
       "overlay",
+      "activity",
     ]);
     expect(idleBlockers()).toEqual([]);
+  });
+
+  test("a running activity blocks idle, and a finished one does not", () => {
+    // An activity spans many PAL calls, so the `platform` source goes quiet in the gaps between
+    // Them while the operation is plainly still running — which is exactly when a screenshot
+    // Photographs a half-done install.
+    resetActivities();
+    const handle = beginActivity({ title: "Installing dependencies" });
+    expect(idleBlockers()).toContain("activity: Installing dependencies — running");
+
+    handle.done();
+    expect(idleBlockers()).toEqual([]);
+    resetActivities();
   });
 
   test("a renderer that never settles keeps the render source blocked", async () => {

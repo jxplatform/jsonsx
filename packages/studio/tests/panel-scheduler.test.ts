@@ -4,7 +4,6 @@ import {
   createPanelScheduler,
   isTextInput,
   pendingSchedulers,
-  schedulersQuiet,
 } from "../src/panels/panel-scheduler";
 
 describe("isTextInput", () => {
@@ -132,7 +131,7 @@ describe("pendingSchedulers", () => {
     const scheduler = createPanelScheduler({ render: () => {}, root });
     scheduler.bindFocus();
 
-    expect(schedulersQuiet()).toBe(true);
+    expect(pendingSchedulers()).toEqual([]);
 
     scheduler.schedule();
     expect(pendingSchedulers()).toEqual(["#frontmatter-panel has a frame queued"]);
@@ -140,7 +139,7 @@ describe("pendingSchedulers", () => {
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
     });
-    expect(schedulersQuiet()).toBe(true);
+    expect(pendingSchedulers()).toEqual([]);
 
     input.dispatchEvent(new Event("focusin", { bubbles: true }));
     scheduler.flushNow();
@@ -167,6 +166,6 @@ describe("pendingSchedulers", () => {
     ]);
     a.unbind();
     b.unbind();
-    expect(schedulersQuiet()).toBe(true);
+    expect(pendingSchedulers()).toEqual([]);
   });
 });

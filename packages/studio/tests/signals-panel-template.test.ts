@@ -16,42 +16,41 @@ import { render } from "lit-html";
 import { activeTab } from "../src/workspace/workspace";
 import { setExtensions } from "../src/format/format-host";
 import { renderSignalsTemplate } from "../src/panels/signals-panel";
+import { shell } from "../src/shell";
 import { pluginSchemaCache } from "../src/services/code-services";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
+/**
+ * The ctx is one field wide now, and that is the assertion.
+ *
+ * It used to carry `renderCanvas` (dead since the takeovers went — nothing in the panel called it)
+ * and `updateSession` (dead since the Logic buttons started going through `openLogicTarget`, which
+ * addresses the focused tab itself). The tests that watched those spies now read the tab and the
+ * shell, which is where the effect actually lands.
+ */
 interface Mounted {
   container: HTMLElement;
-  calls: { canvas: number; left: number; session: Record<string, unknown>[] };
-  ctx: {
-    renderLeftPanel: () => void;
-    renderCanvas: () => void;
-    updateSession: (p: Record<string, unknown>) => void;
-  };
+  calls: { left: number };
+  ctx: { renderLeftPanel: () => void };
   S: Record<string, unknown>;
 }
 
 /** Mount the signals template against the active tab with a re-rendering ctx. */
 function mountSignals(extra: Record<string, unknown> = {}): Mounted {
   const container = document.createElement("div");
-  const calls = { canvas: 0, left: 0, session: [] as Record<string, unknown>[] };
+  const calls = { left: 0 };
   const tab = activeTab.value;
   if (!tab) {
     throw new Error("no active tab");
   }
   const S: Record<string, unknown> = { document: tab.doc.document, ...extra };
   const ctx = {
-    renderCanvas: () => {
-      calls.canvas += 1;
-    },
     renderLeftPanel: () => {
       calls.left += 1;
       S.document = activeTab.value?.doc.document;
       render(renderSignalsTemplate(S as never, ctx), container);
-    },
-    updateSession: (patch: Record<string, unknown>) => {
-      calls.session.push(patch);
     },
   };
   ctx.renderLeftPanel();
@@ -637,14 +636,19 @@ describe("function editor", () => {
     inputValue(body, "console.log(1)");
     expect((docState().save! as { body: string }).body).toBe("console.log(1)");
 
+    shell.docks.bottom.collapsed = true;
     pointer(
       editor.querySelector('sp-action-button[title="Open in code editor"]') as Element,
       "click",
     );
-    expect(h.calls.session).toEqual([
-      { ui: { editingFunction: { defName: "save", type: "def" } } },
-    ]);
-    expect(h.calls.canvas).toBe(1);
+    expect(activeTab.value!.session.ui.editingFunction).toEqual({
+      defName: "save",
+      type: "def",
+    });
+    // The click is a GESTURE: it puts the surface on screen itself rather than leaning on the
+    // Dock's once-per-target effect, which is what made a second click on a closed dock a no-op.
+    expect(shell.bottomTab).toBe("logic");
+    expect(shell.docks.bottom.collapsed).toBe(false);
   });
 
   test("external function shows Source/Export fields instead of a body", async () => {
@@ -1032,16 +1036,28 @@ describe("expression editor", () => {
     expect(editor.querySelector('[data-prop="target"]')).not.toBeNull();
   });
 
-  test("formula-workspace button updates the session and re-renders the canvas", async () => {
+  test("formula-workspace button sets the Logic target and repaints nothing", async () => {
     const h = setup({
       $inc: { $expression: { operator: "=", target: { $ref: "#/state/$count" } } },
     });
     const editor = await expand(h, "$inc");
-    pointer(
-      editor.querySelector('sp-action-button[title="Open in formula workspace"]') as Element,
-      "click",
-    );
-    expect(h.calls.session).toEqual([{ ui: { editingFormula: { defName: "$inc", type: "def" } } }]);
-    expect(h.calls.canvas).toBe(1);
+    const button = editor.querySelector(
+      'sp-action-button[title="Open in formula workspace"]',
+    ) as Element;
+    // "Open below", not "go full-screen": the affordance opens the Bottom dock's Logic tab, and
+    // `panels/toolbar.ts`'s dock toggle already spells that glyph `sp-icon-align-bottom`.
+    expect(button.querySelector("sp-icon-align-bottom")).not.toBeNull();
+    // A function body is open in the same tab: one Logic tab holds ONE target, so opening the
+    // Formula has to take it — this used to leave both set, and `logicTarget` gives the function
+    // The tie, so the click showed nothing and changed nothing.
+    activeTab.value!.session.ui.editingFunction = { defName: "other", type: "def" } as never;
+    shell.docks.bottom.collapsed = true;
+
+    pointer(button, "click");
+
+    expect(activeTab.value!.session.ui.editingFormula).toEqual({ defName: "$inc", type: "def" });
+    expect(activeTab.value!.session.ui.editingFunction).toBeNull();
+    expect(shell.bottomTab).toBe("logic");
+    expect(shell.docks.bottom.collapsed).toBe(false);
   });
 });

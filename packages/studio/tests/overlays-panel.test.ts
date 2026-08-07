@@ -7,9 +7,14 @@
 import { flush, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { mount, render, unmount } from "../src/panels/overlays";
-import { canvasPanels } from "../src/store";
+import { activeCanvasSurface } from "../src/canvas/canvas-surface";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import type { CanvasPanel } from "../src/types";
+
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const canvasPanels = activeCanvasSurface().panels;
 
 let canvasMode = "design";
 let isEditingFlag = false;

@@ -122,10 +122,10 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
 }));
 
 interface PaneContextCtx {
-  closeFormulaWorkspace: () => void;
-  closeFunctionEditor: () => Promise<void> | void;
-  navigateBack: () => Promise<void> | void;
-  navigateToLevel: (i: number) => Promise<void> | void;
+  exportFile: () => Promise<void> | void;
+  getCanvasMode: () => string;
+  parseMediaEntries: (media: Record<string, string> | null | undefined) => unknown;
+  setCanvasMode: (mode: string) => void;
 }
 let paneCtx: PaneContextCtx | null = null;
 void mock.module("../src/panels/pane-context.ts", () => ({
@@ -137,6 +137,7 @@ void mock.module("../src/panels/pane-context.ts", () => ({
 }));
 
 void mock.module("../src/canvas/canvas-render.ts", () => ({
+  handOverCanvasStage: mock(() => {}),
   initCanvasRender: mock(() => {}),
   registerSelectionSetCommand: mock(() => {}),
   renderCanvas: mock(() => {}),
@@ -180,13 +181,20 @@ test("the idle css-props filler is a no-op once the datalist is gone", () => {
   expect(document.querySelector("#css-props")).toBeNull();
 });
 
-test("the pane-context bar wires studio's navigation callbacks", async () => {
+test("the pane-context bar is wired to the four callbacks it still takes", async () => {
   expect(paneCtx).not.toBeNull();
-  // With no active tab (or nothing being edited) every callback is a guarded no-op.
-  expect(() => paneCtx!.closeFormulaWorkspace()).not.toThrow();
-  await paneCtx!.closeFunctionEditor();
-  await paneCtx!.navigateBack();
-  await paneCtx!.navigateToLevel(0);
+  // It took four more — `navigateBack`, `navigateToLevel` and the two logic-editor closes — for a
+  // Breadcrumb and a Back this bar no longer draws. What is left is the axes' own wiring, and with
+  // No active tab every one of them is a guarded no-op.
+  expect(Object.keys(paneCtx!).toSorted()).toEqual([
+    "exportFile",
+    "getCanvasMode",
+    "parseMediaEntries",
+    "setCanvasMode",
+  ]);
+  await paneCtx!.exportFile();
+  expect(typeof paneCtx!.getCanvasMode()).toBe("string");
+  expect(() => paneCtx!.setCanvasMode("edit")).not.toThrow();
 });
 
 test("the bootstrap paints the statusbar once, directly", () => {

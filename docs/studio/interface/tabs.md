@@ -1,20 +1,24 @@
 ---
 title: "Documents and panes"
-description: "How open documents work in Jx Studio — the pane's strip, labels, preview and pinned documents, explicit saving, two panes, and the context bar."
+description: "How open documents work in Jx Studio — the pane's strip, labels, preview and pinned documents, explicit saving, two panes, and the pane's own bars."
 spec:
   - studio.md#14
+  - studio.md#14.7
+  - studio.md#18
 code:
   - packages/studio/src/panels/tab-strip.ts
+  - packages/studio/src/files/file-ops.ts
   - packages/studio/src/commands/context.ts
   - packages/studio/src/tabs/tab.ts
   - packages/studio/src/tabs/project-config.ts
+  - packages/studio/src/panels/jump-bar.ts
   - packages/studio/src/panels/pane-context.ts
   - packages/studio/src/workspace/workspace.ts
 ---
 
 # Documents and panes
 
-Every document you open in Jx Studio belongs to a **pane**. A pane is one editor over one document: its open documents sit in a strip along its top, a context bar under that says which editor and view you're in, and the document itself fills the rest. You can have one pane or two.
+Every document you open in Jx Studio belongs to a **pane**. A pane is one editor over one document: the strip of open documents along the top, the [jump bar](/docs/studio/interface#the-jump-bar) naming where you are, and the context bar saying which editor and view you're in all describe the pane you're working in, and the document itself fills the rest. You can have one pane or two.
 
 ![A pane's strip of open documents, one of them showing the unsaved-changes dot](../../images/tab-strip.png)
 
@@ -46,9 +50,7 @@ Jx Studio does **not** auto-save. Edits live in the open document until you save
 - A **●** marks unsaved changes, the status bar reads **Unsaved changes**, and the **Save** button in the Command Bar lights up.
 - Save with :kbd[⌘S] or the **Save** button. The status bar then says **Saved**, and how long ago, for as long as that stays true.
 
-:::doc-warning
-Closing a document with unsaved changes discards them. Studio always asks first — choose **Close** in the confirmation only if you really mean to throw the edits away. It only skips the question when a collaborator is still in the document, because the shared session keeps the edits.
-:::
+Closing a document with unsaved changes asks first, and the question has three answers: **Save** writes the file and then closes, **Close Without Saving** throws the edits away, and **Cancel** leaves the tab where it was. A save that fails leaves the tab open and still unsaved, with the reason in [Problems](/docs/studio/interface/problems-and-progress) — the close never outruns the write. :kbd[⌘W] and the tab's **×** ask the same question. Studio skips it only when a collaborator is still in the document, because the shared session keeps the edits.
 
 Undo and redo are per document as well: each keeps its own history, so :kbd[⌘Z] in one never unwinds work in another.
 
@@ -78,23 +80,28 @@ The new one carries a small **↳** marker, and hovering it names the document y
 
 ## Two panes
 
-:kbd[⌘\] splits the window in two. The active document moves into a second pane beside the first, on an editor that pane can host — **Code**, **Grid**, **Diff**, **Entry**, **Library** or **Project Styles** — so you can read a page's source, its fields, its data or its diff with the canvas still on screen. The canvas stays in the main pane.
+:kbd[⌘\] gives the open document a **second pane**, on an editor that pane can host — **Code**, **Grid**, **Diff**, **Entry**, **Library** or **Project Styles** — so reading a page's source, its fields, its data or its diff is one keystroke away from the page itself.
 
-- :kbd[⌘⌥0] focuses the side pane; **Focus Primary Pane** in the palette goes back.
-- **Toggle Pane Zoom** fills the grid with the pane you're in, and puts both back.
-- **Unsplit** collapses the split. Closing a pane never closes documents — they move back into the pane that remains.
+**The canvas belongs to the main pane.** A document with nothing but a canvas to offer can't be split at all — **Split Right** is unavailable, and it says which editors it would need. In the side pane, the context bar's **Editor** control lists only the editors that pane can host and draws no **Edit │ Design │ Preview** group, so it never offers a view that would be refused.
 
-Each pane has its own strip and its own context bar, and the focused pane is the one the Inspector, the Outline and the keyboard are pointed at.
+- :kbd[⌘⌥0] focuses the side pane; **Focus Primary Pane** in the palette goes back. The strip, the jump bar, the context bar and the editing surface all follow the focused pane.
+- **Unsplit** collapses the split. Closing a pane never closes documents — they move back into the pane that remains, and a pane you empty collapses on its own rather than standing there with nothing in it.
+
+The focused pane is the one the Inspector, the Outline and the keyboard are pointed at.
+
+## The jump bar
+
+Under the strip, one line names where you are — `◈ project › file › the element you have selected` — and every segment is a button that takes you to that step. A segment whose parent has other children carries a **⌄** listing them, so moving to a sibling element is a click rather than a hunt through the Outline. The full behaviour is in **[The workspace](/docs/studio/interface#the-jump-bar)**.
 
 ## The pane context bar
 
-Under each pane's strip, a labelled row states three things about the document in that pane — and only those three:
+Under the jump bar, a labelled row states three things about the document in that pane — and only those three:
 
 - **Editor** — which editor is open on it: **Canvas**, **Code**, **Grid**, **Diff**, **Entry**, **Library** or **Project Styles**. It offers only the editors this file actually supports, so it never holds an entry that cannot be picked, and a document with one editor prints its name as text rather than as a dropdown that goes nowhere. Those are the same names the [status bar](/docs/studio/interface#status-bar) prints, read from one list.
 - **View** — for the Canvas editor, **Edit │ Design │ Preview** as one control with three values. See [Modes and views](/docs/studio/interface/modes).
 - **Context** — what the page is being rendered _with_: the breakpoint, the color scheme, any feature queries, and whether the layout's own elements are shown. The summary reads at a glance (`Base · Auto`); open it for the full set, and for **Manage contexts…**, which takes you to where breakpoints and schemes are defined. Beside it, **resolving with** carries the document's own data — a picker per URL parameter on a dynamic page, a small field per option on a component.
 
-**Back** and a breadcrumb trail appear at the left when you are inside part of a document that has no file of its own — a repeater's template, or a function body. Click any crumb to jump back up, and Studio puts you back exactly as you left it: same breakpoint, same selected element, same Inspector tab, same zoom.
+Opening a formula or a function body in the Bottom dock's **[Logic](/docs/studio/logic/formula-workspace)** tab changes nothing here. The bar keeps its three controls and the zoom pod, because the document they describe is still on the stage above the dock — and the only way out of the editor is the **Close** in its own header. There is one exit and one address, not two of each.
 
 **Zoom floats over the canvas**, bottom-right, rather than sitting in the bar: the zoom buttons, the percentage (click it for 100%), and a **fit** picker — **Fit page**, **Fit width**, **Actual size**, **No fit** — which is remembered per document, so coming back to a file frames it the way you left it. There is no zoom in **Preview**, which shows the page at its real size in a frame that scrolls itself.
 

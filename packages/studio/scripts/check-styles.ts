@@ -156,24 +156,12 @@ export const ALLOWED_ORPHANS = new Set<string>([
   "body-mode-statements",
   "body-mode-toggle",
   "event-body-mode",
-  // Owner: panels/formula-workspace.ts
-  "formula-workspace",
-  "fw-body",
+  /* Owner: panels/formula-workspace.ts — the seventeen `fw-*` classes that were here are styled in
+     styles/panels.css now. The takeover held itself together with inline `style=` attributes; a
+     dock tab cannot, because its height is the dock's rather than the stage's. Two remain: both
+     are Spectrum action buttons the surface only needs a HANDLE on, and neither carries a rule. */
   "fw-browse-catalog",
-  "fw-chips",
   "fw-close",
-  "fw-context",
-  "fw-context-entry",
-  "fw-context-name",
-  "fw-context-title",
-  "fw-editor",
-  "fw-header",
-  "fw-kind",
-  "fw-result",
-  "fw-result--error",
-  "fw-result--pending",
-  "fw-selected",
-  "fw-title",
   // Owner: panels/head-panel.ts
   "head-add-attr",
   "head-add-tag",

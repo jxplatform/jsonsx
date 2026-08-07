@@ -1,13 +1,13 @@
 /**
  * ⑪ The Bottom dock (`panels/bottom-dock.ts`).
  *
- * What is worth pinning: that the strip is a rendering of the panel REGISTRY (four tabs, at the
- * documented cap, two of them declared-and-hidden until P8 builds them), that its region resolves
- * only while it is open — because a collapsed dock is a box focus must not land in and a shot must
- * not crop — and that the declared budget row and the registered set are the same four titles, so
- * `commands/budget.ts`'s copy cannot drift from what the dock actually hosts.
+ * What is worth pinning: that the strip is a rendering of the panel REGISTRY (three tabs, under a
+ * cap of four, none of them permanently hidden — Logic hides only while nothing is open in it),
+ * that its region resolves only while it is open — because a collapsed dock is a box focus must not
+ * land in and a shot must not crop — and that the declared budget row and the registered set are
+ * the same titles, so `commands/budget.ts`'s copy cannot drift from what the dock actually hosts.
  */
-import { flush, installMockPlatform } from "./harness";
+import { flush, installMockPlatform, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   activeBottomPanel,
@@ -20,13 +20,16 @@ import {
   unmountBottomDock,
   visibleBottomPanels,
 } from "../src/panels/bottom-dock";
+import { openLogicTarget } from "../src/panels/formula-workspace";
 import { panelContext, resetPanels } from "../src/panels/panel-registry";
-import { BOTTOM_TAB_IDS, setBottomTab, setDockCollapsed, shell } from "../src/shell";
+import { BOTTOM_TAB_IDS, isBottomTabId, setBottomTab, setDockCollapsed, shell } from "../src/shell";
 import { DECLARED_DOCK_TABS } from "../src/commands/budget";
 import { beginActivity, resetActivities } from "../src/panels/activity-panel";
 import { notify, resetNotifications } from "../src/services/notify";
 import { resolveRegion } from "../src/ui/regions";
 import { emptyContext } from "../src/commands/context";
+import { activeTab, closeAllTabs } from "../src/workspace/workspace";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 function host(): HTMLElement {
   return document.querySelector("#bottom-dock") as HTMLElement;
@@ -44,6 +47,7 @@ beforeEach(() => {
 
 afterEach(() => {
   unmountBottomDock();
+  closeAllTabs();
   resetPanels();
   resetActivities();
   resetNotifications();
@@ -51,14 +55,9 @@ afterEach(() => {
 });
 
 describe("the tab set", () => {
-  test("is the four ids §3.2 ⑪ names, in strip order", () => {
+  test("is the three ids §3.2 ⑪ names, in strip order", () => {
     expect(bottomPanelSet().map((panel) => panel.id)).toEqual([...BOTTOM_TAB_IDS]);
-    expect(bottomPanelSet().map((panel) => panel.title)).toEqual([
-      "Problems",
-      "Diff",
-      "Logic",
-      "Activity",
-    ]);
+    expect(bottomPanelSet().map((panel) => panel.title)).toEqual(["Problems", "Logic", "Activity"]);
   });
 
   test("agrees with the row `commands/budget.ts` declares, which a bare Bun check reads", () => {
@@ -68,10 +67,10 @@ describe("the tab set", () => {
     expect(declared?.tabs).toEqual(bottomPanelSet().map((panel) => panel.title));
   });
 
-  test("registration is idempotent, and all four tabs are this dock's own records", () => {
+  test("registration is idempotent, and all three tabs are this dock's own records", () => {
     registerBottomPanels();
     registerBottomPanels();
-    expect(bottomPanelSet()).toHaveLength(4);
+    expect(bottomPanelSet()).toHaveLength(3);
     // One record, ONE host (§7.2). Problems included: it keeps a rail button and a badge, but the
     // Rail groups by level rather than by dock, so nothing is registered twice to earn them.
     expect(bottomPanelSet().every((panel) => panel.dock === "bottom")).toBe(true);
@@ -86,16 +85,165 @@ describe("the tab set", () => {
     ).toEqual(["problems"]);
   });
 
-  test("Diff and Logic are declared and hidden until P8 builds them", () => {
-    const hidden = bottomPanelSet().filter((panel) => panel.when?.(emptyContext()) === false);
-    expect(hidden.map((panel) => panel.id)).toEqual(["diff", "logic"]);
-    for (const panel of hidden) {
-      expect(() => panel.render({} as never)).toThrow(/declared but not built/);
-    }
+  test("Diff is not a tab of this dock, and not a tab id at all", () => {
+    // It was reserved here for four phases behind `when: () => false`, on the strength of a comment
+    // That argued against its own reservation: `diff` is an EDITOR KIND and a pane hosts it at pane
+    // Size. P8 shipped the pane. A reserved id whose capability lives somewhere better is just an
+    // Enum member that can only ever select a hidden tab, so `view.setBottomTab` must refuse it.
+    expect(bottomPanelSet().find((panel) => panel.id === "diff")).toBeUndefined();
+    expect(BOTTOM_TAB_IDS).toEqual(["problems", "logic", "activity"]);
+    expect(isBottomTabId("diff")).toBe(false);
+  });
+
+  test("Logic hides itself when nothing is open in it", () => {
+    closeAllTabs();
     expect(visibleBottomPanels(emptyContext()).map((panel) => panel.id)).toEqual([
       "problems",
       "activity",
     ]);
+  });
+
+  test("Logic appears the moment a formula target exists", () => {
+    openFormulaTab();
+    expect(visibleBottomPanels(emptyContext()).map((panel) => panel.id)).toEqual([
+      "problems",
+      "logic",
+      "activity",
+    ]);
+  });
+});
+
+// ─── ⑪ · Logic (plan §12 P8.5) ────────────────────────────────────────────────
+
+/** A tab whose `total` state entry is an `$expression`, with the formula workspace open over it. */
+function openFormulaTab(): void {
+  const tab = resetWorkspaceWithTab(
+    {
+      children: [],
+      state: { total: { $expression: { operator: "+", target: 1, value: 2 } } },
+      tagName: "div",
+    } as unknown as JxMutableNode,
+    { id: "logic-tab" },
+  );
+  tab.session.ui.editingFormula = { defName: "total", type: "def" } as never;
+}
+
+describe("Logic — the takeover that became a tab", () => {
+  test("opening a formula reveals the dock on Logic, and its body renders there", async () => {
+    setBottomTab("problems");
+    setDockCollapsed("bottom", true);
+    mountBottomDock();
+    await flush();
+    expect(host().textContent?.trim()).toBe("");
+
+    openFormulaTab();
+    await flush();
+
+    // The dock opened itself, on the tab that hosts the surface — a takeover reveals itself by
+    // Definition and a dock tab does not, so this is the wiring the move has to add.
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    expect(shell.bottomTab).toBe("logic");
+    expect(host().querySelector<HTMLElement>(".bd-body")?.dataset.jxRegion).toBe(
+      "dock.bottom/panel:logic",
+    );
+    expect(host().querySelector(".formula-workspace")).not.toBeNull();
+    expect(host().querySelector(".fw-title")?.textContent).toContain("total");
+  });
+
+  test("closing the dock over an open formula keeps it closed", async () => {
+    mountBottomDock();
+    openFormulaTab();
+    await flush();
+    (host().querySelector(".bd-close") as HTMLElement).click();
+    await flush();
+    expect(shell.docks.bottom.collapsed).toBe(true);
+    // A reveal that re-fired on every repaint would be a dock you cannot close.
+    notify.error("unrelated");
+    await flush();
+    expect(shell.docks.bottom.collapsed).toBe(true);
+  });
+
+  test("closing the formula takes the tab out of the strip and falls back", async () => {
+    mountBottomDock();
+    openFormulaTab();
+    await flush();
+    expect(host().querySelectorAll("sp-tab")).toHaveLength(3);
+
+    (host().querySelector(".fw-close") as HTMLElement).click();
+    await flush();
+    expect(activeTab.value?.session.ui.editingFormula).toBeNull();
+    expect(host().querySelectorAll("sp-tab")).toHaveLength(2);
+    expect(host().querySelector<HTMLElement>(".bd-body")?.dataset.jxRegion).toBe(
+      "dock.bottom/panel:problems",
+    );
+  });
+
+  test("Monaco is released when the dock stops painting the tab", async () => {
+    const seen: string[] = [];
+    const logic = bottomPanelSet().find((panel) => panel.id === "logic")!;
+    // Restored by the suite's `resetPanels()`, which drops every record and re-registers.
+    logic.afterRender = (_ctx, el) => seen.push(el.className || el.id);
+    mountBottomDock();
+    openFormulaTab();
+    await flush();
+    expect(seen).toContain("bd-body");
+
+    // The three ways to stop showing it. Each must reach the surface, or the Monaco instance the
+    // Logic tab holds stays attached to DOM lit has already discarded.
+    seen.length = 0;
+    setBottomTab("activity");
+    await flush();
+    expect(seen).toEqual(["bd-body"]);
+
+    seen.length = 0;
+    setDockCollapsed("bottom", true);
+    await flush();
+    expect(seen).toEqual(["bottom-dock"]);
+
+    // Four, in fact. Blanking the host on unmount is the one nothing else covers, and the
+    // Canvas-side dispose that used to mop it up went away with the takeover.
+    setDockCollapsed("bottom", false);
+    await flush();
+    seen.length = 0;
+    unmountBottomDock();
+    expect(seen).toEqual(["bottom-dock"]);
+  });
+
+  /**
+   * Two events, not one. The dock's effect answers "a target appeared" and fires at most once per
+   * target — the test above depends on that. It cannot also answer "the user asked for this", which
+   * is a click that changes no target at all, and for three phases nothing did: reopen the same
+   * formula after closing the dock and the key comparison found nothing to do.
+   */
+  test("re-asking for the SAME target reopens a dock the user closed", async () => {
+    mountBottomDock();
+    openFormulaTab();
+    await flush();
+    expect(shell.docks.bottom.collapsed).toBe(false);
+
+    (host().querySelector(".bd-close") as HTMLElement).click();
+    await flush();
+    expect(shell.docks.bottom.collapsed).toBe(true);
+
+    // Exactly what "Open in formula workspace" on `total` does the second time.
+    openLogicTarget({ editing: { defName: "total", type: "def" }, surface: "formula" });
+    await flush();
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    expect(shell.bottomTab).toBe("logic");
+    expect(host().querySelector(".fw-title")?.textContent).toContain("total");
+  });
+
+  test("the panel's afterRender runs against the painted body", async () => {
+    const seen: (string | undefined)[] = [];
+    const logic = bottomPanelSet().find((panel) => panel.id === "logic")!;
+    // Restored by the suite's `resetPanels()`, which drops every record and re-registers.
+    logic.afterRender = (_ctx, el) => seen.push(el.className);
+    mountBottomDock();
+    openFormulaTab();
+    await flush();
+    // Monaco's mount hangs off this hook, so a dock that skipped it would host the record and
+    // Never the editor.
+    expect(seen).toContain("bd-body");
   });
 });
 
@@ -217,12 +365,14 @@ describe("the template, without a host", () => {
 
   test("with no visible tab at all it says so instead of painting a blank box", async () => {
     resetPanels();
-    // Nothing registered, so `bottomPanelSet()` re-registers — gate every tab off instead.
-    shell.bottomTab = "diff";
+    // `logic` is the tab that hides itself when nothing is open in it — the only stored-but-hidden
+    // State the dock can now reach, since Diff stopped being a tab id.
+    closeAllTabs();
+    shell.bottomTab = "logic";
     const ctx = emptyContext();
     const none = visibleBottomPanels(ctx).length;
     expect(none).toBeGreaterThan(0);
-    setBottomTab("diff");
+    setBottomTab("logic");
     mountBottomDock();
     await flush();
     // A hidden stored tab falls back rather than emptying the dock.

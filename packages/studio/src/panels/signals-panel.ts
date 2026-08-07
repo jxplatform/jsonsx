@@ -22,12 +22,13 @@ import { renderFieldRow } from "../ui/field-row";
 import { rawTextArea, spTextField } from "../ui/field-input";
 import { expressionHint, renderExpressionEditor } from "../ui/expression-editor";
 import { renderEmptyState } from "./empty-state";
+import { openLogicTarget } from "./formula-workspace";
 import { bindableSignalNames } from "./properties-panel";
 import { registerPanel } from "./panel-registry";
 import { renderStatementEditor } from "./statement-editor";
 import { livePreviewExpression } from "../services/live-preview";
 import { renderMediaPicker } from "../ui/media-picker";
-import { renderOnly, updateSession } from "../store";
+import { renderOnly } from "../store";
 import { renderForm } from "../ui/schema-form";
 import { resolveContextPointer } from "../services/context-resolver";
 import type { JsonSchema } from "../ui/schema-form";
@@ -55,10 +56,17 @@ interface SignalsPanelState {
   documentPath?: string | null | undefined;
 }
 
+/**
+ * What the State panel's template needs from its host: a repaint, and nothing else.
+ *
+ * It carried `renderCanvas` and `updateSession` too, and both are gone for the same reason. The
+ * canvas hook lost its last caller when the takeovers went and was left threaded from
+ * `registerStatePanel`; the session writer lost its two when the Logic buttons started going
+ * through `openLogicTarget`, which addresses the focused tab itself. A ctx field with no reader is
+ * an invitation to write the wrong thing through it.
+ */
 interface SignalsPanelCtx {
   renderLeftPanel: () => void;
-  renderCanvas: () => void;
-  updateSession: (patch: Record<string, unknown>) => void;
 }
 
 export interface SignalDef {
@@ -858,13 +866,14 @@ function renderSignalEditorTemplate(
           quiet
           title="Open in formula workspace"
           @click=${() => {
-            ctx.updateSession({
-              ui: { editingFormula: { defName: name, type: "def" } },
-            });
-            ctx.renderCanvas();
+            // One call, because a click is BOTH events: it names the target and it asks for the
+            // Surface. Setting the field alone leaned on the dock's reveal effect, which fires at
+            // Most once per target — so clicking this again after closing the dock was a dead
+            // Click. It also left `editingFunction` set, and that one wins the tie.
+            openLogicTarget({ editing: { defName: name, type: "def" }, surface: "formula" });
           }}
         >
-          <sp-icon-full-screen slot="icon"></sp-icon-full-screen>
+          <sp-icon-align-bottom slot="icon"></sp-icon-align-bottom>
         </sp-action-button>
       </div>
       ${renderExpressionEditor(
@@ -1075,10 +1084,11 @@ function renderFunctionFields(
                     quiet
                     title="Open in code editor"
                     @click=${() => {
-                      ctx.updateSession({
-                        ui: { editingFunction: { defName: name, type: "def" } },
+                      // Target AND reveal, in one call. See the formula button above.
+                      openLogicTarget({
+                        editing: { defName: name, type: "def" },
+                        surface: "function",
                       });
-                      ctx.renderCanvas();
                     }}
                   >
                     <sp-icon-code slot="icon"></sp-icon-code>
@@ -1555,12 +1565,10 @@ function definedSignalNames(): string[] {
 export interface SignalsCommandDeps {
   /** Repaint the Navigator — `left-panel.ts`'s `render`. */
   renderLeftPanel: () => void;
-  /** Repaint the canvas, which is what the formula workspace takes over. */
-  renderCanvas: () => void;
 }
 
 /**
- * The State panel's verbs — select a signal, and open its formula full-screen.
+ * The State panel's verbs — select a signal, and open its formula in the Bottom dock.
  *
  * Both used to be XPath presses matching the row's RENDERED NAME, which plan §13's R1 forbids
  * outright: a panel that starts eliding long names, or grouping differently, breaks a shot by
@@ -1570,6 +1578,12 @@ export interface SignalsCommandDeps {
  * rendered inside that signal's own editor, so "the one that is open" is what a reader means. It
  * REFUSES a signal with no `$expression`: the workspace edits an expression tree, and opening it
  * over a plain state entry used to paint an empty canvas takeover.
+ *
+ * It goes through `openLogicTarget` rather than the canvas repaint it used to fire, for the same
+ * reason the panel BUTTONS do. A command is the palette's and the automation's door:
+ * `formula.editDef` and `formula.editEvent` both leave the surface on screen when they return, and
+ * a verb that merely arms a dock the user has collapsed would report success while showing nothing.
+ * The reveal is idempotent.
  *
  * @param {SignalsCommandDeps} deps
  * @returns {AnyCommand[]}
@@ -1643,12 +1657,9 @@ export function signalsCommands(deps: SignalsCommandDeps): AnyCommand[] {
               `$expression — the workspace edits formulas, and this entry is not one`,
           );
         }
-        // The workspace reads its target off the tab; `renderCanvas` is what performs the takeover.
-        const tab = activeTab.value;
-        if (tab) {
-          tab.session.ui.editingFormula = { defName, type: "def" };
-        }
-        deps.renderCanvas();
+        // The workspace reads its target off the tab; the Bottom dock's Logic tab is where it
+        // Draws. Nothing on the canvas depends on this field any more.
+        openLogicTarget({ editing: { defName, type: "def" }, surface: "formula" });
       },
       title: "Open Formula Workspace",
     },
@@ -1684,9 +1695,7 @@ export function registerStatePanel(): void {
     requiresDocument: "Open a page to give it data — values it can read, compute or fetch.",
     render: (ctx) =>
       ctx.deps.renderSignalsTemplate(ctx.doc as SignalsPanelState, {
-        renderCanvas: ctx.deps.renderCanvas,
         renderLeftPanel: ctx.rerender,
-        updateSession,
       }),
   });
 }

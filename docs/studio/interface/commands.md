@@ -122,21 +122,22 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 ## Document
 
-| Command                | Id                      | Shortcut           | Level    | Requires                                          |
-| ---------------------- | ----------------------- | ------------------ | -------- | ------------------------------------------------- |
-| Close Document         | `document.close`        | `⌘W`               | document | an open document                                  |
-| Edit Event Handler     | `formula.editEvent`     | —                  | document | an open document                                  |
-| Edit Function          | `formula.editDef`       | —                  | document | an open document that defines state               |
-| Expand Data Row        | `data.expandRow`        | —                  | document | an open document that defines data                |
-| Keep Document Open     | `document.keepOpen`     | —                  | document | a preview document — one opened by a single click |
-| Next Tab               | `document.nextTab`      | `⌃Tab` or `⌘Tab`   | document | a second open document                            |
-| Open Formula Workspace | `formula.openWorkspace` | —                  | document | a selected state entry that holds a formula       |
-| Pin / Unpin Document   | `document.togglePinned` | —                  | document | an open document                                  |
-| Previous Tab           | `document.previousTab`  | `⌃⇧Tab` or `⌘⇧Tab` | document | a second open document                            |
-| Reopen Closed Document | `document.reopenClosed` | `⌘⇧T`              | document | a document closed in this session                 |
-| Select State Entry     | `state.selectSignal`    | —                  | document | an open document that defines state               |
-| Set Document Pinned    | `document.setPinned`    | —                  | document | an open document                                  |
-| Set Draft              | `content.setDraft`      | —                  | document | a content entry open                              |
+| Command                | Id                       | Shortcut           | Level    | Requires                                                      |
+| ---------------------- | ------------------------ | ------------------ | -------- | ------------------------------------------------------------- |
+| Close Document         | `document.close`         | `⌘W`               | document | an open document                                              |
+| Edit Event Handler     | `formula.editEvent`      | —                  | document | an open document                                              |
+| Edit Function          | `formula.editDef`        | —                  | document | an open document that defines state                           |
+| Expand Data Row        | `data.expandRow`         | —                  | document | an open document that defines data                            |
+| Keep Document Open     | `document.keepOpen`      | —                  | document | a preview document — one opened by a single click             |
+| Leave Sub-document     | `document.setStackLevel` | —                  | document | an open sub-document — a repeater template or a function body |
+| Next Tab               | `document.nextTab`       | `⌃Tab` or `⌘Tab`   | document | a second open document                                        |
+| Open Formula Workspace | `formula.openWorkspace`  | —                  | document | a selected state entry that holds a formula                   |
+| Pin / Unpin Document   | `document.togglePinned`  | —                  | document | an open document                                              |
+| Previous Tab           | `document.previousTab`   | `⌃⇧Tab` or `⌘⇧Tab` | document | a second open document                                        |
+| Reopen Closed Document | `document.reopenClosed`  | `⌘⇧T`              | document | a document closed in this session                             |
+| Select State Entry     | `state.selectSignal`     | —                  | document | an open document that defines state                           |
+| Set Document Pinned    | `document.setPinned`     | —                  | document | an open document                                              |
+| Set Draft              | `content.setDraft`       | —                  | document | a content entry open                                          |
 
 ## Project
 

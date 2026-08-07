@@ -15,6 +15,7 @@ import { createCommandRegistry } from "../src/commands/registry";
 import { makeContext } from "../src/commands/context";
 import { checkPlacements } from "../src/commands/levels";
 import { activeTab, closeAllTabs, openTab } from "../src/workspace/workspace";
+import { setBottomTab, setDockCollapsed, shell } from "../src/shell";
 import type { CommandContext } from "../src/commands/context";
 import type { AnyCommand, CommandRegistry } from "../src/commands/registry";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -44,18 +45,12 @@ const { registerSignalsCommands, selectedSignal, selectSignal, signalsCommands }
   await import("../src/panels/signals-panel");
 const { formulaEditorCommands, registerFormulaEditorCommands } =
   await import("../src/panels/formula-workspace");
-const {
-  availableSelectors,
-  registerStyleCommands,
-  renderStylePanelTemplate,
-  resetSelectorMenu,
-  styleCommands,
-} = await import("../src/panels/style-panel");
+const { registerStyleCommands, renderStylePanelTemplate, resetSelectorMenu, styleCommands } =
+  await import("../src/panels/style-panel");
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 const renderLeftPanel = mock(() => {});
-const renderCanvas = mock(() => {});
 
 let ctx: CommandContext = makeContext();
 let registry: CommandRegistry;
@@ -79,15 +74,14 @@ function allRecords(): AnyCommand[] {
   return [
     ...inspectorCommands(),
     ...dataExplorerCommands({ renderLeftPanel }),
-    ...signalsCommands({ renderCanvas, renderLeftPanel }),
-    ...formulaEditorCommands({ renderCanvas }),
+    ...signalsCommands({ renderLeftPanel }),
+    ...formulaEditorCommands(),
     ...styleCommands(),
   ];
 }
 
 beforeEach(() => {
   renderLeftPanel.mockClear();
-  renderCanvas.mockClear();
   resetDataRowExpansion();
   resetSelectorMenu();
   selectSignal(null);
@@ -95,8 +89,8 @@ beforeEach(() => {
   registry = createCommandRegistry({ getContext: () => ctx });
   registerInspectorCommands(registry);
   registerDataExplorerCommands(registry, { renderLeftPanel });
-  registerSignalsCommands(registry, { renderCanvas, renderLeftPanel });
-  registerFormulaEditorCommands(registry, { renderCanvas });
+  registerSignalsCommands(registry, { renderLeftPanel });
+  registerFormulaEditorCommands(registry);
   registerStyleCommands(registry);
   openDoc();
 });
@@ -219,13 +213,20 @@ describe("state.selectSignal", () => {
 
 describe("formula.openWorkspace", () => {
   test("defaults its target to the selected entry — the button it replaces lives in that editor", () => {
+    setDockCollapsed("bottom", true);
+    setBottomTab("problems");
     void registry.run("state.selectSignal", { name: "toggle0" });
     void registry.run("formula.openWorkspace");
     expect(activeTab.value?.session.ui.editingFormula).toEqual({
       defName: "toggle0",
       type: "def",
     });
-    expect(renderCanvas).toHaveBeenCalled();
+    // It reveals the Logic dock tab, exactly as `formula.editDef` does. It used to call
+    // `renderCanvas` instead: a full repaint of a surgically patched canvas, for a takeover the
+    // Canvas stopped performing in P8, fired by a verb that changes nothing the canvas draws. The
+    // Dep went with it — `SignalsCommandDeps` is `renderLeftPanel` alone now.
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    expect(shell.bottomTab).toBe("logic");
   });
 
   test("takes an explicit defName", () => {
@@ -266,13 +267,18 @@ describe("formula.openWorkspace", () => {
 });
 
 describe("formula.editDef / formula.editEvent", () => {
-  test("editDef opens the code editor over a declared entry", () => {
+  test("editDef opens the code editor over a declared entry, in the Logic dock tab", () => {
+    setDockCollapsed("bottom", true);
+    setBottomTab("problems");
     void registry.run("formula.editDef", { defName: "count" });
     expect(activeTab.value?.session.ui.editingFunction).toEqual({
       defName: "count",
       type: "def",
     });
-    expect(renderCanvas).toHaveBeenCalled();
+    // The verb no longer repaints the canvas — it reveals the dock tab that hosts the editor, and
+    // The canvas keeps rendering the page the body belongs to.
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    expect(shell.bottomTab).toBe("logic");
   });
 
   test("editDef refuses an undeclared entry", () => {
@@ -377,29 +383,6 @@ describe("style.setSelector", () => {
     expect(() => registry.run("style.setSelector", { selector: ":hover" })).toThrow(
       'command "style.setSelector" needs an open document',
     );
-  });
-});
-
-describe("availableSelectors", () => {
-  test("is the common set plus what the selected element declares", () => {
-    activeTab.value!.session.selection = [["children", 0]];
-    expect(availableSelectors()).toContain(":hover");
-  });
-
-  test("includes the active selector even when nothing declares it yet", () => {
-    activeTab.value!.session.selection = [["children", 0]];
-    activeTab.value!.session.ui.activeSelector = "[open]";
-    expect(availableSelectors()).toContain("[open]");
-  });
-
-  test("with nothing selected it is just the common set", () => {
-    activeTab.value!.session.selection = [];
-    expect(availableSelectors()).toContain(":focus");
-  });
-
-  test("with no tab open it still answers", () => {
-    closeAllTabs();
-    expect(availableSelectors().length).toBeGreaterThan(0);
   });
 });
 

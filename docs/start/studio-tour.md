@@ -1,12 +1,13 @@
 ---
 title: "A tour of Jx Studio"
-description: "A guided map of the Jx Studio window — the Command Bar, the Navigator, panes and the canvas, the Inspector, the Bottom dock and the status bar."
+description: "A guided map of the Jx Studio window — the Command Bar, the Navigator, panes and the canvas, the jump bar, the Inspector and the Bottom dock."
 spec:
   - studio.md#3.1
 code:
   - packages/studio/src/panels/toolbar.ts
   - packages/studio/src/panels/activity-bar.ts
   - packages/studio/src/panels/right-panel.ts
+  - packages/studio/src/panels/jump-bar.ts
   - packages/studio/src/panels/bottom-dock.ts
   - packages/studio/src/panels/statusbar.ts
 ---
@@ -31,9 +32,9 @@ The labelled rail on the far left, and the panel it opens beside it. The rail is
 
 ## The panes and the canvas
 
-The center of the window holds one editor pane, or two side by side (:kbd[⌘\]). A pane renders your page or component live, exactly as it will look in production, and you select, edit and rearrange elements directly on it — see **[The canvas](/docs/studio/interface/canvas)**, **[Edit mode](/docs/studio/editing)** and **[Design mode](/docs/studio/design)**.
+The center of the window holds one editor pane — or two, when :kbd[⌘\] gives the open document a pane of its own for reading its source, its diff or its data. A pane renders your page or component live, exactly as it will look in production, and you select, edit and rearrange elements directly on it — see **[The canvas](/docs/studio/interface/canvas)**, **[Edit mode](/docs/studio/editing)** and **[Design mode](/docs/studio/design)**.
 
-Each pane carries its own strip of open documents, and under it a context bar stating which **Editor** is open on the file, which **View** of the canvas — **Edit**, **Design** or **Preview** — and the **Context** it's being rendered in. Details in **[Documents and panes](/docs/studio/interface/tabs)** and **[Modes and views](/docs/studio/interface/modes)**.
+Above the pane sits its strip of open documents, then the **[jump bar](/docs/studio/interface#the-jump-bar)** — `◈ project › file › element`, every segment a button, so you always know where you are and can step anywhere along the chain. Under those, a context bar states which **Editor** is open on the file, which **View** of the canvas — **Edit**, **Design** or **Preview** — and the **Context** it's being rendered in. Details in **[Documents and panes](/docs/studio/interface/tabs)** and **[Modes and views](/docs/studio/interface/modes)**.
 
 ## The Inspector
 
@@ -41,11 +42,11 @@ The dock on the right, in four tabs: **Content** (the selected element's setting
 
 ## The Bottom dock
 
-:kbd[⌘J] opens a dock under the panes with **Problems** — everything waiting to be fixed, each row carrying the file it happened in and the button that fixes it — and **Activity**, one entry per long operation with its steps, its log and a Cancel. It starts closed and only takes space from the canvas, never from the docks on either side.
+:kbd[⌘J] opens a dock under the panes with **Problems** — everything waiting to be fixed, each row carrying the file it happened in and the button that fixes it — and **Activity**, one entry per long operation with its steps, its log and a Cancel. A third tab, **Logic**, appears while you have a formula or a function open, so the page you're computing values for stays on screen beside the editor. The dock starts closed and only takes space from the canvas, never from the docks on either side.
 
 ## The status bar
 
-The thin strip along the bottom says where you are and nothing else: the **project** (name, branch, problem count), the **document** (path, view, and whether it has unsaved changes), and the **selection** with the chain of elements above it. Almost every item is a button.
+The thin strip along the bottom says what is true right now and nothing else: the **project** (name, branch, problem count), the **document** (path, view, and whether it has unsaved changes), and a **selection** count when you have more than one element picked. Almost every item is a button. Where you are is the jump bar's job, one line above the pane.
 
 ## Next
 

@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.6.0-draft
+**Version:** 0.7.0-draft
 **Status:** Partial
-**Updated:** 2026-08-05
+**Updated:** 2026-08-06
 **License:** MIT
 
 ---
@@ -1276,7 +1276,7 @@ Consequently **a tab's document may never be swapped out from under its id.** Dr
 component opens a **real tab** of its own. It used to rewrite `documentPath` in place and leave `id`
 alone, which broke the dedupe — re-opening the original page then called through with an id already
 in the map, overwriting the entry without disposing the old tab's effect scope and pushing a second
-copy of the id into the tab order: duplicate list keys, a leaked scope, and a lost document stack.
+copy of the id into the tab order: duplicate list keys and a leaked scope.
 
 Opening an id that is already open **replaces** the tab in place — the previous one is disposed and
 its position in the strip is reused. The id can never appear twice.
@@ -1288,16 +1288,29 @@ a **relationship, not a navigation stack**: nothing pops it, nothing restores fr
 the parent leaves the child perfectly usable. The strip renders it as a `↳` marker and names the
 origin in the tab's tooltip.
 
-### 14.3 Sub-documents
+### 14.3 Sub-documents: withdrawn
 
-The per-tab document stack survives only for documents that have no file of their own — `$map`
-templates and function bodies. Anything with a file opens a tab instead.
+**There is no per-tab document stack.** This section used to specify one — a stack of frames, each
+snapshotting the parent's document coordinates and its whole UI context, restored on pop — reserved
+for the two things that have no file of their own: `$map` templates and function bodies.
 
-Each frame snapshots the parent's document coordinates (document, path, mode, source format, dirty
-flag, selection) **and its whole UI context** — the previewed breakpoint, the active pseudo-selector,
-the inspector tab, the zoom. Popping restores _where you were_, not merely what you were looking at.
-The frame's nested records are copied, so editing inside the sub-document cannot rewrite the
-snapshot it will be restored from.
+Both cases went elsewhere, and once they had, nothing was left that could push a frame. A function
+body opens in the Bottom dock's Logic tab (§16.3), where the page it belongs to stays on screen
+behind it — which is better than restoring you to a page you were never taken away from. A `$map`
+template is a subtree of its parent document, selected in place on the canvas like any other node,
+so it was never a document to descend into. Anything with a file of its own opens a **tab** (§14.1),
+under the `openedFrom` relationship §14.2 is careful to say is not a navigation stack.
+
+The machinery was nonetheless built, unit-tested and kept for six months. The push function had
+**zero callers** the entire time, so `documentStack` was permanently empty and every consumer of it
+was unreachable: the pop, the jump-to-level, a `Leave Sub-document` command in the palette, a
+breadcrumb in the pane context bar, and a guard that detached the collaboration session while
+"drilled in". A green test suite reported all of it working, because a unit test imports the module
+it tests and cannot see that nothing else does.
+
+The rule that generalises: **a stack needs a push, and the push is the part to specify.** A
+restore-from-frame contract that nothing enters is not a partially-shipped feature — it is a shape
+in the codebase that reads like one.
 
 ### 14.4 The tab strip
 
@@ -1307,7 +1320,7 @@ snapshot it will be restored from.
 | Widening         | Only the tabs that actually collide grow a segment; one collision does not put a directory on every tab.                                                                                                                                                |
 | Overflow         | A chevron at the strip's fixed right edge lists the tabs currently out of view and activates the chosen one. The scrollbar is hidden by design and the wheel is a mouse-only affordance, so the chevron is the pointer-independent route.               |
 | Activation       | Activating a tab points the **file tree** at its document — the tree and the strip never disagree about where you are — and promotes it in the MRU order.                                                                                               |
-| Dirty            | A dot; closing a dirty tab confirms first, unless a collaborator is still holding the document.                                                                                                                                                         |
+| Dirty            | A dot; closing a dirty tab asks before it discards — see §14.7. `⌘W` and the tab's `×` are one implementation, because two copies of that prompt drifted apart once already.                                                                            |
 | `⌃Tab` / `⌃⇧Tab` | Cycle the **MRU** order, not the strip order (§14.5).                                                                                                                                                                                                   |
 | `⌘⇧T`            | Reopen the most recently closed document (§14.6).                                                                                                                                                                                                       |
 
@@ -1329,6 +1342,31 @@ Closing a **file-backed** tab records its path on a bounded, newest-first stack;
 and re-reads the file. A virtual tab with no path is not recorded — there is nothing to re-read, and
 offering to reopen it would be a lie. The command renders disabled, with its reason, until something
 has been closed.
+
+### 14.7 Closing over unsaved work
+
+Three answers, because there are three things the author might mean: **Save · Close Without Saving ·
+Cancel** (`showSaveDiscardDialog`, `studio-ui-guidelines.md` §8.7, whose table assigns that dialog to
+unsaved-work decisions). `⌘W` and the tab's `×` ask it through one implementation.
+
+**The close is conditional on the write, never concurrent with it.** A save that fails leaves the tab
+open, still dirty, with the reason in Problems. This is the reason `saveFile` returns a boolean
+rather than reporting and swallowing: reporting is right for `⌘S`, where the tab stays open either
+way, and useless where the answer decides whether the work survives.
+
+**A dialog may not offer an answer the app cannot honour.** A read-only collaborator's local edits
+reach nothing — the mirror and the record publish are both gated on write permission, while the
+document still marks itself dirty — so `saveFile` refuses those tabs outright rather than falling
+back to writing the shared room's file to disk behind its owner. The prompt therefore has **two**
+answers there, headlined _Changes Cannot Be Saved_: **Close Without Saving · Keep Editing**. Three
+answers when only two are real is the same dishonesty as one when there are three, and it is worse
+on the one dialog whose whole job is to be trusted about losing work.
+
+The rule generalises past this dialog: **before a surface writes, it establishes that it may.** The
+Bottom dock made that concrete by raising the rate at which the Logic editor is torn down and
+repainted — a debounce armed over a disposed editor reads `""` from it, and a repaint that re-syncs
+the buffer from the document discards whatever is being typed. Both were data loss, both were
+invisible to a green suite, and both are one question asked too late.
 
 ## 15. Application Preferences
 
@@ -1370,8 +1408,8 @@ setup notice) repaint without Preferences having to know they exist.
 
 ## 16. Feedback, Problems and Progress
 
-**Status:** Partial — the notification substrate, the Bottom dock, Problems, Activity and the
-inline field slot ship; Diff and Logic are declared tabs that arrive with the pane takeover.
+**Status:** Implemented — the notification substrate, the Bottom dock and all three of its tabs
+(Problems, Logic, Activity), and the inline field slot.
 
 Studio's predecessor had one feedback surface: a 24px status bar carrying 78 outcomes — successes
 and failures alike — in identical 11px grey text, destroyed after 3000ms. Nothing persisted, nothing
@@ -1415,9 +1453,24 @@ at a moment, are different things and had been sharing one 24px strip.
 ### 16.3 The Bottom dock
 
 `⌘J`, under the **pane grid** rather than the window, so it never steals width from the side docks —
-and never covers the canvas, which is the one region that must not disappear. Four tabs, at the
-documented cap: **Problems · Diff · Logic · Activity**. It opens **collapsed**: an empty Problems
+and never covers the canvas, which is the one region that must not disappear. Three tabs, under a
+documented cap of four: **Problems · Logic · Activity**. It opens **collapsed**: an empty Problems
 list must not spend 220px of canvas to say nothing.
+
+**Logic is why the dock exists.** The function editor and the formula workspace were canvas
+takeovers; here the page whose values they compute keeps rendering behind them. Because a takeover
+reveals itself by definition and a dock tab does not, opening a target reveals the dock on Logic —
+**once per target**, so closing the dock over an open formula keeps it closed. The tab joins the
+strip while there is something in it and leaves when the editor's own **Close** clears it; nothing
+short of that closes it, so collapsing the dock or leaving the document and returning keeps your
+place. Nothing else may draw a second exit beside that Close.
+
+**The fourth slot is free, and Diff is not waiting for it.** Diff was reserved here behind a
+permanently-false predicate for four phases, on the strength of an argument against its own
+reservation: `diff` is an editor **kind**, a pane hosts it at pane size, and folding it into a 240px
+dock would be a downgrade. What it lacked was a pane to open into, and §18 shipped one. A
+reservation whose capability arrived somewhere better is not a reservation — it is an id in
+`view.setBottomTab`'s enum that can only ever select a hidden tab.
 
 `view.setBottomDock {open}` and `view.setBottomTab {tab}` are the idempotent setters; the toggle is
 defined in terms of them. The region id `dock.bottom` resolves **only while the dock is open**, so
@@ -1518,8 +1571,90 @@ inline (§16), rather than writing and hoping.
 
 ---
 
+## 18. Panes
+
+**Status:** Partial — the pane model, per-pane canvas state, the jump bar and the dock takeovers
+ship. A second _live Canvas_ does not: the shell has one stage, and §18.2 says what that costs.
+
+### 18.1 A pane is where a document is shown
+
+Two panes at most, and the cap is enforced in code rather than by convention — `splitRight` is the
+only pane creator and refuses past the maximum. The primary keeps the Canvas; the side pane takes a
+capped set of editor kinds.
+
+**The cap is one predicate, asked everywhere.** It was once enforced at the split alone while
+claiming to be enforced in one place, so a tab already in the side pane could be switched back to
+Canvas from the context bar and the cap it existed to enforce was simply absent. The split, the
+mode-setting command, the programmatic setter and the Editor dropdown now all ask the same
+question — and the dropdown asks it in order to not draw a control that would be refused.
+
+Three rules govern the lifecycle, and each of them was a defect first:
+
+1.  **A pane is complete before it is published.** Focus moves last. Publishing a pane's id before
+    its tab left every `activeTab` reader — the jump bar, the Inspector, the toolbar — printing
+    "no document" over a stage that was drawing one.
+2.  **A pane is never observable without existing.** Closing one hands the survivor its tabs and
+    the focus while both are still in the grid, and only then removes it. The window between
+    "focused" and "present" emptied the stage and nothing repainted it, because the render effects
+    key on the active _tab_ and the tab had not changed.
+3.  **A pane with nothing in it is a hole in the grid**, so every path that empties one collapses
+    it. Closing the last tab had this rule; splitting the last tab back to the primary did not, and
+    three keystrokes reached a shell with no stage, no tab strip and no jump bar while two
+    documents were open.
+
+### 18.2 What a second pane costs, and what it does not
+
+Parent-side render preparation happens **once per pass**, not once per host: the document is
+resolved and serialized once and fanned out to every live host, so that cost is flat in the number
+of hosts rather than linear. Param-bound state used to make one backend round trip **per host** for
+the same data; it makes one.
+
+**What no fan-out removes:** each frame lays out its own viewport, and same-origin frames share the
+renderer's main thread, so N hosts remain N `@jxsuite/runtime` renders and N structured clones.
+That is the real budget for a second live Canvas, and it is why the cap exists at all.
+
+**A pane owns its canvas state.** The mounted artboards, the canvas mode, the previous mode that
+decides a teardown, and the escalation target are all per pane. A patch escalates the pane showing
+the document, not every pane — and "is this tab patchable" asks whether _a pane is displaying it_,
+not whether the keyboard is in that pane, which is the more truthful question and happens also to
+be the correct one.
+
+**Anything a host reports resolves through the host, not through focus.** A canvas message names
+its own tab; reading `activeTab` instead wrote the clicked breakpoint, the selection and the
+resolved data scope to whichever document happened to be focused. With one stage that was invisible.
+With two it is a data bug, so the resolution is by host everywhere, including the artboard header
+that lives on the parent side.
+
+### 18.3 One stage, and the surfaces that follow it
+
+Until a second host exists, the shell has one stage and it is **handed between panes**: taking it
+releases the losing pane's mounted artboards and their reactive scopes, and taking it schedules a
+render, because nothing else will — both render effects key on the active tab, and a handover
+changes the pane without changing the tab.
+
+A surface that caches "am I mounted?" in a module outlives the DOM it mounted into. Every such fast
+path must also ask whether the mode changed, or it returns on the strength of an editor whose
+container was thrown away one frame earlier.
+
+The single tab strip follows the same rule as the stage: the pane that holds it draws, and the
+focused pane wins. One strip, one stage, both showing the pane you are in.
+
+**A split is therefore not a side-by-side, and nothing may say that it is.** The side pane is a
+second place to _be_, reached with `⌘⌥0`; it is not a second thing on screen. Every string a reader
+sees must hold to that — a `requires` sentence is printed verbatim in refusals, tooltips and palette
+rows, and `pane.splitRight` promised "beside the canvas" in all three.
+
+**There is no pane zoom until there is a grid to zoom.** The state and its two commands existed,
+both wrote it, and nothing that draws ever read it: with one stage the focused pane already fills
+the shell, so a "zoom" toggle's only observable effect was on itself. It returns with the second
+live host and not one release earlier — a control that does nothing is worse than an absent one,
+because the absent one does not teach the reader that the app ignores them.
+
+---
+
 ## Changelog
 
+- **0.7.0-draft** (2026-08-06) — §18 Panes — the two-pane cap as one predicate, the three lifecycle rules each defect taught, what a second pane costs and what no fan-out removes, and the single stage handed between panes.
 - **0.6.0-draft** (2026-08-05) — §7 Stylebook becomes Project Styles (name only — "stylebook" stays the wire value) and §17 Project Documents: project.json as a Tab under the transaction log, one write chokepoint, a no-op edit that writes nothing, and the collab exclusion.
 - **0.5.2-draft** (2026-08-05) — §5.2 the move buttons follow the primary selection and stay single-target under a multiple selection.
 - **0.5.1-draft** (2026-08-05) — §6.2 corrects the Target Line illustration — the selector is the last segment and a scheme variant appears only at Base — and retires the breakpoint-tabs, inline-selector-picker and Active-toggle subsections the Target Line replaced.
@@ -1572,4 +1707,4 @@ inline (§16), rather than writing and hoping.
 
 ---
 
-_`@jxsuite/studio` Specification v0.6.0-draft_
+_`@jxsuite/studio` Specification v0.7.0-draft_

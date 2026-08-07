@@ -3,19 +3,14 @@ import { describe, expect, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import {
   childIndex,
-  createState,
   flattenTree,
   getNodeAtPath,
-  hoverNode,
   isAncestor,
   nodeLabel,
   normalizeArrayChildren,
   parentElementPath,
   pathKey,
   pathsEqual,
-  popDocument,
-  pushDocument,
-  selectNode,
 } from "../src/state";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -31,11 +26,6 @@ function makeDoc() {
     ],
     tagName: "div",
   };
-}
-
-/** @param {any} [doc] */
-function makeState(doc?: any) {
-  return createState(doc || makeDoc());
 }
 
 // ─── Path utilities ──────────────────────────────────────────────────────────
@@ -371,92 +361,5 @@ describe("nodeLabel", () => {
 
   test("$id wins over slot label", () => {
     expect(nodeLabel({ $id: "hero-slot", tagName: "slot" })).toBe("hero-slot");
-  });
-});
-
-// ─── State factory ───────────────────────────────────────────────────────────
-
-describe("createState", () => {
-  test("initializes with document", () => {
-    const doc = makeDoc();
-    const s = createState(doc);
-    expect(s.document).toBe(doc);
-    expect(s.selection).toBeNull();
-    expect(s.hover).toBeNull();
-  });
-
-  test("history starts with one snapshot", () => {
-    const s = makeState();
-    expect(s.history.length).toBe(1);
-    expect(s.historyIndex).toBe(0);
-  });
-
-  test("dirty starts as false", () => {
-    expect(makeState().dirty).toBe(false);
-  });
-
-  test("ui defaults", () => {
-    const s = makeState();
-    expect(s.ui.rightTab).toBe("properties");
-    expect(s.ui.zoom).toBe(1);
-    expect(s.ui.activeMedia).toBeNull();
-  });
-});
-
-// ─── Selection / hover ───────────────────────────────────────────────────────
-
-describe("selectNode", () => {
-  test("sets selection", () => {
-    const s = selectNode(makeState(), ["children", 0]);
-    expect(s.selection).toEqual(["children", 0]);
-  });
-
-  test("clears selection with null", () => {
-    let s = selectNode(makeState(), ["children", 0]);
-    s = selectNode(s, null);
-    expect(s.selection).toBeNull();
-  });
-});
-
-describe("hoverNode", () => {
-  test("sets hover", () => {
-    const s = hoverNode(makeState(), ["children", 1]);
-    expect(s.hover).toEqual(["children", 1]);
-  });
-});
-
-// ─── Document stack ──────────────────────────────────────────────────────────
-
-describe("pushDocument / popDocument", () => {
-  test("push saves current document and opens new one", () => {
-    let s = makeState();
-    const newDoc = { tagName: "article" };
-    s = pushDocument(s, newDoc, "components/card.json");
-    expect(s.document).toBe(newDoc);
-    expect(s.documentPath).toBe("components/card.json");
-    expect(s.documentStack.length).toBe(1);
-    expect(s.selection).toBeNull();
-  });
-
-  test("pop restores previous document", () => {
-    let s = makeState();
-    s = selectNode(s, ["children", 0]);
-    const origDoc = s.document;
-    s = pushDocument(s, { tagName: "article" }, "card.json");
-    s = popDocument(s);
-    expect(s.document).toEqual(origDoc);
-    expect(s.documentStack.length).toBe(0);
-  });
-
-  test("pop returns same state if stack is empty", () => {
-    const s = makeState();
-    expect(popDocument(s)).toBe(s);
-  });
-
-  test("push resets ui media", () => {
-    let s = makeState();
-    s = { ...s, ui: { ...s.ui, activeMedia: "--md" } };
-    s = pushDocument(s, { tagName: "nav" }, "nav.json");
-    expect(s.ui.activeMedia).toBeNull();
   });
 });

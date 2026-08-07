@@ -80,11 +80,6 @@ export function pendingSchedulers(): string[] {
   return blockers;
 }
 
-/** True when no bound panel scheduler has a frame queued or a render withheld. */
-export function schedulersQuiet(): boolean {
-  return pendingSchedulers().length === 0;
-}
-
 export interface PanelScheduler {
   /** Request a render. Coalesced; deferred while a text input in the panel is focused. */
   schedule: () => void;

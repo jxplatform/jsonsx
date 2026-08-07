@@ -4,8 +4,8 @@
  * Studio.ts is a side-effect module: it wires panel modules together and never exports anything.
  * Heavy leaf modules (monaco, canvas renderer/patcher, toolbar, shortcuts, welcome screen, block
  * action bar, statusbar) are mocked so their init/mount calls capture the private studio callbacks
- * (navigateToComponent, navigateBack, openRecentProject, closeFunctionEditor, ...), which the tests
- * then drive directly.
+ * (navigateToComponent, openRecentProject, closeFunctionEditor, ...), which the tests then drive
+ * directly.
  */
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { nothing } from "lit-html";
@@ -16,14 +16,20 @@ import {
   activateTab,
   activeTab,
   closeAllTabs,
+  closePane,
+  focusPane,
   openTab,
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  splitRight,
   workspace,
 } from "../src/workspace/workspace";
-import { captureTabUi, createTab } from "../src/tabs/tab";
+import { moveCanvasStage, surfaceForPane } from "../src/canvas/canvas-surface";
 import { view } from "../src/view";
 import { shell } from "../src/shell";
 import { resetZoom } from "../src/canvas/canvas-utils";
 import type { Tab } from "../src/tabs/tab";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // ─── Global stubs (must exist before studio.ts is imported) ──────────────────
 
@@ -82,6 +88,12 @@ let shortcutHooks: Record<string, unknown> | null = null;
 
 const statusMessages: string[] = [];
 const scheduleCanvasRenderMock = mock(() => {});
+/* Which pane the shell handed its single stage to, in order. The real handover is
+   `moveCanvasStage` plus the repaint that `canvas-render.test.ts` pins; here the module is mocked,
+   so the mock performs the move and records the call. */
+const handOverMock = mock((paneId: string, wrap: HTMLElement) => {
+  moveCanvasStage(paneId, wrap);
+});
 const renderCanvasMock = mock(() => {});
 let consumePatchedReturn = false;
 const consumePatchedMock = mock((_doc: object) => consumePatchedReturn);
@@ -118,15 +130,15 @@ void mock.module("../src/services/notify.ts", () =>
   notifyModule((call) => statusMessages.push(call.message)),
 );
 
-/** What the toolbar's `openInBrowserTarget` resolves to for the `view.openInBrowser` hook. */
-let browserTarget: { url: string } | { reason: string } = { url: "https://example.test/page" };
+/** Calls the `view.openInBrowser` hook forwards to the toolbar's own implementation. */
+const openInBrowserRuns = mock(() => {});
 
 void mock.module("../src/panels/toolbar.ts", () => ({
   mount: (_el: HTMLElement, ctx: unknown) => {
     toolbarCtx = ctx;
   },
-  openInBrowserTarget: () => browserTarget,
   render: mock(() => {}),
+  runOpenInBrowser: openInBrowserRuns,
   unmount: mock(() => {}),
 }));
 
@@ -177,6 +189,7 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
 }));
 
 void mock.module("../src/canvas/canvas-render.ts", () => ({
+  handOverCanvasStage: handOverMock,
   initCanvasRender: (ctx: unknown) => {
     canvasRenderCtx = ctx;
   },
@@ -256,8 +269,25 @@ void mock.module("../src/collab/collab-session.ts", () => ({
 // ─── Platform (must be registered before import so devserver PAL is skipped) ──
 
 const CARD_DOC = JSON.stringify({ children: [], tagName: "my-card" });
+
+/**
+ * The backend watcher the bootstrap's `ensureFsSync()` subscribes to.
+ *
+ * Held here so a test can fire an event at the real subscription the boot installed, rather than
+ * building a second one — `startFsSync` returns an inert no-op when the platform has no watcher,
+ * and an inert subscription proves nothing about what the boot wired into it.
+ */
+let fsWatcher: ((events: { isDir: boolean; path: string; type: string }[]) => void) | null = null;
+
 const { platform, state } = installMockPlatform(
-  {},
+  {
+    subscribeFileEvents: ((handler: typeof fsWatcher) => {
+      fsWatcher = handler;
+      return () => {
+        fsWatcher = null;
+      };
+    }) as never,
+  },
   {
     "components/card.json": CARD_DOC,
     "components/empty.json": "",
@@ -267,6 +297,8 @@ const { platform, state } = installMockPlatform(
 );
 
 await import("../src/studio");
+const { renderLayoutPickerRow } = await import("../src/panels/head-panel");
+
 await flush();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -363,6 +395,26 @@ describe("canvas mode", () => {
     expect(canvasRenderCtx.gitDiffState).toBeNull();
   });
 
+  /*
+   * The cap on the side pane is a fact about a PANE, so the writer asks it too. Enforced only at
+   * the split, it was one context-bar click from being undone: a tab moved into the side pane could
+   * be switched straight back to Design, putting a second live Canvas host in the pane the cap
+   * exists to keep cheap.
+   */
+  test("setCanvasMode refuses a Canvas mode for a tab in the side pane", () => {
+    const tab = openShellTab(undefined, { capabilities: { modes: ["edit", "design", "source"] } });
+    splitRight();
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+    // The split already capped it to Code; asking for Design back is what must not land.
+    expect(tab.session.ui.canvasMode).toBe("source");
+    toolbarCtx.setCanvasMode("design");
+    expect(tab.session.ui.canvasMode).toBe("source");
+    // Back in the primary, the same call goes through.
+    closePane(SECONDARY_PANE);
+    toolbarCtx.setCanvasMode("design");
+    expect(tab.session.ui.canvasMode).toBe("design");
+  });
+
   test("entering git-diff mode preserves gitDiffState", () => {
     openShellTab();
     canvasRenderCtx.setGitDiffState({ path: "b.json" });
@@ -402,6 +454,64 @@ describe("canvas-wrap background click", () => {
   });
 });
 
+/* The shell has ONE stage and two panes can be focused. `⌘\` focuses the pane it creates, so the
+   moved tab's next render addresses a pane that must own `#canvas-wrap` by then — otherwise the
+   render finds no stage and the document the split just moved is simply not on screen. This is the
+   wiring, not the unit: `canvas-surface.test.ts` proves `moveCanvasStage` moves a stage, and this
+   proves studio.ts actually asks it to when the focus moves. */
+describe("the single stage follows the focused pane", () => {
+  const wrapEl = () => document.querySelector("#canvas-wrap") as HTMLElement;
+
+  test("boots owned by the primary pane", () => {
+    expect(surfaceForPane(PRIMARY_PANE).wrap).toBe(wrapEl());
+  });
+
+  test("splitting right hands the stage to the new pane, and unsplitting hands it back", async () => {
+    openShellTab({ children: [], tagName: "div" }, { documentPath: "pages/split.json" });
+    // Code is a `SECONDARY_PANE_KINDS` kind, so the split is allowed to take this tab.
+    activeTab.value!.session.ui.canvasMode = "source";
+    handOverMock.mockClear();
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    await flush();
+
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+    expect(surfaceForPane(SECONDARY_PANE).wrap).toBe(wrapEl());
+    // And the pane that lost it holds nothing — a stale wrap here is what let one pane's render
+    // Repaint the other pane's stage.
+    expect(surfaceForPane(PRIMARY_PANE).wrap).toBeNull();
+    expect(handOverMock).toHaveBeenLastCalledWith(SECONDARY_PANE, wrapEl());
+
+    focusPane(PRIMARY_PANE);
+    await flush();
+    expect(surfaceForPane(PRIMARY_PANE).wrap).toBe(wrapEl());
+    expect(surfaceForPane(SECONDARY_PANE).wrap).toBeNull();
+  });
+
+  /*
+   * Unsplit is the case the two render effects cannot see: the tab that was in the side pane is
+   * still the active tab afterwards, so nothing downstream of `activeTab` fires. The stage changing
+   * hands is the only event there is, which is why taking it is what repaints — and why the shell
+   * must take it through `handOverCanvasStage` rather than a bare move.
+   */
+  test("unsplitting takes the stage back through the handover, with the same tab active", async () => {
+    openShellTab({ children: [], tagName: "div" }, { documentPath: "pages/unsplit.json" });
+    activeTab.value!.session.ui.canvasMode = "source";
+    splitRight();
+    await flush();
+    const active = activeTab.value;
+    handOverMock.mockClear();
+
+    closePane(SECONDARY_PANE);
+    await flush();
+
+    expect(activeTab.value).toBe(active);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(handOverMock).toHaveBeenLastCalledWith(PRIMARY_PANE, wrapEl());
+    expect(surfaceForPane(PRIMARY_PANE).wrap).toBe(wrapEl());
+    expect(surfaceForPane(SECONDARY_PANE).wrap).toBeNull();
+  });
+});
+
 describe("navigateToComponent", () => {
   test("opens the component in its own tab and leaves the parent tab intact", async () => {
     const parent = openShellTab();
@@ -411,7 +521,6 @@ describe("navigateToComponent", () => {
     // The parent is still open, still on its own document, still holding its selection.
     expect(parent.documentPath).toBe("pages/current.json");
     expect(parent.session.selection).toEqual([["children", 0]]);
-    expect(parent.session.documentStack).toHaveLength(0);
 
     // The component is a real, separately-keyed tab.
     expect(workspace.tabOrder).toEqual(["shell-tab", "components/card.json"]);
@@ -465,229 +574,11 @@ describe("navigateToComponent", () => {
   });
 });
 
-/** Dispatch a Save/Discard/Cancel choice on the currently-open drill-out dialog. */
-function answerDrillPrompt(event: "confirm" | "secondary" | "cancel"): void {
-  const dlg = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
-  dlg.dispatchEvent(new Event(event));
-}
-
-describe("navigateBack", () => {
-  function frameFor(tagName: string, ui: Record<string, unknown> = {}) {
-    return {
-      dirty: false,
-      document: { children: [], tagName },
-      documentPath: "pages/parent.json",
-      mode: null,
-      selection: [],
-      sourceFormat: null,
-      ui: { ...captureTabUi(createTab({ document: {}, id: "frame" }).session.ui), ...ui },
-    };
-  }
-
-  test("no-op when the document stack is empty", async () => {
-    openShellTab();
-    await paneCtx.navigateBack();
-    expect(statusMessages).toHaveLength(0);
-  });
-
-  test("clean child leaves without a prompt and restores the parent frame", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = [frameFor("section")] as any;
-    tab.documentPath = "components/card-clean.json";
-    tab.doc.dirty = false;
-    const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
-    const before = writes();
-    await paneCtx.navigateBack();
-    expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).toBeNull();
-    expect(writes()).toBe(before);
-    expect((tab.doc.document as any).tagName).toBe("section");
-    expect(tab.session.documentStack).toHaveLength(0);
-    expect(statusMessages).toHaveLength(0);
-  });
-
-  test("Save on a dirty child writes it, then restores the parent frame", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = [frameFor("section")] as any;
-    tab.documentPath = "components/card-save.json";
-    tab.doc.dirty = true;
-    const nav = paneCtx.navigateBack();
-    await flush();
-    answerDrillPrompt("confirm");
-    await nav;
-    expect(state.files.get("components/card-save.json")).toContain('"tagName"');
-    expect((tab.doc.document as any).tagName).toBe("section");
-    expect(tab.documentPath).toBe("pages/parent.json");
-    expect(tab.session.documentStack).toHaveLength(0);
-    expect(statusMessages).toHaveLength(0);
-  });
-
-  test("Discard leaves the child unwritten and restores the parent frame", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = [frameFor("section")] as any;
-    tab.documentPath = "components/card-discard.json";
-    tab.doc.dirty = true;
-    const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
-    const before = writes();
-    const nav = paneCtx.navigateBack();
-    await flush();
-    answerDrillPrompt("secondary");
-    await nav;
-    expect(writes()).toBe(before);
-    expect((tab.doc.document as any).tagName).toBe("section");
-    expect(statusMessages).toHaveLength(0);
-  });
-
-  test("Cancel aborts navigation and keeps the child open", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = [frameFor("section")] as any;
-    tab.documentPath = "components/card-cancel.json";
-    tab.doc.dirty = true;
-    const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
-    const before = writes();
-    const nav = paneCtx.navigateBack();
-    await flush();
-    answerDrillPrompt("cancel");
-    await nav;
-    expect(writes()).toBe(before);
-    expect(tab.documentPath).toBe("components/card-cancel.json");
-    expect(tab.session.documentStack).toHaveLength(1);
-  });
-
-  test("a failing save is reported and navigation is cancelled", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = [frameFor("article")] as any;
-    tab.documentPath = "components/card-fail.json";
-    tab.doc.dirty = true;
-    const originalWrite = platform.writeFile;
-    platform.writeFile = async () => {
-      throw new Error("disk full");
-    };
-    try {
-      const nav = paneCtx.navigateBack();
-      await flush();
-      answerDrillPrompt("confirm");
-      await nav;
-    } finally {
-      platform.writeFile = originalWrite;
-    }
-    expect(statusMessages.at(-1)).toStartWith("Could not save");
-    // The child is still open — its edits were not lost to a discard.
-    expect(tab.documentPath).toBe("components/card-fail.json");
-    expect(tab.session.documentStack).toHaveLength(1);
-  });
-
-  test("popping restores the parent's UI context, not just its document", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = [
-      frameFor("section", {
-        activeMedia: "@md",
-        activeSelector: ":hover",
-        rightTab: "style",
-        zoom: 0.5,
-      }),
-    ] as any;
-    tab.documentPath = "components/card-ui.json";
-    tab.session.ui.activeMedia = "@sm";
-    tab.session.ui.activeSelector = "::before";
-    tab.session.ui.rightTab = "properties";
-    tab.session.ui.zoom = 2;
-    await paneCtx.navigateBack();
-    expect(tab.session.ui.activeMedia).toBe("@md");
-    expect(tab.session.ui.activeSelector).toBe(":hover");
-    expect(tab.session.ui.rightTab).toBe("style");
-    expect(tab.session.ui.zoom).toBe(0.5);
-  });
-});
-
-describe("navigateToLevel", () => {
-  function frame(tagName: string) {
-    return {
-      dirty: false,
-      document: { children: [], tagName },
-      documentPath: `pages/${tagName}.json`,
-      mode: null,
-      selection: [],
-      sourceFormat: null,
-      ui: captureTabUi(createTab({ document: {}, id: "frame" }).session.ui),
-    };
-  }
-
-  test("ignores out-of-range indexes", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = [frame("one")] as any;
-    await paneCtx.navigateToLevel(-1);
-    await paneCtx.navigateToLevel(5);
-    expect(tab.session.documentStack).toHaveLength(1);
-    expect(statusMessages).toHaveLength(0);
-  });
-
-  test("ignores calls when there is no stack at all", async () => {
-    openShellTab();
-    await paneCtx.navigateToLevel(0);
-    expect(statusMessages).toHaveLength(0);
-  });
-
-  test("jumps to an ancestor level, truncating the stack", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = [frame("root"), frame("mid")] as any;
-    await paneCtx.navigateToLevel(0);
-    expect((tab.doc.document as any).tagName).toBe("root");
-    expect(tab.documentPath).toBe("pages/root.json");
-    expect(tab.session.documentStack).toHaveLength(0);
-    expect(statusMessages).toHaveLength(0);
-  });
-
-  test("Save on a dirty document writes it before jumping", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = [frame("root")] as any;
-    tab.documentPath = "pages/deep-save.json";
-    tab.doc.dirty = true;
-    const nav = paneCtx.navigateToLevel(0);
-    await flush();
-    answerDrillPrompt("confirm");
-    await nav;
-    expect(state.files.has("pages/deep-save.json")).toBe(true);
-    expect((tab.doc.document as any).tagName).toBe("root");
-  });
-
-  test("Discard jumps without writing the dirty document", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = [frame("root")] as any;
-    tab.documentPath = "pages/deep-discard.json";
-    tab.doc.dirty = true;
-    const writes = () => state.calls.filter((c) => c[0] === "writeFile").length;
-    const before = writes();
-    const nav = paneCtx.navigateToLevel(0);
-    await flush();
-    answerDrillPrompt("secondary");
-    await nav;
-    expect(writes()).toBe(before);
-    expect((tab.doc.document as any).tagName).toBe("root");
-  });
-
-  test("a failing save is reported and the jump is cancelled", async () => {
-    const tab = openShellTab();
-    tab.session.documentStack = [frame("root")] as any;
-    tab.documentPath = "pages/deep-fail.json";
-    tab.doc.dirty = true;
-    const originalWrite = platform.writeFile;
-    platform.writeFile = async () => {
-      throw new Error("readonly fs");
-    };
-    try {
-      const nav = paneCtx.navigateToLevel(0);
-      await flush();
-      answerDrillPrompt("confirm");
-      await nav;
-    } finally {
-      platform.writeFile = originalWrite;
-    }
-    expect(statusMessages.at(-1)).toStartWith("Could not save");
-    // The jump was aborted — the deep doc is still active.
-    expect(tab.documentPath).toBe("pages/deep-fail.json");
-    expect(tab.session.documentStack).toHaveLength(1);
-  });
-});
+/* There is no `navigateBack` / `navigateToLevel` suite here any more.
+   Both callbacks, and the Save/Discard/Cancel prompt they shared, existed to pop
+   `session.documentStack` — a stack nothing in `src/` could push onto, so every case below drove
+   a frame the app itself could never have produced. Leaving a drilled-in document is closing a
+   tab now, and `tab-strip` owns that prompt. See `tabs/tab.ts`. */
 
 describe("closeFunctionEditor", () => {
   test("no-op when nothing is being edited", async () => {
@@ -1061,26 +952,57 @@ describe("shortcuts context", () => {
     expect(typeof shortcutHooks!.openInBrowser).toBe("function");
   });
 
-  test("Open in Browser opens the resolved page, or states why it cannot", () => {
-    const opened: string[] = [];
-    const realOpen = window.open;
-    (window as unknown as { open: unknown }).open = (url: string) => {
-      opened.push(url);
-      return null;
-    };
-    try {
-      browserTarget = { url: "https://example.test/page" };
-      (shortcutHooks!.openInBrowser as () => void)();
-      expect(opened).toEqual(["https://example.test/page"]);
+  test("Open in Browser runs the toolbar's implementation, not a second copy of it", () => {
+    // The bootstrap must DELEGATE. An inline `window.open(target.url)` here would look identical
+    // In this suite and be wrong on the desktop, where `runOpenInBrowser` routes through the
+    // Launcher's preview-navigate seam to the OS browser instead of a webview with no address bar.
+    // Resolving the target and reporting the blocking reason are the toolbar's, and are tested in
+    // `toolbar.test.ts` against the real module.
+    openInBrowserRuns.mockClear();
 
-      // Never silently absent: with no page resolvable the reason is reported (toolbar.ts:173).
-      browserTarget = { reason: "this document is not a page" };
-      (shortcutHooks!.openInBrowser as () => void)();
-      expect(opened).toHaveLength(1);
-      expect(statusMessages.at(-1)).toBe("this document is not a page");
-    } finally {
-      (window as unknown as { open: unknown }).open = realOpen;
-    }
+    (shortcutHooks!.openInBrowser as () => void)();
+
+    expect(openInBrowserRuns).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("filesystem events drop the derived caches", () => {
+  test("a watcher event makes the layout picker re-read layouts/ from disk", async () => {
+    // Three caches are keyed on WHICH FILES EXIST — the page-route list behind the Link-target
+    // Picker, the layout picker plus the effective layout's `$head`, and the `$paths` value
+    // Enumerations. Each had an invalidator and no caller, so a layout deleted outside Studio kept
+    // Being offered and its `$head` kept being attributed to the open page.
+    //
+    // Asserted through the platform call log rather than the module-private cache: what matters is
+    // That the next paint goes back to DISK, which is the thing the stale answer prevented.
+    expect(fsWatcher, "the boot must subscribe to the backend watcher").not.toBeNull();
+    state.files.set("layouts/base.json", JSON.stringify({ tagName: "html" }));
+
+    const doc = { tagName: "main" } as unknown as JxMutableNode;
+    const apply = () => {};
+    // First paint populates the cache; the second is served from it.
+    renderLayoutPickerRow(doc, apply);
+    await waitFor(() => state.calls.some((c) => c[0] === "listDirectory" && c[1] === "layouts"));
+    const afterFirst = state.calls.filter(
+      (c) => c[0] === "listDirectory" && c[1] === "layouts",
+    ).length;
+    renderLayoutPickerRow(doc, apply);
+    await flush();
+    expect(state.calls.filter((c) => c[0] === "listDirectory" && c[1] === "layouts")).toHaveLength(
+      afterFirst,
+    );
+
+    // A file appears on disk. The next paint must go back and look.
+    fsWatcher!([{ isDir: false, path: "layouts/marketing.json", type: "add" }]);
+    renderLayoutPickerRow(doc, apply);
+    await waitFor(
+      () =>
+        state.calls.filter((c) => c[0] === "listDirectory" && c[1] === "layouts").length >
+        afterFirst,
+    );
+    expect(
+      state.calls.filter((c) => c[0] === "listDirectory" && c[1] === "layouts").length,
+    ).toBeGreaterThan(afterFirst);
   });
 });
 
@@ -1263,13 +1185,6 @@ describe("remaining wiring arrows", () => {
     const before = state.calls.filter((c) => c[0] === "writeFile").length;
     await toolbarCtx.saveFile();
     expect(state.calls.filter((c) => c[0] === "writeFile").length).toBe(before + 1);
-  });
-
-  test("tab bar closeFunctionEditor shares the toolbar delegate (no-op path)", async () => {
-    const tab = openShellTab();
-    tab.session.ui.editingFunction = null;
-    await paneCtx.closeFunctionEditor();
-    expect(tab.session.ui.editingFunction).toBeNull();
   });
 
   test("welcome openRecentProject opens the project directly", async () => {

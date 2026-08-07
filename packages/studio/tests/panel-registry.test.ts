@@ -170,13 +170,10 @@ describe("the Navigator's panel set", () => {
     registerNavigatorPanels();
     registerNavigatorPanels();
     expect(listPanels("navigator")).toHaveLength(9);
-    // …and it composes the Bottom dock's four in the same pass, still exactly once each.
-    expect(listPanels("bottom").map((p) => p.id)).toEqual([
-      "problems",
-      "diff",
-      "logic",
-      "activity",
-    ]);
+    // …and it composes the Bottom dock's tabs in the same pass, still exactly once each. There is
+    // No `diff` among them: it was a reserved id with no record behind it, so it could only ever
+    // Select a hidden tab.
+    expect(listPanels("bottom").map((p) => p.id)).toEqual(["problems", "logic", "activity"]);
   });
 
   test("the three renamed ids are gone", () => {

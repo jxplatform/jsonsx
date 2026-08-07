@@ -56,8 +56,7 @@
   -webkit-app-region: drag;
 }
 #toolbar sp-action-group,
-#toolbar sp-action-button,
-#toolbar .breadcrumb {
+#toolbar sp-action-button {
   -webkit-app-region: no-drag;
 }
 .window-controls {
@@ -227,13 +226,30 @@
 #tab-strip:empty {
   display: none;
 }
+/* ⑥ The jump bar. Like `#pane-chrome` below it, this is a PER-PANE surface sharing the pane's
+   own grid cell rather than owning a row of the application grid — the second pane would have
+   nowhere to put an application row. `align-self: start` is what keeps it the height of its own
+   content instead of the height of the cell, so the bar never covers the stage it sits above. */
+#jump-bar {
+  grid-row: 3;
+  grid-column: 3;
+  align-self: start;
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+  max-width: 100%;
+}
 /* The pane's chrome layer — regions ⑦ and ⑩. It shares the pane's grid cell with
    `#canvas-wrap` rather than owning a row of the application grid, because a PER-PANE surface
    cannot be an application-level track: the second pane would have nowhere to put one. The layer
-   itself is inert; only its two children take the pointer. `canvas.css` owns their looks. */
+   itself is inert; only its two children take the pointer. `canvas.css` owns their looks.
+
+   Offset by `--jump-bar-h` for the same reason `#canvas-wrap` is: the jump bar is stacked over
+   the same cell, and one projection per bar is what keeps "no tab open" costing no dead band. */
 #pane-chrome {
   grid-row: 3;
   grid-column: 3;
+  margin-top: var(--jump-bar-h, 0px);
   position: relative;
   z-index: 2;
   min-width: 0;
@@ -260,13 +276,15 @@
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
 }
-/* The stage. Offset by `--pane-context-h` (written by `panels/pane-context.ts`) so the context bar
-   stacked over this cell never covers the document — and by zero when no tab is open, so the
-   welcome screen does not sit under a band nothing explains. */
+/* The stage. Offset by the SUM of the two bars stacked over this cell — `--jump-bar-h` (written by
+   `panels/jump-bar.ts`) and `--pane-context-h` (by `panels/pane-context.ts`) — so neither ever
+   covers the document, and by zero when no tab is open, so the welcome screen does not sit under a
+   band nothing explains. Two variables rather than one total: each bar owns its own answer, and a
+   bar that renders nothing writes 0 without knowing the other exists. */
 #canvas-wrap {
   grid-row: 3;
   grid-column: 3;
-  margin-top: var(--pane-context-h, 0px);
+  margin-top: calc(var(--jump-bar-h, 0px) + var(--pane-context-h, 0px));
   position: relative;
   overflow: auto;
   background: var(--bg-panel);
@@ -801,7 +819,88 @@
 #statusbar .sb-state {
   cursor: default;
 }
-#statusbar .sb-sep {
+
+/* ─── ⑥ Jump bar ──────────────────────────────── */
+/* The pane's address: project › file › node › node, every step a command. It reads at a glance
+   because it is ONE line at the top of the pane — the two half-breadcrumbs it replaces were 28px of
+   pane chrome (only while a takeover editor was open) and 11px of status bar (only while something
+   was selected), and neither ever showed the whole chain.
+
+   It scrolls rather than wraps: a deep selection must not push the stage down by a second line, and
+   the LEAF is the part you are reading, so the overflow is taken at the start. */
+.jump-bar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  height: 24px;
+  padding: 0 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+.jump-bar::-webkit-scrollbar {
+  display: none;
+}
+.jump-bar .jb-seg {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.jump-bar .jb-crumb {
+  max-width: 28ch;
+  overflow: hidden;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.jump-bar button.jb-crumb {
+  cursor: pointer;
+}
+.jump-bar button.jb-crumb:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+.jump-bar button.jb-crumb:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+/* Where you ARE is stated by weight, not by removing the control: the leaf still selects, which is
+   how a stray click in the canvas is undone without leaving the bar. */
+.jump-bar .jb-crumb[aria-current] {
+  color: var(--fg);
+}
+/* A step with no command is a readout, not a dead button — an address with a hole in it would be a
+   lie about containment. No hover, no pointer, no promise. */
+.jump-bar .jb-crumb--static {
+  cursor: default;
+}
+.jump-bar .jb-alts {
+  padding: 0 2px;
+  border: none;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.jump-bar .jb-alts:hover {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+.jump-bar .jb-sep {
+  flex-shrink: 0;
   color: var(--fg-dim);
   opacity: 0.6;
 }

@@ -82,8 +82,13 @@ export interface PatchConsumer {
    * legacy (parent-DOM) consumer ignores it and reads the post-mutation reactive doc instead.
    */
   apply: (tab: Tab, ops: JxPatchOp[], record?: TransactionRecord) => void;
-  /** Schedule a full canvas render as the fallback path, recording the reason. */
-  escalate: (reason: string) => void;
+  /**
+   * Schedule a full canvas render as the fallback path, recording the reason.
+   *
+   * `tab` names the document that failed to patch, and so the PANE whose stage must be rebuilt: a
+   * stage that is not showing this document is not out of date and must not be re-rendered.
+   */
+  escalate: (reason: string, tab: Tab) => void;
 }
 
 let _consumer: PatchConsumer | null = null;

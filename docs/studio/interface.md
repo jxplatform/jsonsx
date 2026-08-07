@@ -1,23 +1,26 @@
 ---
 title: "The workspace"
-description: "Every region of the Jx Studio window: the Command Bar, the Navigator rail and dock, the pane grid, the Inspector, the Bottom dock, and the status bar."
+description: "Every region of the Jx Studio window: the Command Bar, the Navigator, the pane grid, the jump bar, the Inspector, the Bottom dock, and the status bar."
 spec:
   - studio.md#3.1
   - studio.md#16
+  - studio.md#18
 code:
   - packages/studio/src/panels/toolbar.ts
   - packages/studio/src/panels/activity-bar.ts
   - packages/studio/src/panels/left-panel.ts
   - packages/studio/src/files/files.ts
   - packages/studio/src/panels/right-panel.ts
+  - packages/studio/src/panels/jump-bar.ts
   - packages/studio/src/panels/bottom-dock.ts
+  - packages/studio/src/panels/formula-workspace.ts
   - packages/studio/src/panels/statusbar.ts
   - packages/studio/src/ui/panel-resize.ts
 ---
 
 # The workspace
 
-The Jx Studio window is one workspace with a fixed set of regions: the **Command Bar** across the top, the **Navigator** (a labelled rail and the panel it opens) on the left, the **pane grid** in the middle with the canvas in it, the **Inspector** on the right, the **Bottom dock** under the panes, and the **status bar** along the bottom. This page walks through each one. For a quicker orientation, start with **[A tour of Jx Studio](/docs/start/studio-tour)**.
+The Jx Studio window is one workspace with a fixed set of regions: the **Command Bar** across the top, the **Navigator** (a labelled rail and the panel it opens) on the left, the **pane grid** in the middle with the canvas in it and the **jump bar** naming where you are above it, the **Inspector** on the right, the **Bottom dock** under the panes, and the **status bar** along the bottom. This page walks through each one. For a quicker orientation, start with **[A tour of Jx Studio](/docs/start/studio-tour)**.
 
 ![The Jx Studio workspace with the canvas in the center, panels on both sides, and the Command Bar across the top](../images/hero.png)
 
@@ -29,7 +32,7 @@ From left to right:
 
 - The **⬢ menu** holds the commands that don't need a permanent button — **Open Project…**, **Open Recent…**, **New Project…**, **Open Library**, **Preferences…**, **Zen Mode**, and the rest — each with its own keyboard shortcut printed beside it.
 - The **layout tabs** — **Write · Design · Build · Ship** — are named arrangements of the workspace. Clicking one sets the Navigator panel, the dock widths, the Inspector tab and the Bottom dock in a single step. Double-click a tab to rename it, and press **+** to save whatever is on screen now as a layout of your own. Layouts are remembered per project.
-- The **Command Center pill** sits in the middle: `◈ project › document › selection`, with :kbd[⌘K] at its right end. It is the app's address — it always names the project you're in, the document you're editing and the element you have selected — and each segment is a button that opens the palette already scoped to that level. Click the pill's empty space to open the palette with nothing pre-picked.
+- The **Command Center pill** sits in the middle: `◈ project › document › selection`, with :kbd[⌘K] at its right end. It names the project you're in, the document you're editing and the element you have selected, and each segment is a button that opens the palette already scoped to that level. Click the pill's empty space to open the palette with nothing pre-picked. The pill is where you go to _search_ for a place; the [jump bar](#the-jump-bar) over the pane is where you _step_ to one.
 - The **verb cluster** on the right holds the four actions worth a permanent button: **Save**, **Open in Browser**, **Undo** and **Redo**. A greyed-out one tells you in its tooltip what it is waiting for.
 - **Dock toggles** for the Navigator (:kbd[⌘B]), the Inspector (:kbd[⌘⌥B]) and the Bottom dock (:kbd[⌘J]).
 
@@ -86,9 +89,24 @@ If the write itself fails, the reason arrives as a **Problem** in the [Bottom do
 
 ## Panes and the canvas
 
-The middle of the window is the **pane grid**: one editor pane, or two side by side (:kbd[⌘\] splits, :kbd[⌘⌥0] focuses the second one). Each pane has its own strip of open documents along its top and its own context bar below that, and renders one document in one editor — Canvas, Code, Grid, Diff, Library or Project Styles. See **[Documents and panes](/docs/studio/interface/tabs)**.
+The middle of the window is the **pane grid**: one editor pane, or two (:kbd[⌘\] gives the open document a second pane, :kbd[⌘⌥0] focuses it). A pane renders one document in one editor — **Canvas**, **Code**, **Grid**, **Diff**, **Entry**, **Library** or **Project Styles** — and the strip of open documents, the jump bar, the context bar and the editing surface itself all describe the pane you're in. The canvas belongs to the main pane; the second one takes the reading editors. See **[Documents and panes](/docs/studio/interface/tabs)**.
 
 A Canvas pane renders the open file live. Panning, zooming, selection and direct manipulation are covered in **[The canvas](/docs/studio/interface/canvas)**. A page's **Document Header** — title, route, layout picker and the SEO block — is drawn at the top of the artefact itself, inside the stage, because it is part of the document rather than a view of it.
+
+## The jump bar
+
+Between a pane's strip of documents and its context bar, one line names **where you are**, from the outside in — the project, the file, and the chain of elements down to the one you have selected:
+
+`◈ Portfolio › pages/blog/[slug].json › Repeater › article › h1 — Latest posts`
+
+The last segment is where you are, named the way the [Outline](/docs/studio/design/layers) names it; the ones above it print their tag, so a deep address still fits on one line.
+
+- **Every segment is a button**, and each one runs a real Studio command — so the tooltip carries that command's own name and shortcut. The project opens your recents, the file opens file search, an element segment selects that element.
+- **A segment with siblings carries a ⌄.** It lists the other children of the same parent, under their Outline names, with the one you're on marked. A step whose parent has only one child shows no chevron: one alternative is not a choice.
+- **A step you can't take stays on the bar as plain text** rather than disappearing. An address with a hole in it would be a lie about what contains what.
+- With a formula or a function open in the Bottom dock's **Logic** tab, the address ends there — `fx total`, `ƒ onSubmit` — because a definition has no element under it.
+
+The bar names the **primary** selection. Select several elements and the count is in the status bar; the bar keeps naming the one the Inspector is pointed at.
 
 ## Inspector
 
@@ -110,7 +128,10 @@ Studio remembers your layout — dock widths and which docks are collapsed carry
 Press :kbd[⌘J] for the dock under the pane grid. It sits in the panes' column only, so opening it never narrows the Navigator or the Inspector, and it opens **collapsed** — an empty list shouldn't spend canvas to say nothing.
 
 - **Problems** — everything Studio is waiting for you to fix, grouped by where it came from. A row can carry the file it happened in (click it to open the file) and a disclosure with the captured log. When there is something to do about it, the row shows the button for it — the real command, with its own name, its shortcut, and its reason when it isn't available yet. Dismiss a row you've dealt with, or clear the list.
+- **Logic** — the [formula workspace](/docs/studio/logic/formula-workspace) and the [function editor](/docs/studio/logic/code). It joins the strip when you open a formula or a function body and leaves it when you close one, so the tab exists exactly while there is something in it. Opening one reveals the dock on it; close the dock over an open formula and it stays closed until you open another.
 - **Activity** — one entry per long operation: a title, a status line, the steps it's working through, a streaming log, and **Cancel** when the operation can be cancelled. An entry outlives the run, so you can read what a publish or an import actually did after it finished — and a failure leaves both the entry and a Problem carrying its log.
+
+Because the dock sits under the stage rather than over it, **the page keeps rendering while you edit its logic** — you can watch a value change on the canvas as you edit the formula that computes it.
 
 Drag the dock's top edge to resize it, or close it with the **×** in its tab strip.
 
@@ -124,7 +145,7 @@ The strip along the bottom carries **ambient state only** — things that are tr
 
 - **Project** — the project name, the git branch with its ahead/behind counts, a count of open problems, and who else is in the document with you.
 - **Document** — the document's path, the pane's effective view (`Edit`, `Design`, `Preview`, `Code`, `Grid`, `Library`…) in the same words the [pane context bar](/docs/studio/interface/tabs#the-pane-context-bar) uses, and the save state in words: **Unsaved changes**, **Saved**, **Saved 2 minutes ago**, or **Read-only** when a collaborator holds the file.
-- **Selection** — the selected element and the chain of elements above it, each step clickable so you can jump to any ancestor.
+- **Selection** — what the address above can't say: **3 selected** when more than one element is picked, or the style rule the Style panel is editing in Project Styles. The element itself, and the chain above it, are on the [jump bar](#the-jump-bar), which states them permanently.
 
 Nearly every item is a button that runs the command behind it: the project name opens your recents, the branch reveals Source Control, the problem count opens the Bottom dock, **Unsaved changes** saves.
 

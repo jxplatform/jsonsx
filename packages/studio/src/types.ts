@@ -462,16 +462,6 @@ export interface CanvasPanel {
   renderScope: { stop: () => void; run: <T>(fn: () => T) => T | undefined } | null;
 }
 
-export interface DocumentStackEntry {
-  document: JxMutableNode;
-  documentPath: string | null;
-  /** The whole selection set the frame was left with — `[]` when nothing was selected. */
-  selection: JxPath[];
-  dirty?: boolean;
-  mode?: string;
-  sourceFormat?: string | null;
-}
-
 export interface FunctionEditDef {
   type: string;
   defName?: string;
@@ -483,8 +473,8 @@ export interface FunctionEditDef {
 }
 
 /**
- * Identifies which document position's `$expression` the full-screen formula workspace is editing:
- * a state entry (`type: "def"` + defName) or an element event binding (`type: "event"` + path +
+ * Identifies which document position's `$expression` the Bottom dock's Logic tab is editing: a
+ * state entry (`type: "def"` + defName) or an element event binding (`type: "event"` + path +
  * eventKey). Mirrors FunctionEditDef, the Monaco function editor's target shape.
  */
 export interface FormulaEditDef {

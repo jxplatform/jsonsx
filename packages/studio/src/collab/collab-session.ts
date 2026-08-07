@@ -494,21 +494,42 @@ export function collabSourceContext(tab: Tab): {
 }
 
 /**
+ * Whether this client is in `tab`'s session **without write access**.
+ *
+ * The single spelling of "this tab cannot be saved by me". A read-only client edits its local
+ * reactive document freely — nothing blocks structural editing, and `transactDoc` still marks the
+ * tab dirty — but `onTransact` gates BOTH `publishRecord` and `scheduleMirror` behind `canWrite`,
+ * so those edits exist in this browser and nowhere else: not in the Y-doc, not on the relay, not on
+ * disk. Every question that turns on "is this work recoverable from somewhere?" has to ask this
+ * one, which is why it is exported rather than re-derived per caller.
+ */
+export function collabReadOnly(tab: Tab): boolean {
+  const state = collabState(tab);
+  return state.active && state.readOnly;
+}
+
+/**
  * Cmd+S for a collab tab: refresh the source mirror and ask the provider to persist now. Returns
- * false when the tab has no active session (caller saves through the file path as usual).
+ * false when the tab has no active session (caller saves through the file path as usual), and false
+ * when this client cannot write to the session it does have.
+ *
+ * **The read-only `false` is the load-bearing one.** This used to skip `mirrorNow` for a read-only
+ * client and then flush and return `true` anyway — flushing a Y-doc that had received none of the
+ * edits, and reporting the result as a save. `saveFile` stamped "Saved just now" on it and the tab
+ * strip's Save button closed the tab on top of work that was still only in the browser. Answering
+ * `false` is the truth; `saveFile` is where the read-only tab is refused outright, so this never
+ * becomes a licence to write the file behind the room's back.
  */
 export async function collabSave(tab: Tab): Promise<boolean> {
   const session = runtimeOf(tab)?.session;
-  if (!session?.synced) {
+  if (!session?.synced || !session.canWrite) {
     return false;
   }
   if (session.mirrorTimer) {
     clearTimeout(session.mirrorTimer);
     session.mirrorTimer = null;
   }
-  if (session.canWrite) {
-    await mirrorNow(session);
-  }
+  await mirrorNow(session);
   await session.handle.flush();
   return true;
 }
@@ -530,8 +551,13 @@ const liveTabs = new Set<Tab>();
 
 /**
  * Idempotently wire collaboration for a tab. Installs a per-tab watcher that attaches a session for
- * the tab's file while it is at the top of its document stack, detaches while drilled into a
- * component, and tears everything down when the tab's scope is disposed.
+ * the tab's file unless the author has opted out, and tears everything down when the tab's scope is
+ * disposed.
+ *
+ * The watcher used to carry a second condition — detach while the tab is "drilled into" a
+ * sub-document — guarding a `session.documentStack` that nothing could ever push onto. It never
+ * fired, and a tab holds one document now: drilling in opens a tab of its own, which gets its own
+ * watcher for its own file.
  *
  * **`project.json` is out of replication.** It is the one document whose edits arrive from surfaces
  * that are not the canvas — every settings form, the imports panel, the deploy flow — and whose
@@ -556,8 +582,7 @@ export function ensureCollab(tab: Tab): void {
   liveTabs.add(tab);
   tab.scope.run(() => {
     effect(() => {
-      const drilled = (tab.session.documentStack?.length ?? 0) > 0;
-      if (drilled || runtime.optedOut.value) {
+      if (runtime.optedOut.value) {
         detachSession(tab);
       } else {
         void attachSession(tab);

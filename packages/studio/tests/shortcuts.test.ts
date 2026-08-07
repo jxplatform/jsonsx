@@ -60,6 +60,9 @@ const { createCommandRegistry } = await import("../src/commands/registry");
 const { createLiveContext } = await import("../src/commands/live-context");
 const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
 const store = await import("../src/store");
+const { activeCanvasSurface } = await import("../src/canvas/canvas-surface");
+/* Panels belong to a pane's stage now (`src/canvas/canvas-surface.ts`), not to the app. */
+const surface = activeCanvasSurface();
 const { initShellRefs } = store;
 const { activeTab, closeAllTabs, openTab, workspace } = await import("../src/workspace/workspace");
 const { initLayers, isModalOpen } = await import("../src/ui/layers");
@@ -209,7 +212,7 @@ beforeEach(() => {
   ]) {
     m.mockClear();
   }
-  store.canvasPanels.length = 0;
+  surface.panels.length = 0;
   document.body.focus();
   resetProjectShell();
   shell.focusRegion = "pane";
@@ -425,7 +428,7 @@ test("window resize re-applies the edit zoom from the live column width", () => 
   sc.append(column);
   wrapEl().append(sc);
   stubRect(column, { width: 600 });
-  store.canvasPanels.push({ _width: null, canvas, viewport } as never);
+  surface.panels.push({ _width: null, canvas, viewport } as never);
 
   window.dispatchEvent(new Event("resize"));
 
@@ -471,7 +474,7 @@ describe("the old dispatch — twelve modifier chords", () => {
     expect(workspace.tabOrder).toEqual(["test-tab"]);
   });
 
-  test("⌘W on a dirty tab confirms first, then closes", async () => {
+  test("⌘W on a dirty tab prompts the tab strip's own three-way dialog, then closes", async () => {
     const tab = openTab({
       document: { tagName: "div" },
       documentPath: "/project/dirty.json",
@@ -482,7 +485,11 @@ describe("the old dispatch — twelve modifier chords", () => {
     await flush();
     const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper");
     expect(dialog?.getAttribute("headline")).toBe("Unsaved Changes");
-    dialog!.dispatchEvent(new Event("confirm"));
+    // ⌘W calls `requestClose` rather than re-implementing it, so it is the SAME dialog the × opens
+    // — Save included. Copying the ×'s wording into this file is how the two drifted last time.
+    expect(dialog?.getAttribute("confirm-label")).toBe("Save");
+    expect(dialog?.getAttribute("secondary-label")).toBe("Close Without Saving");
+    dialog!.dispatchEvent(new Event("secondary"));
     await flush();
     expect(workspace.tabOrder).toEqual(["test-tab"]);
   });

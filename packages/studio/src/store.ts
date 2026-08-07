@@ -9,14 +9,13 @@
 
 // ─── Re-exports from state.js ────────────────────────────────────────────────
 
-import { activeTab } from "./workspace/workspace";
+import { activeTab, PRIMARY_PANE } from "./workspace/workspace";
+import { registerCanvasSurface } from "./canvas/canvas-surface";
 import { INPUT_DEBOUNCE } from "./ui/timing";
 import type { JxPath } from "./state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
-import type { CanvasPanel } from "./types";
 
 export {
-  createState,
   getNodeAtPath,
   childList,
   flattenTree,
@@ -29,7 +28,6 @@ export {
   projectState,
   setProjectState,
   requireProjectState,
-  updateFrontmatter,
 } from "./state";
 
 // ─── Shell element refs (populated by initShellRefs) ─────────────────────────
@@ -48,11 +46,11 @@ export function initShellRefs() {
   rightPanel = document.querySelector("#right-panel") as HTMLElement;
   toolbarEl = document.querySelector("#toolbar") as HTMLElement;
   statusbarEl = document.querySelector("#statusbar") as HTMLElement;
+  // `#canvas-wrap` is the PRIMARY pane's stage, not "the canvas": the panels mounted into it, the
+  // Mode they were drawn in and the render they escalate to belong to that pane (see
+  // `canvas/canvas-surface.ts`). A second pane registers its own host the same way.
+  registerCanvasSurface(PRIMARY_PANE, canvasWrap);
 }
-
-// ─── Shared containers (mutated in place by owner modules) ───────────────────
-
-export const canvasPanels: CanvasPanel[] = [];
 
 // ─── Shared constants ────────────────────────────────────────────────────────
 

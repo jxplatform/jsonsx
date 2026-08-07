@@ -206,7 +206,10 @@ describe("left panel — document tabs", () => {
     const [snapshot, deps] = captured.signals as [Record<string, unknown>, Record<string, AnyFn>];
     expect(snapshot.document).toBe(activeTab.value!.doc.document);
     expect(snapshot.selection).toBe(activeTab.value!.session.selection);
-    expect(typeof deps.updateSession).toBe("function");
+    // A repaint, and nothing else. `renderCanvas` and `updateSession` were threaded through here
+    // Until nothing in the panel read either — see `SignalsPanelCtx`.
+    expect(typeof deps.renderLeftPanel).toBe("function");
+    expect(Object.keys(deps)).toEqual(["renderLeftPanel"]);
   });
 
   test("data tab passes document state and canvas scope", async () => {

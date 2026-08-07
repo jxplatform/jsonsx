@@ -23,12 +23,17 @@
  * 5. `layers.overlayIdleBlockers()` — overlays still in transition. Only the SETTLING window counts: a
  *    resting toast is not a blocker, which is what lets `toastsAreHeld()` hold one open for a
  *    capture without `probeIdle()` waiting forever alongside it (plan §13.7's named exception).
+ * 6. `activity-panel.activityIdleBlockers()` — operations still RUNNING in the Activity tab. Not a
+ *    duplicate of `platform`: an activity spans a whole operation (an install, a deploy, a clone)
+ *    across many PAL calls, so the gaps between them look quiet at the seam while the operation is
+ *    plainly mid-flight. A finished entry never blocks — the list stays on screen forever.
  *
  * The consumers are the `packages/studio:verify` skill, the screenshot runner and P4.2's Activity
  * tracker (this is a read-only projection of the same in-flight set that dock renders).
  */
 
 import { rendersInFlight } from "../store";
+import { activityIdleBlockers } from "../panels/activity-panel";
 import { pendingSchedulers } from "../panels/panel-scheduler";
 import { canvasIdleBlockers } from "../canvas/iframe-host";
 import { platformInFlight } from "../platform";
@@ -64,7 +69,7 @@ export class NotIdleError extends Error {
 }
 
 /**
- * The five live sources.
+ * The six live sources.
  *
  * Built per call rather than held in a module constant so a test can substitute one without
  * unpicking the others, and so a second window's hosts are never read through the first window's
@@ -95,6 +100,7 @@ export function defaultIdleSources(): IdleSource[] {
       name: "platform",
     },
     { blockers: overlayIdleBlockers, name: "overlay" },
+    { blockers: activityIdleBlockers, name: "activity" },
   ];
 }
 

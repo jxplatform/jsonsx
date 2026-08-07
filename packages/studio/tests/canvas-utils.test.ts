@@ -31,10 +31,22 @@ import {
   setUserZoom,
   updateActivePanelHeaders,
 } from "../src/canvas/canvas-utils";
-import { canvasPanels, canvasWrap, initShellRefs, registerRenderer } from "../src/store";
-import { closeAllTabs } from "../src/workspace/workspace";
+import { canvasWrap, initShellRefs, registerRenderer } from "../src/store";
+import { activeCanvasSurface, surfaceForPane } from "../src/canvas/canvas-surface";
+import {
+  closeAllTabs,
+  openTab,
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  workspace,
+} from "../src/workspace/workspace";
 import { view } from "../src/view";
 import type { CanvasPanel } from "../src/types";
+
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const canvasPanels = activeCanvasSurface().panels;
 
 // ─── Test context plumbing ────────────────────────────────────────────────────
 
@@ -143,23 +155,64 @@ describe("canvasPanelTemplate", () => {
     expect(panel._width).toBeNull();
   });
 
+  /** Mount a panel the way a render does — into a pane's stage, which is what addresses it. */
+  async function mountPanel(
+    media: string | null,
+    label: string,
+    paneId: string = PRIMARY_PANE,
+  ): Promise<CanvasPanel> {
+    const { tpl, panel } = canvasPanelTemplate(media, label, false, 768);
+    await renderInto(tpl);
+    surfaceForPane(paneId).panels.push(panel);
+    return panel;
+  }
+
+  function clickHeader(panel: CanvasPanel) {
+    const header = panel.element!.querySelector(".canvas-panel-header") as HTMLElement;
+    header.click();
+  }
+
   test("header click sets activeMedia from panel media", async () => {
     const tab = resetWorkspaceWithTab();
-    const { tpl, panel } = canvasPanelTemplate("md", "Tablet (768px)", false, 768);
-    await renderInto(tpl);
-    const header = panel.element?.querySelector(".canvas-panel-header") as HTMLElement;
-    header.click();
+    clickHeader(await mountPanel("md", "Tablet (768px)"));
     expect(tab.session.ui.activeMedia).toBe("md");
   });
 
   test("base panel header click resets activeMedia to null", async () => {
     const tab = resetWorkspaceWithTab();
     tab.session.ui.activeMedia = "md";
-    const { tpl, panel } = canvasPanelTemplate("base", "Base (320px)", false, 320);
-    await renderInto(tpl);
-    const header = panel.element?.querySelector(".canvas-panel-header") as HTMLElement;
-    header.click();
+    clickHeader(await mountPanel("base", "Base (320px)"));
     expect(tab.session.ui.activeMedia).toBeNull();
+  });
+
+  /*
+   * The breakpoint belongs to the tab of the pane that MOUNTED the artboard. This is the
+   * parent-side twin of the iframe's `hit` message: `updateUi` writes to `activeTab`, which is the
+   * FOCUSED pane's tab, so clicking a header in a pane the keyboard is not in set another
+   * document's breakpoint — and the Style panel then edited a compound block nobody had opened.
+   */
+  test("the header writes the breakpoint of the pane that mounted it, not the focused one", async () => {
+    const focused = resetWorkspaceWithTab(undefined, { documentPath: "/project/a.json", id: "a" });
+    const other = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "/project/b.json",
+      id: "b",
+    });
+    // Tab "b" lives in the side pane; the keyboard stays in the primary, on "a".
+    workspace.panes[0]!.tabOrder = ["a"];
+    workspace.panes[0]!.activeTabId = "a";
+    workspace.panes = [
+      ...workspace.panes,
+      { activeTabId: "b", id: SECONDARY_PANE, tabOrder: ["b"] },
+    ];
+    workspace.activePaneId = PRIMARY_PANE;
+
+    clickHeader(await mountPanel("md", "Tablet (768px)", SECONDARY_PANE));
+
+    expect(other.session.ui.activeMedia).toBe("md");
+    expect(focused.session.ui.activeMedia).toBeNull();
+
+    surfaceForPane(SECONDARY_PANE).panels.length = 0;
   });
 });
 

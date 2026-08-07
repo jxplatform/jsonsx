@@ -151,7 +151,9 @@ function remoteStep(): DeployStep {
       state: status === null ? "unknown" : "todo",
     };
   }
-  if (status.remotes.length === 0) {
+  // A GitStatus from a host that reports no remotes array is not a repo with remotes — it is a
+  // Host that did not say. Reading through it took the whole status bar down with a TypeError.
+  if ((status.remotes ?? []).length === 0) {
     return {
       command: "git.createGithubRepository",
       detail: "This repository is local only — nothing outside this machine can build it.",

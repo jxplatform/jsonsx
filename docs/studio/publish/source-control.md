@@ -20,7 +20,7 @@ With no project open at all, the panel says what source control is for and offer
 
 The **Local Changes** tab lists every changed file, grouped by the part of the project it belongs to. Each row shows the file's name and a status badge — **M** for modified, **A** for added, **U** for a brand-new untracked file.
 
-- Click a changed file to open a diff in the editor pane — what changed since your last commit.
+- Click a changed file to see what changed since your last commit: the pane switches to its **Diff** editor, at full pane size. **Diff** is also one of the editors a [second pane](/docs/studio/interface/tabs#two-panes) can hold, so a review can have a pane of its own.
 - Click **+** on a row to stage it (mark it for the next commit), or the header's stage-all button to stage everything. Staged files move to a **Staged Changes** section, where **−** unstages them, and an unstage-all button beside its count clears the section.
 - Click the undo icon on a row to discard its changes. Studio asks for confirmation first. An untracked file has nothing to go back to, so its undo icon is disabled rather than offering to throw the file away.
 

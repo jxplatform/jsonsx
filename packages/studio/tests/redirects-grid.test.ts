@@ -32,6 +32,8 @@ void mock.module("../src/ui/layers.js", () => ({
     return { dismiss: () => host.remove(), host, update: () => {} };
   },
   showConfirmDialog: async () => true,
+  /* The tab strip's close is a §8.7 three-way now; this partial mock has to name it. */
+  showSaveDiscardDialog: async () => "discard",
   showDialog: (templateFn: (done: (value: unknown) => void) => TemplateResult) =>
     new Promise((resolve) => {
       const host = document.createElement("div");

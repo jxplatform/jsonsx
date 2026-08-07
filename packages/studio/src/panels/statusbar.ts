@@ -12,8 +12,13 @@
  *
  * ```text
  * PROJECT                        ‖ DOCUMENT                       ‖ SELECTION
- * name · branch ↑n↓n · problems  ‖ path · view · save state       ‖ ancestor breadcrumb
+ * name · branch ↑n↓n · problems  ‖ path · view · save state       ‖ count · style rule
  * ```
+ *
+ * The SELECTION field held an ancestor breadcrumb until region ⑥ landed. The trail is an ADDRESS,
+ * not ambient state, and it now lives once — in the jump bar (`panels/jump-bar.ts`), which merged
+ * it with the pane context bar's document-stack chain. What is left here is the count and the
+ * Stylebook's rule, neither of which is a path.
  *
  * `statusbar/project`, `statusbar/document` and `statusbar/selection` are three placements the
  * level × placement matrix already declares, each admitting exactly one level — so the bar's
@@ -35,20 +40,20 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { getNodeAtPath, nodeLabel, projectState, statusbarEl } from "../store";
+import { projectState, statusbarEl } from "../store";
+import { documentLabel } from "./jump-bar";
 import { shell } from "../shell";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
-import { primarySelection } from "../tabs/selection";
 import { EDITOR_KIND_LABELS } from "../commands/context";
 import { activeRegistry } from "../commands/active-registry";
+import { deployStatusItem } from "../publish/deploy-checklist";
 import { collabState } from "../collab/collab-state";
 import { problemCount, problems } from "../services/notify";
 import { now } from "../services/clock";
 import { relativeTime } from "./ai-chat/sessions-view";
 import type { CommandRegistry } from "../commands/registry";
 import type { EditorKind } from "../commands/context";
-import type { JxPath } from "../state";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
 
@@ -148,6 +153,7 @@ function projectFieldTpl(registry: CommandRegistry | null) {
   const project = projectState;
   const { status } = shell.git;
   const count = problemCount();
+  const deploy = deployStatusItem();
   const peers = activeTab.value ? collabState(activeTab.value).peers.length : 0;
   return fieldTpl("statusbar/project", [
     project
@@ -158,6 +164,16 @@ function projectFieldTpl(registry: CommandRegistry | null) {
           command: "panel.focus.git",
           label: `⑂ ${status.branch}${aheadBehindLabel(status.ahead, status.behind)}`,
           title: `${status.files.length} changed file(s)`,
+        })
+      : nothing,
+    // Where the project stands with shipping — ambient state, so it belongs beside the branch and
+    // The problem count rather than in a toast. `deployStatusItem` names the NEXT missing step
+    // While anything is missing, and the deployment itself once nothing is.
+    deploy
+      ? itemTpl(registry, {
+          command: deploy.command,
+          label: deploy.label,
+          title: deploy.title,
         })
       : nothing,
     count > 0
@@ -194,15 +210,6 @@ export function viewLabel(kind: EditorKind, view: string): string {
     return EDITOR_KIND_LABELS[kind];
   }
   return view.charAt(0).toUpperCase() + view.slice(1);
-}
-
-/** The document's path with the project root taken off — the root is already field one. */
-export function documentLabel(path: string | null): string {
-  if (!path) {
-    return "Untitled";
-  }
-  const root = projectState?.projectRoot;
-  return root && path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path;
 }
 
 /**
@@ -252,76 +259,35 @@ function documentFieldTpl(registry: CommandRegistry | null) {
 
 // ─── ⑫c SELECTION ────────────────────────────────────────────────────────────
 
-/** One crumb of the ancestor breadcrumb: what to call the node, and the path that selects it. */
-export interface SelectionCrumb {
-  label: string;
-  path: JxPath;
-}
-
 /**
- * Walk the selection path one STRUCTURAL step at a time.
+ * What is selected — the COUNT, and nothing that is an address.
  *
- * Most steps are `["children", index]` or `["cases", name]` pairs, but a repeater template is
- * reached by a lone `"map"` segment — so the step width varies. Emitting a crumb per node keeps the
- * array pseudo-element ("Repeater") and its template both visible instead of collapsing the array
- * into a bare `[index]`.
+ * This field used to carry a clickable ancestor trail, one `selection.set` per crumb. That trail
+ * has moved whole to the jump bar (⑥, `panels/jump-bar.ts`), which is region ⑥'s entire reason to
+ * exist: Studio had two half-breadcrumbs — that one, and the pane context bar's document-stack
+ * chain — and neither ever rendered the whole address. Leaving a copy here would have made three.
+ *
+ * What is left is what the jump bar CANNOT say, and both are ambient state in the §16.2 sense: how
+ * many things are selected (a count is not a path, and the jump bar names only the primary), and
+ * which style rule the Stylebook is editing (a CSS selector is not a node in this document).
+ *
+ * A single selection therefore leaves this field empty. That is deliberate — the jump bar's leaf
+ * segment states it permanently, with its ancestors, and a second copy at 11px says nothing new.
  */
-export function selectionCrumbs(document: unknown, selection: JxPath): SelectionCrumb[] {
-  const crumbs: SelectionCrumb[] = [];
-  for (let i = 0; i < selection.length;) {
-    const seg = selection[i];
-    const step = seg === "map" ? 1 : 2;
-    const path = selection.slice(0, i + step) as JxPath;
-    const node = getNodeAtPath(document as never, path);
-    const fallbackTag = node?.tag;
-    const label =
-      node?.$prototype === "Array"
-        ? "Repeater"
-        : node?.tagName ||
-          (typeof fallbackTag === "string" ? fallbackTag : "") ||
-          (seg === "cases" ? String(selection[i + 1]) : `[${selection[i + 1]}]`);
-    crumbs.push({ label, path });
-    i += step;
-  }
-  return crumbs;
-}
-
 function selectionFieldTpl(registry: CommandRegistry | null) {
-  const tab = activeTab.value;
-  const paths = tab?.session.selection ?? [];
-  const selection = primarySelection(paths);
-  if (tab && selection?.length) {
-    const node = getNodeAtPath(tab.doc.document, selection);
-    const crumbs = selectionCrumbs(tab.doc.document, selection);
-    return fieldTpl("statusbar/selection", [
-      // A batch says its SIZE before it says its address: the crumbs that follow lead to the
-      // Primary, and without the count they would read as the whole selection.
-      paths.length > 1
-        ? itemTpl(registry, {
+  const paths = activeTab.value?.session.selection ?? [];
+  if (paths.length > 0) {
+    // A document selection owns the field even when it prints nothing: the Stylebook's selector
+    // Below would otherwise appear while an element is picked, which is two answers to one question.
+    return paths.length > 1
+      ? fieldTpl("statusbar/selection", [
+          itemTpl(registry, {
             command: null,
             label: `${paths.length} selected`,
-            title: `${paths.length} elements are selected; the trail names the primary`,
-          })
-        : nothing,
-      // The last crumb IS the selected element, and its label is the TAG while this one prefers
-      // `$id` — so the two say different things and both earn their place, except when they say the
-      // Same thing. An element whose id matches its tag rendered "re-hero  re-hero".
-      nodeLabel(node) === crumbs.at(-1)?.label
-        ? nothing
-        : itemTpl(registry, {
-            command: null,
-            label: nodeLabel(node),
-            title: "The selected element",
+            title: `${paths.length} elements are selected; the jump bar names the primary`,
           }),
-      ...crumbs.flatMap<ItemResult>((crumb, index) => [
-        index === 0 ? nothing : html`<span class="sb-sep" aria-hidden="true">›</span>`,
-        itemTpl(registry, {
-          args: { path: crumb.path },
-          command: "selection.set",
-          label: crumb.label,
-        }),
-      ]),
-    ]);
+        ])
+      : nothing;
   }
   // The stylebook's own selection is a selection: it is what the Style panel is editing, and it is
   // The only thing in this field when no document node is picked.

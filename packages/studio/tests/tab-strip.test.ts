@@ -2,7 +2,7 @@
  * Tab strip — reactive rendering of open tabs, activation, dirty indicator, the close flow
  * (including the unsaved-changes confirm dialog), and the `context/tab` menu.
  */
-import { flush, resetStudioState } from "./harness";
+import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mount, unmount } from "../src/panels/tab-strip";
 import { collabState } from "../src/collab/collab-state";
@@ -10,6 +10,7 @@ import {
   closeAllTabs,
   closePane,
   closeTab,
+  focusPane,
   openTab,
   paneCommands,
   splitRight,
@@ -180,7 +181,7 @@ describe("tab strip interactions", () => {
     expect(workspace.tabs.has("a")).toBe(true);
   });
 
-  test("dirty tab prompts; cancel keeps it open", async () => {
+  test("dirty tab prompts with all three ways out; cancel keeps it open", async () => {
     const a = open("a");
     a.doc.dirty = true;
     await flush();
@@ -190,24 +191,62 @@ describe("tab strip interactions", () => {
     expect(dialog).not.toBeNull();
     expect(dialog.getAttribute("headline")).toBe("Unsaved Changes");
     expect(dialog.textContent).toContain("a.json");
+    // §8.7 assigns unsaved-work decisions to the three-way dialog. The two-way confirm this
+    // Replaced said "Close without saving?" — the work-keeping answer was not on offer at all.
+    expect(dialog.getAttribute("confirm-label")).toBe("Save");
+    expect(dialog.getAttribute("secondary-label")).toBe("Close Without Saving");
+    expect(dialog.getAttribute("cancel-label")).toBe("Cancel");
     dialog.dispatchEvent(new Event("cancel"));
     await flush();
     expect(workspace.tabs.has("a")).toBe(true);
     expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).toBeNull();
   });
 
-  test("dirty tab prompts; confirm closes it", async () => {
+  test("dirty tab prompts; Close Without Saving discards the work", async () => {
     const a = open("a");
     a.doc.dirty = true;
     await flush();
     (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
     await flush();
     const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
-    expect(dialog.classList.contains("dialog-destructive")).toBe(true);
-    expect(dialog.getAttribute("confirm-label")).toBe("Close");
-    dialog.dispatchEvent(new Event("confirm"));
+    dialog.dispatchEvent(new Event("secondary"));
     await flush();
     expect(workspace.tabs.has("a")).toBe(false);
+  });
+
+  test("dirty tab prompts; Save writes the document, then closes it", async () => {
+    const { state } = installMockPlatform();
+    const a = open("a");
+    a.doc.dirty = true;
+    await flush();
+    (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+    await flush();
+    (document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement).dispatchEvent(
+      new Event("confirm"),
+    );
+    await flush(6);
+    expect(state.files.get("/project/a.json")).toContain('"tagName": "div"');
+    expect(workspace.tabs.has("a")).toBe(false);
+  });
+
+  test("a save that fails keeps the tab — and the work — open", async () => {
+    installMockPlatform({
+      writeFile: async () => {
+        throw new Error("disk is on fire");
+      },
+    });
+    const a = open("a");
+    a.doc.dirty = true;
+    await flush();
+    (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+    await flush();
+    (document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement).dispatchEvent(
+      new Event("confirm"),
+    );
+    await flush(6);
+    // Closing on top of a failed write is the loss the prompt exists to prevent.
+    expect(workspace.tabs.has("a")).toBe(true);
+    expect(a.doc.dirty).toBe(true);
   });
 
   test("a co-edited dirty tab with peers still on the doc closes without a prompt", async () => {
@@ -236,6 +275,67 @@ describe("tab strip interactions", () => {
     await flush();
     expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).not.toBeNull();
     expect(workspace.tabs.has("a")).toBe(true);
+  });
+
+  /**
+   * A read-only collaborator's edits are in the browser and NOWHERE else — `onTransact` gates both
+   * the publish and the mirror behind `canWrite` — so the two comforts this flow relies on are both
+   * false for them: "peers remain, the work is on the server" and "Save will persist it".
+   */
+  describe("a session this client cannot write to", () => {
+    function openReadOnly(id: string) {
+      const tab = open(id);
+      tab.doc.dirty = true;
+      const state = collabState(tab);
+      state.active = true;
+      state.readOnly = true;
+      return tab;
+    }
+
+    test("is prompted even with peers still on the doc — nothing was published", async () => {
+      const a = openReadOnly("a");
+      collabState(a).peers = [{ clientId: 2, state: { focusedPath: "/project/a.json" } as never }];
+      await flush();
+      (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+      await flush();
+      expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).not.toBeNull();
+      expect(workspace.tabs.has("a")).toBe(true);
+    });
+
+    test("is offered discard-or-keep, never a Save it cannot honour", async () => {
+      openReadOnly("a");
+      await flush();
+      (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+      await flush();
+      const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
+      expect(dialog.getAttribute("headline")).toBe("Changes Cannot Be Saved");
+      expect(dialog.textContent).toContain("read access");
+      // The three-way dialog's Save would have called `saveFile`, which refuses this tab. A button
+      // That cannot work has no place on the dialog whose job is to be trusted about lost work.
+      expect(dialog.getAttribute("confirm-label")).toBe("Close Without Saving");
+      expect(dialog.getAttribute("cancel-label")).toBe("Keep Editing");
+      expect(dialog.getAttribute("secondary-label")).toBeNull();
+
+      dialog.dispatchEvent(new Event("cancel"));
+      await flush();
+      expect(workspace.tabs.has("a")).toBe(true);
+    });
+
+    test("closes on the discard, and never reports a save", async () => {
+      const { state } = installMockPlatform();
+      openReadOnly("a");
+      await flush();
+      (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+      await flush();
+      (document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement).dispatchEvent(
+        new Event("confirm"),
+      );
+      await flush(6);
+      expect(workspace.tabs.has("a")).toBe(false);
+      // The old flow's Save wrote nothing and said "Saved just now" anyway; this one writes nothing
+      // And says so.
+      expect(state.files.has("/project/a.json")).toBe(false);
+    });
   });
 
   test("requestClose on a vanished tab id is a no-op", async () => {
@@ -460,6 +560,35 @@ describe("per-pane strips", () => {
       "a.json",
       "b.json",
     ]);
+  });
+
+  /*
+   * The shell has ONE strip host, exactly as it has one `#canvas-wrap`, and the stage is handed to
+   * the focused pane. A strip that does not make the same handover prints a document that is not on
+   * screen — which is what `⌘\` did: the tab moved into the side pane, the stage drew it, and the
+   * strip went on rendering the PRIMARY pane's tabs with the primary's chip marked active.
+   */
+  test("with one host, the strip shows the pane that has the stage", async () => {
+    open("a");
+    open("b", "/project/b.json");
+    await flush();
+    splitRight();
+    await flush();
+
+    const labels = () => [...host.querySelectorAll(".tab-strip-label")].map((e) => e.textContent);
+    expect(labels()).toEqual(["b.json"]);
+    expect(host.querySelector(".tab-strip-row")!.classList.contains("focused")).toBe(true);
+    expect(host.querySelector(".tab-strip-tab.active")!.textContent).toContain("b.json");
+
+    // Focus back, and the one strip follows it back.
+    focusPane("primary");
+    await flush();
+    expect(labels()).toEqual(["a.json"]);
+
+    // Unsplit hands both documents to the pane that is left, and the strip prints both.
+    closePane("secondary");
+    await flush();
+    expect(labels()).toEqual(["a.json", "b.json"]);
   });
 
   test("mousedown inside a strip focuses its pane", async () => {
