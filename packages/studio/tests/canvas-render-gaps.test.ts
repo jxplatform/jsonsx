@@ -4,15 +4,16 @@
  * Heavy collaborators (monaco, grid panel, iframe host, y-monaco, collab session) are mocked so the
  * dispatch runs deterministically.
  */
-import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import { flush, registerPrimaryStage, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { initShellRefs } from "../src/store";
 import { activeCanvasSurface } from "../src/canvas/canvas-surface";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
 import { setFormats } from "../src/format/format-host";
-import { initCanvasUtils } from "../src/canvas/canvas-utils";
 import type { Tab } from "../src/tabs/tab";
+import { surfaceForPane } from "../src/canvas/surface-registry";
+import type { CanvasSurface } from "../src/canvas/surface-registry";
 
 /* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
    app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
@@ -144,6 +145,9 @@ void mock.module("../src/canvas/iframe-host.js", () => ({
   postApplyFormat: () => {},
   postStyleUpdateToStylebookHosts: () => 0,
   requestCanvasEval: () => Promise.resolve(null),
+  /* The non-lazy way out of `liveHosts`: `panels/pane-grid.ts` calls it as a cell is
+     disposed, so it is on the import graph of anything that mounts the shell. */
+  releaseCanvasHosts: () => 0,
   setToolbarRefresh: () => {},
 }));
 
@@ -279,12 +283,13 @@ function makeCollabCtx(overrides: Partial<FakeCollabCtx> = {}): FakeCollabCtx {
 
 function setupShell() {
   document.body.innerHTML = "";
-  for (const id of ["canvas-wrap", "activity-bar", "left-panel", "right-panel", "toolbar"]) {
+  for (const id of ["activity-bar", "left-panel", "right-panel", "toolbar"]) {
     const el = document.createElement("div");
     el.id = id;
     document.body.append(el);
   }
   initShellRefs();
+  registerPrimaryStage();
 }
 
 beforeEach(() => {
@@ -302,18 +307,11 @@ beforeEach(() => {
   detachGridPanel.mockClear();
   canvasPanels.length = 0;
   surface.prevCanvasMode = null;
-  view.panzoomWrap = null;
-  view.monacoEditor = null;
+  surfaceForPane("primary").panzoomWrap = null;
+  surfaceForPane("primary").monacoEditor = null;
   view.functionEditor = null;
-  view.centerObserver = null;
-  view.canvasDndCleanups = [];
-  view.canvasEventCleanups = [];
-  view.renderGeneration = 0;
-  initCanvasUtils({
-    getCanvasMode: () => canvasMode,
-    getZoom: () => 1,
-    setZoomDirect: () => {},
-  });
+  surfaceForPane("primary").centerObserver = null;
+  surfaceForPane("primary").renderGeneration = 0;
   initCanvasRender({
     getCanvasMode: () => canvasMode,
     gitDiffState: null,
@@ -337,11 +335,13 @@ describe("grid mode", () => {
     renderCanvas();
     await flush(); // The source editor mounts behind the lazy Monaco import.
     expect(renderGridMode).toHaveBeenCalledTimes(1);
-    const [host, tab] = renderGridMode.mock.calls[0]! as unknown as [HTMLElement, Tab];
-    expect(host.id).toBe("canvas-wrap");
+    // The SURFACE is the first argument, not a host element: the grid draws into one pane's stage,
+    // And `#canvas-wrap` could only ever have named the primary's.
+    const [drawnOn, tab] = renderGridMode.mock.calls[0]! as unknown as [CanvasSurface, Tab];
+    expect(drawnOn).toBe(surfaceForPane("primary"));
     expect(tab).toBe(activeTab.value!);
-    expect(host.style.display).toBe("block");
-    expect(host.style.padding).toBe("0px");
+    expect(drawnOn.wrap.style.display).toBe("block");
+    expect(drawnOn.wrap.style.padding).toBe("0px");
   });
 
   test("a same-tab re-render while the panel is mounted takes the fast path", async () => {
@@ -417,7 +417,7 @@ describe("source-mode collab binding", () => {
     release();
     // Let the enter() continuation reach the dynamic y-monaco import, then yank the editor.
     await Promise.resolve();
-    view.monacoEditor = null;
+    surfaceForPane("primary").monacoEditor = null;
     await flush();
     // The binding was built but immediately destroyed (cleanup ran, session left).
     expect(bindings).toHaveLength(1);
@@ -439,10 +439,10 @@ describe("source-mode collab binding", () => {
     renderCanvas();
     await flush(); // The source editor mounts behind the lazy Monaco import.
     await flush(); // …and the initial serialization lands, consuming `_ignoreNextChange`.
-    expect(view.monacoEditor!._writes!.typed()).toBe(false);
+    expect(surfaceForPane("primary").monacoEditor!._writes!.typed()).toBe(false);
 
     typeInto(createdEditors[0]!, "# typed");
-    expect(view.monacoEditor!._writes!.typed()).toBe(true);
+    expect(surfaceForPane("primary").monacoEditor!._writes!.typed()).toBe(true);
   });
 
   /**
@@ -464,15 +464,15 @@ describe("source-mode collab binding", () => {
     expect(bindings).toHaveLength(1);
 
     const editor = createdEditors[0]!;
-    expect(view.monacoEditor!._writes!.shared()).toBe(true);
+    expect(surfaceForPane("primary").monacoEditor!._writes!.shared()).toBe(true);
     // A peer types. y-monaco writes it straight into the model — a real keystroke, which the double
     // In this file could not express until it was repaired to match `canvas-render.test.ts`'s.
     typeInto(editor, "# from a peer");
     // And it declared NOTHING: the co-edited mount installs no change handler at all, so the buffer
     // Is not "typed", not "ahead", and clause 3 has nothing to say. That is precisely why clause 5
     // Is its own fact rather than a use of clause 3.
-    expect(view.monacoEditor!._writes!.typed()).toBe(false);
-    expect(view.monacoEditor!._writes!.ahead()).toBe(false);
+    expect(surfaceForPane("primary").monacoEditor!._writes!.typed()).toBe(false);
+    expect(surfaceForPane("primary").monacoEditor!._writes!.ahead()).toBe(false);
 
     // An ordinary repaint — the source reconciler's parse arriving as a structure change is one.
     renderCanvas();
@@ -502,7 +502,7 @@ describe("source-mode collab binding", () => {
     expect(() => renderCanvas()).not.toThrow();
     await flush();
     expect(bindings).toHaveLength(0);
-    expect(view.monacoEditor).toBe(createdEditors[0] as never);
+    expect(surfaceForPane("primary").monacoEditor).toBe(createdEditors[0] as never);
     expect(ctx.leave).toHaveBeenCalledTimes(1);
     expect(createdEditors[0]!.updateOptions).toHaveBeenCalledWith({ readOnly: true });
   });
@@ -534,7 +534,7 @@ describe("source-mode collab binding", () => {
     setMode("source");
     renderCanvas();
     await flush();
-    view.monacoEditor = null;
+    surfaceForPane("primary").monacoEditor = null;
     release();
     await flush();
     expect(bindings).toHaveLength(0);

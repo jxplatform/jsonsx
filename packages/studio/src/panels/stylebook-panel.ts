@@ -18,10 +18,9 @@ import { ref } from "lit-html/directives/ref.js";
 import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
 
-import { canvasWrap, projectState, updateSession } from "../store";
-import { activeCanvasSurface } from "../canvas/canvas-surface";
+import { projectState, updateSession } from "../store";
+import type { CanvasSurface } from "../canvas/canvas-surface";
 import { activeTab } from "../workspace/workspace";
-import { view } from "../view";
 import { shell } from "../shell";
 import { componentRegistry } from "../files/components";
 import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
@@ -49,9 +48,9 @@ interface StylebookCtx {
     fullWidth: boolean,
     width?: number | null,
   ) => { tpl: TemplateResult; panel: CanvasPanel };
-  applyTransform: () => void;
-  observeCenterUntilStable: () => void;
-  updateActivePanelHeaders: () => void;
+  applyTransform: (surface: CanvasSurface) => void;
+  observeCenterUntilStable: (surface: CanvasSurface) => void;
+  updateActivePanelHeaders: (surface: CanvasSurface) => void;
 }
 
 export { default as stylebookMeta } from "../../data/stylebook-meta.json";
@@ -62,7 +61,8 @@ export { default as stylebookMeta } from "../../data/stylebook-meta.json";
  *
  * @param {StylebookCtx} ctx
  */
-export function renderStylebookMode(ctx: StylebookCtx) {
+export function renderStylebookMode(surface: CanvasSurface, ctx: StylebookCtx) {
+  const canvasWrap = surface.wrap;
   const tab = activeTab.value;
   const filter = shell.stylebook.filter.toLowerCase();
   const { customizedOnly } = shell.stylebook;
@@ -159,7 +159,7 @@ export function renderStylebookMode(ctx: StylebookCtx) {
         style="transform-origin:0 0;padding-top:40px"
         ${ref((el) => {
           if (el) {
-            view.panzoomWrap = el as HTMLDivElement;
+            surface.panzoomWrap = el as HTMLDivElement;
           }
         })}
       >
@@ -181,22 +181,22 @@ export function renderStylebookMode(ctx: StylebookCtx) {
     projectRoot: projectState?.projectRoot ?? null,
   });
 
-  const { panels } = activeCanvasSurface();
+  const { panels } = surface;
   for (const { panel } of panelEntries) {
     panels.push(panel);
     mountStylebookCanvas(
-      view.renderGeneration,
+      surface.renderGeneration,
       generated,
       panel.canvas as HTMLElement,
       panel._width,
     );
   }
   if (hasMedia) {
-    ctx.updateActivePanelHeaders();
+    ctx.updateActivePanelHeaders(surface);
   }
 
-  ctx.applyTransform();
-  ctx.observeCenterUntilStable();
+  ctx.applyTransform(surface);
+  ctx.observeCenterUntilStable(surface);
 }
 
 /**

@@ -8,11 +8,12 @@ import {
   installMockPlatform,
   resetStudioState,
   resetWorkspaceWithTab,
+  standUpPaneGrid,
   stubRect,
 } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
-import { canvasWrap, initShellRefs, setProjectState } from "../src/store";
+import { initShellRefs, setProjectState } from "../src/store";
 import {
   activeCanvasSurface,
   registerCanvasSurface,
@@ -30,10 +31,9 @@ import {
 import { view } from "../src/view";
 import { commitTabBuffers, tabBufferUnsaved } from "../src/services/monaco-buffer";
 import { toRaw } from "../src/reactivity";
-import { canvasPerf } from "../src/canvas/canvas-perf";
 import { shell } from "../src/shell";
 import { setFormats } from "../src/format/format-host";
-import { initCanvasUtils, setEditZoom } from "../src/canvas/canvas-utils";
+import { setEditZoom } from "../src/canvas/canvas-utils";
 import { MARKDOWN_FORMAT } from "./format-fixture";
 import type { CanvasPanel } from "../src/types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -82,7 +82,7 @@ const renderWelcome = mock((host: HTMLElement) => {
 const renderFunctionEditor = mock(() => {});
 const notified = mock((_message: string) => {});
 const overlaysRender = mock(() => {});
-const renderStylebookMode = mock((_helpers: unknown) => {});
+const renderStylebookMode = mock((_surface: unknown, _helpers: unknown) => {});
 const parseSourceForPathMock = mock(async (_path: string, _source: string) => ({
   document: { children: [{ tagName: "p", textContent: "parsed-md" }], tagName: "article" },
   format: MARKDOWN_FORMAT,
@@ -209,6 +209,9 @@ void mock.module("../src/canvas/iframe-host.js", () => ({
   postApplyFormat: () => {},
   // Live-preview seam (transitively imported via the panels) — no iframe in this suite.
   requestCanvasEval: () => Promise.resolve(null),
+  /* The non-lazy way out of `liveHosts`: `panels/pane-grid.ts` calls it as a cell is
+     disposed, so it is on the import graph of anything that mounts the shell. */
+  releaseCanvasHosts: () => 0,
   setToolbarRefresh: () => {},
 }));
 
@@ -256,32 +259,42 @@ void mock.module("../src/files/file-ops.js", () => ({
   saveFile: () => Promise.resolve(true),
 }));
 
-const {
-  handOverCanvasStage,
-  initCanvasRender,
-  renderCanvas,
-  renderOverlays,
-  scheduleCanvasRender,
-} = await import("../src/canvas/canvas-render");
+const { initCanvasRender, renderCanvas, renderOverlays, scheduleCanvasRender } =
+  await import("../src/canvas/canvas-render");
 const { mount: mountDocHeader, unmount: unmountDocHeader } =
   await import("../src/panels/frontmatter-panel");
 
 // ─── Test context ─────────────────────────────────────────────────────────────
 
 let canvasMode = "design";
-let canvasModeFn = () => canvasMode;
-let zoom = 1;
 
 /**
- * The render dispatch composes the effective mode from the PANE's tab itself (`canvasModeOfPane`);
- * `canvasModeFn` is only what the canvas-utils helpers are still injected with. Keep both in sync
- * here.
+ * The render dispatch composes the effective mode from the PANE's tab itself (`canvasModeOfPane`),
+ * and so do the canvas-utils helpers now that nothing is injected into them — `canvasMode` is only
+ * this fixture's own record of what it last asked for. Keep both in sync here.
  */
 function setMode(m: string) {
   canvasMode = m;
   const tab = activeTab.value;
   if (tab) {
     tab.session.ui.canvasMode = m;
+  }
+}
+
+/**
+ * The primary pane's own pan-zoom scale.
+ *
+ * Read off the tab rather than off a captured `setZoomDirect`: the fit writes through the SURFACE
+ * it was handed now (`tabOfPane(surface.paneId)`), which is the whole of defect S3 — an injected
+ * setter spelled `activeTab` made one pane's fit land on the other pane's transform.
+ */
+const paneZoom = () => activeTab.value?.session.ui.zoom ?? 1;
+
+/** Put the primary pane's document back at life size. */
+function setPaneZoom(value: number) {
+  const tab = activeTab.value;
+  if (tab) {
+    tab.session.ui.zoom = value;
   }
 }
 
@@ -308,19 +321,18 @@ function setupShell() {
   for (const el of document.head.querySelectorAll("style[data-jx-owner]")) {
     el.remove();
   }
-  for (const id of [
-    "canvas-wrap",
-    "activity-bar",
-    "left-panel",
-    "right-panel",
-    "toolbar",
-    "statusbar",
-  ]) {
+  for (const id of ["activity-bar", "left-panel", "right-panel", "toolbar", "statusbar"]) {
     const el = document.createElement("div");
     el.id = id;
     document.body.append(el);
   }
   initShellRefs();
+  standUpPaneGrid();
+}
+
+/** The primary pane's stage — what `#canvas-wrap` used to be, resolved through its surface. */
+function stageEl(): HTMLElement {
+  return surfaceForPane("primary").wrap;
 }
 
 /**
@@ -390,8 +402,6 @@ beforeEach(() => {
   closeAllTabs();
   setFormats([]);
   setMode("design");
-  canvasModeFn = () => canvasMode;
-  zoom = 1;
   ctx.gitDiffState = null;
   styleUpdateImpl = () => 0;
   iframeImpl = async (_gen, doc, canvas) => {
@@ -422,20 +432,11 @@ beforeEach(() => {
   createdEditors.length = 0;
   canvasPanels.length = 0;
   surface.prevCanvasMode = null;
-  view.panzoomWrap = null;
-  view.monacoEditor = null;
+  surfaceForPane("primary").panzoomWrap = null;
+  surfaceForPane("primary").monacoEditor = null;
   view.functionEditor = null;
-  view.centerObserver = null;
-  view.canvasDndCleanups = [];
-  view.canvasEventCleanups = [];
-  view.renderGeneration = 0;
-  initCanvasUtils({
-    getCanvasMode: () => canvasModeFn(),
-    getZoom: () => zoom,
-    setZoomDirect: (z: number) => {
-      zoom = z;
-    },
-  });
+  surfaceForPane("primary").centerObserver = null;
+  surfaceForPane("primary").renderGeneration = 0;
   initCanvasRender(ctx as never);
 });
 
@@ -449,15 +450,15 @@ describe("renderCanvas without a tab", () => {
   test("renders the welcome screen when no project is loaded", () => {
     setProjectState(null);
     renderCanvas();
-    expect(renderWelcome).toHaveBeenCalledWith(canvasWrap);
+    expect(renderWelcome).toHaveBeenCalledWith(stageEl());
   });
 
   test("clears the canvas when a project is loaded but no tab is open", () => {
     resetStudioState({ isSiteProject: true });
-    canvasWrap.textContent = "leftover";
+    stageEl().textContent = "leftover";
     renderCanvas();
     expect(renderWelcome).not.toHaveBeenCalled();
-    expect(canvasWrap.textContent).toBe("");
+    expect(stageEl().textContent).toBe("");
   });
 
   // The dev server probes its root into projectState even when that root is only a workspace
@@ -466,7 +467,7 @@ describe("renderCanvas without a tab", () => {
   test("keeps the welcome screen when the root is not a site project", () => {
     resetStudioState({ isSiteProject: false, projectRoot: ".", root: "/repo" });
     renderCanvas();
-    expect(renderWelcome).toHaveBeenCalledWith(canvasWrap);
+    expect(renderWelcome).toHaveBeenCalledWith(stageEl());
   });
 });
 
@@ -474,7 +475,7 @@ describe("renderCanvas without a tab", () => {
 
 describe("tab close/reopen lifecycle", () => {
   /** Read Lit's private render-part marker without tripping noImplicitAny. */
-  const litPart = () => (canvasWrap as unknown as Record<string, unknown>)["_$litPart$"];
+  const litPart = () => (stageEl() as unknown as Record<string, unknown>)["_$litPart$"];
 
   test("reopening after closing all tabs re-renders without a dangling Lit part", async () => {
     // A project is open, so closing every tab leaves a bare canvas (not the welcome screen).
@@ -483,7 +484,7 @@ describe("tab close/reopen lifecycle", () => {
     setMode("edit");
     renderCanvas();
     await flush();
-    expect(canvasWrap.querySelector(".content-edit-column")).not.toBeNull();
+    expect(stageEl().querySelector(".content-edit-column")).not.toBeNull();
     // CanvasWrap now owns a Lit render part
     expect(litPart()).toBeDefined();
 
@@ -491,7 +492,7 @@ describe("tab close/reopen lifecycle", () => {
     // Behind is what previously made the next litRender throw "ChildPart has no parentNode".
     closeAllTabs();
     renderCanvas();
-    expect(canvasWrap.textContent).toBe("");
+    expect(stageEl().textContent).toBe("");
     expect(litPart()).toBeUndefined();
     expect(surface.prevCanvasMode).toBeNull();
 
@@ -500,7 +501,7 @@ describe("tab close/reopen lifecycle", () => {
     setMode("edit");
     expect(() => renderCanvas()).not.toThrow();
     await flush();
-    expect(canvasWrap.querySelector(".content-edit-column")).not.toBeNull();
+    expect(stageEl().querySelector(".content-edit-column")).not.toBeNull();
   });
 
   test("edit-mode column hugs a component definition (is-component) but fills for a page", async () => {
@@ -509,7 +510,7 @@ describe("tab close/reopen lifecycle", () => {
     setMode("edit");
     renderCanvas();
     await flush();
-    const pageColumn = canvasWrap.querySelector(".content-edit-column")!;
+    const pageColumn = stageEl().querySelector(".content-edit-column")!;
     expect(pageColumn.classList.contains("is-component")).toBe(false);
 
     // A component-definition root (custom-element tag) → the column hugs its content.
@@ -517,7 +518,7 @@ describe("tab close/reopen lifecycle", () => {
     setMode("edit");
     renderCanvas();
     await flush();
-    const compColumn = canvasWrap.querySelector(".content-edit-column")!;
+    const compColumn = stageEl().querySelector(".content-edit-column")!;
     expect(compColumn.classList.contains("is-component")).toBe(true);
   });
 
@@ -528,13 +529,13 @@ describe("tab close/reopen lifecycle", () => {
     await flush();
     const [editor] = createdEditors;
     const [model] = createdModels;
-    expect(view.monacoEditor).toBe(editor as never);
+    expect(surfaceForPane("primary").monacoEditor).toBe(editor as never);
 
     closeAllTabs();
     renderCanvas();
     expect(editor!.dispose).toHaveBeenCalled();
     expect(model!.dispose).toHaveBeenCalled();
-    expect(view.monacoEditor).toBeNull();
+    expect(surfaceForPane("primary").monacoEditor).toBeNull();
 
     // Reopening source mode builds a fresh editor instead of writing into the dead, detached one.
     openSyncedTab();
@@ -542,19 +543,15 @@ describe("tab close/reopen lifecycle", () => {
     renderCanvas();
     await flush();
     expect(createdEditors.length).toBe(2);
-    expect(view.monacoEditor).toBe(createdEditors[1] as never);
+    expect(surfaceForPane("primary").monacoEditor).toBe(createdEditors[1] as never);
   });
 
   test("clearing to the no-tab state disposes this module's observers, editors, scopes, and cleanups", () => {
     openSyncedTab();
-    const dndCleanup = mock(() => {});
-    const eventCleanup = mock(() => {});
     const stop = mock(() => {});
     const disconnect = mock(() => {});
     const fnDispose = mock(() => {});
-    view.canvasDndCleanups = [dndCleanup];
-    view.canvasEventCleanups = [eventCleanup];
-    view.centerObserver = { disconnect } as never;
+    surfaceForPane("primary").centerObserver = { disconnect } as never;
     view.functionEditor = { dispose: fnDispose } as never;
     surface.prevCanvasMode = "design";
     canvasPanels.push({ renderScope: { stop } } as never);
@@ -562,8 +559,6 @@ describe("tab close/reopen lifecycle", () => {
     closeAllTabs();
     renderCanvas();
 
-    expect(dndCleanup).toHaveBeenCalled();
-    expect(eventCleanup).toHaveBeenCalled();
     expect(stop).toHaveBeenCalled();
     expect(disconnect).toHaveBeenCalled();
     // Everything above is a surface THIS module created. The dock's Monaco is not: the Logic tab
@@ -574,9 +569,7 @@ describe("tab close/reopen lifecycle", () => {
     expect(fnDispose).not.toHaveBeenCalled();
     expect(view.functionEditor).not.toBeNull();
     view.functionEditor = null;
-    expect(view.centerObserver).toBeNull();
-    expect(view.canvasDndCleanups).toEqual([]);
-    expect(view.canvasEventCleanups).toEqual([]);
+    expect(surfaceForPane("primary").centerObserver).toBeNull();
     expect(canvasPanels.length).toBe(0);
     expect(surface.prevCanvasMode).toBeNull();
   });
@@ -634,22 +627,24 @@ describe("source mode", () => {
     setMode("source");
     renderCanvas();
     // The container renders synchronously; the editor itself mounts once Monaco has loaded.
-    expect(canvasWrap.querySelector(".source-wrap")).not.toBeNull();
-    expect(canvasWrap.querySelector(".source-editor")).not.toBeNull();
+    expect(stageEl().querySelector(".source-wrap")).not.toBeNull();
+    expect(stageEl().querySelector(".source-editor")).not.toBeNull();
     await flush();
-    expect(view.monacoEditor).toBe(createdEditors[0] as never);
+    expect(surfaceForPane("primary").monacoEditor).toBe(createdEditors[0] as never);
     expect(createdModels[0]!._value).toBe(JSON.stringify(tab.doc.document, null, 2));
     expect(createdModels[0]!.lang).toBe("json");
     // The load set `_ignoreNextChange` and its own `setValue` CONSUMED it — that is the whole
     // Mechanism, and the flag being false afterwards is the proof it worked. The document's own
     // Text arriving in the buffer is not a keystroke: nothing armed, and the two agree.
     expect(createdEditors[0]!._ignoreNextChange).toBe(false);
-    expect(view.monacoEditor!._writes!.ahead()).toBe(false);
+    expect(surfaceForPane("primary").monacoEditor!._writes!.ahead()).toBe(false);
     expect(tabBufferUnsaved(tab)).toBe(false);
     // And the buffer names the tab it was mounted for, in the spelling the dock's editor uses.
     // Compared through `toRaw`: the pane hands the mount its own reactive wrapper of this tab, and
     // Identity across two proxies of one object is exactly what `buffersForTab` normalizes.
-    expect(toRaw(view.monacoEditor!._editingTab as object)).toBe(toRaw(tab as object));
+    expect(toRaw(surfaceForPane("primary").monacoEditor!._editingTab as object)).toBe(
+      toRaw(tab as object),
+    );
   });
 
   test("debounced edits sync valid JSON back into the document", async () => {
@@ -741,7 +736,7 @@ describe("source mode", () => {
     expect(String(createdModels[1]!.uri)).toBe("file:///project.json");
     expect(createdModels[0]!.dispose).toHaveBeenCalled();
     expect(firstEditor.dispose).toHaveBeenCalled();
-    expect(view.monacoEditor).toBe(createdEditors[1] as never);
+    expect(surfaceForPane("primary").monacoEditor).toBe(createdEditors[1] as never);
   });
 
   /* The generated entry documents get a reserved URI so they cannot collide with the ids the
@@ -903,7 +898,7 @@ describe("source mode", () => {
     // The repaint's own `setValue` fired the change listener and the flag it set absorbed it, so
     // The repaint did not read as a keystroke: nothing armed, and the buffer is not ahead.
     expect(editor!._ignoreNextChange).toBe(false);
-    expect(view.monacoEditor!._writes!.ahead()).toBe(false);
+    expect(surfaceForPane("primary").monacoEditor!._writes!.ahead()).toBe(false);
     expect(tabBufferUnsaved(tab)).toBe(false);
   });
 
@@ -932,7 +927,7 @@ describe("source mode", () => {
 
     tab.doc.document.tagName = "section";
     renderCanvas(); // Fast path kicks off an async buffer refresh…
-    view.monacoEditor = null; // …but the editor goes away before it lands
+    surfaceForPane("primary").monacoEditor = null; // …but the editor goes away before it lands
     await flush();
     expect(editor!.getValue()).toBe("stale-buffer");
   });
@@ -946,7 +941,7 @@ describe("source mode", () => {
       const [editor] = createdEditors;
       editor!._ignoreNextChange = false;
       editor!._model!._value = JSON.stringify({ tagName: "main" });
-      view.monacoEditor = null;
+      surfaceForPane("primary").monacoEditor = null;
       fireModelChange(editor!);
       await runPending();
       expect(tab.doc.document.tagName).toBe("div");
@@ -957,13 +952,14 @@ describe("source mode", () => {
    * The source view's teardown rate is three sites, and neither of the two things they tried was
    * the contract.
    *
-   * `view.monacoEditor` is declared eight lines above `view.functionEditor` and has the same shape,
-   * but P8's teardown fix only reached the dock. Its 600ms timer closes over the editor, a disposed
-   * Monaco answers `getValue()` with `""`, and for a FORMAT-backed document the callback then ran
-   * `parseSourceForPath(path, "")` and assigned the result: the page's body replaced with an empty
-   * parse, 600ms after the user left Code view, the tab left dirty so the next ⌘S puts it on disk.
-   * (A `.json` tab threw inside `JSON.parse("")` and the catch swallowed it — which is luck, and is
-   * why only one of the two shapes was ever going to be noticed.)
+   * `surfaceForPane("primary").monacoEditor` is declared eight lines above `view.functionEditor`
+   * and has the same shape, but P8's teardown fix only reached the dock. Its 600ms timer closes
+   * over the editor, a disposed Monaco answers `getValue()` with `""`, and for a FORMAT-backed
+   * document the callback then ran `parseSourceForPath(path, "")` and assigned the result: the
+   * page's body replaced with an empty parse, 600ms after the user left Code view, the tab left
+   * dirty so the next ⌘S puts it on disk. (A `.json` tab threw inside `JSON.parse("")` and the
+   * catch swallowed it — which is luck, and is why only one of the two shapes was ever going to be
+   * noticed.)
    *
    * Cancelling instead stops the corruption by throwing the edit away, silently: nothing parses
    * `""`, and nothing parses `"# Edited"` either, so the tab is not dirty and the author has no
@@ -990,7 +986,7 @@ describe("source mode", () => {
       setMode("edit");
       renderCanvas();
       await flush();
-      expect(view.monacoEditor).toBeNull();
+      expect(surfaceForPane("primary").monacoEditor).toBeNull();
       expect(editor!.getValue()).toBe(""); // What a surviving timer would have parsed
 
       // The parse got the LIVE buffer, read before the model was detached — never `""`.
@@ -1046,7 +1042,7 @@ describe("source mode", () => {
       renderCanvas();
       await flush();
 
-      expect(view.monacoEditor).toBeNull();
+      expect(surfaceForPane("primary").monacoEditor).toBeNull();
       expect(tab.doc.dirty).toBe(false);
       // The evidence went with the text: no gate can report this any more.
       expect(tabBufferUnsaved(tab)).toBe(false);
@@ -1107,11 +1103,11 @@ describe("source mode", () => {
    *
    * `renderCanvasImpl` assigns `surface.prevCanvasMode = canvasMode` BEFORE it reaches the mount,
    * so a second synchronous `renderCanvas()` inside the cold `await loadMonaco()` sees `modeChanged
-   * === false` and a still-null `view.monacoEditor`: it skips the source fast path and falls
-   * through to mount again. `store.ts`'s `render()`/`renderOnly()` coalesce nothing, so two renders
-   * in a turn is an ordinary thing to ask for. The duplicate is not merely a wasted editor — the
-   * second `createModel` claims a URI the first already registered, which real Monaco throws on,
-   * and the loser's editor stays attached to the stage with nobody holding it.
+   * === false` and a still-null `surfaceForPane("primary").monacoEditor`: it skips the source fast
+   * path and falls through to mount again. `store.ts`'s `render()`/`renderOnly()` coalesce nothing,
+   * so two renders in a turn is an ordinary thing to ask for. The duplicate is not merely a wasted
+   * editor — the second `createModel` claims a URI the first already registered, which real Monaco
+   * throws on, and the loser's editor stays attached to the stage with nobody holding it.
    */
   test("two renders inside the monaco load mount one editor, not two", async () => {
     openSyncedTab(undefined, { documentPath: "pages/index.json" });
@@ -1123,7 +1119,7 @@ describe("source mode", () => {
 
     expect(createdEditors).toHaveLength(1);
     expect(createdModels).toHaveLength(1);
-    expect(view.monacoEditor).toBe(createdEditors[0] as never);
+    expect(surfaceForPane("primary").monacoEditor).toBe(createdEditors[0] as never);
     expect(createdModels[0]!.dispose).not.toHaveBeenCalled();
   });
 
@@ -1224,7 +1220,7 @@ describe("source mode", () => {
     renderCanvas();
     expect(editor!.dispose).toHaveBeenCalled();
     expect(model!.dispose).toHaveBeenCalled();
-    expect(view.monacoEditor).toBeNull();
+    expect(surfaceForPane("primary").monacoEditor).toBeNull();
   });
 });
 
@@ -1234,7 +1230,6 @@ describe("git-diff mode", () => {
   test("falls back to design mode when no diff state is set", () => {
     openSyncedTab();
     setMode("git-diff");
-    canvasModeFn = () => canvasMode;
     renderCanvas();
     expect(ctx.setCanvasMode).toHaveBeenCalledWith("design");
     expect(canvasPanels.length).toBe(1);
@@ -1257,7 +1252,7 @@ describe("git-diff mode", () => {
     renderCanvas();
     await flush();
 
-    const headers = [...canvasWrap.querySelectorAll(".canvas-panel-header")].map((h) =>
+    const headers = [...stageEl().querySelectorAll(".canvas-panel-header")].map((h) =>
       h.textContent?.trim(),
     );
     expect(headers).toEqual(["Original", "Current"]);
@@ -1309,10 +1304,10 @@ describe("edit mode", () => {
     renderCanvas();
     await flush();
 
-    const column = canvasWrap.querySelector(".content-edit-column") as HTMLElement;
+    const column = stageEl().querySelector(".content-edit-column") as HTMLElement;
     expect(column).not.toBeNull();
     expect(column.getAttribute("style")).toContain("max-width:320px");
-    expect(canvasWrap.querySelector(".content-edit-canvas")).not.toBeNull();
+    expect(stageEl().querySelector(".content-edit-canvas")).not.toBeNull();
     expect(canvasPanels.length).toBe(1);
 
     const panel = canvasPanels[0] as unknown as CanvasPanel;
@@ -1334,7 +1329,7 @@ describe("edit mode", () => {
     setMode("edit");
     renderCanvas();
     await flush();
-    const column = canvasWrap.querySelector(".content-edit-column") as HTMLElement;
+    const column = stageEl().querySelector(".content-edit-column") as HTMLElement;
     expect(column.getAttribute("style")).toContain("max-width:600px");
   });
 
@@ -1345,7 +1340,7 @@ describe("edit mode", () => {
     await flush();
     // The column now exists — give it a measurable width (happy-dom performs no layout), set the
     // Persisted zoom, and re-render: the edit branch must re-fit from the LIVE column width.
-    const column = canvasWrap.querySelector(".content-edit-column") as HTMLElement;
+    const column = stageEl().querySelector(".content-edit-column") as HTMLElement;
     stubRect(column, { width: 800 });
     tab.session.ui.editZoom = 2;
     renderCanvas();
@@ -1362,7 +1357,7 @@ describe("edit mode", () => {
     setMode("edit");
     renderCanvas();
     await flush();
-    const gen = view.renderGeneration;
+    const gen = surfaceForPane("primary").renderGeneration;
     const mountSpy = mock(async () => {});
     iframeImpl = mountSpy as never;
 
@@ -1372,7 +1367,7 @@ describe("edit mode", () => {
     // The zoom landed as bare style writes — no render generation bump, no iframe re-mount (which
     // Would rebuild the iframe DOM and destroy a live inline-edit session).
     expect(tab.session.ui.editZoom).toBe(1.5);
-    expect(view.renderGeneration).toBe(gen);
+    expect(surfaceForPane("primary").renderGeneration).toBe(gen);
     expect(mountSpy).not.toHaveBeenCalled();
   });
 });
@@ -1402,7 +1397,7 @@ describe("iframe render pipeline", () => {
       });
     setMode("edit");
     renderCanvas();
-    view.renderGeneration += 1; // A newer render started
+    surfaceForPane("primary").renderGeneration += 1; // A newer render started
     resolveMount();
     await flush();
     expect(tab.session.canvas.status).toBe("idle");
@@ -1431,12 +1426,12 @@ describe("design mode", () => {
     openSyncedTab();
     renderCanvas();
     await flush();
-    expect(view.panzoomWrap).not.toBeNull();
+    expect(surfaceForPane("primary").panzoomWrap).not.toBeNull();
     expect(canvasPanels.length).toBe(1);
     const panel = canvasPanels[0] as unknown as CanvasPanel;
     expect(panel.element?.classList.contains("full-width")).toBe(true);
-    expect(canvasWrap.querySelector(".canvas-panel-header")).toBeNull();
-    expect(view.panzoomWrap?.style.transform).toContain("scale(1)");
+    expect(stageEl().querySelector(".canvas-panel-header")).toBeNull();
+    expect(surfaceForPane("primary").panzoomWrap?.style.transform).toContain("scale(1)");
     expect(panel.canvas?.querySelector("p")?.textContent).toBe("Hello");
   });
 
@@ -1466,7 +1461,7 @@ describe("design mode", () => {
     await flush();
 
     expect(canvasPanels.length).toBe(2);
-    const headers = [...canvasWrap.querySelectorAll(".canvas-panel-header")].map((h) =>
+    const headers = [...stageEl().querySelectorAll(".canvas-panel-header")].map((h) =>
       h.textContent?.trim(),
     );
     expect(headers).toEqual(["Base (320px)", "Md (768px)"]);
@@ -1501,7 +1496,7 @@ describe("design mode", () => {
     // Pass that numbered its own artboards differently would resolve once per artboard.
     expect(gens).toHaveLength(3);
     expect(new Set(gens).size).toBe(1);
-    expect(gens[0]).toBe(view.renderGeneration);
+    expect(gens[0]).toBe(surfaceForPane("primary").renderGeneration);
   });
 
   test("a superseded pass's deferred artboards keep their own (stale) generation", async () => {
@@ -1516,14 +1511,14 @@ describe("design mode", () => {
     } as never);
 
     // Two passes back to back: the first pass's second artboard is still queued behind a timer when
-    // The second pass starts. Reading `view.renderGeneration` inside that timer would stamp the
+    // The second pass starts. Reading `surfaceForPane("primary").renderGeneration` inside that timer would stamp the
     // First pass's artboard with the SECOND pass's number — a duplicate render the iframe cannot
     // Recognise as superseded, because its stale-gen guard only drops a number it has already seen
     // Passed. Carrying the pass's own generation is what lets the frame drop it.
     renderCanvas();
-    const firstGen = view.renderGeneration;
+    const firstGen = surfaceForPane("primary").renderGeneration;
     renderCanvas();
-    const secondGen = view.renderGeneration;
+    const secondGen = surfaceForPane("primary").renderGeneration;
     await flush();
 
     expect(secondGen).toBeGreaterThan(firstGen);
@@ -1531,24 +1526,25 @@ describe("design mode", () => {
     expect(gens.filter((g) => g === secondGen)).toHaveLength(2);
   });
 
-  test("mode transitions run cleanup callbacks and stop panel scopes", () => {
+  test("mode transitions stop the outgoing panel scopes and the centering observer", () => {
+    /* No `canvasDndCleanups` / `canvasEventCleanups` here, and this is the assertion that used to
+       be their only producer. Nothing in `src/` ever pushed to either array — the DnD and panel
+       handlers they were built for live inside the canvas iframe, whose overlay owns their
+       lifetime — so both loops ran over an empty array on every render. `view.test.ts` asserts the
+       two keys are gone from the record rather than merely unread. */
     openSyncedTab();
-    const dndCleanup = mock(() => {});
-    const eventCleanup = mock(() => {});
     const stop = mock(() => {});
     const disconnect = mock(() => {});
-    view.canvasDndCleanups = [dndCleanup];
-    view.canvasEventCleanups = [eventCleanup];
-    view.centerObserver = { disconnect } as never;
+    const observer = { disconnect } as never;
+    surfaceForPane("primary").centerObserver = observer;
     canvasPanels.push({ renderScope: { stop } } as never);
 
     renderCanvas();
-    expect(dndCleanup).toHaveBeenCalled();
-    expect(eventCleanup).toHaveBeenCalled();
     expect(stop).toHaveBeenCalled();
+    // The OUTGOING observer is disconnected. The pass then installs this mode's own, so the field
+    // Is repopulated rather than null — `resetCanvasView` is the path that leaves it empty.
     expect(disconnect).toHaveBeenCalled();
-    expect(view.canvasDndCleanups).toEqual([]);
-    expect(view.canvasEventCleanups).toEqual([]);
+    expect(surfaceForPane("primary").centerObserver).not.toBe(observer);
   });
 });
 
@@ -1558,8 +1554,8 @@ describe("design mode", () => {
 describe("fit on entering Design", () => {
   /** Give the (layout-less) canvas wrap a measurable viewport. */
   function sizeViewport(width: number, height = 600) {
-    Object.defineProperty(canvasWrap, "clientWidth", { configurable: true, value: width });
-    Object.defineProperty(canvasWrap, "clientHeight", { configurable: true, value: height });
+    Object.defineProperty(stageEl(), "clientWidth", { configurable: true, value: width });
+    Object.defineProperty(stageEl(), "clientHeight", { configurable: true, value: height });
   }
 
   test("scales a wide artboard down to the pane on the mode transition", async () => {
@@ -1572,7 +1568,7 @@ describe("fit on entering Design", () => {
     renderCanvas();
     await flush();
     // 1280 + 32 padding = 1312 of artboard in 700px of pane.
-    expect(zoom).toBeCloseTo(700 / 1312);
+    expect(paneZoom()).toBeCloseTo(700 / 1312);
   });
 
   test("a re-render in the same mode does not re-fit over the author's zoom", async () => {
@@ -1584,10 +1580,10 @@ describe("fit on entering Design", () => {
     } as never);
     renderCanvas();
     await flush();
-    zoom = 1;
+    setPaneZoom(1);
     renderCanvas();
     await flush();
-    expect(zoom).toBe(1);
+    expect(paneZoom()).toBe(1);
   });
 
   test("stylebook entry fits too — its specimen sheet is the same artboard", async () => {
@@ -1595,8 +1591,8 @@ describe("fit on entering Design", () => {
     // The real renderStylebookMode builds the panzoom surface; the mock stands in for it.
     renderStylebookMode.mockImplementation(() => {
       const wrap = document.createElement("div");
-      canvasWrap.append(wrap);
-      view.panzoomWrap = wrap as HTMLDivElement;
+      stageEl().append(wrap);
+      surfaceForPane("primary").panzoomWrap = wrap as HTMLDivElement;
       canvasPanels.push({ _width: 800 } as never);
     });
     try {
@@ -1605,7 +1601,7 @@ describe("fit on entering Design", () => {
       renderCanvas();
       await flush();
       // The specimen sheet (800) + 32 padding of artboard in 700px of pane.
-      expect(zoom).toBeCloseTo(700 / 832);
+      expect(paneZoom()).toBeCloseTo(700 / 832);
     } finally {
       renderStylebookMode.mockImplementation(() => {});
     }
@@ -1621,9 +1617,9 @@ describe("preview mode", () => {
     renderCanvas();
     await flush();
 
-    expect(canvasWrap.querySelector(".preview-stage")).not.toBeNull();
-    expect(canvasWrap.querySelector(".panzoom-wrap")).toBeNull();
-    expect(view.panzoomWrap).toBeNull();
+    expect(stageEl().querySelector(".preview-stage")).not.toBeNull();
+    expect(stageEl().querySelector(".panzoom-wrap")).toBeNull();
+    expect(surfaceForPane("primary").panzoomWrap).toBeNull();
     expect(canvasPanels.length).toBe(1);
     const panel = canvasPanels[0] as unknown as CanvasPanel;
     expect(panel.element?.classList.contains("full-width")).toBe(true);
@@ -1636,20 +1632,20 @@ describe("preview mode", () => {
     const tab = openSyncedTab();
     renderCanvas();
     await flush();
-    expect(canvasWrap.querySelector(".panzoom-wrap")).not.toBeNull();
+    expect(stageEl().querySelector(".panzoom-wrap")).not.toBeNull();
 
     // The effective mode flips while the BASE mode stays "design" — the preview toggle.
     tab.session.ui.preview = true;
     renderCanvas();
     await flush();
-    expect(canvasWrap.querySelector(".preview-stage")).not.toBeNull();
-    expect(canvasWrap.querySelector(".panzoom-wrap")).toBeNull();
+    expect(stageEl().querySelector(".preview-stage")).not.toBeNull();
+    expect(stageEl().querySelector(".panzoom-wrap")).toBeNull();
 
     tab.session.ui.preview = false;
     renderCanvas();
     await flush();
-    expect(canvasWrap.querySelector(".preview-stage")).toBeNull();
-    expect(canvasWrap.querySelector(".panzoom-wrap")).not.toBeNull();
+    expect(stageEl().querySelector(".preview-stage")).toBeNull();
+    expect(stageEl().querySelector(".panzoom-wrap")).not.toBeNull();
   });
 
   test("preview over a base of edit still gets the stage, not the edit column", async () => {
@@ -1658,8 +1654,8 @@ describe("preview mode", () => {
     tab.session.ui.preview = true;
     renderCanvas();
     await flush();
-    expect(canvasWrap.querySelector(".preview-stage")).not.toBeNull();
-    expect(canvasWrap.querySelector(".content-edit-canvas")).toBeNull();
+    expect(stageEl().querySelector(".preview-stage")).not.toBeNull();
+    expect(stageEl().querySelector(".content-edit-canvas")).toBeNull();
     tab.session.ui.preview = false;
   });
 });
@@ -1672,7 +1668,10 @@ describe("stylebook mode", () => {
     setMode("stylebook");
     renderCanvas();
     expect(renderStylebookMode).toHaveBeenCalledTimes(1);
-    const helpers = renderStylebookMode.mock.calls[0]![0] as Record<string, unknown>;
+    // The SURFACE is the first argument now — a stylebook draws into one pane's stage — so the
+    // Helper bag is the second.
+    expect((renderStylebookMode.mock.calls[0]![0] as { paneId: string }).paneId).toBe("primary");
+    const helpers = renderStylebookMode.mock.calls[0]![1] as Record<string, unknown>;
     for (const key of [
       "applyTransform",
       "canvasPanelTemplate",
@@ -1794,7 +1793,7 @@ describe("the Document Header slot", () => {
     return tab;
   }
 
-  const slot = () => canvasWrap.querySelector(".doc-header-host");
+  const slot = () => stageEl().querySelector(".doc-header-host");
 
   test("Edit puts it INSIDE the document column, above the artefact", async () => {
     openHeaderedTab();
@@ -1802,7 +1801,7 @@ describe("the Document Header slot", () => {
     renderCanvas();
     await flush();
 
-    const column = canvasWrap.querySelector(".content-edit-column")!;
+    const column = stageEl().querySelector(".content-edit-column")!;
     expect(column.firstElementChild?.classList.contains("doc-header-host")).toBe(true);
     expect(slot()?.classList.contains("in-column")).toBe(true);
     // In the column means in the document's own scroller: it scrolls with the artefact.
@@ -1818,8 +1817,8 @@ describe("the Document Header slot", () => {
     expect(slot()?.classList.contains("pinned")).toBe(true);
     // The artboards are drawn under a transform; the card must not be inside it.
     expect(slot()?.closest(".panzoom-wrap")).toBeNull();
-    expect(canvasWrap.style.flexDirection).toBe("column");
-    expect(canvasWrap.style.alignItems).toBe("stretch");
+    expect(stageEl().style.flexDirection).toBe("column");
+    expect(stageEl().style.alignItems).toBe("stretch");
   });
 
   test("Design with breakpoints pins one slot, not one per artboard", async () => {
@@ -1834,8 +1833,8 @@ describe("the Document Header slot", () => {
     renderCanvas();
     await flush();
 
-    expect(canvasWrap.querySelectorAll(".doc-header-host").length).toBe(1);
-    expect(canvasWrap.querySelectorAll(".canvas-panel").length).toBeGreaterThan(1);
+    expect(stageEl().querySelectorAll(".doc-header-host").length).toBe(1);
+    expect(stageEl().querySelectorAll(".canvas-panel").length).toBeGreaterThan(1);
   });
 
   test("a document with no header gets no slot, and the stage stays a row", async () => {
@@ -1845,7 +1844,7 @@ describe("the Document Header slot", () => {
     await flush();
 
     expect(slot()).toBeNull();
-    expect(canvasWrap.style.flexDirection).toBe("");
+    expect(stageEl().style.flexDirection).toBe("");
   });
 
   test("Preview, Source and Grid draw no header — they are not authoring views", async () => {
@@ -1861,7 +1860,7 @@ describe("the Document Header slot", () => {
   test("a logic editor in the dock leaves the card slotted, and BOUND", async () => {
     // `wantsDocHeader` used to carry `!editingFunction && !editingFormula`, from the days when the
     // Sub-editors covered the stage. In the dock they do not, so those clauses reached
-    // `attachDocumentHeaderHost(null)` on a card that was still visible: it was detached, not
+    // `attachDocumentHeaderHost("primary", null)` on a card that was still visible: it was detached, not
     // Removed, and went on showing frontmatter from before the edit with nothing to say so.
     const tab = openHeaderedTab();
     setMode("edit");
@@ -1916,8 +1915,8 @@ describe("renderCanvas is addressed by pane", () => {
     renderCanvas(SECONDARY_PANE);
     await flush();
 
-    expect(canvasWrap.textContent).toContain("left");
-    expect(canvasWrap.textContent).not.toContain("right");
+    expect(stageEl().textContent).toContain("left");
+    expect(stageEl().textContent).not.toContain("right");
     expect(secondWrap.textContent).toContain("right");
     expect(secondWrap.textContent).not.toContain("left");
     // Each stage kept its own panel list and its own mode memory.
@@ -1944,88 +1943,17 @@ describe("renderCanvas is addressed by pane", () => {
     scheduleCanvasRender(SECONDARY_PANE);
     await flush();
 
-    expect(canvasWrap.querySelector(".panzoom-wrap")).not.toBeNull();
+    expect(stageEl().querySelector(".panzoom-wrap")).not.toBeNull();
     // The second pane shows nothing, so its pass reset its stage rather than borrowing pane one's.
     expect(secondWrap.textContent).toBe("");
     expect(surfaceForPane(SECONDARY_PANE).panels).toHaveLength(0);
   });
 
-  /*
-   * Taking the stage REPAINTS it, and nothing else will.
-   *
-   * `moveCanvasStage` releases what the losing pane mounted, so the moment the stage changes hands
-   * the DOM standing in it belongs to a pane that no longer owns it and no surface describes it.
-   * Both canvas effects are keyed on `activeTab`, and the two handovers that matter — `⌘\` and
-   * `View: Unsplit` — move a PANE, not a document: the same tab stays active, so neither effect
-   * fires. Unsplit is where that showed. `#canvas-wrap` was left empty, clicking the tab did not
-   * even count a full render, and only a reload brought the editor back.
-   */
-  test("taking the stage repaints it, with no change of active tab to trigger one", async () => {
-    const tab = openSyncedTab();
-    // The stage belongs to the side pane, which is showing the same tab — the state `⌘\` leaves
-    // Behind, and the state Unsplit hands back to the primary.
-    workspace.panes.push({ activeTabId: tab.id, id: SECONDARY_PANE, tabOrder: [tab.id] });
-    workspace.activePaneId = SECONDARY_PANE;
-    handOverCanvasStage(SECONDARY_PANE, canvasWrap);
-    await flush();
-    expect(canvasWrap.querySelector(".panzoom-wrap")).not.toBeNull();
-
-    workspace.panes[0]!.tabOrder = [tab.id];
-    workspace.panes[0]!.activeTabId = tab.id;
-    workspace.activePaneId = PRIMARY_PANE;
-    workspace.panes = workspace.panes.filter((pane) => pane.id === PRIMARY_PANE);
-    const before = canvasPerf.fullRenders;
-
-    handOverCanvasStage(PRIMARY_PANE, canvasWrap);
-    await flush();
-
-    // The stage is the primary's, it has been drawn again, and what is on it is the document.
-    expect(canvasPerf.fullRenders).toBeGreaterThan(before);
-    expect(surfaceForPane(PRIMARY_PANE).panels.length).toBeGreaterThan(0);
-    expect(canvasWrap.querySelector(".panzoom-wrap")).not.toBeNull();
-    expect(surfaceForPane(SECONDARY_PANE).panels).toHaveLength(0);
-
-    surfaceForPane(SECONDARY_PANE).wrap = null as unknown as HTMLElement;
-  });
-
-  /*
-   * A fast path may not answer for a stage it cannot see.
-   *
-   * Each one asks a MODULE whether it mounted — `view.monacoEditor`, `gridPanelMounted`, … — and
-   * that answer outlives the DOM. Taking the stage releases the surface, so the next pass is a mode
-   * transition, clears the wrap, and then the source fast path used to return on the strength of a
-   * Monaco editor whose container had just been thrown away. That is the second half of the Unsplit
-   * defect, and it survives the lifecycle fix on its own: an empty `#canvas-wrap`, a live editor
-   * nobody can see, and a reload to get it back.
-   */
-  test("a stage handed back in code view is rebuilt, not fast-pathed onto a cleared one", async () => {
-    openSyncedTab();
-    setMode("source");
-    workspace.panes.push({
-      activeTabId: workspace.activeTabId,
-      id: SECONDARY_PANE,
-      tabOrder: [workspace.activeTabId!],
-    });
-    workspace.activePaneId = SECONDARY_PANE;
-    handOverCanvasStage(SECONDARY_PANE, canvasWrap);
-    await flush();
-    expect(canvasWrap.querySelector(".source-editor")).not.toBeNull();
-    expect(view.monacoEditor).not.toBeNull();
-
-    // Unsplit: the tab and the stage go back to the primary, and the SAME tab stays active.
-    workspace.panes[0]!.tabOrder = [workspace.activeTabId!];
-    workspace.panes[0]!.activeTabId = workspace.panes[1]!.activeTabId;
-    workspace.activePaneId = PRIMARY_PANE;
-    workspace.panes = workspace.panes.filter((pane) => pane.id === PRIMARY_PANE);
-
-    handOverCanvasStage(PRIMARY_PANE, canvasWrap);
-    await flush();
-
-    expect(canvasWrap.querySelector(".source-editor")).not.toBeNull();
-    expect(view.monacoEditor).not.toBeNull();
-
-    surfaceForPane(SECONDARY_PANE).wrap = null as unknown as HTMLElement;
-  });
+  /* The two handover tests that stood here are deleted with the handover.
+     They proved that TAKING the shell's single stage repainted it, because both canvas effects key
+     on `activeTab` and `⌘\` / `View: Unsplit` move a pane without changing the active tab. A cell
+     per pane means nothing is taken; `panels/pane-grid.ts` schedules the new cell's first render as
+     part of building it, which `tests/pane-grid.test.ts` proves. */
 
   test("a pane with no stage paints nothing instead of throwing", async () => {
     // The shell has ONE `#canvas-wrap` and it belongs to whichever pane is focused, so the other

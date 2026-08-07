@@ -9,8 +9,41 @@
  * writes `setDockSize()` and the shell's own effect moves the track; release persists once.
  */
 
-import { DOCK_DEFAULT_SIZES, persistDocks, setDockSize, shell } from "../shell";
+import {
+  DOCK_DEFAULT_SIZES,
+  persistDocks,
+  registerShellSurface,
+  setDockSize,
+  shell,
+} from "../shell";
 import type { DockId } from "../shell";
+
+/**
+ * What a handle drags.
+ *
+ * Generalised out of the three dock rows so the pane splitter can be the fourth. A dock is sized in
+ * px and a pane split is a ratio, which is the whole of the difference: `scale` converts a pointer
+ * delta in px into the target's own units, and everything else — capture, the dragging class, the
+ * text-selection suppression, the double-click reset, the one persist on release — is identical and
+ * was worth having once.
+ */
+export interface ResizeTarget {
+  /** Which coordinate the drag reads. */
+  axis: "x" | "y";
+  /** The current value. */
+  read: () => number;
+  /** Set it. Called on every pointermove, so it must be cheap and idempotent. */
+  write: (value: number) => void;
+  /** The value a double-click restores. */
+  reset: () => number;
+  /** Lower and upper bounds, read fresh because both can depend on the viewport. */
+  min: () => number;
+  max: () => number;
+  /** Target units per pixel of pointer movement, signed: negative grows toward the origin. */
+  scale: () => number;
+  /** Persist. Called once on release and once on reset — never during the drag. */
+  settle: () => void;
+}
 
 /**
  * The smallest a dock may be dragged to, per axis.
@@ -46,7 +79,8 @@ const HANDLES: { selector: string; dock: DockId; axis: "x" | "y"; grow: 1 | -1 }
  * @param {"x" | "y"} axis — which coordinate the drag reads
  * @param {1 | -1} grow — the sign a positive move along `axis` contributes to the dock's size
  */
-function setupHandle(handle: HTMLElement, dock: DockId, axis: "x" | "y", grow: 1 | -1) {
+export function setupHandle(handle: HTMLElement, target: ResizeTarget) {
+  const { axis } = target;
   let drag: { start: number; startSize: number } | null = null;
   const coord = (e: { clientX: number; clientY: number }) => (axis === "x" ? e.clientX : e.clientY);
 
@@ -59,17 +93,17 @@ function setupHandle(handle: HTMLElement, dock: DockId, axis: "x" | "y", grow: 1
     }
     handle.classList.add("dragging");
     document.body.style.userSelect = "none";
-    drag = { start: coord(e), startSize: shell.docks[dock].size };
+    drag = { start: coord(e), startSize: target.read() };
   });
 
   handle.addEventListener("pointermove", (e) => {
     if (!drag) {
       return;
     }
-    const delta = (coord(e) - drag.start) * grow;
-    const maxSize = (axis === "x" ? window.innerWidth : window.innerHeight) * MAX_RATIO;
-    const clamped = Math.max(MIN_SIZE[axis], drag.startSize + delta);
-    setDockSize(dock, Math.round(Math.min(maxSize, clamped)));
+    const delta = (coord(e) - drag.start) * target.scale();
+    const wanted = drag.startSize + delta;
+    const floored = Math.max(target.min(), wanted);
+    target.write(Math.min(target.max(), floored));
   });
 
   handle.addEventListener("pointerup", (e) => {
@@ -84,13 +118,33 @@ function setupHandle(handle: HTMLElement, dock: DockId, axis: "x" | "y", grow: 1
     }
     handle.classList.remove("dragging");
     document.body.style.userSelect = "";
-    persistDocks();
+    target.settle();
   });
 
   handle.addEventListener("dblclick", () => {
-    setDockSize(dock, DOCK_DEFAULT_SIZES[dock]);
-    persistDocks();
+    target.write(target.reset());
+    target.settle();
   });
+}
+
+/** The largest a dock may be dragged to along `axis`. */
+function maxDockSize(axis: "x" | "y"): number {
+  const viewport = axis === "x" ? window.innerWidth : window.innerHeight;
+  return viewport * MAX_RATIO;
+}
+
+/** A dock, as a {@link ResizeTarget}. The three rows of {@link HANDLES}, given the shared shape. */
+function dockTarget(dock: DockId, axis: "x" | "y", grow: 1 | -1): ResizeTarget {
+  return {
+    axis,
+    max: () => maxDockSize(axis),
+    min: () => MIN_SIZE[axis],
+    read: () => shell.docks[dock].size,
+    reset: () => DOCK_DEFAULT_SIZES[dock],
+    scale: () => grow,
+    settle: () => persistDocks(),
+    write: (value) => setDockSize(dock, Math.round(value)),
+  };
 }
 
 /** Attach every handle present in the document. Idempotent per element by construction. */
@@ -98,9 +152,12 @@ export function mountPanelResize(): void {
   for (const { axis, dock, grow, selector } of HANDLES) {
     const handle = document.querySelector<HTMLElement>(selector);
     if (handle) {
-      setupHandle(handle, dock, axis, grow);
+      setupHandle(handle, dockTarget(dock, axis, grow));
     }
   }
 }
 
-mountPanelResize();
+/* Mounted through the shell's own lifecycle rather than by a bare `mountPanelResize()` at module
+   scope. The import-time call read `document` before anything had said the tree existed, which is
+   the one part of `registerShellSurface`'s bargain this module was not keeping. */
+registerShellSurface({ mount: mountPanelResize, unmount: () => {} });

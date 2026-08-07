@@ -27,7 +27,7 @@ import type { Tab } from "./tabs/tab";
  * timer survived three disposal sites and stayed able to replace a page with an empty parse.
  * `services/monaco-buffer.ts` owns the rule; this is the storage it needs.
  */
-type MonacoSurface = editor.IStandaloneCodeEditor & {
+export type MonacoSurface = editor.IStandaloneCodeEditor & {
   _ignoreNextChange?: boolean;
   /** The debounced work armed over this buffer, with this editor's exact lifetime. */
   _writes?: BufferWrites;
@@ -43,14 +43,17 @@ type MonacoSurface = editor.IStandaloneCodeEditor & {
   _editingTab?: Tab | null;
 };
 
+/**
+ * App-wide transient view state.
+ *
+ * **Nothing per-STAGE lives here any more.** The pan/zoom wrap, the centering observer, the pan
+ * offsets, the source-view Monaco and the render generation were all fields of "the canvas" — a
+ * singular that stopped existing when the shell grew a pane grid. They are fields of a
+ * {@link import("./canvas/canvas-surface").CanvasSurface} now, one record per pane, and
+ * `scripts/check-pane-singletons.ts` fails the build if one grows back: the index signature below
+ * means `view.panX` is not a type error, only a silently-`unknown` read.
+ */
 interface ViewState {
-  panzoomWrap: HTMLElement | null;
-  renderGeneration: number;
-  centerObserver: ResizeObserver | null;
-  needsCenter: boolean;
-  panX: number;
-  panY: number;
-  monacoEditor: MonacoSurface | null;
   /**
    * The dock's code editor, plus what it was mounted FOR.
    *
@@ -78,10 +81,6 @@ interface ViewState {
   blockActionBarEl: HTMLElement | null;
   selDragCleanup: (() => void) | null;
   dndCleanups: (() => void)[];
-  canvasDndCleanups: (() => void)[];
-  canvasEventCleanups: (() => void)[];
-  forcedStyleTag: HTMLStyleElement | null;
-  forcedAttrEl: HTMLElement | null;
   elementsCollapsed: Set<string>;
   elementsFilter: string;
   _currentDropTargetRow: HTMLElement | null;
@@ -92,16 +91,7 @@ interface ViewState {
 }
 
 export const view: ViewState = {
-  // Canvas infrastructure
-  panzoomWrap: null,
-  renderGeneration: 0,
-  centerObserver: null,
-  needsCenter: true,
-  panX: 0,
-  panY: 0,
-
   // Editor instances
-  monacoEditor: null,
   functionEditor: null,
 
   // Floating UI containers
@@ -112,12 +102,6 @@ export const view: ViewState = {
 
   // Cleanup arrays (reset on each render cycle)
   dndCleanups: [],
-  canvasDndCleanups: [],
-  canvasEventCleanups: [],
-
-  // Pseudo-state preview
-  forcedStyleTag: null,
-  forcedAttrEl: null,
 
   // Left panel / elements UI
   elementsCollapsed: new Set(),

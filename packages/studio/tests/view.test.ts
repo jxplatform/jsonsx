@@ -9,16 +9,38 @@
 import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
 import { view } from "../src/view";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
 describe("view", () => {
   test("holds renderer outputs — editor instances, DOM refs and cleanup arrays", () => {
-    expect(view.monacoEditor).toBeNull();
-    expect(view.panzoomWrap).toBeNull();
-    expect(view.centerObserver).toBeNull();
+    expect(surfaceForPane("primary").monacoEditor).toBeNull();
+    expect(surfaceForPane("primary").panzoomWrap).toBeNull();
+    expect(surfaceForPane("primary").centerObserver).toBeNull();
     expect(view.dndCleanups).toBeArray();
-    expect(view.canvasDndCleanups).toBeArray();
-    expect(view.canvasEventCleanups).toBeArray();
     expect(view.elementsCollapsed).toBeInstanceOf(Set);
+  });
+
+  test("carries nothing that belongs to ONE STAGE", () => {
+    /* The pan/zoom wrap, the centering observer, the pan offsets, the source Monaco and the render
+       generation are fields of a `CanvasSurface`. They cannot be type errors here — `ViewState` has
+       an index signature — so the guard is `scripts/check-pane-singletons.ts` and this is its
+       assertion in the unit suite: the keys are GONE from the object, not merely unread. */
+    for (const key of [
+      "panzoomWrap",
+      "centerObserver",
+      "needsCenter",
+      "panX",
+      "panY",
+      "monacoEditor",
+      "renderGeneration",
+      // And the four that were dead outright: written by no `src/` file, cleared on every render.
+      "canvasDndCleanups",
+      "canvasEventCleanups",
+      "forcedStyleTag",
+      "forcedAttrEl",
+    ]) {
+      expect(Object.hasOwn(view, key)).toBe(false);
+    }
   });
 
   test("carries no UI inputs", () => {

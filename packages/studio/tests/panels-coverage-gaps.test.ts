@@ -8,10 +8,17 @@
  *   children), stray-toggle clicks, and startLayerTitleEdit guards.
  * - Dnd: the onGenerateDragPreview suppressors for layer and component drags.
  */
-import { flush, renderInto, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import {
+  flush,
+  registerPrimaryStage,
+  renderInto,
+  resetStudioState,
+  resetWorkspaceWithTab,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxPath } from "../src/state";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
 type AnyRec = Record<string, any>;
 
@@ -167,7 +174,11 @@ describe("pane-context interaction gaps", () => {
     resetStudioState();
     const tab = resetWorkspaceWithTab();
     tab.session.ui.zoom = 2.4;
-    view.panzoomWrap = null; // Canvas-utils actions guard on this and no-op cleanly.
+    /* THE PANE's mode, not the ctx's. The pod reads `canvasModeOfPane` now — a fixture that named
+       a mode only in the ctx was describing a state the app cannot be in, and a default `.json`
+       tab opens in `edit`, whose "−" drives `editZoom` rather than the panzoom `ui.zoom`. */
+    tab.session.ui.canvasMode = "design";
+    surfaceForPane("primary").panzoomWrap = null; // Canvas-utils actions guard on this and no-op cleanly.
     const root = document.createElement("div");
     document.body.append(root);
     paneContext.mount(root, makePaneCtx() as never);
@@ -383,6 +394,7 @@ describe("dnd drag previews", () => {
     view.dndCleanups = [];
     document.body.innerHTML = `<div id="left-panel"></div>`;
     initShellRefs();
+    registerPrimaryStage();
   });
 
   test("layer-row drags suppress the native drag image", async () => {

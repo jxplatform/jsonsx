@@ -7,7 +7,13 @@
  * over. These tests play the stage's part with `attachDocumentHeaderHost`; `canvas-render.test.ts`
  * covers where the stage actually puts it.
  */
-import { flush, installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import {
+  flush,
+  installMockPlatform,
+  registerPrimaryStage,
+  resetStudioState,
+  resetWorkspaceWithTab,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { initShellRefs, registerRenderer } from "../src/store";
 import { invalidateMediaCache } from "../src/ui/media-picker";
@@ -25,7 +31,7 @@ const { attachDocumentHeaderHost, documentHeaderHost, hasDocumentHeader, mount, 
 
 /** The node the card paints into — whatever the stage (here, the test) last handed over. */
 function host(): HTMLElement {
-  const el = documentHeaderHost();
+  const el = documentHeaderHost("primary");
   if (!el) {
     throw new Error("no Document Header host is attached");
   }
@@ -58,7 +64,7 @@ function setShell(withPanelHost = true) {
   document.body.innerHTML = `<div id="app">
     <div id="toolbar"></div>
     <div id="activity-bar"></div><div id="left-panel"></div>
-    <div id="canvas-wrap">
+    <div class="pane-stage" data-jx-region="pane.primary">
       <div class="content-edit-canvas"><div class="content-edit-column">
         <div class="doc-header-host in-column"></div>
       </div></div>
@@ -67,7 +73,9 @@ function setShell(withPanelHost = true) {
     <div id="statusbar"></div>
   </div>`;
   initShellRefs();
+  registerPrimaryStage();
   attachDocumentHeaderHost(
+    "primary",
     withPanelHost ? document.querySelector<HTMLElement>(".doc-header-host") : null,
   );
 }
@@ -173,7 +181,7 @@ describe("the three deleted gates", () => {
 
     setShell(false);
     mount();
-    expect(documentHeaderHost()).toBeNull();
+    expect(documentHeaderHost("primary")).toBeNull();
     render(); // Must not throw with no host bound
   });
 });
@@ -187,11 +195,11 @@ describe("the stage owns the host", () => {
 
     const second = document.createElement("div");
     second.className = "doc-header-host pinned";
-    document.querySelector("#canvas-wrap")!.append(second);
-    attachDocumentHeaderHost(second);
+    document.querySelector(".pane-stage")!.append(second);
+    attachDocumentHeaderHost("primary", second);
     await flush(4);
 
-    expect(documentHeaderHost()).toBe(second);
+    expect(documentHeaderHost("primary")).toBe(second);
     expect(second.querySelector(".doc-header")).toBeTruthy();
   });
 
@@ -199,9 +207,9 @@ describe("the stage owns the host", () => {
     setupContentTab({ title: "Hello" });
     await mountAndFlush();
     const el = host();
-    attachDocumentHeaderHost(el);
+    attachDocumentHeaderHost("primary", el);
     await flush(4);
-    expect(documentHeaderHost()).toBe(el);
+    expect(documentHeaderHost("primary")).toBe(el);
     expect(el.querySelectorAll(".doc-header").length).toBe(1);
   });
 
@@ -343,7 +351,7 @@ describe("commits and reactivity", () => {
     // Into it again.
     const painted = host();
     unmount();
-    expect(documentHeaderHost()).toBeNull();
+    expect(documentHeaderHost("primary")).toBeNull();
     transactDoc(tab, (t: any) => mutateUpdateFrontmatter(t, "subtitle", "After"));
     await flush(4);
     const field = painted.querySelector('[data-prop="subtitle"] sp-textfield') as any;

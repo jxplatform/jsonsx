@@ -81,11 +81,10 @@ export async function bootStudio(opts: {
   document.body.innerHTML = `
     <div id="app">
       <div id="toolbar"></div>
-      <div id="tab-strip"></div>
+      <div id="pane-grid"></div>
       <div id="activity-bar"></div>
       <div id="left-panel"></div>
       <div id="resize-left" class="resize-handle"></div>
-      <div id="canvas-wrap"></div>
       <div id="resize-right" class="resize-handle"></div>
       <div id="right-panel"></div>
       <div id="statusbar"></div>
@@ -138,10 +137,15 @@ export async function bootStudio(opts: {
   }));
 
   void mock.module("../src/editor/shortcuts.ts", () => ({
-    // The registry is the first argument now; the pointer/pan thunk is the second.
+    // The registry is the first argument now; the STAGE-context reader is the second — it takes a
+    // Surface, because a wheel belongs to the stage the pointer is over rather than to the pane
+    // The keyboard is in.
     initShortcuts: (_registry: unknown, get: () => unknown) => {
       captured.shortcutsGet = get as () => any;
     },
+    // `panels/pane-grid.ts` installs one disposer per cell it builds, so the mock has to carry it
+    // Or the boot fails at import time.
+    installStageGestures: () => () => {},
     registerStudioCommands: mock(() => {}),
   }));
 

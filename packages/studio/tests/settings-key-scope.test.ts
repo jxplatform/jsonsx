@@ -23,12 +23,19 @@
  * The control case (the same chord over an ordinary page) runs beside each, because a test that
  * only asserts a refusal passes just as well when the command was never registered.
  */
-import { flush, installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import {
+  flush,
+  installMockPlatform,
+  registerPrimaryStage,
+  resetStudioState,
+  resetWorkspaceWithTab,
+} from "./harness";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
 
 import type { CommandRegistry } from "../src/commands/registry";
 import type { Tab } from "../src/tabs/tab";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
 // ─── Module mocks (must precede the modules under test) ──────────────────────
 // `context-menu.ts` is deliberately NOT mocked: its `pasteNode` is the implementation behind
@@ -96,7 +103,6 @@ let registry: CommandRegistry;
 beforeAll(() => {
   document.body.innerHTML = "";
   for (const id of [
-    "canvas-wrap",
     "activity-bar",
     "left-panel",
     "right-panel",
@@ -111,6 +117,7 @@ beforeAll(() => {
     document.body.append(el);
   }
   store.initShellRefs();
+  registerPrimaryStage();
   initLayers();
   installMockPlatform();
   resetStudioState({ isSiteProject: true, name: "demo", projectRoot: "/project" });
@@ -124,7 +131,7 @@ beforeAll(() => {
     },
   });
 
-  const wrap = store.canvasWrap as unknown as Record<string, unknown>;
+  const wrap = surfaceForPane("primary").wrap as unknown as Record<string, unknown>;
   wrap.setPointerCapture = () => {};
   wrap.releasePointerCapture = () => {};
 

@@ -27,6 +27,7 @@ import { BUFFER_COMMIT, bufferWrites } from "../src/services/monaco-buffer";
 import { view } from "../src/view";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../src/tabs/tab";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
 let host: HTMLElement;
 
@@ -371,12 +372,12 @@ describe("tab strip interactions", () => {
       (tab.doc.document as unknown as { body?: string }).body = body;
       tab.doc.dirty = true;
       view.functionEditor?._writes?.markSettled();
-      view.monacoEditor?._writes?.markSettled();
+      surfaceForPane("primary").monacoEditor?._writes?.markSettled();
     }
 
     afterEach(() => {
       view.functionEditor = null;
-      view.monacoEditor = null;
+      surfaceForPane("primary").monacoEditor = null;
     });
 
     test("the dock's armed commit runs before the gate, so ⌘W prompts and Save has the text", async () => {
@@ -394,7 +395,7 @@ describe("tab strip interactions", () => {
 
     test("the source view's commit is awaited — it parses before it assigns", async () => {
       const a = open("a");
-      view.monacoEditor = typingBuffer(a, "# Never saved", async (text) => {
+      surfaceForPane("primary").monacoEditor = typingBuffer(a, "# Never saved", async (text) => {
         await Promise.resolve();
         landBody(a, text);
       }) as never;
@@ -418,7 +419,7 @@ describe("tab strip interactions", () => {
         hasTextFocus: () => false,
       };
       bufferWrites(buffer).markTyped();
-      view.monacoEditor = buffer as never;
+      surfaceForPane("primary").monacoEditor = buffer as never;
       await flush();
       (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
       await flush();
@@ -448,7 +449,7 @@ describe("tab strip interactions", () => {
         hasTextFocus: () => false,
       };
       bufferWrites(buffer).markTyped();
-      view.monacoEditor = buffer as never;
+      surfaceForPane("primary").monacoEditor = buffer as never;
       await flush();
       (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
       await flush();
@@ -475,7 +476,7 @@ describe("tab strip interactions", () => {
     test("a tab destroyed inside the commit's await is not prompted about", async () => {
       const a = open("a");
       a.doc.dirty = true; // The gate fires on this, if it is ever reached.
-      view.monacoEditor = typingBuffer(a, "# Never saved", async (text) => {
+      surfaceForPane("primary").monacoEditor = typingBuffer(a, "# Never saved", async (text) => {
         // The project switch, arriving mid-parse. It takes every tab with it, unprompted.
         closeAllTabs();
         await Promise.resolve();
@@ -556,7 +557,7 @@ describe("tab strip interactions", () => {
   describe("closing the whole workspace at once", () => {
     afterEach(() => {
       view.functionEditor = null;
-      view.monacoEditor = null;
+      surfaceForPane("primary").monacoEditor = null;
     });
 
     test("nothing unsaved needs no prompt", async () => {
@@ -637,7 +638,7 @@ describe("tab strip interactions", () => {
         hasTextFocus: () => false,
       };
       bufferWrites(buffer).markTyped();
-      view.monacoEditor = buffer as never;
+      surfaceForPane("primary").monacoEditor = buffer as never;
       return tab;
     }
 

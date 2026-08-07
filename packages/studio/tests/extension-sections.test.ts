@@ -6,7 +6,7 @@
  * render) lives in settings-document.test.ts; the end-to-end parser parity in
  * contributed-content-types.test.ts.
  */
-import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { flush, installMockPlatform, resetStudioState, surfaceOf } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   deriveSettingsSection,
@@ -27,7 +27,7 @@ let host: HTMLElement;
 
 /** Mount the settings document on a throwaway host and read its inner nav. */
 async function navLabels(): Promise<(string | undefined)[]> {
-  renderSettingsPane(host);
+  renderSettingsPane(surfaceOf(host));
   await flush();
   return [...host.querySelectorAll(".settings-nav-item")].map((b) => b.textContent?.trim());
 }
@@ -65,7 +65,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  detachSettingsPane();
+  detachSettingsPane("primary");
   host.remove();
   setSettingsSection("overview");
   await flush();

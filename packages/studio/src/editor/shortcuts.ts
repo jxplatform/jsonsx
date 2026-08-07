@@ -30,15 +30,16 @@
  * to the code that runs, so a chord and its behaviour cannot drift apart again.
  */
 
-import {
-  canvasWrap,
-  childIndex,
-  childList,
-  getNodeAtPath,
-  parentElementPath,
-  projectState,
-} from "../store";
+import { childIndex, childList, getNodeAtPath, parentElementPath, projectState } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
+import {
+  STAGE_CLASS,
+  allCanvasSurfaces,
+  canvasModeOfPane,
+  surfaceForPane,
+  tabOfPane,
+} from "../canvas/canvas-surface";
+import type { CanvasSurface } from "../canvas/canvas-surface";
 import { primarySelection } from "../tabs/selection";
 import {
   mutateDuplicateNodes,
@@ -86,6 +87,9 @@ export interface ShortcutPointerContext {
   setPan: (x: number, y: number) => void;
   applyTransform: () => void;
 }
+
+/** Read a live pointer context for one pane's stage. */
+export type StageContext = (surface: CanvasSurface) => ShortcutPointerContext;
 
 /** Where a project the user is about to pick should open. */
 export type ProjectOpenTarget = "thisWindow" | "newWindow";
@@ -686,7 +690,10 @@ function canvasCommands(pointer: () => ShortcutPointerContext): AnyCommand[] {
       category: "View",
       group: "6_zoom",
       id: "canvas.zoomReset",
-      keybinding: "mod+0",
+      /* No chord. `⌘0` is `pane.focusPrimary`, pairing with `pane.focusSecondary`'s `⌘⌥0` —
+         the re-bind `workspace/workspace.ts` deferred to this workstream by name. Resetting the
+         zoom keeps its button in the floating zoom pod (`panels/pane-context.ts`), which is where
+         the whole zoom cluster lives; focusing a pane has no control at all and needs the key. */
       keyScope: "canvas",
       level: "document",
       requires: "an open document",
@@ -751,8 +758,13 @@ function canvasCommands(pointer: () => ShortcutPointerContext): AnyCommand[] {
 export function registerStudioCommands(
   registry: CommandRegistry,
   hooks: StudioCommandHooks,
-  pointer: () => ShortcutPointerContext,
+  stageContext: StageContext,
 ): void {
+  /* A COMMAND runs in the focused pane, and that is the one place resolving through focus is the
+     right answer: the person just pressed a key or picked a palette row, so "the canvas" means the
+     one they are in. Every other reader — the wheel, the drag, the render — is answering for a
+     stage the pointer or the pass names, and takes its surface explicitly. */
+  const pointer = () => stageContext(surfaceForPane(workspace.activePaneId));
   registry.registerAll(
     defaultCommands({
       closeDocument,
@@ -823,14 +835,62 @@ function claimChord(registry: CommandRegistry, event: KeyboardEvent): string | u
  * @param registry The app's command registry, already populated.
  * @param getContext Live pointer/pan state, read fresh on every gesture.
  */
-export function initShortcuts(
-  registry: CommandRegistry,
-  getContext: () => ShortcutPointerContext,
-): void {
+export function initShortcuts(registry: CommandRegistry, stageContext: StageContext): void {
   // Publish the composed registry to the chrome. `studio.ts` mounts the Command Bar and the Palette
   // At the top of its body and builds the registry at the bottom, so this — the last bootstrap call
   // Before the automation hook — is the point at which "the registry" exists to be rendered.
   setActiveRegistry(registry);
+  _stageContext = stageContext;
+
+  // Re-fit the edit-mode content zoom on resize: its layout width derives from the LIVE column
+  // Width, which tracks the studio window.
+  window.addEventListener("resize", () => {
+    for (const surface of allCanvasSurfaces()) {
+      if (canvasModeOfPane(surface.paneId) === "edit") {
+        applyEditZoom(surface);
+      }
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    dispatchKey(registry, e);
+  });
+
+  /* Block ctrl+scroll (browser zoom) everywhere that is not A STAGE.
+     `!canvasWrap.contains(target)` was the single-stage spelling of this, and with a grid it would
+     have blocked the browser-zoom guard's own exemption for every pane but one. `closest()` asks
+     the question the rule actually means. */
+  document.addEventListener(
+    "wheel",
+    (e: WheelEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !(e.target as Element | null)?.closest(`.${STAGE_CLASS}`)) {
+        e.preventDefault();
+      }
+    },
+    { passive: false },
+  );
+}
+
+/** The stage-context reader, published by {@link initShortcuts} for {@link installStageGestures}. */
+let _stageContext: StageContext | null = null;
+
+/**
+ * Install one pane's stage gestures: wheel zoom/pan, middle-mouse drag pan, background deselect.
+ *
+ * Per CELL, with the surface in a closure, because every one of these gestures reads or writes
+ * state that belongs to the stage the pointer is over — its pan offsets, its tab's zoom, its tab's
+ * selection. Resolved through focus instead (which is what `getContext()` did) a wheel over the
+ * side pane panned the primary and set the primary tab's zoom.
+ *
+ * @param {CanvasSurface} surface
+ * @returns {() => void} Disposer — called by the grid when the cell is removed.
+ */
+export function installStageGestures(surface: CanvasSurface): () => void {
+  const canvasWrap = surface.wrap;
+  const getContext = () => _stageContext?.(surface) ?? stageless();
+  const controller = new AbortController();
+  const { signal } = controller;
+
   // Wheel handler: Ctrl+Scroll = zoom (cursor-centered), plain scroll = pan
   canvasWrap.addEventListener(
     "wheel",
@@ -841,11 +901,12 @@ export function initShortcuts(
       // Ourselves. The canvas iframe is sized to its content (no internal scroll) and a cross-origin
       // OOPIF doesn't bubble wheel to the parent, so the wheel reaches us forwarded (or over the
       // Canvas chrome) but never triggers native scroll.
+      const paneTab = tabOfPane(surface.paneId);
       if (canvasMode === "edit") {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
-          const editZoom = activeTab.value?.session.ui.editZoom ?? 1;
-          requestEditZoom(editZoom * (1 + -e.deltaY * 0.005));
+          const editZoom = paneTab?.session.ui.editZoom ?? 1;
+          requestEditZoom(editZoom * (1 + -e.deltaY * 0.005), surface);
           return;
         }
         const sc = canvasWrap.querySelector<HTMLElement>(".content-edit-canvas");
@@ -875,15 +936,20 @@ export function initShortcuts(
         const rect = rectOf(canvasWrap);
         const cursorX = e.clientX - rect.left;
         const cursorY = e.clientY - rect.top;
-        const oldZoom = activeTab.value?.session.ui.zoom ?? 1;
+        /* THIS pane's tab, not the focused pane's. Both reads were `activeTab`, so a wheel over
+           the unfocused stage magnified a document on the other side of the splitter. */
+        const oldZoom = paneTab?.session.ui.zoom ?? 1;
         const delta = -e.deltaY * 0.005;
         const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, oldZoom * (1 + delta)));
         const ratio = newZoom / oldZoom;
         // Adjust pan so the point under cursor stays stationary
         setPan(cursorX - (cursorX - panX) * ratio, cursorY - (cursorY - panY) * ratio);
-        activeTab.value!.session.ui.zoom = newZoom;
+        if (paneTab) {
+          paneTab.session.ui.zoom = newZoom;
+        }
         // The author chose this zoom, so re-entering Design keeps it instead of auto-fitting.
-        markExplicitZoom();
+        // On THIS stage: the declared fit is a fact about the document under the cursor.
+        markExplicitZoom(surface);
       } else if (e.shiftKey) {
         // Shift+scroll = horizontal pan
         setPan(panX - e.deltaY, panY);
@@ -893,58 +959,70 @@ export function initShortcuts(
       }
       applyTransform();
     },
-    { passive: false },
+    { passive: false, signal },
   );
 
   // Middle-mouse drag panning
-  canvasWrap.addEventListener("pointerdown", (e: PointerEvent) => {
-    const ctx = getContext();
-    if (ctx.canvasMode === "edit" || ctx.canvasMode === "preview") {
-      return;
-    } // No panning in edit mode, and preview scrolls its own frame rather than panning
-    if (e.button !== 1) {
-      return;
-    } // Middle button only
-    e.preventDefault();
-    canvasWrap.setPointerCapture(e.pointerId);
-    let lastX = e.clientX,
-      lastY = e.clientY;
-    const onMove = (ev: PointerEvent) => {
-      const { panX, panY, setPan, applyTransform } = getContext();
-      setPan(panX + (ev.clientX - lastX), panY + (ev.clientY - lastY));
-      lastX = ev.clientX;
-      lastY = ev.clientY;
-      applyTransform();
-    };
-    const onUp = () => {
-      canvasWrap.releasePointerCapture(e.pointerId);
-      canvasWrap.removeEventListener("pointermove", onMove);
-      canvasWrap.removeEventListener("pointerup", onUp);
-    };
-    canvasWrap.addEventListener("pointermove", onMove);
-    canvasWrap.addEventListener("pointerup", onUp);
-  });
-
-  // Re-fit the edit-mode content zoom on resize: its layout width derives from the LIVE column
-  // Width, which tracks the studio window.
-  window.addEventListener("resize", () => {
-    if (getContext().canvasMode === "edit") {
-      applyEditZoom();
-    }
-  });
-
-  document.addEventListener("keydown", (e) => {
-    dispatchKey(registry, e);
-  });
-
-  // Block ctrl+scroll (browser zoom) on all non-canvas areas
-  document.addEventListener(
-    "wheel",
-    (e: WheelEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !canvasWrap.contains(e.target as Node)) {
-        e.preventDefault();
-      }
+  canvasWrap.addEventListener(
+    "pointerdown",
+    (e: PointerEvent) => {
+      const ctx = getContext();
+      if (ctx.canvasMode === "edit" || ctx.canvasMode === "preview") {
+        return;
+      } // No panning in edit mode, and preview scrolls its own frame rather than panning
+      if (e.button !== 1) {
+        return;
+      } // Middle button only
+      e.preventDefault();
+      canvasWrap.setPointerCapture(e.pointerId);
+      let lastX = e.clientX,
+        lastY = e.clientY;
+      const onMove = (ev: PointerEvent) => {
+        const { panX, panY, setPan, applyTransform } = getContext();
+        setPan(panX + (ev.clientX - lastX), panY + (ev.clientY - lastY));
+        lastX = ev.clientX;
+        lastY = ev.clientY;
+        applyTransform();
+      };
+      const onUp = () => {
+        canvasWrap.releasePointerCapture(e.pointerId);
+        canvasWrap.removeEventListener("pointermove", onMove);
+        canvasWrap.removeEventListener("pointerup", onUp);
+      };
+      canvasWrap.addEventListener("pointermove", onMove);
+      canvasWrap.addEventListener("pointerup", onUp);
     },
-    { passive: false },
+    { signal },
   );
+
+  /* Clicking the stage background (outside any artboard) deselects — and clears THIS pane's tab.
+     It was a bare listener in the bootstrap over `canvasWrap` and `view.panzoomWrap`, comparing
+     against the app's one stage and writing `activeTab`'s selection. Both halves are per-pane. */
+  canvasWrap.addEventListener(
+    "click",
+    (e: MouseEvent) => {
+      if (e.target !== canvasWrap && e.target !== surface.panzoomWrap) {
+        return;
+      }
+      const tab = tabOfPane(surface.paneId);
+      if (!tab?.session.selection.length) {
+        return;
+      }
+      tab.session.selection = [];
+    },
+    { signal },
+  );
+
+  return () => controller.abort();
+}
+
+/** The context a stage answers with before the bootstrap has published a reader. */
+function stageless(): ShortcutPointerContext {
+  return {
+    applyTransform: () => {},
+    canvasMode: "design",
+    panX: 0,
+    panY: 0,
+    setPan: () => {},
+  };
 }

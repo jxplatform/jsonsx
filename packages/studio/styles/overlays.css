@@ -255,8 +255,8 @@
 
 /* ─── Library ────────────────────────────────────
    The Library is a PANE surface, not an overlay — the Manage modal it replaces is gone. It keeps
-   its rules here beside the grid's for one reason: both are non-iframe editors drawn into
-   #canvas-wrap, and splitting them across two sheets is how the two drifted apart before. */
+   its rules here beside the grid's for one reason: both are non-iframe editors drawn into a
+   pane's stage, and splitting them across two sheets is how the two drifted apart before. */
 .library {
   display: flex;
   flex-direction: column;

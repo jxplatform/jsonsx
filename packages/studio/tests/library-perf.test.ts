@@ -15,7 +15,7 @@
  * runner's mood. The timings are PRINTED so a regression is visible to a reader without being a
  * flake for everyone else.
  */
-import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { flush, installMockPlatform, resetStudioState, surfaceOf } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { initLayers } from "../src/ui/layers";
 import { resetNotifications } from "../src/services/notify";
@@ -99,7 +99,7 @@ function install() {
 }
 
 async function mount(): Promise<HTMLElement> {
-  detachLibraryPane();
+  detachLibraryPane("primary");
   host?.remove();
   closeAllTabs();
   const tab = openTab({
@@ -110,7 +110,7 @@ async function mount(): Promise<HTMLElement> {
   });
   host = document.createElement("div");
   document.body.append(host);
-  renderLibraryMode(host, tab);
+  renderLibraryMode(surfaceOf(host), tab);
   await flush();
   await flush();
   return host;
@@ -150,7 +150,7 @@ async function windowedPane(): Promise<HTMLElement> {
 
 beforeEach(() => {
   resetNotifications();
-  detachLibraryPane();
+  detachLibraryPane("primary");
   invalidateLibrary();
   setLibraryCategory("all");
   setLibraryLayout("cards");
@@ -159,7 +159,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  detachLibraryPane();
+  detachLibraryPane("primary");
   host?.remove();
 });
 

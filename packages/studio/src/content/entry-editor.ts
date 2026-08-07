@@ -40,6 +40,7 @@ import { projectState } from "../store";
 import { resolveContextPointer } from "../services/context-resolver";
 import { transactDoc } from "../tabs/transact";
 import { renderForm } from "../ui/schema-form";
+import { paneRegion } from "../ui/regions";
 import { activateTab, workspace } from "../workspace/workspace";
 import { commitEntryFields, entryFields, mutateEntryField } from "./entry-fields";
 import { DRAFT_FIELD, DRAFT_MEANING, hasDraftAxis, isDraftEntry } from "./draft-state";
@@ -47,6 +48,7 @@ import { collectionOfPath, missingRequired } from "./entry-model";
 import type { EntryCollection } from "./entry-model";
 import type { JsonSchema, SchemaFormContext } from "../ui/schema-form";
 import type { Tab } from "../tabs/tab";
+import type { CanvasSurface } from "../canvas/canvas-surface";
 import type { JsonValue } from "../types";
 
 /** The `canvasMode` the entry form draws under. */
@@ -58,25 +60,41 @@ const ENTRY_TAB_MODES = [ENTRY_MODE];
 // ─── Mounting ────────────────────────────────────────────────────────────────
 
 interface ActiveEntryPane {
+  /** The pane whose stage this form is drawn on. */
+  paneId: string;
   tabId: string;
   wrap: HTMLElement;
   scope: { stop: () => void; run: <T>(fn: () => T) => T | undefined };
 }
 
-let active: ActiveEntryPane | null = null;
+/**
+ * The entry form mounted in each pane, keyed by pane id.
+ *
+ * `entry` is one of the kinds the side pane may host, so this singleton was reachable from two
+ * panes at once the day the grid drew a second cell: pane B's mount stopped pane A's effect scope,
+ * leaving a form on screen that no longer tracked its own frontmatter.
+ */
+const _active = new Map<string, ActiveEntryPane>();
 
-/** Whether this tab's entry form is already mounted and still in the document. */
-export function entryPaneMounted(tab: Tab): boolean {
-  return active !== null && active.tabId === tab.id && active.wrap.isConnected;
+/** The form mounted in a pane, or null. */
+function activeIn(paneId: string): ActiveEntryPane | null {
+  return _active.get(paneId) ?? null;
 }
 
-/** Tear the entry form down (mode change, tab switch, project close). Idempotent. */
-export function detachEntryPane(): void {
-  if (!active) {
+/** Whether this tab's entry form is already mounted in this pane and still in the document. */
+export function entryPaneMounted(paneId: string, tab: Tab): boolean {
+  const panel = activeIn(paneId);
+  return panel !== null && panel.tabId === tab.id && panel.wrap.isConnected;
+}
+
+/** Tear one pane's entry form down (mode change, tab switch, project close). Idempotent. */
+export function detachEntryPane(paneId: string): void {
+  const panel = _active.get(paneId);
+  if (!panel) {
     return;
   }
-  active.scope.stop();
-  active = null;
+  panel.scope.stop();
+  _active.delete(paneId);
 }
 
 // ─── Drafts ──────────────────────────────────────────────────────────────────
@@ -211,18 +229,19 @@ function notAnEntryTpl(tab: Tab) {
  * own effect scope from here, so a field commit repaints the form and nothing else — repainting
  * through the canvas pipeline would remount the document's iframe on every keystroke.
  */
-export function renderEntryMode(canvasWrap: HTMLElement, tab: Tab): void {
-  if (entryPaneMounted(tab)) {
+export function renderEntryMode(surface: CanvasSurface, tab: Tab): void {
+  const { paneId, wrap: canvasWrap } = surface;
+  if (entryPaneMounted(paneId, tab)) {
     return;
   }
-  detachEntryPane();
+  detachEntryPane(paneId);
 
   const scope = effectScope();
-  const panel: ActiveEntryPane = { scope, tabId: tab.id, wrap: canvasWrap };
-  active = panel;
+  const panel: ActiveEntryPane = { paneId, scope, tabId: tab.id, wrap: canvasWrap };
+  _active.set(paneId, panel);
 
   const rerender = () => {
-    if (active === panel) {
+    if (activeIn(paneId) === panel) {
       draw();
     }
   };
@@ -231,7 +250,7 @@ export function renderEntryMode(canvasWrap: HTMLElement, tab: Tab): void {
     const collection = collectionOfPath(tab.documentPath);
     if (!collection) {
       litRender(
-        html`<div class="entry-editor" data-jx-region="pane.primary/entry">
+        html`<div class="entry-editor" data-jx-region=${paneRegion(paneId, "entry")}>
           ${notAnEntryTpl(tab)}
         </div>`,
         canvasWrap,
@@ -241,9 +260,9 @@ export function renderEntryMode(canvasWrap: HTMLElement, tab: Tab): void {
     const fields = entryFields(tab);
     litRender(
       html`
-        <div class="entry-editor" data-jx-region="pane.primary/entry">
+        <div class="entry-editor" data-jx-region=${paneRegion(paneId, "entry")}>
           ${headerTpl(tab, collection)}
-          <div class="entry-editor-fields" data-jx-region="pane.primary/entry/fields">
+          <div class="entry-editor-fields" data-jx-region=${paneRegion(paneId, "entry/fields")}>
             ${renderForm(collection.schema as JsonSchema, fields, {
               context: formContext(tab),
               errors: absentRequiredErrors(collection, fields),
@@ -259,7 +278,7 @@ export function renderEntryMode(canvasWrap: HTMLElement, tab: Tab): void {
 
   scope.run(() => {
     effect(() => {
-      if (active !== panel) {
+      if (activeIn(paneId) !== panel) {
         return;
       }
       // Everything the form draws from: the entry's own fields, and the schema that types them.

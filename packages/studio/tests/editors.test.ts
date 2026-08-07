@@ -11,8 +11,9 @@
  * on open, debounced state sync for defs and events, and the completion provider are unchanged and
  * still covered here.
  */
-import { flush, installMockPlatform, resetWorkspaceWithTab } from "./harness";
+import { flush, installMockPlatform, registerPrimaryStage, resetWorkspaceWithTab } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
 type ChangeListener = () => void;
 
@@ -145,11 +146,13 @@ const { activateTab, activeTab, closeAllTabs, closeTab, openTab } =
   await import("../src/workspace/workspace");
 type StudioTab = NonNullable<typeof activeTab.value>;
 
-document.body.innerHTML = `<div id="app"><div id="canvas-wrap"></div><div id="logic"></div></div>`;
+document.body.innerHTML = `<div id="app"><div class="pane-stage" data-jx-region="pane.primary"></div><div id="logic"></div></div>`;
 initShellRefs();
+registerPrimaryStage();
 
-// Destructuring store.canvasWrap would snapshot the pre-initShellRefs null — query instead
-const canvasWrap = document.querySelector("#canvas-wrap") as HTMLElement;
+// The pane's stage, which is what `#canvas-wrap` was. Queried rather than destructured off a
+// Module binding for the same reason as before: the surface's `wrap` is assigned by the fixture.
+const canvasWrap = document.querySelector(".pane-stage") as HTMLElement;
 /** Stands in for the dock's `.bd-body` — what the Logic tab's `afterRender` is handed. */
 const dock = document.querySelector("#logic") as HTMLElement;
 
@@ -264,7 +267,7 @@ beforeEach(() => {
   registerCompletionItemProvider.mockClear();
   view._completionRegistered = false;
   view.functionEditor = null;
-  view.monacoEditor = null;
+  surfaceForPane("primary").monacoEditor = null;
   resetNotifications();
   installMockPlatform({
     codeService: (async (action: string, payload: unknown) => {
@@ -277,10 +280,6 @@ beforeEach(() => {
 
 describe("the code surface — def target", () => {
   test("mounts into the dock body and leaves the canvas mounted", async () => {
-    const dndCleanup = mock(() => {});
-    const eventCleanup = mock(() => {});
-    view.canvasDndCleanups = [dndCleanup];
-    view.canvasEventCleanups = [eventCleanup];
     canvasPanels.push({ id: "panel" } as never);
     canvasWrap.textContent = "the rendered page";
     setEditing({ defName: "greet", type: "def" });
@@ -288,12 +287,8 @@ describe("the code surface — def target", () => {
     await paintLogic();
     await flush();
 
-    // The takeover tore all four of these down before drawing over the stage. The page whose
-    // Handler this is stays rendered, patchable and on screen — the whole point of P8.5.
-    expect(dndCleanup).not.toHaveBeenCalled();
-    expect(eventCleanup).not.toHaveBeenCalled();
-    expect(view.canvasDndCleanups).toHaveLength(1);
-    expect(view.canvasEventCleanups).toHaveLength(1);
+    // The takeover tore the stage down before drawing over it. The page whose handler this is
+    // Stays rendered, patchable and on screen — the whole point of P8.5.
     expect(canvasPanels).toHaveLength(1);
     expect(canvasWrap.textContent).toBe("the rendered page");
 
@@ -421,7 +416,7 @@ describe("the code surface — event target", () => {
     // Source mode's Monaco belongs to the PANE. The takeover disposed it on its way over the
     // Stage; a dock tab shares the screen with it and must leave it alone.
     const paneMonaco = { dispose: mock(() => {}) };
-    view.monacoEditor = paneMonaco as never;
+    surfaceForPane("primary").monacoEditor = paneMonaco as never;
 
     setEditing({ eventKey: "onclick", path: ["children", 0], type: "event" });
     await paintLogic();
@@ -429,7 +424,7 @@ describe("the code surface — event target", () => {
 
     expect(first!.disposed).toBe(true);
     expect(paneMonaco.dispose).not.toHaveBeenCalled();
-    expect(view.monacoEditor).toBe(paneMonaco as never);
+    expect(surfaceForPane("primary").monacoEditor).toBe(paneMonaco as never);
     expect(created).toHaveLength(2);
     expect(created[1]!.value).toBe("go()");
   });

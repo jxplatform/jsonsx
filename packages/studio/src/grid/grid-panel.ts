@@ -22,7 +22,7 @@ import { effect, effectScope, reactive } from "../reactivity";
 import { renderPopover, showConfirmDialog, showPromptDialog } from "../ui/layers";
 import { notify } from "../services/notify";
 import { rectOf } from "../utils/geometry";
-import { activeTab } from "../workspace/workspace";
+import { activeTab, workspace } from "../workspace/workspace";
 import { createGridController, getGridController } from "./grid-controller";
 import { createCsvFileSource } from "./sources/csv-file-source";
 import { createGridView } from "./grid-view";
@@ -44,9 +44,12 @@ import type { GridController } from "./grid-controller";
 import type { GridLayout, GridSortSpec } from "./grid-layout";
 import type { GridView } from "./grid-view";
 import type { Tab } from "../tabs/tab";
+import type { CanvasSurface } from "../canvas/canvas-surface";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
 interface ActiveGridPanel {
+  /** The pane whose stage this grid is drawn on. */
+  paneId: string;
   tabId: string;
   scope: EffectScope;
   view: GridView | null;
@@ -65,21 +68,35 @@ interface ActiveGridPanel {
   bump: () => void;
 }
 
-let active: ActiveGridPanel | null = null;
+/**
+ * The grid mounted in each pane, keyed by pane id.
+ *
+ * A module-level `let active` described a shell with one stage. With two, pane B mounting a grid
+ * destroyed pane A's Tabulator view and effect scope out from under it — and `resetCanvasView`
+ * calls `detachGridPanel` on every pane that empties, so a second grid was never required.
+ */
+const _active = new Map<string, ActiveGridPanel>();
 
-/** Destroy the live grid view/effects (canvas-render teardown + tab switches). */
-export function detachGridPanel() {
-  if (!active) {
-    return;
-  }
-  active.view?.destroy();
-  active.scope.stop();
-  active = null;
+/** The grid mounted in a pane, or null. */
+function activeIn(paneId: string): ActiveGridPanel | null {
+  return _active.get(paneId) ?? null;
 }
 
-/** Whether the grid panel is live for this tab (canvas-render fast-path guard). */
-export function gridPanelMounted(tab: Tab): boolean {
-  return active !== null && active.tabId === tab.id && active.wrap.isConnected;
+/** Destroy one pane's grid view/effects (canvas-render teardown + tab switches). */
+export function detachGridPanel(paneId: string) {
+  const panel = _active.get(paneId);
+  if (!panel) {
+    return;
+  }
+  panel.view?.destroy();
+  panel.scope.stop();
+  _active.delete(paneId);
+}
+
+/** Whether the grid panel is live in this pane for this tab (canvas-render fast-path guard). */
+export function gridPanelMounted(paneId: string, tab: Tab): boolean {
+  const panel = activeIn(paneId);
+  return panel !== null && panel.tabId === tab.id && panel.wrap.isConnected;
 }
 
 function toolbarTpl(controller: GridController, panel: ActiveGridPanel) {
@@ -559,11 +576,12 @@ function shellTpl(
  * @param {HTMLElement} canvasWrap
  * @param {Tab} tab
  */
-export function renderGridMode(canvasWrap: HTMLElement, tab: Tab) {
-  if (gridPanelMounted(tab)) {
+export function renderGridMode(surface: CanvasSurface, tab: Tab) {
+  const { paneId, wrap: canvasWrap } = surface;
+  if (gridPanelMounted(paneId, tab)) {
     return;
   }
-  detachGridPanel();
+  detachGridPanel(paneId);
 
   let controller = getGridController(tab);
   // CSV file tabs can reach grid mode through any open path (deep link, quick search, recents) —
@@ -599,12 +617,13 @@ export function renderGridMode(canvasWrap: HTMLElement, tab: Tab) {
       panel.view?.destroy();
       panel.view = hostEl ? createGridView(hostEl, live) : null;
     },
+    paneId,
     scope,
     tabId: tab.id,
     view: null,
     wrap: canvasWrap,
   };
-  active = panel;
+  _active.set(paneId, panel);
 
   const onHost = (el: HTMLElement | undefined) => {
     hostEl = el ?? null;
@@ -617,7 +636,7 @@ export function renderGridMode(canvasWrap: HTMLElement, tab: Tab) {
 
   scope.run(() => {
     effect(() => {
-      if (active !== panel) {
+      if (activeIn(paneId) !== panel) {
         return;
       }
       // Track everything the toolbar shows.
@@ -663,6 +682,7 @@ export function renderGridMode(canvasWrap: HTMLElement, tab: Tab) {
  */
 function activeGridSurface(): { controller: GridController; panel: ActiveGridPanel } | null {
   const controller = getGridController(activeTab.value);
+  const active = activeIn(workspace.activePaneId);
   if (!controller || !active || active.tabId !== controller.tab.id) {
     return null;
   }

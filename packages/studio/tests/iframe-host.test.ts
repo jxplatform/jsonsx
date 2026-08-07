@@ -1,16 +1,23 @@
 import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { flush, resetStudioState, resetWorkspaceWithTab, stubRect } from "./harness";
+import {
+  flush,
+  registerPrimaryStage,
+  resetStudioState,
+  resetWorkspaceWithTab,
+  stubRect,
+} from "./harness";
 import { activateTab, activeTab, PRIMARY_PANE, SECONDARY_PANE } from "../src/workspace/workspace";
 import { reactive } from "../src/reactivity";
 import { resetProjectShell, shell } from "../src/shell";
-import { canvasWrap, initShellRefs, registerRenderer } from "../src/store";
+import { initShellRefs, registerRenderer } from "../src/store";
 import { activeCanvasSurface, surfaceForPane } from "../src/canvas/canvas-surface";
 import { canvasPerf, resetCanvasPerf } from "../src/canvas/canvas-perf";
 import { clearDragGhost, setDragGhost } from "../src/panels/drag-ghost";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
 import type { CanvasPanel } from "../src/types";
 import type { Tab } from "../src/tabs/tab";
+import { registerCanvasSurface } from "../src/canvas/surface-registry";
 
 /* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
    app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
@@ -26,6 +33,8 @@ interface FakeChannel {
   opts: Record<string, unknown>;
   posts: Record<string, unknown>[];
   deliver: (m: Record<string, unknown>) => void;
+  /** Whether the host really disposed this channel — the only honest teardown signal there is. */
+  disposed?: boolean;
 }
 const channels: FakeChannel[] = [];
 
@@ -35,7 +44,9 @@ void mock.module("../src/canvas/iframe-channel", () => ({
     const rec: FakeChannel = { deliver: (m) => handler?.(m), opts, posts: [] };
     channels.push(rec);
     return {
-      dispose: () => {},
+      dispose: () => {
+        rec.disposed = true;
+      },
       onMessage: (h: (m: Record<string, unknown>) => void) => {
         handler = h;
         return () => {};
@@ -84,6 +95,7 @@ const {
   adoptDragSession,
   allowAutoRequestsOnNextRender,
   beginDragSession,
+  canvasIdleBlockers,
   clearDropIndicator,
   commitActiveEditSession,
   currentDragSession,
@@ -104,6 +116,7 @@ const {
   postSiteStyleToLiveHosts,
   postPatchToHosts,
   postStyleUpdateToStylebookHosts,
+  releaseCanvasHosts,
   requestCanvasEval,
   sawIframeDragOver,
   setCanvasContextMenuHandler,
@@ -571,7 +584,17 @@ type Msg = Record<string, unknown>;
 
 async function mountReady(): Promise<HTMLElement> {
   const canvasEl = document.createElement("div");
-  document.body.append(canvasEl);
+  // Inside the pane's stage, which is where an artboard really lives — the forwarded wheel is
+  // Replayed on the stage that CONTAINS the frame. `beforeEach` empties the body, so the stage is
+  // Re-attached here rather than assumed.
+  // A FRESH stage per mount. The surface record outlives `beforeEach`'s `innerHTML = ""`, so
+  // Reusing the last one would leave every previous test's artboard still inside it.
+  const stage = document.createElement("div");
+  stage.className = "pane-stage";
+  stage.dataset.jxRegion = "pane.primary";
+  document.body.append(stage);
+  registerCanvasSurface(PRIMARY_PANE, stage);
+  stage.append(canvasEl);
   // Mount for the active tab (when one exists) and ack the render so the host adopts the tab
   // Identity — doc-mutating bridge messages (editCommit/editSplit/editInsert/dropResult) route by
   // The host's tabId, never by activeTab at message time.
@@ -1219,8 +1242,7 @@ describe("iframe canvas inline-edit bridge", () => {
   });
 
   test("a preview-mode mount clears a pending re-entry", async () => {
-    await mountReady();
-    const canvasEl = document.body.querySelector("div")!;
+    const canvasEl = await mountReady();
     channels[0]!.deliver({
       after: { textContent: "lo" },
       before: { textContent: "Hi" },
@@ -1237,14 +1259,13 @@ describe("iframe canvas inline-edit bridge", () => {
   test("editCommit routes to the ORIGINATING tab when it races a tab switch (the bleed)", async () => {
     const { openTab, workspace } = await import("../src/workspace/workspace");
     const tabA = activeTab.value!;
-    await mountReady();
+    const canvasEl = await mountReady();
     // The user switches to tab B; the host is re-mounted for B but the iframe has NOT acked yet —
     // Its DOM (and any live edit session) still belongs to tab A.
     const tabB = openTab({
       document: { children: [{ tagName: "p", textContent: "B text" }], tagName: "div" },
       id: "tab-b",
     });
-    const canvasEl = document.body.querySelector("div")!;
     await mountIframeCanvas(2, {} as never, canvasEl, null, tabB.id);
     // The in-flight commit from tab A's session drains BEFORE renderComplete(2) on the FIFO.
     channels[0]!.deliver({
@@ -1317,14 +1338,13 @@ describe("iframe canvas inline-edit bridge", () => {
       tagName: "div",
     });
     const tabA = activeTab.value!;
-    await mountReady();
+    const canvasEl = await mountReady();
     // Switch to tab B; the host re-mounts for B but the iframe has NOT acked — the in-flight
     // Prop commit still belongs to tab A's session (FIFO drains it before renderComplete(2)).
     const tabB = openTab({
       document: { children: [{ $props: { title: "B title" }, tagName: "x-card" }], tagName: "div" },
       id: "tab-b-prop",
     });
-    const canvasEl = document.body.querySelector("div")!;
     await mountIframeCanvas(2, {} as never, canvasEl, null, tabB.id);
     channels[0]!.deliver({
       kind: "editCommitProp",
@@ -2108,7 +2128,7 @@ describe("iframe canvas host viewport plumbing", () => {
     expect(viewport.style.height).toBe("");
   });
 
-  test("forwardWheel re-dispatches a wheel on canvasWrap with the deltas and mapped cursor", async () => {
+  test("forwardWheel re-dispatches a wheel on wrap with the deltas and mapped cursor", async () => {
     // RedispatchWheel reads { rect, scale } = hostDragGeometry(state): scale = rect.width /
     // Iframe.clientWidth = 600 / 300 = 2, and rect left/top = 10/20. So clientX = left + x*scale =
     // 10 + 100*2 = 210 and clientY = top + y*scale = 20 + 50*2 = 120 (happy-dom drops the MouseEvent
@@ -2118,17 +2138,14 @@ describe("iframe canvas host viewport plumbing", () => {
     stubRect(iframe, { height: 240, left: 10, top: 20, width: 600 });
     Object.defineProperty(iframe, "clientWidth", { configurable: true, value: 300 });
 
-    // CanvasWrap is the live binding initShellRefs() populates from #canvas-wrap; the host dispatches
-    // The synthetic wheel on it so the editor's zoom/pan handler fires.
-    const wrap = document.createElement("div");
-    wrap.id = "canvas-wrap";
-    document.body.append(wrap);
-    initShellRefs();
-    expect(canvasWrap).toBe(wrap);
+    /* The wheel is replayed on the stage the FRAME is mounted on, resolved through the artboard
+       that owns it — not on "the canvas", which was the focused pane's and is why a wheel out of an
+       unfocused pane's iframe used to pan the other one. */
+    const { wrap } = surfaceForPane(PRIMARY_PANE);
 
     const seen: WheelEvent[] = [];
     const onWheel = (event: Event) => seen.push(event as WheelEvent);
-    canvasWrap.addEventListener("wheel", onWheel);
+    wrap.addEventListener("wheel", onWheel);
     channels[0]!.deliver({
       ctrlKey: true,
       deltaX: 4,
@@ -2139,7 +2156,7 @@ describe("iframe canvas host viewport plumbing", () => {
       x: 100,
       y: 50,
     });
-    canvasWrap.removeEventListener("wheel", onWheel);
+    wrap.removeEventListener("wheel", onWheel);
 
     expect(seen).toHaveLength(1);
     expect(seen[0]!.type).toBe("wheel");
@@ -2694,6 +2711,7 @@ describe("stylebook host capability", () => {
     wrap.id = "canvas-wrap";
     document.body.append(wrap);
     initShellRefs();
+    registerPrimaryStage();
 
     const { canvasEl, channel } = await mountStylebookReady();
     canvasPanels.push({ canvas: canvasEl, mediaName: null } as unknown as CanvasPanel);
@@ -3143,5 +3161,236 @@ describe("preview frame sizing is derived, not incremental", () => {
     // Nothing measured, so there is nothing to restore — the frame keeps whatever preview left it
     // At rather than inventing a height.
     expect(iframe.style.height).toBe("100%");
+  });
+});
+
+// ─── releaseCanvasHosts ───────────────────────────────────────────────────────
+
+/*
+ * The one NON-lazy path out of `liveHosts`, and the reason a pane can go away without leaking.
+ *
+ * Eleven sites prune a disconnected host when they happen to walk the set. That is enough to stop a
+ * dead frame being POSTED to and is not enough to release it: `iframe-channel.ts` adds a `window`
+ * "message" listener that only `dispose()` removes, and until this landed the sole parent-side
+ * `dispose()` was the URL-change rebuild in `ensureHost`. So every mode transition — which detaches
+ * every artboard — and every closed pane left one live listener and one overlay subtree per frame,
+ * for the life of the window.
+ *
+ * "Stopped iterating" and "disposed" are different states, and only the second is what a teardown
+ * owes. These assertions distinguish them: the channel says it was disposed, the iframe and the
+ * overlay are out of the DOM, and a second release finds nothing left to do.
+ */
+describe("releaseCanvasHosts", () => {
+  test("disposes the channel, removes the frame and the overlay, and says how many", async () => {
+    const stage = document.createElement("div");
+    document.body.append(stage);
+    const canvasEl = document.createElement("div");
+    stage.append(canvasEl);
+
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    channels[0]!.deliver({ kind: "ready" });
+    const iframe = canvasEl.querySelector("iframe")!;
+    expect(iframe.isConnected).toBe(true);
+    expect(channels[0]!.disposed).toBeFalsy();
+
+    expect(releaseCanvasHosts(stage)).toBe(1);
+
+    // Not "the variable was nulled": the channel was disposed and the DOM is gone.
+    expect(channels[0]!.disposed).toBe(true);
+    expect(iframe.isConnected).toBe(false);
+    expect(canvasEl.querySelector("iframe")).toBeNull();
+    expect(canvasEl.querySelector(".jx-canvas-iframe-overlay")).toBeNull();
+    // And the host is out of `liveHosts`, so nothing posts to it again.
+    expect(releaseCanvasHosts(stage)).toBe(0);
+  });
+
+  test("releases only the hosts under the root it was given", async () => {
+    const a = document.createElement("div");
+    const b = document.createElement("div");
+    document.body.append(a, b);
+    const canvasA = document.createElement("div");
+    const canvasB = document.createElement("div");
+    a.append(canvasA);
+    b.append(canvasB);
+
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasA);
+    await mountIframeCanvas(2, { tagName: "div" } as never, canvasB);
+    expect(channels).toHaveLength(2);
+
+    // Unsplitting releases ONE pane's frames. A release that took both would tear down the pane
+    // That is still on screen — which is exactly what a `liveHosts.clear()` would have done.
+    expect(releaseCanvasHosts(a)).toBe(1);
+    expect(channels[0]!.disposed).toBe(true);
+    expect(channels[1]!.disposed).toBeFalsy();
+    expect(canvasB.querySelector("iframe")).toBeTruthy();
+
+    expect(releaseCanvasHosts(b)).toBe(1);
+    expect(channels[1]!.disposed).toBe(true);
+  });
+
+  test("a mounted-then-released host leaves no idle blocker behind", async () => {
+    const stage = document.createElement("div");
+    document.body.append(stage);
+    const canvasEl = document.createElement("div");
+    stage.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    // Un-acked: `pendingTabIds` holds gen 1, which `canvasIdleBlockers()` reports.
+    expect(canvasIdleBlockers().length).toBeGreaterThan(0);
+    releaseCanvasHosts(stage);
+    // The assertion the `screenshots` lane depends on, and its single hard-red failure mode.
+    expect(canvasIdleBlockers()).toEqual([]);
+  });
+});
+
+// ─── Selection and presence are per-pane fan-outs ───────────────────────────────
+
+describe("selection measures are routed by the host's own tab", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" });
+  });
+
+  /** The `measure` posts a channel received, as bare path arrays. */
+  const measures = (channel: FakeChannel) =>
+    channel.posts.filter((p) => p.kind === "measure").map((p) => p.paths);
+
+  /**
+   * Two panes, each with a live host on its own tab, and the keyboard in the primary.
+   *
+   * This is the arrangement the whole defect needs: with ONE pane, "the focused tab" and "this
+   * host's tab" are the same answer and the missing filter is invisible.
+   */
+  async function twoPanesTwoHosts() {
+    const { focusPane, openTab, splitRight } = await import("../src/workspace/workspace");
+    const tabA = activeTab.value!;
+    const tabB = openTab({
+      document: { children: [{ tagName: "p", textContent: "B" }], tagName: "div" },
+      id: "tab-sel-side",
+    });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    focusPane(PRIMARY_PANE);
+
+    const elA = document.createElement("div");
+    const elB = document.createElement("div");
+    document.body.append(elA, elB);
+    await mountIframeCanvas(1, {} as never, elA, null, tabA.id);
+    const chA = channels.at(-1)!;
+    chA.deliver({ kind: "ready" });
+    chA.deliver({ gen: 1, kind: "renderComplete" });
+    await mountIframeCanvas(2, {} as never, elB, null, tabB.id);
+    const chB = channels.at(-1)!;
+    chB.deliver({ kind: "ready" });
+    chB.deliver({ gen: 2, kind: "renderComplete" });
+    chA.posts.length = 0;
+    chB.posts.length = 0;
+    return { chA, chB, elA, elB, tabA, tabB };
+  }
+
+  /** What a host believes it has selected — the bookkeeping the foreign paths used to overwrite. */
+  const selectionOf = (el: HTMLElement) =>
+    (hostForCanvas(el) as unknown as { selectionPaths: unknown[] } | null)?.selectionPaths;
+
+  test("the focused pane's selection is measured in its own frame and in no other", async () => {
+    /* `ensureSelectionWatch` read `activeTab` and posted to every entry in `liveHosts` with no
+       `host.tabId === tab.id` gate — unlike `postPatchToHosts`, `requestCanvasEval` and
+       `flushCanvasEdits`, which all filter. The side pane's frame was asked to measure paths from a
+       document it is not showing, and its own `selectionPath`/`selectionPaths` were overwritten
+       with them. */
+    const { chA, chB, elA, elB, tabA } = await twoPanesTwoHosts();
+
+    tabA.session.selection = [["children", 0]];
+    await flush();
+
+    console.log(
+      `[iframe-host] measures posted to the primary frame: ${JSON.stringify(measures(chA))}  ` +
+        `to the SIDE frame: ${JSON.stringify(measures(chB))}`,
+    );
+    expect(measures(chA)).toEqual([[["children", 0]]]);
+    expect(measures(chB)).toEqual([]);
+    expect(selectionOf(elA)).toEqual([["children", 0]]);
+    expect(selectionOf(elB)).toEqual([]);
+  });
+
+  test("the UNFOCUSED pane can show a selection of its own", async () => {
+    /* The other half, and the worse one: `requestSelection`'s `if (!primary)` branch clears the
+       overlay, so the focused pane merely having nothing selected erased the side pane's box on
+       every pass. The unfocused pane could never draw a selection at all. */
+    const { chA, chB, elA, elB, tabA, tabB } = await twoPanesTwoHosts();
+
+    tabA.session.selection = [];
+    tabB.session.selection = [["children", 1]];
+    await flush();
+
+    expect(measures(chB)).toEqual([[["children", 1]]]);
+    expect(measures(chA)).toEqual([]);
+    // And each host's own bookkeeping is its own document's, not the focused pane's.
+    expect(selectionOf(elB)).toEqual([["children", 1]]);
+    expect(selectionOf(elA)).toEqual([]);
+  });
+});
+
+describe("a released host takes its edit session with it", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" });
+  });
+
+  test("releasing the host ends the session instead of leaving a toolbar over nothing", async () => {
+    /* `releaseHost` cleared the channel, the overlay, the frame, every pending reply and both
+       registries — and left `activeEditHost` pointing at the host it had just destroyed. Unsplit a
+       pane with a live inline-edit caret and `getEditSnapshot()` still answered `editing: true`, so
+       the format toolbar stayed up anchored to a detached frame, and `commitActiveEditSession()`
+       posted through `iframe.contentWindow?.postMessage` on a removed frame — optional-chained, so
+       the author's edit was lost without a word. */
+    const stage = document.createElement("div");
+    document.body.append(stage);
+    const canvasEl = document.createElement("div");
+    stage.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    const channel = channels.at(-1)!;
+    channel.deliver({ kind: "ready" });
+    channel.deliver({ kind: "editStart", path: ["children", 0] });
+
+    expect(getEditSnapshot().editing).toBe(true);
+    expect(isCaretActive()).toBe(true);
+
+    expect(releaseCanvasHosts(stage)).toBe(1);
+
+    expect(getEditSnapshot()).toEqual({ editing: false, editingProp: null, snapshot: null });
+    expect(isCaretActive()).toBe(false);
+    // And the commit does not pretend: no `endEdit` is posted into a frame that cannot receive it.
+    channel.posts.length = 0;
+    commitActiveEditSession();
+    expect(channel.posts).toEqual([]);
+  });
+
+  test("a pending '+' grace timer is cancelled with the host", async () => {
+    const stage = document.createElement("div");
+    document.body.append(stage);
+    const canvasEl = document.createElement("div");
+    stage.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    const channel = channels.at(-1)!;
+    channel.deliver({ kind: "ready" });
+    channel.deliver({
+      kind: "insertZones",
+      zones: [
+        {
+          edge: "top",
+          index: 1,
+          insertParentPath: ["children", 0],
+          rect: { height: 0, width: 300, x: 10, y: 200 },
+        },
+      ],
+    });
+    // A null post arms the grace timer rather than hiding at once.
+    channel.deliver({ kind: "insertZones", zones: null });
+    const host = hostForCanvas(canvasEl) as unknown as {
+      insertHideTimer: ReturnType<typeof setTimeout> | null;
+    };
+    expect(host.insertHideTimer).not.toBeNull();
+
+    releaseCanvasHosts(stage);
+
+    // A timer holding a released host is a callback that will run against a dead overlay.
+    expect(host.insertHideTimer).toBeNull();
   });
 });

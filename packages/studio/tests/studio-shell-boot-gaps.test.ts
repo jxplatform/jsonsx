@@ -49,7 +49,7 @@ document.body.innerHTML = `
     <div id="activity-bar"></div>
     <div id="left-panel"></div>
     <div id="resize-left" class="resize-handle"></div>
-    <div id="canvas-wrap"></div>
+    <div class="pane-stage" data-jx-region="pane.primary"></div>
     <div id="resize-right" class="resize-handle"></div>
     <div id="right-panel"></div>
     <div id="statusbar"></div>
@@ -97,6 +97,8 @@ void mock.module("../src/panels/welcome-screen.ts", () => ({
 
 void mock.module("../src/editor/shortcuts.ts", () => ({
   initShortcuts: mock(() => {}),
+  // The grid installs one stage-gesture disposer per cell; without it the boot fails at import.
+  installStageGestures: () => () => {},
   registerStudioCommands: mock(() => {}),
 }));
 
@@ -129,6 +131,8 @@ interface PaneContextCtx {
 }
 let paneCtx: PaneContextCtx | null = null;
 void mock.module("../src/panels/pane-context.ts", () => ({
+  // The grid hands every cell its chrome host, so this is on the boot's import graph.
+  attachPaneChromeHost: mock(() => {}),
   mount: (_host: HTMLElement, ctx: PaneContextCtx) => {
     paneCtx = ctx;
   },

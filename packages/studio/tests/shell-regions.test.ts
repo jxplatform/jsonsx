@@ -17,13 +17,20 @@ import { closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
 import { shell } from "../src/shell";
 import { listRegions, resolveRegion, stampShellRegions } from "../src/ui/regions";
+/* Imported for its side effect: the grid registers itself as a shell surface at import time, the
+   same bargain `ui/panel-resize.ts` makes, so `mountShell()` below draws the pane cells. `studio.ts`
+   gets this for free by importing `cellForPane`; a test that mounts the shell without the
+   bootstrap has to say so. */
+import "../src/panels/pane-grid";
 
+/* `#pane-grid` stands where `#tab-strip` and `#canvas-wrap` used to. Both were flat siblings of
+   the application grid that only ever described the PRIMARY pane; `panels/pane-grid.ts` builds a
+   cell per `workspace.panes` entry inside this host, and the cell is what carries the ids. */
 const SHELL_HTML = `
   <div id="toolbar"></div>
-  <div id="tab-strip"></div>
   <div id="activity-bar"></div>
   <div id="left-panel"></div>
-  <div id="canvas-wrap"></div>
+  <div id="pane-grid"></div>
   <div id="right-panel"></div>
   <div id="statusbar"></div>
   <div id="layer-popover"></div>
@@ -53,7 +60,7 @@ afterEach(() => {
 // ─── The shell hosts ──────────────────────────────────────────────────────────
 
 describe("stampShellRegions, through mountShell", () => {
-  test("the six surfaces and the pane's tab strip resolve after boot", async () => {
+  test("the five fixed surfaces resolve from the table after boot", async () => {
     const { mountShell, unmountShell } = await import("../src/shell");
     mountShell();
     try {
@@ -62,10 +69,26 @@ describe("stampShellRegions, through mountShell", () => {
       expect(resolveRegion("navigator")?.id).toBe("left-panel");
       expect(resolveRegion("inspector")?.id).toBe("right-panel");
       expect(resolveRegion("statusbar")?.id).toBe("statusbar");
-      expect(resolveRegion("pane.primary")?.id).toBe("canvas-wrap");
+    } finally {
+      unmountShell();
+    }
+  });
+
+  test("the pane's ids come from its CELL, not from a `<div id>` in the table", async () => {
+    const { mountShell, unmountShell } = await import("../src/shell");
+    mountShell();
+    try {
+      /* No `.id` to assert against, and that is the change: `pane.primary` named `#canvas-wrap`
+         and `pane.primary/tabs` named `#tab-strip`, two application-grid siblings that could only
+         ever be one pane's. Both are derived from the pane id now, so the assertion is about the
+         SHAPE the grid built. */
+      const stage = resolveRegion("pane.primary");
+      expect(stage?.classList.contains("pane-stage")).toBe(true);
+      expect(resolveRegion("pane.primary/tabs")?.classList.contains("pane-strip")).toBe(true);
       // `pane` is the primary pane, so an id minted before the second pane still means what it did.
-      expect(resolveRegion("pane")?.id).toBe("canvas-wrap");
-      expect(resolveRegion("pane.primary/tabs")?.id).toBe("tab-strip");
+      expect(resolveRegion("pane")).toBe(stage);
+      // And the cell is inside the grid host, not a sibling of it.
+      expect(document.querySelector("#pane-grid")!.contains(stage)).toBe(true);
     } finally {
       unmountShell();
     }

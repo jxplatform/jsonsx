@@ -1,7 +1,7 @@
 /**
  * The minimal pane model (§4.1) — panes as the unit of split, focus and zoom; the workspace-level
- * `activeTabId` / `tabOrder` as DERIVED reads over the focused pane; the non-Canvas cap on the
- * second pane; pin, drag reorder and preview tabs; and the five `pane.*` command records.
+ * `activeTabId` / `tabOrder` as DERIVED reads over the focused pane; pin, drag reorder and preview
+ * tabs; and the five `pane.*` command records.
  */
 import "./harness";
 import { afterEach, describe, expect, test } from "bun:test";
@@ -11,7 +11,6 @@ import {
   SECONDARY_PANE,
   activePane,
   activateTab,
-  canOpenInSecondPane,
   closeAllTabs,
   closePane,
   closeTab,
@@ -20,10 +19,8 @@ import {
   moveTab,
   openTab,
   activeTab,
-  hostableKindsOf,
   paneById,
   paneCommands,
-  paneOfTabCanHostMode,
   paneOfTab,
   promoteDirtyPreviewTabs,
   promoteTab,
@@ -39,12 +36,14 @@ import { editorKindOf, editorKindsOf, modeForEditorKind } from "../src/tabs/tab"
 import { effect, effectScope } from "../src/reactivity";
 import { createCommandRegistry } from "../src/commands/registry";
 import { emptyContext, makeContext } from "../src/commands/context";
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 function open(id: string, opts: Record<string, unknown> = {}) {
   return openTab({ document: { tagName: "div" }, documentPath: `${id}.json`, id, ...opts });
 }
 
-/** A tab whose only modes are Canvas ones — the case the second pane must refuse. */
+/** A tab whose only modes are Canvas ones — the case the second pane used to refuse. */
 function openCanvasOnly(id: string) {
   return openTab({
     capabilities: { modes: ["edit", "design", "preview"] },
@@ -118,19 +117,24 @@ describe("splitting", () => {
     expect(workspace.activeTabId).toBe("b");
   });
 
-  test("the second pane caps the tab to a non-Canvas kind rather than opening a second host", () => {
+  test("the tab moves AS IT IS — the split no longer rewrites a Design page into Code", () => {
+    /* `capToPaneKind` used to run here. The side pane hosted six cheap kinds and a Canvas was not
+       one of them, so `⌘\` on a page you were designing flipped `session.ui.canvasMode` to
+       `source` before focus moved — silently reopening your page as Code in the pane you had just
+       asked for. Both panes draw a live Canvas now, so a split is a move and nothing else. */
     const tab = open("a", { capabilities: { modes: ["edit", "design", "source"] } });
     expect(editorKindOf(tab)).toBe("canvas");
+    const mode = tab.session.ui.canvasMode;
     splitRight();
-    expect(editorKindOf(workspace.tabs.get("a")!)).toBe("code");
-    expect(workspace.tabs.get("a")!.session.ui.preview).toBe(false);
+    expect(editorKindOf(workspace.tabs.get("a")!)).toBe("canvas");
+    expect(workspace.tabs.get("a")!.session.ui.canvasMode).toBe(mode);
   });
 
-  test("a Canvas-only document is refused, and says so", () => {
-    const tab = openCanvasOnly("only");
-    expect(canOpenInSecondPane(tab)).toBe(false);
-    expect(splitRight()).toBeNull();
-    expect(workspace.panes.length).toBe(1);
+  test("a Canvas-only document splits — that refusal was the cap, and the cap is lifted", () => {
+    openCanvasOnly("only");
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    expect(workspace.panes.length).toBe(2);
+    expect(editorKindOf(workspace.tabs.get("only")!)).toBe("canvas");
   });
 
   test("splitting with nothing open is a no-op", () => {
@@ -212,34 +216,42 @@ describe("splitting", () => {
   });
 });
 
-describe("the cap on the side pane", () => {
+describe("the lifted cap", () => {
   /*
-   * The cap used to be enforced at the SPLIT and nowhere else, while claiming "one rule, one
-   * place". A tab already in the side pane could be switched straight back to Canvas — from the
-   * context bar, from `canvas.setMode`, from anything that writes `ui.canvasMode` — which is the
-   * second live Canvas host the cap exists to prevent. The rule is now one predicate, asked at
-   * every point that offers or performs a switch.
+   * There is exactly ONE cap left, and it is {@link MAX_PANES}. `SECONDARY_PANE_KINDS` and its five
+   * predicates — `paneCanHostKind`, `canOpenInSecondPane`, `hostableKindsOf`,
+   * `paneOfTabCanHostMode`, `capToPaneKind` — are deleted, because they existed to keep a second
+   * LIVE canvas host off the screen and workstream 1 made one affordable.
+   *
+   * This is the assertion that the deletion was complete rather than partial: a cap enforced at
+   * some of its points and not others is how the two ends of a rule start disagreeing, and this one
+   * had five ends.
    */
-  test("what a pane may host is asked of the pane the tab is IN", () => {
+  test("what a pane may host does not depend on WHICH pane the tab is in", () => {
     open("a", { capabilities: { modes: ["edit", "design", "source"] } });
     const tab = workspace.tabs.get("a")!;
-    // In the primary, every kind the document declares is on offer.
-    expect(hostableKindsOf(tab)).toEqual(["canvas", "code"]);
-    expect(paneOfTabCanHostMode(tab, "design")).toBe(true);
+    expect(editorKindsOf(tab)).toEqual(["canvas", "code"]);
 
     open("b");
     activateTab("a");
     splitRight();
+    expect(paneOfTab("a")!.id).toBe(SECONDARY_PANE);
 
-    // In the side pane, the Canvas kind is neither offered nor accepted.
-    expect(hostableKindsOf(tab)).toEqual(["code"]);
-    expect(paneOfTabCanHostMode(tab, "design")).toBe(false);
-    expect(paneOfTabCanHostMode(tab, "source")).toBe(true);
+    // Same answer in the side pane, and the tab can be switched back to a Canvas mode there.
+    expect(editorKindsOf(tab)).toEqual(["canvas", "code"]);
+    tab.session.ui.canvasMode = "design";
+    expect(editorKindOf(tab)).toBe("canvas");
+  });
 
-    // A tab no pane holds is unconstrained — nothing is capping it.
-    closePane(SECONDARY_PANE);
-    workspace.panes[0]!.tabOrder = [];
-    expect(paneOfTabCanHostMode(tab, "design")).toBe(true);
+  test("two Canvas documents can be open side by side — the point of the workstream", () => {
+    openCanvasOnly("left");
+    openCanvasOnly("right");
+    splitRight();
+    expect(workspace.panes).toHaveLength(2);
+    expect(editorKindOf(workspace.tabs.get("left")!)).toBe("canvas");
+    expect(editorKindOf(workspace.tabs.get("right")!)).toBe("canvas");
+    expect(paneById(PRIMARY_PANE)!.activeTabId).toBe("left");
+    expect(paneById(SECONDARY_PANE)!.activeTabId).toBe("right");
   });
 });
 
@@ -328,6 +340,57 @@ describe("collapsing", () => {
     open("a");
     closePane(PRIMARY_PANE);
     expect(workspace.panes.length).toBe(1);
+  });
+
+  test("unsplitting from the PRIMARY leaves the primary showing its own document", () => {
+    /* `survivor.activeTabId = pane.activeTabId ?? survivor.activeTabId` was unconditional, and
+       `pane.unsplit` closes the SIDE pane whichever pane is focused — so unsplitting while looking
+       at the primary swapped its document for the side pane's. The document you were looking at
+       follows you; the one you were not does not replace it. Nothing is lost either way: the side
+       pane's tabs are in the primary's strip, one click away. */
+    open("a");
+    open("b");
+    splitRight();
+    focusPane(PRIMARY_PANE);
+    expect(paneById(PRIMARY_PANE)!.activeTabId).toBe("a");
+    expect(paneById(SECONDARY_PANE)!.activeTabId).toBe("b");
+
+    closePane(SECONDARY_PANE);
+
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.activeTabId).toBe("a");
+    // Both documents are still open — this is a layout action, not a destructive one.
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["a", "b"]);
+  });
+
+  test("closing the primary's last tab while split collapses the grid too", () => {
+    /* §18.1 rule 3 — a pane with nothing in it is a hole in the grid — held on ONE side only:
+       `closeTab` and `detachTab` both exempted the primary, so this left a welcome screen sitting
+       beside a live document in a grid nobody had asked to keep. It collapses in the other
+       direction, because `pane.primary` is the id nine shots crop and the one `resolveRegion`
+       canonicalises onto: the SIDE pane is what leaves, and the primary adopts its tab. */
+    open("a");
+    open("b");
+    splitRight();
+    focusPane(PRIMARY_PANE);
+    expect(workspace.panes.length).toBe(2);
+
+    closeTab("a");
+
+    expect(workspace.panes.map((p) => p.id)).toEqual([PRIMARY_PANE]);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.activeTabId).toBe("b");
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["b"]);
+    expect(workspace.tabs.size).toBe(1);
+  });
+
+  test("closing the primary's last tab UNSPLIT still leaves the empty primary standing", () => {
+    // The floor of the same rule: with one pane there is no grid to collapse, and a shell with no
+    // Pane at all has nowhere to draw the welcome screen.
+    open("a");
+    closeTab("a");
+    expect(workspace.panes.map((p) => p.id)).toEqual([PRIMARY_PANE]);
+    expect(paneById(PRIMARY_PANE)!.activeTabId).toBeNull();
   });
 });
 
@@ -511,12 +574,23 @@ describe("the pane commands", () => {
     }
   });
 
-  test(String.raw`⌘\ is the split chord and ⌘⌥0 focuses the side pane`, () => {
+  test(String.raw`⌘\ is the split chord and ⌘0 / ⌘⌥0 are the focus PAIR`, () => {
     const byId = new Map(paneCommands().map((c) => [c.id, c]));
     expect(byId.get("pane.splitRight")!.keybinding).toBe("mod+\\");
+    expect(byId.get("pane.focusPrimary")!.keybinding).toBe("mod+0");
     expect(byId.get("pane.focusSecondary")!.keybinding).toBe("mod+alt+0");
-    // ⌘0 is `canvas.zoomReset` in the same registry; claiming it here would throw at bootstrap.
-    expect(byId.get("pane.focusPrimary")!.keybinding).toBeUndefined();
+  });
+
+  test("⌘0 is claimed once — `canvas.zoomReset` gave it up rather than sharing it", () => {
+    /* Two commands claiming one chord throws at bootstrap, so this is the assertion that keeps
+       the pair legal. `canvas.zoomReset` kept its button in the floating zoom pod; focusing a pane
+       has no control at all, which is the whole argument for the re-bind. */
+    const source = readFileSync(
+      join(resolve(import.meta.dir, "..", "src"), "editor", "shortcuts.ts"),
+      "utf8",
+    );
+    const zoomReset = source.slice(source.indexOf('id: "canvas.zoomReset"'));
+    expect(zoomReset.slice(0, zoomReset.indexOf("},"))).not.toContain("keybinding");
   });
 
   test("the three grid commands refuse with a sentence until the grid is split", () => {
@@ -531,13 +605,13 @@ describe("the pane commands", () => {
     expect(registry.isEnabled("pane.unsplit")).toBe(true);
   });
 
-  test("Split Right refuses a Canvas-only document by name", () => {
+  test("Split Right needs only a document, and says so", () => {
     const registry = registryWith(paneCommands());
-    openCanvasOnly("only");
     expect(registry.isEnabled("pane.splitRight")).toBe(false);
-    expect(registry.disabledReason("pane.splitRight")).toBe(
-      "a document that can open as Code, Config, Diff, Grid or Library in a second pane",
-    );
+    expect(registry.disabledReason("pane.splitRight")).toBe("an open document");
+    // A Canvas-only document used to be refused BY NAME here. It is not any more.
+    openCanvasOnly("only");
+    expect(registry.isEnabled("pane.splitRight")).toBe(true);
   });
 
   test("running them drives the model", async () => {

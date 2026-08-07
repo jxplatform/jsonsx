@@ -51,7 +51,7 @@ beforeEach(() => {
     projectDirs: ["pages"],
   });
   closeAllTabs();
-  detachLibraryPane();
+  detachLibraryPane("primary");
   invalidateLibrary();
   libraryView.category = "all";
   libraryView.layout = "cards";

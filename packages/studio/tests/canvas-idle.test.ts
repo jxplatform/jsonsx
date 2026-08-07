@@ -10,7 +10,8 @@
  */
 import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
+import { flush, registerPrimaryStage, resetWorkspaceWithTab, stubRect } from "./harness";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 happyDOM.setURL("http://localhost:3000/");
@@ -67,9 +68,7 @@ const {
   postPatchToHosts,
   revealCanvasPath,
 } = await import("../src/canvas/iframe-host");
-const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
 const { initShellRefs } = await import("../src/store");
-const { view } = await import("../src/view");
 
 const QUIET = { animations: 0, fonts: true, images: 0, kind: "idle" as const };
 
@@ -87,14 +86,15 @@ async function mountReadyCanvas(gen = 1): Promise<{ canvasEl: HTMLElement; chann
 
 beforeEach(() => {
   channels.length = 0;
-  // The real pan path writes `view.panY` and reads `#canvas-wrap` — stand the shell up rather than
+  // The real pan path writes `surfaceForPane("primary").panY` and reads `#canvas-wrap` — stand the shell up rather than
   // Mocking canvas-utils, so `revealCanvasPath` is exercised end to end.
-  document.body.innerHTML = '<div id="canvas-wrap"><div class="panzoom-wrap"></div></div>';
+  document.body.innerHTML =
+    '<div class="pane-stage" data-jx-region="pane.primary"><div class="panzoom-wrap"></div></div>';
   initShellRefs();
-  initCanvasUtils({ getCanvasMode: () => "design", getZoom: () => 1, setZoomDirect: () => {} });
-  view.panzoomWrap = document.querySelector(".panzoom-wrap");
-  view.panX = 0;
-  view.panY = 0;
+  registerPrimaryStage();
+  surfaceForPane("primary").panzoomWrap = document.querySelector(".panzoom-wrap");
+  surfaceForPane("primary").panX = 0;
+  surfaceForPane("primary").panY = 0;
 });
 
 describe("canvasIdleBlockers", () => {
@@ -304,7 +304,7 @@ describe("revealCanvasPath", () => {
     await flush(4);
     const second = channel.posts.at(-1)!;
     expect(second.reqId).not.toBe(first.reqId);
-    expect(view.panY).not.toBe(0);
+    expect(surfaceForPane("primary").panY).not.toBe(0);
     channel.deliver({
       hits: [{ path: ["children", 0], rect: { height: 10, width: 10, x: 0, y: 10 } }],
       kind: "geometry",

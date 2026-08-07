@@ -11,10 +11,15 @@ import { classMap } from "lit-html/directives/class-map.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 
-import { canvasWrap, renderOnly } from "../store";
-import { activeCanvasSurface, tabOfMountedPanel } from "./canvas-surface";
-import { SECONDARY_PANE_KINDS, activeTab, paneOfTabCanHostMode } from "../workspace/workspace";
-import { view } from "../view";
+import { renderOnly } from "../store";
+import {
+  activeCanvasSurface,
+  canvasModeOfPane,
+  tabOfMountedPanel,
+  tabOfPane,
+} from "./canvas-surface";
+import type { CanvasSurface } from "./canvas-surface";
+import { activeTab } from "../workspace/workspace";
 import { findCanvasElement, getActivePanel, panelMediaToActiveMedia } from "./canvas-helpers";
 import { rectOf } from "../utils/geometry";
 import {
@@ -26,28 +31,45 @@ import {
 } from "../commands/command-args";
 import type { TemplateResult } from "lit-html";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
+import type { Tab } from "../tabs/tab";
 
-let _ctx: {
-  getCanvasMode: () => string;
-  getZoom: () => number;
-  setZoomDirect: (zoom: number) => void;
-};
-
-/**
- * Initialize the canvas utils module.
+/*
+ * There is no `initCanvasUtils`, and no `_ctx`.
  *
- * @param {{
- *   getCanvasMode: () => string;
- *   getZoom: () => number;
- *   setZoomDirect: (zoom: number) => void;
- * }} ctx
+ * It injected three functions — `getCanvasMode`, `getZoom`, `setZoomDirect` — and all three were
+ * spelled `activeTab.value`, which is the FOCUSED pane's tab. Every geometry function here already
+ * takes a `CanvasSurface`, so the pan/zoom offsets and the pan-zoom wrap moved onto it while the
+ * SCALE stayed behind the injection, and the two disagreed in four visible ways:
+ *
+ *   1 · the unfocused pane drew at the focused tab's scale — `scale(1)` for a document at 2×;
+ *   2 · the side pane's `+` zoomed the PRIMARY's document, by a factor computed from the side's
+ *       own zoom (`b.zoom * 1.2` written to `a`);
+ *   3 · `getFit()` keyed on `activeTab`, so the unfocused pod reported the focused pane's fit;
+ *   4 · the side pane entering Design ran `fitOnCanvasEntry` → `setZoomDirect(0.163)` and the
+ *       PRIMARY snapped to 16%, because the other pane had fitted itself.
+ *
+ * `scripts/check-pane-singletons.ts` could not see any of it: it bans `view.<field>` by name and
+ * the zoom was never on `view`. The rule it enforces is now the general one — per-stage state is
+ * reached through a surface — and this module reads `activeTab` in exactly one place, the command
+ * verbs, where "the active pane" is the whole meaning of the request.
  */
-export function initCanvasUtils(ctx: {
-  getCanvasMode: () => string;
-  getZoom: () => number;
-  setZoomDirect: (zoom: number) => void;
-}) {
-  _ctx = ctx;
+
+/** The tab a stage is showing. The one route from a surface to the state its geometry needs. */
+function tabOfSurface(surface: CanvasSurface): Tab | null {
+  return tabOfPane(surface.paneId);
+}
+
+/** A stage's own pan-zoom scale. 1 when its pane shows nothing. */
+function zoomOf(surface: CanvasSurface): number {
+  return tabOfSurface(surface)?.session.ui.zoom ?? 1;
+}
+
+/** Write a stage's own pan-zoom scale. A no-op when its pane shows nothing. */
+function setZoomOf(surface: CanvasSurface, zoom: number): void {
+  const tab = tabOfSurface(surface);
+  if (tab) {
+    tab.session.ui.zoom = zoom;
+  }
 }
 
 /**
@@ -132,52 +154,62 @@ export function canvasPanelTemplate(
   return { panel, tpl };
 }
 
-/** Center canvas horizontally in viewport, top-aligned vertically. */
-export function centerCanvas() {
-  if (!view.panzoomWrap) {
+/*
+ * Every geometry function below takes its surface EXPLICITLY, and none of them defaults to
+ * `activeCanvasSurface()`.
+ *
+ * A default is how one pane's fit lands on the other's transform: the fit that runs on a mode
+ * transition, the observer that re-centres until content settles and the wheel that pans are all
+ * scheduled from a render, and a render belongs to the pane it was scheduled for — which is the
+ * focused pane only by coincidence. Every call site already holds a surface or a tab.
+ */
+
+/** Center a stage's content horizontally in its viewport, top-aligned vertically. */
+export function centerCanvas(surface: CanvasSurface) {
+  if (!surface.panzoomWrap) {
     return;
   }
-  const wrapWidth = canvasWrap.clientWidth;
-  const contentWidth = view.panzoomWrap.scrollWidth;
-  const zoom = _ctx.getZoom();
+  const wrapWidth = surface.wrap.clientWidth;
+  const contentWidth = surface.panzoomWrap.scrollWidth;
+  const zoom = zoomOf(surface);
   const scaledWidth = contentWidth * zoom;
-  view.panX = Math.max(16, (wrapWidth - scaledWidth) / 2);
-  view.panY = 0;
+  surface.panX = Math.max(16, (wrapWidth - scaledWidth) / 2);
+  surface.panY = 0;
 }
 
 /**
  * Attach a ResizeObserver to view.panzoomWrap that re-centers until the user pans. Handles async
  * content (runtime rendering, data fetching) that changes layout after initial paint.
  */
-export function observeCenterUntilStable() {
-  if (view.centerObserver) {
-    view.centerObserver.disconnect();
-    view.centerObserver = null;
+export function observeCenterUntilStable(surface: CanvasSurface) {
+  if (surface.centerObserver) {
+    surface.centerObserver.disconnect();
+    surface.centerObserver = null;
   }
-  if (!view.panzoomWrap) {
+  if (!surface.panzoomWrap) {
     return;
   }
-  view.needsCenter = true;
-  view.centerObserver = new ResizeObserver(() => {
-    if (!view.needsCenter) {
-      view.centerObserver?.disconnect();
-      view.centerObserver = null;
+  surface.needsCenter = true;
+  surface.centerObserver = new ResizeObserver(() => {
+    if (!surface.needsCenter) {
+      surface.centerObserver?.disconnect();
+      surface.centerObserver = null;
       return;
     }
-    centerCanvas();
-    applyTransform();
+    centerCanvas(surface);
+    applyTransform(surface);
   });
-  view.centerObserver.observe(view.panzoomWrap);
-  centerCanvas();
+  surface.centerObserver.observe(surface.panzoomWrap);
+  centerCanvas(surface);
 }
 
 /** Apply the current zoom + pan transform to the panzoom wrapper. */
-export function applyTransform() {
-  if (!view.panzoomWrap) {
+export function applyTransform(surface: CanvasSurface) {
+  if (!surface.panzoomWrap) {
     return;
   }
-  const zoom = _ctx.getZoom();
-  view.panzoomWrap.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${zoom})`;
+  const zoom = zoomOf(surface);
+  surface.panzoomWrap.style.transform = `translate(${surface.panX}px, ${surface.panY}px) scale(${zoom})`;
   // Overlays live INSIDE the scaled panzoom-wrap (iframe hosts draw there), so no per-mode redraw
   // Is needed here — the flush only re-anchors the fixed block-action-bar. The floating zoom pod
   // Tracks `ui.zoom` reactively, so no explicit indicator refresh is needed either.
@@ -217,17 +249,19 @@ export function clampEditZoom(zoom: number): number {
  * bare style writes only; the iframe's own ResizeObserver re-posts `contentHeight` after the
  * reflow, which also finalizes the viewport height.
  */
-export function applyEditZoom() {
-  if (_ctx.getCanvasMode() !== "edit") {
+export function applyEditZoom(surface: CanvasSurface = activeCanvasSurface()) {
+  // THIS pane's effective mode. It was the focused pane's, so a side pane in Edit was refused its
+  // Own content zoom whenever the primary happened to be in Design.
+  if (canvasModeOfPane(surface.paneId) !== "edit") {
     return;
   }
-  const [panel] = activeCanvasSurface().panels;
+  const [panel] = surface.panels;
   if (!panel?.canvas || !panel.viewport) {
     return;
   }
   const canvasEl = panel.canvas;
   const iframe = canvasEl.querySelector("iframe");
-  const editZoom = activeTab.value?.session.ui.editZoom ?? 1;
+  const editZoom = tabOfSurface(surface)?.session.ui.editZoom ?? 1;
   if (editZoom === 1) {
     // Exactly today's fluid behavior — no inline width, no transform, auto viewport height.
     panel._width = null;
@@ -239,7 +273,7 @@ export function applyEditZoom() {
     }
     panel.viewport.style.height = "";
   } else {
-    const column = canvasWrap.querySelector<HTMLElement>(".content-edit-column");
+    const column = surface.wrap.querySelector<HTMLElement>(".content-edit-column");
     if (!column) {
       return;
     }
@@ -267,36 +301,52 @@ export function applyEditZoom() {
   renderOnly("overlays");
 }
 
-/** Set the active tab's edit zoom (clamped) and apply it synchronously. */
-export function setEditZoom(zoom: number) {
-  const tab = activeTab.value;
+/**
+ * Set a stage's edit zoom (clamped) and apply it synchronously.
+ *
+ * The SURFACE decides whose zoom this is, not the focus. Both this and {@link requestEditZoom}
+ * opened `activeTab.value`, so the side pane's `+` and the wheel over the side pane's stage — which
+ * had already resolved the right surface and the right tab — wrote the primary's `editZoom`.
+ */
+export function setEditZoom(zoom: number, surface: CanvasSurface = activeCanvasSurface()) {
+  const tab = tabOfSurface(surface);
   if (!tab) {
     return;
   }
   tab.session.ui.editZoom = clampEditZoom(zoom);
-  applyEditZoom();
+  applyEditZoom(surface);
 }
 
-let _editZoomRaf = 0;
+/**
+ * One pending edit-zoom frame PER STAGE.
+ *
+ * A single `let _editZoomRaf` was a shared slot: a wheel burst over one pane suppressed the other
+ * pane's coalesced reflow entirely, and the frame that did run applied whichever surface won the
+ * race. Keyed by pane id, for the reason `canvas-render.ts` keys its own render frames that way.
+ */
+const _editZoomRafs = new Map<string, number>();
 
 /**
  * Wheel-rate edit-zoom setter: the reactive `editZoom` write lands immediately (the zoom pod's
  * label tracks it), but the DOM work — an iframe width resize, i.e. a real reflow — is coalesced to
  * one `applyEditZoom()` per animation frame so a fast ctrl+scroll burst doesn't thrash layout.
  */
-export function requestEditZoom(zoom: number) {
-  const tab = activeTab.value;
+export function requestEditZoom(zoom: number, surface: CanvasSurface = activeCanvasSurface()) {
+  const tab = tabOfSurface(surface);
   if (!tab) {
     return;
   }
   tab.session.ui.editZoom = clampEditZoom(zoom);
-  if (_editZoomRaf) {
+  if (_editZoomRafs.has(surface.paneId)) {
     return;
   }
-  _editZoomRaf = requestAnimationFrame(() => {
-    _editZoomRaf = 0;
-    applyEditZoom();
-  });
+  _editZoomRafs.set(
+    surface.paneId,
+    requestAnimationFrame(() => {
+      _editZoomRafs.delete(surface.paneId);
+      applyEditZoom(surface);
+    }),
+  );
 }
 
 /**
@@ -306,23 +356,23 @@ export function requestEditZoom(zoom: number) {
  * fits the horizontal axis and lets the page run off the bottom, which is what you want on a long
  * document you are about to scroll. `maxZoom` caps the result.
  */
-function applyGeometricFit(axis: "width" | "page", maxZoom: number): void {
-  if (!view.panzoomWrap) {
+function applyGeometricFit(surface: CanvasSurface, axis: "width" | "page", maxZoom: number): void {
+  if (!surface.panzoomWrap) {
     return;
   }
-  const wrapWidth = canvasWrap.clientWidth;
-  const wrapHeight = canvasWrap.clientHeight;
+  const wrapWidth = surface.wrap.clientWidth;
+  const wrapHeight = surface.wrap.clientHeight;
   const gap = 24;
   const padding = 32;
   let totalPanelWidth = 0;
-  const { panels } = activeCanvasSurface();
+  const { panels } = surface;
   for (const p of panels) {
     totalPanelWidth += p._width || 800;
   }
   totalPanelWidth += gap * Math.max(0, panels.length - 1) + padding;
 
-  const zoom = _ctx.getZoom();
-  const wrapRect = rectOf(view.panzoomWrap);
+  const zoom = zoomOf(surface);
+  const wrapRect = rectOf(surface.panzoomWrap);
   const unscaledHeight = wrapRect.height / zoom;
   const maxPanelHeight = unscaledHeight + padding;
 
@@ -331,13 +381,13 @@ function applyGeometricFit(axis: "width" | "page", maxZoom: number): void {
   const wanted = axis === "width" ? fitZoomW : Math.min(fitZoomW, fitZoomH);
   const fitZoom = Math.min(maxZoom, Math.max(PAN_ZOOM_MIN, wanted));
 
-  _ctx.setZoomDirect(fitZoom);
+  setZoomOf(surface, fitZoom);
 
   const scaledWidth = totalPanelWidth * fitZoom;
   const scaledHeight = maxPanelHeight * fitZoom;
-  view.panX = Math.max(0, (wrapWidth - scaledWidth) / 2);
-  view.panY = Math.max(0, (wrapHeight - scaledHeight) / 2);
-  applyTransform();
+  surface.panX = Math.max(0, (wrapWidth - scaledWidth) / 2);
+  surface.panY = Math.max(0, (wrapHeight - scaledHeight) / 2);
+  applyTransform(surface);
 }
 
 /**
@@ -347,11 +397,14 @@ function applyGeometricFit(axis: "width" | "page", maxZoom: number): void {
  * asking to magnify a small artboard too); the automatic fit on entering a panzoom mode passes 1,
  * because arriving at a document should never blow it up past life size.
  */
-export function fitToScreen({ maxZoom = PAN_ZOOM_MAX }: { maxZoom?: number } = {}) {
+export function fitToScreen({
+  maxZoom = PAN_ZOOM_MAX,
+  surface = activeCanvasSurface(),
+}: { maxZoom?: number; surface?: CanvasSurface } = {}) {
   // Declared before the guard: "frame the whole page" is a preference the author expressed, and it
   // Stays true whether or not there is a laid-out artboard to apply it to this instant.
-  declareFit("page");
-  applyGeometricFit("page", maxZoom);
+  declareFit("page", surface);
+  applyGeometricFit(surface, "page", maxZoom);
 }
 
 // ─── Pan-zoom (design / stylebook / git-diff artboards) ──────────────────────
@@ -419,29 +472,34 @@ function fitArg(commandId: string, args: Record<string, unknown>, key: string): 
 /** Declared fits, keyed per tab + document. */
 const _fits = new Map<string, FitMode>();
 
-/** The registry key for the active tab's document (null when no tab is open). */
-function fitKey(): string | null {
-  const tab = activeTab.value;
+/**
+ * The registry key for the document a STAGE is showing (null when its pane shows none).
+ *
+ * It read `activeTab`, which is why the unfocused pane's zoom pod reported the focused pane's fit —
+ * and why "Fit page" chosen in one pane changed the label in the other.
+ */
+function fitKey(surface: CanvasSurface): string | null {
+  const tab = tabOfSurface(surface);
   return tab ? `${tab.id}::${tab.documentPath ?? ""}` : null;
 }
 
-/** Write the active document's fit without applying it — the internal half of {@link setFit}. */
-function declareFit(fit: FitMode): void {
-  const key = fitKey();
+/** Write a stage's document's fit without applying it — the internal half of {@link setFit}. */
+function declareFit(fit: FitMode, surface: CanvasSurface): void {
+  const key = fitKey(surface);
   if (key) {
     _fits.set(key, fit);
   }
 }
 
-/** The active document's declared fit, or {@link DEFAULT_FIT}. Readable by the zoom control. */
-export function getFit(): FitMode {
-  const key = fitKey();
+/** A stage's declared fit, or {@link DEFAULT_FIT}. Readable by that pane's zoom control. */
+export function getFit(surface: CanvasSurface = activeCanvasSurface()): FitMode {
+  const key = fitKey(surface);
   return (key === null ? undefined : _fits.get(key)) ?? DEFAULT_FIT;
 }
 
-/** Whether the active document has declared a fit of its own. */
-export function hasDeclaredFit(): boolean {
-  const key = fitKey();
+/** Whether a stage's document has declared a fit of its own. */
+export function hasDeclaredFit(surface: CanvasSurface = activeCanvasSurface()): boolean {
+  const key = fitKey(surface);
   return key !== null && _fits.has(key);
 }
 
@@ -450,25 +508,29 @@ export function resetFits(): void {
   _fits.clear();
 }
 
-/** Honour a fit right now. Defaults to the active document's declared one. */
-export function applyFit(fit: FitMode = getFit()): void {
-  if (fit === "none") {
-    applyTransform();
+/** Honour a fit right now. Defaults to the STAGE's own declared one. */
+export function applyFit(fit?: FitMode, surface: CanvasSurface = activeCanvasSurface()): void {
+  /* Resolved in the body rather than as a parameter default: a default may only read parameters
+     declared BEFORE it, and the fit belongs to the surface that comes after. Reading `getFit()`
+     with no surface is exactly what made the default answer for the FOCUSED pane. */
+  const chosen = fit ?? getFit(surface);
+  if (chosen === "none") {
+    applyTransform(surface);
     return;
   }
-  if (typeof fit === "number") {
-    _ctx.setZoomDirect(clampPanZoom(fit));
-    applyTransform();
+  if (typeof chosen === "number") {
+    setZoomOf(surface, clampPanZoom(chosen));
+    applyTransform(surface);
     return;
   }
   // Capped at life size: arriving at a document should never blow it up past 100%.
-  applyGeometricFit(fit, 1);
+  applyGeometricFit(surface, chosen, 1);
 }
 
 /** Declare the active document's fit AND honour it. The one writer every control routes through. */
-export function setFit(fit: FitMode): void {
-  declareFit(fit);
-  applyFit(fit);
+export function setFit(fit: FitMode, surface: CanvasSurface = activeCanvasSurface()): void {
+  declareFit(fit, surface);
+  applyFit(fit, surface);
 }
 
 /**
@@ -478,16 +540,16 @@ export function setFit(fit: FitMode): void {
  * `ui.zoom` directly, pinch will too. An author-chosen zoom is a numeric fit, so re-entering the
  * mode restores it instead of re-framing over the top of it.
  */
-export function markExplicitZoom(): void {
-  declareFit(clampPanZoom(_ctx.getZoom()));
+export function markExplicitZoom(surface: CanvasSurface = activeCanvasSurface()): void {
+  declareFit(clampPanZoom(zoomOf(surface)), surface);
 }
 
 /**
  * Set the active tab's pan-zoom on the author's behalf: clamped, declared as this document's fit,
  * and applied. Every author-facing pan-zoom control routes through here.
  */
-export function setUserZoom(zoom: number): void {
-  const tab = activeTab.value;
+export function setUserZoom(zoom: number, surface: CanvasSurface = activeCanvasSurface()): void {
+  const tab = tabOfSurface(surface);
   if (!tab) {
     return;
   }
@@ -495,9 +557,9 @@ export function setUserZoom(zoom: number): void {
   // Synchronously on assignment, and the zoom pod reads `getFit()` while it renders — so declaring
   // Second means the control repaints one interaction behind the state it is reporting.
   const next = clampPanZoom(zoom);
-  declareFit(next);
+  declareFit(next, surface);
   tab.session.ui.zoom = next;
-  applyTransform();
+  applyTransform(surface);
 }
 
 /**
@@ -507,25 +569,28 @@ export function setUserZoom(zoom: number): void {
  * the iframes have not painted, which is why the geometry is driven by the panel widths rather than
  * by anything measured from content.
  */
-export function fitOnCanvasEntry(): void {
-  // An unmeasurable viewport (the pane is hidden, or layout has not run yet) would fit to the 5%
-  // Floor, which is worse than the clipping this replaces. Leave the zoom alone.
-  if (canvasWrap.clientWidth <= 0) {
-    applyTransform();
+export function fitOnCanvasEntry(surface: CanvasSurface): void {
+  /* An unmeasurable viewport would fit to the 5% floor, which is worse than the clipping this
+     replaces. Leave the zoom alone.
+     This guard is load-bearing rather than defensive now: a zoomed pane grid hides the other cell
+     with `display:none`, so its stage really does measure zero — and unzooming re-fits for free
+     through {@link observeCenterUntilStable}'s observer, which fires on the restored layout. */
+  if (surface.wrap.clientWidth <= 0) {
+    applyTransform(surface);
     return;
   }
-  applyFit();
+  applyFit(getFit(surface), surface);
 }
 
 /** Reset zoom to 100% and re-center horizontally, declaring 100% as this document's fit. */
-export function resetZoom() {
-  declareFit(1);
-  if (!view.panzoomWrap) {
+export function resetZoom(surface: CanvasSurface = activeCanvasSurface()) {
+  declareFit(1, surface);
+  if (!surface.panzoomWrap) {
     return;
   }
-  _ctx.setZoomDirect(1);
-  centerCanvas();
-  applyTransform();
+  setZoomOf(surface, 1);
+  centerCanvas(surface);
+  applyTransform(surface);
 }
 
 /**
@@ -536,8 +601,8 @@ export function resetZoom() {
  * hands a rect back), so one arithmetic serves a rect measured from a parent DOM element and a rect
  * measured inside a canvas iframe alike.
  */
-function centeringOffset(rect: { top: number; height: number }): number {
-  const wrapRect = rectOf(canvasWrap);
+function centeringOffset(surface: CanvasSurface, rect: { top: number; height: number }): number {
+  const wrapRect = rectOf(surface.wrap);
   const elCenterY = rect.top + rect.height / 2 - wrapRect.top;
   return wrapRect.height / 2 - elCenterY;
 }
@@ -567,10 +632,10 @@ export function revealScroller(): HTMLElement | null {
  * one {@link import("./iframe-host").revealCanvasPath} waits out frame by frame — but a scroll has
  * no such settle protocol, so an un-eased caller gets a scroll that is finished on return.
  */
-function revealBy(offsetY: number, smooth: boolean): void {
+function revealBy(surface: CanvasSurface, offsetY: number, smooth: boolean): void {
   const scroller = revealScroller();
   if (!scroller) {
-    animatePanBy(offsetY);
+    animatePanBy(surface, offsetY);
     return;
   }
   const top = scroller.scrollTop - offsetY;
@@ -588,8 +653,8 @@ function revealBy(offsetY: number, smooth: boolean): void {
  *
  * @param {HTMLElement} el
  */
-function _panToEl(el: HTMLElement) {
-  revealBy(centeringOffset(rectOf(el)), true);
+function _panToEl(surface: CanvasSurface, el: HTMLElement) {
+  revealBy(surface, centeringOffset(surface, rectOf(el)), true);
 }
 
 /**
@@ -600,21 +665,24 @@ function _panToEl(el: HTMLElement) {
  * reaches the screen through a `.panzoom-wrap` transform, and Edit has none — so `revealCanvasPath`
  * reported a node's unchanged off-screen point and the click that followed selected nothing.
  */
-export function panToParentRect(rect: { top: number; height: number }) {
-  revealBy(centeringOffset(rect), false);
+export function panToParentRect(
+  rect: { top: number; height: number },
+  surface: CanvasSurface = activeCanvasSurface(),
+) {
+  revealBy(surface, centeringOffset(surface, rect), false);
 }
 
-/** Animate `view.panY` by `offsetY` with the shared 250ms ease-out. */
-function animatePanBy(offsetY: number) {
-  const startY = view.panY;
+/** Animate a stage's `panY` by `offsetY` with the shared 250ms ease-out. */
+function animatePanBy(surface: CanvasSurface, offsetY: number) {
+  const startY = surface.panY;
   const targetY = startY + offsetY;
   const start = performance.now();
   const duration = 250;
   const step = (now: number) => {
     const t = Math.min((now - start) / duration, 1);
     const ease = t * (2 - t);
-    view.panY = startY + (targetY - startY) * ease;
-    applyTransform();
+    surface.panY = startY + (targetY - startY) * ease;
+    applyTransform(surface);
     if (t < 1) {
       requestAnimationFrame(step);
     }
@@ -628,6 +696,7 @@ function animatePanBy(offsetY: number) {
  * @param {(string | number)[]} path
  */
 export function panToElement(path: (string | number)[]) {
+  const surface = activeCanvasSurface();
   const panel = getActivePanel();
   if (!panel?.canvas) {
     return;
@@ -636,7 +705,7 @@ export function panToElement(path: (string | number)[]) {
   if (!el) {
     return;
   }
-  _panToEl(el);
+  _panToEl(surface, el);
 }
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
@@ -800,17 +869,10 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
               `supports — it declares: ${modes.join(", ")}`,
           );
         }
-        // The document supports it; the PANE may not. The side pane is capped to the cheap editor
-        // Kinds, and a refusal that names the pane is the difference between "this is not
-        // Available here" and a setter that reports success and does nothing.
-        if (!paneOfTabCanHostMode(tab, mode)) {
-          throw new RangeError(
-            `command "canvas.setMode" argument "mode": "${mode}" is a Canvas mode and this ` +
-              `document is in the side pane, which hosts ` +
-              `${[...SECONDARY_PANE_KINDS].join(", ")}. Unsplit, or move it back to the primary ` +
-              `pane first`,
-          );
-        }
+        /* There is no second refusal here. The pane used to be asked too — the side pane hosted
+           Code, Diff, Config, Entry, Grid and Library only, so a Canvas mode was refused by
+           NAME with a sentence telling you to unsplit first. Both panes draw a live Canvas now
+           (`panels/pane-grid.ts`), so the document's own declared modes are the whole answer. */
         if (mode === "preview") {
           const base = tab.session.ui.canvasMode;
           if (!PREVIEWABLE_BASE_MODES.has(base)) {
@@ -912,10 +974,16 @@ export function registerCanvasViewCommands(
   registry.registerAll(canvasViewCommands(deps));
 }
 
-/** Toggle "active" class on canvas panel headers based on activeMedia. */
-export function updateActivePanelHeaders() {
-  const activeMedia = activeTab.value?.session.ui.activeMedia ?? null;
-  for (const p of activeCanvasSurface().panels) {
+/**
+ * Toggle the "active" class on a stage's artboard headers, from that stage's own `activeMedia`.
+ *
+ * Surface-taking for the same reason everything else here is: the breakpoint a header reports is a
+ * fact about the document that stage is drawing, and reading `activeTab` drew the focused pane's
+ * breakpoint onto the other pane's artboards.
+ */
+export function updateActivePanelHeaders(surface: CanvasSurface = activeCanvasSurface()) {
+  const activeMedia = tabOfSurface(surface)?.session.ui.activeMedia ?? null;
+  for (const p of surface.panels) {
     const header = p.element?.querySelector(".canvas-panel-header");
     if (header) {
       const isActive =

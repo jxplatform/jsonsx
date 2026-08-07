@@ -1,4 +1,5 @@
-import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { flush, installMockPlatform, resetStudioState, surfaceOf } from "./harness";
+
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
 import { FakeTabulator, tabulatorMockModule } from "./tabulator-mock";
@@ -90,7 +91,7 @@ function gridTab(id = "grid://collection/posts") {
 }
 
 beforeEach(() => {
-  detachGridPanel();
+  detachGridPanel("primary");
   resetStudioState();
   closeAllTabs();
   installMockPlatform();
@@ -105,13 +106,13 @@ describe("renderGridMode", () => {
     const controller = createGridController(tab, stubSource());
     await controller.load();
 
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
 
     expect(wrap.querySelector(".jx-grid-toolbar")).not.toBeNull();
     expect(wrap.querySelector(".jx-grid-host")).not.toBeNull();
     expect(wrap.textContent).toContain("1 row");
-    expect(gridPanelMounted(tab)).toBeTrue();
+    expect(gridPanelMounted("primary", tab)).toBeTrue();
 
     const table = FakeTabulator.instances.at(-1);
     expect(table).toBeDefined();
@@ -129,7 +130,7 @@ describe("renderGridMode", () => {
       documentPath: "lazy.csv",
       id: "lazy.csv",
     });
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
     expect(wrap.textContent).not.toContain("no grid source");
     expect(wrap.textContent).toContain("1 row");
@@ -139,10 +140,10 @@ describe("renderGridMode", () => {
     const wrap = document.createElement("div");
     document.body.append(wrap);
     const tab = gridTab("grid://collection/orphan");
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
     expect(wrap.textContent).toContain("no grid source");
-    expect(gridPanelMounted(tab)).toBeFalse();
+    expect(gridPanelMounted("primary", tab)).toBeFalse();
   });
 
   test("same-tab re-render is a no-op; switching tabs rebuilds the view", async () => {
@@ -151,22 +152,22 @@ describe("renderGridMode", () => {
     const tabA = gridTab("grid://collection/a");
     const controllerA = createGridController(tabA, stubSource("grid://collection/a"));
     await controllerA.load();
-    renderGridMode(wrap, tabA);
+    renderGridMode(surfaceOf(wrap), tabA);
     await flush();
     const firstCount = FakeTabulator.instances.length;
-    renderGridMode(wrap, tabA);
+    renderGridMode(surfaceOf(wrap), tabA);
     await flush();
     expect(FakeTabulator.instances.length).toBe(firstCount);
 
     const tabB = gridTab("grid://collection/b");
     const controllerB = createGridController(tabB, stubSource("grid://collection/b"));
     await controllerB.load();
-    renderGridMode(wrap, tabB);
+    renderGridMode(surfaceOf(wrap), tabB);
     await flush();
     expect(FakeTabulator.instances.length).toBe(firstCount + 1);
     expect(FakeTabulator.instances.at(-2)!.destroyed).toBeTrue();
-    expect(gridPanelMounted(tabA)).toBeFalse();
-    expect(gridPanelMounted(tabB)).toBeTrue();
+    expect(gridPanelMounted("primary", tabA)).toBeFalse();
+    expect(gridPanelMounted("primary", tabB)).toBeTrue();
   });
 
   test("Save button reflects the dirty count and triggers controller.save", async () => {
@@ -176,7 +177,7 @@ describe("renderGridMode", () => {
     const source = stubSource();
     const controller = createGridController(tab, source);
     await controller.load();
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
 
     // Sp-button is not upgraded under happy-dom — lit's ?disabled binding lands as an attribute.
@@ -201,7 +202,7 @@ describe("renderGridMode", () => {
     const tab = gridTab();
     const controller = createGridController(tab, stubSource());
     await controller.load();
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
 
     const addButton = [...wrap.querySelectorAll("sp-action-button")].find((b) =>
@@ -219,11 +220,11 @@ describe("renderGridMode", () => {
     const tab = gridTab();
     const controller = createGridController(tab, stubSource());
     await controller.load();
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
     expect(wrap.textContent).toContain("rewrites frontmatter");
 
-    detachGridPanel();
+    detachGridPanel("primary");
     closeAllTabs();
     const csvTab = openTab({
       capabilities: { modes: ["grid", "source"] },
@@ -233,7 +234,7 @@ describe("renderGridMode", () => {
     });
     const csvController = createGridController(csvTab, stubSource("data.csv"));
     await csvController.load();
-    renderGridMode(wrap, csvTab);
+    renderGridMode(surfaceOf(wrap), csvTab);
     await flush();
     expect(wrap.textContent).not.toContain("rewrites frontmatter");
   });
@@ -244,7 +245,7 @@ describe("renderGridMode", () => {
     const tab = gridTab();
     const controller = createGridController(tab, stubSource());
     await controller.load();
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
     const table = FakeTabulator.instances.at(-1)!;
     const buttonFor = (label: string) =>
@@ -283,7 +284,7 @@ describe("renderGridMode", () => {
     };
     const controller = createGridController(tab, source);
     await controller.load();
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
     expect(wrap.textContent).toContain("backend exploded");
   });
@@ -301,7 +302,7 @@ describe("renderGridMode", () => {
     };
     const controller = createGridController(tab, source);
     await controller.load();
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
 
     const next = [...wrap.querySelectorAll("sp-action-button")].find(
@@ -327,7 +328,7 @@ describe("renderGridMode", () => {
     const tab = gridTab();
     const controller = createGridController(tab, stubSource());
     await controller.load();
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
 
     const replaceButton = [...wrap.querySelectorAll("sp-action-button")].find((b) =>
@@ -356,13 +357,13 @@ describe("renderGridMode", () => {
     const tab = gridTab();
     const controller = createGridController(tab, stubSource());
     await controller.load();
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
     const table = FakeTabulator.instances.at(-1)!;
 
-    detachGridPanel();
+    detachGridPanel("primary");
     expect(table.destroyed).toBeTrue();
-    expect(gridPanelMounted(tab)).toBeFalse();
+    expect(gridPanelMounted("primary", tab)).toBeFalse();
 
     controller.buffer.setCell("a", "title", "After detach");
     await flush();
@@ -402,7 +403,7 @@ async function mountViewGrid() {
   const tab = gridTab(VIEW_GRID);
   const controller = createGridController(tab, viewSource());
   await controller.load();
-  renderGridMode(wrap, tab);
+  renderGridMode(surfaceOf(wrap), tab);
   await flush();
   return { controller, tab, wrap };
 }
@@ -669,7 +670,7 @@ describe("saved-view commands", () => {
   });
 
   test("they are disabled, and refuse, when no grid is on screen", async () => {
-    detachGridPanel();
+    detachGridPanel("primary");
     const record = byId("grid.resetView");
     expect(record.enablement!({} as never)).toBeFalse();
     expect(() => record.run({} as never, undefined as never)).toThrow("needs a grid on screen");
@@ -779,7 +780,7 @@ describe("saved views — the awkward corners", () => {
     saveGridLayout(VIEW_GRID, { hidden: ["body"] });
     saveViewAs(VIEW_GRID, "Detached");
     const box = await openViews(wrap);
-    detachGridPanel();
+    detachGridPanel("primary");
     (box.querySelector(".jx-grid-view-name") as HTMLElement).click();
     await flush();
     expect(loadGridLayout(VIEW_GRID)?.hidden).toEqual(["body"]);

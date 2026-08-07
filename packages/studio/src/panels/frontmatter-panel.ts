@@ -36,7 +36,9 @@
 
 import { html, nothing, render as litRender } from "lit-html";
 import { projectState } from "../store";
-import { activeTab } from "../workspace/workspace";
+import { workspace } from "../workspace/workspace";
+import { tabOfPane } from "../canvas/canvas-surface";
+import { paneRegion } from "../ui/regions";
 import { effect, effectScope } from "../reactivity";
 import { createPanelScheduler } from "./panel-scheduler";
 import { collectFmFields, renderFmField } from "./frontmatter-fields";
@@ -75,8 +77,15 @@ import type { Tab } from "../tabs/tab";
 import type { PanelScheduler } from "./panel-scheduler";
 import type { TemplateResult } from "lit-html";
 
-let _scheduler: PanelScheduler | null = null;
-let _host: HTMLElement | null = null;
+/**
+ * The card's host and scheduler, per PANE.
+ *
+ * A single `_host` was the same singleton every other stage-content module had, and it produced a
+ * subtler failure than most: the stage hands the host over from a lit `ref`, so with two stages
+ * drawing a header the second `ref` to fire silently took the card away from the first, leaving one
+ * pane's Document Header frozen on the frontmatter of the moment it lost the handle.
+ */
+const _hosts = new Map<string, { el: HTMLElement; scheduler: PanelScheduler }>();
 let _scope: { stop: () => void; run: <T>(fn: () => T) => T | undefined } | null = null;
 
 /** Per-document disclosure state, keyed by tab id — not stored on the document. */
@@ -93,27 +102,28 @@ const _rawOpen = new Set<string>();
  *
  * @param {HTMLElement | null} el
  */
-export function attachDocumentHeaderHost(el: HTMLElement | null): void {
-  if (el === _host) {
+export function attachDocumentHeaderHost(paneId: string, el: HTMLElement | null): void {
+  const held = _hosts.get(paneId);
+  if (held?.el === el) {
     return;
   }
-  _scheduler?.unbind();
-  _scheduler = null;
-  _host = el;
+  held?.scheduler.unbind();
+  _hosts.delete(paneId);
   if (!el) {
     return;
   }
-  _scheduler = createPanelScheduler({ render: _doRender, root: el });
-  _scheduler.bindFocus();
-  _scheduler.schedule();
+  const scheduler = createPanelScheduler({ render: () => _doRender(paneId), root: el });
+  _hosts.set(paneId, { el, scheduler });
+  scheduler.bindFocus();
+  scheduler.schedule();
 }
 
 /**
  * The host the stage last handed over, or `null`. The stage reads it back to settle Lit's
  * order-independent detach report; nothing else needs to know where the card lives.
  */
-export function documentHeaderHost(): HTMLElement | null {
-  return _host;
+export function documentHeaderHost(paneId: string): HTMLElement | null {
+  return _hosts.get(paneId)?.el ?? null;
 }
 
 /**
@@ -127,8 +137,9 @@ export function mount() {
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
-      const tab = activeTab.value;
-      if (tab) {
+      // Every pane's tab, not the focused one's: two stages can each be drawing a header, and a
+      // Card that only tracked `activeTab` stopped repainting the moment focus moved away from it.
+      for (const tab of paneTabs()) {
         // Track everything the card reads: the document root (title / `$head` / `$layout` live
         // There for a JSON page) plus the frontmatter object AND its entries — field commits mutate
         // Keys in place while the source-mode round-trip swaps the whole object, and both must
@@ -154,11 +165,24 @@ export function mount() {
 export function unmount() {
   _scope?.stop();
   _scope = null;
-  _scheduler?.unbind();
-  _scheduler = null;
-  _host = null;
+  for (const { scheduler } of _hosts.values()) {
+    scheduler.unbind();
+  }
+  _hosts.clear();
   _seoOpen.clear();
   _rawOpen.clear();
+}
+
+/** Each pane's tab, deduplicated — the set of documents a header could be drawn for. */
+function paneTabs(): Tab[] {
+  const tabs: Tab[] = [];
+  for (const pane of workspace.panes) {
+    const tab = tabOfPane(pane.id);
+    if (tab && !tabs.includes(tab)) {
+      tabs.push(tab);
+    }
+  }
+  return tabs;
 }
 
 /**
@@ -166,7 +190,9 @@ export function unmount() {
  * never clobber a field mid-edit.
  */
 export function render() {
-  _scheduler?.schedule();
+  for (const { scheduler } of _hosts.values()) {
+    scheduler.schedule();
+  }
 }
 
 /**
@@ -192,12 +218,12 @@ export function hasDocumentHeader(tab: Tab): boolean {
   return isPageDocument();
 }
 
-function _doRender() {
-  const host = _host;
+function _doRender(paneId: string) {
+  const host = _hosts.get(paneId)?.el;
   if (!host) {
     return;
   }
-  const tab = activeTab.value;
+  const tab = tabOfPane(paneId);
   if (!tab || !hasDocumentHeader(tab)) {
     // The stage decides whether the host exists; this only covers the window between a document
     // Losing its header and the canvas noticing. Lit leaves comment markers, so `:empty` cannot be
@@ -206,7 +232,7 @@ function _doRender() {
     host.hidden = true;
     return;
   }
-  litRender(documentHeaderTemplate(tab), host);
+  litRender(documentHeaderTemplate(tab, paneId), host);
   host.hidden = false;
 }
 
@@ -221,7 +247,7 @@ function _doRender() {
  * @param {Tab} tab
  * @returns {TemplateResult}
  */
-export function documentHeaderTemplate(tab: Tab): TemplateResult {
+export function documentHeaderTemplate(tab: Tab, paneId: string): TemplateResult {
   const isContent = tab.doc.mode === "content";
   const fm = (tab.doc.content?.frontmatter ?? {}) as Record<string, unknown>;
   // ONE view of the document's head material, whichever realm it lives in: frontmatter keys for a
@@ -230,7 +256,12 @@ export function documentHeaderTemplate(tab: Tab): TemplateResult {
   const applyMutation = isContent
     ? (fn: (doc: JxMutableNode) => void) => applyContentMutation(render, fn)
     : (fn: (doc: JxMutableNode) => void) => {
-        transact(activeTab.value, fn);
+        // `tab`, not `activeTab` — the card is drawn for the pane that mounted it, and every other
+        // Line in this template already reads that. This one resolved through FOCUS, so with two
+        // Panes the visible card's controls edited whichever document happened to be focused: click
+        // "Clear title" on the card in the left pane and the field disappears from the right pane's
+        // Document instead. Invisible with one stage, which is why it survived the pane keying.
+        transact(tab, fn);
       };
 
   // ONE call. The old pair of surfaces made two, with two different reserved-key policies.
@@ -248,7 +279,7 @@ export function documentHeaderTemplate(tab: Tab): TemplateResult {
     <section
       class="doc-header"
       aria-label="Document header"
-      data-jx-region="pane.primary/frontmatter"
+      data-jx-region=${paneRegion(paneId, "frontmatter")}
     >
       <header class="doc-header-bar">
         <span class="doc-header-title">${collection ? collection.name : "Document"}</span>

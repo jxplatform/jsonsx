@@ -21,9 +21,9 @@ import {
   splitRight,
   workspace,
 } from "../src/workspace/workspace";
-import { view } from "../src/view";
 import type { CommandContext } from "../src/commands/context";
 import type { CommandRegistry } from "../src/commands/registry";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
 // ─── Seams (all must precede the modules under test) ─────────────────────────
 
@@ -61,6 +61,9 @@ void mock.module("../src/canvas/iframe-host.js", () => ({
   },
   postStyleUpdateToStylebookHosts: () => {},
   requestCanvasEval: () => Promise.resolve(null),
+  /* The non-lazy way out of `liveHosts`: `panels/pane-grid.ts` calls it as a cell is
+     disposed, so it is on the import graph of anything that mounts the shell. */
+  releaseCanvasHosts: () => 0,
   setToolbarRefresh: () => {},
 }));
 void mock.module("../src/panels/welcome-screen.js", () => ({
@@ -112,7 +115,6 @@ const {
   canvasViewCommands,
   EDIT_ZOOM_MAX,
   EDIT_ZOOM_MIN,
-  initCanvasUtils,
   PAN_ZOOM_MAX,
   PAN_ZOOM_MIN,
   getFit,
@@ -157,8 +159,7 @@ beforeEach(() => {
   canvasMode = "design";
   setCanvasMode.mockClear();
   resetFits();
-  view.panzoomWrap = null;
-  initCanvasUtils({ getCanvasMode: () => canvasMode, getZoom: () => 1, setZoomDirect: () => {} });
+  surfaceForPane("primary").panzoomWrap = null;
   ctx = makeContext({ document: { open: true } });
   registry = createCommandRegistry({ getContext: () => ctx });
   registerCanvasViewCommands(registry, deps);
@@ -248,20 +249,21 @@ describe("canvas.setMode", () => {
   });
 
   /*
-   * The document declares the mode; the PANE may still refuse it. The side pane is capped to the
-   * cheap editor kinds because a second live Canvas host is the expensive part, and enforcing that
-   * only at the split left the way back in wide open — `canvas.setMode { mode: "design" }` (and
-   * the context bar behind it) put a Canvas in a pane that must not host one.
+   * The DOCUMENT is the only thing that can refuse a mode.
+   *
+   * This used to refuse a second one: the side pane was capped to Code, Diff, Config, Entry, Grid
+   * and Library, so `canvas.setMode { mode: "design" }` threw a sentence telling you to unsplit
+   * first. The cap existed because a second live Canvas host was unaffordable, and it is gone —
+   * `panels/pane-grid.ts` draws a stage per pane and `canvas/surface-registry.ts` gives each its
+   * own panels, mode, pan and render generation. A Canvas in the side pane is the object the
+   * primary has always had.
    */
-  test("refuses a Canvas mode for a document sitting in the side pane", () => {
+  test("a Canvas mode goes through in the side pane — the cap that refused it is lifted", () => {
     openWith(["edit", "design", "source"]);
     splitRight();
     expect(workspace.activePaneId).toBe(SECONDARY_PANE);
-    expect(() => registry.run("canvas.setMode", { mode: "design" })).toThrow(
-      'command "canvas.setMode" argument "mode": "design" is a Canvas mode and this document ' +
-        "is in the side pane",
-    );
-    // The kinds that pane DOES host still go through.
+    void registry.run("canvas.setMode", { mode: "design" });
+    expect(setCanvasMode).toHaveBeenCalledWith("design");
     void registry.run("canvas.setMode", { mode: "source" });
     expect(setCanvasMode).toHaveBeenCalledWith("source");
   });

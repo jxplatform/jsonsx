@@ -1,14 +1,16 @@
 /* Jx Studio — canvas surface.
    Load after tokens.css, after shell.css.
 
-   Owns the multi-panel canvas frame (#canvas-wrap, .panzoom-wrap,
+   Owns the multi-panel canvas frame (.pane-stage, .panzoom-wrap,
    .canvas-panel*), the pane's context bar and floating zoom pod, the
    content-edit-mode canvas column, the selection/hover/layout overlay
    boxes drawn over the rendered document, and the unified block action
    bar plus its link popover. */
 
 /* ─── Canvas (multi-panel) ────────────────────── */
-#canvas-wrap {
+/* The stage's own axis. `shell.css` places the cell; this says what it does with it. Selected by
+   class rather than by `#canvas-wrap`, because there are as many stages as there are panes. */
+.pane-stage {
   display: flex;
   gap: 24px;
   align-items: flex-start;

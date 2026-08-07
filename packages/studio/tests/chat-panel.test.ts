@@ -69,7 +69,7 @@ function chatHost(): HTMLElement {
 beforeEach(() => {
   document.body.innerHTML = `<div id="app">
     <div id="toolbar"></div><div id="activity-bar"></div><div id="left-panel"></div>
-    <div id="canvas-wrap"></div><div id="right-panel"><div id="assistant-tab"></div></div>
+    <div class="pane-stage" data-jx-region="pane.primary"></div><div id="right-panel"><div id="assistant-tab"></div></div>
     <div id="statusbar"></div>
   </div>`;
   initShellRefs();

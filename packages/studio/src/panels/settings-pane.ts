@@ -35,18 +35,27 @@ import {
   setSettingsSection,
   sortedSettingsSections,
 } from "../settings/section-registry";
+import type { CanvasSurface } from "../canvas/canvas-surface";
 
-/** The mounted host, or null when the settings editor is not on screen. */
-let _host: HTMLElement | null = null;
+/**
+ * One mounted editor per PANE.
+ *
+ * `config` is a kind the side pane may host, so the previous single `_host` had both panes' stages
+ * competing for it: `settingsPaneMounted` answered false for whichever host lost, and that pane's
+ * fast path rebuilt the whole section body on every render — throwing away an open inline form
+ * mid-keystroke, which is the exact failure the idempotence was written to prevent.
+ */
+interface ActiveSettingsPane {
+  host: HTMLElement;
+  /** The section body container, handed to whichever section renderer is current. */
+  body: HTMLElement | null;
+  /** The section the body currently holds, so an idle re-render does not rebuild it. */
+  rendered: string | null;
+  /** Unsubscribe from the document's change notifications. */
+  off: (() => void) | null;
+}
 
-/** The section body container, handed to whichever section renderer is current. */
-let _body: HTMLElement | null = null;
-
-/** The section the body currently holds, so an idle re-render does not rebuild it. */
-let _rendered: string | null = null;
-
-/** Unsubscribe from the document's change notifications. */
-let _off: (() => void) | null = null;
+const _active = new Map<string, ActiveSettingsPane>();
 
 /**
  * Mount (or refresh) the settings editor inside the pane.
@@ -54,34 +63,42 @@ let _off: (() => void) | null = null;
  * Idempotent for the same host: canvas-render calls this on every render for this mode, and
  * rebuilding the section body on each one would throw away an open inline form mid-keystroke.
  *
- * @param {HTMLElement} host - The pane's canvas host (`#canvas-wrap`)
+ * @param {CanvasSurface} surface - The pane whose stage hosts the editor
  */
-export function renderSettingsPane(host: HTMLElement): void {
-  if (_host !== host) {
-    detachSettingsPane();
-    _host = host;
-    _off = onSettingsDocumentChanged(() => draw(true));
+export function renderSettingsPane(surface: CanvasSurface): void {
+  const { paneId, wrap: host } = surface;
+  let panel = _active.get(paneId);
+  if (panel?.host !== host) {
+    detachSettingsPane(paneId);
+    panel = {
+      body: null,
+      host,
+      off: onSettingsDocumentChanged(() => draw(paneId, true)),
+      rendered: null,
+    };
+    _active.set(paneId, panel);
   }
-  draw(false);
+  draw(paneId, false);
 }
 
-/** Tear the editor down — the mode-change and project-close path. */
-export function detachSettingsPane(): void {
-  _off?.();
-  _off = null;
-  _host = null;
-  _body = null;
-  _rendered = null;
+/** Tear one pane's editor down — the mode-change and project-close path. */
+export function detachSettingsPane(paneId: string): void {
+  const panel = _active.get(paneId);
+  if (!panel) {
+    return;
+  }
+  panel.off?.();
+  _active.delete(paneId);
 }
 
 /**
- * Whether the editor is mounted on this host — canvas-render's "did I already build this".
+ * Whether the editor is mounted on this pane's stage — canvas-render's "did I already build this".
  *
- * @param {HTMLElement} host
+ * @param {CanvasSurface} surface
  * @returns {boolean}
  */
-export function settingsPaneMounted(host: HTMLElement): boolean {
-  return _host === host;
+export function settingsPaneMounted(surface: CanvasSurface): boolean {
+  return _active.get(surface.paneId)?.host === surface.wrap;
 }
 
 /**
@@ -91,8 +108,9 @@ export function settingsPaneMounted(host: HTMLElement): boolean {
  *   for a real state change (a nav click, a section registering, an entry being selected by
  *   command); false for canvas-render's idempotent remount.
  */
-function draw(force: boolean): void {
-  if (!_host) {
+function draw(paneId: string, force: boolean): void {
+  const panel = _active.get(paneId);
+  if (!panel) {
     return;
   }
   const active = settingsDocumentSection();
@@ -120,27 +138,27 @@ function draw(force: boolean): void {
         class="settings-doc-content"
         ${ref((el: Element | undefined) => {
           const next = (el as HTMLElement | undefined) ?? null;
-          if (next !== _body) {
-            _body = next;
-            _rendered = null;
+          if (next !== panel.body) {
+            panel.body = next;
+            panel.rendered = null;
           }
         })}
       ></div>
     </div>
   `;
 
-  litRender(tpl, _host);
+  litRender(tpl, panel.host);
 
-  if (!_body || (!force && _rendered === active)) {
+  if (!panel.body || (!force && panel.rendered === active)) {
     return;
   }
-  _rendered = active;
+  panel.rendered = active;
   const section = settingsSection(active);
   if (section) {
-    section.render(_body);
+    section.render(panel.body);
     return;
   }
   /* Every section unregistered at once — a project closing while the editor is open. A blank
      content area beside a nav reads as a broken pane, so it says which it is. */
-  litRender(html`<div class="settings-empty-state">No settings sections.</div>`, _body);
+  litRender(html`<div class="settings-empty-state">No settings sections.</div>`, panel.body);
 }

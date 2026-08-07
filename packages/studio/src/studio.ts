@@ -14,7 +14,6 @@
 import { errorMessage } from "@jxsuite/schema/parse";
 
 import {
-  canvasWrap,
   initShellRefs,
   projectState,
   registerRenderer,
@@ -26,17 +25,17 @@ import {
 } from "./store";
 
 import {
+  PRIMARY_PANE,
   activeTab,
   closeAllTabs,
   openTab,
-  paneOfTabCanHostMode,
   registerTabCommands,
   setWorkspaceProject,
   workspace,
 } from "./workspace/workspace";
-import { effect } from "./reactivity";
+import { effect, effectScope } from "./reactivity";
+import type { EffectScope } from "@vue/reactivity";
 
-import { view } from "./view";
 import {
   mountShell,
   registerShellViewCommands,
@@ -46,16 +45,16 @@ import {
 } from "./shell";
 
 import { isEditing } from "./editor/inline-edit";
-import { applyTransform, initCanvasUtils, registerCanvasViewCommands } from "./canvas/canvas-utils";
+import { applyTransform, registerCanvasViewCommands } from "./canvas/canvas-utils";
+import type { CanvasSurface } from "./canvas/canvas-surface";
 import {
-  handOverCanvasStage,
   initCanvasRender,
   registerSelectionSetCommand,
   renderCanvas,
   renderOverlays,
   scheduleCanvasRender,
 } from "./canvas/canvas-render";
-import { canvasModeOfPane } from "./canvas/canvas-surface";
+import { canvasModeOfPane, surfaceForPane, tabOfPane } from "./canvas/canvas-surface";
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
 import {
   commitActiveEditSession,
@@ -77,6 +76,7 @@ import { makeCanvasContextMenuHandler } from "./editor/canvas-context-menu";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import { mountStatusbar, renderStatusbar } from "./panels/statusbar";
 import { mountJumpBar } from "./panels/jump-bar";
+import { cellForPane } from "./panels/pane-grid";
 import { notify } from "./services/notify";
 import { beginActivity } from "./panels/activity-panel";
 import { exportFile, parseSourceForPath, saveFile, serializeDocument } from "./files/file-ops";
@@ -223,17 +223,16 @@ function getCanvasMode() {
 /**
  * Write the focused pane's BASE canvas mode.
  *
- * Refuses a mode the tab's PANE may not host (`paneOfTabCanHostMode`) — the side pane is capped to
- * the cheap editor kinds, and a cap enforced only at the split is a cap a context-bar click walks
- * straight back out of. Silent because no control offers a refused mode: the pane context bar draws
- * `hostableKindsOf`, and `canvas.setMode` — the one caller that can be handed an arbitrary string —
- * refuses it by name before it gets here.
+ * No pane check. It used to refuse a mode the tab's pane could not host, because the side pane was
+ * capped to the cheap editor kinds and a cap enforced only at the split is one a context-bar click
+ * walks straight back out of. Both panes host every kind, so the only thing that can refuse a mode
+ * is the document not declaring it — which `canvas.setMode` checks by name.
  *
  * @param {string} mode
  */
 function setCanvasMode(mode: string) {
   const tab = activeTab.value;
-  if (!tab || !paneOfTabCanHostMode(tab, mode)) {
+  if (!tab) {
     return;
   }
   if (getCanvasMode() === "git-diff" && mode !== "git-diff") {
@@ -341,9 +340,15 @@ toolbarPanel.mount(toolbarEl, {
 initLayers();
 initQuickSearch({ openRecentProject: (root: string) => openRecentProject(root) });
 
-tabStrip.mount(document.querySelector("#tab-strip") as HTMLElement);
+/* The pane's four surfaces come from its CELL, not from `document.querySelector`.
+   `panels/pane-grid.ts` mounted through `mountShell()` above, so the primary's cell exists by now;
+   each of these three modules still holds one host, which is exactly right while the grid draws one
+   cell and is what `mountForPane` replaces when it draws two. */
+const primaryCell = cellForPane(PRIMARY_PANE);
 
-paneContext.mount(document.querySelector("#pane-chrome") as HTMLElement, {
+tabStrip.mount(primaryCell?.strip ?? document.createElement("div"));
+
+paneContext.mount(primaryCell?.chrome ?? document.createElement("div"), {
   exportFile,
   getCanvasMode,
   parseMediaEntries,
@@ -432,15 +437,14 @@ window.addEventListener("beforeunload", (e: BeforeUnloadEvent) => {
   }
 });
 
-initCanvasUtils({
-  getCanvasMode,
-  getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
-  setZoomDirect: (zoom) => {
-    if (activeTab.value) {
-      activeTab.value.session.ui.zoom = zoom;
-    }
-  },
-});
+/* No `initCanvasUtils` any more, and the three functions it injected are why.
+   `getZoom` and `setZoomDirect` were `activeTab.value?.session.ui.zoom` — the FOCUSED pane's tab —
+   while every geometry function in `canvas/canvas-utils.ts` already took an explicit
+   `CanvasSurface`. So the pan and the wrap were per-stage and the SCALE was not: the unfocused pane
+   drew at the focused tab's scale, the side pane's `+` zoomed the primary's document, and the side
+   pane entering Design snapped the primary to whatever it had fitted itself to. `getCanvasMode`
+   was the same shape one layer down. The module reaches all three through the surface it is given
+   (`tabOfPane(surface.paneId)`), so there is nothing left to inject. */
 initCanvasLiveRender({
   getCanvasMode,
 });
@@ -485,67 +489,107 @@ initWelcome({
   openRecentProject: (root: string) => openRecentProject(root),
 });
 
-/* The shell's single stage follows the focus. A pane is the unit of render (see
-   `canvas/canvas-surface.ts`), but `index.html` has one `#canvas-wrap` — so the pane that owns it
-   is whichever pane the keyboard is in, and the handover has to happen the moment focus moves
-   rather than at boot. `⌘\` is the case that proves it: `splitRight` focuses the pane it creates,
-   and until this effect existed the moved tab's next render addressed a pane with no stage.
+/* There is no stage-handover effect here any more.
+   It existed because the shell had one `#canvas-wrap` and a pane is the unit of render, so "which
+   pane owns the stage" had to be re-answered every time focus moved. `panels/pane-grid.ts` builds a
+   cell per pane and registers its stage with it; nothing moves, and nothing has to be repainted
+   because it changed hands. */
 
-   Registered BEFORE the two render effects only for readability — a render is an rAF, so it lands
-   after every synchronous effect this focus change fires either way.
+/**
+ * One pane's render subscriptions.
+ *
+ * Effect-driven canvas rendering, split into three triggers so document changes can be
+ * distinguished from mode/UI changes:
+ *
+ * - Doc-effect: tracks only the document root reference. Document mutations that were consumed
+ *   surgically by the canvas patcher skip the full render here.
+ * - Ui-effect: tracks canvas mode and UI flags; always schedules a full render.
+ * - The colour-scheme post, which is a document-level attribute flip inside the iframe and
+ *   deliberately never part of the ui-effect: flipping the scheme must not re-render.
+ *
+ * Scheduling is deduped inside `scheduleCanvasRender` (double-RAF).
+ *
+ * **Keyed on the PANE, not on `activeTab`, and this is what makes `⌘\` and Unsplit work at all.**
+ * Both effects used to read the focused pane's tab and schedule "the" canvas. A split moves a tab
+ * between panes without changing which tab is active, so neither effect re-ran: the pane the tab
+ * LEFT went on displaying it, and Unsplit — where the survivor's `activeTabId` changes but
+ * `activeTab` does not — left the primary showing document A while the strip, the jump bar and the
+ * Inspector all said B. `tabOfPane` tracks the pane's own `activeTabId`, so the pane that changed
+ * is the pane that repaints.
+ *
+ * @param {string} paneId
+ */
+function installPaneRenderEffects(paneId: string): void {
+  effect(() => {
+    const tab = tabOfPane(paneId);
+    if (tab) {
+      const doc = tab.doc.document;
+      if (doc && consumePatchedDocument(doc)) {
+        return;
+      }
+    }
+    scheduleCanvasRender(paneId);
+  });
+  effect(() => {
+    const tab = tabOfPane(paneId);
+    if (tab) {
+      void tab.doc.mode;
+      void tab.session.ui.canvasMode;
+      void tab.session.ui.editingFormula;
+      void tab.session.ui.editingFunction;
+      void tab.session.ui.featureToggles;
+      void tab.session.ui.preview;
+      void tab.session.ui.previewParams;
+      void tab.session.ui.previewProps;
+      void tab.session.ui.showLayout;
+    }
+    // Project-level render inputs: the stylebook catalogue's filters and the settings section are
+    // Shell state, so a change repaints the canvas with or without a document focused.
+    void shell.settingsTab;
+    void shell.stylebook.tab;
+    void shell.stylebook.filter;
+    void shell.stylebook.customizedOnly;
+    scheduleCanvasRender(paneId);
+  });
+  effect(() => {
+    const scheme = tabOfPane(paneId)?.session.ui.previewColorScheme;
+    // Scoped to THIS pane's stage: the scheme is a per-tab choice, and an unscoped post flipped
+    // Both documents from one pane's control.
+    postColorSchemeToLiveHosts(
+      scheme === "light" || scheme === "dark" ? scheme : null,
+      surfaceForPane(paneId).wrap,
+    );
+  });
+}
 
-   `handOverCanvasStage` repaints as part of taking the stage, because neither render effect below
-   can: both are keyed on `activeTab`, and a handover moves a pane, not a document — `⌘\` and
-   `View: Unsplit` both leave the same tab active.
+/**
+ * Subscribe every drawn pane, and unsubscribe one that leaves the grid.
+ *
+ * A scope per pane rather than one loop over `workspace.panes`, because the distinction the two
+ * effects above draw only survives if each pane is tracked separately: an effect that read both
+ * panes' documents would re-render BOTH whenever either moved, and `consumePatchedDocument` would
+ * skip both whenever one was patched.
+ */
+const _paneRenderScopes = new Map<string, EffectScope>();
 
-   This effect is deleted by P8 workstream 2, not extended: with a host per pane, each registers
-   its own stage and none of them moves. */
 effect(() => {
-  handOverCanvasStage(workspace.activePaneId, canvasWrap);
-});
-
-// Effect-driven canvas rendering, split into two triggers so document changes can be
-// Distinguished from mode/UI changes:
-// - doc-effect: tracks only the document root reference. Document mutations that were
-//   Consumed surgically by the canvas patcher skip the full render here.
-// - ui-effect: tracks canvas mode and UI flags; always schedules a full render.
-// Scheduling is deduped inside scheduleCanvasRender (double-RAF).
-effect(() => {
-  const tab = activeTab.value;
-  if (tab) {
-    const doc = tab.doc.document;
-    if (doc && consumePatchedDocument(doc)) {
-      return;
+  const wanted = new Set(workspace.panes.map((pane) => pane.id));
+  for (const [paneId, scope] of _paneRenderScopes) {
+    if (!wanted.has(paneId)) {
+      scope.stop();
+      _paneRenderScopes.delete(paneId);
     }
   }
-  scheduleCanvasRender();
-});
-effect(() => {
-  const tab = activeTab.value;
-  if (tab) {
-    void tab.doc.mode;
-    void tab.session.ui.canvasMode;
-    void tab.session.ui.editingFormula;
-    void tab.session.ui.editingFunction;
-    void tab.session.ui.featureToggles;
-    void tab.session.ui.preview;
-    void tab.session.ui.previewParams;
-    void tab.session.ui.previewProps;
-    void tab.session.ui.showLayout;
+  for (const paneId of wanted) {
+    if (_paneRenderScopes.has(paneId)) {
+      continue;
+    }
+    const scope = effectScope();
+    _paneRenderScopes.set(paneId, scope);
+    scope.run(() => {
+      installPaneRenderEffects(paneId);
+    });
   }
-  // Project-level render inputs: the stylebook catalogue's filters and the settings section are
-  // Shell state, so a change repaints the canvas with or without a document focused.
-  void shell.settingsTab;
-  void shell.stylebook.tab;
-  void shell.stylebook.filter;
-  void shell.stylebook.customizedOnly;
-  scheduleCanvasRender();
-});
-// Color-scheme preview is a document-level attribute flip inside the iframe — deliberately its
-// Own effect, never part of the ui-effect above: flipping the scheme must not re-render.
-effect(() => {
-  const s = activeTab.value?.session.ui.previewColorScheme;
-  postColorSchemeToLiveHosts(s === "light" || s === "dark" ? s : null);
 });
 
 rightPanelMod.mount({
@@ -612,19 +656,13 @@ mountStatusbar();
 // ⑥ The jump bar, in the pane's own grid cell above the context bar. It renders the whole address
 // — project › file › node › node — and it is the only breadcrumb in the shell: the pane context
 // Bar drew a second one, and it named a sub-document stack nothing could push onto.
-mountJumpBar(document.querySelector("#jump-bar") as HTMLElement);
+mountJumpBar(primaryCell?.jump ?? document.createElement("div"));
 mountActivityBar();
 
-// Clicking on the canvas-wrap background (outside any canvas panel) deselects the current element
-canvasWrap.addEventListener("click", (e: MouseEvent) => {
-  if (e.target !== canvasWrap && e.target !== view.panzoomWrap) {
-    return;
-  }
-  if (!activeTab.value?.session.selection.length) {
-    return;
-  }
-  activeTab.value.session.selection = [];
-});
+/* The background-click deselect moved into `editor/shortcuts.ts`'s `installStageGestures`, beside
+   the wheel and the middle-drag, because it is a STAGE gesture: it compared against the app's one
+   `#canvas-wrap` and one `view.panzoomWrap` and cleared `activeTab`'s selection, all three of which
+   name the focused pane rather than the pane that was clicked. */
 
 function safeRenderRightPanel() {
   rightPanelMod.render();
@@ -655,14 +693,18 @@ let fsUnsub: (() => void) | null = null;
 function ensureFsSync() {
   fsUnsub?.();
   fsUnsub = startFsSync({
-    // The three caches keyed on the project's file listing. Each one is derived — the pages tree
-    // Behind the Link-target picker, the layouts listing plus the effective layout's `$head`, and
-    // The `$paths` value enumerations — so a file appearing or disappearing is the only event that
-    // Can make any of them wrong, and it is the same event for all three.
+    /* The four caches keyed on the project's file listing. Each one is derived — the pages tree
+       behind the Link-target picker, the layouts listing plus the effective layout's `$head`, the
+       `$paths` value enumerations, and the context bar's own memo of the enumerations it has
+       already asked for — so a file appearing or disappearing is the only event that can make any
+       of them wrong, and it is the same event for all four. The bar's memo is separate from
+       `page-params`' because it is keyed per DOCUMENT rather than globally; leaving it behind kept
+       a stale candidate list in the picker after the collection changed. */
     invalidateDerivedCaches: () => {
       invalidatePageRouteCache();
       invalidateLayoutPickerCache();
       invalidateParamValues();
+      paneContext.resetParamValues();
     },
     onContentChange: reloadCleanTab,
     renderLeftPanel,
@@ -1039,16 +1081,22 @@ function openFileFromTree(path: string) {
 
 // ─── Commands and the keyboard ────────────────────────────────────────────────
 
-/** Pointer/pan state, read fresh on every gesture. */
-const pointerContext = () => ({
-  applyTransform,
-  canvasMode: getCanvasMode(),
-  panX: view.panX,
-  panY: view.panY,
+/**
+ * Pointer/pan state for ONE pane's stage, read fresh on every gesture.
+ *
+ * Takes the surface rather than resolving `view.panX` / `getCanvasMode()`, both of which answered
+ * for the focused pane: a wheel over the side pane wrote the primary's pan offsets and asked the
+ * primary's mode whether panning was even allowed.
+ */
+const stageContext = (surface: CanvasSurface) => ({
+  applyTransform: () => applyTransform(surface),
+  canvasMode: canvasModeOfPane(surface.paneId),
+  panX: surface.panX,
+  panY: surface.panY,
   setPan: (x: number, y: number) => {
-    view.panX = x;
-    view.panY = y;
-    view.needsCenter = false;
+    surface.panX = x;
+    surface.panY = y;
+    surface.needsCenter = false;
   },
 });
 
@@ -1084,7 +1132,7 @@ registerStudioCommands(
       await saveFile();
     },
   },
-  pointerContext,
+  stageContext,
 );
 
 // Tab navigation (⌃Tab MRU cycling, ⌘⇧T reopen-closed) is defined beside the tab model it drives.
@@ -1132,7 +1180,7 @@ registerCollabCommands(commandRegistry);
  */
 registerSelectionCommands(commandRegistry, { convertToComponent, navigateToComponent });
 
-initShortcuts(commandRegistry, pointerContext);
+initShortcuts(commandRegistry, stageContext);
 
 // The gated scripting surface (`?automation=1` only) is a PROJECTION of the registry above, so it
 // Installs after it — still inside this module's synchronous body, which is what the screenshot

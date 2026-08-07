@@ -25,9 +25,8 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Tab } from "../src/tabs/tab";
 
 const paneContext = await import("../src/panels/pane-context");
-const { closeAllTabs } = await import("../src/workspace/workspace");
-const { getFit, hasDeclaredFit, initCanvasUtils, resetFits } =
-  await import("../src/canvas/canvas-utils");
+const { activeTab, closeAllTabs } = await import("../src/workspace/workspace");
+const { getFit, hasDeclaredFit, resetFits } = await import("../src/canvas/canvas-utils");
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { makeContext } = await import("../src/commands/context");
 const { setActiveRegistry } = await import("../src/commands/active-registry");
@@ -49,6 +48,23 @@ function makeCtx(overrides: Partial<Ctx> = {}): Ctx {
     setCanvasMode: mock((_mode: string) => {}),
     ...overrides,
   } as Ctx;
+}
+
+/**
+ * A ctx in `mode`, with the focused pane's tab put into it too.
+ *
+ * Both, because both are now read. The zoom pod asks `canvasModeOfPane` — THIS pane's effective
+ * mode — rather than `ctx.getCanvasMode()`, which answers for whichever pane has focus and so drew
+ * an `editZoom` control over a stage rendering Design the moment two panes existed. A fixture that
+ * set only the ctx was describing a state the app cannot be in.
+ */
+function ctxInMode(mode: string, overrides: Partial<Ctx> = {}): Ctx {
+  const tab = activeTab.value;
+  if (tab) {
+    tab.session.ui.canvasMode = mode;
+    tab.session.ui.preview = false;
+  }
+  return makeCtx({ getCanvasMode: mock(() => mode), ...overrides });
 }
 
 function openTestTab(): Tab {
@@ -109,13 +125,6 @@ beforeEach(() => {
   resetStudioState();
   installMockPlatform();
   resetFits();
-  // The pod's edit-mode actions run the real canvas-utils setEditZoom, which needs the module
-  // Context initialized (applyEditZoom then no-ops on the empty canvasPanels).
-  initCanvasUtils({
-    getCanvasMode: () => "edit",
-    getZoom: () => 1,
-    setZoomDirect: () => {},
-  });
   root = document.createElement("div");
   document.body.append(root);
 });
@@ -255,7 +264,7 @@ describe("a logic editor open in the dock", () => {
 
   test("the Export control survives too, in the view that owns it", async () => {
     const tab = openTestTab();
-    paneContext.mount(root, makeCtx({ getCanvasMode: mock(() => "source") }));
+    paneContext.mount(root, ctxInMode("source"));
     tab.session.ui.editingFormula = { eventKey: "onclick", type: "event" };
     await flush();
     expect(hasBtn("Export")).toBe(true);
@@ -372,7 +381,7 @@ describe("canvas view", () => {
   test("is absent entirely when the editor is not the Canvas", async () => {
     const tab = openTestTab();
     tab.session.ui.canvasMode = "source";
-    paneContext.mount(root, makeCtx({ getCanvasMode: mock(() => "source") }));
+    paneContext.mount(root, ctxInMode("source"));
     await flush();
     expect(root.querySelector(".pc-view")).toBeNull();
     expect(axes()).toEqual(["Editor", "Context"]);
@@ -684,7 +693,7 @@ describe("zoom pod", () => {
   test("design mode drives ui.zoom and declares each step as the document's fit", async () => {
     const tab = openTestTab();
     tab.session.ui.zoom = 2;
-    paneContext.mount(root, makeCtx({ getCanvasMode: mock(() => "design") }));
+    paneContext.mount(root, ctxInMode("design"));
     await flush();
     expect(root.querySelector(".pc-zoom-label")?.textContent?.trim()).toBe("200%");
     expect(hasDeclaredFit()).toBe(false);
@@ -702,7 +711,7 @@ describe("zoom pod", () => {
 
   test("the fit picker writes the declared fit, and 100% declares the number 1", async () => {
     openTestTab();
-    paneContext.mount(root, makeCtx({ getCanvasMode: mock(() => "design") }));
+    paneContext.mount(root, ctxInMode("design"));
     await flush();
 
     const fit = root.querySelector("sp-picker.pc-fit") as HTMLElement & { value: string };
@@ -742,7 +751,7 @@ describe("zoom pod", () => {
   test("the picker shows an author-chosen zoom as no named fit", async () => {
     const tab = openTestTab();
     tab.session.ui.zoom = 2;
-    paneContext.mount(root, makeCtx({ getCanvasMode: mock(() => "design") }));
+    paneContext.mount(root, ctxInMode("design"));
     await flush();
     pointer(btn("+"), "click");
     await flush();
@@ -751,17 +760,17 @@ describe("zoom pod", () => {
 
   test("stylebook is on the panzoom surface; preview and source have no pod", async () => {
     openTestTab();
-    paneContext.mount(root, makeCtx({ getCanvasMode: mock(() => "stylebook") }));
+    paneContext.mount(root, ctxInMode("stylebook"));
     await flush();
     expect(root.querySelector(".pane-zoom")).not.toBeNull();
 
     paneContext.unmount();
-    paneContext.mount(root, makeCtx({ getCanvasMode: mock(() => "preview") }));
+    paneContext.mount(root, ctxInMode("preview"));
     await flush();
     expect(root.querySelector(".pane-zoom")).toBeNull();
 
     paneContext.unmount();
-    paneContext.mount(root, makeCtx({ getCanvasMode: mock(() => "source") }));
+    paneContext.mount(root, ctxInMode("source"));
     await flush();
     expect(root.querySelector(".pane-zoom")).toBeNull();
   });
@@ -772,14 +781,14 @@ describe("zoom pod", () => {
 describe("export", () => {
   test("shows in the Code view only, and invokes ctx.exportFile", async () => {
     openTestTab();
-    const ctx = makeCtx({ getCanvasMode: mock(() => "source") });
+    const ctx = ctxInMode("source");
     paneContext.mount(root, ctx);
     await flush();
     pointer(btn("Export"), "click");
     expect(ctx.exportFile).toHaveBeenCalledTimes(1);
 
     paneContext.unmount();
-    paneContext.mount(root, makeCtx({ getCanvasMode: mock(() => "design") }));
+    paneContext.mount(root, ctxInMode("design"));
     await flush();
     expect(hasBtn("Export")).toBe(false);
   });

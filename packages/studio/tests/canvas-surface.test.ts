@@ -12,7 +12,6 @@ import {
   activeCanvasSurface,
   canvasModeOfPane,
   canvasModeOfTab,
-  moveCanvasStage,
   panelHostingCanvas,
   registerCanvasSurface,
   surfaceForPane,
@@ -27,8 +26,6 @@ import {
   splitRight,
   workspace,
 } from "../src/workspace/workspace";
-
-import { effect, effectScope, reactive } from "../src/reactivity";
 
 import type { CanvasPanel } from "../src/types";
 import type { Tab } from "../src/tabs/tab";
@@ -94,80 +91,12 @@ describe("the surface registry", () => {
   });
 });
 
-/* One stage, two panes that can be focused. `moveCanvasStage` is the whole of that arrangement,
-   and it is deleted the day each pane hosts its own — so what these tests protect is the TAKING,
-   not the giving: a pane that keeps a wrap it no longer owns is a pane whose next render repaints
-   the other pane's document. */
-describe("handing the shell's single stage between panes", () => {
-  test("the pane it moves to owns it, and the pane it came from owns nothing", () => {
-    const stage = surfaceForPane(PRIMARY_PANE).wrap;
-    surfaceForPane(PRIMARY_PANE).panels.push(panelOn(document.createElement("div")));
-    surfaceForPane(PRIMARY_PANE).prevCanvasMode = "design";
-
-    const moved = moveCanvasStage(SECONDARY_PANE, stage);
-
-    expect(moved.paneId).toBe(SECONDARY_PANE);
-    expect(moved.wrap).toBe(stage);
-    expect(surfaceForPane(SECONDARY_PANE).wrap).toBe(stage);
-    // The loser is emptied, not merely un-pointed: its panels named artboards the new owner is
-    // About to tear out, and its mode memory described a structure it no longer owns.
-    expect(surfaceForPane(PRIMARY_PANE).wrap).toBeNull();
-    expect(surfaceForPane(PRIMARY_PANE).panels).toHaveLength(0);
-    expect(surfaceForPane(PRIMARY_PANE).prevCanvasMode).toBeNull();
-  });
-
-  test("the artboards the losing pane mounted have their render scopes stopped", () => {
-    // Dropping the records is not enough — an artboard's render scope goes on reacting to the
-    // Document, repainting DOM on a stage its pane no longer has. One live scope per artboard per
-    // Handover is a leak no assertion about `panels.length` can see.
-    const stage = surfaceForPane(PRIMARY_PANE).wrap;
-    const scope = effectScope();
-    let ran = 0;
-    const source = reactive({ n: 0 });
-    scope.run(() => {
-      effect(() => {
-        void source.n;
-        ran += 1;
-      });
-    });
-    expect(ran).toBe(1);
-    const panel = panelOn(document.createElement("div"));
-    panel.renderScope = scope;
-    surfaceForPane(PRIMARY_PANE).panels.push(panel);
-
-    moveCanvasStage(SECONDARY_PANE, stage);
-
-    source.n = 1;
-    expect(ran).toBe(1);
-    expect(panel.renderScope).toBeNull();
-  });
-
-  test("a stage moved away stops answering panelHostingCanvas for its old pane", () => {
-    const stage = surfaceForPane(PRIMARY_PANE).wrap;
-    const artboard = document.createElement("div");
-    surfaceForPane(PRIMARY_PANE).panels.push(panelOn(artboard));
-    expect(panelHostingCanvas(artboard)?.surface.paneId).toBe(PRIMARY_PANE);
-
-    moveCanvasStage(SECONDARY_PANE, stage);
-
-    // Nothing is mounted on the new owner's stage yet, and the old owner no longer claims it.
-    expect(panelHostingCanvas(artboard)).toBeNull();
-  });
-
-  test("handing a pane the stage it already holds still resets it, and disturbs no other pane", () => {
-    const stage = surfaceForPane(PRIMARY_PANE).wrap;
-    const other = wrap("canvas-wrap-elsewhere");
-    registerCanvasSurface("pane-elsewhere", other);
-    surfaceForPane(PRIMARY_PANE).prevCanvasMode = "edit";
-
-    moveCanvasStage(PRIMARY_PANE, stage);
-
-    expect(surfaceForPane(PRIMARY_PANE).wrap).toBe(stage);
-    expect(surfaceForPane(PRIMARY_PANE).prevCanvasMode).toBeNull();
-    // A different pane's own host is not a stage anyone took.
-    expect(surfaceForPane("pane-elsewhere").wrap).toBe(other);
-  });
-});
+/* There is no `moveCanvasStage` test block, because there is no handover.
+   It protected the TAKING half of a one-stage shell: a pane that kept a wrap it no longer owned
+   was a pane whose next render repainted the other pane's document. With a cell per pane nothing
+   is taken — `panels/pane-grid.ts` registers a stage when it builds a cell and disposes it when it
+   removes one — and what survives is {@link releaseMountedPanels}, exercised through
+   `disposePaneSurface` below. */
 
 describe("which pane is showing what", () => {
   test("tabOfPane answers per pane, and null for a pane showing nothing", () => {

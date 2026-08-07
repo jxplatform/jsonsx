@@ -278,10 +278,15 @@ export function focusRegionOf(el: Element | null): FocusRegion | null {
  * grid row; the Document Header card is now drawn INSIDE the stage, so
  * `panels/frontmatter-panel.ts` stamps the id on the card's own `<section>` wherever the stage puts
  * it. Two rows gone, no shot re-pointed.
+ *
+ * `pane.primary` and `pane.primary/tabs` are the third and fourth to leave, and the clearest case
+ * yet: they named `#canvas-wrap` and `#tab-strip`, two flat siblings of an APPLICATION grid that
+ * were only ever the primary pane's stage and strip. `panels/pane-grid.ts` builds a cell per pane
+ * and stamps {@link paneRegion} on each, so the id is derived from the pane rather than from a div
+ * that could only ever be one of them. Four rows gone, not one shot re-pointed.
  */
 export const SHELL_REGION_HOSTS: Readonly<Record<string, string>> = {
   "#activity-bar": "rail",
-  "#canvas-wrap": "pane.primary",
   // The fourth overlay layer. It is here rather than stamped by `ui/layers.ts` for the same reason
   // Every other row is: it is a bare `<div id>` in index.html, so it cannot stamp itself, and the
   // Id has to resolve whether or not a toast has ever been raised — a region that only exists once
@@ -290,7 +295,6 @@ export const SHELL_REGION_HOSTS: Readonly<Record<string, string>> = {
   "#left-panel": "navigator",
   "#right-panel": "inspector",
   "#statusbar": "statusbar",
-  "#tab-strip": "pane.primary/tabs",
   "#toolbar": "commandbar",
 };
 
@@ -302,6 +306,29 @@ export function stampShellRegions(root: ParentNode = document): void {
   for (const [selector, id] of Object.entries(SHELL_REGION_HOSTS)) {
     root.querySelector(selector)?.setAttribute(REGION_ATTR, id);
   }
+}
+
+/**
+ * Region id for a pane, or for a part inside one — derived from the pane's own id.
+ *
+ * The fourth member of the derived-region family, and the one that had to exist before a second
+ * pane could be drawn. Twelve surfaces used to emit the literal `pane.primary/…` because the shell
+ * had exactly one pane to be; the moment two cells are on screen, every one of those ids resolves
+ * to two elements and `resolveRegion` takes the LAST — so a shot cropping `pane.primary/library`
+ * would silently photograph the SIDE pane's library. For the primary this produces byte-identical
+ * strings, which is why the manifest needed no edit.
+ *
+ * @param {string} paneId
+ * @param {string} [part]
+ * @returns {string}
+ */
+export function paneRegion(paneId: string, part?: string): string {
+  return part ? `pane.${paneId}/${part}` : `pane.${paneId}`;
+}
+
+/** Region id of a pane's tab strip. One spelling, derived like every other. */
+export function paneStripRegion(paneId: string): string {
+  return paneRegion(paneId, "tabs");
 }
 
 /** Region id for a Navigator panel, derived from the panel's own id. */

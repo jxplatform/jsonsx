@@ -20,7 +20,7 @@
  * step, and a flick fast enough that it never reports at all. The second is the worse one, because
  * the only release path in the old code was the report.
  */
-import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { flush, installMockPlatform, resetStudioState, surfaceOf } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { initLayers } from "../src/ui/layers";
 import { resetNotifications } from "../src/services/notify";
@@ -150,7 +150,7 @@ function install() {
 
 /** Mount, give the scroller the box happy-dom never computes, and repaint into the window. */
 async function windowedPane(): Promise<HTMLElement> {
-  detachLibraryPane();
+  detachLibraryPane("primary");
   host?.remove();
   closeAllTabs();
   const tab = openTab({
@@ -161,7 +161,7 @@ async function windowedPane(): Promise<HTMLElement> {
   });
   host = document.createElement("div");
   document.body.append(host);
-  renderLibraryMode(host, tab);
+  renderLibraryMode(surfaceOf(host), tab);
   await flush();
   await flush();
   const body = host.querySelector(".library-body") as HTMLElement;
@@ -205,7 +205,7 @@ async function sweep(body: HTMLElement, opts: { fire: boolean }) {
 
 beforeEach(() => {
   resetNotifications();
-  detachLibraryPane();
+  detachLibraryPane("primary");
   invalidateLibrary();
   setLibraryCategory("all");
   setLibraryLayout("cards");
@@ -218,7 +218,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  detachLibraryPane();
+  detachLibraryPane("primary");
   host?.remove();
   live.clear();
   instances.clear();
@@ -293,7 +293,7 @@ describe(`${PAGE_COUNT} pages, the observation set`, () => {
       const body = await windowedPane();
       await sweep(body, { fire: false });
       expect(live.size).toBeGreaterThan(0);
-      detachLibraryPane();
+      detachLibraryPane("primary");
       expect(live.size).toBe(0);
     },
     SWEEP_BUDGET_MS,

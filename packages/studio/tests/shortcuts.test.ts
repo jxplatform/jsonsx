@@ -15,6 +15,7 @@
 import {
   flush,
   installMockPlatform,
+  registerPrimaryStage,
   resetStudioState,
   resetWorkspaceWithTab,
   stubRect,
@@ -22,6 +23,8 @@ import {
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
 import type { InspectorTabId } from "../src/shell";
+import { surfaceForPane } from "../src/canvas/surface-registry";
+import { paneCommands } from "../src/workspace/workspace";
 
 // ─── Module mocks (must precede the shortcuts import) ─────────────────────────
 
@@ -50,6 +53,7 @@ void mock.module("../src/services/notify.js", () => notifyModule((call) => notif
 const {
   focusShellRegion,
   initShortcuts,
+  installStageGestures,
   nextRegion,
   openProjectFlow,
   REGION_CYCLE,
@@ -58,7 +62,6 @@ const {
 const { stampShellRegions } = await import("../src/ui/regions");
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { createLiveContext } = await import("../src/commands/live-context");
-const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
 const store = await import("../src/store");
 const { activeCanvasSurface } = await import("../src/canvas/canvas-surface");
 /* Panels belong to a pane's stage now (`src/canvas/canvas-surface.ts`), not to the app. */
@@ -93,9 +96,9 @@ globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
   return 0;
 }) as typeof requestAnimationFrame;
 
-/** Live accessor — store.canvasWrap is assigned by initShellRefs() in beforeAll. */
+/** Live accessor — surfaceForPane("primary").wrap is assigned by initShellRefs() in beforeAll. */
 function wrapEl(): HTMLElement {
-  return store.canvasWrap;
+  return surfaceForPane("primary").wrap;
 }
 
 // ─── Shortcut context (mutable; read by getContext on every event) ────────────
@@ -124,12 +127,17 @@ function freshDoc() {
   };
 }
 
-const pointerContext = () => ({ applyTransform, canvasMode, panX, panY, setPan });
+const stageContext = () => ({ applyTransform, canvasMode, panX, panY, setPan });
+
+/** Disposer for the stage gestures the fixture installs, so a re-setup does not double-bind. */
+let releaseStageGestures: (() => void) | null = null;
+
+/** The composed registry, so a test can ask what a verb's chord IS rather than only pressing it. */
+let registry: ReturnType<typeof createCommandRegistry>;
 
 beforeAll(() => {
   document.body.innerHTML = "";
   for (const id of [
-    "canvas-wrap",
     "activity-bar",
     "left-panel",
     "right-panel",
@@ -144,6 +152,7 @@ beforeAll(() => {
     document.body.append(el);
   }
   initShellRefs();
+  registerPrimaryStage();
   initLayers();
   installMockPlatform();
   // A site project, so `view.openInBrowser`'s `when` holds — ⌘⇧O is one of the chords the port adds.
@@ -159,7 +168,7 @@ beforeAll(() => {
    * DIVERGENCE that has to be stated up front: the old switch tested `e.ctrlKey || e.metaKey`, so
    * ⌘S fired on Linux and Ctrl+S fired on a mac. `mod` is now one modifier per platform.
    */
-  const registry = createCommandRegistry({
+  registry = createCommandRegistry({
     getContext: createLiveContext({
       aiConfigured: () => false,
       canvasMode: () => canvasMode,
@@ -172,25 +181,20 @@ beforeAll(() => {
   registerStudioCommands(
     registry,
     { openInBrowser, openProject, saveDocument: saveFile },
-    pointerContext,
+    stageContext,
   );
   // ⌘J and ⌘⇧4 both address the Assistant, which is an Inspector TAB and therefore
   // `shell.ts`'s record rather than a dock flag. The app's bootstrap composes it in; so does this
   // Fixture, because a registry without it makes those two chords silently inert.
   registerShellViewCommands(registry, { inspectorTab, setInspectorTab });
-  initShortcuts(registry, pointerContext);
+  initShortcuts(registry, stageContext);
+  /* Stage gestures install per CELL now, with the surface in a closure — `initShortcuts` keeps only
+     the two genuinely document-level guards. The fixture installs them on the stage it built. */
+  releaseStageGestures?.();
+  releaseStageGestures = installStageGestures(surfaceForPane("primary"));
 
   // The edit-zoom path (ctrl+wheel / Ctrl+0/+/- / resize in edit mode) runs the REAL canvas-utils
   // ApplyEditZoom, which needs the module context initialized.
-  initCanvasUtils({
-    getCanvasMode: () => canvasMode,
-    getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
-    setZoomDirect: (z: number) => {
-      if (activeTab.value) {
-        activeTab.value.session.ui.zoom = z;
-      }
-    },
-  });
 });
 
 beforeEach(() => {
@@ -543,9 +547,23 @@ describe("the old dispatch — twelve modifier chords", () => {
     expect(handler()).toHaveBeenCalledTimes(1);
   });
 
-  test('⌘0 resets zoom and pan (`case "0"`)', () => {
+  /* ⌘0 is `pane.focusPrimary` now, pairing with `pane.focusSecondary`'s ⌘⌥0 — the re-bind
+     `workspace/workspace.ts` deferred to this workstream by name. `canvas.zoomReset` keeps the verb
+     and its button in the floating zoom pod; what it gives up is a chord that was the second way to
+     reach a control already on screen, while focusing a pane had no way at all. */
+  test("⌘0 no longer resets the zoom — the chord belongs to the pane", () => {
     activeTab.value!.session.ui.zoom = 2.5;
     pressDoc("0", { ctrlKey: true });
+    expect(activeTab.value!.session.ui.zoom).toBe(2.5);
+    expect(registry.get("canvas.zoomReset")?.keybinding).toBeUndefined();
+    // The pane verbs live beside the pane model, in a registry this fixture does not compose —
+    // Their records are the source of truth for the chord either way.
+    expect(paneCommands().find((c) => c.id === "pane.focusPrimary")?.keybinding).toBe("mod+0");
+  });
+
+  test("Reset Zoom still works as a verb, from the pod and the palette", () => {
+    activeTab.value!.session.ui.zoom = 2.5;
+    registry.run("canvas.zoomReset");
     expect(activeTab.value!.session.ui.zoom).toBe(1);
     expect(setPan).toHaveBeenCalledWith(16, 16);
     expect(applyTransform).toHaveBeenCalled();
@@ -574,7 +592,8 @@ describe("the old dispatch — twelve modifier chords", () => {
     pressDoc("-", { ctrlKey: true });
     expect(tab.session.ui.editZoom).toBeCloseTo(1);
     tab.session.ui.editZoom = 2.4;
-    pressDoc("0", { ctrlKey: true });
+    // ⌘0 is the pane's now; Reset Zoom keeps the verb, and in Edit it is the CONTENT zoom it resets.
+    registry.run("canvas.zoomReset");
     expect(tab.session.ui.editZoom).toBe(1);
     // The design-mode zoom and pan are untouched by edit-mode zoom shortcuts.
     expect(tab.session.ui.zoom).toBe(2);
@@ -1216,5 +1235,53 @@ describe("openProjectFlow", () => {
     await pending;
     expect(openProject).not.toHaveBeenCalled();
     expect(notified).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Stage background click ───────────────────────────────────────────────────
+
+/*
+ * Clicking the stage background deselects — and it is a STAGE gesture, installed per cell with the
+ * surface in a closure.
+ *
+ * It was a bare listener in `studio.ts`'s body over `canvasWrap` and `view.panzoomWrap`, clearing
+ * `activeTab`'s selection. All three reads name the focused pane: with a grid, clicking the
+ * unfocused pane's background would have cleared the OTHER document's selection, and clicking the
+ * focused pane's `panzoomWrap` would not have matched at all once each stage had its own.
+ */
+describe("stage background click", () => {
+  test("clears THIS pane's selection when the stage itself is clicked", () => {
+    const tab = activeTab.value!;
+    tab.session.selection = [["children", 0]];
+    wrapEl().dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(tab.session.selection).toEqual([]);
+  });
+
+  test("clears it when the pan/zoom wrap is clicked — the surface's, not the app's", () => {
+    const tab = activeTab.value!;
+    const panzoom = document.createElement("div");
+    wrapEl().append(panzoom);
+    surfaceForPane("primary").panzoomWrap = panzoom;
+    tab.session.selection = [["children", 0]];
+    panzoom.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(tab.session.selection).toEqual([]);
+    surfaceForPane("primary").panzoomWrap = null;
+    panzoom.remove();
+  });
+
+  test("ignores a click on an artboard, and is a no-op with nothing selected", () => {
+    const tab = activeTab.value!;
+    tab.session.selection = [["children", 0]];
+    const child = document.createElement("div");
+    wrapEl().append(child);
+    child.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(tab.session.selection).toEqual([["children", 0]]);
+    child.remove();
+
+    tab.session.selection = [];
+    expect(() => {
+      wrapEl().dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    }).not.toThrow();
+    expect(tab.session.selection).toEqual([]);
   });
 });

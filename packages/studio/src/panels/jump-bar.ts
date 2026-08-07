@@ -46,7 +46,9 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { childList, getNodeAtPath, nodeLabel, pathsEqual, projectState } from "../store";
 import { effect, effectScope } from "../reactivity";
-import { activeTab } from "../workspace/workspace";
+import { PRIMARY_PANE, workspace } from "../workspace/workspace";
+import { tabOfPane } from "../canvas/canvas-surface";
+import { paneRegion } from "../ui/regions";
 import { primarySelection } from "../tabs/selection";
 import { activeRegistry } from "../commands/active-registry";
 import { renderPopover } from "../ui/layers";
@@ -289,7 +291,15 @@ function editorSegment(sigil: string, def: FunctionEditDef | FormulaEditDef): Ju
 
 // ─── Rendering ───────────────────────────────────────────────────────────────
 
-let _host: HTMLElement | null = null;
+/**
+ * Where each pane's bar renders. One entry per drawn cell.
+ *
+ * A Map rather than a `let _host`, because the bar addresses a PANE: it prints where you are, and
+ * with two panes on screen there are two answers. `panels/pane-grid.ts` attaches a cell's
+ * `.pane-jump` as the cell is built and detaches it as the cell is disposed, which is the same
+ * hand-over `panels/frontmatter-panel.ts` takes from the stage.
+ */
+const _hosts = new Map<string, HTMLElement>();
 
 let _scope: EffectScope | null = null;
 
@@ -403,14 +413,25 @@ function segmentTpl(
   return html`<span class="jb-seg" data-jump-kind=${segment.kind}>${crumb}${alternatives}</span>`;
 }
 
-/** The whole bar, as one template. There is no second variant for the empty states. */
-export function jumpBarTemplate(): TemplateResult | typeof nothing {
-  const segments = jumpSegments(activeTab.value ?? null);
+/**
+ * The whole bar, as one template. There is no second variant for the empty states.
+ *
+ * @param {string} [paneId] Whose address to print. Defaults to the focused pane, which is what the
+ *   answer was when the shell had one bar.
+ */
+export function jumpBarTemplate(
+  paneId: string = workspace.activePaneId,
+): TemplateResult | typeof nothing {
+  const segments = jumpSegments(tabOfPane(paneId));
   if (segments.length === 0) {
     return nothing;
   }
   const registry = activeRegistry();
-  return html`<nav class="jump-bar" data-jx-region="pane.primary/jump" aria-label="Location">
+  return html`<nav
+    class="jump-bar"
+    data-jx-region=${paneRegion(paneId, "jump")}
+    aria-label="Location"
+  >
     ${segments.map(
       (segment, i) =>
         html`${i === 0 ? nothing : html`<span class="jb-sep" aria-hidden="true">›</span>`}${segmentTpl(
@@ -426,30 +447,86 @@ export function jumpBarTemplate(): TemplateResult | typeof nothing {
  * Keep the stage clear of the bar.
  *
  * The same one-projection-one-variable shape `pane-context.ts` uses for its own band, and for the
- * same reason: `#canvas-wrap`'s offset is the SUM of the two, so a pane with no tab open (no bar)
- * costs the welcome screen no dead band.
+ * same reason: the stage's offset is the SUM of the two, so a pane with no tab open (no bar) costs
+ * the welcome screen no dead band.
+ *
+ * **The variable is written on the PANE, not on `:root`** — when there is a pane to write it on.
+ * Two cells have two bars and two stages, and one document-level number would offset both by
+ * whichever pane painted last: a side pane showing a document would push the primary's welcome
+ * screen down by 24px, and closing the last tab in one pane would lift the other's document under
+ * its own bar. `.pane-stage` reads it from its cell by cascade. A host outside a cell (the tests,
+ * and the bare offset callers) still writes the root, which is exactly what it meant before.
+ *
+ * @param {number} height Bar height in px. `0` when the pane has no address to print.
+ * @param {HTMLElement | null} [host] The bar's host. Its cell takes the variable when it has one.
  */
-export function applyJumpBarOffset(height: number): void {
-  document.documentElement.style.setProperty(JUMP_BAR_VAR, `${height}px`);
+export function applyJumpBarOffset(height: number, host?: HTMLElement | null): void {
+  const target = host?.closest<HTMLElement>(".pane") ?? document.documentElement;
+  target.style.setProperty(JUMP_BAR_VAR, `${height}px`);
 }
 
-/** Paint the bar. Exported because the bootstrap paints once before mounting the effect. */
-export function renderJumpBar(): void {
-  if (!_host) {
+/**
+ * Paint one pane's bar. Exported because the bootstrap paints once before mounting the effect.
+ *
+ * @param {string} [paneId] Defaults to every attached pane — what "render the jump bar" means when
+ *   the caller is a lifecycle rather than a pane.
+ */
+export function renderJumpBar(paneId?: string): void {
+  if (_hosts.size === 0) {
     return;
   }
   // The address changed, so an open menu is describing a place that may no longer be on the bar.
   // Repaints happen only when tracked state moves, so this cannot close a menu you are reading.
   dismissJumpMenu();
-  const template = jumpBarTemplate();
-  litRender(template, _host);
-  applyJumpBarOffset(template === nothing ? 0 : JUMP_BAR_HEIGHT);
+  for (const [id, host] of _hosts) {
+    if (paneId !== undefined && id !== paneId) {
+      continue;
+    }
+    const template = jumpBarTemplate(id);
+    litRender(template, host);
+    applyJumpBarOffset(template === nothing ? 0 : JUMP_BAR_HEIGHT, host);
+  }
 }
 
-/** Subscribe the bar to the state it renders. Idempotent. */
+/**
+ * Give a pane's bar somewhere to paint, or take it away.
+ *
+ * Called by `panels/pane-grid.ts` as a cell is built and as it is disposed. Detaching blanks the
+ * host first: a cell being removed still has this bar's DOM in it, and the lit part that owns that
+ * DOM is about to be unreachable.
+ *
+ * @param {string} paneId
+ * @param {HTMLElement | null} host
+ */
+export function attachJumpBarHost(paneId: string, host: HTMLElement | null): void {
+  const previous = _hosts.get(paneId);
+  if (previous === host) {
+    return;
+  }
+  if (previous) {
+    litRender(nothing, previous);
+    applyJumpBarOffset(0, previous);
+  }
+  if (host) {
+    _hosts.set(paneId, host);
+    renderJumpBar(paneId);
+  } else {
+    _hosts.delete(paneId);
+  }
+}
+
+/**
+ * Subscribe the bar to the state it renders. Idempotent.
+ *
+ * `host` is the PRIMARY pane's, the same bargain `panels/tab-strip.ts`'s `mount` makes: the
+ * bootstrap holds the primary's cell and hands it over, and every other pane's host arrives from
+ * the grid through {@link attachJumpBarHost}.
+ *
+ * @param {HTMLElement} host
+ */
 export function mountJumpBar(host: HTMLElement): void {
   unmountJumpBar();
-  _host = host;
+  attachJumpBarHost(PRIMARY_PANE, host);
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -457,8 +534,14 @@ export function mountJumpBar(host: HTMLElement): void {
       // Reading it here is what repaints the bar from a skeleton into the real thing.
       void activeRegistry();
       void projectState?.name;
-      const tab = activeTab.value;
-      if (tab) {
+      /* EVERY pane's tab, not the focused one's. Two bars print two addresses, and the side pane's
+         has to repaint when its own document moves — an effect that tracked `activeTab` alone left
+         the unfocused bar frozen on whatever it last said. */
+      for (const pane of workspace.panes) {
+        const tab = tabOfPane(pane.id);
+        if (!tab) {
+          continue;
+        }
         void tab.doc.document;
         void tab.documentPath;
         void tab.session.selection.map((path) => path.join("/")).join("|");
@@ -474,7 +557,10 @@ export function unmountJumpBar(): void {
   dismissJumpMenu();
   _scope?.stop();
   _scope = null;
-  _host = null;
+  for (const host of _hosts.values()) {
+    applyJumpBarOffset(0, host);
+  }
+  _hosts.clear();
   applyJumpBarOffset(0);
 }
 

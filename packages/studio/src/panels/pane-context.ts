@@ -41,7 +41,9 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { projectState, updateUi } from "../store";
 import { effect, effectScope } from "../reactivity";
-import { activeTab, hostableKindsOf, paneOfTabCanHostMode } from "../workspace/workspace";
+import { PRIMARY_PANE, workspace } from "../workspace/workspace";
+import { canvasModeOfPane, surfaceForPane, tabOfPane } from "../canvas/canvas-surface";
+import { paneRegion } from "../ui/regions";
 import {
   canvasViewOf,
   canvasViewsFor,
@@ -53,7 +55,7 @@ import {
   setFit,
   setUserZoom,
 } from "../canvas/canvas-utils";
-import { editorKindOf, modeForEditorKind } from "../tabs/tab";
+import { editorKindOf, editorKindsOf, modeForEditorKind } from "../tabs/tab";
 import { collabState } from "../collab/collab-state";
 import { readOnlyBannerTemplate } from "../collab/presence-chips";
 import { activeRegistry } from "../commands/active-registry";
@@ -101,7 +103,14 @@ export interface PaneContextCtx {
   };
 }
 
-let _host: HTMLElement | null = null;
+/**
+ * Where each pane's chrome renders. One entry per drawn cell.
+ *
+ * A Map rather than a `let _host`, for the reason the whole grid exists: this bar states one pane's
+ * editor kind, canvas view, rendering context and zoom, and two panes have two of each.
+ * `panels/pane-grid.ts` attaches a cell's `.pane-chrome` as the cell is built.
+ */
+const _hosts = new Map<string, HTMLElement>();
 
 let _ctx: PaneContextCtx | null = null;
 
@@ -122,19 +131,54 @@ const SCHEMES = [
 ] as const;
 
 /**
- * Mount the pane chrome into its host.
+ * Give a pane's chrome somewhere to paint, or take it away.
+ *
+ * Called by `panels/pane-grid.ts` as a cell is built and as it is disposed.
+ *
+ * @param {string} paneId
+ * @param {HTMLElement | null} host
+ */
+export function attachPaneChromeHost(paneId: string, host: HTMLElement | null): void {
+  const previous = _hosts.get(paneId);
+  if (previous === host) {
+    return;
+  }
+  if (previous) {
+    litRender(nothing, previous);
+    applyPaneContextOffset(0, previous);
+  }
+  if (host) {
+    _hosts.set(paneId, host);
+    renderPane(paneId, host);
+  } else {
+    _hosts.delete(paneId);
+  }
+}
+
+/**
+ * Mount the pane chrome. Idempotent.
+ *
+ * `host` is the PRIMARY pane's, the same bargain `panels/tab-strip.ts`'s `mount` makes: the
+ * bootstrap holds the primary's cell, and every other pane's host arrives from the grid through
+ * {@link attachPaneChromeHost}.
  *
  * @param {HTMLElement} host
  * @param {PaneContextCtx} ctx
  */
 export function mount(host: HTMLElement, ctx: PaneContextCtx) {
-  _host = host;
   _ctx = ctx;
+  attachPaneChromeHost(PRIMARY_PANE, host);
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
-      const tab = activeTab.value;
-      if (tab) {
+      /* EVERY pane's tab. The bar states its own pane's editor kind, canvas view, rendering
+         context and zoom, so the unfocused one has to repaint when ITS document moves — tracking
+         `activeTab` alone left the side pane's bar frozen describing whatever it last drew. */
+      for (const pane of workspace.panes) {
+        const tab = tabOfPane(pane.id);
+        if (!tab) {
+          continue;
+        }
         // Read reactive properties to establish tracking — mirrors the toolbar's subset.
         void tab.doc.document;
         void tab.doc.document?.$layout;
@@ -165,7 +209,10 @@ export function mount(host: HTMLElement, ctx: PaneContextCtx) {
 export function unmount() {
   _scope?.stop();
   _scope = null;
-  _host = null;
+  for (const host of _hosts.values()) {
+    applyPaneContextOffset(0, host);
+  }
+  _hosts.clear();
   _ctx = null;
   applyPaneContextOffset(0);
 }
@@ -177,10 +224,17 @@ export function unmount() {
  * welcome screen (no tab, no bar) does not open under a 28px gap nothing explains, and a read-only
  * banner does not sit on top of the document it is warning you about.
  *
+ * **On the PANE, not on `:root`**, for the reason `panels/jump-bar.ts` gives at the same seam: two
+ * cells have two bands of different heights, and a single document-level number offsets both stages
+ * by whichever pane painted last. A host outside a cell writes the root, which is what it meant
+ * when the shell had one bar.
+ *
  * @param {number} height Band height in px. `0` when the pane has no chrome.
+ * @param {HTMLElement | null} [host] The bar's host. Its cell takes the variable when it has one.
  */
-export function applyPaneContextOffset(height: number): void {
-  document.documentElement.style.setProperty(PANE_CONTEXT_VAR, `${height}px`);
+export function applyPaneContextOffset(height: number, host?: HTMLElement | null): void {
+  const target = host?.closest<HTMLElement>(".pane") ?? document.documentElement;
+  target.style.setProperty(PANE_CONTEXT_VAR, `${height}px`);
 }
 
 /**
@@ -191,8 +245,8 @@ export function applyPaneContextOffset(height: number): void {
  * test), so the bar's declared height is the floor: the offset is then exactly what it was before
  * banners existed, which is the honest answer when nothing has been laid out.
  */
-function topBandHeight(): number {
-  const band = _host?.querySelector<HTMLElement>(".pc-band");
+function topBandHeight(host: HTMLElement): number {
+  const band = host.querySelector<HTMLElement>(".pc-band");
   return Math.max(band?.offsetHeight ?? 0, PANE_CONTEXT_HEIGHT);
 }
 
@@ -211,15 +265,23 @@ function wantsContextBar(tab: Tab): boolean {
   return tab.session.ui.canvasMode !== "settings";
 }
 
+/** Paint every attached pane's chrome. */
 export function render() {
-  if (!_host || !_ctx) {
+  for (const [paneId, host] of _hosts) {
+    renderPane(paneId, host);
+  }
+}
+
+/** Paint one pane's chrome into its own host, from its own tab. */
+function renderPane(paneId: string, host: HTMLElement) {
+  if (!_ctx) {
     return;
   }
   try {
-    const tab = activeTab.value;
+    const tab = tabOfPane(paneId);
     const show = Boolean(tab) && wantsContextBar(tab as Tab);
-    litRender(show ? paneChromeTemplate(tab as Tab, _ctx) : nothing, _host);
-    applyPaneContextOffset(show ? topBandHeight() : 0);
+    litRender(show ? paneChromeTemplate(tab as Tab, paneId, _ctx) : nothing, host);
+    applyPaneContextOffset(show ? topBandHeight(host) : 0, host);
   } catch (error) {
     console.error("pane-context render error:", error);
   }
@@ -247,26 +309,30 @@ function axisTpl(label: string, control: TemplateResult): TemplateResult {
  * and the Logic tab's own header carries the Close. This bar drew a second Back and a second trail
  * beside both of them.
  */
-function paneChromeTemplate(tab: Tab, ctx: PaneContextCtx): TemplateResult {
+function paneChromeTemplate(tab: Tab, paneId: string, ctx: PaneContextCtx): TemplateResult {
   const kind = editorKindOf(tab);
 
   return html`
     <div class="pc-band">
-      <div class="pane-context" data-jx-region="pane.primary/context">
+      <div class="pane-context" data-jx-region=${paneRegion(paneId, "context")}>
         <div class="pc-spacer"></div>
         ${editorKindTpl(tab, ctx)} ${kind === "canvas" ? viewTpl(tab, ctx) : nothing}
-        ${renderingContextTpl(tab, ctx)} ${exportTpl(ctx)}
+        ${renderingContextTpl(tab, paneId, ctx)} ${exportTpl(ctx)}
       </div>
       ${readOnlyBannerTemplate(tab)}
     </div>
-    ${zoomPodTpl(tab, ctx)}
+    ${zoomPodTpl(tab, paneId)}
   `;
 }
 
 // ─── Axis 1 · Editor kind ────────────────────────────────────────────────────
 
 function editorKindTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult {
-  const kinds = hostableKindsOf(tab);
+  /* What the DOCUMENT declares, and nothing else. This read `hostableKindsOf` — the declared kinds
+     narrowed by what the tab's pane was allowed to host — so a page in the side pane was offered
+     Code and not Design. The pane cap is gone; a control that cannot go anywhere is still the
+     defect this axis exists to remove, and one declared kind still renders as text. */
+  const kinds = editorKindsOf(tab);
   const current = editorKindOf(tab);
   if (kinds.length < 2) {
     // One kind is not a choice. Rendering it as a dropdown would be a control that cannot move —
@@ -303,9 +369,9 @@ function editorKindTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult {
 // ─── Axis 2 · Canvas view ────────────────────────────────────────────────────
 
 function viewTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult | typeof nothing {
-  // A view its pane cannot host is a dead segment, which is the defect this axis exists to remove:
-  // The side pane hosts Code, Diff, Config, Grid and Library, so it draws no Canvas view group.
-  const views = canvasViewsFor(tab).filter((value) => paneOfTabCanHostMode(tab, value));
+  // Every pane draws a live Canvas, so this is no longer narrowed by WHERE the tab is — only by
+  // What the document declares. A document with no Canvas view still draws no view group.
+  const views = canvasViewsFor(tab);
   if (views.length === 0) {
     return nothing;
   }
@@ -345,7 +411,7 @@ function isPageDoc(tab: Tab): boolean {
   );
 }
 
-function renderingContextTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult {
+function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): TemplateResult {
   const { ui } = tab.session;
   const { featureQueries, sizeBreakpoints } = ctx.parseMediaEntries(
     getEffectiveMedia(tab.doc.document?.$media as Record<string, string> | undefined),
@@ -358,7 +424,7 @@ function renderingContextTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult {
   const schemeLabel = SCHEMES.find(([value]) => value === scheme)?.[1] ?? "Auto";
   const summary = schemeQueries.length > 0 ? `${sizeLabel} · ${schemeLabel}` : sizeLabel;
   const hasLayout = isPageDoc(tab) && Boolean(getEffectiveLayoutPath(tab.doc.document?.$layout));
-  const resolving = isPageDoc(tab) ? paramPickersTpl(tab) : propFieldsTpl(tab);
+  const resolving = isPageDoc(tab) ? paramPickersTpl(tab) : propFieldsTpl(tab, paneId);
 
   return axisTpl(
     "Context",
@@ -584,73 +650,91 @@ function fitChoiceValue(fit: FitMode): string {
  * fit, because a fit is a statement about an artboard. Preview is deliberately absent: its frame is
  * a real viewport that scrolls its own document, so there is nothing to zoom.
  */
-function zoomPodTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult | typeof nothing {
-  const mode = ctx.getCanvasMode();
+function zoomPodTpl(tab: Tab, paneId: string): TemplateResult | typeof nothing {
+  /* THIS pane's mode. `ctx.getCanvasMode()` answers for the focused pane, so the unfocused pod
+     offered an `editZoom` control over a stage drawing Design — and hid the fit that stage has. */
+  const mode = canvasModeOfPane(paneId);
+  /* And THIS pane's stage. Every zoom verb below takes a surface: without one they all defaulted to
+     `activeCanvasSurface()`, so the side pane's `+` magnified the primary's document by a factor
+     computed from the side pane's own zoom, and its "100%" button reset the primary. */
+  const surface = surfaceForPane(paneId);
   if (mode === "edit") {
     const editZoom = tab.session.ui.editZoom ?? 1;
-    return podTpl(html`
-      ${zoomButton("Zoom out (Ctrl+-)", "−", () =>
-        setEditZoom((tab.session.ui.editZoom ?? 1) / 1.2),
-      )}
-      <sp-action-button
-        size="s"
-        class="pc-zoom-label"
-        title="Reset to 100% (Ctrl+0)"
-        @click=${() => setEditZoom(1)}
-      >
-        ${Math.round(editZoom * 100)}%
-      </sp-action-button>
-      ${zoomButton("Zoom in (Ctrl+=)", "+", () => setEditZoom((tab.session.ui.editZoom ?? 1) * 1.2))}
-    `);
+    return podTpl(
+      paneId,
+      html`
+        ${zoomButton("Zoom out (Ctrl+-)", "−", () =>
+          setEditZoom((tab.session.ui.editZoom ?? 1) / 1.2, surface),
+        )}
+        <sp-action-button
+          size="s"
+          class="pc-zoom-label"
+          title="Reset to 100% (Ctrl+0)"
+          @click=${() => setEditZoom(1, surface)}
+        >
+          ${Math.round(editZoom * 100)}%
+        </sp-action-button>
+        ${zoomButton("Zoom in (Ctrl+=)", "+", () =>
+          setEditZoom((tab.session.ui.editZoom ?? 1) * 1.2, surface),
+        )}
+      `,
+    );
   }
   if (mode !== "design" && mode !== "stylebook" && mode !== "git-diff") {
     return nothing;
   }
   const zoom = tab.session.ui.zoom ?? 1;
-  const chosen = fitChoiceValue(getFit());
-  return podTpl(html`
-    ${zoomButton("Zoom out (Ctrl+-)", "−", () => setUserZoom((tab.session.ui.zoom ?? 1) / 1.2))}
-    <sp-action-button
-      size="s"
-      class="pc-zoom-label"
-      title="Reset to 100% (Ctrl+0)"
-      @click=${() => resetZoom()}
-    >
-      ${Math.round(zoom * 100)}%
-    </sp-action-button>
-    ${zoomButton("Zoom in (Ctrl+=)", "+", () => setUserZoom((tab.session.ui.zoom ?? 1) * 1.2))}
-    <sp-picker
-      size="s"
-      quiet
-      class="pc-fit"
-      label="Fit"
-      value=${chosen}
-      title="How this document is framed"
-      @change=${(e: Event) => {
-        const { value } = e.target as HTMLInputElement;
-        const choice = FIT_CHOICES.find((entry) => entry.value === value);
-        if (!choice) {
-          return;
-        }
-        // "Fit page" from the control may magnify a small artboard past life size; the fit APPLIED
-        // On arrival never does. Same declared state, two caps — see fitToScreen's maxZoom.
-        if (choice.fit === "page") {
-          fitToScreen();
-          return;
-        }
-        setFit(choice.fit);
-      }}
-    >
-      ${FIT_CHOICES.map(
-        ({ value, label }) => html`<sp-menu-item value=${value}>${label}</sp-menu-item>`,
+  const chosen = fitChoiceValue(getFit(surface));
+  return podTpl(
+    paneId,
+    html`
+      ${zoomButton("Zoom out (Ctrl+-)", "−", () =>
+        setUserZoom((tab.session.ui.zoom ?? 1) / 1.2, surface),
       )}
-    </sp-picker>
-  `);
+      <sp-action-button
+        size="s"
+        class="pc-zoom-label"
+        title="Reset to 100% (Ctrl+0)"
+        @click=${() => resetZoom(surface)}
+      >
+        ${Math.round(zoom * 100)}%
+      </sp-action-button>
+      ${zoomButton("Zoom in (Ctrl+=)", "+", () =>
+        setUserZoom((tab.session.ui.zoom ?? 1) * 1.2, surface),
+      )}
+      <sp-picker
+        size="s"
+        quiet
+        class="pc-fit"
+        label="Fit"
+        value=${chosen}
+        title="How this document is framed"
+        @change=${(e: Event) => {
+          const { value } = e.target as HTMLInputElement;
+          const choice = FIT_CHOICES.find((entry) => entry.value === value);
+          if (!choice) {
+            return;
+          }
+          // "Fit page" from the control may magnify a small artboard past life size; the fit APPLIED
+          // On arrival never does. Same declared state, two caps — see fitToScreen's maxZoom.
+          if (choice.fit === "page") {
+            fitToScreen({ surface });
+            return;
+          }
+          setFit(choice.fit, surface);
+        }}
+      >
+        ${FIT_CHOICES.map(
+          ({ value, label }) => html`<sp-menu-item value=${value}>${label}</sp-menu-item>`,
+        )}
+      </sp-picker>
+    `,
+  );
 }
 
-function podTpl(body: TemplateResult): TemplateResult {
+function podTpl(paneId: string, body: TemplateResult): TemplateResult {
   return html`
-    <div class="pane-zoom" data-jx-region="pane.primary/zoom">
+    <div class="pane-zoom" data-jx-region=${paneRegion(paneId, "zoom")}>
       <sp-action-group compact size="s">${body}</sp-action-group>
     </div>
   `;
@@ -669,9 +753,30 @@ function zoomButton(title: string, glyph: string, onClick: () => void): Template
 // Value auto-selects the first candidate (matching the compiler, whose first expanded route is the
 // First path entry).
 
-let _paramValues: ParamValues | null = null;
+/**
+ * Candidate values per `(documentPath, $paths)` key, and the keys whose load is in flight.
+ *
+ * **A Map, not one slot, and that is a livelock fix rather than a cache-size preference.** It was
+ * `_paramValues` + `_paramValuesKey`, holding exactly ONE result, while {@link render} loops every
+ * attached pane. Two panes on documents with different keys evicted each other on every pass: pane
+ * A's render stored A's key and cleared the value, pane B's render in the same loop stored B's, and
+ * whichever load landed found its key gone — or, once the "still shown somewhere" guard let it
+ * through, stored its value and called `render()`, which re-issued both loads again. An unbounded
+ * microtask chain: no rAF, no paint, no input. `⌘\` with two pages under dynamic routes was enough,
+ * and the probe never returned.
+ *
+ * `_paramLoading` is what stops a re-render re-issuing a load that has not landed yet; the value
+ * map is what stops one pane's answer erasing the other's.
+ */
+const _paramValues = new Map<string, ParamValues>();
 
-let _paramValuesKey: string | null = null;
+const _paramLoading = new Set<string>();
+
+/** Drop every cached candidate list — a project switch, and the tests. */
+export function resetParamValues(): void {
+  _paramValues.clear();
+  _paramLoading.clear();
+}
 
 /**
  * @param {Tab} tab
@@ -686,20 +791,27 @@ function paramValuesFor(tab: Tab): ParamValues | null {
     return null;
   }
   const key = `${tab.documentPath ?? ""}::${JSON.stringify(pathsDef)}`;
-  if (_paramValuesKey === key) {
-    return _paramValues;
+  const cached = _paramValues.get(key);
+  if (cached) {
+    return cached;
   }
-  _paramValuesKey = key;
-  _paramValues = null;
+  if (_paramLoading.has(key)) {
+    return null;
+  }
+  _paramLoading.add(key);
   void loadParamValues(tab.documentPath, pathsDef).then((values) => {
-    if (_paramValuesKey !== key || activeTab.value !== tab) {
+    _paramLoading.delete(key);
+    /* Still SHOWN somewhere, rather than still focused. The candidate values fill a picker in one
+       pane's bar; a load that landed while the keyboard was in the other pane used to be discarded,
+       leaving the picker permanently empty for whoever was not looking at it. */
+    if (!workspace.panes.some((pane) => pane.activeTabId === tab.id)) {
       return;
     }
-    _paramValues = values;
+    _paramValues.set(key, values);
     autoSelectParams(tab, values);
     render();
   });
-  return _paramValues;
+  return null;
 }
 
 /**
@@ -777,9 +889,10 @@ function parsePropValue(raw: string): JsonValue {
 
 /**
  * @param {Tab} tab
+ * @param {string} paneId
  * @returns {TemplateResult | typeof nothing}
  */
-function propFieldsTpl(tab: Tab): TemplateResult | typeof nothing {
+function propFieldsTpl(tab: Tab, paneId: string): TemplateResult | typeof nothing {
   const doc = tab.doc.document;
   if (!isComponentDoc(doc)) {
     return nothing;
@@ -798,7 +911,7 @@ function propFieldsTpl(tab: Tab): TemplateResult | typeof nothing {
           size="s"
           quiet
           class="pc-prop"
-          data-jx-region=${`pane.primary/prop:${name}`}
+          data-jx-region=${paneRegion(paneId, `prop:${name}`)}
           placeholder=${name}
           title=${`Test value for ${name}`}
           .value=${display(previewProps?.[name])}

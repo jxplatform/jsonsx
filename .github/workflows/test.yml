@@ -198,6 +198,11 @@ jobs:
       # `docs:verify` below checks only that referenced images EXIST; this is the check
       # that turns a panel or command rename into a red X in the PR that caused it.
       - run: bun scripts/check-shot-contract.ts
+      # The pane grid's two singleton rules (UX-REDESIGN-PLAN §18): per-stage state must live on
+      # `CanvasSurface`, and a module that draws into a stage must key its instance by pane id.
+      # Neither is expressible in the type system — `ViewState` has an index signature and a
+      # module-level `let active` is well-typed — so the guard is a ratcheting allow-list.
+      - run: bun --cwd packages/studio scripts/check-pane-singletons.ts
       - run: bun run typecheck
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
       # which the root's two strictest flags reject 165 times) so it needs its own pass — without

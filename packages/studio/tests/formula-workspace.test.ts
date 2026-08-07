@@ -10,13 +10,18 @@
  * the previous tree. The wiring into the dock (reveal, strip, `afterRender`) is
  * `tests/bottom-dock.test.ts`.
  */
-import { flush, pointer, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import {
+  flush,
+  pointer,
+  registerPrimaryStage,
+  resetStudioState,
+  resetWorkspaceWithTab,
+} from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { render as litRender } from "lit-html";
 import { initShellRefs } from "../src/store";
 import { activeCanvasSurface } from "../src/canvas/canvas-surface";
 import { undo } from "../src/tabs/transact";
-import { view } from "../src/view";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import { shell } from "../src/shell";
 import {
@@ -36,11 +41,12 @@ import type { Tab } from "../src/tabs/tab";
    binding still sees what the render mutated. */
 const canvasPanels = activeCanvasSurface().panels;
 
-document.body.innerHTML = `<div id="app"><div id="canvas-wrap"></div><div id="logic"></div></div>`;
+document.body.innerHTML = `<div id="app"><div class="pane-stage" data-jx-region="pane.primary"></div><div id="logic"></div></div>`;
 initShellRefs();
-
-// Destructuring store.canvasWrap would snapshot the pre-initShellRefs null — query instead.
-const canvasWrap = document.querySelector("#canvas-wrap") as HTMLElement;
+/* The primary pane's stage. It is the `.pane-stage` the fixture above wrote, adopted rather than
+   queried by id: there is no `#canvas-wrap`, and the surface record is what every renderer
+   resolves through. */
+const canvasWrap = registerPrimaryStage().wrap;
 /** Stands in for the dock's `.bd-body`: the element the Logic tab's body is rendered into. */
 const dock = document.querySelector("#logic") as HTMLElement;
 
@@ -169,20 +175,14 @@ describe("def-type target", () => {
 
   test("leaves the canvas alone — the page it computes is the whole point of the move", () => {
     const tab = resetWorkspaceWithTab(docFixture(), { id: "fw-tab" });
-    const cleanups: string[] = [];
-    view.canvasDndCleanups = [() => cleanups.push("dnd")];
-    view.canvasEventCleanups = [() => cleanups.push("event")];
     canvasPanels.push({ ready: true } as never);
     canvasWrap.textContent = "the rendered page";
 
     tab.session.ui.editingFormula = { defName: "total", type: "def" } as never;
     renderLogic();
 
-    // The takeover cleared all four of these before drawing itself over the stage. Nothing here
-    // Touches them, which is what keeps the canvas mounted, patchable and on screen.
-    expect(cleanups).toEqual([]);
-    expect(view.canvasDndCleanups).toHaveLength(1);
-    expect(view.canvasEventCleanups).toHaveLength(1);
+    // The takeover cleared the stage before drawing itself over it. Nothing here touches the
+    // Mounted panels or the painted DOM, which is what keeps the canvas patchable and on screen.
     expect(canvasPanels).toHaveLength(1);
     expect(canvasWrap.textContent).toBe("the rendered page");
     expect(dock.querySelector(".formula-workspace")).not.toBeNull();

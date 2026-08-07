@@ -3,13 +3,20 @@
  * specimen doc, one panel per breakpoint, and mounts each through the (mocked) iframe host.
  * Selection is session-state only; overlay drawing/measurement lives in the host.
  */
-import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import {
+  flush,
+  registerPrimaryStage,
+  resetStudioState,
+  resetWorkspaceWithTab,
+  standUpPaneGrid,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { html } from "lit-html";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { CanvasPanel } from "../src/types";
 import { shell } from "../src/shell";
 import { PROJECT_STYLES_TITLE, PROJECT_STYLES_VIEW } from "../src/style/project-styles";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
 // ─── iframe-host mock (captures stylebook mounts + pans) ────────────────────────
 
@@ -46,27 +53,24 @@ const { activeCanvasSurface } = await import("../src/canvas/canvas-surface");
 /* Panels belong to a pane's stage now (`src/canvas/canvas-surface.ts`), not to the app. */
 const canvasPanels = activeCanvasSurface().panels;
 const { componentRegistry } = await import("../src/files/components");
-const { view } = await import("../src/view");
 const { closeAllTabs } = await import("../src/workspace/workspace");
 
 // ─── Shell + panel scaffolding ────────────────────────────────────────────────
 
 function setupShell() {
   document.body.innerHTML = "";
-  for (const id of [
-    "canvas-wrap",
-    "activity-bar",
-    "left-panel",
-    "right-panel",
-    "toolbar",
-    "statusbar",
-  ]) {
+  for (const id of ["activity-bar", "left-panel", "right-panel", "toolbar", "statusbar"]) {
     const el = document.createElement("div");
     el.id = id;
     document.body.append(el);
   }
   initShellRefs();
+  registerPrimaryStage();
+  stage = standUpPaneGrid();
 }
+
+/** The primary pane's stage, stood up by {@link setupShell}. */
+let stage = surfaceForPane("primary");
 
 const panelTemplateCalls: unknown[][] = [];
 const ctx = {
@@ -91,7 +95,7 @@ const ctx = {
   },
   observeCenterUntilStable: mock(() => {}),
   updateActivePanelHeaders: mock(() => {}),
-} as Parameters<typeof renderStylebookMode>[0];
+} as Parameters<typeof renderStylebookMode>[1];
 
 const ctxMocks = ctx as unknown as Record<string, ReturnType<typeof mock>>;
 
@@ -107,7 +111,7 @@ beforeEach(() => {
   panelTemplateCalls.length = 0;
   mounts.length = 0;
   pans.length = 0;
-  view.renderGeneration = 7;
+  stage.renderGeneration = 7;
   for (const key of ["applyTransform", "observeCenterUntilStable", "updateActivePanelHeaders"]) {
     ctxMocks[key]!.mockClear();
   }
@@ -123,7 +127,7 @@ afterEach(() => {
 describe("renderStylebookMode", () => {
   test("no $media → one full-width panel mounting the generated doc", () => {
     makeTab();
-    renderStylebookMode(ctx);
+    renderStylebookMode(stage, ctx);
     expect(panelTemplateCalls).toEqual([[null, null, true, undefined]]);
     expect(canvasPanels).toHaveLength(1);
     expect(mounts).toHaveLength(1);
@@ -139,7 +143,7 @@ describe("renderStylebookMode", () => {
 
   test("$media breakpoints → base + one panel per breakpoint, SAME generated doc for all", () => {
     makeTab({ $media: { "--": "320px", md: "(min-width: 768px)" } });
-    renderStylebookMode(ctx);
+    renderStylebookMode(stage, ctx);
     expect(canvasPanels.map((panel) => panel.mediaName)).toEqual(["base", "md"]);
     expect(mounts).toHaveLength(2);
     expect(mounts[0]!.generated).toBe(mounts[1]!.generated);
@@ -150,7 +154,7 @@ describe("renderStylebookMode", () => {
   test("the chrome bar filter narrows the generated doc; Customized toggles the session flag", async () => {
     makeTab();
     shell.stylebook.filter = "h1";
-    renderStylebookMode(ctx);
+    renderStylebookMode(stage, ctx);
     expect(mounts[0]!.generated.tagToCardPath.has("h1")).toBe(true);
     expect(mounts[0]!.generated.tagToCardPath.has("ul")).toBe(false);
 
@@ -170,7 +174,7 @@ describe("renderStylebookMode", () => {
        the surface has one name and not one per control. The wire value must never surface here. */
     makeTab();
     shell.stylebook.customizedOnly = false;
-    renderStylebookMode(ctx);
+    renderStylebookMode(stage, ctx);
     const bar = document.querySelector(".sb-chrome [role='toolbar']") as HTMLElement;
     expect(bar.getAttribute("aria-label")).toBe(PROJECT_STYLES_TITLE);
 
@@ -183,7 +187,7 @@ describe("renderStylebookMode", () => {
     expect(toggle.getAttribute("title")).toBeTruthy();
     toggle.click();
     await flush();
-    renderStylebookMode(ctx);
+    renderStylebookMode(stage, ctx);
     expect(
       (document.querySelector(".sb-chrome button") as HTMLElement).getAttribute("aria-pressed"),
     ).toBe("true");

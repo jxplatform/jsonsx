@@ -30,6 +30,7 @@ import type { MonacoBuffer } from "../src/services/monaco-buffer";
 import { view } from "../src/view";
 import { problems, resetNotifications, toasts } from "../src/services/notify";
 import type { Tab } from "../src/tabs/tab";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
 const sleep = (ms: number) =>
   new Promise((resolve) => {
@@ -532,7 +533,7 @@ function mountedBuffer(tab: Tab | null, value: string, landed: string[], ms = 50
 }
 
 afterEach(() => {
-  view.monacoEditor = null;
+  surfaceForPane("primary").monacoEditor = null;
   view.functionEditor = null;
 });
 
@@ -540,7 +541,7 @@ describe("commitTabBuffers", () => {
   test("runs the armed commit of every buffer mounted for the tab", async () => {
     const landed: string[] = [];
     view.functionEditor = mountedBuffer(tabA, "return typed();", landed) as never;
-    view.monacoEditor = mountedBuffer(tabA, "# Never saved", landed) as never;
+    surfaceForPane("primary").monacoEditor = mountedBuffer(tabA, "# Never saved", landed) as never;
 
     await commitTabBuffers(tabA);
 
@@ -573,7 +574,7 @@ describe("commitTabBuffers", () => {
       landed.push(text);
       writes.markSettled();
     });
-    view.monacoEditor = buffer as never;
+    surfaceForPane("primary").monacoEditor = buffer as never;
 
     await commitTabBuffers(tabA);
     expect(landed).toEqual(["# Never saved"]);
@@ -603,7 +604,7 @@ describe("commitTabBuffers", () => {
     expect(tabBufferUnsaved(tabA)).toBe(false);
 
     view.functionEditor = null;
-    view.monacoEditor = null;
+    surfaceForPane("primary").monacoEditor = null;
     await commitTabBuffers(tabA);
     expect(tabBufferUnsaved(tabA)).toBe(false);
   });
@@ -637,7 +638,7 @@ describe("commitTabBuffers", () => {
       landed.push(`document := ${text}`);
       writes.markSettled();
     });
-    view.monacoEditor = source as never;
+    surfaceForPane("primary").monacoEditor = source as never;
     view.functionEditor = mountedBuffer(tabA, "typed();", landed) as never;
 
     await commitTabBuffers(tabA);
@@ -660,7 +661,7 @@ describe("commitTabBuffers", () => {
       await sleep(10);
       dock.dispose();
     });
-    view.monacoEditor = source as never;
+    surfaceForPane("primary").monacoEditor = source as never;
     view.functionEditor = dock as never;
 
     await commitTabBuffers(tabA);
@@ -692,7 +693,7 @@ describe("commitTabBuffers", () => {
       await sleep(5);
       throw new Error("the format host is down");
     });
-    view.monacoEditor = source as never;
+    surfaceForPane("primary").monacoEditor = source as never;
     view.functionEditor = mountedBuffer(tabA, "typed();", landed) as never;
 
     // It resolves rather than rejecting, which is what keeps ⌘W a gesture that does something.
@@ -711,7 +712,7 @@ describe("commitTabBuffers", () => {
 
   test("a buffer that names no tab belongs to no tab", async () => {
     const landed: string[] = [];
-    view.monacoEditor = mountedBuffer(null, "orphan", landed) as never;
+    surfaceForPane("primary").monacoEditor = mountedBuffer(null, "orphan", landed) as never;
     await commitTabBuffers(tabA);
     expect(landed).toEqual([]);
     expect(tabBufferUnsaved(tabA)).toBe(false);

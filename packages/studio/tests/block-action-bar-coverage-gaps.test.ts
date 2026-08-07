@@ -10,10 +10,11 @@
  * - Stale Move up/down clicks after the selection is gone
  * - The drag handle's onGenerateDragPreview suppressor
  */
-import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
+import { flush, registerPrimaryStage, resetWorkspaceWithTab, stubRect } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxPath } from "../src/state";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
 type AnyRec = Record<string, any>;
 
@@ -62,12 +63,13 @@ const { closeAllTabs } = await import("../src/workspace/workspace");
 
 document.body.innerHTML = `<div id="app">
   <div id="toolbar"></div><div id="activity-bar"></div><div id="left-panel"></div>
-  <div id="canvas-wrap"></div><div id="right-panel"></div><div id="chat-panel"></div>
+  <div class="pane-stage" data-jx-region="pane.primary"></div><div id="right-panel"></div><div id="chat-panel"></div>
   <div id="statusbar"></div>
   <div id="layer-popover"></div><div id="layer-modal"></div><div id="layer-dialog"></div>
 </div>`;
 initLayers();
 store.initShellRefs();
+registerPrimaryStage();
 
 let canvasMode = "design";
 
@@ -117,7 +119,7 @@ describe("block action bar gaps", () => {
     dismissBlockActionBar();
     // Reset canvas-wrap geometry to a tall area so barPosition's bounds check stays inert
     // Unless a test narrows it deliberately.
-    stubRect(store.canvasWrap, { height: 2000, left: 0, top: 0, width: 1600 });
+    stubRect(surfaceForPane("primary").wrap, { height: 2000, left: 0, top: 0, width: 1600 });
   });
 
   test("scrolls without a selection are ignored", () => {
@@ -156,7 +158,7 @@ describe("block action bar gaps", () => {
 
   test("an anchor scrolled out of the canvas area hides the bar", async () => {
     setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
-    stubRect(store.canvasWrap, { height: 400, left: 0, top: 100, width: 1600 });
+    stubRect(surfaceForPane("primary").wrap, { height: 400, left: 0, top: 100, width: 1600 });
     renderBlockActionBar();
     await flush();
     expect(bar()).toBeTruthy();

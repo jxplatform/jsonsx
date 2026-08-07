@@ -9,7 +9,7 @@
  * passed while the editor drew a blank form over a JSON entry full of data and discarded every edit
  * at save time. A test that invents the state under test can only ever agree with itself.
  */
-import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { flush, installMockPlatform, resetStudioState, surfaceOf } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "lit-html";
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
@@ -119,7 +119,7 @@ function openPost(frontmatter = "title: Hello\npubDate: 2026-01-01\n"): Promise<
 async function mount(tab: Tab): Promise<HTMLElement> {
   const host = document.createElement("div");
   document.body.append(host);
-  renderEntryMode(host, tab);
+  renderEntryMode(surfaceOf(host), tab);
   await flush();
   return host;
 }
@@ -150,7 +150,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  detachEntryPane();
+  detachEntryPane("primary");
   document.body.replaceChildren();
   closeAllTabs();
 });
@@ -201,7 +201,7 @@ describe("rendering", () => {
     const present = await mount(await openAda());
     expect(present.textContent).not.toContain("Required — this entry does not have one.");
 
-    detachEntryPane();
+    detachEntryPane("primary");
     const absent = await mount(
       await openEntry("content/authors/nobody.json", JSON.stringify({ bio: "Anonymous" })),
     );
@@ -212,7 +212,7 @@ describe("rendering", () => {
     const missing = await mount(await openPost("title: Hello\n"));
     expect(missing.textContent).toContain("Required — this entry does not have one.");
 
-    detachEntryPane();
+    detachEntryPane("primary");
     const seeded = await mount(await openPost('title: ""\npubDate: ""\n'));
     expect(seeded.textContent).not.toContain("Required — this entry does not have one.");
   });
@@ -227,12 +227,12 @@ describe("rendering", () => {
   test("mounting is idempotent per tab and released by detach", async () => {
     const tab = await openAda();
     const host = await mount(tab);
-    expect(entryPaneMounted(tab)).toBe(true);
-    renderEntryMode(host, tab); // Second call is a no-op — the pane owns its own reactivity.
-    expect(entryPaneMounted(tab)).toBe(true);
-    detachEntryPane();
-    expect(entryPaneMounted(tab)).toBe(false);
-    detachEntryPane(); // Idempotent.
+    expect(entryPaneMounted("primary", tab)).toBe(true);
+    renderEntryMode(surfaceOf(host), tab); // Second call is a no-op — the pane owns its own reactivity.
+    expect(entryPaneMounted("primary", tab)).toBe(true);
+    detachEntryPane("primary");
+    expect(entryPaneMounted("primary", tab)).toBe(false);
+    detachEntryPane("primary"); // Idempotent.
   });
 
   test("a dynamic enum resolves through the project config", async () => {
@@ -306,7 +306,7 @@ describe("a field edit reaches the file that gets saved", () => {
     await flush();
     expect(jsonHost.querySelector(".entry-editor-note")?.textContent).toContain("Marked a draft");
 
-    detachEntryPane();
+    detachEntryPane("primary");
     const md = await openPost();
     const mdHost = await mount(md);
     expect(mdHost.querySelector(".entry-editor-note")).toBeNull();

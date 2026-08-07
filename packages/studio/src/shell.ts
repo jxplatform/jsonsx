@@ -294,6 +294,15 @@ export interface ShellState {
   /** The Studio chrome's Spectrum theme. One of {@link CHROME_THEMES}. */
   theme: ChromeTheme;
   docks: Record<DockId, DockState>;
+  /**
+   * Where the splitter sits between two panes, as the primary's share of the grid — [0.2, 0.8].
+   *
+   * On `shell` rather than on `workspace` because it is pure LAYOUT: it names no tab, no document
+   * and no pane identity, and it is remembered with the dock widths because it is the same kind of
+   * thing. Read only when `workspace.panes.length > 1`, so a value restored with no split open is
+   * inert rather than wrong.
+   */
+  paneSplit: number;
   focusRegion: FocusRegion;
   /** The active {@link LayoutPreset}'s id — the Command Bar tab drawn as selected. */
   layout: string;
@@ -410,6 +419,27 @@ interface PersistedDocks {
   leftTab?: string;
   /** The Bottom dock tab last shown. Checked by {@link isBottomTabId} on read. */
   bottomTab?: string;
+  /** The pane splitter's position. Clamped on READ — see {@link clampPaneSplit}. */
+  paneSplit?: number;
+}
+
+/** An even split — what the grid opens on, and what a double-click on the splitter restores. */
+export const DEFAULT_PANE_SPLIT = 0.5;
+
+/**
+ * Coerce a stored split into the supported range.
+ *
+ * Clamped here, at the READ, rather than at the drag site: the drag already refuses to leave the
+ * range, so the only way a bad value arrives is a corrupt or hand-edited record — and that is the
+ * one caller that has to be defended.
+ */
+function clampPaneSplit(value: unknown): number {
+  return typeof value === "number" && value >= 0.2 && value <= 0.8 ? value : DEFAULT_PANE_SPLIT;
+}
+
+/** Move the splitter. Clamped, and the one writer every control routes through. */
+export function setPaneSplit(value: number): void {
+  shell.paneSplit = Math.min(0.8, Math.max(0.2, value));
 }
 
 /** Read the persisted dock record, tolerating absent/corrupt storage. */
@@ -533,6 +563,7 @@ function createShellState(): ShellState {
     bottomTab: isBottomTabId(saved.bottomTab) ? saved.bottomTab : DEFAULT_BOTTOM_TAB,
     docks,
     focusRegion: "pane",
+    paneSplit: clampPaneSplit(saved.paneSplit),
     git: freshGit(),
     layout: DEFAULT_LAYOUT_ID,
     layoutSelection: null,
@@ -582,6 +613,7 @@ export function persistDocks(): void {
         left: shell.docks.left.size,
         leftCollapsed: shell.docks.left.collapsed,
         leftTab: shell.leftTab,
+        paneSplit: shell.paneSplit,
         right: shell.docks.right.size,
         rightCollapsed: shell.docks.right.collapsed,
       } satisfies PersistedDocks),

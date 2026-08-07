@@ -10,7 +10,7 @@
  *   endGroup, and group-op history pruning.
  * - Grid-panel: the Prev pager and the Replace popover's no-match/cancel paths.
  */
-import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { flush, installMockPlatform, resetStudioState, surfaceOf } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
 import { FakeTabulator, tabulatorMockModule } from "./tabulator-mock";
@@ -82,7 +82,7 @@ function setupPosts(seedFiles: Record<string, string> = {}, overrides = {}) {
 beforeEach(() => {
   closeAllTabs();
   seedMarkdownFormat();
-  detachGridPanel();
+  detachGridPanel("primary");
   FakeTabulator.reset();
 });
 
@@ -479,7 +479,7 @@ describe("grid-panel gaps", () => {
     };
     const controller = createGridController(tab, source);
     await controller.load();
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
 
     const buttonByTitle = (title: string) =>
@@ -504,7 +504,7 @@ describe("grid-panel gaps", () => {
     const tab = gridTab("grid://collection/posts");
     const controller = createGridController(tab, stubSource("grid://collection/posts"));
     await controller.load();
-    renderGridMode(wrap, tab);
+    renderGridMode(surfaceOf(wrap), tab);
     await flush();
 
     const replaceButton = [...wrap.querySelectorAll("sp-action-button")].find((b) =>

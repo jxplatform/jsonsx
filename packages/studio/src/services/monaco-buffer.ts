@@ -108,6 +108,7 @@ import { toRaw } from "../reactivity";
 import { notify } from "./notify";
 import type { Tab } from "../tabs/tab";
 import { view } from "../view";
+import { allCanvasSurfaces } from "../canvas/surface-registry";
 
 /** The slice of a Monaco editor this module needs. Both of Studio's Monacos satisfy it. */
 export interface MonacoBuffer {
@@ -508,7 +509,14 @@ export function bufferMovedOn(buffer: MonacoBuffer, expected?: string): boolean 
  */
 function buffersForTab(tab: Tab): MonacoBuffer[] {
   const raw = toRaw(tab as object);
-  const mounted: (MonacoBuffer | null)[] = [view.monacoEditor, view.functionEditor];
+  /* Every stage's source buffer, plus the dock's one function editor.
+     The source view is per-PANE now: two Code panes are two Monaco instances over two documents,
+     and a close gate that asked only "the" source editor would have missed whichever one it was
+     not holding — which is the same half-answer that let ⌘W close a tab over unprompted typing. */
+  const mounted: (MonacoBuffer | null)[] = [
+    ...allCanvasSurfaces().map((surface) => surface.monacoEditor as MonacoBuffer | null),
+    view.functionEditor,
+  ];
   return mounted.filter(
     (buffer): buffer is MonacoBuffer =>
       buffer != null &&

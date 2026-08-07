@@ -19,6 +19,7 @@ import {
   pointer,
   resetStudioState,
   stubRect,
+  surfaceOf,
   testFile,
 } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
@@ -165,7 +166,7 @@ function setup(tree: Record<string, DirEntry[]> = TREE, dirs = Object.keys(TREE)
 async function mount(): Promise<HTMLElement> {
   // A live pane holds the tab id, so a second mount in the same test would be answered by the
   // Re-entrancy guard and leave the new host empty.
-  detachLibraryPane();
+  detachLibraryPane("primary");
   host?.remove();
   closeAllTabs();
   const tab = openTab({
@@ -176,7 +177,7 @@ async function mount(): Promise<HTMLElement> {
   });
   host = document.createElement("div");
   document.body.append(host);
-  renderLibraryMode(host, tab);
+  renderLibraryMode(surfaceOf(host), tab);
   await flush();
   await flush();
   return host;
@@ -194,7 +195,7 @@ beforeEach(() => {
   createAnswer = "new-thing.json";
   resetNotifications();
   resetActivities();
-  detachLibraryPane();
+  detachLibraryPane("primary");
   invalidateLibrary();
   setLibraryCategory("all");
   setLibraryLayout("cards");
@@ -203,7 +204,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  detachLibraryPane();
+  detachLibraryPane("primary");
   host?.remove();
 });
 
@@ -220,7 +221,7 @@ describe("mounting", () => {
       documentPath: null,
       id: "grid://library",
     });
-    expect(libraryPaneMounted(tab)).toBe(true);
+    expect(libraryPaneMounted("primary", tab)).toBe(true);
   });
 
   test("a second mount for the same tab is a no-op — the pane owns its own reactivity", async () => {
@@ -232,25 +233,25 @@ describe("mounting", () => {
     });
     host = document.createElement("div");
     document.body.append(host);
-    renderLibraryMode(host, tab);
+    renderLibraryMode(surfaceOf(host), tab);
     await flush();
     const first = host.querySelector(".library");
-    renderLibraryMode(host, tab);
+    renderLibraryMode(surfaceOf(host), tab);
     await flush();
     expect(host.querySelector(".library")).toBe(first!);
   });
 
   test("detaching is idempotent", async () => {
     await mount();
-    detachLibraryPane();
-    detachLibraryPane();
+    detachLibraryPane("primary");
+    detachLibraryPane("primary");
     const tab = openTab({
       capabilities: { modes: ["manage"] },
       document: { children: [], tagName: "div" },
       documentPath: null,
       id: "grid://library",
     });
-    expect(libraryPaneMounted(tab)).toBe(false);
+    expect(libraryPaneMounted("primary", tab)).toBe(false);
   });
 
   test("a repaint while previews are still loading does not ask for them twice", async () => {

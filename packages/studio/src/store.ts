@@ -9,8 +9,7 @@
 
 // ─── Re-exports from state.js ────────────────────────────────────────────────
 
-import { activeTab, PRIMARY_PANE } from "./workspace/workspace";
-import { registerCanvasSurface } from "./canvas/canvas-surface";
+import { activeTab } from "./workspace/workspace";
 import { INPUT_DEBOUNCE } from "./ui/timing";
 import type { JxPath } from "./state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -32,7 +31,11 @@ export {
 
 // ─── Shell element refs (populated by initShellRefs) ─────────────────────────
 
-export let canvasWrap = null as unknown as HTMLElement;
+/* There is no `canvasWrap` here, and there cannot be one.
+   It was `#canvas-wrap`, the shell's single stage, imported by six modules and read at ~30 sites —
+   each of which meant "the pane I am acting on" and got "the pane that happens to be focused". A
+   stage belongs to a pane (`canvas/canvas-surface.ts`), a pane's cell is built by
+   `panels/pane-grid.ts`, and every one of those readers now takes its surface. */
 export let activityBar = null as unknown as HTMLElement;
 export let leftPanel = null as unknown as HTMLElement;
 export let rightPanel = null as unknown as HTMLElement;
@@ -40,16 +43,11 @@ export let toolbarEl = null as unknown as HTMLElement;
 export let statusbarEl = null as unknown as HTMLElement;
 
 export function initShellRefs() {
-  canvasWrap = document.querySelector("#canvas-wrap") as HTMLElement;
   activityBar = document.querySelector("#activity-bar") as HTMLElement;
   leftPanel = document.querySelector("#left-panel") as HTMLElement;
   rightPanel = document.querySelector("#right-panel") as HTMLElement;
   toolbarEl = document.querySelector("#toolbar") as HTMLElement;
   statusbarEl = document.querySelector("#statusbar") as HTMLElement;
-  // `#canvas-wrap` is the PRIMARY pane's stage, not "the canvas": the panels mounted into it, the
-  // Mode they were drawn in and the render they escalate to belong to that pane (see
-  // `canvas/canvas-surface.ts`). A second pane registers its own host the same way.
-  registerCanvasSurface(PRIMARY_PANE, canvasWrap);
 }
 
 // ─── Shared constants ────────────────────────────────────────────────────────

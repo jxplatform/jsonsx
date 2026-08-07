@@ -9,7 +9,7 @@
  * regressions the modal could not have had: the deep link surviving a section being refreshed, and
  * `settings.open` reaching the `project.json` tab rather than a layer.
  */
-import { flush, installMockPlatform, pointer, resetStudioState } from "./harness";
+import { flush, installMockPlatform, pointer, resetStudioState, surfaceOf } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { html, render } from "lit-html";
 import {
@@ -88,7 +88,7 @@ function body(): HTMLElement {
 
 /** Mount the editor and let its deferred section render land. */
 async function mount(): Promise<void> {
-  renderSettingsPane(host);
+  renderSettingsPane(surfaceOf(host));
   await flush();
 }
 
@@ -164,7 +164,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  detachSettingsPane();
+  detachSettingsPane("primary");
   host.remove();
   closeAllTabs();
   await flush();
@@ -183,12 +183,12 @@ describe("the settings document", () => {
 
   test("the host says whether it is mounted, and stops saying so once detached", async () => {
     const other = document.createElement("div");
-    expect(settingsPaneMounted(host)).toBe(false);
+    expect(settingsPaneMounted(surfaceOf(host))).toBe(false);
     await mount();
-    expect(settingsPaneMounted(host)).toBe(true);
-    expect(settingsPaneMounted(other)).toBe(false);
-    detachSettingsPane();
-    expect(settingsPaneMounted(host)).toBe(false);
+    expect(settingsPaneMounted(surfaceOf(host))).toBe(true);
+    expect(settingsPaneMounted(surfaceOf(other))).toBe(false);
+    detachSettingsPane("primary");
+    expect(settingsPaneMounted(surfaceOf(host))).toBe(false);
     // A change notification with nothing mounted must be a no-op rather than a null dereference.
     setSettingsSection("contexts");
     expect(host.querySelector(".settings-doc")).not.toBeNull();

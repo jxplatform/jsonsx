@@ -24,10 +24,21 @@
 :root {
   --dock-h-bottom: 220px;
 }
+/* FOUR rows, not five. The pane's tab strip used to own row 2 of the APPLICATION grid, which is
+   the one thing a per-pane surface can never be — so it is a row of the pane's own cell now and
+   this grid is one row shorter.
+
+   The columns are NAMED. Every rule below addressed them by index, so the four surfaces that left
+   this grid would have meant re-counting `grid-column: 4` at seven sites and getting it wrong at
+   one of them. A name survives an insertion; a number does not. */
 #app {
   display: grid;
-  grid-template-rows: 36px auto minmax(0, 1fr) var(--dock-h-bottom) 24px;
-  grid-template-columns: 56px var(--panel-w-left) 1fr var(--panel-w-right);
+  grid-template-rows: 36px minmax(0, 1fr) var(--dock-h-bottom) 24px;
+  grid-template-columns:
+    [rail] 56px
+    [nav] var(--panel-w-left)
+    [pane] 1fr
+    [insp] var(--panel-w-right);
   height: 100%;
 }
 #toolbar {
@@ -217,38 +228,52 @@
   cursor: nwse-resize;
 }
 
-#tab-strip {
+/* ─── The pane grid ──────────────────────────── */
+/* One track per pane, laid out by `panels/pane-grid.ts` — the reconciler writes
+   `grid-template-columns` because the track count depends on `workspace.panes.length`, which the
+   shell's own layout effect must not read. */
+#pane-grid {
   grid-row: 2;
-  grid-column: 3;
+  grid-column: pane;
+  display: grid;
+  grid-template-rows: 1fr;
+  min-width: 0;
+  min-height: 0;
+}
+/* One PANE. Its own two-row grid: the strip, then everything stacked in the cell below it. */
+.pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+.pane-strip {
+  grid-row: 1;
   min-height: 0;
   min-width: 0;
 }
-#tab-strip:empty {
+.pane-strip:empty {
   display: none;
 }
-/* ⑥ The jump bar. Like `#pane-chrome` below it, this is a PER-PANE surface sharing the pane's
-   own grid cell rather than owning a row of the application grid — the second pane would have
-   nowhere to put an application row. `align-self: start` is what keeps it the height of its own
-   content instead of the height of the cell, so the bar never covers the stage it sits above. */
-#jump-bar {
-  grid-row: 3;
-  grid-column: 3;
+/* ⑥ The jump bar. Like `.pane-chrome` below it, this shares the pane's lower cell rather than
+   owning a row, so the two bars stack over the stage instead of pushing it down. `align-self:
+   start` is what keeps it the height of its own content instead of the height of the cell, so the
+   bar never covers the stage it sits above. */
+.pane-jump {
+  grid-row: 2;
   align-self: start;
   position: relative;
   z-index: 3;
   min-width: 0;
   max-width: 100%;
 }
-/* The pane's chrome layer — regions ⑦ and ⑩. It shares the pane's grid cell with
-   `#canvas-wrap` rather than owning a row of the application grid, because a PER-PANE surface
-   cannot be an application-level track: the second pane would have nowhere to put one. The layer
-   itself is inert; only its two children take the pointer. `canvas.css` owns their looks.
+/* The pane's chrome layer — regions ⑦ and ⑩. It shares the stage's cell; the layer itself is
+   inert and only its two children take the pointer. `canvas.css` owns their looks.
 
-   Offset by `--jump-bar-h` for the same reason `#canvas-wrap` is: the jump bar is stacked over
-   the same cell, and one projection per bar is what keeps "no tab open" costing no dead band. */
-#pane-chrome {
-  grid-row: 3;
-  grid-column: 3;
+   Offset by `--jump-bar-h` for the same reason `.pane-stage` is: the jump bar is stacked over the
+   same cell, and one projection per bar is what keeps "no tab open" costing no dead band. */
+.pane-chrome {
+  grid-row: 2;
   margin-top: var(--jump-bar-h, 0px);
   position: relative;
   z-index: 2;
@@ -258,43 +283,43 @@
   justify-content: space-between;
   pointer-events: none;
 }
-#pane-chrome > * {
+.pane-chrome > * {
   pointer-events: auto;
-}
-#activity-bar {
-  grid-row: 2 / 5;
-  grid-column: 1;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-  border-right: 1px solid var(--border);
-}
-#left-panel {
-  grid-row: 2 / 5;
-  grid-column: 2;
-  overflow-y: auto;
-  background: var(--bg-panel);
-  border-right: 1px solid var(--border);
 }
 /* The stage. Offset by the SUM of the two bars stacked over this cell — `--jump-bar-h` (written by
    `panels/jump-bar.ts`) and `--pane-context-h` (by `panels/pane-context.ts`) — so neither ever
    covers the document, and by zero when no tab is open, so the welcome screen does not sit under a
    band nothing explains. Two variables rather than one total: each bar owns its own answer, and a
    bar that renders nothing writes 0 without knowing the other exists. */
-#canvas-wrap {
-  grid-row: 3;
-  grid-column: 3;
+.pane-stage {
+  grid-row: 2;
   margin-top: calc(var(--jump-bar-h, 0px) + var(--pane-context-h, 0px));
   position: relative;
   overflow: auto;
   background: var(--bg-panel);
+  min-width: 0;
+}
+#activity-bar {
+  grid-row: 2 / 4;
+  grid-column: rail;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+}
+#left-panel {
+  grid-row: 2 / 4;
+  grid-column: nav;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
 }
 /* The Inspector dock. A flex COLUMN, not a scroll box: the header and the four-tab strip are
    fixed, and the selected tab's body is the only thing that scrolls — which is what lets the
    Assistant tab (whose chat owns its own scrolling) share the dock at zero extra width. */
 #right-panel {
-  grid-row: 2 / 5;
-  grid-column: 4;
+  grid-row: 2 / 4;
+  grid-column: insp;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -307,8 +332,8 @@
    is the only thing that scrolls. It borders on the top only — the sides are the pane's, and a
    box drawn inside the stage's column would read as a second panel rather than as the floor. */
 #bottom-dock {
-  grid-row: 4;
-  grid-column: 3;
+  grid-row: 3;
+  grid-column: pane;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -760,10 +785,10 @@
    characters: the boundary between PROJECT, DOCUMENT and SELECTION is structural, and the eye
    should be able to find it without reading. */
 #statusbar {
-  /* Row 5, not 4: row 4 is the Bottom dock, which collapses to 0px. Sharing that row put the whole
-     bar in a zero-height cell — it rendered its three fields into nothing while row 5's 24px stood
-     empty, so the app looked like it had lost its status bar the day it gained a dock. */
-  grid-row: 5;
+  /* Its OWN row, below the Bottom dock's, which collapses to 0px. Sharing that row put the whole
+     bar in a zero-height cell — it rendered its three fields into nothing while the 24px track
+     stood empty, so the app looked like it had lost its status bar the day it gained a dock. */
+  grid-row: 4;
   grid-column: 1 / -1;
   display: flex;
   align-items: stretch;
@@ -1018,7 +1043,7 @@
 /* The two column handles span the stage AND the bottom dock, so the grab target is the dock's
    full height rather than stopping at the floor of the canvas. */
 .resize-handle {
-  grid-row: 3 / 5;
+  grid-row: 2 / 4;
   width: 5px;
   margin-left: -3px;
   margin-right: -2px;
@@ -1032,18 +1057,29 @@
   opacity: 0.5;
 }
 #resize-left {
-  grid-column: 3;
+  grid-column: pane;
   justify-self: start;
 }
 #resize-right {
-  grid-column: 4;
+  grid-column: insp;
   justify-self: start;
 }
 /* The Bottom dock's handle resizes on the other axis, so every dimension flips: it is a row in
    the pane's column, full width, five px tall, and it drags up and down. */
+/* The pane splitter. A column handle like the two dock ones, but INSIDE the pane grid rather than
+   on `#app`'s grid — so it takes its own track (`panels/pane-grid.ts` writes the 5px column) and
+   spans the cell's full height rather than naming an application row. */
+.pane-splitter {
+  grid-row: 1 / -1;
+  grid-column: auto;
+  justify-self: stretch;
+  margin: 0;
+  width: auto;
+  background: var(--border);
+}
 .resize-handle-row {
-  grid-row: 4;
-  grid-column: 3;
+  grid-row: 3;
+  grid-column: pane;
   align-self: start;
   width: auto;
   height: 5px;

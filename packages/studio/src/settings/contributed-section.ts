@@ -18,6 +18,9 @@ import { resolveContextPointer } from "../services/context-resolver";
 import { deriveSecretEnvName } from "../services/data-service";
 import { validateProjectConfig } from "../services/jx-validate";
 import { notify } from "../services/notify";
+import { paneRegion } from "../ui/regions";
+import { stageContaining } from "../canvas/canvas-surface";
+import { PRIMARY_PANE } from "../workspace/workspace";
 
 import type { TemplateResult } from "lit-html";
 import type { JsonSchema, SchemaFormContext } from "../ui/schema-form";
@@ -308,6 +311,19 @@ function sectionValue(key: string): Record<string, unknown> | null {
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 /**
+ * Which pane a section is being drawn into, DERIVED from the container it was handed.
+ *
+ * The settings-section registry is an extension-facing contract — a contribution's `render(host)`
+ * takes an element and nothing else — so a pane id cannot be threaded through it without widening
+ * that contract for every extension. It does not need to be: the container is inside a stage, and
+ * the stage knows whose it is. Falls back to the primary for a detached container (the tests, and a
+ * section rendered outside the pane grid entirely).
+ */
+function paneOfContainer(container: HTMLElement): string {
+  return stageContaining(container)?.paneId ?? PRIMARY_PANE;
+}
+
+/**
  * Render a contributed settings section into the settings document's content area.
  *
  * @param {HTMLElement} container
@@ -325,7 +341,7 @@ export function renderContributedSection(
 
   const body =
     layout === "map"
-      ? renderMapLayout(contribution, opts, rerender)
+      ? renderMapLayout(contribution, opts, rerender, paneOfContainer(container))
       : renderFormLayout(contribution, opts, rerender);
 
   const selected = layout === "map" ? (selectedEntries.get(contribution.key) ?? null) : null;
@@ -379,6 +395,7 @@ function renderMapLayout(
   contribution: SettingsContribution,
   opts: ContributedSectionOptions,
   rerender: () => void,
+  paneId: string,
 ): TemplateResult {
   const { key: sectionKey } = contribution;
   const entries = sectionValue(sectionKey) ?? {};
@@ -436,7 +453,7 @@ function renderMapLayout(
         (name) => html`
           <sp-action-button
             size="s"
-            data-jx-region=${`pane.primary/entry:${name}`}
+            data-jx-region=${paneRegion(paneId, `entry:${name}`)}
             ?selected=${selected === name}
             @click=${() => {
               selectedEntries.set(sectionKey, name);
@@ -492,7 +509,7 @@ function renderMapLayout(
   const editorTpl: TemplateResult =
     selected && selectedEntry && typeof selectedEntry === "object"
       ? html`
-          <div class="settings-editor-panel" data-jx-region="pane.primary/editor">
+          <div class="settings-editor-panel" data-jx-region=${paneRegion(paneId, "editor")}>
             <div class="settings-editor-header">
               <sp-textfield
                 size="s"

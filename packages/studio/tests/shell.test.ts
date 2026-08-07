@@ -265,6 +265,9 @@ describe("the assistant is not a dock", () => {
       "left",
       "leftCollapsed",
       "leftTab",
+      // The pane splitter rides in the same record as the dock geometry: it is remembered for the
+      // Same reason and by the same single writer.
+      "paneSplit",
       "right",
       "rightCollapsed",
     ]);

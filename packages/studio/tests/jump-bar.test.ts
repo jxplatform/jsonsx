@@ -572,12 +572,25 @@ describe("the bar is wired to the app, not to a stub", () => {
   test("the bootstrap mounts the bar into a cell the shell actually has", () => {
     // `app-commands-composition.test.ts` guards the projection; this guards the other half — a
     // Surface nothing mounts is exactly as unreachable as a command nothing registers.
+    //
+    // There is no `#jump-bar`. The bar is a PER-PANE surface, so its host is built by the pane's
+    // Cell rather than declared as a row of the application grid — a `<div id>` can only ever be
+    // One pane's bar, which is exactly the bug the grid exists to end.
     const bootstrap = readFileSync(
       join(resolve(import.meta.dir, "..", "src"), "studio.ts"),
       "utf8",
     );
-    expect(bootstrap).toContain('mountJumpBar(document.querySelector("#jump-bar")');
+    expect(bootstrap).toContain("mountJumpBar(primaryCell");
+    const grid = readFileSync(
+      join(resolve(import.meta.dir, "..", "src"), "panels", "pane-grid.ts"),
+      "utf8",
+    );
+    // The cell is a lit template now, so the host is a `class="pane-jump"` in it and the bar is
+    // Handed the element by the `ref()` beside it rather than by a `createElement` + `append`.
+    expect(grid).toContain('<div class="pane-jump"');
+    expect(grid).toContain("attachJumpBarHost(paneId,");
     const shellHtml = readFileSync(resolve(import.meta.dir, "..", "index.html"), "utf8");
-    expect(shellHtml).toContain('id="jump-bar"');
+    expect(shellHtml).not.toContain('id="jump-bar"');
+    expect(shellHtml).toContain('id="pane-grid"');
   });
 });

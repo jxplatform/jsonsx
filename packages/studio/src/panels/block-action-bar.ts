@@ -27,7 +27,6 @@ import { disableNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/elem
 
 import {
   VOID_ELEMENTS,
-  canvasWrap,
   childIndex,
   childList,
   getNodeAtPath,
@@ -35,6 +34,7 @@ import {
   parentElementPath,
 } from "../store";
 import { activeTab } from "../workspace/workspace";
+import { stageContaining, surfaceShowingTab } from "../canvas/canvas-surface";
 import { primarySelection, structuralBatch } from "../tabs/selection";
 import {
   mutateDuplicateNodes,
@@ -135,8 +135,7 @@ export function onCanvasScroll(e: Event): void {
   // Only canvas-area scrolls (or the window itself) move the anchor; left/right panel scrolling
   // Never does.
   const isCanvasScroll =
-    e.target === document ||
-    (canvasWrap != null && e.target instanceof Node && canvasWrap.contains(e.target));
+    e.target === document || (e.target instanceof Node && stageContaining(e.target) !== null);
   if (!isCanvasScroll || _scrollRafPending) {
     return;
   }
@@ -183,8 +182,12 @@ function barPosition(anchor: {
   top: number;
   height: number;
 }): { left: number; top: number } | null {
-  if (canvasWrap) {
-    const wrap = rectOf(canvasWrap);
+  /* Clipped against the stage the CARET is on. The bar anchors to one selection in one document,
+     and the bar is one element, so "is the anchor still on screen" is a question about that pane's
+     stage — the focused pane's, which was `canvasWrap`, is the same one only by coincidence. */
+  const stage = surfaceShowingTab(activeTab.value)?.wrap;
+  if (stage) {
+    const wrap = rectOf(stage);
     if (anchor.top + anchor.height < wrap.top || anchor.top > wrap.bottom) {
       return null;
     }
@@ -1018,8 +1021,9 @@ function focusToolbarItem(bar: HTMLElement, index: number): void {
 
 /** Put the keyboard back where it came from — the canvas iframe, else its wrapper. */
 function returnFocusToCanvas(): void {
-  const iframe = canvasWrap?.querySelector<HTMLElement>("iframe.jx-canvas-iframe");
-  (iframe ?? canvasWrap)?.focus();
+  const stage = surfaceShowingTab(activeTab.value)?.wrap;
+  const iframe = stage?.querySelector<HTMLElement>("iframe.jx-canvas-iframe");
+  (iframe ?? stage)?.focus();
 }
 
 /** `role="toolbar"` navigation: ←/→ between items, Home/End to the ends, Esc back to the canvas. */

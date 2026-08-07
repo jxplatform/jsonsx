@@ -11,20 +11,21 @@ import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { nothing } from "lit-html";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
+import type { NotifyCall } from "./notify-mock";
 import { projectState } from "../src/state";
 import {
   activateTab,
   activeTab,
   closeAllTabs,
   closePane,
-  focusPane,
   openTab,
+  paneById,
   PRIMARY_PANE,
   SECONDARY_PANE,
   splitRight,
   workspace,
 } from "../src/workspace/workspace";
-import { moveCanvasStage, surfaceForPane } from "../src/canvas/canvas-surface";
+import { surfaceForPane } from "../src/canvas/canvas-surface";
 import { view } from "../src/view";
 import { bufferWrites } from "../src/services/monaco-buffer";
 import { shell } from "../src/shell";
@@ -62,11 +63,10 @@ globalThis.fetch = fetchMock as unknown as typeof fetch;
 document.body.innerHTML = `
   <div id="app">
     <div id="toolbar"></div>
-    <div id="tab-strip"></div>
+    <div id="pane-grid"></div>
     <div id="activity-bar"></div>
     <div id="left-panel"></div>
     <div id="resize-left" class="resize-handle"></div>
-    <div id="canvas-wrap"></div>
     <div id="resize-right" class="resize-handle"></div>
     <div id="right-panel"></div>
     <div id="statusbar"></div>
@@ -84,17 +84,12 @@ let welcomeCtx: any = null;
 let blockBarCtx: any = null;
 let canvasRenderCtx: any = null;
 let canvasPatcherCtx: any = null;
-let shortcutsGet: (() => any) | null = null;
+let shortcutsGet: ((surface: unknown) => any) | null = null;
 let shortcutHooks: Record<string, unknown> | null = null;
 
 const statusMessages: string[] = [];
-const scheduleCanvasRenderMock = mock(() => {});
-/* Which pane the shell handed its single stage to, in order. The real handover is
-   `moveCanvasStage` plus the repaint that `canvas-render.test.ts` pins; here the module is mocked,
-   so the mock performs the move and records the call. */
-const handOverMock = mock((paneId: string, wrap: HTMLElement) => {
-  moveCanvasStage(paneId, wrap);
-});
+/** Records WHICH pane each render was scheduled for — the effects are per-pane now. */
+const scheduleCanvasRenderMock = mock((_paneId?: string) => {});
 const renderCanvasMock = mock(() => {});
 let consumePatchedReturn = false;
 const consumePatchedMock = mock((_doc: object) => consumePatchedReturn);
@@ -127,8 +122,13 @@ void mock.module("../src/panels/statusbar.ts", () => ({
   unmountStatusbar: mock(() => {}),
 }));
 
+/** Every notification, with its severity and options — the keyed ones need more than a string. */
+const notifyCalls: NotifyCall[] = [];
 void mock.module("../src/services/notify.ts", () =>
-  notifyModule((call) => statusMessages.push(call.message)),
+  notifyModule((call) => {
+    notifyCalls.push(call);
+    statusMessages.push(call.message);
+  }),
 );
 
 /** Calls the `view.openInBrowser` hook forwards to the toolbar's own implementation. */
@@ -144,10 +144,15 @@ void mock.module("../src/panels/toolbar.ts", () => ({
 }));
 
 void mock.module("../src/panels/pane-context.ts", () => ({
+  // The grid hands every cell its chrome host, so this is on the boot's import graph.
+  attachPaneChromeHost: mock(() => {}),
   mount: (_el: HTMLElement, ctx: unknown) => {
     paneCtx = ctx;
   },
   render: mock(() => {}),
+  // The bar's memo of a `$paths` enumeration is keyed on the project's file listing, so the boot
+  // Drops it beside the other three derived caches when a watcher event lands.
+  resetParamValues: mock(() => {}),
   unmount: mock(() => {}),
 }));
 
@@ -159,10 +164,14 @@ void mock.module("../src/panels/welcome-screen.ts", () => ({
 }));
 
 void mock.module("../src/editor/shortcuts.ts", () => ({
-  // The registry is the first argument now; the pointer/pan thunk is the second.
-  initShortcuts: (_registry: unknown, get: () => unknown) => {
-    shortcutsGet = get as () => any;
+  // The registry is the first argument; the STAGE-context reader is the second — it takes a
+  // Surface now, because a wheel belongs to the stage the pointer is over rather than to the
+  // Focused pane.
+  initShortcuts: (_registry: unknown, get: (surface: unknown) => unknown) => {
+    shortcutsGet = get as (surface: unknown) => any;
   },
+  // The grid installs one disposer per cell; the fixture only has to hand one back.
+  installStageGestures: () => () => {},
   registerStudioCommands: (_registry: unknown, hooks: unknown) => {
     shortcutHooks = hooks as Record<string, unknown>;
   },
@@ -190,7 +199,6 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
 }));
 
 void mock.module("../src/canvas/canvas-render.ts", () => ({
-  handOverCanvasStage: handOverMock,
   initCanvasRender: (ctx: unknown) => {
     canvasRenderCtx = ctx;
   },
@@ -259,8 +267,14 @@ type CollabParserFn = (
   text: string,
 ) => Promise<{ document: Record<string, unknown>; frontmatter?: Record<string, unknown> }>;
 let collabParser: CollabParserFn | null = null;
+/** The freeze notifier studio injects — the other half of the same injection. */
+let collabNotifier: ((message: string) => void) | null = null;
 void mock.module("../src/collab/collab-session.ts", () => ({
   ...collabSnapshot,
+  configureCollabNotifier: (fn: ((message: string) => void) | null) => {
+    collabNotifier = fn;
+    collabSnapshot.configureCollabNotifier(fn as never);
+  },
   configureCollabParser: (fn: CollabParserFn | null) => {
     collabParser = fn;
     collabSnapshot.configureCollabParser(fn as never);
@@ -339,9 +353,9 @@ beforeEach(() => {
   consumePatchedMock.mockClear();
   consumePatchedReturn = false;
   view.functionEditor = null;
-  view.panX = 0;
-  view.panY = 0;
-  view.needsCenter = true;
+  surfaceForPane("primary").panX = 0;
+  surfaceForPane("primary").panY = 0;
+  surfaceForPane("primary").needsCenter = true;
 });
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -402,18 +416,23 @@ describe("canvas mode", () => {
    * be switched straight back to Design, putting a second live Canvas host in the pane the cap
    * exists to keep cheap.
    */
-  test("setCanvasMode refuses a Canvas mode for a tab in the side pane", () => {
+  test("setCanvasMode does not care WHICH pane the tab is in — the kind cap is lifted", () => {
+    /* This used to be a refusal. `splitRight` capped the tab to Code on its way across and
+       `setCanvasMode` refused Design back, because the side pane hosted only the cheap editor
+       kinds. Both halves are deleted: `panels/pane-grid.ts` draws a live stage per pane, so the
+       mode a document declares is the whole answer wherever the document is. */
     const tab = openShellTab(undefined, { capabilities: { modes: ["edit", "design", "source"] } });
+    const before = tab.session.ui.canvasMode;
     splitRight();
     expect(workspace.activePaneId).toBe(SECONDARY_PANE);
-    // The split already capped it to Code; asking for Design back is what must not land.
-    expect(tab.session.ui.canvasMode).toBe("source");
-    toolbarCtx.setCanvasMode("design");
-    expect(tab.session.ui.canvasMode).toBe("source");
-    // Back in the primary, the same call goes through.
-    closePane(SECONDARY_PANE);
+    // The split moved it AS IT WAS — no rewrite of the mode on the way over.
+    expect(tab.session.ui.canvasMode).toBe(before);
     toolbarCtx.setCanvasMode("design");
     expect(tab.session.ui.canvasMode).toBe("design");
+    // And the same call still goes through back in the primary.
+    closePane(SECONDARY_PANE);
+    toolbarCtx.setCanvasMode("source");
+    expect(tab.session.ui.canvasMode).toBe("source");
   });
 
   test("entering git-diff mode preserves gitDiffState", () => {
@@ -425,93 +444,17 @@ describe("canvas mode", () => {
   });
 });
 
-describe("canvas-wrap background click", () => {
-  const canvasWrap = () => document.querySelector("#canvas-wrap") as HTMLElement;
+/* The background-click deselect is no longer the bootstrap's, so it is no longer tested here.
+   It compared against the app's one `#canvas-wrap` and one `view.panzoomWrap` and cleared
+   `activeTab`'s selection — three reads that all name the FOCUSED pane rather than the pane that
+   was clicked. It is a stage gesture, installed per cell by `editor/shortcuts.ts`'s
+   `installStageGestures`, and `tests/shortcuts.test.ts` owns it. */
 
-  test("clears the selection when the wrap itself is clicked", () => {
-    const tab = openShellTab();
-    tab.session.selection = [["children", 0]];
-    canvasWrap().dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(tab.session.selection).toEqual([]);
-  });
-
-  test("ignores clicks on child elements", () => {
-    const tab = openShellTab();
-    tab.session.selection = [["children", 0]];
-    const child = document.createElement("div");
-    canvasWrap().append(child);
-    child.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(tab.session.selection).toEqual([["children", 0]]);
-    child.remove();
-  });
-
-  test("no-op when nothing is selected", () => {
-    const tab = openShellTab();
-    tab.session.selection = [];
-    expect(() => {
-      canvasWrap().dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    }).not.toThrow();
-    expect(tab.session.selection).toEqual([]);
-  });
-});
-
-/* The shell has ONE stage and two panes can be focused. `⌘\` focuses the pane it creates, so the
-   moved tab's next render addresses a pane that must own `#canvas-wrap` by then — otherwise the
-   render finds no stage and the document the split just moved is simply not on screen. This is the
-   wiring, not the unit: `canvas-surface.test.ts` proves `moveCanvasStage` moves a stage, and this
-   proves studio.ts actually asks it to when the focus moves. */
-describe("the single stage follows the focused pane", () => {
-  const wrapEl = () => document.querySelector("#canvas-wrap") as HTMLElement;
-
-  test("boots owned by the primary pane", () => {
-    expect(surfaceForPane(PRIMARY_PANE).wrap).toBe(wrapEl());
-  });
-
-  test("splitting right hands the stage to the new pane, and unsplitting hands it back", async () => {
-    openShellTab({ children: [], tagName: "div" }, { documentPath: "pages/split.json" });
-    // Code is a `SECONDARY_PANE_KINDS` kind, so the split is allowed to take this tab.
-    activeTab.value!.session.ui.canvasMode = "source";
-    handOverMock.mockClear();
-    expect(splitRight()?.id).toBe(SECONDARY_PANE);
-    await flush();
-
-    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
-    expect(surfaceForPane(SECONDARY_PANE).wrap).toBe(wrapEl());
-    // And the pane that lost it holds nothing — a stale wrap here is what let one pane's render
-    // Repaint the other pane's stage.
-    expect(surfaceForPane(PRIMARY_PANE).wrap).toBeNull();
-    expect(handOverMock).toHaveBeenLastCalledWith(SECONDARY_PANE, wrapEl());
-
-    focusPane(PRIMARY_PANE);
-    await flush();
-    expect(surfaceForPane(PRIMARY_PANE).wrap).toBe(wrapEl());
-    expect(surfaceForPane(SECONDARY_PANE).wrap).toBeNull();
-  });
-
-  /*
-   * Unsplit is the case the two render effects cannot see: the tab that was in the side pane is
-   * still the active tab afterwards, so nothing downstream of `activeTab` fires. The stage changing
-   * hands is the only event there is, which is why taking it is what repaints — and why the shell
-   * must take it through `handOverCanvasStage` rather than a bare move.
-   */
-  test("unsplitting takes the stage back through the handover, with the same tab active", async () => {
-    openShellTab({ children: [], tagName: "div" }, { documentPath: "pages/unsplit.json" });
-    activeTab.value!.session.ui.canvasMode = "source";
-    splitRight();
-    await flush();
-    const active = activeTab.value;
-    handOverMock.mockClear();
-
-    closePane(SECONDARY_PANE);
-    await flush();
-
-    expect(activeTab.value).toBe(active);
-    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
-    expect(handOverMock).toHaveBeenLastCalledWith(PRIMARY_PANE, wrapEl());
-    expect(surfaceForPane(PRIMARY_PANE).wrap).toBe(wrapEl());
-    expect(surfaceForPane(SECONDARY_PANE).wrap).toBeNull();
-  });
-});
+/* There is no "the single stage follows the focused pane" block, because the stage no longer
+   follows anything. It proved that `studio.ts` re-answered "which pane owns `#canvas-wrap`" on
+   every focus move — the workaround for a shell with one stage and a model with two panes.
+   `panels/pane-grid.ts` builds a cell per pane and registers its stage as part of building it, so
+   the question has a static answer and `tests/pane-grid.test.ts` is where it is asked. */
 
 describe("navigateToComponent", () => {
   test("opens the component in its own tab and leaves the parent tab intact", async () => {
@@ -676,6 +619,52 @@ describe("canvas render effects", () => {
     scheduleCanvasRenderMock.mockClear();
     shell.settingsTab = "fonts";
     expect(scheduleCanvasRenderMock).toHaveBeenCalled();
+  });
+
+  /*
+   * The effects are keyed on the PANE, and this is the bug that proves why.
+   *
+   * Both used to read `activeTab` and schedule "the" canvas. A split moves a tab between panes
+   * without changing which tab is active, so neither effect re-ran: the pane the tab LEFT went on
+   * displaying it, and the pane it arrived in — which had no stage at all until the grid drew one —
+   * was never asked to paint. Unsplit was the same shape from the other side: `closePane` changes
+   * the survivor's `activeTabId` and leaves `activeTab` identical, so split → open B in the side
+   * pane → unsplit left the primary showing A while the strip, the jump bar and the Inspector all
+   * said B.
+   */
+  test("a split schedules BOTH panes — the one that lost the tab and the one that gained it", async () => {
+    openShellTab();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/side.json", id: "side-tab" });
+    await flush();
+    scheduleCanvasRenderMock.mockClear();
+
+    splitRight();
+    await flush();
+
+    const panes = scheduleCanvasRenderMock.mock.calls.map(([paneId]) => paneId);
+    expect(panes).toContain(PRIMARY_PANE);
+    expect(panes).toContain(SECONDARY_PANE);
+  });
+
+  test("unsplit repaints the survivor, whose active tab changed under an unchanged `activeTab`", async () => {
+    openShellTab();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/side.json", id: "side-tab" });
+    await flush();
+    splitRight();
+    await flush();
+    // The keyboard is in the side pane, showing "side-tab"; the primary still holds "shell-tab".
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+    expect(paneById(PRIMARY_PANE)!.activeTabId).toBe("shell-tab");
+    const before = activeTab.value;
+    scheduleCanvasRenderMock.mockClear();
+
+    closePane(SECONDARY_PANE);
+    await flush();
+
+    // `activeTab` did NOT move — which is exactly why the old effects stayed silent.
+    expect(activeTab.value).toBe(before);
+    expect(paneById(PRIMARY_PANE)!.activeTabId).toBe("side-tab");
+    expect(scheduleCanvasRenderMock.mock.calls.map(([paneId]) => paneId)).toContain(PRIMARY_PANE);
   });
 });
 
@@ -1028,16 +1017,18 @@ describe("wiring arrows", () => {
 });
 
 describe("shortcuts context", () => {
-  test("exposes live canvas state and pan setter", () => {
+  test("exposes live canvas state and pan setter, for the STAGE it was asked about", () => {
     openShellTab();
     toolbarCtx.setCanvasMode("design");
-    const ctx = shortcutsGet!();
+    // The reader takes a surface: the pan offsets and the mode it reports are that pane's, not
+    // Whichever pane the keyboard happens to be in.
+    const ctx = shortcutsGet!(surfaceForPane("primary"));
     expect(ctx.canvasMode).toBe("design");
     expect(typeof ctx.applyTransform).toBe("function");
     ctx.setPan(12, 34);
-    expect(view.panX).toBe(12);
-    expect(view.panY).toBe(34);
-    expect(view.needsCenter).toBe(false);
+    expect(surfaceForPane("primary").panX).toBe(12);
+    expect(surfaceForPane("primary").panY).toBe(34);
+    expect(surfaceForPane("primary").needsCenter).toBe(false);
   });
 
   /* Save / Open Project / Open in Browser are no longer read off the gesture context: they are the
@@ -1109,13 +1100,13 @@ describe("zoom wiring", () => {
     const tab = openShellTab();
     tab.session.ui.zoom = 2.5;
     const wrap = document.createElement("div");
-    document.querySelector("#canvas-wrap")!.append(wrap);
-    view.panzoomWrap = wrap;
+    surfaceForPane("primary").wrap.append(wrap);
+    surfaceForPane("primary").panzoomWrap = wrap;
     try {
       resetZoom();
       expect(tab.session.ui.zoom).toBe(1);
     } finally {
-      view.panzoomWrap = null;
+      surfaceForPane("primary").panzoomWrap = null;
       wrap.remove();
     }
   });
@@ -1123,11 +1114,11 @@ describe("zoom wiring", () => {
   test("setZoomDirect is a no-op without an active tab", () => {
     closeAllTabs();
     const wrap = document.createElement("div");
-    view.panzoomWrap = wrap;
+    surfaceForPane("primary").panzoomWrap = wrap;
     try {
       expect(() => resetZoom()).not.toThrow();
     } finally {
-      view.panzoomWrap = null;
+      surfaceForPane("primary").panzoomWrap = null;
     }
   });
 });
@@ -1283,6 +1274,21 @@ describe("collab parser wiring", () => {
     } finally {
       setFormats([]);
     }
+  });
+
+  test("the freeze notifier is a KEYED warning, not a stack of identical toasts", () => {
+    /* A source-canonical freeze is a STATE the author is being held in, not an error, and a run of
+       them is one message. The bootstrap is the only place that decides that — `collab-session.ts`
+       hands it a string and knows nothing about toasts — so the injection is what has to be
+       checked, not the sentence. */
+    expect(collabNotifier).not.toBeNull();
+    statusMessages.length = 0;
+    collabNotifier!("Source is canonical while the file is open in Code view.");
+    expect(statusMessages.at(-1)).toBe("Source is canonical while the file is open in Code view.");
+    expect(notifyCalls.at(-1)).toMatchObject({
+      options: { key: "collab.freeze", source: "Collaboration" },
+      severity: "warn",
+    });
   });
 });
 

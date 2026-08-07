@@ -1,14 +1,12 @@
 import { computed, reactive, toRaw } from "../reactivity";
 import { commitTabBuffers } from "../services/monaco-buffer";
 import { ensureCollab, rekeyCollab } from "../collab/collab-session";
-import { createTab, disposeTab, editorKindOf, editorKindsOf, modeForEditorKind } from "../tabs/tab";
-import { editorKindForMode } from "../commands/context";
+import { createTab, disposeTab } from "../tabs/tab";
 import { projectState } from "../state";
 import { argsSchema, booleanArg, booleanProperty } from "../commands/command-args";
 import type { Tab, TabOrigin } from "../tabs/tab";
 
 import type { ComponentEntry } from "../files/components";
-import type { EditorKind } from "../commands/context";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 import type { ComputedRef } from "@vue/reactivity";
@@ -48,26 +46,20 @@ export const SECONDARY_PANE = "secondary";
 /**
  * Two, and enforced.
  *
- * Not a UI preference: every additional Canvas pane is a real `@jxsuite/runtime` render plus an
- * `iframe-channel` connection, and the risk P8 exists to manage is a performance cliff.
+ * Not a UI preference and not a placeholder: every additional Canvas pane is a real
+ * `@jxsuite/runtime` render, an `iframe-channel` connection and a structured clone of the resolved
+ * document, all on one main thread. Two is a budget that was measured; three is a cliff.
+ *
+ * This is the ONE cap left. `SECONDARY_PANE_KINDS` used to sit beside it — Code, Diff, Config,
+ * Entry, Grid, Library, the cheap kinds — because a second LIVE host was unaffordable while the
+ * shell had one stage to hand between panes and one app-wide render generation to invalidate.
+ * Neither is true: `canvas/surface-registry.ts` gives every pane its own panels, mode, pan, Monaco
+ * and generation, and `panels/pane-grid.ts` gives every pane its own stage. A Canvas in the side
+ * pane is now the same object the primary has always had, so the kind cap has nothing left to
+ * protect and every predicate that read it is deleted with it — including the one that FLIPPED a
+ * splitting Design tab to Code on its way across.
  */
 export const MAX_PANES = 2;
-
-/**
- * The editor kinds a pane OTHER than the primary may host.
- *
- * The cap is the whole reason the pane model can land before P8: a second live Canvas host is the
- * expensive part, so the second pane gets the cheap kinds — Code, Diff, Config, Grid, Library — and
- * `probe.idle()` already aggregates per-host state in anticipation of lifting it.
- */
-export const SECONDARY_PANE_KINDS: ReadonlySet<EditorKind> = new Set<EditorKind>([
-  "code",
-  "diff",
-  "config",
-  "entry",
-  "grid",
-  "library",
-]);
 
 export interface Workspace {
   projectRoot: string | null;
@@ -206,94 +198,24 @@ export function focusOtherPane() {
   }
 }
 
-/**
- * THE cap, as one predicate: whether a pane may host an editor kind.
+/*
+ * There is no `paneCanHostKind`, no `canOpenInSecondPane`, no `hostableKindsOf`, no
+ * `paneOfTabCanHostMode` and no `capToPaneKind`.
  *
- * Every enforcement point below reads this and nothing else — the split ({@link capToPaneKind}),
- * the later mode switch ({@link paneOfTabCanHostMode}) and the controls that offer either ({@link
- * hostableKindsOf}). A second copy of "is it in the set" is how the two ends of a cap start
- * disagreeing.
+ * Five predicates, one cap: "a pane other than the primary may only host Code, Diff, Config, Entry,
+ * Grid or Library". Two of them enforced it (the split, and every later write of
+ * `session.ui.canvasMode`), one picked the replacement kind, and two narrowed what the controls
+ * offered so no dropdown could contain an entry the app would refuse.
  *
- * @param {string} paneId
- * @param {EditorKind} kind
- * @returns {boolean}
+ * The cap existed because a second LIVE canvas host was unaffordable, and it is gone because
+ * workstream 1 made it affordable — see {@link MAX_PANES}. Its LAST act was a bug: `capToPaneKind`
+ * flipped a splitting Design tab to `source` before focus moved, so `⌘\` on a page you were
+ * designing silently became "open this as Code somewhere else".
+ *
+ * What replaces them is `tabs/tab.ts`'s `editorKindsOf` — the kinds a DOCUMENT declares — which is
+ * the only narrowing left and the only one that was ever about the document rather than about what
+ * the shell could afford to draw.
  */
-export function paneCanHostKind(paneId: string, kind: EditorKind): boolean {
-  return paneId === PRIMARY_PANE || SECONDARY_PANE_KINDS.has(kind);
-}
-
-/**
- * Whether `tab` can be hosted outside the primary pane — i.e. whether it supports any of
- * {@link SECONDARY_PANE_KINDS}.
- *
- * @param {Tab} tab
- * @returns {boolean}
- */
-export function canOpenInSecondPane(tab: Tab): boolean {
-  return editorKindsOf(tab).some((kind) => paneCanHostKind(SECONDARY_PANE, kind));
-}
-
-/**
- * The editor kinds `tab` may show WHERE IT IS — {@link editorKindsOf} narrowed by its pane's cap.
- *
- * What a control offers has to be what the app will accept, or the segment is dead: the pane
- * context bar's Editor dropdown and Canvas view group both draw from this, so a tab in the side
- * pane is never offered the Design its pane would refuse.
- *
- * @param {Tab} tab
- * @returns {EditorKind[]}
- */
-export function hostableKindsOf(tab: Tab): EditorKind[] {
-  const pane = paneOfTab(tab.id);
-  const kinds = editorKindsOf(tab);
-  return pane ? kinds.filter((kind) => paneCanHostKind(pane.id, kind)) : kinds;
-}
-
-/**
- * Whether the pane currently holding `tab` may host `mode`. A tab no pane holds is unconstrained.
- *
- * This is the half of the cap the split cannot enforce: a tab already in the side pane can be
- * switched back to Canvas from the context bar, from `canvas.setMode`, or by any other writer of
- * `session.ui.canvasMode`. Enforcing only at the split left that open, and it stays harmless only
- * for as long as the shell has ONE stage that follows focus — which P8 workstream 2 ends.
- *
- * @param {Tab} tab
- * @param {string} mode
- * @returns {boolean}
- */
-export function paneOfTabCanHostMode(tab: Tab, mode: string): boolean {
-  const pane = paneOfTab(tab.id);
-  return !pane || paneCanHostKind(pane.id, editorKindForMode(mode));
-}
-
-/**
- * Force a tab that is MOVING into a non-primary pane onto a kind that pane may host.
- *
- * The split is one of the two enforcement points, not the only one — it is the only one that can
- * pick a replacement kind, because it runs before the tab is in the target pane. Once it is there,
- * {@link paneOfTabCanHostMode} refuses a switch back out of the capped set.
- *
- * @param {Tab} tab
- * @param {string} paneId — the pane the tab is moving INTO
- * @returns {boolean} Whether the tab is (now) hostable there
- */
-function capToPaneKind(tab: Tab, paneId: string): boolean {
-  if (paneCanHostKind(paneId, editorKindOf(tab))) {
-    return true;
-  }
-  for (const kind of editorKindsOf(tab)) {
-    if (!paneCanHostKind(paneId, kind)) {
-      continue;
-    }
-    const mode = modeForEditorKind(tab, kind);
-    if (mode) {
-      tab.session.ui.canvasMode = mode;
-      tab.session.ui.preview = false;
-      return true;
-    }
-  }
-  return false;
-}
 
 /**
  * Split the grid and move the focused tab into the new pane, which becomes focused.
@@ -315,10 +237,10 @@ export function splitRight(): Pane | null {
     return null;
   }
   const targetId = existing?.id ?? SECONDARY_PANE;
-  // The primary keeps the Canvas; whichever pane is NOT primary takes the capped kind.
-  if (!capToPaneKind(tab, targetId)) {
-    return null;
-  }
+  /* The tab moves AS IT IS. `capToPaneKind` used to run here and rewrite `session.ui.canvasMode`
+     when the target pane could not host the tab's kind — which, for a Design tab, meant `⌘\`
+     silently reopened your page as Code in the pane you had just made. Both panes host every kind
+     now, so a split is a move and nothing else. */
   const target = existing ?? addPane(targetId);
   detachTab(tabId);
   insertIntoPane(target, tabId);
@@ -383,7 +305,16 @@ export function closePane(paneId: string) {
   for (const tabId of pane.tabOrder) {
     insertIntoPane(survivor, tabId);
   }
-  survivor.activeTabId = pane.activeTabId ?? survivor.activeTabId;
+  /* The document you were LOOKING AT follows you; the one you were not does not replace it.
+     This was `pane.activeTabId ?? survivor.activeTabId` unconditionally, so Unsplit run from the
+     primary — which closes the SIDE pane, never the focused one — swapped the primary's document
+     for the side pane's: focused=primary showing=a became focused=primary showing=b, and the only
+     way back was the tab strip. Nothing is lost either way, because the closing pane's tabs have
+     just been moved into the survivor above; this only decides which of them is on screen. */
+  survivor.activeTabId =
+    workspace.activePaneId === paneId
+      ? (pane.activeTabId ?? survivor.activeTabId)
+      : (survivor.activeTabId ?? pane.activeTabId);
   workspace.activePaneId = survivor.id;
   workspace.panes = workspace.panes.filter((candidate) => candidate.id !== paneId);
   resetTabCycle();
@@ -406,6 +337,10 @@ function detachTab(tabId: string) {
     if (pane.activeTabId === tabId) {
       pane.activeTabId = pane.tabOrder.at(-1) ?? null;
     }
+    /* The PRIMARY is exempt HERE and only here. `splitRight` moves the tab out of the source pane
+       through this function, so a lone document split from the primary empties it — and that state
+       is the one the author just asked for, a welcome screen beside the document they sent across.
+       Closing a document is a different request, and `closeTab` collapses on both sides. */
     if (pane.id !== PRIMARY_PANE && pane.tabOrder.length === 0) {
       emptied.push(pane.id);
     }
@@ -417,7 +352,34 @@ function detachTab(tabId: string) {
   // Not `closePane`'s ordering bug, which is fixed: "the active pane exists and has no tab"
   // Produces the identical empty shell, and only this stops it being mintable.
   for (const paneId of emptied) {
+    collapseEmptiedPane(paneId);
+  }
+}
+
+/**
+ * Collapse a pane that has just emptied — whichever side of the splitter it is on.
+ *
+ * §18.1 rule 3 held on ONE side only: the primary was exempted from the collapse, so closing its
+ * last tab while split left a welcome screen sitting beside a live document, in a grid the author
+ * had asked to be rid of. The exemption was defending something real, though — `PRIMARY_PANE` is
+ * the id nine screenshots crop and the one `resolveRegion("pane")` canonicalises onto, so the
+ * primary must never be the pane that LEAVES. Both are satisfied by collapsing in the other
+ * direction: the side pane is the one removed, and `closePane` hands its tabs to the primary, whose
+ * `activeTabId` is null and therefore adopts the side pane's.
+ *
+ * @param {string} paneId The pane that just lost its last tab.
+ */
+function collapseEmptiedPane(paneId: string): void {
+  if (workspace.panes.length < 2) {
+    return;
+  }
+  if (paneId !== PRIMARY_PANE) {
     closePane(paneId);
+    return;
+  }
+  const other = workspace.panes.find((candidate) => candidate.id !== PRIMARY_PANE);
+  if (other) {
+    closePane(other.id);
   }
 }
 
@@ -743,10 +705,12 @@ export function closeTab(tabId: string) {
   detachTab(tabId);
   workspace.mruOrder = workspace.mruOrder.filter((id) => id !== tabId);
   resetTabCycle();
-  // Emptying the second pane collapses it: a pane with nothing in it is a hole in the grid, and
-  // The author asked to close a document, not to keep a slot open for one.
-  if (pane && pane.id !== PRIMARY_PANE && pane.tabOrder.length === 0) {
-    closePane(pane.id);
+  // Emptying EITHER pane collapses the grid: a pane with nothing in it is a hole in it, and the
+  // Author asked to close a document, not to keep a slot open for one. `detachTab` above has
+  // Usually done this already; this is the belt to its braces, and it goes through the same helper
+  // So the primary can never be the pane that leaves.
+  if (pane && pane.tabOrder.length === 0) {
+    collapseEmptiedPane(pane.id);
   }
   if (!wasActive) {
     return;
@@ -1098,11 +1062,10 @@ export function tabCommands(deps: TabCommandDeps): AnyCommand[] {
  * They live beside the pane model for the same reason the tab commands do, and they are the whole
  * user-facing surface of §4.1's Pane transport: split, focus, unsplit, zoom.
  *
- * **`⌘0` / `⌘⌥0` are not both bound yet.** `⌘0` is `canvas.zoomReset` (`editor/shortcuts.ts`),
- * registered into the same registry, so claiming it here would throw at bootstrap on the chord
- * conflict the keymap exists to catch. `⌘⌥0` is free and is bound. The plan puts the zoom cluster
- * into the floating canvas chrome (§3.2 ⑩) and re-binds ⌘0 in P8 workstream 2; until then
- * `pane.focusPrimary` is palette- and API-reachable and prints no chord it does not have.
+ * `⌘0` and `⌘⌥0` are a PAIR, and they are both bound. `⌘0` was `canvas.zoomReset`, which held it
+ * for the one verb of the zoom cluster that also has a button in the floating zoom pod (§3.2 ⑩) —
+ * so the chord was the second way to reach a control that is already on screen, while focusing a
+ * pane had no way at all. The zoom keeps its pod button and gives up the key.
  *
  * @returns {AnyCommand[]}
  */
@@ -1118,23 +1081,15 @@ export function paneCommands(): AnyCommand[] {
       menus: ["context/pane", "context/tab", "palette"],
       group: "5_pane",
       when: (ctx) => ctx.document.open,
-      enablement: () => {
-        const id = workspace.activeTabId;
-        const tab = id ? workspace.tabs.get(id) : null;
-        if (!tab) {
-          return false;
-        }
-        // Already split: moving the tab across is always allowed back into the primary.
-        if (workspace.panes.length > 1) {
-          return workspace.activePaneId === PRIMARY_PANE ? canOpenInSecondPane(tab) : true;
-        }
-        return canOpenInSecondPane(tab);
-      },
-      // Not "beside the canvas": §18.3 has one stage, handed to whichever pane has focus. The side
-      // Pane is a second place to BE, not a second thing on screen — and a `requires` string is
-      // Printed verbatim in every refusal, tooltip and palette row, so it may only promise what a
-      // Reader will actually see.
-      requires: "a document that can open as Code, Config, Diff, Grid or Library in a second pane",
+      /* One condition, and it is the one the `when` already states: there has to be a document to
+         move. The enablement used to ask `canOpenInSecondPane` — whether the tab declared any of
+         the six kinds the side pane was allowed to host — and refuse a Design-only page outright.
+         Both panes draw a live Canvas now, so the only thing that can refuse a split is having
+         nothing to split. */
+      enablement: () => workspace.activeTabId !== null,
+      // A `requires` string is printed verbatim in every refusal, tooltip and palette row, so it
+      // May only promise what a reader will actually see.
+      requires: "an open document",
       undo: "none",
       run: () => {
         splitRight();
@@ -1145,6 +1100,7 @@ export function paneCommands(): AnyCommand[] {
       title: "Focus Primary Pane",
       category: "View",
       level: "document",
+      keybinding: "mod+0",
       menus: ["palette"],
       group: "5_pane",
       enablement: twoPanes,

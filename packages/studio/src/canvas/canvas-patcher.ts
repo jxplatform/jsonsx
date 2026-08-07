@@ -20,7 +20,6 @@
 
 import { getNodeAtPath, parentElementPath } from "../store";
 import { canvasModeOfPane, surfaceShowingTab } from "./canvas-surface";
-import { view } from "../view";
 import { toRaw } from "../reactivity";
 import { postPatchToHosts } from "./iframe-host";
 import { canvasPerf, recordEscalation, SPAN_PATCH_BATCH, timeSpan } from "./canvas-perf";
@@ -369,7 +368,11 @@ export function applyPatchBatch(tab: Tab, _ops: JxPatchOp[], record?: Transactio
   // Render then runs), so an edit is never dropped.
   timeSpan(SPAN_PATCH_BATCH, () => {
     const forwardOps = (record?.docOps ?? []).map((pair) => pair.forward);
-    const hosts = postPatchToHosts(forwardOps, view.renderGeneration, tab.id);
+    /* The generation is the SHOWING pane's, not "the canvas's". A patch is posted to whichever
+       hosts are rendering this tab's document, and the number they check it against belongs to the
+       stage they are mounted on. A tab no pane is showing has no host to post to and escalates. */
+    const surface = surfaceShowingTab(tab);
+    const hosts = surface ? postPatchToHosts(forwardOps, surface.renderGeneration, tab.id) : 0;
     if (hosts === 0) {
       throw new Error("no-ready-iframe-host");
     }

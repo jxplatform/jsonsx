@@ -25,10 +25,25 @@ void mock.module("../src/canvas/iframe-host", () => ({
 
 const { applyPatchBatch } = await import("../src/canvas/canvas-patcher");
 const { canvasPerf, resetCanvasPerf } = await import("../src/canvas/canvas-perf");
+const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
+
+/**
+ * A tab some pane is actually SHOWING.
+ *
+ * `{} as Tab` used to be enough, because the patch was posted with "the canvas's" generation. It is
+ * posted with the generation of the surface displaying the tab now (`surfaceShowingTab`), and a tab
+ * no pane holds has no host to post to — which is the correct answer and the reason the cast
+ * stopped working. The fixture has to put the tab somewhere.
+ */
+function showingTab(): Tab {
+  closeAllTabs();
+  return openTab({ document: { tagName: "div" }, documentPath: "/p/index.json", id: "wire-tab" });
+}
 
 describe("parent → iframe patch wire format", () => {
   test("posts value-carrying forward ops — the values cross, not just paths", () => {
     captured = null;
+    const tab = showingTab();
     const record: TransactionRecord = {
       docOps: [
         {
@@ -53,7 +68,7 @@ describe("parent → iframe patch wire format", () => {
       ],
     };
 
-    applyPatchBatch({} as Tab, record.ops, record);
+    applyPatchBatch(tab, record.ops, record);
 
     expect(captured).not.toBeNull();
     // The bridge receives the forward (value-carrying) ops, NOT the path-only `record.ops`.
@@ -73,7 +88,7 @@ describe("parent → iframe patch wire format", () => {
 
   test("posts an empty op list when the transaction recorded no docOps", () => {
     captured = null;
-    applyPatchBatch({} as Tab, [{ op: "set-text", path: ["children", 0] }], {
+    applyPatchBatch(showingTab(), [{ op: "set-text", path: ["children", 0] }], {
       docOps: [],
       fmOps: [],
       invertible: true,
@@ -87,8 +102,9 @@ describe("parent → iframe patch wire format", () => {
     // Must count MUTATIONS. Counting the fan-out would make a six-breakpoint canvas look six times
     // Busier than a single-artboard one for exactly the same edit.
     resetCanvasPerf();
+    const tab = showingTab();
     const batch = (): [Tab, TransactionRecord["ops"], TransactionRecord] => [
-      {} as Tab,
+      tab,
       [{ op: "set-text", path: ["children", 0] }],
       {
         docOps: [

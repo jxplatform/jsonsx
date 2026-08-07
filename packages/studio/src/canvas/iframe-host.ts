@@ -29,9 +29,9 @@ import { applyDropInstruction } from "../panels/dnd";
 import { rectOf } from "../utils/geometry";
 import { notify } from "../services/notify";
 import { effect, effectScope } from "../reactivity";
-import { canvasWrap, pathsEqual, projectState, renderOnly } from "../store";
+import { pathsEqual, projectState, renderOnly } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
-import { panelHostingCanvas } from "./canvas-surface";
+import { panelHostingCanvas, stageContaining } from "./canvas-surface";
 import { cloneSelection, primarySelection, toggleSelected } from "../tabs/selection";
 import type { JxPath } from "../state";
 import { setLayoutSelection, shell } from "../shell";
@@ -320,6 +320,17 @@ function consumeAllowAutoRequests(): boolean {
 /** Pending eval resolvers keyed by reqId; a timeout or stale reply resolves null. */
 const pendingEvals = new Map<number, (results: EvalExprResult[] | null) => void>();
 
+/**
+ * Which host each in-flight request belongs to.
+ *
+ * `pendingEvals` and `pendingFlushes` are keyed by reqId alone, which was enough while nothing ever
+ * released a host: an unanswered request simply timed out. A pane that goes away has to settle its
+ * OWN requests and nobody else's, and the reqId does not say whose they are.
+ */
+const evalOwners = new Map<number, HostState>();
+
+const flushOwners = new Map<number, HostState>();
+
 /** How long (ms) the parent waits for an `evalResult` before falling back to the snapshot. */
 export const EVAL_TIMEOUT_MS = 300;
 
@@ -366,10 +377,13 @@ export function requestCanvasEval(
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       pendingEvals.delete(reqId);
+      evalOwners.delete(reqId);
       resolve(null);
     }, timeoutMs);
+    evalOwners.set(reqId, target);
     pendingEvals.set(reqId, (results) => {
       clearTimeout(timer);
+      evalOwners.delete(reqId);
       resolve(results);
     });
   });
@@ -415,6 +429,7 @@ export function flushCanvasEdits(
     const timer = setTimeout(() => {
       for (const id of ids) {
         pendingFlushes.delete(id);
+        flushOwners.delete(id);
       }
       resolve();
     }, timeoutMs);
@@ -431,6 +446,7 @@ export function flushCanvasEdits(
       const reqId = flushReqId;
       ids.push(reqId);
       pendingFlushes.set(reqId, settle);
+      flushOwners.set(reqId, host);
       host.channel.post({ kind: "flushEdits", reqId });
     }
   });
@@ -1164,7 +1180,38 @@ function hostTab(state: HostState): Tab | null {
   return state.tabId ? (workspace.tabs.get(state.tabId) ?? null) : null;
 }
 
-/** Lazily start one reactive watcher that re-measures the selection in every live iframe host. */
+/** No selection. A shared frozen empty, so the "this host shows nothing" path allocates nothing. */
+const NO_SELECTION: readonly JxPath[] = Object.freeze([]);
+
+/** The tab each pane is showing, by tab id. Reading it inside an effect tracks every pane. */
+function shownSelections(): Map<string, readonly JxPath[]> {
+  const byTab = new Map<string, readonly JxPath[]>();
+  for (const pane of workspace.panes) {
+    const tab = pane.activeTabId ? workspace.tabs.get(pane.activeTabId) : null;
+    if (!tab) {
+      continue;
+    }
+    const sel = (tab.session.selection ?? []) as readonly JxPath[];
+    // Track the selection deeply enough that a change WITHIN the set re-measures: the effect
+    // Reads every path, not just the array reference.
+    void sel.map((path) => path.join("/")).join("|");
+    byTab.set(tab.id, sel);
+  }
+  return byTab;
+}
+
+/**
+ * Lazily start one reactive watcher that re-measures each host's OWN document's selection.
+ *
+ * **Every other fan-out in this module filters by `host.tabId`** — `postPatchToHosts`,
+ * `requestCanvasEval`, `flushCanvasEdits` — and this one did not. It read `activeTab` and posted
+ * the result to every entry in `liveHosts`, so with two panes open the focused pane's selection
+ * paths were measured inside the OTHER pane's frame, against a document that does not contain them,
+ * and written over that host's own `selectionPath`/`selectionPaths`. The reverse cost more:
+ * `requestSelection`'s `if (!primary)` branch clears the overlay, so the focused pane merely having
+ * nothing selected erased the side pane's box — the unfocused pane could never show a selection at
+ * all.
+ */
 function ensureSelectionWatch(): void {
   if (selectionWatch) {
     return;
@@ -1172,15 +1219,12 @@ function ensureSelectionWatch(): void {
   const scope = effectScope(true);
   scope.run(() => {
     effect(() => {
-      const sel = activeTab.value?.session.selection ?? [];
-      // Track the selection deeply enough that a change WITHIN the set re-measures: the effect
-      // Reads every path, not just the array reference.
-      void sel.map((path) => path.join("/")).join("|");
+      const byTab = shownSelections();
       // Track the stylebook selection too: stylebook hosts measure the selected TAG's card
       // (session.selection is deliberately [] in stylebook mode).
       void shell.stylebook.selection;
       for (const host of liveHosts) {
-        requestSelection(host, sel);
+        requestSelection(host, (host.tabId ? byTab.get(host.tabId) : null) ?? NO_SELECTION);
       }
     });
   });
@@ -1199,8 +1243,14 @@ function ensurePresenceWatch(): void {
   const scope = effectScope(true);
   scope.run(() => {
     effect(() => {
-      const tab = activeTab.value;
-      if (tab) {
+      // EVERY shown tab's roster, for the reason {@link ensureSelectionWatch} gives: a peer moving
+      // Their cursor in the side pane's document is a repaint the side pane owes, and tracking only
+      // The focused tab left the other pane's presence boxes frozen at whatever it last drew.
+      for (const pane of workspace.panes) {
+        const tab = pane.activeTabId ? workspace.tabs.get(pane.activeTabId) : null;
+        if (!tab) {
+          continue;
+        }
         // Track the roster deeply enough that selection moves re-trigger.
         const { peers } = collabState(tab);
         void peers.map((peer) => JSON.stringify(peer.state.structuralSelection ?? null)).join("|");
@@ -1224,7 +1274,10 @@ function requestPresence(host: HostState): void {
   if (host.stylebook || !host.ready || !host.iframe.isConnected) {
     return;
   }
-  const tab = activeTab.value;
+  // THIS host's document, not the focused pane's — the peer boxes drawn in a frame have to be the
+  // Peers looking at what that frame is showing, and `peer.state.focusedPath` is compared against
+  // It below.
+  const tab = hostTab(host);
   const peers = tab ? collabState(tab).peers : [];
   host.presenceMeta.clear();
   const paths: (string | number)[][] = [];
@@ -1324,6 +1377,79 @@ function requestStylebookSelection(host: HostState): void {
  */
 const DEFAULT_CANVAS_URL = "/packages/studio/canvas.html";
 
+/**
+ * Release one host: its channel, its overlay, its frame, and everything awaiting a reply from it.
+ *
+ * A settled-with-nothing reply rather than a dropped promise, because every caller of
+ * `requestCanvasEval` / `flushCanvasEdits` / a measure is awaiting one: dropping the entry would
+ * hang a save on a frame that no longer exists, and `canvasIdleBlockers()` would go on naming it.
+ */
+function releaseHost(host: HostState): void {
+  host.channel.dispose();
+  for (const [reqId, resolve] of pendingEvals) {
+    if (evalOwners.get(reqId) === host) {
+      pendingEvals.delete(reqId);
+      evalOwners.delete(reqId);
+      resolve(null);
+    }
+  }
+  for (const [reqId, settle] of pendingFlushes) {
+    if (flushOwners.get(reqId) === host) {
+      pendingFlushes.delete(reqId);
+      flushOwners.delete(reqId);
+      settle();
+    }
+  }
+  for (const [, resolve] of host.pendingMeasures) {
+    resolve([]);
+  }
+  host.pendingMeasures.clear();
+  host.pendingTabIds.clear();
+  cancelInsertHide(host);
+  /* The module-level pointer at THIS host goes with it. Everything else here was already released
+     and `activeEditHost` was not, so unsplitting a pane with a live inline-edit caret left the
+     parent realm believing it was still editing: the format toolbar stayed up anchored to a
+     detached frame, and `commitActiveEditSession()` posted `endEdit` through
+     `iframe.contentWindow?.postMessage` on a removed frame — an optional-chained silent no-op, so
+     the edit was lost without a word. Cleared here rather than guarded at each reader, because
+     "the host that owns the edit session" cannot be a host that no longer exists. */
+  if (activeEditHost === host) {
+    activeEditHost = null;
+  }
+  host.overlay.root.remove();
+  host.iframe.remove();
+  hosts.delete(host.canvasEl);
+  liveHosts.delete(host);
+}
+
+/**
+ * Release every canvas host mounted under `root`, and say how many there were.
+ *
+ * The one NON-lazy path out of {@link liveHosts}. Eleven sites prune a disconnected host when they
+ * happen to walk the set, which is enough to stop a dead frame being posted to and is not enough to
+ * release it: `iframe-channel.ts` adds a `window` "message" listener that only `dispose()` removes,
+ * and the sole parent-side `dispose()` was the URL-change rebuild in {@link ensureHost}. So a closed
+ * pane — or any mode transition, which detaches every artboard — left one live listener and one
+ * overlay subtree per frame, for the life of the window.
+ *
+ * @param {HTMLElement} root
+ * @returns {number} How many hosts were released.
+ */
+export function releaseCanvasHosts(root: HTMLElement): number {
+  let released = 0;
+  for (const host of new Set(liveHosts)) {
+    if (root.contains(host.canvasEl)) {
+      releaseHost(host);
+      released += 1;
+    }
+  }
+  return released;
+}
+
+/* There is no `liveCanvasHostCount()`. A count the app never reads is a function reachable from
+   nothing, which `tests/reachability.test.ts` refuses on principle — and the honest measure was
+   already there: {@link releaseCanvasHosts} RETURNS how many it released. */
+
 function ensureHost(canvasEl: HTMLElement): HostState {
   // Read the platform's canvasUrl when one is registered; otherwise fall back to the default. The
   // Dev server leaves it unset, and some tests mount without a platform registered.
@@ -1336,9 +1462,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     // The platform's loopback canvasUrl arrived after this host was built with the default URL
     // (electrobun resolves it async over RPC) — tear the early iframe down and rebuild against the
     // Right cross-origin origin.
-    existing.channel.dispose();
-    liveHosts.delete(existing);
-    hosts.delete(canvasEl);
+    releaseHost(existing);
   }
   // ParentOrigin is the parent's real origin, passed into the iframe URL so the cross-origin iframe
   // Can target a postMessage back at it.
@@ -1744,6 +1868,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         return;
       }
       pendingEvals.delete(msg.reqId);
+      evalOwners.delete(msg.reqId);
       resolve(msg.gen === state.lastRenderedGen ? msg.results : null);
       return;
     }
@@ -1973,6 +2098,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       const done = pendingFlushes.get(msg.reqId);
       if (done) {
         pendingFlushes.delete(msg.reqId);
+        flushOwners.delete(msg.reqId);
         done();
       }
       return;
@@ -2157,7 +2283,16 @@ function redispatchWheel(
   msg: Extract<IframeToParent, { kind: "forwardWheel" }>,
 ): void {
   const { rect, scale } = hostDragGeometry(state);
-  canvasWrap.dispatchEvent(
+  /* The wheel goes back to the stage this FRAME is mounted on, not to "the canvas".
+     `canvasWrap` was the focused pane's stage, so a wheel forwarded out of an unfocused pane's
+     iframe panned the other pane. Resolved from the DOM rather than from the panel bookkeeping,
+     because the frame is physically inside exactly one stage whether or not a pass has recorded an
+     artboard for it yet. */
+  const stage = stageContaining(state.canvasEl)?.wrap;
+  if (!stage) {
+    return;
+  }
+  stage.dispatchEvent(
     new WheelEvent("wheel", {
       bubbles: true,
       cancelable: true,
@@ -2417,10 +2552,20 @@ function activeSchemeWire(): "light" | "dark" | null {
  * Flip the color-scheme preview on every ready host (page and stylebook alike — both render
  * scheme-aware CSS). A pure attribute write iframe-side: no render, no patch, no gen.
  */
-export function postColorSchemeToLiveHosts(scheme: "light" | "dark" | null): void {
+export function postColorSchemeToLiveHosts(
+  scheme: "light" | "dark" | null,
+  root?: HTMLElement | null,
+): void {
   for (const host of liveHosts) {
     if (!host.iframe.isConnected) {
       liveHosts.delete(host);
+      continue;
+    }
+    /* Scoped to one stage when the caller names one. The preview scheme is a per-TAB choice
+       (`session.ui.previewColorScheme`), so with two live hosts an unscoped post flipped the other
+       pane's document to a scheme nobody had asked it for — and left its own control still saying
+       "Auto", because the record it reads belongs to the tab that was never changed. */
+    if (root && !root.contains(host.iframe)) {
       continue;
     }
     if (host.ready) {
@@ -2510,13 +2655,20 @@ export function getEditSnapshot(): {
   editingProp: string | null;
   snapshot: SelectionSnapshot | null;
 } {
-  if (!activeEditHost) {
+  /* The same connectivity guard {@link isCaretActive} has, and for the same reason: a session
+     belongs to a frame, and a frame that has left the document has no caret in it. `releaseHost`
+     clears `activeEditHost`, so this is the second line rather than the first — it covers the frame
+     detached by something that never routed through a release (a `hardClearCanvasWrap`, a mode
+     transition mid-session), where an unguarded `editing: true` keeps the format toolbar on screen
+     anchored to nothing. */
+  const host = activeEditHost;
+  if (!host || !host.iframe.isConnected) {
     return { editing: false, editingProp: null, snapshot: null };
   }
   return {
-    editing: activeEditHost.editing,
-    editingProp: activeEditHost.editingProp,
-    snapshot: activeEditHost.snapshot,
+    editing: host.editing,
+    editingProp: host.editingProp,
+    snapshot: host.snapshot,
   };
 }
 
@@ -2538,7 +2690,9 @@ export function postApplyFormat(intent: ApplyFormatIntent): void {
  */
 export function commitActiveEditSession(): void {
   const host = activeEditHost;
-  if (host?.editing && host.ready) {
+  // `isConnected` too: posting into a removed frame is an optional-chained no-op inside the
+  // Channel, so the caller is told the commit was requested when nothing received it.
+  if (host?.editing && host.ready && host.iframe.isConnected) {
     host.channel.post({ kind: "endEdit" });
   }
 }

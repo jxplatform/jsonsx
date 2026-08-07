@@ -55,6 +55,7 @@ import {
 import { createLibrarySource, libraryColumns } from "./library-source";
 import { createPreviewCache, createPreviewObserver, previewFor } from "./library-preview";
 import { computeWindow } from "./virtual-window";
+import { paneRegion } from "../ui/regions";
 import {
   LAYOUT_METRICS,
   boardTpl,
@@ -73,6 +74,7 @@ import type { LayoutContext } from "./library-layouts";
 import type { PreviewCache, PreviewObserver } from "./library-preview";
 import type { WindowRange } from "./virtual-window";
 import type { Tab } from "../tabs/tab";
+import type { CanvasSurface } from "../canvas/canvas-surface";
 
 // ─── View state ──────────────────────────────────────────────────────────────
 
@@ -150,8 +152,10 @@ export function setLibrarySearch(query: string): void {
 export function invalidateLibrary(): void {
   source = null;
   scanAttempted = false;
-  active?.cache.clear();
-  active?.slots.clear();
+  for (const panel of _active.values()) {
+    panel.cache.clear();
+    panel.slots.clear();
+  }
   bump();
 }
 
@@ -232,13 +236,17 @@ async function loadLibrary(): Promise<void> {
 export async function refreshLibrary(): Promise<void> {
   source = null;
   scanAttempted = false;
-  active?.cache.clear();
+  for (const panel of _active.values()) {
+    panel.cache.clear();
+  }
   await loadLibrary();
 }
 
 // ─── The mounted pane ────────────────────────────────────────────────────────
 
 interface ActiveLibraryPane {
+  /** The pane whose stage this Library is drawn on. The map key, held on the record too. */
+  paneId: string;
   tabId: string;
   scope: EffectScope;
   wrap: HTMLElement;
@@ -260,24 +268,41 @@ interface ActiveLibraryPane {
   pendingPaths: Set<string>;
 }
 
-let active: ActiveLibraryPane | null = null;
+/**
+ * The Library mounted in each pane, keyed by pane id.
+ *
+ * ONE instance per pane, not per window. It was a module-level `let active`, which is a fact about
+ * the shell having had one stage — and the failure it produced the moment two are drawn is not
+ * cosmetic: pane B mounting a Library called `detachLibraryPane()`, destroying pane A's
+ * `IntersectionObserver`, preview cache and effect scope while pane A's DOM was still on screen.
+ * `canvas-render.ts`'s `resetCanvasView` calls the detach UNCONDITIONALLY on every empty pane, so
+ * it did not even take a second Library to do it.
+ */
+const _active = new Map<string, ActiveLibraryPane>();
 
-/** Whether the Library is live for this tab — the canvas-render fast-path guard. */
-export function libraryPaneMounted(tab: Tab): boolean {
-  return active !== null && active.tabId === tab.id && active.wrap.isConnected;
+/** The Library mounted in a pane, or null. */
+function activeIn(paneId: string): ActiveLibraryPane | null {
+  return _active.get(paneId) ?? null;
 }
 
-/** Tear the Library down (mode change, tab switch, project close). Idempotent. */
-export function detachLibraryPane(): void {
-  if (!active) {
+/** Whether the Library is live in this pane for this tab — the canvas-render fast-path guard. */
+export function libraryPaneMounted(paneId: string, tab: Tab): boolean {
+  const panel = activeIn(paneId);
+  return panel !== null && panel.tabId === tab.id && panel.wrap.isConnected;
+}
+
+/** Tear one pane's Library down (mode change, tab switch, project close). Idempotent. */
+export function detachLibraryPane(paneId: string): void {
+  const panel = _active.get(paneId);
+  if (!panel) {
     return;
   }
-  active.observer.destroy();
-  active.cache.clear();
-  active.slots.clear();
-  active.pendingPaths.clear();
-  active.scope.stop();
-  active = null;
+  panel.observer.destroy();
+  panel.cache.clear();
+  panel.slots.clear();
+  panel.pendingPaths.clear();
+  panel.scope.stop();
+  _active.delete(paneId);
 }
 
 // ─── Geometry ────────────────────────────────────────────────────────────────
@@ -307,7 +332,7 @@ async function fillPreview(panel: ActiveLibraryPane, file: LibraryFile) {
   panel.pendingPaths.add(file.path);
   try {
     const rendered = await previewFor(file.path, panel.cache);
-    if (!rendered || active !== panel) {
+    if (!rendered || activeIn(panel.paneId) !== panel) {
       return;
     }
     const slot = panel.slots.get(file.path);
@@ -823,11 +848,12 @@ function bodyTpl(panel: ActiveLibraryPane, files: readonly LibraryFile[], ctx: L
  * Draw the Library into the pane. Re-entrant: a same-tab call while it is live is a no-op, because
  * the pane owns its own reactivity from here (the grid/settings/stylebook pattern).
  */
-export function renderLibraryMode(canvasWrap: HTMLElement, tab: Tab): void {
-  if (libraryPaneMounted(tab)) {
+export function renderLibraryMode(surface: CanvasSurface, tab: Tab): void {
+  const { paneId, wrap: canvasWrap } = surface;
+  if (libraryPaneMounted(paneId, tab)) {
     return;
   }
-  detachLibraryPane();
+  detachLibraryPane(paneId);
 
   const scope = effectScope();
   const panel: ActiveLibraryPane = {
@@ -835,6 +861,7 @@ export function renderLibraryMode(canvasWrap: HTMLElement, tab: Tab): void {
     observer: createPreviewObserver(() => {
       /* Replaced immediately below — the observer needs the panel to exist first. */
     }),
+    paneId,
     pending: new WeakMap(),
     pendingPaths: new Set(),
     scope,
@@ -851,7 +878,7 @@ export function renderLibraryMode(canvasWrap: HTMLElement, tab: Tab): void {
       void fillPreview(panel, file);
     }
   });
-  active = panel;
+  _active.set(paneId, panel);
 
   const ctx: LayoutContext = {
     columns: libraryColumns(),
@@ -875,7 +902,7 @@ export function renderLibraryMode(canvasWrap: HTMLElement, tab: Tab): void {
 
   scope.run(() => {
     effect(() => {
-      if (active !== panel) {
+      if (activeIn(paneId) !== panel) {
         return;
       }
       // Everything the pane draws from.
@@ -898,11 +925,11 @@ export function renderLibraryMode(canvasWrap: HTMLElement, tab: Tab): void {
 
       litRender(
         html`
-          <div class="library" data-jx-region="pane.primary/library">
+          <div class="library" data-jx-region=${paneRegion(paneId, "library")}>
             ${toolbarTpl(panel)} ${failureBannerTpl(current)}
             <div
               class="library-body"
-              data-jx-region="pane.primary/library/dropZone"
+              data-jx-region=${paneRegion(paneId, "library/dropZone")}
               ${ref(onScroller)}
               @dragover=${(e: DragEvent) => {
                 e.preventDefault();
