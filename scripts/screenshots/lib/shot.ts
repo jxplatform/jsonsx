@@ -399,11 +399,18 @@ function measureRegionInPage(
     id === "pane" ? "pane.primary" : id.startsWith("pane/") ? `pane.primary/${id.slice(5)}` : id;
   let matches = [...document.querySelectorAll<HTMLElement>(`[${ATTR}="${CSS.escape(canonical)}"]`)];
   if (matches.length === 0) {
-    const field = /^inspector\/field:(.+)$/.exec(canonical);
-    const inspector = field ? document.querySelector(`[${ATTR}="inspector"]`) : null;
-    if (inspector) {
+    const inspector = document.querySelector(`[${ATTR}="inspector"]`);
+    // `/browse` FIRST. `(.+)` is greedy, so the bare-field rule below would otherwise claim
+    // `image/browse` as a prop of that name and answer nothing — which is exactly what it did.
+    const browse = /^inspector\/field:(.+)\/browse$/.exec(canonical);
+    const field = browse ? null : /^inspector\/field:(.+)$/.exec(canonical);
+    if (inspector && browse) {
+      const row = inspector.querySelector<HTMLElement>(`[data-prop="${CSS.escape(browse[1]!)}"]`);
+      const button = row?.querySelector<HTMLElement>(".media-picker-browse");
+      matches = button ? [button] : [];
+    } else if (inspector && field) {
       matches = [
-        ...inspector.querySelectorAll<HTMLElement>(`[data-prop="${CSS.escape(field![1]!)}"]`),
+        ...inspector.querySelectorAll<HTMLElement>(`[data-prop="${CSS.escape(field[1]!)}"]`),
       ];
     }
   }

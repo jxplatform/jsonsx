@@ -240,15 +240,26 @@
   min-width: 0;
   min-height: 0;
 }
-/* One PANE. Its own two-row grid: the strip, then everything stacked in the cell below it. */
+/* One PANE. Its own two-row grid: the strip, then everything stacked in the cell below it.
+
+   ONE COLUMN, declared. Three children name `grid-row: 2` in order to share the lower cell, and
+   auto-placement answers that by inventing an implicit column each: the jump bar, the chrome layer
+   and the stage lined up side by side, the stage taking a third of the pane and pinning the
+   document to the right edge. `grid-template-columns` is what makes "share the cell" mean it, and
+   every row-2 child restates `grid-column: 1` so a future fourth one cannot re-open the same hole.
+
+   No unit test can see this: happy-dom does no layout, so every rect is zero and the grid the
+   assertions describe is the one they were written from. The screenshot lane is what caught it. */
 .pane {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
 }
 .pane-strip {
   grid-row: 1;
+  grid-column: 1;
   min-height: 0;
   min-width: 0;
 }
@@ -261,6 +272,7 @@
    bar never covers the stage it sits above. */
 .pane-jump {
   grid-row: 2;
+  grid-column: 1;
   align-self: start;
   position: relative;
   z-index: 3;
@@ -274,6 +286,7 @@
    same cell, and one projection per bar is what keeps "no tab open" costing no dead band. */
 .pane-chrome {
   grid-row: 2;
+  grid-column: 1;
   margin-top: var(--jump-bar-h, 0px);
   position: relative;
   z-index: 2;
@@ -293,6 +306,7 @@
    bar that renders nothing writes 0 without knowing the other exists. */
 .pane-stage {
   grid-row: 2;
+  grid-column: 1;
   margin-top: calc(var(--jump-bar-h, 0px) + var(--pane-context-h, 0px));
   position: relative;
   overflow: auto;
@@ -1069,8 +1083,20 @@
 /* The pane splitter. A column handle like the two dock ones, but INSIDE the pane grid rather than
    on `#app`'s grid — so it takes its own track (`panels/pane-grid.ts` writes the 5px column) and
    spans the cell's full height rather than naming an application row. */
+/* The splitter between two cells.
+
+   `grid-row: auto`, and it has to be. It inherits `grid-row: 2 / 4` from `.resize-handle` — the
+   APP grid's placement, where the three dock handles live — and any definite row position, that
+   one or the `1 / -1` this rule used to carry, moves the item into an earlier step of CSS Grid's
+   auto-placement: definite-row items are placed before fully-auto ones, so the splitter claimed
+   column 1 and the two cells flowed around it into the 5px track and the second half. DOM order
+   was already correct; the placement algorithm was not reading it. Both axes auto is what makes
+   the DOM order decide. `#pane-grid` has one row, so an auto item still stretches its full height.
+
+   Like the row-1 column declaration above, this is invisible to every test in the package:
+   happy-dom does no layout. */
 .pane-splitter {
-  grid-row: 1 / -1;
+  grid-row: auto;
   grid-column: auto;
   justify-self: stretch;
   margin: 0;
