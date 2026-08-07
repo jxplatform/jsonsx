@@ -187,11 +187,24 @@ export function syncFunctionEditor(host: HTMLElement): void {
  * commit flushed here finds `tabIsLive(tab) === false` and correctly writes nothing. Those two are
  * fixed at the gate that decides — `services/monaco-buffer.ts`'s `commitTabBuffers` runs the commit
  * while the tab is still open, and `tabBufferUnsaved` answers for typing no commit could land.
+ *
+ * **AND THE COMMIT IS ALLOWED TO FAIL, at which point this is a deletion.** The collab freeze
+ * refuses the body write outright; a collaborator deleting the element the handler hangs off leaves
+ * `editing.path` resolving to nothing. Either way `commitBufferWrites` returns false, and the very
+ * next line detaches the model — so `buffersForTab` stops finding the buffer and `tabBufferUnsaved`
+ * goes back to answering "nothing to lose" about text that no longer exists anywhere.
+ *
+ * Refusing the teardown is not on offer here, which is why the answer is a message rather than a
+ * bail-out: every caller is a repaint or a mode transition that has ALREADY replaced the container
+ * (the dock's `afterRender`, `closeFunctionEditor`'s tail), so keeping the instance would keep a
+ * live Monaco bound to detached DOM — the leak `syncFunctionEditor` exists to close, and an editor
+ * the author cannot see or reach is not a rescued edit. `closeFunctionEditor` is where a refusal
+ * DOES keep the surface, because it is a gesture and the surface is still standing.
  */
 export function disposeFunctionEditor(): void {
   const editor = view.functionEditor;
   if (editor) {
-    commitBufferWrites(editor);
+    commitBufferWrites(editor, "logic");
     editor.dispose();
     view.functionEditor = null;
   }
@@ -218,7 +231,12 @@ export function disposeFunctionEditor(): void {
  * been given the author's text when it had not, and every subsequent close discarded it without a
  * word. So the settle is conditional on the write LANDING, and the answer is handed back to the
  * caller: the debounce has nothing useful to do with it (the gate raises its own keyed toast on
- * every refusal), but the Close does — see {@link closeFunctionEditor}.
+ * every refusal), but the Close does — see {@link closeFunctionEditor} — and so does every
+ * disposer, through `commitBufferWrites`.
+ *
+ * **Three ways it does not land, not one.** The tab is gone; the collab gate refuses; or the node
+ * `editing.path` names has been deleted out from under the open editor, in which case there is no
+ * coordinate to write to at all.
  *
  * @param {Tab} tab The document this buffer was filled from.
  * @param {EditingTarget} editing The def or event binding inside it.
@@ -236,7 +254,18 @@ function bodyWriter(tab: Tab, editing: EditingTarget, writes?: BufferWrites) {
       wrote = transactDoc(tab, (t) => mutateUpdateDef(t, editing.defName, { body: newBody }));
     } else if (editing.type === "event") {
       const node = getNodeAtPath(tab.doc.document, editing.path);
-      const current = node?.[editing.eventKey] || {};
+      /* THE ELEMENT THE HANDLER HANGS OFF CAN GO WHILE THE EDITOR IS OPEN — a collaborator's
+         delete arriving over the wire, or the author's own ⌘Z. `editing.path` then resolves to
+         nothing, and `mutateUpdateProperty` read `getNodeAtPath(...)[key]` straight through it:
+         `undefined is not an object`, thrown out of the 500ms commit and, through
+         `commitBufferWrites`, out of the dock panel's `afterRender`.
+         There is no coordinate left to write the body to, so the honest answer is that the write
+         did not happen. Reporting it as a success would settle the buffer and tell every close
+         gate the document had been given text that has nowhere to be. */
+      if (!node) {
+        return false;
+      }
+      const current = node[editing.eventKey] || {};
       wrote = transactDoc(tab, (t) =>
         mutateUpdateProperty(t, editing.path, editing.eventKey, {
           ...(current as object),

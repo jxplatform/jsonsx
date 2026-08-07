@@ -882,6 +882,15 @@ async function openProject() {
     }
     return;
   }
+  // The SECOND destroyer, and it was ungated for as long as the first one was. `openRecentProject`
+  // Below asks `confirmCloseAll` and then calls `closeAllTabs`; this branch reaches
+  // `files.ts`'s `replaceAllTabs`, which throws the same documents away by a different name — so an
+  // Enumeration of "who calls closeAllTabs" reported the matrix complete while ⌘O, the toolbar
+  // Button and the welcome screen all discarded unsaved work in silence. `platformUsesRepoPicker()`
+  // Is true only for the cloud platform, so desktop and browser both arrived here.
+  if (!(await tabStrip.confirmCloseAll("Opening another project"))) {
+    return;
+  }
   const result = await _openProject({ renderLeftPanel });
   ensureFsSync();
   return result;

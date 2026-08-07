@@ -28,7 +28,7 @@ import {
 } from "../src/services/monaco-buffer";
 import type { MonacoBuffer } from "../src/services/monaco-buffer";
 import { view } from "../src/view";
-import { problems, resetNotifications } from "../src/services/notify";
+import { problems, resetNotifications, toasts } from "../src/services/notify";
 import type { Tab } from "../src/tabs/tab";
 
 const sleep = (ms: number) =>
@@ -273,7 +273,7 @@ describe("commitBufferWrites", () => {
     writes.arm(BUFFER_COMMIT, 500, () => void written.push(buffer.getValue()));
     writes.arm("lint", 750, () => void linted.push(buffer.getValue()));
 
-    commitBufferWrites(buffer);
+    commitBufferWrites(buffer, "logic");
     buffer.dispose();
 
     // The commit ran against the LIVE buffer — `"return 42;"`, not the `""` a detached model answers.
@@ -287,12 +287,214 @@ describe("commitBufferWrites", () => {
 
   test("is safe on nothing, and on a buffer that never armed a commit", () => {
     const nothing = undefined as MonacoBuffer | null | undefined;
-    expect(() => commitBufferWrites(null)).not.toThrow();
-    expect(() => commitBufferWrites(nothing)).not.toThrow();
-    expect(() => commitBufferWrites(fakeBuffer())).not.toThrow();
+    expect(commitBufferWrites(null, "logic")).toBe(true);
+    expect(commitBufferWrites(nothing, "logic")).toBe(true);
+    expect(commitBufferWrites(fakeBuffer(), "source")).toBe(true);
     const buffer = fakeBuffer();
     bufferWrites(buffer);
-    expect(() => commitBufferWrites(buffer)).not.toThrow();
+    expect(commitBufferWrites(buffer, "logic")).toBe(true);
+  });
+
+  /**
+   * A DISPOSER THAT DESTROYS THE AUTHOR'S TEXT HAS TO SAY SO.
+   *
+   * `bodyWriter` answers whether the body reached the document, and the answer is `false` whenever
+   * the collab freeze refuses the write, the tab is gone, or the element the handler hangs off has
+   * been deleted; the source view's parse simply declines to settle on text that does not parse.
+   * Throwing that answer away turned five exits — dock tab switch, dock collapse, ⌘, opening
+   * another Logic target, switching to another tab — into silent deletions, and the last line of
+   * each is what makes them unrecoverable: once the model is detached `buffersForTab` no longer
+   * finds the buffer, so `tabBufferUnsaved` and every gate built on it go back to reporting
+   * "nothing to lose" about text that has just been destroyed.
+   */
+  test("a refused commit is reported, and the answer says the text is gone", () => {
+    resetNotifications();
+    const buffer = fakeBuffer("state.count += 1;") as ReturnType<typeof fakeBuffer> & {
+      _editingTab?: Tab | null;
+    };
+    buffer._editingTab = { documentPath: "pages/index.md", id: "a" } as unknown as Tab;
+    const writes = bufferWrites(buffer);
+    writes.markTyped();
+    // The freeze: `transactDoc` returns false, so `bodyWriter` never settles the buffer.
+    writes.arm(BUFFER_COMMIT, 500, () => {});
+
+    expect(commitBufferWrites(buffer, "logic")).toBe(false);
+
+    const toast = toasts.find((t) => t.key === "buffer-discarded:logic:a");
+    expect(toast?.message).toBe(
+      'The handler you were typing was discarded — it was never written into "pages/index.md".',
+    );
+    expect(toast?.path).toBe("pages/index.md");
+    // A toast, not a Problem: the buffer is detached on the caller's next line, so there is
+    // Nothing left for anybody to go and fix.
+    expect(toast?.tier).toBe("toast");
+    expect(problems.find((p) => p.key === "buffer-discarded:logic:a")).toBeUndefined();
+  });
+
+  test("a commit that landed says nothing at all", () => {
+    resetNotifications();
+    const landed: string[] = [];
+    const buffer = mountedBuffer(tabA, "return 1;", landed);
+    expect(commitBufferWrites(buffer, "logic")).toBe(true);
+    expect(landed).toEqual(["return 1;"]);
+    expect(toasts.filter((t) => t.key?.startsWith("buffer-discarded:"))).toEqual([]);
+  });
+
+  test("and neither does a buffer that is merely ahead — format-on-open loses nobody anything", () => {
+    resetNotifications();
+    const buffer = fakeBuffer("return 1;\n");
+    bufferWrites(buffer).markAhead();
+    expect(commitBufferWrites(buffer, "logic")).toBe(true);
+    expect(toasts.filter((t) => t.key?.startsWith("buffer-discarded:"))).toEqual([]);
+  });
+
+  /* The source view's commit parses through the format host, so "did it land" has no value until
+     long after the synchronous disposer has returned. The report goes with the answer. */
+  test("an async parse that fails reports when it fails, not when the disposer returns", async () => {
+    resetNotifications();
+    const buffer = fakeBuffer("# half a headin") as ReturnType<typeof fakeBuffer> & {
+      _editingTab?: Tab | null;
+    };
+    buffer._editingTab = { documentPath: "pages/about.md", id: "s" } as unknown as Tab;
+    const writes = bufferWrites(buffer);
+    writes.markTyped();
+    writes.arm(BUFFER_COMMIT, 600, async () => {
+      await sleep(5);
+      // Unparseable: the commit keeps the buffer rather than resyncing, and never settles.
+    });
+
+    // Nothing is known yet, so nothing is claimed.
+    expect(commitBufferWrites(buffer, "source")).toBe(true);
+    expect(toasts.filter((t) => t.key?.startsWith("buffer-discarded:"))).toEqual([]);
+
+    await sleep(30);
+    const toast = toasts.find((t) => t.key === "buffer-discarded:source:s");
+    expect(toast?.message).toBe(
+      'The source you were typing was discarded — it was never parsed into "pages/about.md".',
+    );
+  });
+
+  /*
+   * THE TIMER MAY HAVE FIRED ALREADY, AND THAT IS NOT THE SAME AS NOTHING BEING ARMED.
+   *
+   * `arm` drops its key before running, so a flush arriving mid-run used to find nothing and read
+   * that as "there was nothing of the author's to carry" — then announce a discard for text that
+   * was, at that moment, being written. For the source view the window is the format host's IPC
+   * round trip: tens of milliseconds beginning the moment the author STOPS typing, which is
+   * exactly when they click another tab.
+   */
+  test("a commit already in flight is waited for, not reported as a discard", async () => {
+    resetNotifications();
+    const landed: string[] = [];
+    const buffer = fakeBuffer("# the page") as ReturnType<typeof fakeBuffer> & {
+      _editingTab?: Tab | null;
+    };
+    buffer._editingTab = tabA;
+    const writes = bufferWrites(buffer);
+    writes.markTyped();
+    writes.arm(BUFFER_COMMIT, 1, async () => {
+      const text = buffer.getValue();
+      await sleep(20);
+      landed.push(text);
+      writes.markSettled();
+    });
+
+    // Let the 1ms timer fire. The run is now executing and its key is already gone.
+    await sleep(10);
+    expect(writes.typed()).toBe(true);
+
+    expect(commitBufferWrites(buffer, "source")).toBe(true);
+    expect(toasts.filter((t) => t.key?.startsWith("buffer-discarded:"))).toEqual([]);
+
+    await sleep(40);
+    // It landed, and no toast ever claimed otherwise.
+    expect(landed).toEqual(["# the page"]);
+    expect(writes.typed()).toBe(false);
+    expect(toasts.filter((t) => t.key?.startsWith("buffer-discarded:"))).toEqual([]);
+  });
+
+  test("an async parse that lands says nothing", async () => {
+    resetNotifications();
+    const landed: string[] = [];
+    const buffer = fakeBuffer("# the page") as ReturnType<typeof fakeBuffer> & {
+      _editingTab?: Tab | null;
+    };
+    buffer._editingTab = tabA;
+    const writes = bufferWrites(buffer);
+    writes.markTyped();
+    writes.arm(BUFFER_COMMIT, 600, async () => {
+      const text = buffer.getValue();
+      await sleep(5);
+      landed.push(text);
+      writes.markSettled();
+    });
+
+    expect(commitBufferWrites(buffer, "source")).toBe(true);
+    await sleep(30);
+    expect(landed).toEqual(["# the page"]);
+    expect(toasts.filter((t) => t.key?.startsWith("buffer-discarded:"))).toEqual([]);
+  });
+
+  /**
+   * A COMMIT THAT THROWS MUST NOT ESCAPE, and its twin has been guarded since the round before.
+   *
+   * `bodyWriter`'s event branch resolves `editing.path` in the live tree, and a collaborator's
+   * delete — or a local undo — makes it resolve to nothing. The throw escaped `commitBufferWrites`,
+   * `disposeFunctionEditor` and `syncFunctionEditor`, which is the dock panel's `afterRender`: the
+   * repaint aborted mid-way, `cancel()` never ran, `dispose()` never ran, and a live 500ms timer
+   * was left over an editor whose container lit was about to replace.
+   */
+  test("a commit that throws still cancels, and is reported rather than rethrown", async () => {
+    resetNotifications();
+    const buffer = fakeBuffer("return 1;") as ReturnType<typeof fakeBuffer> & {
+      _editingTab?: Tab | null;
+    };
+    buffer._editingTab = { documentPath: "pages/index.md", id: "t" } as unknown as Tab;
+    const writes = bufferWrites(buffer);
+    writes.markTyped();
+    writes.arm(BUFFER_COMMIT, 500, () => {
+      throw new TypeError("undefined is not an object (evaluating 'node[key]')");
+    });
+    const linted: string[] = [];
+    writes.arm("lint", 10, () => void linted.push("lint"));
+
+    expect(commitBufferWrites(buffer, "logic")).toBe(false);
+
+    const toast = toasts.find((t) => t.key === "buffer-discarded:logic:t");
+    expect(toast?.detail).toContain("undefined is not an object");
+    // The teardown happened anyway: no orphan timer is left to read `""` off a detached model.
+    await sleep(40);
+    expect(linted).toEqual([]);
+  });
+
+  test("an async commit that rejects is reported the same way", async () => {
+    resetNotifications();
+    const buffer = fakeBuffer("# page") as ReturnType<typeof fakeBuffer> & {
+      _editingTab?: Tab | null;
+    };
+    buffer._editingTab = { documentPath: "pages/about.md", id: "r" } as unknown as Tab;
+    const writes = bufferWrites(buffer);
+    writes.markTyped();
+    writes.arm(BUFFER_COMMIT, 600, async () => {
+      await sleep(5);
+      throw new Error("the format host is down");
+    });
+
+    expect(commitBufferWrites(buffer, "source")).toBe(true);
+    await sleep(30);
+    const toast = toasts.find((t) => t.key === "buffer-discarded:source:r");
+    expect(toast?.detail).toContain("the format host is down");
+  });
+
+  test("a buffer that names no tab still gets a sentence", () => {
+    resetNotifications();
+    const buffer = fakeBuffer("orphan");
+    const writes = bufferWrites(buffer);
+    writes.markTyped();
+    expect(commitBufferWrites(buffer, "logic")).toBe(false);
+    const toast = toasts.find((t) => t.key === "buffer-discarded:logic:none");
+    expect(toast?.message).toContain('"Untitled"');
+    expect(toast?.path).toBeUndefined();
   });
 });
 

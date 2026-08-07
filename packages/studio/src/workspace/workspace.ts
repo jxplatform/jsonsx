@@ -610,29 +610,36 @@ export function openTab(opts: {
     tab.pinned = previous.pinned;
     disposeTab(previous);
   } else {
-    // A preview open takes the pane's existing preview slot rather than adding a chip beside it.
+    /* A preview open takes the pane's existing preview slot rather than adding a chip beside it —
+       but only after the sitting tab has been given the chance to become ineligible.
+       `promoteDirtyPreviewTabs` is the gate: an edited preview tab stops being replaceable. It
+       reads `doc.dirty`, which is a fact a buffer's armed commit has not established yet, so the
+       flush has to come BEFORE the victim is chosen. Choosing first and flushing after — which is
+       what this did — ran the gate against the state of half a second ago and then destroyed the
+       tab the gate would have saved. */
+    if (preview) {
+      const sitting = previewTabIn(pane);
+      const sittingTab = sitting ? workspace.tabs.get(sitting) : null;
+      if (sittingTab) {
+        void commitTabBuffers(sittingTab);
+      }
+      promoteDirtyPreviewTabs();
+    }
     const replaced = preview ? previewTabIn(pane) : null;
     if (replaced) {
       slot = pane.tabOrder.indexOf(replaced);
       /* THE EIGHTH WAY OUT OF A MONACO BUFFER, and the only one nobody asked for.
-         `services/monaco-buffer.ts` lists seven exits and fixes them in two places — the disposers
-         flush five, and `commitTabBuffers` covers ⌘W and quitting. This is the eighth: the author
-         single-clicked another page, so the tab they were typing in is destroyed by a gesture that
-         is not a close and shows no dialog. Same shape as ⌘W, so it gets the same call, before the
-         destruction rather than after it.
-         `promoteDirtyPreviewTabs` is the gate that should have made this unreachable — an edited
-         preview tab stops being replaceable — and it reads `doc.dirty`, which is the exact fact a
-         buffer's armed commit has not established yet. So the flush is what MAKES that fact, half
-         a second earlier than the debounce would have.
-         Not awaited, and it cannot be: `openTab` is synchronous, its callers hold the `Tab` it
-         returns, and the slot index below is computed against the strip as it is right now. So the
-         dock's body write (synchronous) lands and the source view's parse (a format round trip)
-         does not — it resolves into a tab that is already gone and its own `tabIsLive` re-check
-         drops it, which is the correct answer to "write into a destroyed tab", not a second bug. */
-      const victim = workspace.tabs.get(replaced);
-      if (victim) {
-        void commitTabBuffers(victim);
-      }
+         `services/monaco-buffer.ts` lists seven exits: the disposers flush five, and
+         `commitTabBuffers` covers ⌘W and quitting. This is the eighth — the author single-clicked
+         another page, so the tab they were typing in is destroyed by a gesture that is not a close
+         and shows no dialog. Anything the flush above carried has already promoted this tab out of
+         the preview slot, so reaching here means the buffer had nothing of the author's in it.
+         The flush is not awaited and cannot be: `openTab` is synchronous, its callers hold the
+         `Tab` it returns, and `slot` is computed against the strip as it stands. The dock's body
+         write is synchronous and therefore counts; the source view's parse is a format round trip
+         and does not. That one resolves into a tab that is already gone and its own `tabIsLive`
+         re-check drops it — the correct answer to "write into a destroyed tab", and the reason a
+         source buffer is the one case this ordering still cannot rescue. */
       closeTab(replaced);
     }
     insertIntoPane(pane, tab.id, slot);

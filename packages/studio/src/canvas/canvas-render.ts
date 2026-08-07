@@ -320,13 +320,23 @@ async function createSourceCollabBinding(
  * nothing says the edit went missing. {@link commitBufferWrites} runs the armed parse WHILE the
  * model is still attached — `getValue()` is read before its first `await` — and only then drops
  * what is left, so leaving Code view saves the edit instead of choosing which way to discard it.
+ *
+ * **And the parse is allowed not to land, which is the third way out.** Unparseable source
+ * deliberately keeps the buffer rather than resyncing over a half-typed heading — the right call
+ * while the surface is standing, and a deletion the moment it is not, because the next two lines
+ * detach the model and the text existed nowhere else. `commitBufferWrites` says so; it cannot say
+ * it synchronously, because the parse runs through the format host, so the answer arrives with the
+ * promise. Refusing the teardown instead is not available to any of the three callers: they are a
+ * pane reset, a mode transition and a model-URI swap, each of which has already taken the container
+ * or the URI this editor needs, and a Monaco kept alive over either is unreachable rather than
+ * rescued.
  */
 function disposeSourceEditor(): void {
   const editor = view.monacoEditor;
   if (!editor) {
     return;
   }
-  commitBufferWrites(editor);
+  commitBufferWrites(editor, "source");
   editor.getModel()?.dispose();
   editor.dispose();
   view.monacoEditor = null;

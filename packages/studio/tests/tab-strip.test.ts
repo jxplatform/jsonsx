@@ -489,6 +489,41 @@ describe("tab strip interactions", () => {
       expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).toBeNull();
     });
 
+    /**
+     * THE CONDITION THAT PRODUCES THE RESIDUE IS THE ONE THAT USED TO SUPPRESS THE WARNING.
+     *
+     * "Peers remain, so the edits are still on the server" holds only for a client whose edits
+     * REACH the server, and `collabReadOnly` was carved out as the one exception. The
+     * source-canonical freeze is the second: a refused `transactDoc` never reaches `onTransact`, so
+     * nothing is published, nothing is mirrored, nothing is written — for EVERY client, not merely
+     * a read-only one. And the two predicates are the same predicate, because the peer holding the
+     * source lock is by definition a peer focused on this path: the busier the room, the quieter
+     * the close became.
+     */
+    test("a co-edited tab with peers still loses the buffer's residue, so it prompts", async () => {
+      const a = open("a");
+      const state = collabState(a);
+      state.active = true;
+      state.peers = [{ clientId: 2, state: { focusedPath: "/project/a.json" } as never }];
+      // What the freeze leaves: `bodyWriter` was refused, so the buffer never settled and the
+      // Document is not even dirty.
+      const buffer = {
+        _editingTab: a,
+        getModel: () => ({}),
+        getValue: () => "state.count += 1;",
+        hasTextFocus: () => false,
+      };
+      bufferWrites(buffer).markTyped();
+      view.functionEditor = buffer as never;
+      await flush();
+      (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+      await flush();
+
+      expect(a.doc.dirty).toBe(false);
+      expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).not.toBeNull();
+      expect(workspace.tabs.has("a")).toBe(true);
+    });
+
     test("a buffer that is merely AHEAD is not unsaved work, and closes without a word", async () => {
       const a = open("a");
       // Format-on-open, over a body `closeFunctionEditor` minified: the buffer differs from the
@@ -592,28 +627,115 @@ describe("tab strip interactions", () => {
       expect(await answering).toBe(false);
     });
 
-    /**
-     * §14.7 for the set: one un-saveable document makes "Save All" a button that would report
-     * success while leaving work behind, so the whole prompt drops to the honest pair.
-     */
-    test("one document that cannot be saved takes Save off the whole prompt", async () => {
-      open("a").doc.dirty = true;
-      const b = open("b");
+    /** An unparseable source buffer on `id`, which is what makes a tab un-saveable. */
+    function blockTab(id: string) {
+      const tab = open(id);
       const buffer = {
-        _editingTab: b,
+        _editingTab: tab,
         getModel: () => ({}),
         getValue: () => "# Half a headi",
         hasTextFocus: () => false,
       };
       bufferWrites(buffer).markTyped();
       view.monacoEditor = buffer as never;
+      return tab;
+    }
+
+    /**
+     * §14.7 SAYS A DIALOG MAY NOT OFFER AN ANSWER THE APP CANNOT HONOUR. It does not say to
+     * withdraw one it can.
+     *
+     * The blocked check was all-or-nothing, so one unparseable source buffer among five dirty
+     * documents left "Close Without Saving" as the only forward answer — and taking it threw away
+     * four documents that would have written perfectly, none of them even named. The rule the
+     * button actually has to satisfy is that its LABEL is true: "Save All" is a lie here, and "Save
+     * 2 of 3" is not.
+     */
+    test("one blocked document does not take Save away from the ones that can be written", async () => {
+      const { state } = installMockPlatform();
+      open("a").doc.dirty = true;
+      open("b").doc.dirty = true;
+      blockTab("c");
+      await flush();
+      const answering = confirmCloseAll("Opening another project");
+      await flush();
+      const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
+
+      expect(dialog.getAttribute("headline")).toBe("Unsaved Changes");
+      expect(dialog.getAttribute("confirm-label")).toBe("Save 2 of 3");
+      expect(dialog.getAttribute("secondary-label")).toBe("Close Without Saving");
+      // The split is named, so the honest answer is still a legible one.
+      expect(dialog.textContent).toContain("3 documents have unsaved changes");
+      expect(dialog.textContent).toContain('"c.json" cannot be saved at all');
+      expect(dialog.textContent).toContain("saving writes the other 2 and discards that one");
+
+      dialog.dispatchEvent(new Event("confirm"));
+      expect(await answering).toBe(true);
+      expect(state.files.has("/project/a.json")).toBe(true);
+      expect(state.files.has("/project/b.json")).toBe(true);
+      // And the blocked one is never attempted: `saveFile` would report success for a write that
+      // Left the buffer's text behind, which is exactly why it was named on the button.
+      expect(state.files.has("/project/c.json")).toBe(false);
+    });
+
+    test("two blocked documents are counted rather than named, and both are excluded", async () => {
+      const { state } = installMockPlatform();
+      open("a").doc.dirty = true;
+      // A read-only session is the other way a tab cannot be saved — nothing was ever published.
+      const b = open("b");
+      b.doc.dirty = true;
+      Object.assign(collabState(b), { active: true, readOnly: true });
+      blockTab("c");
+      await flush();
+      const answering = confirmCloseAll("Opening another project");
+      await flush();
+      const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
+      expect(dialog.getAttribute("confirm-label")).toBe("Save 1 of 3");
+      expect(dialog.textContent).toContain("2 of them cannot be saved at all");
+      expect(dialog.textContent).toContain("saving writes the other 1 and discards those");
+      dialog.dispatchEvent(new Event("confirm"));
+      expect(await answering).toBe(true);
+      expect(state.files.has("/project/a.json")).toBe(true);
+      expect(state.files.has("/project/b.json")).toBe(false);
+      expect(state.files.has("/project/c.json")).toBe(false);
+    });
+
+    /** {@link shouldWarnOnClose} is the one definition, so the set inherits the freeze fix free. */
+    test("a co-edited tab whose buffer the room never saw is counted in the set", async () => {
+      const a = open("a");
+      const state = collabState(a);
+      state.active = true;
+      state.peers = [{ clientId: 2, state: { focusedPath: "/project/a.json" } as never }];
+      const buffer = {
+        _editingTab: a,
+        getModel: () => ({}),
+        getValue: () => "state.count += 1;",
+        hasTextFocus: () => false,
+      };
+      bufferWrites(buffer).markTyped();
+      view.functionEditor = buffer as never;
+      await flush();
+      const answering = confirmCloseAll("Opening another project");
+      await flush();
+      // Without the freeze fix there is no prompt at all: the peer count answered for text the
+      // Room was never told about, and the switch took it silently.
+      const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
+      expect(dialog).not.toBeNull();
+      expect(dialog.textContent).toContain('"a.json" has unsaved changes');
+      // And Save is not on offer, because the document does not contain the buffer's text either.
+      expect(dialog.getAttribute("headline")).toBe("Changes Cannot Be Saved");
+      dialog.dispatchEvent(new Event("confirm"));
+      expect(await answering).toBe(true);
+    });
+
+    test("when NOTHING in the set can be saved the prompt drops to the honest pair", async () => {
+      blockTab("b");
       await flush();
       const answering = confirmCloseAll("Opening another project");
       await flush();
       const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
       expect(dialog.getAttribute("headline")).toBe("Changes Cannot Be Saved");
       expect(dialog.getAttribute("secondary-label")).toBeNull();
-      expect(dialog.textContent).toContain("2 documents have unsaved changes");
       expect(dialog.textContent).toContain('"b.json" cannot be saved at all');
       dialog.dispatchEvent(new Event("confirm"));
       expect(await answering).toBe(true);

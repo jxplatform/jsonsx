@@ -131,7 +131,7 @@ const {
   registerFunctionCompletions,
   syncFunctionEditor,
 } = await import("../src/panels/editors");
-const { render: litRender } = await import("lit-html");
+const { nothing, render: litRender } = await import("lit-html");
 const { loadMonaco } = await import("../src/services/monaco-lazy");
 const { initShellRefs, registerRenderer } = await import("../src/store");
 const { activeCanvasSurface } = await import("../src/canvas/canvas-surface");
@@ -866,6 +866,122 @@ describe("closeFunctionEditor", () => {
     await commitTabBuffers(tab);
     expect((tab.doc.document.state as any).greet.body).toBe("return 43;");
     expect(tabBufferUnsaved(tab)).toBe(false);
+  });
+
+  /**
+   * THE FIVE EXITS THAT ARE NOT THE CLOSE BUTTON, and what a refusal costs them.
+   *
+   * `closeFunctionEditor` can refuse: the surface is standing, so keeping the text on screen IS an
+   * answer. A DISPOSER has no such option — every one of its callers is a repaint or a mode
+   * transition that has already replaced the container, so a Monaco kept alive over one is
+   * unreachable rather than rescued. Its two remaining choices were to say the text went or to say
+   * nothing, and it said nothing: the flush's answer was discarded, the next line detached the
+   * model, and `buffersForTab` then stopped finding the buffer — so `tabBufferUnsaved`,
+   * `shouldWarnOnClose` and `hasUnsavedTabs` all went back to "nothing to lose" about a handler
+   * that no longer existed anywhere. The author saw only the freeze's standing "structural edits
+   * are paused" toast, which does not say that a surface just deleted their work.
+   */
+  test("a dock tab switch under the freeze reports the handler it discarded", async () => {
+    setEditing({ defName: "greet", type: "def" });
+    await paintLogic();
+    const ed = created.at(-1)!;
+    ed.type("return 42;");
+    const tab = activeTab.value!;
+    expect(tabBufferUnsaved(tab)).toBe(true);
+    resetNotifications();
+
+    setTransactGate(() => "source-canonical");
+    try {
+      // Selecting Problems: lit replaced the Logic tab's body, so `afterRender` finds no container.
+      litRender(nothing, dock);
+      syncFunctionEditor(dock);
+    } finally {
+      setTransactGate(null);
+    }
+
+    expect(ed.disposed).toBe(true);
+    expect(view.functionEditor).toBeNull();
+    expect((tab.doc.document.state as any).greet.body).toBe("return 1;");
+    // The buffer went with the text, so nothing else can ever report this.
+    expect(tabBufferUnsaved(tab)).toBe(false);
+    const toast = toasts.find((t) => t.key === `buffer-discarded:logic:${tab.id}`);
+    expect(toast?.message).toBe(
+      'The handler you were typing was discarded — it was never written into "/project/pages/index.json".',
+    );
+  });
+
+  /** The pair the last round left half-done: the Close kept the text, and the next exit ate it. */
+  test("a refused Close keeps the text, and the teardown that follows says it is gone", async () => {
+    setEditing({ defName: "greet", type: "def" });
+    await paintLogic();
+    const ed = created.at(-1)!;
+    ed.type("return 42;");
+    const tab = activeTab.value!;
+
+    setTransactGate(() => "source-canonical");
+    try {
+      await closeFunctionEditor();
+      // Refused: the surface is exactly as it was, which is the whole point of the refusal.
+      expect(ed.disposed).toBe(false);
+      expect(tabBufferUnsaved(tab)).toBe(true);
+      resetNotifications();
+
+      // Now collapse the dock. Nothing is armed any more — the Close cancelled it — so the buffer
+      // Is simply detached, and the only thing that can speak is the disposer.
+      litRender(nothing, dock);
+      syncFunctionEditor(dock);
+    } finally {
+      setTransactGate(null);
+    }
+
+    expect(ed.disposed).toBe(true);
+    expect(tabBufferUnsaved(tab)).toBe(false);
+    expect(toasts.some((t) => t.key === `buffer-discarded:logic:${tab.id}`)).toBe(true);
+  });
+
+  test("a teardown that carried the body says nothing at all", async () => {
+    setEditing({ defName: "greet", type: "def" });
+    await paintLogic();
+    created.at(-1)!.type("return 42;");
+    const tab = activeTab.value!;
+    resetNotifications();
+
+    litRender(nothing, dock);
+    syncFunctionEditor(dock);
+
+    expect((tab.doc.document.state as any).greet.body).toBe("return 42;");
+    expect(toasts.filter((t) => t.key?.startsWith("buffer-discarded:"))).toEqual([]);
+  });
+
+  /**
+   * THE NODE UNDER THE HANDLER CAN GO WHILE THE HANDLER IS OPEN.
+   *
+   * A collaborator deleting the button — or the author's own ⌘Z — leaves `editing.path` resolving
+   * to nothing, and `mutateUpdateProperty` read `getNodeAtPath(...)[key]` straight through it. The
+   * `undefined is not an object` escaped the commit, `commitBufferWrites` and
+   * `disposeFunctionEditor` and came out of the dock panel's `afterRender`: the repaint aborted
+   * mid-way with `cancel()` unrun, `dispose()` unrun, and a live 500ms timer left over an editor
+   * whose container lit was about to replace — a timer that would read `""` off a detached model,
+   * which is the exact defect this module was created to prevent.
+   */
+  test("the element the handler hangs off being deleted neither throws nor loses the alarm", async () => {
+    setEditing({ eventKey: "onclick", path: ["children", 0], type: "event" });
+    await paintLogic();
+    const ed = created.at(-1)!;
+    ed.type("boom()");
+    const tab = activeTab.value!;
+    // The delete arrives — over the wire, or from undo.
+    (tab.doc.document.children as any[]).length = 0;
+    resetNotifications();
+
+    litRender(nothing, dock);
+    expect(() => syncFunctionEditor(dock)).not.toThrow();
+
+    // The teardown completed: no orphan editor, no orphan timer.
+    expect(ed.disposed).toBe(true);
+    expect(view.functionEditor).toBeNull();
+    // And the write was reported as the non-event it was, rather than as a success.
+    expect(toasts.some((t) => t.key === `buffer-discarded:logic:${tab.id}`)).toBe(true);
   });
 
   test("is a no-op with no target, and clears the target when no editor was mounted", async () => {

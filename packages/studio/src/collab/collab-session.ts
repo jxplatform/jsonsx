@@ -521,14 +521,32 @@ export function collabSourceContext(tab: Tab): {
       if (local) {
         handle.awareness.setLocalState({ ...local, mode: "structure" });
       }
+      /* A client with no write access never reached `acquireSourceCanonical` above, so it holds
+         nothing to hand back — and `releaseSourceCanonical` is itself a write to shared state,
+         which the relay drops from a read-only socket anyway. The guard is right; it was never the
+         asymmetry. See below for the one that was. */
       if (!session.canWrite) {
         return;
       }
-      const others = collab.otherSourceEditors(
-        handle.awareness,
-        session.path,
-        handle.awareness.clientID,
-      );
+      /* AND A READ-ONLY VIEWER MUST NOT COUNT AS SOMEONE STILL HOLDING THE LOCK.
+         `otherSourceEditors` answers "who else has Code view open", per awareness, which is a
+         different question from the one asked here: who else could be the reason not to release.
+         A read-only guest publishes `mode: "source"` when they open Code view and then returns at
+         the guard above — they can neither acquire the lock nor hand it back. Counted, they made
+         the LAST WRITE-CAPABLE editor's departure release nothing, and their own departure release
+         nothing: `meta.canonical` stayed `"source"` for the whole room, forever, and with the
+         lock-holder exemption gone from the transact gate that is every client frozen out of every
+         structural edit, with only the keyed "structural edits are paused" toast to explain it.
+         The same `canWrite !== false` filter the reconciler election above uses, for the same
+         reason: a client that cannot write cannot be the one holding a write. */
+      const others = collab
+        .otherSourceEditors(handle.awareness, session.path, handle.awareness.clientID)
+        .filter((clientId) => {
+          const peer = handle.awareness.getStates().get(clientId) as
+            | { canWrite?: boolean }
+            | undefined;
+          return peer?.canWrite !== false;
+        });
       if (others.length === 0) {
         // Freshen the structure mirror once more, then hand the lock back.
         void sourceParseNow(session).then(() => {

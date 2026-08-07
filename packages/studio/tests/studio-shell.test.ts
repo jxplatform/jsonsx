@@ -853,6 +853,45 @@ describe("openRecentProject", () => {
       expect(dialog()).toBeNull();
       expect(platform.projectRoot).toBe("/recent/site");
     });
+
+    /*
+     * The directory picker is a SECOND destroyer, and it was ungated for as long as the first was.
+     * `openRecentProject` asks and then calls `closeAllTabs`; this branch reaches `files.ts`'s
+     * `replaceAllTabs`, which throws the same documents away under a different name — so an
+     * enumeration of "who calls closeAllTabs" reported the matrix complete while ⌘O, the toolbar
+     * button and the welcome screen all discarded unsaved work in silence. `platformUsesRepoPicker`
+     * is true only for the cloud platform, so desktop and browser both arrived here.
+     */
+    test("Open Project… asks too, and Cancel never reaches the platform", async () => {
+      const before = state.calls.filter((c) => c[0] === "openProject").length;
+      const tab = openShellTab();
+      tab.doc.dirty = true;
+      const opening = toolbarCtx.openProject();
+      await flush(4);
+
+      const el = dialog()!;
+      expect(el).not.toBeNull();
+      expect(el.textContent).toContain("Opening another project closes every open document");
+      el.dispatchEvent(new Event("cancel"));
+      await opening;
+
+      // The picker is never even shown: the question comes before the gesture that destroys.
+      expect(state.calls.filter((c) => c[0] === "openProject")).toHaveLength(before);
+      expect(workspace.tabs.has("shell-tab")).toBe(true);
+      expect(tab.doc.dirty).toBe(true);
+    });
+
+    test("Open Project… proceeds to the picker once the answer allows it", async () => {
+      const before = state.calls.filter((c) => c[0] === "openProject").length;
+      const tab = openShellTab();
+      tab.doc.dirty = true;
+      const opening = toolbarCtx.openProject();
+      await flush(4);
+      dialog()!.dispatchEvent(new Event("secondary"));
+      await opening;
+
+      expect(state.calls.filter((c) => c[0] === "openProject")).toHaveLength(before + 1);
+    });
   });
 });
 

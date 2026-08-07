@@ -210,6 +210,72 @@ describe("the canonical source lock", () => {
     expect((tabJson(tab).children as JxMutableNode[])[0]!.textContent).toBe("Still mine");
   });
 
+  /**
+   * A READ-ONLY GUEST COULD FREEZE THE ROOM FOREVER, and neither half of it could get out.
+   *
+   * `enter()` returns at its `canWrite` guard, so a read-only client never acquires the lock — but
+   * it does publish `mode: "source"` the moment it opens Code view, and `otherSourceEditors`
+   * counted it. So the LAST write-capable editor's `leave()` saw "somebody else still has Code view
+   * open" and released nothing, and the guest's own `leave()` returned at the same `canWrite`
+   * guard, holding nothing it could hand back. `meta.canonical` stayed `"source"` for the whole
+   * room, and with the lock-holder exemption gone from the transact gate that is every client
+   * frozen out of every structural edit — permanently, with only a keyed toast to explain it.
+   *
+   * A client that cannot write cannot be the one holding a write, which is the same reasoning the
+   * reconciler election already uses.
+   */
+  test("a read-only peer in code view does not keep the lock after the writer leaves", async () => {
+    const hub = createMockCollabHub();
+    const tab = await openAttached(hub);
+    const guest = (await hub.capability(PATH))!;
+    guest.awareness.setLocalState({
+      canWrite: false,
+      focusedPath: PATH,
+      mode: "source",
+      user: { color: "#fff", login: "guest" },
+    });
+    await settleCollab();
+
+    const ctx = collabSourceContext(tab)!;
+    await ctx.enter();
+    await settleCollab();
+    expect(canonicalOf(hub.serverDoc(PATH))).toBe("source");
+
+    ctx.leave();
+    await settleCollab();
+
+    expect(canonicalOf(hub.serverDoc(PATH))).toBe("structure");
+    expect(collabState(tab).sourceCanonical).toBe(false);
+    // And structural editing works again for everybody, which is the whole point of the release.
+    transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 0], "textContent", "Unfrozen"));
+    expect((tabJson(tab).children as JxMutableNode[])[0]!.textContent).toBe("Unfrozen");
+    guest.destroy();
+  });
+
+  test("a WRITE-CAPABLE peer in code view still holds the lock open", async () => {
+    const hub = createMockCollabHub();
+    const tab = await openAttached(hub);
+    const peer = (await hub.capability(PATH))!;
+    peer.awareness.setLocalState({
+      canWrite: true,
+      focusedPath: PATH,
+      mode: "source",
+      user: { color: "#fff", login: "peer" },
+    });
+    await settleCollab();
+
+    const ctx = collabSourceContext(tab)!;
+    await ctx.enter();
+    await settleCollab();
+    ctx.leave();
+    await settleCollab();
+
+    // Somebody is still co-editing the text the tree is derived from — releasing would make the
+    // Structure canonical underneath them.
+    expect(canonicalOf(hub.serverDoc(PATH))).toBe("source");
+    peer.destroy();
+  });
+
   test("the source reconciler parses peer text edits into everyone's structure", async () => {
     const hub = createMockCollabHub();
     const tab = await openAttached(hub);

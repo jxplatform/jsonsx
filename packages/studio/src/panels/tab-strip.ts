@@ -845,7 +845,8 @@ export function tabLabel(tab: Tab): string {
  * @param {Tab} tab
  */
 export function shouldWarnOnClose(tab: Tab): boolean {
-  if (!tab.doc.dirty && !tabBufferUnsaved(tab)) {
+  const residue = tabBufferUnsaved(tab);
+  if (!tab.doc.dirty && !residue) {
     return false;
   }
   const state = collabState(tab);
@@ -856,6 +857,17 @@ export function shouldWarnOnClose(tab: Tab): boolean {
   // The server. A read-only client publishes nothing (`collabReadOnly`), so its work is in this
   // Browser and nowhere else, and the room being busy is no comfort at all.
   if (collabReadOnly(tab)) {
+    return true;
+  }
+  /* AND THE FREEZE IS THE SECOND WAY EDITS DO NOT REACH THE SERVER. Buffer residue is by
+     construction text `onTransact` never saw — `commitTabBuffers` ran above this gate and the write
+     was refused, so nothing was ever published, mirrored or written to disk. It is in this browser
+     and nowhere else for EVERY client, not merely for a read-only one, so no peer count can make it
+     safe. Worse, the two predicates are the same predicate under the source-canonical freeze: the
+     lock holder is by definition a peer focused on this path, so the busier the room got, the
+     quieter the close became. Asked before the peer count rather than after, because the peer count
+     has no jurisdiction over text the room has never been told about. */
+  if (residue) {
     return true;
   }
   const peersHere = state.peers.filter((p) => p.state?.focusedPath === tab.documentPath);
@@ -997,9 +1009,15 @@ export async function requestClose(id: string) {
  * **The same three rules as {@link confirmClose}, applied to the set.** {@link shouldWarnOnClose}
  * is the one definition of "closing this loses work" — it already knows about collab peers who
  * still hold the room, read-only sessions and buffers the document never received — so the set is
- * whatever it says yes to. And Save is offered only if it can be honoured for EVERY one of them:
- * one un-saveable document in the set (§14.7 again) makes "Save" a button that would leave work
- * behind while reporting success, so the whole prompt drops to the honest pair.
+ * whatever it says yes to.
+ *
+ * **§14.7 says a dialog may not offer an answer the app cannot honour; it does not say to withdraw
+ * one it can.** The blocked check used to be all-or-nothing, so an author with five dirty documents
+ * and one unparseable source buffer was offered "Close Without Saving" or "Keep Editing" — and the
+ * forward answer threw away four documents that would have written perfectly. The rule the button
+ * has to satisfy is that its LABEL is true: "Save All" is a lie when one of them cannot be saved,
+ * and `Save 4 of 5` is not. So the split is named in the sentence, the count is on the button, and
+ * the only prompt that drops to the honest pair is the one where nothing at all can be written.
  *
  * **A failed save cancels the switch.** Same reason as the single-tab close: an author who watched
  * a write fail must not then watch the document be discarded because they had asked to save it.
@@ -1023,19 +1041,31 @@ export async function confirmCloseAll(action: string): Promise<boolean> {
     unsaved.length === 1
       ? `"${tabLabel(unsaved[0]!)}" has unsaved changes`
       : `${unsaved.length} documents have unsaved changes`;
-  const blocked = unsaved.find((tab) => saveUnavailableReason(tab) !== null);
-  if (blocked) {
+  const blocked = unsaved.filter((tab) => saveUnavailableReason(tab) !== null);
+  const saveable = unsaved.filter((tab) => saveUnavailableReason(tab) === null);
+  const blockedNames =
+    blocked.length === 1 ? `"${tabLabel(blocked[0]!)}"` : `${blocked.length} of them`;
+  if (saveable.length === 0) {
+    // Nothing to offer: every dirty document in the set would be written without the text the
+    // Author is looking at, so there is no honourable Save and the pair is the whole truth.
     return showConfirmDialog(
       "Changes Cannot Be Saved",
-      `${action} closes every open document, and ${count}. "${tabLabel(blocked)}" cannot be ` +
+      `${action} closes every open document, and ${count}. ${blockedNames} cannot be ` +
         `saved at all, so saving would leave work behind. Closing discards it.`,
       { cancelLabel: "Keep Editing", confirmLabel: "Close Without Saving", destructive: true },
     );
   }
   const answer = await showSaveDiscardDialog(
     "Unsaved Changes",
-    `${action} closes every open document, and ${count}.`,
-    { discardLabel: "Close Without Saving", saveLabel: "Save All" },
+    blocked.length === 0
+      ? `${action} closes every open document, and ${count}.`
+      : `${action} closes every open document, and ${count}. ${blockedNames} cannot be saved at ` +
+          `all — saving writes the other ${saveable.length} and discards ` +
+          `${blocked.length === 1 ? "that one" : "those"}.`,
+    {
+      discardLabel: "Close Without Saving",
+      saveLabel: blocked.length === 0 ? "Save All" : `Save ${saveable.length} of ${unsaved.length}`,
+    },
   );
   if (answer === "cancel") {
     return false;
@@ -1043,7 +1073,9 @@ export async function confirmCloseAll(action: string): Promise<boolean> {
   if (answer === "discard") {
     return true;
   }
-  for (const tab of unsaved) {
+  // The blocked ones are deliberately not attempted: `saveFile` would report success for a write
+  // That left the buffer's text behind, which is the whole reason they were named on the button.
+  for (const tab of saveable) {
     if (!(await saveFile(tab))) {
       return false;
     }

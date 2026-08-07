@@ -90,6 +90,11 @@
  * destroy a tab ({@link commitTabBuffers}'s callers) read {@link BufferWrites.typed}, which is
  * exactly the text a close would take with it.
  *
+ * {@link commitBufferWrites} reads the same fact from the other end. A gate asks it BEFORE the
+ * destruction, to decide whether to prompt; a disposer asks it AFTER its own flush, when the answer
+ * can only be "I have just deleted this" — and is the last thing in a position to say so, because
+ * the next line detaches the model and `buffersForTab` stops finding the buffer at all.
+ *
  * Writes OUT of a buffer — a debounce reading `getValue()` into the document — ask `bufferIsLive`
  * instead, which is clause 1 alone. Deliberately, and it is the only kind of call site in the
  * codebase entitled to a subset: clauses 2 and 3 describe a buffer that is AHEAD of the document,
@@ -154,6 +159,13 @@ export interface BufferWrites {
    * Returns whatever the work returned, so an async commit can be awaited. The disposers ignore it
    * on purpose: they flush precisely because they are about to detach the model, and every commit
    * reads `getValue()` before its own first `await`.
+   *
+   * **A commit that already fired counts as armed.** The timer drops its key before running, so a
+   * flush arriving mid-run would otherwise find nothing and read that as "there was nothing to
+   * carry" — which for the source view, whose commit awaits an IPC round trip to the format host,
+   * is a window of tens of milliseconds starting the moment the author stops typing. Exactly when
+   * they click another tab. The in-flight promise is returned instead, so the caller waits for the
+   * answer rather than inventing one.
    */
   flush: (key: string) => void | Promise<void>;
   /** Clause 3, as a fact: the buffer holds text the document has not been given. */
@@ -197,9 +209,29 @@ export const BUFFER_COMMIT = "commit";
 export function bufferWrites(buffer: MonacoBuffer): BufferWrites {
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const runs = new Map<string, () => void | Promise<void>>();
+  /** Runs that have started and not yet answered. See {@link BufferWrites.flush}. */
+  const inFlight = new Map<string, Promise<void>>();
   let isAhead = false;
   let isTyped = false;
   let isShared = false;
+  /**
+   * Remember a run while it is answering, so a flush arriving mid-run returns its promise rather
+   * than the `undefined` that means "nothing was armed". Self-clearing, and it never rejects — the
+   * caller inspects the settled state through `typed()`, and a rejection is the commit's own to
+   * report.
+   */
+  function track(key: string, result: void | Promise<void>): void | Promise<void> {
+    if (typeof (result as Promise<void> | undefined)?.then !== "function") {
+      return result;
+    }
+    const promise = (result as Promise<void>).finally(() => {
+      if (inFlight.get(key) === promise) {
+        inFlight.delete(key);
+      }
+    });
+    inFlight.set(key, promise);
+    return promise;
+  }
   const writes: BufferWrites = {
     arm(key, ms, run) {
       clearTimeout(timers.get(key));
@@ -211,7 +243,7 @@ export function bufferWrites(buffer: MonacoBuffer): BufferWrites {
           // Arm cleared out from under it, and a flush of a key already executing must find nothing.
           timers.delete(key);
           runs.delete(key);
-          void run();
+          track(key, run());
         }, ms),
       );
     },
@@ -225,12 +257,13 @@ export function bufferWrites(buffer: MonacoBuffer): BufferWrites {
     flush(key) {
       const run = runs.get(key);
       if (!run) {
-        return;
+        // Nothing armed — but something may be RUNNING. Its answer is the honest one.
+        return inFlight.get(key);
       }
       clearTimeout(timers.get(key));
       timers.delete(key);
       runs.delete(key);
-      return run();
+      return track(key, run());
     },
     ahead: () => isAhead,
     markAhead() {
@@ -252,6 +285,68 @@ export function bufferWrites(buffer: MonacoBuffer): BufferWrites {
   };
   buffer._writes = writes;
   return writes;
+}
+
+/**
+ * The two Monaco surfaces, named so a teardown that loses text can say what the author was looking
+ * at when it went. Both spellings are this module's, not the caller's, because the sentence has to
+ * read the same whichever disposer produced it.
+ */
+export type BufferSurface = "logic" | "source";
+
+const SURFACE: Record<BufferSurface, { holds: string; reached: string; source: string }> = {
+  logic: { holds: "The handler you were typing", reached: "written into", source: "Logic" },
+  source: { holds: "The source you were typing", reached: "parsed into", source: "Editor" },
+};
+
+/**
+ * Say that a teardown destroyed the author's typing, and answer whether it did.
+ *
+ * Called once per {@link commitBufferWrites}, at the moment the answer is known — synchronously for
+ * the dock's body write, and from the promise's continuation for the source view's parse, which
+ * cannot answer before the disposer has returned.
+ *
+ * **A toast rather than a Problem, and the difference is whether anything can be done.** A commit
+ * that THREW leaves the text in the buffer, so {@link commitTabBuffers} files a Problem — the
+ * author can still go and rescue it, minutes later. Here the buffer is being detached in the same
+ * breath: there is nothing left to fix, and a record the app promises to keep until somebody fixes
+ * it is the wrong host for a loss that is already final.
+ *
+ * **It does not ask whether a gate already said this.** A close that destroys the TAB runs
+ * `commitTabBuffers` and its dialog first, so an author who chose "Close Without Saving" hears it
+ * twice; "is that tab still open?" is `workspace`'s to answer, and `workspace` imports this module.
+ * One extra keyed toast confirming a choice the author just made is the cheaper of the two costs.
+ *
+ * @param {MonacoBuffer} buffer
+ * @param {BufferSurface} surface
+ * @param {{ error: unknown } | null} failure What the commit threw, BOXED — a commit is free to
+ *   throw `undefined`, and "did it throw" must not become "was what it threw interesting".
+ * @returns {boolean} True when there was nothing to lose.
+ */
+function reportDiscarded(
+  buffer: MonacoBuffer,
+  surface: BufferSurface,
+  failure: { error: unknown } | null,
+): boolean {
+  const writes = buffer._writes;
+  if (writes?.typed() !== true) {
+    return true;
+  }
+  const tab = buffer._editingTab ?? null;
+  const where = tab?.documentPath ?? "Untitled";
+  const { holds, reached, source } = SURFACE[surface];
+  notify.warn(`${holds} was discarded — it was never ${reached} "${where}".`, {
+    ...(failure ? { detail: describeCommitFailure(failure.error) } : {}),
+    key: `buffer-discarded:${surface}:${tab?.id ?? "none"}`,
+    source,
+    ...(tab?.documentPath ? { path: tab.documentPath } : {}),
+  });
+  return false;
+}
+
+/** What a failed commit is worth showing: the stack when there is one, the value otherwise. */
+function describeCommitFailure(error: unknown): string {
+  return error instanceof Error ? (error.stack ?? error.message) : String(error);
 }
 
 /**
@@ -285,18 +380,68 @@ export function bufferWrites(buffer: MonacoBuffer): BufferWrites {
  * other disposal path — `disposeFunctionEditor`, `disposeSourceEditor` and therefore
  * `resetCanvasView`, the model-URI swap and the mode transition — flushes.
  *
+ * **AND THE FLUSH IS ALLOWED TO FAIL, which is what the answer is for.** `bodyWriter` returns
+ * whether the body reached the document, and it returns `false` whenever the collab gate refuses
+ * the write, the tab is gone, or the element the handler hangs off has been deleted; the source
+ * view's parse simply declines to settle when the text does not parse. Throwing that answer away
+ * here made five exits — dock tab switch, dock collapse, ⌘, opening another Logic target, switching
+ * to another tab, plus the source view's model-URI swap and its mode transition — into silent
+ * deletions: the buffer holding the only copy is detached on the next line, and with it goes
+ * `buffersForTab`'s knowledge that it ever existed, so {@link tabBufferUnsaved} and every gate
+ * built on it go back to answering "nothing to lose" about text that has just been destroyed.
+ *
+ * `closeFunctionEditor` shows the other shape — a refused write keeps the surface, so the text
+ * stays on screen and the author can act. **A disposer has no such option.** Every one of its call
+ * sites is a repaint or a mode transition that has already replaced the container, and refusing
+ * would leave a live Monaco bound to detached DOM, which is the leak this module's teardown exists
+ * to prevent. So the disposers all choose the other answer: they cannot keep the text, and they say
+ * that it is gone ({@link reportDiscarded}).
+ *
+ * **The source view's commit answers late, and the report goes with it.** Its parse is an `await`,
+ * so the disposer is long finished by the time "did it land" has a value; the promise's
+ * continuation reports, and the synchronous return says only what is known at return time. A
+ * `false` therefore always means the loss is certain and has been announced.
+ *
  * @param {MonacoBuffer | null | undefined} buffer
+ * @param {BufferSurface} surface Which editor is being destroyed — names the toast.
+ * @returns {boolean} True when the teardown carried everything the author typed, or there was
+ *   nothing of theirs to carry. False when it destroyed the author's text, which is reported.
  */
-export function commitBufferWrites(buffer: MonacoBuffer | null | undefined): void {
+export function commitBufferWrites(
+  buffer: MonacoBuffer | null | undefined,
+  surface: BufferSurface,
+): boolean {
   const writes = buffer?._writes;
-  if (!writes) {
-    return;
+  if (!buffer || !writes) {
+    return true;
   }
-  // Fire-and-forget on purpose: the disposer is synchronous, and the commit read `getValue()`
-  // Before its own first `await`. What is left to await is the write INTO the document, which does
-  // Not need this editor to still exist.
-  void writes.flush(BUFFER_COMMIT);
+  /* THE FLUSH IS GUARDED AND ITS TWIN'S WAS NOT, which is the whole difference between a failed
+     commit and a broken repaint. `bodyWriter`'s event branch resolves `editing.path` in the live
+     tree, and a collaborator's delete — or a local undo — makes that path resolve to nothing. The
+     throw escaped into `disposeFunctionEditor`, into `syncFunctionEditor`, and out of the dock
+     panel's `afterRender`: the repaint aborted mid-way, `cancel()` never ran, `dispose()` never
+     ran, and a live 500ms timer was left over an editor whose container lit was about to replace.
+     A timer reading `""` off a detached model is the exact defect this module was created to
+     prevent, so the teardown below must happen whatever the commit does. */
+  let pending: Promise<void> | undefined;
+  try {
+    // Fire-and-forget on purpose: the disposer is synchronous, and the commit read `getValue()`
+    // Before its own first `await`. What is left to await is the write INTO the document, which
+    // Does not need this editor to still exist.
+    pending = writes.flush(BUFFER_COMMIT) as Promise<void> | undefined;
+  } catch (error) {
+    writes.cancel();
+    return reportDiscarded(buffer, surface, { error });
+  }
   writes.cancel();
+  if (typeof pending?.then === "function") {
+    void pending.then(
+      () => reportDiscarded(buffer, surface, null),
+      (error: unknown) => reportDiscarded(buffer, surface, { error }),
+    );
+    return true;
+  }
+  return reportDiscarded(buffer, surface, null);
 }
 
 /**

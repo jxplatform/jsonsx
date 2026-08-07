@@ -262,6 +262,26 @@ describe("mutateUpdateProperty", () => {
     expect((tab.doc.document as any).children[0].textContent).toBeUndefined();
     disposeTab(tab);
   });
+
+  /**
+   * A PATH THAT NO LONGER RESOLVES IS AN ORDINARY STATE OF THE DOCUMENT, not a programming error.
+   *
+   * Deletions arrive from collaborators and from the author's own undo while a surface addressing
+   * the deleted node is still open. `getNodeAtPath` answers `undefined` for the coordinate, and
+   * `node[key]` on that threw `undefined is not an object` from INSIDE the mutation — rolled back
+   * and rethrown by `transactDoc`, correctly, into whatever asked for the edit. For the dock's
+   * debounced body commit that caller is `commitBufferWrites`, and the throw came out of the dock
+   * panel's `afterRender`: the repaint aborted with the editor undisposed and its 500ms timer still
+   * armed over a container lit was about to replace.
+   */
+  test("a path that no longer resolves changes nothing instead of throwing", () => {
+    const tab = makeTab();
+    expect(() =>
+      transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 7], "onclick", { body: "x" })),
+    ).not.toThrow();
+    expect((tab.doc.document as any).children[7]).toBeUndefined();
+    disposeTab(tab);
+  });
 });
 
 describe("mutateUpdateStyle", () => {

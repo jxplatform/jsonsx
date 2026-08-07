@@ -446,6 +446,39 @@ describe("preview tabs", () => {
     expect(landed).toEqual(["typed();"]);
     view.functionEditor = null;
   });
+
+  /*
+   * ...and the flush has to come BEFORE the victim is chosen, or the gate runs against the past.
+   *
+   * `promoteDirtyPreviewTabs` is what makes an edited preview tab unreplaceable, and it reads
+   * `doc.dirty` — the fact the flush creates. Choosing the victim first and flushing after asked
+   * the gate about the state of half a second ago, then destroyed the tab the gate would have
+   * saved. The successful write is what made it silent: the buffer settles, so the discard toast
+   * is correctly suppressed, and the edit dies inside a document destroyed on the next line.
+   */
+  test("a commit that dirties the document promotes the tab out of the slot instead", () => {
+    const victim = open("p1", { preview: true });
+    const buffer = {
+      _editingTab: victim,
+      getModel: () => ({}),
+      getValue: () => "typed();",
+      hasTextFocus: () => false,
+    };
+    const writes = bufferWrites(buffer);
+    writes.markTyped();
+    writes.arm(BUFFER_COMMIT, 500, () => {
+      victim.doc.dirty = true;
+    });
+    view.functionEditor = buffer as never;
+
+    open("p2", { preview: true });
+
+    // The victim survives, upright, holding the edit; p2 opens beside it rather than over it.
+    expect(workspace.tabs.has("p1")).toBe(true);
+    expect(workspace.tabs.get("p1")!.preview).toBe(false);
+    expect(activePane().tabOrder).toEqual(["p1", "p2"]);
+    view.functionEditor = null;
+  });
 });
 
 describe("activation across panes", () => {

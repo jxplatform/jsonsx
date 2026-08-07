@@ -922,6 +922,19 @@ export function mutateMoveNode(tab: Tab, fromPath: JxPath, toParentPath: JxPath,
 }
 
 /**
+ * Set (or, for an empty value, delete) one property on the node `path` names.
+ *
+ * **A path that no longer resolves is a no-op, not a throw.** `getNodeAtPath` answers `undefined`
+ * for a coordinate that has been deleted, and `node[key]` on that is `undefined is not an object` —
+ * an exception thrown from inside a mutation, which {@link transactDoc} correctly rolls back and
+ * rethrows into whatever asked for the edit. For a panel that is one stale click; for the dock's
+ * debounced body commit it escaped through `commitBufferWrites` and out of the dock's
+ * `afterRender`, aborting the repaint with the editor undisposed and its 500ms timer still armed.
+ * Deletions arrive from collaborators and from the author's own undo while an editor is open, so a
+ * stale path is an ordinary state of the document rather than a programming error, and the ordinary
+ * answer is to change nothing. Callers that must distinguish "wrote" from "nothing to write to"
+ * resolve the node themselves first — `panels/editors.ts`'s `bodyWriter` does exactly that.
+ *
  * @param {Tab} tab
  * @param {JxPath} path
  * @param {string} key
@@ -929,6 +942,9 @@ export function mutateMoveNode(tab: Tab, fromPath: JxPath, toParentPath: JxPath,
  */
 export function mutateUpdateProperty(tab: Tab, path: JxPath, key: string, value?: JxNodeValue) {
   const node = getNodeAtPath(tab.doc.document, path);
+  if (!node) {
+    return;
+  }
   const prev = node[key];
   const before = cloneValue(prev);
   if (value === undefined || value === null || value === "") {

@@ -1008,6 +1008,56 @@ describe("source mode", () => {
   });
 
   /**
+   * …AND THE FLUSH IS ALLOWED TO FAIL, at which point the teardown is a deletion.
+   *
+   * Unparseable source deliberately keeps the buffer rather than resyncing over a half-typed
+   * heading. That is the right call while the surface is standing and the wrong one the instant it
+   * is not: the two lines after the flush detach the model, and with them goes `buffersForTab`'s
+   * knowledge that the buffer ever existed — so `tabBufferUnsaved` answers TRUE before the mode
+   * transition and FALSE after it, about text that no longer exists anywhere at all.
+   *
+   * A disposer cannot keep the surface (its callers have already taken the container, the mode or
+   * the model URI), so its only other answer is to say the text went. It cannot say it
+   * synchronously either: the parse is a round trip through the format host, so the sentence
+   * arrives with the promise.
+   */
+  test("leaving code view over source that will not parse says the text is gone", async () => {
+    setFormats([MARKDOWN_FORMAT]);
+    closeAllTabs();
+    const tab = openSyncedTab(undefined, { documentPath: "/project/post.md" });
+    tab.doc.sourceFormat = "Markdown";
+    setMode("source");
+    await withFastTimers(async (runPending) => {
+      renderCanvas();
+      await flush();
+      const [editor] = createdEditors;
+      editor!._ignoreNextChange = false;
+      editor!._model!._value = "# Half a headi";
+      fireModelChange(editor!);
+      // The gates can still see the work while the buffer is standing.
+      expect(tabBufferUnsaved(tab)).toBe(true);
+
+      parseSourceForPathMock.mockImplementationOnce(() =>
+        Promise.reject(new Error("unterminated heading")),
+      );
+      notified.mockClear();
+
+      setMode("edit");
+      renderCanvas();
+      await flush();
+
+      expect(view.monacoEditor).toBeNull();
+      expect(tab.doc.dirty).toBe(false);
+      // The evidence went with the text: no gate can report this any more.
+      expect(tabBufferUnsaved(tab)).toBe(false);
+      expect(notified).toHaveBeenCalledWith(
+        'The source you were typing was discarded — it was never parsed into "/project/post.md".',
+      );
+      expect(await runPending()).toBe(0);
+    });
+  });
+
+  /**
    * The dock's cross-document commit, in its twin — where it survived only by coincidence.
    *
    * The 600ms callback resolved its tab through `activeTab.value`, exactly as the dock's did. It
