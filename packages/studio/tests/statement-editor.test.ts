@@ -10,6 +10,12 @@ import {
   statementKind,
   withLaneList,
 } from "../src/panels/statement-editor";
+import {
+  INSPECTOR_STATEMENTS_REGION,
+  NAVIGATOR_STATEMENTS_REGION,
+  resolveAllRegions,
+  resolveRegion,
+} from "../src/ui/regions";
 
 import type { JxStatement } from "@jxsuite/schema/types";
 
@@ -47,7 +53,11 @@ void mock.module("@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const DEFAULT_OPTS = { allowEventRef: true, stateDefs: ["count", "items"] };
+const DEFAULT_OPTS = {
+  allowEventRef: true,
+  region: "navigator/statements",
+  stateDefs: ["count", "items"],
+};
 
 function mount(statements: JxStatement[], opts: Record<string, unknown> = {}) {
   const changes: JxStatement[][] = [];
@@ -650,5 +660,69 @@ describe("drag reorder", () => {
       { dispatchEvent: "x" },
       { dispatchEvent: "y" },
     ]);
+  });
+});
+
+// ─── The editor has two hosts, so it may not name one ─────────────────────────
+
+describe("the region id names the HOST, not the control", () => {
+  /*
+   * `renderStatementEditor` hard-stamped `data-jx-region="navigator/statements"` on itself, and it
+   * has two hosts that can be open at the same time: the Navigator's State panel
+   * (`panels/signals-panel.ts`) and the INSPECTOR's Events tab (`panels/events-panel.ts`).
+   * `resolveRegion` takes the LAST match in document order and `#right-panel` follows
+   * `#left-panel`, so the id resolved to the Inspector's editor while saying Navigator — and the
+   * `statement-editor` shot cropped a control in the wrong dock.
+   *
+   * The verdict is the one `ui/regions.ts`'s `DERIVED_RESOLVERS` already records for the media
+   * picker's Browse button: an id claiming a surface the element is not in is not a pane-scoping
+   * problem, it is a wrong id.
+   */
+  function bothDocks() {
+    document.body.innerHTML = `<div id="app"><div id="left-panel"></div><div id="right-panel"></div></div>`;
+    const stmts: JxStatement[] = [{ operator: "=", target: { $ref: "#/state/count" }, value: 1 }];
+    render(
+      renderStatementEditor(stmts, () => {}, {
+        ...DEFAULT_OPTS,
+        region: NAVIGATOR_STATEMENTS_REGION,
+      } as never),
+      document.querySelector("#left-panel")!,
+    );
+    render(
+      renderStatementEditor(stmts, () => {}, {
+        ...DEFAULT_OPTS,
+        region: INSPECTOR_STATEMENTS_REGION,
+      } as never),
+      document.querySelector("#right-panel")!,
+    );
+  }
+
+  test("with both editors open, each id resolves to exactly one, in its own dock", () => {
+    bothDocks();
+
+    const navigator = resolveAllRegions(NAVIGATOR_STATEMENTS_REGION);
+    const inspector = resolveAllRegions(INSPECTOR_STATEMENTS_REGION);
+    console.log(
+      `[statement-editor] both docks open: navigator/statements → ${navigator.length} element(s), ` +
+        `inspector/statements → ${inspector.length}`,
+    );
+    expect(navigator).toHaveLength(1);
+    expect(inspector).toHaveLength(1);
+    // The shot's id crops the NAVIGATOR's editor — the one the docs page is about.
+    expect(resolveRegion(NAVIGATOR_STATEMENTS_REGION)!.closest("#left-panel")).not.toBeNull();
+    expect(resolveRegion(INSPECTOR_STATEMENTS_REGION)!.closest("#right-panel")).not.toBeNull();
+  });
+
+  test("a third host cannot appear without naming itself", () => {
+    // `region` is required on `StatementEditorOpts`, so the stamp is whatever the host said and
+    // Nothing else. There is no default to fall back to being wrong about.
+    const container = document.createElement("div");
+    render(
+      renderStatementEditor([], () => {}, { ...DEFAULT_OPTS, region: "dock.bottom/statements" }),
+      container,
+    );
+    expect((container.querySelector(".statement-editor") as HTMLElement).dataset.jxRegion).toBe(
+      "dock.bottom/statements",
+    );
   });
 });

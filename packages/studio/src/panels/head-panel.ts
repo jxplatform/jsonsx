@@ -23,6 +23,7 @@ import { getPlatform } from "../platform";
 import { pageRoute } from "./tab-strip";
 
 import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
+import type { Tab } from "../tabs/tab";
 import type { TemplateResult } from "lit-html";
 
 interface MetaField {
@@ -652,14 +653,18 @@ export function layoutDisplayName(path: string): string {
  * lands. Showing nothing briefly is the honest state — the alternative is attributing the layout's
  * entries to the page.
  *
+ * @param {Tab | null} tab — the tab whose document the entries are being resolved FOR.
  * @param {string | false} [docLayout]
  * @returns {{ entries: JxHeadEntry[]; name: string | null }}
  */
-export function layoutHeadEntries(docLayout?: string | false): {
+export function layoutHeadEntries(
+  tab: Tab | null,
+  docLayout?: string | false,
+): {
   entries: JxHeadEntry[];
   name: string | null;
 } {
-  const path = isPageDocument() ? getEffectiveLayoutPath(docLayout) : null;
+  const path = isPageDocument(tab) ? getEffectiveLayoutPath(docLayout) : null;
   if (path === null) {
     return { entries: [], name: null };
   }
@@ -674,13 +679,15 @@ export function layoutHeadEntries(docLayout?: string | false): {
 /**
  * The preview for the document the card is showing.
  *
+ * @param {Tab | null} tab — the tab the card was drawn for; its route and its layout, not the
+ *   focused pane's.
  * @param {JxMutableNode} doc — the head-bearing view of the document (`buildHeadDoc` for content).
  * @returns {SeoPreview}
  */
-export function seoPreviewFor(doc: JxMutableNode): SeoPreview {
+export function seoPreviewFor(tab: Tab | null, doc: JxMutableNode): SeoPreview {
   const config = projectState?.projectConfig;
-  const layout = layoutHeadEntries(doc.$layout);
-  const path = activeTab.value?.documentPath;
+  const layout = layoutHeadEntries(tab, doc.$layout);
+  const path = tab?.documentPath;
   return buildSeoPreview(
     {
       layout: layout.entries,
@@ -782,7 +789,10 @@ export function renderHeadTemplate({
   const isContent = tab?.doc.mode === "content";
   const frontmatterSection = isContent ? renderFrontmatterSection() : nothing;
 
-  const layoutSection = renderLayoutSection(doc, applyMutation);
+  // `tab` is the FOCUSED tab, and legitimately so: this template is the Navigator's Page panel,
+  // Which is drawn once for the shell and follows the focus by design. Spelling it here is what
+  // Lets `renderLayoutSection` and everything under it take a tab instead of asking.
+  const layoutSection = renderLayoutSection(tab, doc, applyMutation);
 
   return html`
     <div class="imports-panel">
@@ -953,12 +963,25 @@ export function renderHeadTemplate({
 // ─── Layout picker ───────────────────────────────────────────────────────
 
 /**
- * Whether the open document is a page of a site project — the only documents a layout applies to.
+ * Whether `tab`'s document is a page of a site project — the only documents a layout applies to.
  *
+ * **It takes the tab, and that is the whole of finding 3.** It was zero-argument and read
+ * `activeTab.value?.documentPath`, while both of its important callers had already been handed a
+ * tab: `hasDocumentHeader(tab)` inspects THAT tab's frontmatter, title and `$head` and then fell
+ * through to here for the "a page always has one" rule, and `documentHeaderTemplate(tab, paneId)`
+ * gates the Layout picker on it. Both directions were visible with two panes — a page in the
+ * unfocused pane lost its Title and Route because the focused tab was a component, and a bare
+ * component GAINED a header card because the focused tab was a page — and the Layout picker
+ * appeared or vanished in the pane you were editing according to the document in the other one.
+ *
+ * A caller whose subject genuinely IS the focused document (the Navigator's Page panel) passes
+ * `activeTab.value`, where a reviewer can see it. The same bargain `setCanvasMode` made.
+ *
+ * @param {Tab | null} tab
  * @returns {boolean}
  */
-export function isPageDocument(): boolean {
-  const path = activeTab.value?.documentPath;
+export function isPageDocument(tab: Tab | null): boolean {
+  const path = tab?.documentPath;
   return Boolean(
     path &&
     projectState?.isSiteProject &&
@@ -1038,10 +1061,11 @@ export function renderLayoutPickerRow(
 
 /** The Page panel's boxed wrapper around {@link renderLayoutPickerRow}. */
 function renderLayoutSection(
+  tab: Tab | null,
   doc: JxMutableNode,
   applyMutation: (fn: (doc: JxMutableNode) => void) => void,
 ): TemplateResult | typeof nothing {
-  if (!isPageDocument()) {
+  if (!isPageDocument(tab)) {
     return nothing;
   }
   const row = renderLayoutPickerRow(doc, applyMutation);

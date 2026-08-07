@@ -77,9 +77,12 @@ void mock.module("../src/panels/stylebook-panel", () => ({
 }));
 
 let resolveCalls = 0;
+/** The `documentPath` of the tab each resolution was asked FOR — see the last describe. */
+const resolvedFor: (string | null)[] = [];
 void mock.module("../src/canvas/canvas-live-render", () => ({
-  resolveCanvasDocument: () => {
+  resolveCanvasDocument: (_doc: unknown, tab: { documentPath?: string } | null) => {
     resolveCalls += 1;
+    resolvedFor.push(tab?.documentPath ?? null);
     return Promise.resolve({
       docBase: "http://localhost:3000/doc.json",
       mapperCtx: {
@@ -123,6 +126,7 @@ async function splitIntoTwoCanvasPanes() {
   }
   channels.length = 0;
   resolveCalls = 0;
+  resolvedFor.length = 0;
   resetCanvasPerf();
   return { left, right };
 }
@@ -478,5 +482,95 @@ describe("unsplit actually releases", () => {
     // Unsplitting is a LAYOUT action. It must not tear down the pane that stays.
     expect(primaryStopped).toBe(0);
     expect((primaryPanel as { renderScope: unknown }).renderScope).not.toBeNull();
+  });
+});
+
+// ─── 5 · A click in a canvas is a click in a PANE ─────────────────────────────
+
+describe("a click inside an artboard focuses the pane that mounted it", () => {
+  /*
+   * `panels/pane-grid.ts` moves the pane focus on a `pointerdown` anywhere in a cell, and that
+   * listener structurally cannot see this one: the canvas is a cross-origin `<iframe>`, so the
+   * pointer event is delivered in the frame's own realm. The `hit` message IS that pointerdown,
+   * re-posted across the channel, and until now the handler wrote `hostTab(state).session.selection`
+   * — correctly, the pane's own tab — and left the keyboard where it was. The result was a node
+   * selected in the side pane that the Inspector, the block action bar and the overlays effect all
+   * refused to show, because every one of them answers for the FOCUSED pane.
+   */
+  async function sideArtboardWithPrimaryFocused() {
+    const { right } = await splitIntoTwoCanvasPanes();
+    const side = await mountArtboard(SECONDARY_PANE, 1, { tagName: "div" }, right.id);
+    focusPane(PRIMARY_PANE);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    return { right, side };
+  }
+
+  test("a `hit` in the side pane's frame moves the keyboard there", async () => {
+    const { right, side } = await sideArtboardWithPrimaryFocused();
+
+    side.channel.deliver({
+      hit: { path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } },
+      kind: "hit",
+    });
+
+    console.log(
+      `[two-pane] clicked the SIDE pane's canvas: focus=${workspace.activePaneId} ` +
+        `selection=${JSON.stringify(right.session.selection)}`,
+    );
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+    // And the selection it made is now one the Inspector will actually be asked about.
+    expect(right.session.selection).toEqual([["children", 0]]);
+  });
+
+  test("a `layoutHit` counts too — layout chrome is still canvas", async () => {
+    const { side } = await sideArtboardWithPrimaryFocused();
+
+    side.channel.deliver({
+      hit: {
+        layoutFile: "layouts/base.json",
+        layoutPath: ["children", 0],
+        rect: { height: 20, width: 100, x: 0, y: 0 },
+        tagName: "header",
+      },
+      kind: "layoutHit",
+    });
+
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+  });
+
+  test("a click in the pane that already has focus leaves the MRU order alone", async () => {
+    /* The handler runs on every hit, so it has to be free when it has nothing to do. `focusPane`
+       returns early for the pane that already has focus — otherwise every canvas click would
+       rewrite the order `⌃Tab` walks. */
+    const { left } = await splitIntoTwoCanvasPanes();
+    const home = await mountArtboard(PRIMARY_PANE, 1, { tagName: "div" }, left.id);
+    focusPane(PRIMARY_PANE);
+    workspace.mruOrder = ["b", "a"];
+
+    home.channel.deliver({
+      hit: { path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } },
+      kind: "hit",
+    });
+
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.mruOrder).toEqual(["b", "a"]);
+  });
+});
+
+// ─── 6 · The document is resolved FOR a tab ───────────────────────────────────
+
+describe("a pass tells the resolver which tab it is for", () => {
+  test("each pane's artboard resolves against its OWN tab, whichever has focus", async () => {
+    /* The parameter exists because `resolveCanvasDocument` used to open with `activeTab.value`.
+       `mountIframeCanvas` derives it from the canvas element by default — the `paneOfContainer`
+       route — and `canvas-render.ts` passes `tabOfPane(surface.paneId)` explicitly. */
+    await splitIntoTwoCanvasPanes();
+    focusPane(PRIMARY_PANE);
+
+    await mountArtboard(SECONDARY_PANE, 1, { tagName: "div" }, "b");
+    await mountArtboard(PRIMARY_PANE, 2, { tagName: "div" }, "a");
+
+    console.log(`[two-pane] resolutions were asked for: ${JSON.stringify(resolvedFor)}`);
+    expect(resolvedFor).toEqual(["/p/b.json", "/p/a.json"]);
   });
 });

@@ -7,7 +7,7 @@
  */
 
 import { projectState, stripEventHandlers } from "../store";
-import { activeTab } from "../workspace/workspace";
+import { canvasModeOfTab } from "./canvas-surface";
 import { toRaw } from "../reactivity";
 import {
   distributePageIntoLayout,
@@ -33,9 +33,8 @@ import type { JxElement, JxMutableNode, JxPath } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
 import type { ContentSectionEntry } from "../types";
 import type { LayoutMarker } from "./path-mapping";
+import type { Tab } from "../tabs/tab";
 import type { WireMapperCtx } from "./iframe-protocol";
-
-let _ctx: { getCanvasMode: () => string } | null = null;
 
 /**
  * Walk the merged document tree to find where page children were distributed into the layout slot.
@@ -108,32 +107,41 @@ export function markLayoutNodes(node: JxMutableNode, file: string, path: JxPath 
 }
 
 /**
- * Initialize the canvas live render module.
- *
- * @param {{
- *   getCanvasMode: () => string;
- * }} ctx
- */
-export function initCanvasLiveRender(ctx: { getCanvasMode: () => string }) {
-  _ctx = ctx;
-}
-
-/**
  * Resolve a document into the form the iframe canvas renders: layout-distributed, edit-transformed,
  * with components/imports/$media/$head merged in, plus the path-mapper context and site style. This
  * is the "parent resolves, iframe renders" split — the realm-specific work (defineElement,
  * injecting $head/site-style into the DOM, buildScope/renderNode) happens inside the iframe from
  * this result.
+ *
+ * **`tab` is the tab the render is FOR, and it is a parameter because it is not "the active tab".**
+ * This function opened with `const tab = activeTab.value` and took its mode from an injected
+ * `getCanvasMode()` — the focused pane's, one layer down — which threw away everything the caller
+ * had already resolved correctly: `canvas-render.ts` picks the document with
+ * `tabOfPane(surface.paneId)` and threads that tab's id through `mountIframeCanvas` →
+ * `preparePassRender`. Six values came from the wrong tab whenever the pane being drawn was not the
+ * focused one: `documentPath` (hence `docBase` and the `isPage` test), `showLayout`,
+ * `previewParams`, `previewProps`, and the composed `canvasMode`.
+ *
+ * The mode is the one with teeth. `mountIframeCanvas` ends with `setHostPreview(state, message.mode
+ * === "preview")`, so a side pane in Edit whose neighbour was in Preview got a PREVIEW frame — no
+ * overlay, no editing messages honoured — and a pane being previewed beside an editing one got an
+ * editable frame for a document nobody was editing. `canvasModeOfTab(tab)` is the same composition
+ * every other gate reads, applied to the tab that is actually being drawn.
+ *
+ * @param {JxMutableNode} doc
+ * @param {Tab | null} tab — the tab whose document and view settings this render is of.
  */
-export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
+export async function resolveCanvasDocument(
+  doc: JxMutableNode,
+  tab: Tab | null,
+): Promise<{
   renderDoc: JxMutableNode;
   docBase: string | undefined;
   mapperCtx: WireMapperCtx;
   siteStyle: Record<string, unknown> | null;
 }> {
-  const tab = activeTab.value;
   const S = { documentPath: tab?.documentPath, mode: tab?.doc.mode };
-  const canvasMode = _ctx!.getCanvasMode();
+  const canvasMode = canvasModeOfTab(tab);
 
   let renderDoc =
     canvasMode === "preview"

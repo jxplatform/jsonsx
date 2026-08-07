@@ -1303,6 +1303,10 @@ function renderCanvasIntoPanel(
       canvas,
       panel._width,
       docOverride ? null : (tab?.id ?? null),
+      // The VIEW tab, which an override does not null out: a git-diff frame routes no mutations
+      // But is still a view of this pane's document, and its docBase, layout toggle and mode are
+      // That tab's. Explicit rather than left to the default, because this line already knows.
+      tab,
     ),
   )
     .then(() => {

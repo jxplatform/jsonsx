@@ -42,6 +42,24 @@ export interface StatementEditorOpts {
   allowEventRef: boolean;
   /** The entry's declared CEM events — offered as dispatchEvent name completions. */
   emits?: CemEvent[];
+  /**
+   * The region id of THIS editor, supplied by the surface that is drawing it.
+   *
+   * Required, and required of every host, which is the point. The editor used to hard-stamp
+   * `navigator/statements` on itself, and it has two hosts that can be open at the same time — the
+   * Navigator's State panel (`signals-panel.ts`) and the INSPECTOR's Events tab
+   * (`events-panel.ts`). `resolveRegion` takes the last match in document order and `#right-panel`
+   * follows `#left-panel`, so the id resolved to the Inspector's editor while saying Navigator, and
+   * the shot that crops it cropped the wrong control.
+   *
+   * A shared control cannot know where it is, so it may not claim to. This is the same verdict
+   * `ui/regions.ts`'s `DERIVED_RESOLVERS` records for the media picker's Browse button — _an
+   * `inspector/…` id on an element outside the Inspector is not a pane-scoping problem, it is a
+   * wrong id_ — reached the other way round: the picker's id is derived from the Inspector because
+   * nothing addresses the card's copies, whereas both statement editors are real surfaces that
+   * deserve names, so the HOST names them.
+   */
+  region: string;
 }
 
 /**
@@ -702,7 +720,7 @@ export function renderStatementEditor(
   return html`
     <div
       class="statement-editor"
-      data-jx-region="navigator/statements"
+      data-jx-region=${opts.region}
       ${ref((el) => {
         if (el) {
           registerStatementsDnD(el as HTMLElement, safe, onChange);

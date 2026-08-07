@@ -78,7 +78,6 @@ import {
 import { runInsertZoneAction } from "./editor/insert-zone-action";
 import { canvasSlashHandler } from "./editor/canvas-slash-bridge";
 import { makeCanvasContextMenuHandler } from "./editor/canvas-context-menu";
-import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import { mountStatusbar, renderStatusbar } from "./panels/statusbar";
 import { mountJumpBar } from "./panels/jump-bar";
 import { cellForPane } from "./panels/pane-grid";
@@ -469,10 +468,14 @@ window.addEventListener("beforeunload", (e: BeforeUnloadEvent) => {
    drew at the focused tab's scale, the side pane's `+` zoomed the primary's document, and the side
    pane entering Design snapped the primary to whatever it had fitted itself to. `getCanvasMode`
    was the same shape one layer down. The module reaches all three through the surface it is given
-   (`tabOfPane(surface.paneId)`), so there is nothing left to inject. */
-initCanvasLiveRender({
-  getCanvasMode,
-});
+   (`tabOfPane(surface.paneId)`), so there is nothing left to inject.
+
+   No `initCanvasLiveRender` either, and it went for the same reason one layer further down again.
+   `getCanvasMode` was the ONLY thing that context carried, and `resolveCanvasDocument` used it
+   while ALSO reading `activeTab.value` for the document path, the layout toggle and the preview
+   params — so the pane the render had already been resolved for was discarded and the focused
+   pane's answers substituted for all six. It takes the tab now, and the injection point had
+   nothing else in it. */
 initCanvasPatcher({
   renderOverlays,
   scheduleCanvasRender,

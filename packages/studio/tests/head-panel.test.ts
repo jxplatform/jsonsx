@@ -25,6 +25,7 @@ import { invalidateLayoutCache } from "../src/site-context";
 import { closeAllTabs } from "../src/workspace/workspace";
 
 import type { HeadLayers, SeoPreview } from "../src/panels/head-panel";
+import type { Tab } from "../src/tabs/tab";
 import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -994,7 +995,7 @@ describe("layoutHeadEntries — the one layer that lives in a file", () => {
       isSiteProject: true,
       projectConfig: { defaults: { layout: "./layouts/main-layout.json" } },
     });
-    resetWorkspaceWithTab(undefined, { documentPath: "pages/about.json" });
+    return resetWorkspaceWithTab(undefined, { documentPath: "pages/about.json" }) as Tab;
   }
 
   beforeEach(() => {
@@ -1004,15 +1005,17 @@ describe("layoutHeadEntries — the one layer that lives in a file", () => {
 
   test("a non-page document never reads a layout at all", () => {
     resetStudioState({ isSiteProject: false, projectConfig: {} });
-    resetWorkspaceWithTab(undefined, { documentPath: "components/card.json" });
-    expect(layoutHeadEntries()).toEqual({ entries: [], name: null });
+    const tab = resetWorkspaceWithTab(undefined, {
+      documentPath: "components/card.json",
+    }) as Tab;
+    expect(layoutHeadEntries(tab)).toEqual({ entries: [], name: null });
   });
 
   test("the first call is empty and schedules the read; the second has the entries", async () => {
-    seedLayout();
-    expect(layoutHeadEntries()).toEqual({ entries: [], name: "Main Layout" });
+    const tab = seedLayout();
+    expect(layoutHeadEntries(tab)).toEqual({ entries: [], name: "Main Layout" });
     await flush();
-    const resolved = layoutHeadEntries();
+    const resolved = layoutHeadEntries(tab);
     expect(resolved.name).toBe("Main Layout");
     expect(resolved.entries).toHaveLength(1);
   });
@@ -1023,28 +1026,28 @@ describe("layoutHeadEntries — the one layer that lives in a file", () => {
       isSiteProject: true,
       projectConfig: { defaults: { layout: "./layouts/gone.json" } },
     });
-    resetWorkspaceWithTab(undefined, { documentPath: "pages/about.json" });
-    layoutHeadEntries();
+    const tab = resetWorkspaceWithTab(undefined, { documentPath: "pages/about.json" }) as Tab;
+    layoutHeadEntries(tab);
     await flush();
-    expect(layoutHeadEntries().entries).toEqual([]);
+    expect(layoutHeadEntries(tab).entries).toEqual([]);
   });
 
   test("invalidateLayoutPickerCache drops the head too — one event, one answer", async () => {
-    seedLayout();
-    layoutHeadEntries();
+    const tab = seedLayout();
+    layoutHeadEntries(tab);
     await flush();
-    expect(layoutHeadEntries().entries).toHaveLength(1);
+    expect(layoutHeadEntries(tab).entries).toHaveLength(1);
     invalidateLayoutPickerCache();
-    expect(layoutHeadEntries().entries).toEqual([]);
+    expect(layoutHeadEntries(tab).entries).toEqual([]);
   });
 
   test("a second layout asked for mid-flight owns the cache; the first is discarded", async () => {
-    seedLayout();
-    layoutHeadEntries("./layouts/main-layout.json");
-    layoutHeadEntries("./layouts/other.json");
+    const tab = seedLayout();
+    layoutHeadEntries(tab, "./layouts/main-layout.json");
+    layoutHeadEntries(tab, "./layouts/other.json");
     await flush();
     // The superseded read must not have written "Main Layout"'s entries under "Other".
-    expect(layoutHeadEntries("./layouts/other.json").entries).toEqual([]);
+    expect(layoutHeadEntries(tab, "./layouts/other.json").entries).toEqual([]);
   });
 
   test("layoutDisplayName reads a path the way a person names the layout", () => {
@@ -1075,11 +1078,11 @@ describe("layoutHeadEntries — the one layer that lives in a file", () => {
         url: "https://acme.test",
       },
     });
-    resetWorkspaceWithTab(undefined, { documentPath: "pages/about.json" });
-    seoPreviewFor({ tagName: "div" });
+    const tab = resetWorkspaceWithTab(undefined, { documentPath: "pages/about.json" }) as Tab;
+    seoPreviewFor(tab, { tagName: "div" });
     await flush();
 
-    const preview = seoPreviewFor({ tagName: "div", title: "About" });
+    const preview = seoPreviewFor(tab, { tagName: "div", title: "About" });
     expect(preview.url.href).toBe("https://acme.test/about");
     expect(seoField(preview, "title")).toMatchObject({ source: "page", value: "About" });
     expect(seoField(preview, "description")).toMatchObject({

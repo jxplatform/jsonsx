@@ -34,16 +34,23 @@
  * command verbs, where "the active pane" is the whole meaning of the request.
  *
  * **The FOURTH rule is the general form of the third, and it exists because the third was a list of
- * FILES.** See {@link focusReadsInPaneScope}: a function that has been handed a `paneId` or a
- * `CanvasSurface` may not consult the focus in its body, wherever in `src/` it lives. Rule 3 named
- * one module; the pane context bar was in another, and wrote nine controls through
- * `activeTab.value` for a pane it was not drawing.
+ * FILES.** See {@link analyzeFocusScope}: a function that has been handed a pane may not consult
+ * the focus in its body — nor reach it through a zero-argument helper — wherever in `src/` it
+ * lives. Rule 3 named one module; the pane context bar was in another, and wrote nine controls
+ * through `activeTab.value` for a pane it was not drawing.
+ *
+ * It is the only rule here that parses rather than matches, and it had to become one: a regex over
+ * function headers is blind to an arrow with a template-literal body, to a return type containing a
+ * brace, and — structurally — to a focus read that is one call away. The table in that docstring
+ * lists all eight shapes it used to walk past.
  *
  * Run: bun scripts/check-pane-singletons.ts
  */
 
 import { Glob } from "bun";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
+import { API } from "typescript/unstable/async";
+import { SyntaxKind } from "typescript/unstable/ast";
 
 const ROOT = join(import.meta.dir, "..");
 
@@ -162,25 +169,60 @@ const INSTANCE_RE = /^let (active|_active|_host|_scheduler|sourceCollabCleanup)\
  * value)`, which resolved `activeTab.value` on the caller's behalf. So `store.ts`'s session
  * dispatchers take their target now — there is no `activeTab` in that file — and a pane-scoped
  * caller that wants the focused tab has to spell it, where this rule can see it.
+ *
+ * **It is an AST check now, and it had to become one.** The first version was a regex over function
+ * HEADERS — `\(params\)\s*(:type)?\s*(=>)?\s*\{` — and measured against thirteen hand-written
+ * sources it caught four shapes and walked past eight:
+ *
+ * | missed shape                                               | why the regex could not see it                                   |
+ * | ---------------------------------------------------------- | ---------------------------------------------------------------- |
+ * | an arrow whose body is a template literal                  | there is no `{`, so no header matched                            |
+ * | ``(paneId) => html`…` ``                                   | same, and it is how half this package renders                    |
+ * | a return type containing a brace (`): { a: number } {`)    | the `{` of the TYPE closed the header                            |
+ * | a return type that is a function type (`): (x) => void {`) | the `=>` did                                                     |
+ * | `Promise<{ … }>`                                           | the brace again, one generic deeper                              |
+ * | a parameter named `pane`                                   | the name list held `paneId` only                                 |
+ * | a parameter named `container`                              | `paneOfContainer(container)` is the derived route — same promise |
+ * | a focus read reached through a HELPER                      | a body-text scan cannot follow a call                            |
+ *
+ * The last one is the one that mattered: `documentHeaderTemplate(tab, paneId)` called
+ * `isPageDocument()`, a zero-argument function whose body read `activeTab.value.documentPath`, and
+ * so the Layout picker appeared and vanished in the pane being edited according to the document in
+ * the OTHER one. A rule that only reads the body it is standing in cannot say that, however good
+ * its regex is, which is why {@link analyzeFocusScope} walks ONE hop of the call graph: a call to a
+ * zero-parameter local function that reads the focus is a focus read at the call site.
+ *
+ * One hop rather than a transitive closure, deliberately. Two hops reaches `render()`, and from
+ * `render()` everything is reachable from everything — the rule would stop naming a defect and
+ * start naming the module graph. Zero-parameter is the second brake: a helper that takes a tab has
+ * already been told what it is about, so the caller passing one is the fix rather than the bug.
  */
-const FOCUS_RE =
-  /\bactiveTab\b|\bactivePaneId\b|\bactivePane\s*\(|\bactiveCanvasSurface\s*\(|\bgetCanvasMode\s*\(/g;
+const FOCUS_NAMES: ReadonlySet<string> = new Set([
+  "activeTab",
+  "activePaneId",
+  "activePane",
+  "activeCanvasSurface",
+  "getCanvasMode",
+]);
 
 /**
- * A parameter list that names a pane or a stage. `Tab` is deliberately NOT here: plenty of
- * functions take a tab AND legitimately ask whether it is the focused one ({@link isTabActive}'s
- * callers). A `paneId` or a `CanvasSurface` is a different promise — it says the caller has already
- * decided which pane this is about.
+ * A parameter name that says "the caller has already decided which pane this is about".
+ *
+ * `tab` is deliberately NOT here: plenty of functions take a tab AND legitimately ask whether it is
+ * the focused one ({@link isTabActive}'s callers). `container` IS here, and it is the subtle one —
+ * `canvas-surface.ts`'s `paneOfContainer(container)` exists precisely so stage content that is
+ * handed an element and nothing else can still name its pane, so a function taking a container has
+ * the same answer available and the same obligation to use it.
  */
-const PANE_PARAM_RE = /\bpaneId\b|\bsurface\b|\bCanvasSurface\b/;
+export const PANE_PARAM_NAMES: ReadonlySet<string> = new Set([
+  "paneId",
+  "pane",
+  "surface",
+  "container",
+]);
 
-/**
- * Function headers, as they appear in this package: `function name(params) {`, a method, or an
- * arrow with a block body. The regex tolerates one level of nested parens in the parameter list (a
- * callback type, a destructured default) which is as deep as anything here goes.
- */
-const FUNCTION_HEADER_RE =
-  /(?:function\s+(?<name>[A-Za-z_$][\w$]*)\s*)?\((?<params>[^()]*(?:\([^()]*\)[^()]*)*)\)\s*(?::[^{=;]*)?(?:=>\s*)?\{/g;
+/** A parameter TYPE that says it, whatever the parameter is called. */
+const PANE_PARAM_TYPE_RE = /\bCanvasSurface\b/;
 
 /**
  * The module that OWNS focus, excluded by name.
@@ -196,48 +238,282 @@ const FOCUS_OWNER = "src/workspace/workspace.ts";
 const FOCUS_SCOPE_SCAN = ["src/**/*.ts"];
 
 /**
- * Functions still allowed to consult the focus while holding a pane. Empty: none do.
+ * Functions still allowed to consult the focus while holding a pane.
  *
- * Keyed by file, counted like every other list here, and failing both ways.
+ * Keyed by file, counted like every other list here, and failing both ways. It was empty under the
+ * regex and has two entries under the AST rule, which is the rule working: both are shapes a body
+ * scan could not see, and each is written down rather than silently tolerated.
+ *
+ * - **`src/panels/editors.ts`** — `functionMountWanted(container, tab, editing)` asks
+ *   `activeTab.value === tab` on the far side of Monaco's 12.6 MB dynamic import, and it is right
+ *   to. Its `container` is the BOTTOM DOCK's, not a pane's stage: the function editor is one
+ *   app-level surface that shows the focused document's target by design, so "is this still the tab
+ *   the dock is showing" is the whole question. The rule cannot tell a dock container from a stage
+ *   container by its name, and widening the name list was worth this one entry — `container` is how
+ *   `canvas-surface.ts`'s `paneOfContainer` route is spelled everywhere else.
+ * - **`src/settings/css-vars-editor.ts`** — `renderCssVarsEditor(container)` IS drawn in a pane's
+ *   stage, and it calls `pushProjectStylesToCanvas()`, which is a zero-argument focus reader. This
+ *   is the one-hop rule earning its keep: the SITE half of that push goes to every live host and is
+ *   correct, while the STYLEBOOK half composes `activeTab.value?.doc.document?.style` and posts one
+ *   result to all specimen canvases — so two panes each showing a stylebook get the focused
+ *   document's effective style. Real debt, in `src/style/live-preview.ts` rather than here; the fix
+ *   is a per-host post and it is a workstream of its own.
  */
-export const ALLOWED_FOCUS_IN_PANE_SCOPE: Readonly<Record<string, number>> = {};
+export const ALLOWED_FOCUS_IN_PANE_SCOPE: Readonly<Record<string, number>> = {
+  "src/panels/editors.ts": 1,
+  "src/settings/css-vars-editor.ts": 1,
+};
 
-/**
- * Count focus reads that appear in the BODY of a pane-scoped function, per file.
- *
- * The body only — a default such as `surface: CanvasSurface = activeCanvasSurface()` is the
- * opposite of the defect: it is a signature saying, in public, "the focused pane when you do not
- * say". Eleven of the geometry verbs are written that way on purpose.
- *
- * @param {string} source A module's text, comments already stripped.
- * @returns {number}
- */
-export function focusReadsInPaneScope(source: string): number {
-  let found = 0;
-  const headers = new RegExp(FUNCTION_HEADER_RE.source, FUNCTION_HEADER_RE.flags);
-  let header: RegExpExecArray | null;
-  while ((header = headers.exec(source)) !== null) {
-    if (!PANE_PARAM_RE.test(header.groups?.params ?? "")) {
-      continue;
+/** A node as the compiler API hands it back; shapes vary by kind, so this stays loose. */
+type AnyNode = any;
+
+/** Type-only syntax, from `CallSignature` to `ImportType`; an identifier inside one is not a read. */
+const FIRST_TYPE_KIND = SyntaxKind.CallSignature;
+const LAST_TYPE_KIND = SyntaxKind.ImportType;
+
+/** The four ways this package spells a function. */
+const FUNCTION_KINDS = new Set<SyntaxKind>([
+  SyntaxKind.ArrowFunction,
+  SyntaxKind.FunctionDeclaration,
+  SyntaxKind.FunctionExpression,
+  SyntaxKind.MethodDeclaration,
+]);
+
+/** Declarations that are erased before anything runs, or that are not calls. */
+const SKIP_KINDS = new Set<SyntaxKind>([
+  SyntaxKind.ExportDeclaration,
+  SyntaxKind.ImportDeclaration,
+  SyntaxKind.ImportEqualsDeclaration,
+  SyntaxKind.InterfaceDeclaration,
+  SyntaxKind.ModuleDeclaration,
+  SyntaxKind.TypeAliasDeclaration,
+]);
+
+/** Every name a parameter binds — an identifier, or the leaves of a destructuring pattern. */
+function boundNames(name: AnyNode, out: string[] = []): string[] {
+  if (!name) {
+    return out;
+  }
+  if (name.kind === SyntaxKind.Identifier) {
+    out.push(name.text as string);
+    return out;
+  }
+  for (const element of (name.elements as AnyNode[] | undefined) ?? []) {
+    boundNames(element.name, out);
+  }
+  return out;
+}
+
+/** True when this function's signature says which pane it is about. */
+function isPaneScoped(fn: AnyNode, sf: AnyNode): boolean {
+  for (const param of (fn.parameters as AnyNode[] | undefined) ?? []) {
+    if (boundNames(param.name).some((name) => PANE_PARAM_NAMES.has(name))) {
+      return true;
     }
-    const open = header.index + header[0].length - 1;
-    let depth = 0;
-    let close = source.length;
-    for (let i = open; i < source.length; i += 1) {
-      if (source[i] === "{") {
-        depth += 1;
-      } else if (source[i] === "}") {
-        depth -= 1;
-        if (depth === 0) {
-          close = i;
-          break;
+    const type = param.type as AnyNode | undefined;
+    if (type && PANE_PARAM_TYPE_RE.test((sf.text as string).slice(type.pos, type.end))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Does this subtree name the focus directly? Used to classify a candidate helper. */
+function readsFocusDirectly(node: AnyNode): boolean {
+  const kind: SyntaxKind = node.kind;
+  if ((kind >= FIRST_TYPE_KIND && kind <= LAST_TYPE_KIND) || SKIP_KINDS.has(kind)) {
+    return false;
+  }
+  if (kind === SyntaxKind.Identifier) {
+    return FOCUS_NAMES.has(node.text as string);
+  }
+  let found = false;
+  node.forEachChild((child: AnyNode) => {
+    found ||= readsFocusDirectly(child);
+  });
+  return found;
+}
+
+/** One module's parsed facts. */
+interface ModuleFacts {
+  sf: AnyNode;
+  /** Local binding name → the `src/` module it was imported from, for relative imports only. */
+  importedFrom: Map<string, string>;
+  /** Names of top-level ZERO-parameter functions in this module whose body reads the focus. */
+  readers: Set<string>;
+}
+
+/** Resolve a relative import to a file in `sources`, the way the bundler will. */
+function resolveSpecifier(from: string, spec: string, sources: Set<string>): string | undefined {
+  if (!spec.startsWith(".")) {
+    return undefined;
+  }
+  const base = join(dirname(from), spec.replace(/\.js$/, ""));
+  for (const candidate of [base, `${base}.ts`, `${base}/index.ts`]) {
+    if (sources.has(candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
+/** A function-shaped top-level declaration: `function f()` or `const f = () => …`. */
+function topLevelFunctions(sf: AnyNode): { name: string; fn: AnyNode }[] {
+  const out: { name: string; fn: AnyNode }[] = [];
+  for (const st of sf.statements as AnyNode[]) {
+    if (st.kind === SyntaxKind.FunctionDeclaration && st.name?.text) {
+      out.push({ fn: st, name: st.name.text as string });
+    } else if (st.kind === SyntaxKind.VariableStatement) {
+      for (const d of st.declarationList.declarations as AnyNode[]) {
+        const init = d.initializer as AnyNode | undefined;
+        if (
+          d.name?.kind === SyntaxKind.Identifier &&
+          init &&
+          FUNCTION_KINDS.has(init.kind as SyntaxKind)
+        ) {
+          out.push({ fn: init, name: d.name.text as string });
         }
       }
     }
-    const body = source.slice(open + 1, close);
-    found += body.match(new RegExp(FOCUS_RE.source, FOCUS_RE.flags))?.length ?? 0;
   }
-  return found;
+  return out;
+}
+
+/** Every local binding a module's relative imports introduce, by local name. */
+function importedBindings(sf: AnyNode, from: string, sources: Set<string>): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const st of sf.statements as AnyNode[]) {
+    if (st.kind !== SyntaxKind.ImportDeclaration || !st.importClause) {
+      continue;
+    }
+    const target = resolveSpecifier(from, st.moduleSpecifier.text as string, sources);
+    if (!target) {
+      continue;
+    }
+    const clause = st.importClause as AnyNode;
+    if (clause.name?.text) {
+      map.set(clause.name.text as string, target);
+    }
+    for (const element of (clause.namedBindings?.elements as AnyNode[] | undefined) ?? []) {
+      map.set(element.name.text as string, target);
+    }
+  }
+  return map;
+}
+
+/** One focus read the rule objects to, located and explained. */
+export interface FocusSite {
+  /** 1-based line of the read. */
+  line: number;
+  /** The identifier read, or the helper called. */
+  name: string;
+  /** Set when the read is one hop away: the zero-argument reader this call reaches. */
+  via: string | null;
+}
+
+/**
+ * The focus reads inside pane-scoped functions, per absolute file path.
+ *
+ * A read is counted ONCE however many pane-scoped functions enclose it — nesting an arrow inside a
+ * pane-scoped renderer is how every one of the context bar's controls was written, and counting the
+ * same `activeTab` twice would make the numbers in the allow-list depend on how deeply the closure
+ * happened to sit.
+ *
+ * Parameter subtrees are walked OUTSIDE the pane scope on purpose, so a default such as `surface:
+ * CanvasSurface = activeCanvasSurface()` does not count. That signature is the opposite of the
+ * defect: it says in public "the focused pane when you do not say", and eleven of the geometry
+ * verbs are written that way.
+ *
+ * @param {string[]} files Absolute paths to analyse.
+ * @returns {Promise<Map<string, FocusSite[]>>} Absolute path → sites. Empty entries are omitted.
+ */
+export async function analyzeFocusScope(files: string[]): Promise<Map<string, FocusSite[]>> {
+  const api = new API({ cwd: ROOT });
+  try {
+    const snapshot = await api.updateSnapshot({ openFiles: files });
+    const parsed = await Promise.all(
+      files.map(async (file) => {
+        const project = await snapshot.getDefaultProjectForFile(file);
+        const sf = project ? await project.program.getSourceFile(file) : undefined;
+        return [file, sf] as const;
+      }),
+    );
+    const sources = new Set(parsed.filter(([, sf]) => sf).map(([file]) => file));
+    const modules = new Map<string, ModuleFacts>();
+    for (const [file, sf] of parsed) {
+      if (!sf) {
+        continue;
+      }
+      const readers = new Set<string>();
+      for (const { name, fn } of topLevelFunctions(sf)) {
+        const arity = ((fn.parameters as AnyNode[] | undefined) ?? []).length;
+        if (arity === 0 && fn.body && readsFocusDirectly(fn.body)) {
+          readers.add(name);
+        }
+      }
+      modules.set(file, { importedFrom: importedBindings(sf, file, sources), readers, sf });
+    }
+
+    /**
+     * Is a bare `name()` a call to a zero-argument focus reader — here, or in a module this one
+     * imports it from? Cross-module is the case that matters: finding 3 was `frontmatter-panel.ts`
+     * calling `head-panel.ts`'s `isPageDocument()`.
+     */
+    const isFocusReader = (facts: ModuleFacts, name: string): boolean =>
+      facts.readers.has(name) ||
+      (modules.get(facts.importedFrom.get(name) ?? "")?.readers.has(name) ?? false);
+
+    const found = new Map<string, FocusSite[]>();
+    for (const [file, facts] of modules) {
+      const hits = new Map<number, FocusSite>();
+      const at = (node: AnyNode, name: string, via: string | null): FocusSite => ({
+        line: (facts.sf.getLineAndCharacterOfPosition(node.getStart(facts.sf)).line as number) + 1,
+        name,
+        via,
+      });
+      const walk = (node: AnyNode, inPane: boolean): void => {
+        const kind: SyntaxKind = node.kind;
+        if ((kind >= FIRST_TYPE_KIND && kind <= LAST_TYPE_KIND) || SKIP_KINDS.has(kind)) {
+          return;
+        }
+        if (FUNCTION_KINDS.has(kind)) {
+          const scoped = inPane || isPaneScoped(node, facts.sf);
+          for (const param of (node.parameters as AnyNode[] | undefined) ?? []) {
+            walk(param, inPane);
+          }
+          if (node.body) {
+            walk(node.body, scoped);
+          }
+          return;
+        }
+        if (inPane) {
+          if (kind === SyntaxKind.Identifier && FOCUS_NAMES.has(node.text as string)) {
+            hits.set(node.getStart(facts.sf) as number, at(node, node.text as string, null));
+          } else if (
+            kind === SyntaxKind.CallExpression &&
+            node.expression?.kind === SyntaxKind.Identifier &&
+            isFocusReader(facts, node.expression.text as string)
+          ) {
+            const callee = node.expression.text as string;
+            hits.set(node.getStart(facts.sf) as number, at(node, `${callee}()`, callee));
+          }
+        }
+        node.forEachChild((child: AnyNode) => {
+          walk(child, inPane);
+        });
+      };
+      walk(facts.sf, false);
+      if (hits.size > 0) {
+        found.set(
+          file,
+          [...hits.values()].toSorted((a, b) => a.line - b.line),
+        );
+      }
+    }
+    return found;
+  } finally {
+    await api.close();
+  }
 }
 
 /** A `view.<banned>` read, as it appears in code rather than in prose. */
@@ -312,26 +588,54 @@ export function diffAgainstAllowed(
   return failures;
 }
 
+/** Rule 4's sites, per repo-relative file. {@link FOCUS_OWNER} is dropped rather than allow-listed. */
+export async function focusSitesInPaneScope(patterns: string[]): Promise<Map<string, FocusSite[]>> {
+  const scanned = await filesFor(patterns);
+  const files = scanned.filter((file) => relative(ROOT, file) !== FOCUS_OWNER);
+  const sites = new Map<string, FocusSite[]>();
+  if (files.length === 0) {
+    return sites;
+  }
+  for (const [file, found] of await analyzeFocusScope(files)) {
+    sites.set(relative(ROOT, file), found);
+  }
+  return sites;
+}
+
 /**
  * Rule 4's counts, per file. Same shape as {@link countPerFile}, but the unit is a function body
  * rather than a match, so it cannot reuse it.
  */
 export async function countFocusInPaneScope(patterns: string[]): Promise<Map<string, number>> {
-  const counts = new Map<string, number>();
-  for (const file of await filesFor(patterns)) {
-    const path = relative(ROOT, file);
-    if (path === FOCUS_OWNER) {
-      continue;
-    }
-    const text = await Bun.file(file)
-      .text()
-      .catch(() => "");
-    const found = focusReadsInPaneScope(code(text));
-    if (found > 0) {
-      counts.set(path, found);
-    }
-  }
-  return counts;
+  const sites = await focusSitesInPaneScope(patterns);
+  return new Map([...sites].map(([file, found]) => [file, found.length]));
+}
+
+/**
+ * `file:line name` for every site the rule objects to — printed under a rule-4 failure.
+ *
+ * A count alone sends the reader back to the source to find out what it meant, and the one-hop
+ * reads are the ones nobody would find: `pushProjectStylesToCanvas()` contains no focus name at all
+ * at the call site.
+ */
+export function describeFocusSites(sites: Map<string, FocusSite[]>, file: string): string {
+  const found = sites.get(file) ?? [];
+  return found
+    .map((site) => `${file}:${site.line} ${site.name}${site.via ? " (one hop)" : ""}`)
+    .join(", ");
+}
+
+/**
+ * Append `file:line name` detail to each rule-4 failure line, which opens with the file's path.
+ *
+ * Separate and pure so it is testable without a failing tree: a checker whose most informative
+ * output only appears when the repo is broken is one nobody has read.
+ */
+export function withFocusDetail(failures: string[], sites: Map<string, FocusSite[]>): string[] {
+  return failures.map((line) => {
+    const detail = describeFocusSites(sites, line.slice(0, line.indexOf(":")));
+    return detail ? `${line} — ${detail}` : line;
+  });
 }
 
 export async function checkPaneSingletons(): Promise<string[]> {
@@ -350,10 +654,15 @@ export async function checkPaneSingletons(): Promise<string[]> {
     ALLOWED_ACTIVE_TAB_READS,
     "focused-tab read(s) in stage geometry",
   );
-  const paneScopeFailures = diffAgainstAllowed(
-    await countFocusInPaneScope(FOCUS_SCOPE_SCAN),
-    ALLOWED_FOCUS_IN_PANE_SCOPE,
-    "focus read(s) inside a function that was given a pane",
+  const sites = await focusSitesInPaneScope(FOCUS_SCOPE_SCAN);
+  const siteCounts = new Map([...sites].map(([file, found]) => [file, found.length]));
+  const paneScopeFailures = withFocusDetail(
+    diffAgainstAllowed(
+      siteCounts,
+      ALLOWED_FOCUS_IN_PANE_SCOPE,
+      "focus read(s) inside a function that was given a pane",
+    ),
+    sites,
   );
   return [...viewFailures, ...instanceFailures, ...focusFailures, ...paneScopeFailures];
 }
@@ -376,9 +685,11 @@ export function report(failures: string[]): number {
       "\n   Per-stage state belongs on `CanvasSurface` (src/canvas/surface-registry.ts);\n" +
         "   per-pane content belongs in a Map keyed by pane id; and stage geometry reaches\n" +
         "   both through the surface it was given — never through `activeTab`.\n" +
-        "   A function handed a `paneId` or a `CanvasSurface` has already been told which pane\n" +
-        "   it is about: ask `tabOfPane(paneId)` / `canvasModeOfTab(tab)`, and pass the tab on\n" +
-        "   to `updateUi` / `setCanvasMode`, which take one.",
+        "   A function handed a `paneId`, a `pane`, a `surface` or a `container` has already been\n" +
+        "   told which pane it is about: ask `tabOfPane(paneId)` / `paneOfContainer(container)` /\n" +
+        "   `canvasModeOfTab(tab)`, and pass the tab on to `updateUi` / `setCanvasMode`, which\n" +
+        "   take one. A read marked `(one hop)` is reached through a zero-argument helper — give\n" +
+        "   that helper the tab too, at the call site where the pane is still known.",
     );
     return 1;
   }

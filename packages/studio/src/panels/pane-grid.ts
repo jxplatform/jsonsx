@@ -58,7 +58,7 @@ import { scheduleCanvasRender } from "../canvas/canvas-render";
 import { paneRegion, paneStripRegion } from "../ui/regions";
 import { attachJumpBarHost } from "./jump-bar";
 import { attachPaneChromeHost } from "./pane-context";
-import { workspace } from "../workspace/workspace";
+import { focusPane, workspace } from "../workspace/workspace";
 import { setupHandle } from "../ui/panel-resize";
 import type { EffectScope } from "@vue/reactivity";
 import type { CanvasSurface } from "../canvas/canvas-surface";
@@ -89,6 +89,8 @@ interface CellRefs extends PaneCell {
   onJump: (el?: Element) => void;
   onChrome: (el?: Element) => void;
   onStage: (el?: Element) => void;
+  /** Capture-phase `pointerdown` on the cell root — see {@link cellRefs}. */
+  onPointerDown: { handleEvent: () => void; capture: true };
   /** Stage-gesture disposer, live between the stage's attach and its detach. */
   releaseGestures: (() => void) | null;
 }
@@ -147,6 +149,43 @@ function cellRefs(paneId: string): CellRefs {
         cell.jump = el as HTMLElement;
       }
       attachJumpBarHost(paneId, (el as HTMLElement | undefined) ?? null);
+    },
+    /**
+     * **A pointer landing anywhere in this cell puts the keyboard in this pane.**
+     *
+     * Before this, `panels/tab-strip.ts`'s strip row was the ONLY thing in the app that moved
+     * `workspace.activePaneId` by pointer, so a click on the side pane's canvas, its context bar,
+     * its Library, its Code editor or its entry form selected and edited that pane's document while
+     * every keyboard command, the Inspector, the block action bar and the overlay effect went on
+     * answering for the other one.
+     *
+     * ONE listener, on the cell, because the cell is the only thing that knows which pane a click
+     * is IN. The alternative — a `focusPane` call in each of the seven surfaces a pane can contain
+     * — is a list that a new surface joins by being remembered.
+     *
+     * Three properties it needs, and where each comes from:
+     *
+     * 1. _It must not disturb a control mid-interaction._ It moves the pane focus, never the DOM
+     *    focus, so a text field in the context bar keeps its caret and its selection; and it fires
+     *    on `pointerdown`, before any gesture has begun. The pane SPLITTER is a sibling of the
+     *    cells rather than a child of one, so a splitter drag never reaches this at all.
+     * 2. _It must reach clicks inside the canvas._ It cannot: those land in a cross-origin iframe and
+     *    never surface as a parent-realm pointer event. `canvas/iframe-host.ts`'s `hit` /
+     *    `layoutHit` handlers are that seam and call {@link focusPane} themselves, from the pane
+     *    that mounted the artboard.
+     * 3. _It must cost nothing when the pane is already focused._ {@link focusPane} returns early in
+     *    that case — the guard is in the module that owns focus, because a function handed a
+     *    `paneId` may not read the focus (`scripts/check-pane-singletons.ts` rule 4).
+     *
+     * CAPTURE phase, so a surface inside the cell that stops propagation cannot silently take the
+     * pane's focus with it. `studio.ts`'s commit-on-parent-click listener is on `document`, so it
+     * still runs first and the outgoing inline-edit session is committed before focus moves.
+     */
+    onPointerDown: {
+      capture: true,
+      handleEvent: () => {
+        focusPane(paneId);
+      },
     },
     /* Every element field is written on ATTACH and left alone on detach. A caller holding the
        record when its pane goes away — `studio.ts`'s primary cell, three tests — asks it what the
@@ -231,7 +270,7 @@ function detachStage(cell: CellRefs): void {
 function cellTpl(paneId: string): TemplateResult {
   const cell = cellRefs(paneId);
   return html`
-    <div class="pane" data-pane-id=${paneId} ${ref(cell.onRoot)}>
+    <div class="pane" data-pane-id=${paneId} @pointerdown=${cell.onPointerDown} ${ref(cell.onRoot)}>
       <div class="pane-strip" data-jx-region=${paneStripRegion(paneId)} ${ref(cell.onStrip)}></div>
       <div class="pane-jump" ${ref(cell.onJump)}></div>
       <div class="pane-chrome" ${ref(cell.onChrome)}></div>

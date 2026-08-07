@@ -5,6 +5,8 @@ import {
   SECONDARY_PANE,
   closeAllTabs,
   closePane,
+  focusPane,
+  openTab,
   splitRight,
   workspace,
 } from "../src/workspace/workspace";
@@ -377,5 +379,89 @@ describe("the second cell", () => {
     expect(grid.style.gridTemplateColumns).toBe("minmax(0, 1fr)");
     // And the survivor is untouched, still holding its own stage.
     expect(surfaceForPane(PRIMARY_PANE).wrap).toBe(cellForPane(PRIMARY_PANE)!.stage);
+  });
+});
+
+describe("a pointer in a cell moves the keyboard into it", () => {
+  const doc = () => ({ children: [{ tagName: "p", textContent: "x" }], tagName: "div" });
+
+  async function split() {
+    closeAllTabs();
+    openTab({ document: doc(), documentPath: "/project/left.json", id: "left" });
+    openTab({ document: doc(), documentPath: "/project/right.json", id: "right" });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    await flush();
+    // `splitRight` leaves the NEW pane focused, so put the keyboard back in the primary: every
+    // Assertion below is about a pointer landing in the pane the keyboard is NOT in.
+    focusPane(PRIMARY_PANE);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+  }
+
+  const down = (el: Element) => {
+    el.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, cancelable: true }));
+  };
+
+  test("every surface in the side cell focuses it — not only its tab strip", async () => {
+    /* `panels/tab-strip.ts`'s strip row was the ONLY thing in the app that moved
+       `workspace.activePaneId` by pointer. Clicking the side pane's canvas, its context bar, its
+       jump bar or anything drawn into its stage left the keyboard in the primary, so the
+       Inspector, the block action bar, the overlay effect and every keyboard command went on
+       answering for a document the person was not looking at. */
+    await split();
+    const side = cellForPane(SECONDARY_PANE)!;
+    for (const [name, el] of [
+      ["stage", side.stage],
+      ["chrome", side.chrome],
+      ["jump", side.jump],
+      ["root", side.root],
+    ] as const) {
+      focusPane(PRIMARY_PANE);
+      down(el);
+      expect(`${name}: ${workspace.activePaneId}`).toBe(`${name}: ${SECONDARY_PANE}`);
+    }
+  });
+
+  test("a pointer deep INSIDE a cell counts — the listener is on the cell, not on each surface", async () => {
+    await split();
+    const side = cellForPane(SECONDARY_PANE)!;
+    const deep = document.createElement("button");
+    side.chrome.append(deep);
+    down(deep);
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+  });
+
+  test("a handler that stops propagation cannot take the pane's focus with it", async () => {
+    /* Capture phase, so a control inside the cell that swallows the event — a picker, a drag
+       start — cannot leave the keyboard in the other pane. */
+    await split();
+    const side = cellForPane(SECONDARY_PANE)!;
+    const swallow = document.createElement("button");
+    swallow.addEventListener("pointerdown", (e) => e.stopPropagation());
+    side.chrome.append(swallow);
+    down(swallow);
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+  });
+
+  test("the SPLITTER is not in a cell, so a drag on it never moves focus", async () => {
+    /* The one interaction that must not be disturbed mid-gesture. It is a sibling of the cells in
+       the grid rather than a child of either, so the listener structurally cannot see it. */
+    await split();
+    const grid = document.querySelector("#pane-grid") as HTMLElement;
+    const splitter = grid.querySelector(".pane-splitter") as HTMLElement;
+    expect(splitter.closest(".pane")).toBeNull();
+    down(splitter);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+  });
+
+  test("a pointer in the pane that already has focus changes nothing at all", async () => {
+    /* `focusPane` is called on every pointerdown now, so it has to be free when it has nothing to
+       do: `promoteMru` rewrites the order `⌃Tab` walks and `resetTabCycle` abandons a live walk
+       through it. Clicking around in the pane you are already in must not touch either. */
+    await split();
+    const primary = cellForPane(PRIMARY_PANE)!;
+    workspace.mruOrder = ["right", "left"];
+    down(primary.stage);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.mruOrder).toEqual(["right", "left"]);
   });
 });

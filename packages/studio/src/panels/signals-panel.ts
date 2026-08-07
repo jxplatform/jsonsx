@@ -26,6 +26,7 @@ import { openLogicTarget } from "./formula-workspace";
 import { bindableSignalNames } from "./properties-panel";
 import { registerPanel } from "./panel-registry";
 import { renderStatementEditor } from "./statement-editor";
+import { NAVIGATOR_STATEMENTS_REGION } from "../ui/regions";
 import { livePreviewExpression } from "../services/live-preview";
 import { renderMediaPicker } from "../ui/media-picker";
 import { renderOnly } from "../store";
@@ -1109,6 +1110,8 @@ function renderFunctionFields(
                 {
                   allowEventRef: true,
                   emits: def.emits ?? [],
+                  // This editor is in the Navigator's State panel; the Events tab's is not.
+                  region: NAVIGATOR_STATEMENTS_REGION,
                   stateDefs: Object.keys(S.document.state || {}),
                   stateEntries: S.document.state || {},
                 },

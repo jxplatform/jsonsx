@@ -171,11 +171,20 @@ export function paneOfTab(tabId: string): Pane | undefined {
  * Move focus to a pane. A no-op for an id no pane carries, so a stale persisted layout cannot
  * strand the keyboard in a pane that is not there.
  *
+ * **And a no-op for the pane that already has it**, which is what makes it safe to call on every
+ * pointerdown. Moving focus is not only the `activePaneId` write — Vue skips that one when the
+ * value is unchanged — it is also `resetTabCycle` (which abandons a live ⌘-Tab walk), `promoteMru`
+ * (which rewrites the MRU order every ⌘-Tab reads) and `syncTreeSelection` (which moves the
+ * Library's cursor). Running those on a click that changed nothing would make every click in the
+ * focused pane a small act of state destruction, so the guard is HERE rather than at the call site:
+ * this is the module that owns focus, and a caller holding a `paneId` may not ask which pane has it
+ * (`scripts/check-pane-singletons.ts` rule 4).
+ *
  * @param {string} paneId
  */
 export function focusPane(paneId: string) {
   const pane = paneById(paneId);
-  if (!pane) {
+  if (!pane || pane.id === workspace.activePaneId) {
     return;
   }
   workspace.activePaneId = pane.id;
@@ -188,6 +197,24 @@ export function focusPane(paneId: string) {
       syncTreeSelection(tab);
     }
   }
+}
+
+/**
+ * Whether `paneId` is the pane the keyboard is in.
+ *
+ * A one-line predicate that exists so a pane-scoped renderer can DRAW the focus without READING it.
+ * `panels/tab-strip.ts` is the case: its strip carries a `focused` class, so "which pane has focus"
+ * is genuinely part of what it paints — but it is handed a pane, and
+ * `scripts/check-pane-singletons.ts` rule 4 (rightly) refuses `pane.id === workspace.activePaneId`
+ * inside a function that was told which pane it is about. Asking the module that OWNS focus is the
+ * distinction the rule is drawing: a surface may render the answer, it may not resolve its subject
+ * from it.
+ *
+ * @param {string} paneId
+ * @returns {boolean}
+ */
+export function isPaneFocused(paneId: string): boolean {
+  return workspace.activePaneId === paneId;
 }
 
 /** Focus the pane that is not the focused one, when there is one. */

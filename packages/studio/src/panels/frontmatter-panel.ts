@@ -215,7 +215,11 @@ export function hasDocumentHeader(tab: Tab): boolean {
     return true;
   }
   // A page always has one, even an empty one: Title and Route are the two facts it must state.
-  return isPageDocument();
+  // THIS tab's page-ness. `isPageDocument()` was zero-argument and answered about the focused
+  // Pane's document, so a predicate whose every other line reads `tab` finished by asking about a
+  // Different one: a page in the side pane lost its header whenever a component was focused, and a
+  // Bare component in the side pane grew one whenever a page was.
+  return isPageDocument(tab);
 }
 
 function _doRender(paneId: string) {
@@ -313,10 +317,10 @@ export function documentHeaderTemplate(tab: Tab, paneId: string): TemplateResult
             { placeholder: "Untitled" },
           ),
         })}
-        ${isPageDocument() ? renderLayoutPickerRow(headDoc, applyMutation) : nothing}
+        ${isPageDocument(tab) ? renderLayoutPickerRow(headDoc, applyMutation) : nothing}
         ${fields.map((f) => renderFmField(f.field, f.entry, f.value, requiredFields))}
       </div>
-      ${disclosure(tab.id, _seoOpen, "SEO", seoBody(headDoc, head, applyMutation))}
+      ${disclosure(tab.id, _seoOpen, "SEO", seoBody(tab, headDoc, head, applyMutation))}
       ${disclosure(tab.id, _rawOpen, "Raw head tags", rawHeadBody(head))}
     </section>
   `;
@@ -524,12 +528,14 @@ function seoWarningList(preview: SeoPreview): TemplateResult {
  * to write is already coming from the site.
  */
 function seoBody(
+  tab: Tab,
   headDoc: JxMutableNode,
   head: JxHeadEntry[],
   applyMutation: (fn: (doc: JxMutableNode) => void) => void,
 ): TemplateResult {
   const iconHref = String(findLinkEntry(head, "icon")?.attributes?.href ?? "");
-  const preview = seoPreviewFor(headDoc);
+  // The card's tab, so the SERP row shows this document's route and this document's layout layer.
+  const preview = seoPreviewFor(tab, headDoc);
   return html`
     <div class="seo-previews">${serpCard(preview)} ${socialCard(preview)}</div>
     ${seoFieldList(preview)} ${seoWarningList(preview)}

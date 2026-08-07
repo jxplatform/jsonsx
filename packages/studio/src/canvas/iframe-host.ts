@@ -30,8 +30,8 @@ import { rectOf } from "../utils/geometry";
 import { notify } from "../services/notify";
 import { effect, effectScope } from "../reactivity";
 import { pathsEqual, projectState, renderOnly } from "../store";
-import { activeTab, workspace } from "../workspace/workspace";
-import { panelHostingCanvas, stageContaining } from "./canvas-surface";
+import { activeTab, focusPane, workspace } from "../workspace/workspace";
+import { panelHostingCanvas, stageContaining, tabOfContainer } from "./canvas-surface";
 import { cloneSelection, primarySelection, toggleSelected } from "../tabs/selection";
 import type { JxPath } from "../state";
 import { setLayoutSelection, shell } from "../shell";
@@ -1180,6 +1180,26 @@ function hostTab(state: HostState): Tab | null {
   return state.tabId ? (workspace.tabs.get(state.tabId) ?? null) : null;
 }
 
+/**
+ * Put the keyboard in the pane whose artboard was just clicked.
+ *
+ * `panels/pane-grid.ts` moves the pane focus on a `pointerdown` anywhere in a cell, and that
+ * listener cannot see this click: the canvas is a cross-origin `<iframe>`, so a pointer event
+ * inside it is delivered in the frame's own realm and never surfaces in the parent's. The `hit` and
+ * `layoutHit` messages ARE that pointerdown, re-posted across the channel, so this is the seam.
+ *
+ * The pane comes from the artboard the message arrived through — `panelHostingCanvas` is the same
+ * route the breakpoint and the escalation already take — never from the focus, which is the thing
+ * being corrected. `focusPane` is a no-op when the pane already has focus, so the common case
+ * (clicking around in the pane you are already in) costs one map lookup.
+ */
+function focusHostPane(state: HostState): void {
+  const paneId = panelHostingCanvas(state.canvasEl)?.surface.paneId;
+  if (paneId) {
+    focusPane(paneId);
+  }
+}
+
 /** No selection. A shared frozen empty, so the "this host shows nothing" path allocates nothing. */
 const NO_SELECTION: readonly JxPath[] = Object.freeze([]);
 
@@ -1683,6 +1703,10 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "hit": {
+      /* A click in a canvas is a click in a PANE, and the parent realm never saw it. See
+         `focusHostPane`; it goes first so everything below writes into the pane the person is now
+         in rather than starting a selection the Inspector will not show. */
+      focusHostPane(state);
       // Selecting a real document node retires any layout selection — the two are alternatives, and
       // A stale layout panel next to a fresh element selection would name the wrong thing.
       setLayoutSelection(null);
@@ -1748,6 +1772,8 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       if (state.stylebook) {
         return;
       }
+      // Layout chrome is still canvas, and clicking it is still a click in a pane.
+      focusHostPane(state);
       canvasContextMenuHandler?.dismiss();
       setLayoutSelection(msg.hit);
       // Mutually exclusive with a document selection: the inspector renders one panel or the other.
@@ -2344,7 +2370,10 @@ type PreparedRender = Omit<
 >;
 
 /** One render pass's prepared payloads, by document IDENTITY. */
-type PreparedDocs = Map<JxMutableNode, { tabId: string | null; payload: Promise<PreparedRender> }>;
+type PreparedDocs = Map<
+  JxMutableNode,
+  { tabId: string | null; viewTabId: string | null; payload: Promise<PreparedRender> }
+>;
 
 /**
  * How many render passes may be prepared at once. Two panes, each mid-pass, plus slack.
@@ -2377,7 +2406,10 @@ const PREPARED_PASS_LIMIT = 4;
  *
  * Within a generation the key is document IDENTITY, because git-diff mounts two different documents
  * under one generation and each gets its own entry. `tabId` rides along because `editableTags` is
- * derived from it; a mismatch re-prepares rather than reusing.
+ * derived from it, and the VIEW tab's id beside it because the whole resolution is derived from
+ * THAT — the document path, the layout toggle, the preview params and the mode. A mismatch in
+ * either re-prepares rather than reusing. `tabId` alone would not do: an override render nulls it,
+ * so two git-diff documents would agree on `null` while being views of different tabs.
  */
 const preparedPasses = new Map<number, PreparedDocs>();
 
@@ -2419,10 +2451,12 @@ function preparePassRender(
   gen: number,
   doc: JxMutableNode,
   tabId: string | null,
+  viewTab: Tab | null,
 ): Promise<PreparedRender> {
   const byDoc = preparedDocsFor(gen);
+  const viewTabId = viewTab?.id ?? null;
   const cached = byDoc.get(doc);
-  if (cached && cached.tabId === tabId) {
+  if (cached && cached.tabId === tabId && cached.viewTabId === viewTabId) {
     return cached.payload;
   }
   // One-shot per PASS, not per host. `allowAutoRequestsOnNextRender` arms "the next render", and
@@ -2432,7 +2466,7 @@ function preparePassRender(
   const allowAutoRequests = consumeAllowAutoRequests();
   const payload = timeSpanAsync(SPAN_PREPARE_RENDER, async (): Promise<PreparedRender> => {
     canvasPerf.renderPreparations += 1;
-    const resolved = await resolveCanvasDocument(doc);
+    const resolved = await resolveCanvasDocument(doc, viewTab);
     // The doc must be structured-cloneable to cross postMessage. A Jx document is JSON by contract,
     // So a JSON round-trip (NOT structuredClone, which would throw) drops residual functions /
     // Reactive proxy artifacts that would otherwise raise DataCloneError and silently drop the
@@ -2462,7 +2496,7 @@ function preparePassRender(
       ...(allowAutoRequests ? { allowAutoRequests: true } : {}),
     };
   });
-  byDoc.set(doc, { payload, tabId });
+  byDoc.set(doc, { payload, tabId, viewTabId });
   return payload;
 }
 
@@ -2483,6 +2517,15 @@ function preparePassRender(
  * git-diff, whose iframes must never route doc mutations anywhere). It is recorded against `gen`
  * and adopted into `host.tabId` only when the iframe acks the render — see
  * {@link HostState.tabId}.
+ *
+ * `viewTab` is a DIFFERENT question and that is why it is a second parameter: `tabId` asks "where
+ * do this frame's mutations go", `viewTab` asks "whose document path, layout toggle, preview params
+ * and canvas mode resolve it". They diverge for exactly the override case — a git-diff render has
+ * no mutation target but is still a view OF the tab whose diff it is, and its `docBase` and edit
+ * transform must come from that tab. The default derives it from the element, the way
+ * `paneOfContainer` does everywhere else stage content is handed a host and nothing else; the one
+ * production caller (`canvas-render.ts`) passes `tabOfPane(surface.paneId)` explicitly, because it
+ * has already resolved it to pick the document.
  */
 export async function mountIframeCanvas(
   gen: number,
@@ -2490,6 +2533,7 @@ export async function mountIframeCanvas(
   canvasEl: HTMLElement,
   widthPx?: number | null,
   tabId: string | null = null,
+  viewTab: Tab | null = tabOfContainer(canvasEl),
 ): Promise<void> {
   const state = ensureHost(canvasEl);
   state.pendingTabIds.set(gen, tabId);
@@ -2500,7 +2544,7 @@ export async function mountIframeCanvas(
   // Own `latestGen`), so the parent must NOT gate on `view.renderGeneration`: during boot many
   // Renders fire and the generation is usually stale by the time resolution finishes, which would
   // Otherwise drop every post.
-  const prepared = await preparePassRender(gen, doc, tabId);
+  const prepared = await preparePassRender(gen, doc, tabId, viewTab);
   const message: ParentToIframe = {
     ...prepared,
     // Per-host, and cheap: read at POST time so a scheme flip that raced the shared resolution is

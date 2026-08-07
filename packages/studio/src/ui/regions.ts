@@ -368,6 +368,25 @@ export function inspectorTabRegion(tabId: string): string {
 }
 
 /**
+ * The statement editor has TWO hosts, so the id names the host and not the control.
+ *
+ * `panels/statement-editor.ts` hard-stamped `navigator/statements` on itself. It is drawn by the
+ * Navigator's State panel AND by the Inspector's Events tab, both openable at once, and
+ * {@link resolveRegion} takes the LAST match in document order — `#right-panel` follows
+ * `#left-panel` — so the id addressed the INSPECTOR's editor under a name that says Navigator, and
+ * the shot cropping it cropped a control in the wrong dock.
+ *
+ * These two constants are the fix, and their shape is the general rule: a shared control cannot
+ * know where it is, so its region id is a REQUIRED argument its host supplies (see
+ * {@link import("../panels/statement-editor").StatementEditorOpts}). A third host cannot be added
+ * without naming itself.
+ */
+export const NAVIGATOR_STATEMENTS_REGION = "navigator/statements";
+
+/** @see {@link NAVIGATOR_STATEMENTS_REGION} */
+export const INSPECTOR_STATEMENTS_REGION = "inspector/statements";
+
+/**
  * Region id for a Bottom dock tab, derived from the panel's own id.
  *
  * The third member of the derived-region family, and the one that shows the grammar was worth

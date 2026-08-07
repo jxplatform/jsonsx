@@ -35,6 +35,7 @@ import {
   activateTab,
   closeTab,
   focusPane,
+  isPaneFocused,
   moveTab,
   promoteDirtyPreviewTabs,
   promoteTab,
@@ -162,7 +163,7 @@ function render() {
   const claims = new Map<HTMLElement, Pane>();
   for (const pane of workspace.panes) {
     const host = hostFor(pane);
-    if (host && (!claims.has(host) || pane.id === workspace.activePaneId)) {
+    if (host && (!claims.has(host) || isPaneFocused(pane.id))) {
       claims.set(host, pane);
     }
   }
@@ -198,7 +199,7 @@ function renderPane(pane: Pane, host: HTMLElement) {
   }
 
   const labels = tabLabels(pane);
-  const focused = pane.id === workspace.activePaneId;
+  const focused = isPaneFocused(pane.id);
 
   litRender(
     html`

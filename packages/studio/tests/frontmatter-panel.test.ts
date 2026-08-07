@@ -17,10 +17,21 @@ import {
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { initShellRefs, registerRenderer } from "../src/store";
 import { invalidateMediaCache } from "../src/ui/media-picker";
-import { closeAllTabs } from "../src/workspace/workspace";
+import {
+  activateTab,
+  activeTab,
+  closeAllTabs,
+  openTab,
+  paneById,
+  splitRight,
+} from "../src/workspace/workspace";
 import { mutateUpdateFrontmatter, transactDoc } from "../src/tabs/transact";
 import { collectFmFields } from "../src/panels/frontmatter-fields";
-import { RESERVED_FM_KEYS, invalidateLayoutHeadCache } from "../src/panels/head-panel";
+import {
+  RESERVED_FM_KEYS,
+  invalidateLayoutHeadCache,
+  invalidateLayoutPickerCache,
+} from "../src/panels/head-panel";
 import { invalidateLayoutCache } from "../src/site-context";
 import { createCommandRegistry } from "../src/commands/registry";
 import { emptyContext } from "../src/commands/context";
@@ -231,6 +242,81 @@ describe("hasDocumentHeader", () => {
     delete tab.doc.document.$head;
     tab.doc.content.frontmatter = { draft: true };
     expect(hasDocumentHeader(tab)).toBe(true);
+  });
+
+  /*
+   * The predicate takes a tab, inspects THAT tab's frontmatter, title and `$head` — and then fell
+   * through to a zero-argument `isPageDocument()` for the "a page always has one" rule. So its last
+   * line answered about a different document from its first three, and both directions were visible
+   * the moment a second pane existed.
+   */
+  function twoDocuments() {
+    resetStudioState({ isSiteProject: true, projectConfig: {} });
+    closeAllTabs();
+    const page = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "pages/about.json",
+      id: "hdr-page",
+    });
+    const component = openTab({
+      document: { children: [], tagName: "x-card" },
+      documentPath: "components/Card.json",
+      id: "hdr-component",
+    });
+    return { component, page };
+  }
+
+  test("a PAGE keeps its header while a component is focused", () => {
+    const { component, page } = twoDocuments();
+    activateTab(component.id);
+    expect(activeTab.value?.documentPath).toBe("components/Card.json");
+    // The page has no frontmatter, no title and no $head — the page rule is the only thing that
+    // Can give it a header, and it used to be asked about the OTHER document.
+    expect(hasDocumentHeader(page)).toBe(true);
+  });
+
+  test("a bare COMPONENT does not gain one because a page is focused", () => {
+    const { component, page } = twoDocuments();
+    activateTab(page.id);
+    expect(hasDocumentHeader(component)).toBe(false);
+  });
+});
+
+describe("the Layout picker belongs to the card's own document", () => {
+  /*
+   * `documentHeaderTemplate(tab, paneId)` gated the picker on the same zero-argument read, so the
+   * control appeared and vanished in the pane you were editing according to the document in the
+   * other one — while the `$layout` it writes is this document's.
+   */
+  test("a PAGE's card shows the Layout row while a component is focused elsewhere", async () => {
+    resetStudioState({ isSiteProject: true, projectConfig: {} });
+    installMockPlatform({}, { "layouts/base.json": JSON.stringify({ tagName: "div" }) });
+    invalidateLayoutPickerCache();
+    closeAllTabs();
+    const page = resetWorkspaceWithTab({ children: [], tagName: "div", title: "About" } as never, {
+      documentPath: "pages/about.json",
+      id: "layout-page",
+    });
+    openTab({
+      document: { children: [], tagName: "x-card", title: "Card" },
+      documentPath: "components/Card.json",
+      id: "layout-component",
+    });
+    // The component goes to the SIDE pane and takes the focus with it; the card under test is the
+    // Primary's, still drawing the page.
+    expect(splitRight()?.id).toBe("secondary");
+    expect(paneById("primary")!.activeTabId).toBe(page.id);
+    expect(activeTab.value?.documentPath).toBe("components/Card.json");
+
+    await mountAndFlush();
+    // The layouts listing settles asynchronously and repaints through `renderOnly`.
+    await flush(4);
+
+    console.log(
+      `[frontmatter] focus=${activeTab.value?.documentPath} card-for=${page.documentPath} ` +
+        `layout rows=${host().querySelectorAll('[data-prop="layout"]').length}`,
+    );
+    expect(host().querySelectorAll('[data-prop="layout"]').length).toBe(1);
   });
 });
 

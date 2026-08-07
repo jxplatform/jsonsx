@@ -27,6 +27,7 @@ import { invalidateMediaCache, renderMediaPicker } from "../src/ui/media-picker"
 import { resetShellSurfaces } from "../src/shell";
 import {
   ALLOWED_ACTIVE_TAB_READS,
+  analyzeFocusScope,
   ALLOWED_FOCUS_IN_PANE_SCOPE,
   ALLOWED_SINGLE_INSTANCE,
   ALLOWED_VIEW_READS,
@@ -34,10 +35,15 @@ import {
   checkPaneSingletons,
   countFocusInPaneScope,
   countPerFile,
+  describeFocusSites,
   diffAgainstAllowed,
-  focusReadsInPaneScope,
+  focusSitesInPaneScope,
   report,
+  withFocusDetail,
 } from "../scripts/check-pane-singletons";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 happyDOM.setURL("http://localhost:3000/");
@@ -298,78 +304,233 @@ describe("the singleton guard", () => {
     expect([...nothingInjected]).toEqual([]);
   });
 
+  /*
+   * 30s, and the number is the rule's own cost. Rule 4 parses every module under `src/` with the
+   * TypeScript compiler rather than matching a regex over its text — ~2s standalone, and more under
+   * `--coverage` on a loaded machine. Bun's 5s default is a budget for a unit test; this is a
+   * compiler run, and the alternative to paying for it is the eight shapes a regex walks past.
+   */
   test("passes against the tree it guards", async () => {
     expect(await checkPaneSingletons()).toEqual([]);
-  });
+  }, 30_000);
 
-  test("the fourth rule is the general one: a function GIVEN a pane may not ask for the focus", () => {
+  test("the fourth rule's residue is two entries, and each names what it is", () => {
     /* Rules 1 and 2 are lists of names, rule 3 is a list of files, and each was written after a
        failure the next one walked straight past. This is the sentence all four were reaching for:
-       a function that has been told which pane it is about does not get to consult the focus. */
-    expect(ALLOWED_FOCUS_IN_PANE_SCOPE).toEqual({});
+       a function that has been told which pane it is about does not get to consult the focus.
+
+       It was empty under the regex and has two entries under the AST rule, which is the rule
+       working rather than the tree regressing: the bottom dock's function editor is app-level and
+       its `container` is not a stage, and `renderCssVarsEditor` reaches the focus one hop away
+       through `pushProjectStylesToCanvas()` — a real two-pane defect in `style/live-preview.ts`
+       that no body scan could ever have named. */
+    expect(ALLOWED_FOCUS_IN_PANE_SCOPE).toEqual({
+      "src/panels/editors.ts": 1,
+      "src/settings/css-vars-editor.ts": 1,
+    });
   });
 
-  test("it counts a focus read in the BODY of a pane-scoped function, and only there", () => {
-    // The shape the pane context bar had: drawn per pane, resolving through the focused tab.
-    expect(
-      focusReadsInPaneScope(`
-        function renderPane(paneId: string, host: HTMLElement) {
-          const tab = activeTab.value;
-          host.textContent = tab?.id ?? "";
+  /**
+   * The thirteen shapes the rule is measured against, written to disk and parsed.
+   *
+   * On disk because the rule is an AST check now: it asks the TypeScript compiler for a source
+   * file, and a compiler takes a path. They go to a temp directory rather than into `tests/`
+   * precisely BECAUSE they are deliberately broken code — half of them would not type-check, and a
+   * fixture that has to compile is a fixture that cannot hold the shape being tested.
+   */
+  const FIXTURES: { file: string; why: string; expected: number; source: string }[] = [
+    // ── The four the regex already caught. They must keep being caught. ──
+    {
+      expected: 1,
+      file: "plain.ts",
+      source: `function renderPane(paneId: string, host: HTMLElement) {
+          host.textContent = activeTab.value?.id ?? "";
+        }`,
+      why: "a plain function — the shape the pane context bar had",
+    },
+    {
+      expected: 1,
+      file: "arrow-block.ts",
+      source: `const draw = (surface: CanvasSurface) => {
+          return activeTab.value;
+        };`,
+      why: "an arrow with a block body",
+    },
+    {
+      expected: 1,
+      file: "method.ts",
+      source: `class Stage {
+          paint(paneId: string) {
+            return activeTab.value;
+          }
+        }`,
+      why: "a class method",
+    },
+    {
+      expected: 1,
+      file: "if-surface.ts",
+      source: `function fit(surface: CanvasSurface) {
+          if (surface) {
+            return getCanvasMode();
+          }
+          return null;
+        }`,
+      why: "a read inside a branch, not directly in the body",
+    },
+    // ── The eight it walked past. ──
+    {
+      expected: 1,
+      file: "arrow-template.ts",
+      source: "const label = (paneId: string) => `pane ${paneId} ${activeTab.value?.id}`;",
+      why: "an arrow whose body is a template literal — there is no `{` to match",
+    },
+    {
+      expected: 1,
+      file: "arrow-html.ts",
+      source: "const row = (paneId: string) => html`<b>${activeTab.value?.id}</b>`;",
+      why: "`=> html`…`` with no block — how half this package renders",
+    },
+    {
+      expected: 1,
+      file: "return-brace.ts",
+      source: `function sizes(paneId: string): { w: number } {
+          return { w: activeTab.value ? 1 : 0 };
+        }`,
+      why: "a return type containing a brace — the type's `{` closed the header",
+    },
+    {
+      expected: 1,
+      file: "return-fn-type.ts",
+      source: `function bind(surface: CanvasSurface): (x: number) => void {
+          return () => {
+            void activeTab.value;
+          };
+        }`,
+      why: "a return type that is a function type — the `=>` closed the header",
+    },
+    {
+      expected: 1,
+      file: "return-promise.ts",
+      source: `async function load(paneId: string): Promise<{ id: string }> {
+          return { id: activeTab.value?.id ?? "" };
+        }`,
+      why: "`Promise<{…}>` — the brace again, one generic deeper",
+    },
+    {
+      expected: 1,
+      file: "param-pane.ts",
+      source: `function strip(pane: Pane) {
+          return activePane().id;
+        }`,
+      why: "a parameter named `pane` — the name list held `paneId` only",
+    },
+    {
+      expected: 1,
+      file: "param-container.ts",
+      source: `function mount(container: HTMLElement) {
+          return getCanvasMode();
+        }`,
+      why: "a parameter named `container` — `paneOfContainer` is the derived route",
+    },
+    {
+      expected: 0,
+      file: "hop-reader.ts",
+      source: `export function isPageDocument() {
+          return Boolean(activeTab.value?.documentPath);
         }
-      `),
-    ).toBe(1);
-    // The shape `renderStylebookMode` had — a surface in, the focused tab consulted anyway.
-    expect(
-      focusReadsInPaneScope(`
-        export function renderStylebookMode(surface: CanvasSurface, ctx: StylebookCtx) {
-          const tab = activeTab.value;
-          return tab;
-        }
-      `),
-    ).toBe(1);
-    // And the mode read, which is the same defect one layer down.
-    expect(
-      focusReadsInPaneScope(`
-        function exportTpl(paneId: string, ctx: Ctx) {
-          return ctx.getCanvasMode() === "source";
-        }
-      `),
-    ).toBe(1);
-  });
+        export default function isPageMode() {
+          return getCanvasMode();
+        }`,
+      why: "the zero-argument readers themselves take no pane, so they are not the defect",
+    },
+    {
+      expected: 2,
+      file: "hop-caller.ts",
+      source: `import isPageMode, { isPageDocument } from "./hop-reader";
+        export function documentHeaderTemplate(tab: Tab, paneId: string) {
+          return isPageDocument() ? isPageMode() : "";
+        }`,
+      why: "finding 3: focus reached through a HELPER, one hop away, named import and default",
+    },
+  ];
 
-  test("a DEFAULT is the opposite of the defect, and is not counted", () => {
+  /** Write `sources` to a temp directory, analyse them, and hand back the counts by file name. */
+  async function analyzeSources(
+    sources: { file: string; source: string }[],
+  ): Promise<Map<string, number>> {
+    const dir = await mkdtemp(join(tmpdir(), "jx-pane-scope-"));
+    try {
+      const paths = sources.map((fixture) => join(dir, fixture.file));
+      await Promise.all(
+        sources.map(async (fixture, i) => writeFile(paths[i]!, fixture.source, "utf8")),
+      );
+      const found = await analyzeFocusScope(paths);
+      return new Map(
+        sources.map((fixture, i) => [fixture.file, found.get(paths[i]!)?.length ?? 0]),
+      );
+    } finally {
+      await rm(dir, { force: true, recursive: true });
+    }
+  }
+
+  test("the AST rule catches all thirteen shapes — including the eight the regex missed", async () => {
+    const counts = await analyzeSources(FIXTURES);
+    const actual = FIXTURES.map((f) => `${f.file} → ${counts.get(f.file)} · ${f.why}`);
+    const wanted = FIXTURES.map((f) => `${f.file} → ${f.expected} · ${f.why}`);
+    expect(actual).toEqual(wanted);
+  }, 30_000);
+
+  test("a DEFAULT is the opposite of the defect, and is not counted", async () => {
     /* `surface: CanvasSurface = activeCanvasSurface()` is a signature saying, in public, "the
        focused pane when you do not say" — eleven of the geometry verbs are written that way on
-       purpose, and a rule that fired on them would be one nobody could keep green. */
-    expect(
-      focusReadsInPaneScope(`
-        export function resetZoom(surface: CanvasSurface = activeCanvasSurface()) {
-          surface.panX = 0;
-        }
-      `),
-    ).toBe(0);
-  });
-
-  test("a function that takes only a TAB is not pane-scoped — it may ask whether it is focused", () => {
-    expect(
-      focusReadsInPaneScope(`
-        export function isTabActive(tab: Tab | null): boolean {
-          return tab !== null && activeTab.value === tab;
-        }
-      `),
-    ).toBe(0);
-  });
+       purpose, and a rule that fired on them would be one nobody could keep green. A parameter
+       list is walked OUTSIDE the pane scope for exactly this reason. */
+    const counts = await analyzeSources([
+      {
+        file: "default.ts",
+        source: `export function resetZoom(surface: CanvasSurface = activeCanvasSurface()) {
+            surface.panX = 0;
+          }`,
+      },
+      {
+        // A function that takes only a TAB may legitimately ask whether it is the focused one.
+        file: "tab-only.ts",
+        source: `export function isTabActive(tab: Tab | null): boolean {
+            return tab !== null && activeTab.value === tab;
+          }`,
+      },
+    ]);
+    expect([...counts]).toEqual([
+      ["default.ts", 0],
+      ["tab-only.ts", 0],
+    ]);
+  }, 30_000);
 
   test("the module that OWNS focus is excluded rather than allow-listed", async () => {
     /* `focusPane` and `closePane` both take a `paneId` and both WRITE `workspace.activePaneId` —
        that is the definition of moving focus. Putting the one legitimate writer in a table of
        things that must not come back would be a lie about what the table is. */
-    const owner = await Bun.file("src/workspace/workspace.ts").text();
-    expect(focusReadsInPaneScope(owner)).toBeGreaterThan(0);
+    const seen = await analyzeFocusScope([join(process.cwd(), "src/workspace/workspace.ts")]);
+    expect([...seen.values()][0]!.length).toBeGreaterThan(0);
     const counted = await countFocusInPaneScope(["src/workspace/workspace.ts"]);
     expect(counted.size).toBe(0);
-  });
+  }, 30_000);
+
+  test("a failure NAMES the site, and says when it is one hop away", async () => {
+    /* A count alone sends the reader back to the source to find out what it meant — and the
+       one-hop reads are the ones nobody would find, because the call site contains no focus name
+       at all. */
+    /* Both files: a hop can only be resolved when the module holding the reader is in the set,
+       which is why the real run scans all of `src/` in one pass. */
+    const sites = await focusSitesInPaneScope([
+      "src/settings/css-vars-editor.ts",
+      "src/style/live-preview.ts",
+    ]);
+    expect(describeFocusSites(sites, "src/settings/css-vars-editor.ts")).toContain(
+      "pushProjectStylesToCanvas() (one hop)",
+    );
+    expect(describeFocusSites(sites, "src/nothing/here.ts")).toBe("");
+  }, 30_000);
 
   test("a path that no longer exists counts as zero, not as a crash", async () => {
     /* Both lists name PATHS. A checker that threw on a renamed file would be one nobody could run
@@ -399,6 +560,25 @@ describe("the singleton guard", () => {
     // "failed" would send the next reader back to the source to find out what it meant.
     expect(errors.join("\n")).toContain("src/view.ts: 1 per-stage");
     expect(errors.join("\n")).toContain("src/canvas/surface-registry.ts");
+  });
+
+  test("the detail is appended to the failure line, not printed beside it", () => {
+    const sites = new Map([
+      ["src/a.ts", [{ line: 12, name: "activeTab", via: null }]],
+      [
+        "src/b.ts",
+        [{ line: 88, name: "pushProjectStylesToCanvas()", via: "pushProjectStylesToCanvas" }],
+      ],
+    ]);
+    expect(
+      withFocusDetail(["src/a.ts: 1 focus read(s), 0 allowed", "src/c.ts: unrelated"], sites),
+    ).toEqual([
+      "src/a.ts: 1 focus read(s), 0 allowed — src/a.ts:12 activeTab",
+      "src/c.ts: unrelated",
+    ]);
+    expect(withFocusDetail(["src/b.ts: x"], sites)).toEqual([
+      "src/b.ts: x — src/b.ts:88 pushProjectStylesToCanvas() (one hop)",
+    ]);
   });
 
   test("fails BOTH ways — a new occurrence, and a stale entry", () => {
