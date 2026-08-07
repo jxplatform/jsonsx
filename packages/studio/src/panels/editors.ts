@@ -47,6 +47,7 @@ import {
   commitBufferWrites,
 } from "../services/monaco-buffer";
 import { globalEntries, namedFormulaEntries } from "../ui/formula-catalog";
+import { notify } from "../services/notify";
 
 import type { BufferWrites } from "../services/monaco-buffer";
 import type { OxLintDiagnostic } from "../services/code-services";
@@ -180,6 +181,12 @@ export function syncFunctionEditor(host: HTMLElement): void {
  * a formula through `openLogicTarget`, collapsing the dock, and a same-target switch to another
  * TAB. {@link commitBufferWrites} reads the buffer while it is still alive, writes it to the tab it
  * was mounted for, and only then drops what is left. The order is the fix, not the call.
+ *
+ * **Seven, and the last two are not this function's.** ⌘W / the tab × and quitting destroy the TAB:
+ * `closeTab` deletes it from `workspace.tabs` before any repaint reaches this disposer, so the
+ * commit flushed here finds `tabIsLive(tab) === false` and correctly writes nothing. Those two are
+ * fixed at the gate that decides — `services/monaco-buffer.ts`'s `commitTabBuffers` runs the commit
+ * while the tab is still open, and `tabBufferUnsaved` answers for typing no commit could land.
  */
 export function disposeFunctionEditor(): void {
   const editor = view.functionEditor;
@@ -204,23 +211,33 @@ export function disposeFunctionEditor(): void {
  * at all — nothing would ever read it, and `transactDoc` would still push history and dirty a
  * document the user has already dismissed.
  *
+ * **A WRITE IS ALLOWED TO BE REFUSED, and the buffer has to hear about it.** `transactDoc` consults
+ * the collab gate, which under the source-canonical freeze blocks every structural edit including
+ * the lock holder's own — so this returns having changed nothing. Settling the buffer anyway told
+ * `tabBufferUnsaved` (and therefore `shouldWarnOnClose` and `hasUnsavedTabs`) that the document had
+ * been given the author's text when it had not, and every subsequent close discarded it without a
+ * word. So the settle is conditional on the write LANDING, and the answer is handed back to the
+ * caller: the debounce has nothing useful to do with it (the gate raises its own keyed toast on
+ * every refusal), but the Close does — see {@link closeFunctionEditor}.
+ *
  * @param {Tab} tab The document this buffer was filled from.
  * @param {EditingTarget} editing The def or event binding inside it.
  * @param {BufferWrites} [writes] The buffer's debounce holder, when there is a buffer: a completed
  *   write is precisely what settles clause 3.
- * @returns {(body: string) => void}
+ * @returns {(body: string) => boolean} True when the body reached the document.
  */
 function bodyWriter(tab: Tab, editing: EditingTarget, writes?: BufferWrites) {
-  return (newBody: string) => {
+  return (newBody: string): boolean => {
     if (!tabIsLive(tab)) {
-      return;
+      return false;
     }
+    let wrote = false;
     if (editing.type === "def") {
-      transactDoc(tab, (t) => mutateUpdateDef(t, editing.defName, { body: newBody }));
+      wrote = transactDoc(tab, (t) => mutateUpdateDef(t, editing.defName, { body: newBody }));
     } else if (editing.type === "event") {
       const node = getNodeAtPath(tab.doc.document, editing.path);
       const current = node?.[editing.eventKey] || {};
-      transactDoc(tab, (t) =>
+      wrote = transactDoc(tab, (t) =>
         mutateUpdateProperty(t, editing.path, editing.eventKey, {
           ...(current as object),
           $prototype: "Function",
@@ -229,8 +246,11 @@ function bodyWriter(tab: Tab, editing: EditingTarget, writes?: BufferWrites) {
       );
     }
     // The document now holds what the buffer holds — clause 3 is cleared by the write that made it
-    // True, not by a timer expiring.
-    writes?.markSettled();
+    // True, not by a timer expiring, and never by a write that was refused.
+    if (wrote) {
+      writes?.markSettled();
+    }
+    return wrote;
   };
 }
 
@@ -263,6 +283,16 @@ function bodyWriter(tab: Tab, editing: EditingTarget, writes?: BufferWrites) {
  * debounce cannot land in different places. An editor handle this module did not mount carries no
  * writer, and then the only meaning the gesture has left is its own tab and its own target — the
  * same {@link bodyWriter}, bound to those.
+ *
+ * **AND THE WRITE CAN BE REFUSED, in which case there is nothing left to close over.** Under the
+ * source-canonical freeze the collab gate blocks the body commit, and this used to carry on:
+ * minify, refused write, `cancelBufferWrites` (the armed commit gone too), dispose, target cleared.
+ * The Close button — the one action whose entire purpose is to save the body — destroyed it, and
+ * the standing "frozen" chip in the presence strip does not say that a button just did nothing. A
+ * refusal therefore keeps the surface exactly as it is (the text stays on screen, the target stays
+ * open) and says why, once, through the same Problems/toast channel every other failed write uses.
+ * Nothing is re-armed: the buffer is still marked typed, so the close and quit gates already know
+ * the work exists.
  */
 export async function closeFunctionEditor(): Promise<void> {
   const tab = activeTab.value;
@@ -281,7 +311,17 @@ export async function closeFunctionEditor(): Promise<void> {
        same target a moment before the minified version lands on top of it. */
     cancelBufferWrites(editor);
     const write = editor._commitBody ?? bodyWriter(tab, editing);
-    write(minResult?.code ?? currentCode);
+    if (!write(minResult?.code ?? currentCode)) {
+      notify.warn(
+        "The handler could not be saved — source editing holds this document. Your code is still in the editor.",
+        {
+          key: "logic.close-refused",
+          source: "Logic",
+          ...(tab.documentPath ? { path: tab.documentPath } : {}),
+        },
+      );
+      return;
+    }
     if (view.functionEditor !== null && view.functionEditor !== editor) {
       return;
     }
@@ -421,8 +461,10 @@ async function mountFunctionEditor(
 
     // A keystroke. The buffer is ahead of the document from this instant until the commit lands —
     // Stated as a fact rather than left to be read off the timer, because the timer is only ONE of
-    // The ways a buffer gets ahead and the other one is invisible to it.
-    writes.markAhead();
+    // The ways a buffer gets ahead and the other one is invisible to it. `markTyped` rather than
+    // `markAhead`: this text is the AUTHOR'S, so it is also the text a close would destroy, and
+    // Format-on-open's (below) is not.
+    writes.markTyped();
 
     writes.arm(BUFFER_COMMIT, 500, () => {
       editor._commitBody?.(editor.getValue());

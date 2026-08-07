@@ -200,7 +200,15 @@ export async function cutNode() {
   await writeToClipboard(json);
   // The clipboard holds the primary node; the cut removes everything selected, in one undo step.
   const cutting = tab.session.selection.filter((path) => path.length >= 2);
-  transactDoc(tab, (t) => mutateRemoveNodes(t, cutting));
+  /* AND THE REMOVAL CAN BE REFUSED, which makes this a copy rather than a cut.
+     `transactDoc` consults the collab gate, which pauses structural editing for the whole room
+     while source is canonical. Reporting "Cut" anyway claims a removal that did not happen — and
+     the toast's action is `edit.undo`, so the one recovery it offered was aimed at whatever edit
+     came BEFORE this one. The gate raises its own keyed toast saying why; this one stays silent
+     rather than adding a false claim beside it. */
+  if (!transactDoc(tab, (t) => mutateRemoveNodes(t, cutting))) {
+    return;
+  }
   notify.success("Cut", { action: "edit.undo", key: "clipboard" });
 }
 

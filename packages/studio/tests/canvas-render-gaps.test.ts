@@ -22,13 +22,30 @@ const canvasPanels = surface.panels;
 
 // ─── Controllable mock behavior ───────────────────────────────────────────────
 
+/**
+ * THE SAME DOUBLE `canvas-render.test.ts` USES, and this is the file that needed it more.
+ *
+ * It used to be the earlier, cruder copy: `onDidChangeModelContent: () => {}` threw the handler
+ * away, and `setValue` assigned `_model._value` directly rather than going through the model. A
+ * keystroke could therefore not be EXPRESSED here — no change handler existed to fire, and a
+ * programmatic write fired nothing either — in the one test file that owns the collab surface,
+ * where "a peer typed" and "the author typed" are the whole subject. Repaired to match: handlers
+ * are kept, `editor.setValue` goes through `model.setValue`, and `model.setValue` fires the
+ * adopting editor's handlers exactly as Monaco's does (which is why `_ignoreNextChange` exists).
+ */
 interface FakeModel {
   _value: string;
+  /** A model carries the file identity Monaco validates against; the repaint compares it. */
+  uri: unknown;
+  /** Fires the adopting editor's change handlers, as a real model's `setValue` does. */
+  _fire: () => void;
   dispose: ReturnType<typeof mock>;
   getValue: () => string;
   setValue: (v: string) => void;
 }
 interface FakeEditor {
+  _changeHandlers: (() => void)[];
+  _focused: boolean;
   _ignoreNextChange: boolean;
   _model: FakeModel | null;
   dispose: ReturnType<typeof mock>;
@@ -41,12 +58,22 @@ interface FakeEditor {
 }
 const createdEditors: FakeEditor[] = [];
 
+/** A keystroke, which the old double had no way to say. */
+function typeInto(editor: FakeEditor, text: string) {
+  editor._model!._value = text;
+  for (const cb of editor._changeHandlers) {
+    cb();
+  }
+}
+
 void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (s: string) => ({ toString: () => s }) },
   editor: {
     create: (_el: HTMLElement, opts: { model?: FakeModel }) => {
       const ed: FakeEditor = {
+        _changeHandlers: [],
+        _focused: false,
         _ignoreNextChange: false,
         _model: opts?.model ?? null,
         // Mirrors Monaco: `dispose()` runs `_detachModel()`, so `getModel()` is null and
@@ -56,26 +83,38 @@ void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
         }),
         getModel: () => ed._model,
         getValue: () => ed._model?._value ?? "",
-        hasTextFocus: () => false,
-        onDidChangeModelContent: () => {},
+        hasTextFocus: () => ed._focused,
+        onDidChangeModelContent: (cb: () => void) => {
+          ed._changeHandlers.push(cb);
+        },
         setValue: (v: string) => {
-          if (ed._model) {
-            ed._model._value = v;
-          }
+          ed._model?.setValue(v);
         },
         updateOptions: mock(() => {}),
       };
+      // A model belongs to the editor that adopts it, and `model.setValue` reaches that editor's
+      // Change handlers — which is how the source view's initial load fires one.
+      if (ed._model) {
+        ed._model._fire = () => {
+          for (const cb of ed._changeHandlers) {
+            cb();
+          }
+        };
+      }
       createdEditors.push(ed);
       return ed;
     },
-    createModel: (value: string) => {
+    createModel: (value: string, _lang: string, uri: unknown) => {
       const m: FakeModel = {
+        _fire: () => {},
         _value: value,
         dispose: mock(() => {}),
         getValue: () => m._value,
         setValue: (v: string) => {
           m._value = v;
+          m._fire();
         },
+        uri,
       };
       return m;
     },
@@ -185,10 +224,15 @@ void mock.module("../src/collab/collab-session.js", () => ({
 
 // Y-monaco: record constructed bindings.
 const bindings: { destroyed: boolean; args: unknown[] }[] = [];
+/** Set by a test to make `new MonacoBinding(...)` throw — y-monaco loading and then failing. */
+let bindingShouldThrow = false;
 void mock.module("y-monaco", () => ({
   MonacoBinding: class {
     rec: { destroyed: boolean; args: unknown[] };
     constructor(...args: unknown[]) {
+      if (bindingShouldThrow) {
+        throw new Error("binding unavailable");
+      }
       this.rec = { args, destroyed: false };
       bindings.push(this.rec);
     }
@@ -252,6 +296,7 @@ beforeEach(() => {
   gridMounted = false;
   collabCtx = null;
   bindings.length = 0;
+  bindingShouldThrow = false;
   createdEditors.length = 0;
   renderGridMode.mockClear();
   detachGridPanel.mockClear();
@@ -358,23 +403,6 @@ describe("source-mode collab binding", () => {
     expect(document.head.querySelector("style[data-jx-collab-cursors]")).toBeNull();
   });
 
-  test("an editor torn down before enter() resolves never binds", async () => {
-    let release!: () => void;
-    collabCtx = makeCollabCtx({
-      enter: () =>
-        new Promise<void>((resolve) => {
-          release = resolve;
-        }),
-    });
-    setMode("source");
-    renderCanvas();
-    await flush(); // The source editor mounts behind the lazy Monaco import.
-    view.monacoEditor = null; // The editor goes away while the session enters.
-    release();
-    await flush();
-    expect(bindings).toHaveLength(0);
-  });
-
   test("an editor replaced while y-monaco loads unbinds immediately", async () => {
     let release!: () => void;
     collabCtx = makeCollabCtx();
@@ -397,12 +425,119 @@ describe("source-mode collab binding", () => {
     expect(ctx.leave).toHaveBeenCalledTimes(1);
   });
 
-  test("an enter() failure degrades to a local buffer without throwing", async () => {
+  /**
+   * THE CONTROL, and the reason the assertions in the next test mean anything.
+   *
+   * A SOLO source mount installs `onDidChangeModelContent`, so a keystroke marks the buffer typed
+   * and arms its commit. The double in this file could not say that until it was repaired to match
+   * `canvas-render.test.ts`'s — it discarded every handler, and its `setValue` bypassed the model,
+   * so `_ignoreNextChange` was never consumed and the first real keystroke would have been eaten.
+   */
+  test("a keystroke into a SOLO source buffer marks it typed", async () => {
+    collabCtx = null;
+    setMode("source");
+    renderCanvas();
+    await flush(); // The source editor mounts behind the lazy Monaco import.
+    await flush(); // …and the initial serialization lands, consuming `_ignoreNextChange`.
+    expect(view.monacoEditor!._writes!.typed()).toBe(false);
+
+    typeInto(createdEditors[0]!, "# typed");
+    expect(view.monacoEditor!._writes!.typed()).toBe(true);
+  });
+
+  /**
+   * THE FIFTH WRITER, and the only one whose text reaches other people's machines.
+   *
+   * Y-monaco binds the model to the shared `Y.Text`, so peers' keystrokes arrive here saying
+   * nothing — and the binding is two-way, so a local `setValue` is a whole-document replace
+   * PUBLISHED to every peer. The repaint's fast path would do exactly that: it serializes the
+   * structure tree, which is what `sourceParseNow` parsed OUT of this same shared text, so every
+   * round trip that is not byte-stable republished the document to the room, on every repaint.
+   * `hasTextFocus()` protected only the person currently typing.
+   */
+  test("a repaint never replaces a co-edited buffer — the CRDT owns that text", async () => {
+    collabCtx = makeCollabCtx();
+    setMode("source");
+    renderCanvas();
+    await flush(); // The source editor mounts behind the lazy Monaco import.
+    await flush(); // …and the y-monaco binding lands.
+    expect(bindings).toHaveLength(1);
+
+    const editor = createdEditors[0]!;
+    expect(view.monacoEditor!._writes!.shared()).toBe(true);
+    // A peer types. y-monaco writes it straight into the model — a real keystroke, which the double
+    // In this file could not express until it was repaired to match `canvas-render.test.ts`'s.
+    typeInto(editor, "# from a peer");
+    // And it declared NOTHING: the co-edited mount installs no change handler at all, so the buffer
+    // Is not "typed", not "ahead", and clause 3 has nothing to say. That is precisely why clause 5
+    // Is its own fact rather than a use of clause 3.
+    expect(view.monacoEditor!._writes!.typed()).toBe(false);
+    expect(view.monacoEditor!._writes!.ahead()).toBe(false);
+
+    // An ordinary repaint — the source reconciler's parse arriving as a structure change is one.
+    renderCanvas();
+    await flush();
+
+    expect(editor.getValue()).toBe("# from a peer");
+  });
+
+  /**
+   * A BINDING FAILURE HOLDS A LOCK AND CARRIES NOTHING, and both halves are losses.
+   *
+   * `enter()` flips the room's canonical lock to "source" before y-monaco is even imported, and
+   * `ctx.leave()` lives in exactly one place — the cleanup the binding returns. So a failure past
+   * that point left the lock held by a client with no binding, and now that the freeze includes the
+   * lock holder (`collab-session.ts`'s transact gate), nobody in the room can edit the structure
+   * and nobody can edit the source either, until someone reloads.
+   *
+   * The buffer is the other half. The co-edited mount returns before installing its change handler,
+   * so on this path a keystroke arms no commit and marks nothing: `tabBufferUnsaved` stays false
+   * and the next repaint replaces the author's words — with clause 5 unable to help, because
+   * `markShared` is exactly what never ran. A surface that carries nothing says so.
+   */
+  test("an enter() failure hands the lock back and stops pretending to be an editor", async () => {
     collabCtx = makeCollabCtx({ enter: () => Promise.reject(new Error("room unavailable")) });
+    const ctx = collabCtx;
     setMode("source");
     expect(() => renderCanvas()).not.toThrow();
     await flush();
     expect(bindings).toHaveLength(0);
     expect(view.monacoEditor).toBe(createdEditors[0] as never);
+    expect(ctx.leave).toHaveBeenCalledTimes(1);
+    expect(createdEditors[0]!.updateOptions).toHaveBeenCalledWith({ readOnly: true });
+  });
+
+  test("a y-monaco failure after enter() hands the lock back too", async () => {
+    collabCtx = makeCollabCtx();
+    const ctx = collabCtx;
+    bindingShouldThrow = true;
+    setMode("source");
+    renderCanvas();
+    await flush();
+    await flush();
+    expect(bindings).toHaveLength(0);
+    expect(ctx.leave).toHaveBeenCalledTimes(1);
+    expect(createdEditors[0]!.updateOptions).toHaveBeenCalledWith({ readOnly: true });
+  });
+
+  /* The editor can also simply be gone by the time `enter()` resolves — the lock was taken for a
+     surface that no longer exists, and the cleanup that would release it is never constructed. */
+  test("an editor torn down before enter() resolves hands the lock back", async () => {
+    let release!: () => void;
+    collabCtx = makeCollabCtx({
+      enter: () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    });
+    const ctx = collabCtx;
+    setMode("source");
+    renderCanvas();
+    await flush();
+    view.monacoEditor = null;
+    release();
+    await flush();
+    expect(bindings).toHaveLength(0);
+    expect(ctx.leave).toHaveBeenCalledTimes(1);
   });
 });

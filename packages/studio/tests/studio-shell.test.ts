@@ -26,6 +26,7 @@ import {
 } from "../src/workspace/workspace";
 import { moveCanvasStage, surfaceForPane } from "../src/canvas/canvas-surface";
 import { view } from "../src/view";
+import { bufferWrites } from "../src/services/monaco-buffer";
 import { shell } from "../src/shell";
 import { resetZoom } from "../src/canvas/canvas-utils";
 import type { Tab } from "../src/tabs/tab";
@@ -795,6 +796,64 @@ describe("openRecentProject", () => {
     }
     expect(statusMessages.at(-1)).toStartWith("Could not open");
   });
+
+  /**
+   * THE PROJECT SWITCH WAS THE LAST EXIT WITH NO GATE, and it is the one that takes everything.
+   *
+   * `closeAllTabs()` disposes every open document with no prompt anywhere on the path — ⌘W, the tab
+   * ×, quitting and the preview slot's replacement each acquired one over eight rounds, and the
+   * gesture that throws away the whole workspace at once never had one.
+   *
+   * The prompt is asked BEFORE the switch begins, because everything the switch does is one-way:
+   * `setWindowProject` binds this window's backend to the new root and `platform.projectRoot` moves
+   * the base every relative path resolves against. A prompt after either of those can be answered
+   * "keep editing" and leave the app pointing at a project it is not showing.
+   */
+  describe("unsaved documents", () => {
+    function dialog(): HTMLElement | null {
+      return document.querySelector("#layer-dialog sp-dialog-wrapper");
+    }
+
+    test("Cancel abandons the switch with the workspace untouched", async () => {
+      const root = platform.projectRoot;
+      const readsBefore = state.calls.filter((c) => c[0] === "readFile").length;
+      const tab = openShellTab();
+      tab.doc.dirty = true;
+      const opening = toolbarCtx.openRecentProject("/recent/site");
+      await flush(4);
+
+      const el = dialog()!;
+      expect(el).not.toBeNull();
+      expect(el.textContent).toContain("Opening another project closes every open document");
+      el.dispatchEvent(new Event("cancel"));
+      await opening;
+
+      // Nothing moved: not the root, not the tab, not the document.
+      expect(platform.projectRoot).toBe(root);
+      expect(workspace.tabs.has("shell-tab")).toBe(true);
+      expect(tab.doc.dirty).toBe(true);
+      expect(state.calls.filter((c) => c[0] === "readFile")).toHaveLength(readsBefore);
+    });
+
+    test("Close Without Saving lets the switch proceed", async () => {
+      const tab = openShellTab();
+      tab.doc.dirty = true;
+      const opening = toolbarCtx.openRecentProject("/recent/site");
+      await flush(4);
+      dialog()!.dispatchEvent(new Event("secondary"));
+      await opening;
+
+      expect(platform.projectRoot).toBe("/recent/site");
+      expect(workspace.tabs.has("shell-tab")).toBe(false);
+    });
+
+    test("a clean workspace is switched with no prompt at all", async () => {
+      openShellTab();
+      await toolbarCtx.openRecentProject("/recent/site");
+      expect(dialog()).toBeNull();
+      expect(platform.projectRoot).toBe("/recent/site");
+    });
+  });
 });
 
 describe("project open delegates", () => {
@@ -1046,6 +1105,48 @@ describe("unsaved-changes guard", () => {
     const dirty = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(dirty);
     expect(dirty.defaultPrevented).toBe(true);
+  });
+
+  /**
+   * Quitting is the one exit no disposer follows, and `dirty` could not see a Monaco buffer.
+   *
+   * The last 500ms (dock) / 600ms (source) of typing lives in an armed commit the document has not
+   * received, so ⌘Q left with no prompt at all. There is nothing to flush here — `beforeunload`
+   * cannot await, and the source commit parses through the format host before it assigns — so the
+   * gate asks the buffer instead.
+   */
+  test("and while a buffer holds typing the document has not been given", () => {
+    const tab = openShellTab();
+    tab.doc.dirty = false;
+    const buffer = {
+      _editingTab: tab,
+      getModel: () => ({}),
+      getValue: () => "typed();",
+      hasTextFocus: () => false,
+    };
+    const writes = bufferWrites(buffer);
+    writes.markTyped();
+    view.functionEditor = buffer as never;
+    try {
+      const typed = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(typed);
+      expect(typed.defaultPrevented).toBe(true);
+
+      // The commit lands: the document has the text, and the buffer says so. Nothing to warn about
+      // Beyond the ordinary dirty flag, which this tab does not have.
+      writes.markSettled();
+      const settled = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(settled);
+      expect(settled.defaultPrevented).toBe(false);
+
+      // And format-on-open — ahead, never committed, nothing an author loses — is not a prompt.
+      writes.markAhead();
+      const formatted = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(formatted);
+      expect(formatted.defaultPrevented).toBe(false);
+    } finally {
+      view.functionEditor = null;
+    }
   });
 });
 

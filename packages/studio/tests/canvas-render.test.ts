@@ -28,6 +28,8 @@ import {
   workspace,
 } from "../src/workspace/workspace";
 import { view } from "../src/view";
+import { commitTabBuffers, tabBufferUnsaved } from "../src/services/monaco-buffer";
+import { toRaw } from "../src/reactivity";
 import { canvasPerf } from "../src/canvas/canvas-perf";
 import { shell } from "../src/shell";
 import { setFormats } from "../src/format/format-host";
@@ -92,6 +94,8 @@ interface FakeModel {
   _value: string;
   lang: string;
   uri: unknown;
+  /** Fires the adopting editor's change handlers, as a real model's `setValue` does. */
+  _fire: () => void;
   dispose: ReturnType<typeof mock>;
   getValue: () => string;
   setValue: (v: string) => void;
@@ -137,23 +141,35 @@ void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
         onDidChangeModelContent: (cb: () => void) => {
           ed._changeHandlers.push(cb);
         },
+        /**
+         * Mirrors Monaco, and mirrors the DOCK's double, which has always done this: a programmatic
+         * `setValue` fires `onDidChangeModelContent` exactly as a keystroke does. That is the whole
+         * reason `_ignoreNextChange` exists, and a double that stayed silent left the flag set
+         * after every programmatic write — so each test had to clear it by hand before a keystroke
+         * would be seen, and no test could have caught a write site that forgot to set it.
+         */
         setValue: (v: string) => {
-          if (ed._model) {
-            ed._model._value = v;
-          }
+          ed._model?.setValue(v);
         },
       };
+      // A model belongs to the editor that adopts it, and `model.setValue` reaches that editor's
+      // Change handlers — which is how the source view's initial load fires one.
+      if (ed._model) {
+        ed._model._fire = () => fireModelChange(ed);
+      }
       createdEditors.push(ed);
       return ed;
     },
     createModel: (value: string, lang: string, uri: unknown) => {
       const m: FakeModel = {
         _value: value,
+        _fire: () => {},
         dispose: mock(() => {}),
         getValue: () => m._value,
         lang,
         setValue: (v: string) => {
           m._value = v;
+          m._fire();
         },
         uri,
       };
@@ -624,7 +640,16 @@ describe("source mode", () => {
     expect(view.monacoEditor).toBe(createdEditors[0] as never);
     expect(createdModels[0]!._value).toBe(JSON.stringify(tab.doc.document, null, 2));
     expect(createdModels[0]!.lang).toBe("json");
-    expect(createdEditors[0]!._ignoreNextChange).toBe(true);
+    // The load set `_ignoreNextChange` and its own `setValue` CONSUMED it — that is the whole
+    // Mechanism, and the flag being false afterwards is the proof it worked. The document's own
+    // Text arriving in the buffer is not a keystroke: nothing armed, and the two agree.
+    expect(createdEditors[0]!._ignoreNextChange).toBe(false);
+    expect(view.monacoEditor!._writes!.ahead()).toBe(false);
+    expect(tabBufferUnsaved(tab)).toBe(false);
+    // And the buffer names the tab it was mounted for, in the spelling the dock's editor uses.
+    // Compared through `toRaw`: the pane hands the mount its own reactive wrapper of this tab, and
+    // Identity across two proxies of one object is exactly what `buffersForTab` normalizes.
+    expect(toRaw(view.monacoEditor!._editingTab as object)).toBe(toRaw(tab as object));
   });
 
   test("debounced edits sync valid JSON back into the document", async () => {
@@ -676,21 +701,20 @@ describe("source mode", () => {
     });
   });
 
-  test("javascript files use the document toString and only mark dirty", async () => {
+  /* There is no `.js` case any more, and there never was a reachable one. A document tab is a
+     format tab or it is JSON — `files.ts`, `file-ops.ts` and the project-URL open all end at
+     `noFormatError` for an extension no format class claims. The branch this test covered marked
+     such a tab DIRTY for text the document cannot represent (`sourceContent` answered
+     `doc.document?.toString?.()`, i.e. `"[object Object]"`, and ⌘S would have written that), so it
+     was deleted rather than left with a flush running down it. */
+  test("a path no format claims is still opened as JSON, not as a language of its own", async () => {
     closeAllTabs();
     const tab = openSyncedTab(undefined, { documentPath: "/project/handlers.js" });
     setMode("source");
-    await withFastTimers(async (runPending) => {
-      renderCanvas();
-      await flush();
-      expect(createdModels[0]!.lang).toBe("javascript");
-      expect(createdModels[0]!._value).toBe(String(tab.doc.document));
-      const [editor] = createdEditors;
-      editor!._ignoreNextChange = false;
-      fireModelChange(editor!);
-      await runPending();
-      expect(tab.doc.dirty).toBe(true);
-    });
+    renderCanvas();
+    await flush();
+    expect(createdModels[0]!.lang).toBe("json");
+    expect(createdModels[0]!._value).toBe(JSON.stringify(tab.doc.document, null, 2));
   });
 
   /* A model carries the file identity Monaco validates against: its URI is what the JSON language
@@ -767,6 +791,81 @@ describe("source mode", () => {
     });
   });
 
+  /**
+   * S3 — ⌘W one keystroke after the last one, on the source surface.
+   *
+   * The 600ms commit is the only thing that carries the buffer into the document, and until it
+   * fires nothing is dirty. `closeTab` deletes the tab before any teardown reaches this editor, so
+   * the flush had to move to the gate — and the gate can only find this buffer because the mount
+   * now says whose it is.
+   */
+  test("typing is visible to the close path, and the close path can land it", async () => {
+    setFormats([MARKDOWN_FORMAT]);
+    closeAllTabs();
+    const tab = openSyncedTab(undefined, { documentPath: "/project/post.md" });
+    tab.doc.sourceFormat = "Markdown";
+    setMode("source");
+    await withFastTimers(async () => {
+      renderCanvas();
+      await flush();
+      const [editor] = createdEditors;
+      editor!._model!._value = "# Never saved";
+      fireModelChange(editor!);
+
+      // Nothing has fired. The document knows nothing, and `dirty` — all either gate used to read
+      // — says there is nothing to lose.
+      expect(tab.doc.dirty).toBe(false);
+      expect(tabBufferUnsaved(tab)).toBe(true);
+
+      await commitTabBuffers(tab);
+      expect(parseSourceForPathMock).toHaveBeenCalledWith("/project/post.md", "# Never saved");
+      expect(tab.doc.document.tagName).toBe("article");
+      expect(tab.doc.dirty).toBe(true);
+      expect(tabBufferUnsaved(tab)).toBe(false);
+    });
+  });
+
+  /**
+   * S3b — the parse is an await, and `tabIsLive` was asked only on the near side of it.
+   *
+   * S3 is what made this reachable: the commit now runs from `commitTabBuffers`, whose two callers
+   * are both DESTROYERS — `requestClose`, and the preview slot's replacement in `openTab`, which is
+   * synchronous and cannot wait for a format round trip. So the ordinary case is that the tab is
+   * gone by the time the parse resolves. The guard's own comment says why the write must not happen
+   * ("a parse written into it is a parse nothing will ever read"), and the guard was one `await`
+   * short of meaning it.
+   */
+  test("a tab closed inside the parse is not written into", async () => {
+    setFormats([MARKDOWN_FORMAT]);
+    closeAllTabs();
+    const tab = openSyncedTab(undefined, { documentPath: "/project/post.md" });
+    tab.doc.sourceFormat = "Markdown";
+    setMode("source");
+    await withFastTimers(async () => {
+      renderCanvas();
+      await flush();
+      const [editor] = createdEditors;
+      editor!._model!._value = "# Never saved";
+      fireModelChange(editor!);
+
+      // The project switch lands mid-parse: `closeAllTabs` takes every tab, unprompted.
+      parseSourceForPathMock.mockImplementationOnce(async () => {
+        closeAllTabs();
+        await Promise.resolve();
+        return {
+          document: { children: [], tagName: "article" },
+          format: MARKDOWN_FORMAT,
+          frontmatter: { title: "Parsed" },
+        };
+      });
+      await commitTabBuffers(tab);
+
+      expect(parseSourceForPathMock).toHaveBeenCalledWith("/project/post.md", "# Never saved");
+      expect(tab.doc.document.tagName).toBe("div");
+      expect(tab.doc.dirty).toBe(false);
+    });
+  });
+
   test("unparseable format source leaves the document untouched", async () => {
     setFormats([MARKDOWN_FORMAT]);
     closeAllTabs();
@@ -795,14 +894,17 @@ describe("source mode", () => {
     await flush();
     expect(createdEditors.length).toBe(1);
     const [editor] = createdEditors;
-    editor!._ignoreNextChange = false;
 
     tab.doc.document.tagName = "section";
     renderCanvas();
     await flush();
     expect(createdEditors.length).toBe(1);
     expect(editor!.getValue()).toBe(JSON.stringify(tab.doc.document, null, 2));
-    expect(editor!._ignoreNextChange).toBe(true);
+    // The repaint's own `setValue` fired the change listener and the flag it set absorbed it, so
+    // The repaint did not read as a keystroke: nothing armed, and the buffer is not ahead.
+    expect(editor!._ignoreNextChange).toBe(false);
+    expect(view.monacoEditor!._writes!.ahead()).toBe(false);
+    expect(tabBufferUnsaved(tab)).toBe(false);
   });
 
   test("re-render does not clobber the buffer while the editor has focus", async () => {

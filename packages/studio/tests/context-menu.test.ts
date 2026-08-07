@@ -14,7 +14,8 @@
 import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { componentRegistry } from "../src/files/components";
-import { resetNotifications } from "../src/services/notify";
+import { resetNotifications, toasts } from "../src/services/notify";
+import { setTransactGate } from "../src/tabs/transact";
 import { initLayers } from "../src/ui/layers";
 import { activeTab, closeAllTabs, workspace } from "../src/workspace/workspace";
 import { checkPlacements } from "../src/commands/levels";
@@ -322,6 +323,29 @@ describe("cutNode", () => {
     select(["children", 9]);
     await cutNode();
     expect((doc().children as JxMutableNode[]).length).toBe(2);
+  });
+
+  /**
+   * A CUT WHOSE REMOVAL WAS REFUSED IS A COPY, and it used to report itself as a cut.
+   *
+   * `transactDoc` consults the collab gate, which pauses structural editing for the whole room
+   * while source is canonical. The clipboard write had already happened, the removal silently did
+   * not, and the success toast said "Cut" — with an `edit.undo` action whose only possible target
+   * was whatever edit came BEFORE this one.
+   */
+  test("a refused removal claims nothing — the gate's own toast is the whole story", async () => {
+    resetNotifications();
+    select(["children", 0]);
+    setTransactGate(() => "source-canonical");
+    try {
+      await cutNode();
+    } finally {
+      setTransactGate(null);
+    }
+    // The copy landed (it is the half that worked), and the document kept the node.
+    expect(workspace.clipboard).not.toBeNull();
+    expect((doc().children as JxMutableNode[]).length).toBe(2);
+    expect(toasts.some((t) => t.message === "Cut")).toBe(false);
   });
 });
 

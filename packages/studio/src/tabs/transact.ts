@@ -181,9 +181,19 @@ function rollbackFailedTransaction(
  * Save. The exception now rolls the applied ops back ({@link rollbackFailedTransaction}) and only
  * then rethrows, so a failed transaction is indistinguishable from one that never ran.
  *
+ * **AND IT SAYS WHETHER IT WROTE**, because {@link setTransactGate} made "returned normally" and
+ * "changed the document" two different facts and nothing downstream could tell them apart. Under
+ * the source-canonical freeze the dock's body commit is refused here — and its caller went on to
+ * mark the buffer settled, so `tabBufferUnsaved`, `shouldWarnOnClose` and `hasUnsavedTabs` all
+ * reported "nothing to lose" about text that only existed in the buffer. Every close then took it
+ * with no prompt. A refusal is not an exception (it is an ordinary, expected state of the room), so
+ * it is a return value: `false` means the document is exactly as it was.
+ *
  * @param {Tab | null} tab
  * @param {(tab: Tab) => void} mutationFn
  * @param {{ skipHistory?: boolean; origin?: TransactOrigin }} [opts]
+ * @returns {boolean} True when the mutation was applied; false when there was no tab, or the gate
+ *   refused it.
  */
 export function transactDoc(
   tab: Tab | null,
@@ -193,12 +203,12 @@ export function transactDoc(
     origin = "user",
     coalesceKey = null,
   }: { skipHistory?: boolean; origin?: TransactOrigin; coalesceKey?: string | null } = {},
-) {
+): boolean {
   if (!tab) {
-    return;
+    return false;
   }
   if (origin !== "remote" && _transactGate?.(tab, origin)) {
-    return;
+    return false;
   }
   const selectionBefore = cloneSelection(tab.session.selection);
   const dirtyBefore = tab.doc.dirty;
@@ -259,6 +269,7 @@ export function transactDoc(
   tab.doc.dirty = true;
 
   _transactObserver?.(tab, record, origin);
+  return true;
 }
 
 /**
@@ -362,13 +373,14 @@ function materializeState(
  * @param {Tab | null} tab
  * @param {(doc: JxMutableNode) => void} fn
  * @param {{ skipHistory?: boolean; origin?: TransactOrigin }} [opts]
+ * @returns {boolean} Whatever {@link transactDoc} answered — whether the mutation was applied.
  */
 export function transact(
   tab: Tab | null,
   fn: (doc: JxMutableNode) => void,
   opts?: { skipHistory?: boolean; origin?: TransactOrigin },
-) {
-  transactDoc(tab, (t) => fn(t.doc.document), opts);
+): boolean {
+  return transactDoc(tab, (t) => fn(t.doc.document), opts);
 }
 
 /**
@@ -600,7 +612,7 @@ export function undo(tab: Tab) {
   if ((inverseOps && inverseOps.length > 0) || (fmOps && fmOps.length > 0)) {
     // Surgical path: apply inverse ops through the normal transaction pipeline (the canvas
     // Patches in place when it can), in reverse recording order.
-    transactDoc(
+    const applied = transactDoc(
       tab,
       (t) => {
         if (inverseOps) {
@@ -617,6 +629,14 @@ export function undo(tab: Tab) {
       },
       { origin: "history", skipHistory: true },
     );
+    /* A REFUSED REPLAY IS NOT A STEP TAKEN. `"history"` is not `"remote"`, so the gate refuses this
+       exactly as it refuses a direct edit — and everything below assumed the ops landed. Moving the
+       index over a document that did not change desynchronises the log from the tree: the next redo
+       replays a forward op onto a state it was never the inverse of, and `doc.dirty` claims an edit
+       nobody made. Undo that cannot run is undo that does nothing, which is the honest answer. */
+    if (!applied) {
+      return;
+    }
     tab.session.selection = cloneSelection(toRaw(entry.selectionBefore ?? []));
     tab.history.index -= 1;
     assertHistoryConsistency(tab, tab.history.index);
@@ -641,7 +661,7 @@ export function redo(tab: Tab) {
   const forwardOps = patchHistoryEnabled() ? entry.forwardOps : null;
   const fmOps = patchHistoryEnabled() ? entry.fmOps : null;
   if ((forwardOps && forwardOps.length > 0) || (fmOps && fmOps.length > 0)) {
-    transactDoc(
+    const applied = transactDoc(
       tab,
       (t) => {
         if (forwardOps) {
@@ -658,6 +678,11 @@ export function redo(tab: Tab) {
       },
       { origin: "history", skipHistory: true },
     );
+    // Same as {@link undo}: a refused replay leaves the document alone, so the index must stay
+    // Where it is or the log stops describing the tree.
+    if (!applied) {
+      return;
+    }
     tab.session.selection = cloneSelection(toRaw(entry.selection));
     tab.history.index += 1;
     assertHistoryConsistency(tab, tab.history.index);

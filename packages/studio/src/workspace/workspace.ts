@@ -1,4 +1,5 @@
 import { computed, reactive, toRaw } from "../reactivity";
+import { commitTabBuffers } from "../services/monaco-buffer";
 import { ensureCollab, rekeyCollab } from "../collab/collab-session";
 import { createTab, disposeTab, editorKindOf, editorKindsOf, modeForEditorKind } from "../tabs/tab";
 import { editorKindForMode } from "../commands/context";
@@ -613,6 +614,25 @@ export function openTab(opts: {
     const replaced = preview ? previewTabIn(pane) : null;
     if (replaced) {
       slot = pane.tabOrder.indexOf(replaced);
+      /* THE EIGHTH WAY OUT OF A MONACO BUFFER, and the only one nobody asked for.
+         `services/monaco-buffer.ts` lists seven exits and fixes them in two places — the disposers
+         flush five, and `commitTabBuffers` covers ⌘W and quitting. This is the eighth: the author
+         single-clicked another page, so the tab they were typing in is destroyed by a gesture that
+         is not a close and shows no dialog. Same shape as ⌘W, so it gets the same call, before the
+         destruction rather than after it.
+         `promoteDirtyPreviewTabs` is the gate that should have made this unreachable — an edited
+         preview tab stops being replaceable — and it reads `doc.dirty`, which is the exact fact a
+         buffer's armed commit has not established yet. So the flush is what MAKES that fact, half
+         a second earlier than the debounce would have.
+         Not awaited, and it cannot be: `openTab` is synchronous, its callers hold the `Tab` it
+         returns, and the slot index below is computed against the strip as it is right now. So the
+         dock's body write (synchronous) lands and the source view's parse (a format round trip)
+         does not — it resolves into a tab that is already gone and its own `tabIsLive` re-check
+         drops it, which is the correct answer to "write into a destroyed tab", not a second bug. */
+      const victim = workspace.tabs.get(replaced);
+      if (victim) {
+        void commitTabBuffers(victim);
+      }
       closeTab(replaced);
     }
     insertIntoPane(pane, tab.id, slot);
@@ -737,7 +757,18 @@ export function closeTab(tabId: string) {
   }
 }
 
-/** Close all open tabs, disposing each. Defers reactivity until fully cleared. */
+/**
+ * Close all open tabs, disposing each. Defers reactivity until fully cleared.
+ *
+ * **Deliberately no gate and no `commitTabBuffers`, unlike `openTab`'s preview replacement and
+ * `requestClose` — and that is now a statement about this function's CALLERS rather than a hole.**
+ * It is the destructive half of a decision somebody else makes: the only caller in `src/` is the
+ * project switch, and `panels/tab-strip.ts`'s `confirmCloseAll` runs both halves of the discipline
+ * for it — commit every tab's buffers, then prompt once for the whole set — before the switch
+ * begins, because everything the switch does after that point is one-way. Putting either half here
+ * would put an `await` and a dialog inside a synchronous teardown that the test harness and
+ * `resetStudioState` also call, which is exactly how a reset would start prompting.
+ */
 export function closeAllTabs() {
   const tabs = [...workspace.tabs.values()];
   workspace.tabs.clear();

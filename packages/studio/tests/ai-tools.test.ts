@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { createToolRegistry } from "@jxsuite/ai";
 import { createTab, disposeTab } from "../src/tabs/tab";
 import type { Tab } from "../src/tabs/tab";
-import { beginBatch, endBatch, undo } from "../src/tabs/transact";
+import { beginBatch, endBatch, setTransactGate, undo } from "../src/tabs/transact";
 import { registerAiTools } from "../src/services/ai-tools";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import { beginTurn, endTurn, resetAiWrites } from "../src/services/ai-writes";
@@ -729,6 +729,33 @@ describe("create_page's three refusals, and the write ledger", () => {
     const [write] = endTurn("m1");
     expect(write!.disk).toBe(false);
     expect(write!.path).toBe("pages/a.json");
+    disposeTab(tab);
+  });
+});
+
+/**
+ * A REFUSED MUTATION IS NOT A SUCCESSFUL ONE, and the model has no other way to find out.
+ *
+ * `transactDoc` consults the collab gate, which pauses structural editing for the whole room while
+ * a source buffer is canonical. The tool used to carry on: a ledger entry ("Changed N files"), then
+ * a validation of the UNCHANGED document — which produces no new errors, so the answer was
+ * `success: true`. The model then built its next edits on a change that never existed.
+ */
+describe("ai-tools — a document the room has frozen", () => {
+  test("reports the refusal instead of validating the unchanged document", async () => {
+    const { tab, registry } = harness({ children: [], tagName: "div" });
+    const before = JSON.stringify(tab.doc.document);
+    setTransactGate(() => "source-canonical");
+    let res;
+    try {
+      res = await registry.execute("set_text", { path: [], value: "hello" });
+    } finally {
+      setTransactGate(null);
+    }
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("frozen");
+    expect(JSON.stringify(tab.doc.document)).toBe(before);
+    expect(tab.doc.dirty).toBe(false);
     disposeTab(tab);
   });
 });

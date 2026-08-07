@@ -47,7 +47,7 @@ export async function convertToComponent() {
 
   // Single atomic mutation: replace node + add $elements ref
   const selectionPath = selected;
-  transact(tab, (doc) => {
+  const converted = transact(tab, (doc) => {
     // Navigate to parent's children array and replace the node
     const pp = parentElementPath(selectionPath) ?? [];
     const idx = childIndex(selectionPath) as number;
@@ -73,6 +73,15 @@ export async function convertToComponent() {
       doc.$elements.push({ $ref: refPath });
     }
   });
+  /* THE FILE IS WRITTEN ONLY IF THE DOCUMENT TOOK THE REFERENCE.
+     `transact` consults the collab gate, which pauses structural editing while source is canonical.
+     A refusal used to be invisible here: the extraction still wrote `components/<name>.json` to
+     disk and still said "Converted to <name>" — leaving a component file nothing references, in a
+     document the author was told had been changed. The gate raises its own toast saying why the
+     edit is paused; the honest thing to add to it is nothing at all. */
+  if (!converted) {
+    return;
+  }
 
   // Write component file and refresh registry
   try {

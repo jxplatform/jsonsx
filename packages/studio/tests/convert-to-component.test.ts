@@ -12,6 +12,7 @@ import { componentRegistry } from "../src/files/components";
 import { problems, resetNotifications, toasts } from "../src/services/notify";
 import { initLayers } from "../src/ui/layers";
 import { activeTab } from "../src/workspace/workspace";
+import { setTransactGate } from "../src/tabs/transact";
 import type { Tab } from "../src/tabs/tab";
 
 // ─── Environment ──────────────────────────────────────────────────────────────
@@ -308,5 +309,37 @@ describe("name validation", () => {
     const doc = tab.doc.document as Record<string, unknown>;
     expect((doc.children as unknown[])[0]).toEqual({ tagName: "my-widget" });
     expect(activeTab.value!.doc.dirty).toBe(true);
+  });
+});
+
+/**
+ * A DISK WRITE THAT ASSUMED THE DOCUMENT HAD TAKEN THE REFERENCE.
+ *
+ * `transact` consults the collab gate, which pauses structural editing for the whole room while
+ * source is canonical, and returned nothing to say so. The extraction carried on: the component
+ * file was written, the registry reloaded, and "Converted to <name>" appeared — over a document
+ * that still held the original markup. An orphan file, and an author told the opposite.
+ */
+describe("a refused conversion", () => {
+  test("writes no file and claims no success", async () => {
+    resetNotifications();
+    tab.session.selection = [["children", 0]];
+    const before = JSON.stringify(tab.doc.document);
+    const done = convertToComponent();
+    await flush();
+    setName("frozen-widget");
+    setTransactGate(() => "source-canonical");
+    try {
+      confirmDialog();
+      await done;
+    } finally {
+      setTransactGate(null);
+    }
+
+    expect(JSON.stringify(tab.doc.document)).toBe(before);
+    expect(platformState.files.has("components/frozen-widget.json")).toBe(false);
+    // The gate raises its own keyed toast; this path adds no claim of its own beside it.
+    expect(toasts.some((t) => t.message.startsWith("Converted to"))).toBe(false);
+    expect(problems).toHaveLength(0);
   });
 });

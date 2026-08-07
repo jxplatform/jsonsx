@@ -4,7 +4,7 @@
  */
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { mount, unmount } from "../src/panels/tab-strip";
+import { confirmCloseAll, mount, unmount } from "../src/panels/tab-strip";
 import { collabState } from "../src/collab/collab-state";
 import {
   closeAllTabs,
@@ -23,7 +23,10 @@ import { setActiveRegistry } from "../src/commands/active-registry";
 import { makeContext } from "../src/commands/context";
 import { defaultCommands, noopCommandDeps } from "../src/commands/defaults";
 import { contentCommands } from "../src/content/entry-commands";
+import { BUFFER_COMMIT, bufferWrites } from "../src/services/monaco-buffer";
+import { view } from "../src/view";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { Tab } from "../src/tabs/tab";
 
 let host: HTMLElement;
 
@@ -335,6 +338,314 @@ describe("tab strip interactions", () => {
       // The old flow's Save wrote nothing and said "Saved just now" anyway; this one writes nothing
       // And says so.
       expect(state.files.has("/project/a.json")).toBe(false);
+    });
+  });
+
+  /**
+   * THE LAST KEYSTROKE BEFORE ⌘W, which neither gate could see.
+   *
+   * A Monaco buffer carries the last 500ms (dock) / 600ms (source) of typing in an armed commit,
+   * and nothing marks the document dirty for work it has not received. `shouldWarnOnClose` reads
+   * `dirty`, so it said "nothing to lose" — no prompt, the tab closed, and the typing went with it.
+   * No disposer can cover this: `closeTab` deletes the tab before any repaint disposes an editor,
+   * and every commit then correctly refuses to write into a tab `tabIsLive` says is gone.
+   */
+  describe("a buffer holding work the document has not been given", () => {
+    /** A Monaco stand-in mounted for `tab`, mid-debounce, exactly as both surfaces leave one. */
+    function typingBuffer(tab: Tab, text: string, commit: (text: string) => void | Promise<void>) {
+      const model: object | null = {};
+      const buffer = {
+        _editingTab: tab,
+        getModel: () => model,
+        getValue: () => text,
+        hasTextFocus: () => false,
+      };
+      const writes = bufferWrites(buffer);
+      writes.markTyped();
+      writes.arm(BUFFER_COMMIT, 500, () => commit(buffer.getValue()));
+      return buffer;
+    }
+
+    /** What `bodyWriter` does when the commit lands: the document has it, the buffer settles. */
+    function landBody(tab: Tab, body: string) {
+      (tab.doc.document as unknown as { body?: string }).body = body;
+      tab.doc.dirty = true;
+      view.functionEditor?._writes?.markSettled();
+      view.monacoEditor?._writes?.markSettled();
+    }
+
+    afterEach(() => {
+      view.functionEditor = null;
+      view.monacoEditor = null;
+    });
+
+    test("the dock's armed commit runs before the gate, so ⌘W prompts and Save has the text", async () => {
+      const a = open("a");
+      view.functionEditor = typingBuffer(a, "typed();", (body) => landBody(a, body)) as never;
+      await flush();
+      (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+      await flush();
+
+      // The commit landed WHILE the tab was still open — which is the only moment it could.
+      expect((a.doc.document as unknown as { body?: string }).body).toBe("typed();");
+      expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).not.toBeNull();
+      expect(workspace.tabs.has("a")).toBe(true);
+    });
+
+    test("the source view's commit is awaited — it parses before it assigns", async () => {
+      const a = open("a");
+      view.monacoEditor = typingBuffer(a, "# Never saved", async (text) => {
+        await Promise.resolve();
+        landBody(a, text);
+      }) as never;
+      await flush();
+      (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+      await flush();
+
+      expect((a.doc.document as unknown as { body?: string }).body).toBe("# Never saved");
+      expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).not.toBeNull();
+      expect(workspace.tabs.has("a")).toBe(true);
+    });
+
+    test("typing no commit could land still stops the close", async () => {
+      const a = open("a");
+      // Unparseable source: the commit ran, kept the buffer rather than resyncing over a half-typed
+      // Heading, and deliberately did not settle. That text exists nowhere but the buffer.
+      const buffer = {
+        _editingTab: a,
+        getModel: () => ({}),
+        getValue: () => "# Half a headi",
+        hasTextFocus: () => false,
+      };
+      bufferWrites(buffer).markTyped();
+      view.monacoEditor = buffer as never;
+      await flush();
+      (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+      await flush();
+
+      expect(a.doc.dirty).toBe(false); // Nothing made it dirty, and it is still unsaved work
+      expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).not.toBeNull();
+      expect(workspace.tabs.has("a")).toBe(true);
+    });
+
+    /**
+     * …AND THE PROMPT MUST NOT OFFER TO SAVE IT, because Save writes the document and the document
+     * is precisely what does not contain this text.
+     *
+     * The three-way dialog appeared, the author chose the careful answer, `saveFile` wrote the file
+     * as it stood — without the half-typed heading — reported "Saved just now" and closed the tab.
+     * §14.7: a dialog may not offer an answer the app cannot honour. `requestClose` has already run
+     * every commit by the time it asks, so a buffer still marked `typed()` means the commit COULD
+     * NOT land, and there is no version of Save that includes it.
+     */
+    test("…and is not offered a Save that would write the document without it", async () => {
+      const a = open("a");
+      a.doc.dirty = true; // Other, saveable edits exist — Save is still not honest about the text.
+      const buffer = {
+        _editingTab: a,
+        getModel: () => ({}),
+        getValue: () => "# Half a headi",
+        hasTextFocus: () => false,
+      };
+      bufferWrites(buffer).markTyped();
+      view.monacoEditor = buffer as never;
+      await flush();
+      (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+      await flush();
+
+      const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
+      expect(dialog.getAttribute("headline")).toBe("Changes Cannot Be Saved");
+      expect(dialog.getAttribute("secondary-label")).toBeNull();
+      expect(dialog.getAttribute("confirm-label")).toBe("Close Without Saving");
+      expect(dialog.getAttribute("cancel-label")).toBe("Keep Editing");
+      expect(dialog.textContent).toContain("does not parse");
+    });
+
+    /**
+     * THE AWAIT IS A WINDOW, and everything below it was addressed to a tab captured above it.
+     *
+     * The flush is new, and it made `requestClose` async before its first read of `tab`. A source
+     * commit parses through the format host, and a project switch (`closeAllTabs`) or the preview
+     * slot's replacement destroys tabs synchronously from an event this close is not ordered
+     * against — so the tab can be gone by the time the promise resolves. What followed was a prompt
+     * about a document nobody can see, whose **Save** button calls `saveFile(tab)`: a write of
+     * `tab.documentPath`, which is project-relative, through a `platform.projectRoot` the switch
+     * has already moved. The old project's document, into the new project, at the same path.
+     */
+    test("a tab destroyed inside the commit's await is not prompted about", async () => {
+      const a = open("a");
+      a.doc.dirty = true; // The gate fires on this, if it is ever reached.
+      view.monacoEditor = typingBuffer(a, "# Never saved", async (text) => {
+        // The project switch, arriving mid-parse. It takes every tab with it, unprompted.
+        closeAllTabs();
+        await Promise.resolve();
+        landBody(a, text);
+      }) as never;
+      await flush();
+      (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+      await flush();
+
+      expect(workspace.tabs.has("a")).toBe(false);
+      expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).toBeNull();
+    });
+
+    test("a buffer that is merely AHEAD is not unsaved work, and closes without a word", async () => {
+      const a = open("a");
+      // Format-on-open, over a body `closeFunctionEditor` minified: the buffer differs from the
+      // Document for as long as the editor is open, and an author loses nothing by leaving.
+      const buffer = {
+        _editingTab: a,
+        getModel: () => ({}),
+        getValue: () => "return 1;\n",
+        hasTextFocus: () => false,
+      };
+      bufferWrites(buffer).markAhead();
+      view.functionEditor = buffer as never;
+      await flush();
+      (tabs()[0]!.querySelector(".tab-strip-close") as HTMLElement).click();
+      await flush();
+
+      expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).toBeNull();
+      expect(workspace.tabs.has("a")).toBe(false);
+    });
+  });
+
+  /**
+   * THE ONE EXIT WITH NO GATE AT ALL, until now: activating another project.
+   *
+   * `closeAllTabs()` disposes every open document and asks nobody. ⌘W, the tab ×, quitting and the
+   * preview slot's replacement each acquired a gate over eight rounds; the gesture that throws away
+   * the WHOLE workspace at once never had one, so a project switch discarded every dirty document
+   * silently and by design.
+   */
+  describe("closing the whole workspace at once", () => {
+    afterEach(() => {
+      view.functionEditor = null;
+      view.monacoEditor = null;
+    });
+
+    test("nothing unsaved needs no prompt", async () => {
+      open("a");
+      open("b");
+      await flush();
+      expect(await confirmCloseAll("Opening another project")).toBe(true);
+      expect(document.querySelector("#layer-dialog sp-dialog-wrapper")).toBeNull();
+    });
+
+    test("one prompt for the set, naming how many documents are unsaved", async () => {
+      open("a").doc.dirty = true;
+      open("b").doc.dirty = true;
+      open("c");
+      await flush();
+      const answering = confirmCloseAll("Opening another project");
+      await flush();
+      const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
+      // ONE dialog for three tabs, and it counts only the two that would lose work.
+      expect(document.querySelectorAll("#layer-dialog sp-dialog-wrapper")).toHaveLength(1);
+      expect(dialog.textContent).toContain("2 documents have unsaved changes");
+      expect(dialog.getAttribute("confirm-label")).toBe("Save All");
+
+      dialog.dispatchEvent(new Event("cancel"));
+      expect(await answering).toBe(false);
+      // Cancel keeps the workspace exactly as it was — the switch has not started.
+      expect(workspace.tabs.size).toBe(3);
+    });
+
+    test("a single unsaved document is named rather than counted", async () => {
+      open("a").doc.dirty = true;
+      await flush();
+      const answering = confirmCloseAll("Opening another project");
+      await flush();
+      const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
+      expect(dialog.textContent).toContain('"a.json" has unsaved changes');
+      dialog.dispatchEvent(new Event("secondary"));
+      expect(await answering).toBe(true);
+    });
+
+    test("Save All writes every one of them, and a failed write cancels the switch", async () => {
+      const { state } = installMockPlatform();
+      open("a").doc.dirty = true;
+      open("b").doc.dirty = true;
+      await flush();
+      let answering = confirmCloseAll("Opening another project");
+      await flush();
+      (document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement).dispatchEvent(
+        new Event("confirm"),
+      );
+      expect(await answering).toBe(true);
+      expect(state.files.has("/project/a.json")).toBe(true);
+      expect(state.files.has("/project/b.json")).toBe(true);
+
+      // And when a write fails, the answer is "no" — an author who watched a save fail must not
+      // Then watch the document be discarded because they asked to save it.
+      installMockPlatform({
+        writeFile: () => Promise.reject(new Error("disk full")),
+      });
+      const c = open("c");
+      c.doc.dirty = true;
+      await flush();
+      answering = confirmCloseAll("Opening another project");
+      await flush();
+      (document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement).dispatchEvent(
+        new Event("confirm"),
+      );
+      expect(await answering).toBe(false);
+    });
+
+    /**
+     * §14.7 for the set: one un-saveable document makes "Save All" a button that would report
+     * success while leaving work behind, so the whole prompt drops to the honest pair.
+     */
+    test("one document that cannot be saved takes Save off the whole prompt", async () => {
+      open("a").doc.dirty = true;
+      const b = open("b");
+      const buffer = {
+        _editingTab: b,
+        getModel: () => ({}),
+        getValue: () => "# Half a headi",
+        hasTextFocus: () => false,
+      };
+      bufferWrites(buffer).markTyped();
+      view.monacoEditor = buffer as never;
+      await flush();
+      const answering = confirmCloseAll("Opening another project");
+      await flush();
+      const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
+      expect(dialog.getAttribute("headline")).toBe("Changes Cannot Be Saved");
+      expect(dialog.getAttribute("secondary-label")).toBeNull();
+      expect(dialog.textContent).toContain("2 documents have unsaved changes");
+      expect(dialog.textContent).toContain('"b.json" cannot be saved at all');
+      dialog.dispatchEvent(new Event("confirm"));
+      expect(await answering).toBe(true);
+    });
+
+    test("the buffers are committed before the count is taken", async () => {
+      const a = open("a");
+      const model: object | null = {};
+      const buffer = {
+        _editingTab: a,
+        getModel: () => model,
+        getValue: () => "typed();",
+        hasTextFocus: () => false,
+      };
+      const writes = bufferWrites(buffer);
+      writes.markTyped();
+      writes.arm(BUFFER_COMMIT, 500, () => {
+        a.doc.dirty = true;
+        writes.markSettled();
+      });
+      view.functionEditor = buffer as never;
+      await flush();
+
+      const answering = confirmCloseAll("Opening another project");
+      await flush();
+      // The armed commit ran while the tab was still open, so the prompt is about a document that
+      // Really does hold the typing — and Save All can therefore honour it.
+      expect(a.doc.dirty).toBe(true);
+      const dialog = document.querySelector("#layer-dialog sp-dialog-wrapper") as HTMLElement;
+      expect(dialog.getAttribute("confirm-label")).toBe("Save All");
+      dialog.dispatchEvent(new Event("secondary"));
+      expect(await answering).toBe(true);
     });
   });
 

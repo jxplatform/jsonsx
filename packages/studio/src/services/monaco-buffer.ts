@@ -1,14 +1,34 @@
 /// <reference lib="dom" />
 /**
- * The one question every write into a Monaco buffer has to ask: **has the buffer moved on?**
+ * The one question every write into a Monaco buffer has to ask: **may I write into this buffer?**
  *
  * Studio has two Monaco surfaces — the source view on the canvas stage (`view.monacoEditor`,
  * mounted by `canvas/canvas-render.ts`) and the function body in the Bottom dock's Logic tab
- * (`view.functionEditor`, mounted by `panels/editors.ts`). Both are written into from places that
- * cannot see the keyboard: a repaint pushing the document's text in, a code-service round trip
- * landing with a formatted body, a serializer resolving with the file's contents. Every one of
- * those writes is computed from a buffer state that may be several keystrokes old by the time it
- * arrives, and `setValue` does not merge — it replaces, and takes the user's unsaved work with it.
+ * (`view.functionEditor`, mounted by `panels/editors.ts`).
+ *
+ * **The count in this file is of WRITE SITES — places that put text INTO a buffer** — because a
+ * write into a buffer is the only thing that has to ask this module's question. (Writes OUT are
+ * counted nowhere: there are two, one per surface, they are the debounced commits, and they ask
+ * `bufferIsLive` instead. See the note at the end of this header.) There are four, and none of them
+ * can see the keyboard:
+ *
+ * 1. **the serializer resolving with the file's contents**, at mount — `canvas-render.ts`'s
+ *    `mountSourceEditor`;
+ * 2. **a repaint pushing the document's text in** — `canvas-render.ts`'s source fast path;
+ * 3. **the dock's re-sync**, showing an edit that arrived from somewhere else — `editors.ts`'s
+ *    `syncFunctionEditor`;
+ * 4. **a code-service round trip landing with a formatted body** — `editors.ts`'s format-on-open.
+ *
+ * Every one of those writes is computed from a buffer state that may be several keystrokes old by
+ * the time it arrives, and `setValue` does not merge — it replaces, and takes the user's unsaved
+ * work with it.
+ *
+ * **And on a co-edited tab there is a FIFTH writer, which is not in that list because it never
+ * calls anything here.** y-monaco binds the source model to a shared `Y.Text`, so every peer's
+ * keystrokes arrive in the buffer directly and say nothing to anyone. It is also the only writer
+ * whose text reaches other people's machines: the binding is two-way, so a local `setValue` over a
+ * bound model is a whole-document replace PUBLISHED to every peer. A buffer in that state declares
+ * itself with {@link BufferWrites.markShared} and clause 5 refuses every write into it.
  *
  * The rule was already discovered once, in one branch of one fast path:
  *
@@ -16,13 +36,15 @@
  * if (!editor.hasTextFocus() && editor.getValue() !== newVal) { … }
  * ```
  *
- * …and it was never given a name, so the other four write sites each invented a different guard.
- * All four asked **identity** — "is this still the same editor object?" — which answers a real
+ * …and it was never given a name, so the other three write sites each invented a different guard.
+ * All three asked **identity** — "is this still the same editor object?" — which answers a real
  * question (a retarget must not write A's body into B) and is not the same question. An editor can
  * keep its identity for minutes while its buffer moves on with every keypress. Identity is
  * necessary and never sufficient.
  *
- * {@link bufferMovedOn} is that rule's one home. A buffer has moved on when any of these is true:
+ * {@link bufferMovedOn} is that rule's one home. A write must be dropped when any of these is true
+ * — the first four are "the buffer moved on", and the fifth is the one the co-edited surface
+ * added:
  *
  * 1. **It is gone.** `dispose()` detaches the model, and `CodeEditorWidget.getValue()` opens with `if
  *    (!this._modelData) return "";` — so a dead editor answers the empty string and a write into it
@@ -47,6 +69,26 @@
  *    ahead and arms its commit; the commit marks settled.
  * 4. **It is not what the write was computed from.** A caller that read the buffer before an `await`
  *    passes what it read as `expected`; a mismatch means the round trip lost the race.
+ * 5. **It is not this process's buffer to replace.** The one clause that is not "the buffer moved on"
+ *    — it is "the buffer is not yours". A co-edited source buffer is bound to a shared `Y.Text` and
+ *    the CRDT is the source of truth for that text while the source lock is held: the structure
+ *    tree is DERIVED from it by the source reconciler (`collab/collab-session.ts`'s
+ *    `sourceParseNow` parses the shared text back into the tree). A repaint serializing that tree
+ *    over the buffer is therefore a rendering of the text asserting itself over the text — and
+ *    because the model is bound, it is published to every peer, on every repaint, for every round
+ *    trip that is not byte-stable. There is no direction in which a co-edited buffer wants the
+ *    document's serialized text, so this fact is set once at bind ({@link BufferWrites.markShared})
+ *    and never cleared: a future writer's `markSettled` must not be able to unlock it, which is why
+ *    it is its own fact and not a use of clause 3.
+ *
+ * **Ahead is not the same as unsaved, and the gates that warn about lost work need the narrower
+ * fact.** Format-on-open leaves a buffer ahead deliberately and never commits — and since
+ * `closeFunctionEditor` writes a MINIFIED body, the pretty-printed buffer differs from the document
+ * for as long as the editor is open. Counting THAT as unsaved work would put "you have unsaved
+ * changes" in front of every author who merely opened a handler. So a keystroke says
+ * {@link BufferWrites.markTyped} — ahead, and the text is the user's own — and the two gates that
+ * destroy a tab ({@link commitTabBuffers}'s callers) read {@link BufferWrites.typed}, which is
+ * exactly the text a close would take with it.
  *
  * Writes OUT of a buffer — a debounce reading `getValue()` into the document — ask `bufferIsLive`
  * instead, which is clause 1 alone. Deliberately, and it is the only kind of call site in the
@@ -57,6 +99,11 @@
  * @docs studio/logic/code
  */
 
+import { toRaw } from "../reactivity";
+import { notify } from "./notify";
+import type { Tab } from "../tabs/tab";
+import { view } from "../view";
+
 /** The slice of a Monaco editor this module needs. Both of Studio's Monacos satisfy it. */
 export interface MonacoBuffer {
   getValue: () => string;
@@ -64,6 +111,17 @@ export interface MonacoBuffer {
   hasTextFocus: () => boolean;
   /** The debounced work armed over THIS buffer. Installed by {@link bufferWrites}. */
   _writes?: BufferWrites;
+  /**
+   * The tab this buffer was mounted for — **whose buffer this is**, and both surfaces answer it the
+   * same way.
+   *
+   * Only the dock's editor used to carry it. The source editor named its tab in a closure inside
+   * `mountSourceEditor`, which is unreachable from outside — so a caller holding a `Tab` could ask
+   * the dock "is this yours?" and had no way at all to ask the source view. Every question about a
+   * tab's buffers ({@link commitTabBuffers}, {@link tabBufferUnsaved}) needs both answers, and a
+   * question that can only be asked of one of two surfaces is answered wrong half the time.
+   */
+  _editingTab?: Tab | null;
 }
 
 /**
@@ -76,8 +134,14 @@ export interface MonacoBuffer {
  * all. Whoever disposes an editor now has its canceller in their hand by construction.
  */
 export interface BufferWrites {
-  /** (Re)arm the timer called `key`, replacing whatever was armed under that key. */
-  arm: (key: string, ms: number, run: () => void) => void;
+  /**
+   * (Re)arm the timer called `key`, replacing whatever was armed under that key.
+   *
+   * The work may be async — the source view's commit parses through the format host — and
+   * {@link BufferWrites.flush} hands that promise back, because a caller that flushes in order to
+   * ASK A QUESTION about the result (has this tab unsaved work now?) has to wait for it.
+   */
+  arm: (key: string, ms: number, run: () => void | Promise<void>) => void;
   /** Cancel every armed timer. The disposer calls this; see {@link cancelBufferWrites}. */
   cancel: () => void;
   /**
@@ -86,14 +150,29 @@ export interface BufferWrites {
    * The teardown's half of {@link commitBufferWrites}: the debounce is the only thing that carries
    * the last half-second of typing into the document, so a disposer that merely cancels it deletes
    * that typing — silently, because the document is never marked dirty for work it never received.
+   *
+   * Returns whatever the work returned, so an async commit can be awaited. The disposers ignore it
+   * on purpose: they flush precisely because they are about to detach the model, and every commit
+   * reads `getValue()` before its own first `await`.
    */
-  flush: (key: string) => void;
+  flush: (key: string) => void | Promise<void>;
   /** Clause 3, as a fact: the buffer holds text the document has not been given. */
   ahead: () => boolean;
   /** Declare that the buffer just took text which did NOT come from the document. */
   markAhead: () => void;
+  /**
+   * Clause 3, narrowed to the text a close would DESTROY: the user's own keystrokes, not yet in the
+   * document. See the header — `ahead` is also true of format-on-open, whose text nobody loses.
+   */
+  typed: () => boolean;
+  /** Declare a keystroke: {@link BufferWrites.markAhead}, and the text is the user's own. */
+  markTyped: () => void;
   /** Declare that buffer and document now hold the same text, whichever way it travelled. */
   markSettled: () => void;
+  /** Clause 5, as a fact: this buffer is bound to a shared text that this process does not own. */
+  shared: () => boolean;
+  /** Declare that the buffer is now bound to a shared text. Permanent — see clause 5. */
+  markShared: () => void;
 }
 
 /**
@@ -117,8 +196,10 @@ export const BUFFER_COMMIT = "commit";
  */
 export function bufferWrites(buffer: MonacoBuffer): BufferWrites {
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
-  const runs = new Map<string, () => void>();
+  const runs = new Map<string, () => void | Promise<void>>();
   let isAhead = false;
+  let isTyped = false;
+  let isShared = false;
   const writes: BufferWrites = {
     arm(key, ms, run) {
       clearTimeout(timers.get(key));
@@ -130,7 +211,7 @@ export function bufferWrites(buffer: MonacoBuffer): BufferWrites {
           // Arm cleared out from under it, and a flush of a key already executing must find nothing.
           timers.delete(key);
           runs.delete(key);
-          run();
+          void run();
         }, ms),
       );
     },
@@ -149,14 +230,24 @@ export function bufferWrites(buffer: MonacoBuffer): BufferWrites {
       clearTimeout(timers.get(key));
       timers.delete(key);
       runs.delete(key);
-      run();
+      return run();
     },
     ahead: () => isAhead,
     markAhead() {
       isAhead = true;
     },
+    typed: () => isTyped,
+    markTyped() {
+      isAhead = true;
+      isTyped = true;
+    },
     markSettled() {
       isAhead = false;
+      isTyped = false;
+    },
+    shared: () => isShared,
+    markShared() {
+      isShared = true;
     },
   };
   buffer._writes = writes;
@@ -173,6 +264,14 @@ export function bufferWrites(buffer: MonacoBuffer): BufferWrites {
  * out of the code surface lost an edit that way (switch dock tab, open another target, open a
  * formula through `openLogicTarget`, collapse the dock, switch to a tab whose target string
  * matches), and each measured as "the pre-typing body, quietly".
+ *
+ * **Two more ways out are not a disposer's to fix, and this function cannot reach them.** ⌘W / the
+ * tab × and quitting DESTROY THE TAB: `closeTab` deletes it from `workspace.tabs` before anything
+ * disposes an editor, so by the time a dock repaint reaches `disposeFunctionEditor` the commit
+ * flushed here finds `tabIsLive(tab) === false` and writes nothing. Seven ways out, and the last
+ * two are fixed where the decision is made — {@link commitTabBuffers} runs the commit before the
+ * gate reads the tab, and {@link tabBufferUnsaved} is what the gate reads when the commit could not
+ * land it.
  *
  * The order is the whole point: flush WHILE THE BUFFER IS STILL ALIVE, then cancel, then dispose.
  * Reversed, or deferred by so much as a microtask, the flush reads the empty string off a detached
@@ -193,7 +292,10 @@ export function commitBufferWrites(buffer: MonacoBuffer | null | undefined): voi
   if (!writes) {
     return;
   }
-  writes.flush(BUFFER_COMMIT);
+  // Fire-and-forget on purpose: the disposer is synchronous, and the commit read `getValue()`
+  // Before its own first `await`. What is left to await is the write INTO the document, which does
+  // Not need this editor to still exist.
+  void writes.flush(BUFFER_COMMIT);
   writes.cancel();
 }
 
@@ -226,18 +328,144 @@ export function bufferIsLive(buffer: MonacoBuffer | null | undefined): boolean {
 }
 
 /**
- * Whether the buffer has moved on since the write now being attempted was computed. The four
- * clauses are stated in this module's header.
+ * Whether this write must be dropped — the buffer moved on, or was never this write's to make. The
+ * five clauses are stated in this module's header.
  *
  * @param {MonacoBuffer} buffer The editor about to be written into.
  * @param {string} [expected] What the caller read out of the buffer before its `await`, when it
  *   made one. Omitted by callers that computed their value from the DOCUMENT rather than from the
- *   buffer, for which clauses 1–3 are the whole question.
+ *   buffer, for which clauses 1–3 and 5 are the whole question.
  * @returns {boolean} True when the write must be dropped.
  */
 export function bufferMovedOn(buffer: MonacoBuffer, expected?: string): boolean {
-  if (!bufferIsLive(buffer) || buffer.hasTextFocus() || buffer._writes?.ahead()) {
+  if (
+    !bufferIsLive(buffer) ||
+    buffer.hasTextFocus() ||
+    buffer._writes?.ahead() ||
+    buffer._writes?.shared()
+  ) {
     return true;
   }
   return expected !== undefined && buffer.getValue() !== expected;
+}
+
+/**
+ * The Monaco buffers Studio currently has mounted for `tab`, and nothing else.
+ *
+ * Both surfaces are asked the same question through `_editingTab`, and both are asked clause 1
+ * first: a buffer whose model is detached answers `""` to everything and has no work left to hold.
+ *
+ * **The order is the SOURCE view first and the dock second, and it is load-bearing** — see
+ * {@link commitTabBuffers}, which commits them in this order one at a time.
+ *
+ * @param {Tab} tab
+ * @returns {MonacoBuffer[]}
+ */
+function buffersForTab(tab: Tab): MonacoBuffer[] {
+  const raw = toRaw(tab as object);
+  const mounted: (MonacoBuffer | null)[] = [view.monacoEditor, view.functionEditor];
+  return mounted.filter(
+    (buffer): buffer is MonacoBuffer =>
+      buffer != null &&
+      buffer._editingTab != null &&
+      toRaw(buffer._editingTab as object) === raw &&
+      bufferIsLive(buffer),
+  );
+}
+
+/**
+ * Carry what `tab`'s buffers are holding into the document, leaving the buffers standing.
+ *
+ * **The close path is a WRITE before it is a question.** `shouldWarnOnClose` and `hasUnsavedTabs`
+ * both read `tab.doc.dirty`, and nothing makes a buffer's armed commit dirty a document it has not
+ * reached yet — so typing the last character of a handler and pressing ⌘W closed the tab with no
+ * prompt at all and took the last 500ms (dock) / 600ms (source) with it. No disposer can cover
+ * this: `closeTab` deletes the tab first, and every commit checks `tabIsLive` precisely so that it
+ * will not write into a tab nobody can read. The flush therefore has to happen while the tab is
+ * still open, which is here, before the gate.
+ *
+ * **The two commits run ONE AT A TIME, source first, because they are not independent.** Both
+ * surfaces can be open on one tab — the dock's Logic editor is not a canvas mode, so a handler body
+ * and the page source are editable side by side — and their two commits write at different
+ * granularities. The dock's writes ONE body at `editing.path`; the source view's parses the whole
+ * buffer and assigns a whole new `tab.doc.document`. Started together, the dock's synchronous write
+ * lands first and the source's post-await assign — computed from buffer text that predates it —
+ * replaces the entire tree on top of it, so the body the author just typed is gone with no trace.
+ *
+ * Reversed, both survive: `bodyWriter` re-reads `tab.doc.document` and re-resolves `editing.path`
+ * at call time, so the dock's targeted write applies to whatever tree is there when it runs. The
+ * whole-document assign is the destructive direction and therefore goes first; the body write goes
+ * last and is the only one that can be the last word. (Two independent timers could already race
+ * this either way — but a race that used to be a coin toss is not a licence to make the losing side
+ * certain.)
+ *
+ * **It is always a promise, and callers `await` it.** It used to return `Promise<void> | void` so
+ * that a tab with nothing armed closed without spending a microtask. Nothing a user can perceive
+ * distinguishes zero microtasks from one; the entire cost was five synchronous assertions in
+ * `tests/shortcuts.test.ts`, and the entire price was a three-line `const committing = …; if
+ * (committing) await committing;` dance in every present and future caller — which is exactly the
+ * shape that let {@link commitTabBuffers}'s one existing caller forget to re-check its tab across
+ * the await.
+ *
+ * Deliberately NOT {@link commitBufferWrites}: that one cancels afterwards, which is right for a
+ * disposer and wrong here. The tab may well survive this call — the author can press Cancel on the
+ * dialog the flush just caused to appear — and its buffers must still have their lint armed.
+ *
+ * **AND IT NEVER REJECTS, because its callers are gestures.** `requestClose` awaits this before it
+ * asks anything, and a rejection there propagated out of an `async` function nobody awaits: ⌘W did
+ * nothing — no prompt, no close, no message, an unhandled rejection in the console. The other two
+ * callers (`openTab`'s preview replacement, the project switch) do not even await it, so a
+ * rejection is invisible by construction. A commit is also not all-or-nothing: the source view's
+ * commit and the dock's write to DIFFERENT places, so the first one throwing must not cost the
+ * second its turn — which is why the guard is per buffer rather than around the loop.
+ *
+ * What a failed commit leaves behind is the honest state, not a lost one: `markSettled` never ran,
+ * so the buffer is still `typed()`, {@link tabBufferUnsaved} still answers yes, and the gate above
+ * the close still prompts. This function's remaining job is to make sure somebody is told, which is
+ * a problem rather than a toast: an author who reads it minutes later still needs to know that one
+ * document's editor holds text the file does not.
+ *
+ * @param {Tab} tab
+ * @returns {Promise<void>} Resolves when every commit this flush started has finished or failed.
+ */
+export async function commitTabBuffers(tab: Tab): Promise<void> {
+  for (const buffer of buffersForTab(tab)) {
+    /* Clause 1, RE-ASKED, because the list was taken before the previous commit's await. Assigning
+       a new document repaints the dock, and a repaint can dispose the function editor — whose
+       `getValue()` then answers `""`. Committing that is the deletion this module exists to
+       prevent. (The ordinary teardown already flushed and cancelled, so this usually finds nothing
+       armed; "usually" is not a guard.) */
+    if (!bufferIsLive(buffer)) {
+      continue;
+    }
+    try {
+      await buffer._writes?.flush(BUFFER_COMMIT);
+    } catch (error) {
+      notify.error(
+        `Could not save the editor's contents into "${tab.documentPath ?? "Untitled"}".`,
+        {
+          detail: error instanceof Error ? (error.stack ?? error.message) : String(error),
+          key: `buffer-commit:${tab.id}`,
+          source: "Editor",
+          ...(tab.documentPath ? { path: tab.documentPath } : {}),
+        },
+      );
+    }
+  }
+}
+
+/**
+ * Whether a buffer of `tab`'s holds the user's own typing that the document has not been given.
+ *
+ * What the unsaved-work gates ask AFTER {@link commitTabBuffers}, because a commit is allowed to
+ * fail to land: unparseable source deliberately leaves the buffer ahead rather than resyncing over
+ * a half-typed heading, and that text exists nowhere but the buffer. `typed()` rather than
+ * `ahead()` — the header says why counting format-on-open as unsaved work would warn every author
+ * who merely opened a handler.
+ *
+ * @param {Tab} tab
+ * @returns {boolean}
+ */
+export function tabBufferUnsaved(tab: Tab): boolean {
+  return buffersForTab(tab).some((buffer) => buffer._writes?.typed() === true);
 }

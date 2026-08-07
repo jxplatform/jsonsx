@@ -30,8 +30,11 @@ import {
   setTabPinned,
   splitRight,
   tabCommands,
+  tabIsLive,
   workspace,
 } from "../src/workspace/workspace";
+import { BUFFER_COMMIT, bufferWrites } from "../src/services/monaco-buffer";
+import { view } from "../src/view";
 import { editorKindOf, editorKindsOf, modeForEditorKind } from "../src/tabs/tab";
 import { effect, effectScope } from "../src/reactivity";
 import { createCommandRegistry } from "../src/commands/registry";
@@ -405,6 +408,43 @@ describe("preview tabs", () => {
   test("promoting an id nothing holds is a no-op", () => {
     promoteTab("ghost");
     expect(workspace.tabs.size).toBe(0);
+  });
+
+  /**
+   * THE EIGHTH WAY OUT OF A MONACO BUFFER — and the only one that is not a close.
+   *
+   * `services/monaco-buffer.ts` names seven exits and covers them in two places: five disposers
+   * flush, and `commitTabBuffers` covers ⌘W and quitting. This is the eighth, and it wears no
+   * warning at all: a single click on another page in the tree destroys the preview tab you were
+   * typing in. `promoteDirtyPreviewTabs` is the gate that should make it unreachable — an edited
+   * preview tab stops being replaceable — and it reads `doc.dirty`, the exact fact a buffer's armed
+   * commit has not established yet. So the last 500ms of a handler body went with the tab, with no
+   * dialog, no dirty dot and nothing anywhere saying an edit had gone missing.
+   */
+  test("replacing a preview tab commits its Monaco buffers first", () => {
+    const victim = open("p1", { preview: true });
+    const landed: string[] = [];
+    const buffer = {
+      _editingTab: victim,
+      getModel: () => ({}),
+      getValue: () => "typed();",
+      hasTextFocus: () => false,
+    };
+    const writes = bufferWrites(buffer);
+    writes.markTyped();
+    // The dock's commit, as `editors.ts` arms it: synchronous, and it refuses a dead tab.
+    writes.arm(BUFFER_COMMIT, 500, () => {
+      if (tabIsLive(victim)) {
+        landed.push(buffer.getValue());
+      }
+    });
+    view.functionEditor = buffer as never;
+
+    open("p2", { preview: true });
+
+    expect(workspace.tabs.has("p1")).toBe(false);
+    expect(landed).toEqual(["typed();"]);
+    view.functionEditor = null;
   });
 });
 

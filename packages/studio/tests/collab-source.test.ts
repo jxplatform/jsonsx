@@ -85,6 +85,131 @@ describe("the canonical source lock", () => {
     peer.destroy();
   });
 
+  /**
+   * AND FOR THE LOCK HOLDER, who used to be the one client exempt from its own freeze.
+   *
+   * The exemption (`&& !session.inSourceMode`) assumed a carrier that does not exist. A structural
+   * edit made while this client holds the lock never reaches the shared `Y.Text` — `scheduleMirror`
+   * returns early while canonical is `"source"` — and nothing notices, because the source observer
+   * fires on TEXT changes only. The tree and the text simply diverged, and the divergence was
+   * resolved at `leave()`: it runs `sourceParseNow` before releasing, the UNCHANGED text parses
+   * back into the pre-edit tree, and the revert reaches every client as a `"remote"` origin, which
+   * passes this gate by design. The layer the author deleted in the Outline reappeared seconds
+   * later, with no explanation, to the one person the toast was never shown to.
+   *
+   * Mirroring the other way is not the alternative — that is the round trip `monaco-buffer.ts`'s
+   * clause 5 exists to refuse. Clause 5's own reasoning settles it: if the CRDT owns the text and
+   * the tree is derived from it, nobody edits the tree directly, the pen-holder included.
+   */
+  test("…and for the client HOLDING the lock, which is told why", async () => {
+    const notifications: string[] = [];
+    const hub = createMockCollabHub();
+    const tab = await openAttached(hub);
+    configureCollabNotifier((message) => notifications.push(message));
+    const ctx = collabSourceContext(tab)!;
+
+    await ctx.enter();
+    await settleCollab();
+    expect(collabState(tab).sourceCanonical).toBe(true);
+
+    const before = tabJson(tab);
+    transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 0], "textContent", "FromOutline"));
+
+    expect(tabJson(tab)).toEqual(before);
+    expect(notifications.some((m) => m.includes("Source editing"))).toBe(true);
+    // The invariant the freeze exists for: while the text is canonical, the tree it is parsed into
+    // Agrees with it. A divergence here is an edit `leave()` is about to silently take back.
+    expect(sourceText(hub.serverDoc(PATH)).toString()).toBe(JSON.stringify(before));
+
+    ctx.leave();
+    await settleCollab();
+    expect(canonicalOf(hub.serverDoc(PATH))).toBe("structure");
+    expect(tabJson(tab)).toEqual(before);
+  });
+
+  /**
+   * TOGGLING CODE VIEW OFF AND ON INSIDE ONE ROUND TRIP, which stranded the lock.
+   *
+   * `enter()` flips the room's canonical lock before y-monaco is even imported, and `leave()` lives
+   * in exactly one place — the cleanup `canvas-render.ts`'s `createSourceCollabBinding` returns. So
+   * two overlapping mounts meant the FIRST one's cleanup releasing a lock the SECOND one now held:
+   * a co-edited buffer bound to a `Y.Text` the room had stopped treating as canonical, with the
+   * structure mirror free to serialize over it and publish the result to every peer.
+   *
+   * The release now belongs to the holder. The stale mount's `leave()` is not a smaller release —
+   * it is not a release at all, and it does not reset the awareness `mode` either, because this
+   * client really is still in source mode.
+   */
+  test("a stale mount's leave cannot release the live mount's lock", async () => {
+    const hub = createMockCollabHub();
+    const tab = await openAttached(hub);
+    const first = collabSourceContext(tab)!;
+    const second = collabSourceContext(tab)!;
+
+    await first.enter();
+    await settleCollab();
+    expect(canonicalOf(hub.serverDoc(PATH))).toBe("source");
+
+    // The toggle: a second mount claims the surface before the first one's cleanup fires.
+    await second.enter();
+    await settleCollab();
+    first.leave();
+    await settleCollab();
+
+    expect(canonicalOf(hub.serverDoc(PATH))).toBe("source");
+    expect(collabState(tab).sourceCanonical).toBe(true);
+
+    // And the holder can still hand it back.
+    second.leave();
+    await settleCollab();
+    expect(canonicalOf(hub.serverDoc(PATH))).toBe("structure");
+  });
+
+  /**
+   * The other half of the same identity: an ACQUIRE that lands after the surface it was for is
+   * gone.
+   *
+   * `enter()` awaits a serialization through the format host, and a cold round trip is long enough
+   * to open Code view, close it, and have the room hand the lock back — at which point the stale
+   * promise resolves and re-freezes everybody, seeded from a surface nobody is looking at. Nothing
+   * would ever release it: the mount that would have called `leave()` was torn down before it had a
+   * binding. The freeze is honest enough to include the lock holder now, so that state is the whole
+   * room unable to edit anything, structure or source, until someone reloads.
+   */
+  test("an acquire that resolves after its surface is gone does not re-freeze the room", async () => {
+    const hub = createMockCollabHub();
+    const tab = await openAttached(hub);
+    let resolveStale: (() => void) | null = null;
+    configureCollabSerializer(
+      (t) =>
+        new Promise<string>((resolve) => {
+          resolveStale = () => resolve(JSON.stringify(toRaw(t.doc.document)));
+        }),
+    );
+    const stale = collabSourceContext(tab)!;
+    const staleEntering = stale.enter();
+
+    // The author toggles Code view again while the first serialization is still in flight: a second
+    // Mount takes the lock and gives it back.
+    configureCollabSerializer((t) => Promise.resolve(JSON.stringify(toRaw(t.doc.document))));
+    const live = collabSourceContext(tab)!;
+    await live.enter();
+    await settleCollab();
+    live.leave();
+    await settleCollab();
+    expect(canonicalOf(hub.serverDoc(PATH))).toBe("structure");
+
+    resolveStale!();
+    await staleEntering;
+    await settleCollab();
+
+    // Nobody is in Code view, so nobody holds the lock — and structural editing still works.
+    expect(canonicalOf(hub.serverDoc(PATH))).toBe("structure");
+    expect(collabState(tab).sourceCanonical).toBe(false);
+    transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 0], "textContent", "Still mine"));
+    expect((tabJson(tab).children as JxMutableNode[])[0]!.textContent).toBe("Still mine");
+  });
+
   test("the source reconciler parses peer text edits into everyone's structure", async () => {
     const hub = createMockCollabHub();
     const tab = await openAttached(hub);

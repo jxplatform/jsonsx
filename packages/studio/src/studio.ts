@@ -161,6 +161,7 @@ import * as frontmatterPanelMod from "./panels/frontmatter-panel";
 import * as rightPanelMod from "./panels/right-panel";
 import * as chatPanelMod from "./panels/chat-panel";
 import { setProjectAdopter } from "./services/project-adoption";
+import { tabBufferUnsaved } from "./services/monaco-buffer";
 import * as leftPanelMod from "./panels/left-panel";
 import * as tabStrip from "./panels/tab-strip";
 import * as paneContext from "./panels/pane-context";
@@ -404,9 +405,19 @@ document.addEventListener(
 // Unsaved-changes guard: saving is explicit (no idle autosave), so warn before the window unloads
 // While any open tab has unsaved edits. For collab tabs, `dirty` reflects the room-level unsaved
 // State; closing loses in-memory edits that were never flushed to disk.
+/*
+ * `dirty` alone could not see a Monaco buffer, and quitting is the one exit no disposer follows.
+ *
+ * A keystroke in the source view or the dock's Logic tab reaches the document on a 600ms / 500ms
+ * debounce, and nothing marks the tab dirty in the meantime — so typing the last character of a
+ * handler and pressing ⌘Q left with no prompt at all. There is no flush to make here: `beforeunload`
+ * cannot await, and the source view's commit parses through the format host before it assigns, so
+ * the answer would arrive after the window is gone. The buffer is asked directly instead —
+ * `tabBufferUnsaved` is the author's own typing that the document has not been given.
+ */
 export function hasUnsavedTabs(): boolean {
   for (const tab of workspace.tabs.values()) {
-    if (tab.doc.dirty) {
+    if (tab.doc.dirty || tabBufferUnsaved(tab)) {
       return true;
     }
   }
@@ -899,6 +910,23 @@ async function openRecentProject(root: string) {
     if (projectState && platform.openProjectInNewWindow) {
       await platform.openProjectInNewWindow(root);
       activity.done("Opened in another window");
+      return;
+    }
+
+    /* THE LAST UNGUARDED DESTROYER, and it is the biggest one.
+       Past this point the window replaces its project, and `closeAllTabs()` below disposes every
+       open document — dirty or not, with no prompt anywhere on the path. ⌘W, the tab ×, quitting
+       and the preview slot's replacement each acquired a gate; this one, which throws away the
+       whole workspace at once, never had one.
+       Asked HERE rather than lower down because everything below it is one-way: `setWindowProject`
+       binds this window's backend to the new root, `platform.projectRoot` moves the base every
+       relative path resolves against, and `resetProjectShell` drops the surfaces that describe the
+       project being left. A prompt after any of those can be answered "keep editing" and leave the
+       app pointing at a project it is not showing. The one cost of asking first is the
+       already-open-elsewhere case just below, where the switch turns out to be a window focus and
+       nothing is closed: a redundant question, and never a lost document. */
+    if (!(await tabStrip.confirmCloseAll("Opening another project"))) {
+      activity.done("Kept the current project");
       return;
     }
 

@@ -31,6 +31,7 @@ What you get:
 - **Live linting** — problems are underlined as you type, with the message on hover.
 - **Completions** — type `state.` to see every entry from the **[State panel](/docs/studio/logic/state)** (your values, data sources, and functions), and `window.` for the standard library (`Math`, `JSON`, …). Named formulas carry their descriptions into the suggestions.
 - **Automatic write-back** — edits flow into the document as you type; there is no separate apply step. Save the file as usual when you're done.
+- **Your last keystrokes are never the ones that get lost.** Write-back is batched, so at any instant the editor can be a moment ahead of the document — and every way out of it settles that first. Switching to Problems, collapsing the dock, moving to another document, opening a different formula, closing the editor: each one lands what you typed. Closing the tab or quitting counts that text as unsaved and asks you about it, even when nothing else in the document has changed.
 
 **Close**, in the editor's header, writes the body back one last time — minified — and takes the tab off the dock's strip. Until then the editor keeps its place: collapsing the dock or switching to another document and back leaves it exactly as it was. The same tab carries the **[formula workspace](/docs/studio/logic/formula-workspace)** when what you're editing is a structured expression rather than code.
 
@@ -45,6 +46,7 @@ A function body normally lives inside the component's JSON. When one grows large
 The **Code** entry in the context bar's **Editor** control shows the open file itself as raw source — JSON for pages and components, Markdown for content — as introduced in **[Modes and views](/docs/studio/interface/modes)**. It's the same document the visual surfaces edit, from the other side:
 
 - Edits parse back into the document as you type, so switching back to **Edit** or **Design** shows your changes. While the source is momentarily unparseable mid-edit, Studio simply waits — it never replaces your document with a broken parse.
+- **Leaving Code view takes your typing with you.** Parsing back is batched the same way the function editor's write-back is, so switching to **Edit**, **Design** or another editor settles the last keystrokes first, and the unsaved dot appears if they changed anything. Text that could not be parsed stays in the editor and still counts as unsaved — you are not asked to choose between a broken parse and losing the line you were writing.
 - JSON files are checked against your project's own schema as you type — mistyped keys, wrong value types and missing required properties are underlined, and :kbd[Ctrl+Space] completes property names. Studio uses the `project.schema.json` and `document.schema.json` that [`jx schema`](/docs/framework/build/cli) generates from your enabled extensions, so the editor enforces exactly what `jx validate` does, including extension-contributed sections. It reads them directly, with no network access — an offline project still gets full validation.
 - **Export**, at the right of the context bar, saves a copy of the file elsewhere.
 

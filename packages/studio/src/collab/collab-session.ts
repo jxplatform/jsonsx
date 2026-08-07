@@ -119,13 +119,26 @@ interface ActiveSession {
   applyingRemoteFrontmatter: boolean;
   synced: boolean;
   canWrite: boolean;
-  /** True while THIS client is in the code view (its structural freeze exempts itself). */
-  inSourceMode: boolean;
   mirrorTimer: ReturnType<typeof setTimeout> | null;
   /** When the shared source text was last brought up to date; bounds the debounce's max lag. */
   lastMirrorAt?: number;
   /** Debounce for the source reconciler's Y.Text → structure parse mirror. */
   sourceParseTimer: ReturnType<typeof setTimeout> | null;
+  /**
+   * Which source surface currently speaks for this client's canonical lock.
+   *
+   * The lock is a room-level fact with no owner, and `leave()` reaches it from exactly one place —
+   * the cleanup {@link canvas/canvas-render.ts}'s `createSourceCollabBinding` returns. Toggling Code
+   * view off and on inside one round trip runs two mounts that overlap: the second `enter()` has
+   * already re-flipped the lock by the time the first mount's cleanup fires, and that cleanup
+   * released a lock the live mount was holding — leaving a co-edited buffer bound to a Y.Text that
+   * the room no longer treats as canonical, with the structure mirror free to serialize over it.
+   *
+   * A token, minted synchronously by each `enter()`, is the identity the release checks. Call
+   * order, not resolution order: `enter()` awaits a serialization, so the last mount to be ASKED
+   * must win regardless of which round trip returns first.
+   */
+  sourceLockOwner: object | null;
   disposers: (() => void)[];
 }
 
@@ -183,11 +196,25 @@ function installGlobalHooks(): void {
   hooksInstalled = true;
   setTransactObserver(onTransact);
   setBatchEndNotifier(onBatchEnd);
-  // Soft-freeze structural editing while a peer holds source-canonical (remote origins pass —
-  // They ARE the reconciler's mirror of the frozen representation).
+  /* Soft-freeze structural editing while ANYONE holds source-canonical (remote origins pass — they
+     ARE the reconciler's mirror of the frozen representation).
+     **Including the client holding the lock, which used to be exempt** (`&& !session.inSourceMode`).
+     The exemption assumed a carrier that does not exist: a structural edit made by the lock holder
+     never reaches the shared `Y.Text`, because `scheduleMirror` returns early while canonical is
+     `"source"`, and nothing notices, because the source observer fires on TEXT changes only. So the
+     tree and the text diverged, held apart until `leave()` — which runs `sourceParseNow` before
+     releasing the lock, parses the UNCHANGED text back into a tree, and reverts the author's edit
+     under `MIRROR_ORIGIN`. It then arrives at every peer through `applyExternalDocOps` (origin
+     `"remote"`, which passes this gate by design), so the layer they deleted in the Outline
+     reappeared seconds later with no explanation — and they were the one client this toast was
+     never shown to.
+     Mirroring the other way while source is canonical is not the alternative: it is exactly the
+     round trip `services/monaco-buffer.ts`'s clause 5 exists to refuse. Clause 5's own reasoning
+     settles this one — if the CRDT owns that text and the tree is DERIVED from it, then nobody may
+     edit the tree directly, and "nobody" includes whoever is holding the pen. */
   setTransactGate((tab) => {
     const session = runtimeOf(tab)?.session;
-    if (session?.synced && collabState(tab).sourceCanonical && !session.inSourceMode) {
+    if (session?.synced && collabState(tab).sourceCanonical) {
       _notify("Source editing in progress — structural edits are paused");
       return "source-canonical";
     }
@@ -441,10 +468,20 @@ export function collabSourceContext(tab: Tab): {
     return null;
   }
   const { collab, handle } = session;
+  /* THIS CONTEXT'S CLAIM ON THE LOCK, and the reason a release needs one.
+     One context object is handed to one mount, and `leave()` is called by that mount's cleanup —
+     but the lock it releases is the SESSION's, shared by every mount this client makes. Toggling
+     Code view off and on inside one round trip overlaps two of them, and the first one's cleanup
+     handed back a lock the second one had just taken. The token is minted synchronously at
+     `enter()` so the ordering is the order the surfaces were asked for, not the order two
+     serializations happened to resolve in. */
+  let claim: object | null = null;
+  const holdsClaim = () => claim !== null && session.sourceLockOwner === claim;
   return {
     awareness: handle.awareness,
     enter: async () => {
-      session.inSourceMode = true;
+      claim = {};
+      session.sourceLockOwner = claim;
       const local = handle.awareness.getLocalState();
       if (local) {
         handle.awareness.setLocalState({ ...local, mode: "source" });
@@ -460,6 +497,11 @@ export function collabSourceContext(tab: Tab): {
           serialized = null;
         }
       }
+      // Asked again across the await: a later mount owns the surface now, and seeding the shared
+      // Text from THIS mount's serialization would push a stale document at the room.
+      if (!holdsClaim()) {
+        return;
+      }
       collab.acquireSourceCanonical(
         handle.doc,
         serialized ?? collab.sourceText(handle.doc).toString(),
@@ -467,7 +509,14 @@ export function collabSourceContext(tab: Tab): {
       );
     },
     leave: () => {
-      session.inSourceMode = false;
+      // Not this mount's lock to hand back, and not its awareness state to reset either — the live
+      // Mount is in source mode and says so.
+      if (!holdsClaim()) {
+        claim = null;
+        return;
+      }
+      claim = null;
+      session.sourceLockOwner = null;
       const local = handle.awareness.getLocalState();
       if (local) {
         handle.awareness.setLocalState({ ...local, mode: "structure" });
@@ -761,10 +810,10 @@ function createSession(
     collab,
     disposers: [],
     handle,
-    inSourceMode: false,
     lastSeenRef: toRaw(tab.doc.document) as object,
     mirrorTimer: null,
     path,
+    sourceLockOwner: null,
     sourceParseTimer: null,
     synced: false,
     tab,

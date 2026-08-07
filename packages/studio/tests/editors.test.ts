@@ -138,6 +138,9 @@ const { activeCanvasSurface } = await import("../src/canvas/canvas-surface");
 /* Panels belong to a pane's stage now (`src/canvas/canvas-surface.ts`), not to the app. */
 const canvasPanels = activeCanvasSurface().panels;
 const { view } = await import("../src/view");
+const { commitTabBuffers, tabBufferUnsaved } = await import("../src/services/monaco-buffer");
+const { setTransactGate } = await import("../src/tabs/transact");
+const { resetNotifications, toasts } = await import("../src/services/notify");
 const { activateTab, activeTab, closeAllTabs, closeTab, openTab } =
   await import("../src/workspace/workspace");
 type StudioTab = NonNullable<typeof activeTab.value>;
@@ -262,6 +265,7 @@ beforeEach(() => {
   view._completionRegistered = false;
   view.functionEditor = null;
   view.monacoEditor = null;
+  resetNotifications();
   installMockPlatform({
     codeService: (async (action: string, payload: unknown) => {
       codeServiceCalls.push([action, payload]);
@@ -537,6 +541,30 @@ describe("living in a dock tab", () => {
   });
 
   /**
+   * A6 — ⌘W one keystroke after the last one.
+   *
+   * The 500ms commit is the only thing that carries this buffer into the document, and until it
+   * lands nothing is dirty — so `shouldWarnOnClose` said there was nothing to lose, the tab closed
+   * with no prompt, and the handler kept its pre-typing body. The disposer cannot help: `closeTab`
+   * deletes the tab first, and `bodyWriter` then correctly refuses to write into it.
+   */
+  test("typing is visible to the close path, and the close path can land it", async () => {
+    setEditing({ defName: "greet", type: "def" });
+    await paintLogic();
+    const ed = created.at(-1)!;
+    const tab = activeTab.value!;
+
+    ed.type("typed();");
+    expect(tab.doc.dirty).toBe(false);
+    expect(tabBufferUnsaved(tab)).toBe(true);
+
+    await commitTabBuffers(tab);
+    expect((tab.doc.document.state as any).greet.body).toBe("typed();");
+    expect(tab.doc.dirty).toBe(true);
+    expect(tabBufferUnsaved(tab)).toBe(false);
+  });
+
+  /**
    * The REPAINT got more frequent in P8 too, and it is the rate that matters most: it is the one
    * that runs while the author's hands are on the keyboard.
    *
@@ -770,6 +798,74 @@ describe("closeFunctionEditor", () => {
     expect(node.onclick.$prototype).toBe("Function");
     expect(node.onclick.body).toBe("bye()");
     expect(activeTab.value!.session.ui.editingFunction).toBeNull();
+  });
+
+  /**
+   * A REFUSED WRITE, and the button that destroyed the body because it could not see one.
+   *
+   * The collab gate pauses structural editing while anyone holds source-canonical — the lock holder
+   * included, since the CRDT owns the text the tree is derived from. `transactDoc` returned the
+   * same `undefined` for that refusal as for a write that landed, so the Close carried on: minify,
+   * refused write, `cancelBufferWrites` (the armed commit gone with it), dispose, target cleared.
+   * The one action whose entire purpose is to save the body deleted it, and the standing "frozen"
+   * chip in the presence strip does not say that a button just did nothing.
+   */
+  test("a refused write leaves the body on screen and says so", async () => {
+    setEditing({ defName: "greet", type: "def" });
+    await paintLogic();
+    const ed = created.at(-1)!;
+    ed.type("return 42;");
+    const editor = view.functionEditor;
+
+    setTransactGate(() => "source-canonical");
+    try {
+      await closeFunctionEditor();
+    } finally {
+      setTransactGate(null);
+    }
+
+    // The document never received it — and neither the editor nor the target went away, so the
+    // Author is still looking at the text they typed.
+    expect((activeTab.value!.doc.document.state as any).greet.body).toBe("return 1;");
+    expect(view.functionEditor).toBe(editor);
+    expect(ed.disposed).toBe(false);
+    expect(activeTab.value!.session.ui.editingFunction).toEqual({
+      defName: "greet",
+      type: "def",
+    });
+    // And it is still unsaved work, so ⌘W and ⌘Q will both stop for it.
+    expect(tabBufferUnsaved(activeTab.value!)).toBe(true);
+    // A toast, not a Problem: the author just pressed a button and is looking at the surface it
+    // Failed to close. The durable half of the fact is the buffer itself, which now reports the
+    // Work honestly to every close gate; a Problems row would outlive the freeze it describes.
+    expect(toasts.some((t) => t.key === "logic.close-refused")).toBe(true);
+  });
+
+  /**
+   * The debounce's half of the same fact. Nothing here is destroyed, so there is nothing to keep —
+   * but settling the buffer would have told every close gate the document had the text.
+   */
+  test("a refused debounce does not settle the buffer", async () => {
+    setEditing({ defName: "greet", type: "def" });
+    await paintLogic();
+    const tab = activeTab.value!;
+
+    setTransactGate(() => "source-canonical");
+    try {
+      created.at(-1)!.type("return 42;");
+      await commitTabBuffers(tab);
+    } finally {
+      setTransactGate(null);
+    }
+
+    expect((tab.doc.document.state as any).greet.body).toBe("return 1;");
+    expect(tabBufferUnsaved(tab)).toBe(true);
+
+    // And the moment the freeze lifts, the same buffer commits normally.
+    created.at(-1)!.type("return 43;");
+    await commitTabBuffers(tab);
+    expect((tab.doc.document.state as any).greet.body).toBe("return 43;");
+    expect(tabBufferUnsaved(tab)).toBe(false);
   });
 
   test("is a no-op with no target, and clears the target when no editor was mounted", async () => {

@@ -467,10 +467,16 @@ describe("the old dispatch — twelve modifier chords", () => {
     expect(openQuickSearch).toHaveBeenCalledTimes(1);
   });
 
-  test('⌘W closes a clean tab when several are open (`case "w"`)', () => {
+  /* AWAITED, and every ⌘W below it too. `requestClose` flushes the tab's Monaco buffers before it
+     reads `dirty`, and `commitTabBuffers` is now unconditionally async — the union it used to
+     return existed to spare a clean tab one microtask, which no author can perceive and which cost
+     every caller a three-line `if (committing) await committing;` dance. `flush()` is one turn of
+     the same pump these tests already use for the dialog. */
+  test('⌘W closes a clean tab when several are open (`case "w"`)', async () => {
     openTab({ document: { tagName: "div" }, id: "second-tab" });
     expect(workspace.activeTabId).toBe("second-tab");
     pressDoc("w", { ctrlKey: true });
+    await flush();
     expect(workspace.tabOrder).toEqual(["test-tab"]);
   });
 
@@ -732,9 +738,10 @@ describe("the old dispatch — the three blanket guards", () => {
       assert();
     });
 
-    test("⌘W still closes the document", () => {
+    test("⌘W still closes the document", async () => {
       openTab({ document: { tagName: "div" }, id: "second-tab" });
       pressDoc("w", { ctrlKey: true });
+      await flush();
       expect(workspace.tabOrder).toEqual(["test-tab"]);
     });
 
@@ -850,9 +857,10 @@ describe("the old dispatch — Preview refuses to edit", () => {
 describe("deliberate divergences", () => {
   /* 1. THE NAMED FIX. `shortcuts.ts:192` refused to close the last tab; `tab-strip.ts:182`'s ×
         closed it happily. One record now, and it is the ×'s behaviour. */
-  test("⌘W closes the last remaining document, as the tab's × always did", () => {
+  test("⌘W closes the last remaining document, as the tab's × always did", async () => {
     expect(workspace.tabOrder).toEqual(["test-tab"]);
     pressDoc("w", { ctrlKey: true });
+    await flush();
     expect(workspace.tabOrder).toEqual([]);
   });
 
@@ -893,10 +901,11 @@ describe("deliberate divergences", () => {
     expect(openProject).toHaveBeenCalledTimes(1);
   });
 
-  test("⌘W from a text field closes the document instead of being eaten", () => {
+  test("⌘W from a text field closes the document instead of being eaten", async () => {
     openTab({ document: { tagName: "div" }, id: "second-tab" });
     focusTextField();
     pressDoc("w", { ctrlKey: true });
+    await flush();
     expect(workspace.tabOrder).toEqual(["test-tab"]);
   });
 

@@ -2,13 +2,20 @@
  * The one rule both Monaco surfaces owe (`services/monaco-buffer.ts`).
  *
  * Studio has two Monaco editors, mounted by different modules and torn down by different events,
- * and each of the five writes into or out of them had grown its own guard. All five asked identity
- * — "is this still the same editor object?" — which is a different question from "has the buffer
- * moved on?", and is passed by a repaint into a live editor mid-word. These tests pin the four
- * clauses of the shared predicate in isolation; `tests/editors.test.ts` and
- * `tests/canvas-render.test.ts` pin what each call site does with the answer.
+ * and each of the FOUR writes INTO them had grown its own guard. (Four is the count of write sites,
+ * which is the module header's rule and the only count kept anywhere: writes OUT are the two
+ * debounced commits, and they ask `bufferIsLive` instead.) All four asked identity — "is this still
+ * the same editor object?" — which is a different question from "has the buffer moved on?", and is
+ * passed by a repaint into a live editor mid-word. A co-edited tab has a FIFTH writer (y-monaco,
+ * writing peers' keystrokes into the model) which asked nothing at all, because it does not know
+ * this module exists.
+ *
+ * These tests pin the five clauses of the shared predicate in isolation, plus the two questions a
+ * TAB asks of its buffers when it is about to be destroyed; `tests/editors.test.ts`,
+ * `tests/canvas-render.test.ts`, `tests/tab-strip.test.ts` and `tests/studio-shell.test.ts` pin
+ * what each call site does with the answer.
  */
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   BUFFER_COMMIT,
   bufferIsLive,
@@ -16,8 +23,13 @@ import {
   bufferWrites,
   cancelBufferWrites,
   commitBufferWrites,
+  commitTabBuffers,
+  tabBufferUnsaved,
 } from "../src/services/monaco-buffer";
 import type { MonacoBuffer } from "../src/services/monaco-buffer";
+import { view } from "../src/view";
+import { problems, resetNotifications } from "../src/services/notify";
+import type { Tab } from "../src/tabs/tab";
 
 const sleep = (ms: number) =>
   new Promise((resolve) => {
@@ -118,6 +130,71 @@ describe("bufferMovedOn", () => {
     const buffer = fakeBuffer("typed since");
     expect(bufferMovedOn(buffer, "what I sent")).toBe(true);
   });
+
+  /**
+   * Clause 5 is the one that is not "the buffer moved on" — it is "the buffer is not yours".
+   *
+   * A co-edited source buffer is bound to a shared `Y.Text`: peers' keystrokes arrive in it saying
+   * nothing, and anything written into it is PUBLISHED to every peer. Clause 3 could not stand in
+   * for this. `ahead` is cleared by any `markSettled`, and a fact that a future writer can switch
+   * off is not a lock; the CRDT owns this text for the whole life of the binding.
+   */
+  test("clause 5 — a buffer bound to a shared text refuses every write, permanently", () => {
+    const buffer = fakeBuffer();
+    const writes = bufferWrites(buffer);
+    expect(bufferMovedOn(buffer)).toBe(false);
+
+    writes.markShared();
+    expect(writes.shared()).toBe(true);
+    expect(bufferMovedOn(buffer)).toBe(true);
+    // Even for a caller holding exactly the text the buffer holds, and even after a settle.
+    expect(bufferMovedOn(buffer, "hello")).toBe(true);
+    writes.markSettled();
+    expect(bufferMovedOn(buffer)).toBe(true);
+  });
+});
+
+/**
+ * AHEAD IS NOT UNSAVED, and the gates that destroy a tab need the narrower fact.
+ *
+ * Both are "the buffer holds text the document has not been given", and only one of them is work a
+ * close would destroy. Format-on-open pretty-prints into the buffer and deliberately never commits;
+ * since `closeFunctionEditor` writes a MINIFIED body, that difference lasts as long as the editor
+ * is open. Reading `ahead()` at the quit gate would therefore prompt "you have unsaved changes" at
+ * every author who merely opened a handler and typed nothing.
+ */
+describe("typed", () => {
+  test("a keystroke is both ahead and typed; format-on-open is only ahead", () => {
+    const formatted = bufferWrites(fakeBuffer());
+    formatted.markAhead();
+    expect(formatted.ahead()).toBe(true);
+    expect(formatted.typed()).toBe(false);
+
+    const keyed = bufferWrites(fakeBuffer());
+    keyed.markTyped();
+    expect(keyed.ahead()).toBe(true);
+    expect(keyed.typed()).toBe(true);
+  });
+
+  test("the commit settles both — the document now holds what the buffer holds", () => {
+    const writes = bufferWrites(fakeBuffer());
+    writes.markTyped();
+    writes.markSettled();
+    expect(writes.ahead()).toBe(false);
+    expect(writes.typed()).toBe(false);
+  });
+
+  test("a commit that could NOT land leaves the typing declared", () => {
+    // What the source view does with unparseable text: it keeps the buffer rather than resyncing
+    // Over a half-typed heading, and deliberately does not settle. That text exists nowhere else.
+    const writes = bufferWrites(fakeBuffer());
+    writes.markTyped();
+    writes.arm(BUFFER_COMMIT, 500, () => {
+      /* The parse throws, so nothing settles. */
+    });
+    void writes.flush(BUFFER_COMMIT);
+    expect(writes.typed()).toBe(true);
+  });
 });
 
 describe("bufferWrites", () => {
@@ -125,13 +202,13 @@ describe("bufferWrites", () => {
     const buffer = fakeBuffer();
     const writes = bufferWrites(buffer);
     const ran: string[] = [];
-    writes.arm(BUFFER_COMMIT, 10, () => ran.push("first"));
-    writes.arm(BUFFER_COMMIT, 10, () => ran.push("second"));
+    writes.arm(BUFFER_COMMIT, 10, () => void ran.push("first"));
+    writes.arm(BUFFER_COMMIT, 10, () => void ran.push("second"));
     await sleep(40);
     expect(ran).toEqual(["second"]);
     // A fired timer leaves nothing to flush — the key is dropped before the body runs, so a
     // Teardown arriving during the commit cannot run it a second time.
-    writes.flush(BUFFER_COMMIT);
+    void writes.flush(BUFFER_COMMIT);
     expect(ran).toEqual(["second"]);
   });
 
@@ -139,13 +216,13 @@ describe("bufferWrites", () => {
     const buffer = fakeBuffer();
     const writes = bufferWrites(buffer);
     const ran: string[] = [];
-    writes.arm(BUFFER_COMMIT, 10, () => ran.push("commit"));
-    writes.arm("lint", 15, () => ran.push("lint"));
+    writes.arm(BUFFER_COMMIT, 10, () => void ran.push("commit"));
+    writes.arm("lint", 15, () => void ran.push("lint"));
     writes.cancel();
     await sleep(40);
     expect(ran).toEqual([]);
     // Cancelled means gone, not merely un-timed: a later flush has nothing to find.
-    writes.flush(BUFFER_COMMIT);
+    void writes.flush(BUFFER_COMMIT);
     expect(ran).toEqual([]);
   });
 
@@ -154,7 +231,7 @@ describe("bufferWrites", () => {
     const writes = bufferWrites(buffer);
     expect(buffer._writes).toBe(writes);
     const ran: string[] = [];
-    writes.arm(BUFFER_COMMIT, 10, () => ran.push("commit"));
+    writes.arm(BUFFER_COMMIT, 10, () => void ran.push("commit"));
     cancelBufferWrites(buffer);
     await sleep(40);
     expect(ran).toEqual([]);
@@ -164,16 +241,16 @@ describe("bufferWrites", () => {
     const buffer = fakeBuffer();
     const writes = bufferWrites(buffer);
     const ran: string[] = [];
-    writes.arm(BUFFER_COMMIT, 500, () => ran.push("commit"));
-    writes.arm("lint", 750, () => ran.push("lint"));
+    writes.arm(BUFFER_COMMIT, 500, () => void ran.push("commit"));
+    writes.arm("lint", 750, () => void ran.push("lint"));
 
-    writes.flush(BUFFER_COMMIT);
+    void writes.flush(BUFFER_COMMIT);
     expect(ran).toEqual(["commit"]);
 
     // And the timer it just ran is gone, so it does not also fire on its own schedule.
     await sleep(40);
     expect(ran).toEqual(["commit"]);
-    writes.flush("nothing-armed-here");
+    void writes.flush("nothing-armed-here");
     expect(ran).toEqual(["commit"]);
   });
 });
@@ -193,8 +270,8 @@ describe("commitBufferWrites", () => {
     const writes = bufferWrites(buffer);
     const written: string[] = [];
     const linted: string[] = [];
-    writes.arm(BUFFER_COMMIT, 500, () => written.push(buffer.getValue()));
-    writes.arm("lint", 750, () => linted.push(buffer.getValue()));
+    writes.arm(BUFFER_COMMIT, 500, () => void written.push(buffer.getValue()));
+    writes.arm("lint", 750, () => void linted.push(buffer.getValue()));
 
     commitBufferWrites(buffer);
     buffer.dispose();
@@ -204,7 +281,7 @@ describe("commitBufferWrites", () => {
     // The lint did not. A round trip started for an editor being disposed answers to nobody.
     expect(linted).toEqual([]);
     // And nothing is left armed to fire afterwards.
-    writes.flush(BUFFER_COMMIT);
+    void writes.flush(BUFFER_COMMIT);
     expect(written).toEqual(["return 42;"]);
   });
 
@@ -225,5 +302,230 @@ describe("cancelBufferWrites", () => {
     expect(() => cancelBufferWrites(null)).not.toThrow();
     expect(() => cancelBufferWrites(nothing)).not.toThrow();
     expect(() => cancelBufferWrites(fakeBuffer())).not.toThrow();
+  });
+});
+
+/**
+ * THE TAB'S BUFFERS, asked as one question.
+ *
+ * The two gates that destroy a tab — `requestClose` (⌘W and the ×) and `hasUnsavedTabs`
+ * (`beforeunload`) — must not each learn about two editors, and until now they could not have: the
+ * dock's editor named its tab on the instance, the source view named its tab only inside a closure,
+ * so "is this buffer this tab's?" was a question one surface could answer and the other could not.
+ */
+const tabA = { id: "a" } as unknown as Tab;
+const tabB = { id: "b" } as unknown as Tab;
+
+/** A buffer mounted for `tab`, with a commit armed that writes `value` into `landed`. */
+function mountedBuffer(tab: Tab | null, value: string, landed: string[], ms = 500) {
+  const buffer = fakeBuffer(value) as ReturnType<typeof fakeBuffer> & { _editingTab?: Tab | null };
+  buffer._editingTab = tab;
+  const writes = bufferWrites(buffer);
+  writes.markTyped();
+  writes.arm(BUFFER_COMMIT, ms, () => {
+    landed.push(buffer.getValue());
+    writes.markSettled();
+  });
+  return buffer;
+}
+
+afterEach(() => {
+  view.monacoEditor = null;
+  view.functionEditor = null;
+});
+
+describe("commitTabBuffers", () => {
+  test("runs the armed commit of every buffer mounted for the tab", async () => {
+    const landed: string[] = [];
+    view.functionEditor = mountedBuffer(tabA, "return typed();", landed) as never;
+    view.monacoEditor = mountedBuffer(tabA, "# Never saved", landed) as never;
+
+    await commitTabBuffers(tabA);
+
+    expect(landed.toSorted()).toEqual(["# Never saved", "return typed();"]);
+    expect(tabBufferUnsaved(tabA)).toBe(false);
+  });
+
+  test("and no other tab's — a × on one chip is not a commit for the strip", async () => {
+    const landed: string[] = [];
+    view.functionEditor = mountedBuffer(tabB, "b's handler", landed) as never;
+    await commitTabBuffers(tabA);
+    expect(landed).toEqual([]);
+    expect(tabBufferUnsaved(tabA)).toBe(false);
+    expect(tabBufferUnsaved(tabB)).toBe(true);
+  });
+
+  /* The close asks its question on the very next line, so a commit that is still parsing has not
+     answered yet. The source view's is exactly that: it awaits the format host before it assigns. */
+  test("waits for an async commit before returning", async () => {
+    const landed: string[] = [];
+    const buffer = fakeBuffer("# Never saved") as ReturnType<typeof fakeBuffer> & {
+      _editingTab?: Tab | null;
+    };
+    buffer._editingTab = tabA;
+    const writes = bufferWrites(buffer);
+    writes.markTyped();
+    writes.arm(BUFFER_COMMIT, 600, async () => {
+      const text = buffer.getValue();
+      await sleep(10);
+      landed.push(text);
+      writes.markSettled();
+    });
+    view.monacoEditor = buffer as never;
+
+    await commitTabBuffers(tabA);
+    expect(landed).toEqual(["# Never saved"]);
+  });
+
+  test("leaves everything else armed — the tab may survive the prompt it just caused", async () => {
+    const landed: string[] = [];
+    const buffer = mountedBuffer(tabA, "typed", landed);
+    const linted: string[] = [];
+    buffer._writes!.arm("lint", 10, () => void linted.push("lint"));
+
+    await commitTabBuffers(tabA);
+    await sleep(40);
+    // Cancel-after-flush is a DISPOSER's order. Cancel here and an author who pressed Keep Editing
+    // Would be left in a buffer whose lint never arrives.
+    expect(linted).toEqual(["lint"]);
+  });
+
+  test("a disposed buffer is never read, and an unmounted surface is never asked", async () => {
+    const landed: string[] = [];
+    const buffer = mountedBuffer(tabA, "return 1;", landed);
+    buffer.dispose();
+    view.functionEditor = buffer as never;
+    await commitTabBuffers(tabA);
+    // Clause 1: a detached model answers `""`, so reading it is the deletion the flush prevents.
+    expect(landed).toEqual([]);
+    expect(tabBufferUnsaved(tabA)).toBe(false);
+
+    view.functionEditor = null;
+    view.monacoEditor = null;
+    await commitTabBuffers(tabA);
+    expect(tabBufferUnsaved(tabA)).toBe(false);
+  });
+
+  /**
+   * TWO SURFACES ON ONE TAB, and their two commits are not independent.
+   *
+   * The dock's Logic editor is not a canvas mode, so a handler body and the page source are
+   * editable side by side. Their commits write at different granularities: the dock's puts ONE body
+   * at `editing.path`; the source view's parses the whole buffer and assigns a whole new
+   * `tab.doc.document`, built from text that predates the dock's write. Started together, the
+   * synchronous body write lands first and the parse replaces the entire tree on top of it — so the
+   * body the author just typed is gone, with `dirty` set and nothing saying what went missing.
+   *
+   * Two independent timers could already race this either way. Flushing them in one turn makes the
+   * loser certain, so the turn has to pick the survivable order: `bodyWriter` re-reads
+   * `tab.doc.document` and re-resolves `editing.path` at call time, so a body write applied AFTER a
+   * document replacement lands on the new tree. The reverse recovers nothing.
+   */
+  test("the source's whole-document assign lands BEFORE the dock's body write", async () => {
+    const landed: string[] = [];
+    const source = fakeBuffer("# the page") as ReturnType<typeof fakeBuffer> & {
+      _editingTab?: Tab | null;
+    };
+    source._editingTab = tabA;
+    const writes = bufferWrites(source);
+    writes.markTyped();
+    writes.arm(BUFFER_COMMIT, 600, async () => {
+      const text = source.getValue();
+      await sleep(10); // The format host.
+      landed.push(`document := ${text}`);
+      writes.markSettled();
+    });
+    view.monacoEditor = source as never;
+    view.functionEditor = mountedBuffer(tabA, "typed();", landed) as never;
+
+    await commitTabBuffers(tabA);
+
+    expect(landed).toEqual(["document := # the page", "typed();"]);
+  });
+
+  /* And the ordering opens its own hole: the list was taken before the first commit's await, and
+     assigning a document repaints the dock — which can dispose the function editor inside it. */
+  test("a buffer disposed by the commit before it is never read", async () => {
+    const landed: string[] = [];
+    const dock = mountedBuffer(tabA, "typed();", landed);
+    const source = fakeBuffer("# the page") as ReturnType<typeof fakeBuffer> & {
+      _editingTab?: Tab | null;
+    };
+    source._editingTab = tabA;
+    const writes = bufferWrites(source);
+    writes.markTyped();
+    writes.arm(BUFFER_COMMIT, 600, async () => {
+      await sleep(10);
+      dock.dispose();
+    });
+    view.monacoEditor = source as never;
+    view.functionEditor = dock as never;
+
+    await commitTabBuffers(tabA);
+    // A detached model answers `""`, and committing that is the deletion the flush exists to stop.
+    expect(landed).toEqual([]);
+  });
+
+  /**
+   * A COMMIT THAT THROWS MUST NOT SWALLOW THE GESTURE.
+   *
+   * `requestClose` awaits this before it asks anything, and a rejection propagated straight out of
+   * an `async` function nobody awaits: ⌘W did nothing — no prompt, no close, no message, an
+   * unhandled rejection in the console. The other two callers do not even await it, so a rejection
+   * there is invisible by construction.
+   *
+   * And a commit is not all-or-nothing: the source view writes a whole document and the dock writes
+   * one body, so the first one throwing must not cost the second its turn.
+   */
+  test("a commit that throws is reported, and the other buffer still commits", async () => {
+    resetNotifications();
+    const landed: string[] = [];
+    const source = fakeBuffer("# the page") as ReturnType<typeof fakeBuffer> & {
+      _editingTab?: Tab | null;
+    };
+    source._editingTab = tabA;
+    const writes = bufferWrites(source);
+    writes.markTyped();
+    writes.arm(BUFFER_COMMIT, 600, async () => {
+      await sleep(5);
+      throw new Error("the format host is down");
+    });
+    view.monacoEditor = source as never;
+    view.functionEditor = mountedBuffer(tabA, "typed();", landed) as never;
+
+    // It resolves rather than rejecting, which is what keeps ⌘W a gesture that does something.
+    await commitTabBuffers(tabA);
+
+    expect(landed).toEqual(["typed();"]);
+    // The failure is a Problem, not a toast: an author reading it minutes later still needs to
+    // Know one document's editor holds text the file does not.
+    const problem = problems.find((p) => p.key === `buffer-commit:${tabA.id}`);
+    expect(problem?.tier).toBe("problem");
+    expect(problem?.detail).toContain("the format host is down");
+    // And the buffer never settled, so every close gate still sees the work.
+    expect(source._writes!.typed()).toBe(true);
+    expect(tabBufferUnsaved(tabA)).toBe(true);
+  });
+
+  test("a buffer that names no tab belongs to no tab", async () => {
+    const landed: string[] = [];
+    view.monacoEditor = mountedBuffer(null, "orphan", landed) as never;
+    await commitTabBuffers(tabA);
+    expect(landed).toEqual([]);
+    expect(tabBufferUnsaved(tabA)).toBe(false);
+  });
+});
+
+describe("tabBufferUnsaved", () => {
+  test("is the author's own typing, not a buffer that is merely ahead", () => {
+    const formatted = fakeBuffer("return 1;\n") as ReturnType<typeof fakeBuffer> & {
+      _editingTab?: Tab | null;
+    };
+    formatted._editingTab = tabA;
+    bufferWrites(formatted).markAhead();
+    view.functionEditor = formatted as never;
+    // Format-on-open, against a body `closeFunctionEditor` minified: ahead for as long as the
+    // Editor is open, and nothing an author loses. Quitting must not stop to ask about it.
+    expect(tabBufferUnsaved(tabA)).toBe(false);
   });
 });

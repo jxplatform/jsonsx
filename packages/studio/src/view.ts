@@ -31,6 +31,16 @@ type MonacoSurface = editor.IStandaloneCodeEditor & {
   _ignoreNextChange?: boolean;
   /** The debounced work armed over this buffer, with this editor's exact lifetime. */
   _writes?: BufferWrites;
+  /**
+   * The tab this buffer was mounted for. ONE spelling for both surfaces, because "whose buffer is
+   * this?" is a question the close path asks of a tab, not of an editor it happens to know about.
+   *
+   * It was the function editor's alone, and the source view kept the same fact in a closure inside
+   * `mountSourceEditor` — reachable from nowhere. `services/monaco-buffer.ts`'s `commitTabBuffers`
+   * and `tabBufferUnsaved` have to ask both, and a question only one surface can answer is the
+   * reason ⌘W could close a source tab over the last 600ms of typing without a word.
+   */
+  _editingTab?: Tab | null;
 };
 
 interface ViewState {
@@ -46,19 +56,23 @@ interface ViewState {
    *
    * The target string alone was not an answer. `{"eventKey":"onclick","path":["children",0],"type":
    * "event"}` is the SAME string for the first button on any two pages, so a re-sync could match
-   * across a tab switch and hand one document's buffer to another. `_editingTab` is the missing
-   * half, held by identity rather than by id so a commit can ask `tabIsLive` whether the document
-   * it was promised to still exists.
+   * across a tab switch and hand one document's buffer to another. `_editingTab` (on every Monaco
+   * surface, above) is the missing half, held by identity rather than by id so a commit can ask
+   * `tabIsLive` whether the document it was promised to still exists.
    *
    * `_commitBody` is the one writer for both of them: a closure built at mount over that tab and
    * that target, so the debounce and the Close cannot disagree about where a body goes — and
    * neither can resolve it through whichever tab happens to be focused when they run.
+   *
+   * **It answers whether the body LANDED.** `transactDoc` can refuse a write outright (the collab
+   * source-canonical freeze pauses structural edits for everyone, the lock holder included), and a
+   * writer that reported nothing let the Close dispose an editor whose text had gone nowhere. The
+   * boolean is what lets the caller keep the surface up instead.
    */
   functionEditor:
     | (MonacoSurface & {
         _editingTarget?: string | null;
-        _editingTab?: Tab | null;
-        _commitBody?: (body: string) => void;
+        _commitBody?: (body: string) => boolean;
       })
     | null;
   blockActionBarEl: HTMLElement | null;

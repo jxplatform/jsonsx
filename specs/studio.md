@@ -195,6 +195,15 @@ tall as its document never scrolls, so `position: sticky`, scroll-driven animati
 `IntersectionObserver` reveals can never fire. Preview therefore mounts ONE frame at the pane's own
 size, which scrolls its own document. It has no zoom control and no pan.
 
+**Source is batched, so every way out of it settles first.** Parsing the buffer back into the
+document is debounced, which means at any instant the editor may hold text the document has not
+received. Leaving the mode, changing tab, switching pane, closing the tab and quitting all commit
+that text before they proceed — a teardown that merely cancelled the pending parse would discard the
+author's last keystrokes, and cancel it silently, because `dirty` had never been set. Text that
+cannot be parsed stays in the buffer and still counts as unsaved: the author is never made to choose
+between a broken document and the line they were writing. The same rule governs the Logic tab's
+function editor (§16.3), for the same reason and through the same mechanism.
+
 **Following a link in Preview leaves the canvas.** Editable modes de-link anchors — the runtime stamps
 `href` onto `data-jx-href`, so a click selects the element instead of navigating. Preview keeps them
 live, where a click would navigate the canvas iframe and destroy the render along with the editing

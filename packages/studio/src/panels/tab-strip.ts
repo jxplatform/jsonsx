@@ -55,6 +55,7 @@ import { collabReadOnly } from "../collab/collab-session";
 import { collabState } from "../collab/collab-state";
 import { rectOf } from "../utils/geometry";
 import { resolveRegion } from "../ui/regions";
+import { commitTabBuffers, tabBufferUnsaved } from "../services/monaco-buffer";
 import type { EffectScope } from "@vue/reactivity";
 
 /**
@@ -835,10 +836,16 @@ export function tabLabel(tab: Tab): string {
  * (no other peer is focused on its path). When peers remain, the shared session lives on and the
  * edits are still on the server, so closing is safe.
  *
+ * **`dirty` is not the whole question, because a Monaco buffer can hold work the document has never
+ * received.** `requestClose` flushes the armed commit before asking, so ordinary typing IS dirty by
+ * the time we get here — but a commit is allowed to fail to land (unparseable source keeps the
+ * buffer rather than resyncing over a half-typed heading), and that text exists nowhere else.
+ * {@link tabBufferUnsaved} is that residue, and it is the user's own typing by construction.
+ *
  * @param {Tab} tab
  */
 export function shouldWarnOnClose(tab: Tab): boolean {
-  if (!tab.doc.dirty) {
+  if (!tab.doc.dirty && !tabBufferUnsaved(tab)) {
     return false;
   }
   const state = collabState(tab);
@@ -856,22 +863,55 @@ export function shouldWarnOnClose(tab: Tab): boolean {
 }
 
 /**
+ * Why a save is not one of the ways out of this tab, or `null` when it is.
+ *
+ * §14.7: a dialog may not offer an answer the app cannot honour. Two states make "Save" a button
+ * that would run and still not write what is on screen, and they are different sentences because
+ * they are different situations to be in.
+ *
+ * **The buffer case is the one that was being got wrong.** `requestClose` commits every buffer
+ * before it asks anything, so by the time this runs a `typed()` buffer means the commit could not
+ * land: unparseable source deliberately keeps the buffer rather than resyncing over a half-typed
+ * heading, the collab freeze refuses the dock's body write outright, and a commit that threw is
+ * reported and stepped over. In every one of those the document does not contain the text the
+ * author is looking at — so `saveFile` would write the file WITHOUT it, stamp "Saved just now", and
+ * close the tab. The prompt appeared, the author chose the careful answer, and the work went
+ * anyway.
+ */
+function saveUnavailableReason(tab: Tab): string | null {
+  if (collabReadOnly(tab)) {
+    return (
+      `You have read access to this session, so "${tabLabel(tab)}" has changes that were never ` +
+      `published and have nowhere to be saved. Closing discards them.`
+    );
+  }
+  if (tabBufferUnsaved(tab)) {
+    return (
+      `"${tabLabel(tab)}" has text in its editor that the document could not be given — the ` +
+      `source does not parse, or a collaborator holds the source lock. Saving would write the ` +
+      `file without it, so it is not offered. Closing discards that text.`
+    );
+  }
+  return null;
+}
+
+/**
  * Ask what to do about a tab that is about to close over unsaved work. True means go ahead.
  *
  * **Two dialogs, because there are two situations and only one of them has three answers.** Save /
- * Discard / Cancel is right when a save would do something. For a read-only collaborator it would
- * not: the edits never left the browser, `saveFile` refuses the tab outright, and offering the
- * button anyway would put a control that cannot work on the one dialog whose entire job is to be
- * trusted about unsaved work. That case gets the honest pair — discard, or keep editing.
+ * Discard / Cancel is right when a save would do something. When it would not — see
+ * {@link saveUnavailableReason} — offering the button anyway would put a control that cannot work
+ * on the one dialog whose entire job is to be trusted about unsaved work. Those cases get the
+ * honest pair: discard, or keep editing.
  */
 async function confirmClose(tab: Tab): Promise<boolean> {
-  if (collabReadOnly(tab)) {
-    return showConfirmDialog(
-      "Changes Cannot Be Saved",
-      `You have read access to this session, so "${tabLabel(tab)}" has changes that were never ` +
-        `published and have nowhere to be saved. Closing discards them.`,
-      { cancelLabel: "Keep Editing", confirmLabel: "Close Without Saving", destructive: true },
-    );
+  const cannotSave = saveUnavailableReason(tab);
+  if (cannotSave) {
+    return showConfirmDialog("Changes Cannot Be Saved", cannotSave, {
+      cancelLabel: "Keep Editing",
+      confirmLabel: "Close Without Saving",
+      destructive: true,
+    });
   }
   const answer = await showSaveDiscardDialog(
     "Unsaved Changes",
@@ -913,8 +953,100 @@ export async function requestClose(id: string) {
   if (!tab) {
     return;
   }
+  /* THE CLOSE IS A WRITE BEFORE IT IS A QUESTION.
+     Both unsaved-work gates read `tab.doc.dirty`, and a Monaco buffer's armed commit has not
+     dirtied anything yet — so typing the last character of a handler and pressing ⌘W closed the tab
+     with no prompt and took the last 500ms (dock) / 600ms (source) of typing with it. A disposer
+     cannot cover this: `closeTab` below deletes the tab first, and every commit checks `tabIsLive`
+     precisely so it will not write into a tab nobody can read.
+     The source view's commit parses through the format host before it assigns, and the next line
+     reads the result, so this is awaited. */
+  await commitTabBuffers(tab);
+  /* AND THE TAB MAY BE GONE, because that await is a window and everything below acts on `tab`.
+     `closeAllTabs` (project switch, project close) and the preview slot's replacement both destroy
+     a tab synchronously from an event this close is not ordered against, so the flush's own
+     duration is enough. Everything below is then addressed to a tab nobody can see: the freeze is a
+     prompt about a document that is no longer on screen, and `saveFile(tab)` on its Save button is
+     a WRITE — of `tab.documentPath`, which is project-relative, through a `platform.projectRoot`
+     that the project switch has already moved. The old project's document, written into the new
+     project, at the same relative path.
+     Re-read by id rather than trusting the captured object: identity survives destruction, and
+     membership of `workspace.tabs` is the fact `tabIsLive` is defined as. */
+  if (!workspace.tabs.has(id)) {
+    return;
+  }
   if (shouldWarnOnClose(tab) && !(await confirmClose(tab))) {
     return;
   }
   closeTab(id);
+}
+
+/**
+ * Ask about EVERY open tab at once, before something destroys them all. True means go ahead.
+ *
+ * `workspace.closeAllTabs()` disposes the lot with no gate of any kind, and one caller reaches it
+ * from a gesture that loses work: activating another project. Every dirty document went, silently,
+ * with no dialog anywhere on the path. It was the last unguarded destroyer in the matrix — ⌘W, the
+ * ×, quitting and the preview slot's replacement each acquired one, and this one predates them
+ * all.
+ *
+ * **One prompt, not N.** A project switch is a single decision; walking the author through six
+ * dialogs to make it is how a prompt becomes something to click past. The count is in the sentence
+ * instead, because "3 documents have unsaved changes" is the fact that decides the answer.
+ *
+ * **The same three rules as {@link confirmClose}, applied to the set.** {@link shouldWarnOnClose}
+ * is the one definition of "closing this loses work" — it already knows about collab peers who
+ * still hold the room, read-only sessions and buffers the document never received — so the set is
+ * whatever it says yes to. And Save is offered only if it can be honoured for EVERY one of them:
+ * one un-saveable document in the set (§14.7 again) makes "Save" a button that would leave work
+ * behind while reporting success, so the whole prompt drops to the honest pair.
+ *
+ * **A failed save cancels the switch.** Same reason as the single-tab close: an author who watched
+ * a write fail must not then watch the document be discarded because they had asked to save it.
+ *
+ * @param {string} action What the confirmation is for, e.g. "Opening another project".
+ * @returns {Promise<boolean>} True to proceed with the destruction.
+ */
+export async function confirmCloseAll(action: string): Promise<boolean> {
+  // The close is a write before it is a question, for a set exactly as for one tab. At most two
+  // Monaco buffers are mounted app-wide, so this is a no-op for every tab but theirs. Snapshotted,
+  // Because each commit is an await and the map is live.
+  const open = [...workspace.tabs.values()];
+  for (const tab of open) {
+    await commitTabBuffers(tab);
+  }
+  const unsaved = [...workspace.tabs.values()].filter((tab) => shouldWarnOnClose(tab));
+  if (unsaved.length === 0) {
+    return true;
+  }
+  const count =
+    unsaved.length === 1
+      ? `"${tabLabel(unsaved[0]!)}" has unsaved changes`
+      : `${unsaved.length} documents have unsaved changes`;
+  const blocked = unsaved.find((tab) => saveUnavailableReason(tab) !== null);
+  if (blocked) {
+    return showConfirmDialog(
+      "Changes Cannot Be Saved",
+      `${action} closes every open document, and ${count}. "${tabLabel(blocked)}" cannot be ` +
+        `saved at all, so saving would leave work behind. Closing discards it.`,
+      { cancelLabel: "Keep Editing", confirmLabel: "Close Without Saving", destructive: true },
+    );
+  }
+  const answer = await showSaveDiscardDialog(
+    "Unsaved Changes",
+    `${action} closes every open document, and ${count}.`,
+    { discardLabel: "Close Without Saving", saveLabel: "Save All" },
+  );
+  if (answer === "cancel") {
+    return false;
+  }
+  if (answer === "discard") {
+    return true;
+  }
+  for (const tab of unsaved) {
+    if (!(await saveFile(tab))) {
+      return false;
+    }
+  }
+  return true;
 }

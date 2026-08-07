@@ -115,25 +115,27 @@ export function initCanvasRender(ctx: CanvasRenderCtx) {
   _ctx = ctx;
 }
 
-/** Monaco language for the source view of a tab's document. */
+/**
+ * Monaco language for the source view of a tab's document.
+ *
+ * A document tab is a format tab or it is JSON — every opener (`files.ts`, `file-ops.ts`, the
+ * project-URL path in `studio.ts`) refuses an extension no format class claims, with
+ * `noFormatError`. This used to answer `"javascript"` for a `.js` path, which no tab can have, and
+ * the language flowed on into a source commit that marked such a tab dirty for text the document
+ * cannot hold.
+ */
 function sourceLang(tab: Tab) {
   const format = formatByName(tab.doc.sourceFormat);
-  if (format) {
-    return format.mediaType?.split("/").pop() ?? "plaintext";
-  }
-  return (tab.documentPath || "").endsWith(".js") ? "javascript" : "json";
+  return format ? (format.mediaType?.split("/").pop() ?? "plaintext") : "json";
 }
 
 /**
  * The full source text for the source view. Format-class files serialize to their on-disk form
  * (e.g. frontmatter YAML plus the body for markdown), not just the JSON of the body tree.
  */
-async function sourceContent(tab: Tab, lang: string) {
+async function sourceContent(tab: Tab) {
   if (formatByName(tab.doc.sourceFormat)) {
     return serializeDocument(tab);
-  }
-  if (lang === "javascript") {
-    return tab.doc.document?.toString?.() || "";
   }
   return JSON.stringify(tab.doc.document, null, 2);
 }
@@ -416,6 +418,10 @@ async function mountSourceEditor(
       .then(async () => {
         const editor = view.monacoEditor;
         if (!editor || editor.getModel() !== model) {
+          // The lock was taken FOR a surface that is no longer here, and `leave()` reaches this
+          // Mount from exactly one place: the cleanup below, which this path never gets. See the
+          // Catch for what a lock nobody releases now costs.
+          collabCtx.leave();
           return;
         }
         const cleanup = await createSourceCollabBinding(model, editor, collabCtx);
@@ -425,15 +431,39 @@ async function mountSourceEditor(
           return;
         }
         sourceCollabCleanup = cleanup;
+        /* AND THE BUFFER SAYS SO, because from this instant it is not ours.
+           The binding is two-way: peers' keystrokes arrive in the model with nothing declared, and
+           anything WE write into the model is published to all of them. The repaint's fast path
+           below would happily serialize the structure tree over it — and the structure tree is what
+           the source reconciler PARSED OUT of this same shared text, so every round trip that is
+           not byte-stable was a whole-document replace pushed to every peer, on every repaint, with
+           `hasTextFocus()` protecting only the person currently typing. Clause 5 refuses it. */
+        editor._writes?.markShared();
         if (collabCtx.readOnly) {
           editor.updateOptions({ readOnly: true });
         }
       })
       .catch(() => {
-        // Binding failures degrade to a read-only-ish local buffer; the session stays live.
+        /* A BINDING FAILURE HOLDS A LOCK AND CARRIES NOTHING, and both halves have to be said.
+           `enter()` flips the room's canonical lock to "source" before y-monaco is even imported,
+           and `ctx.leave()` lives in exactly one place — the cleanup `createSourceCollabBinding`
+           returns. So a failure past that point left the lock held by a client with no binding, and
+           the freeze is now honest enough to include that client too (`collab-session.ts`'s transact
+           gate no longer exempts the lock holder): nobody in the room could edit the structure, and
+           nobody could edit the source either, until someone reloaded. Hand it back.
+           And say what the buffer is, because it is not an editing surface. The mount returns before
+           installing its change handler on a co-edited tab, so on this path a keystroke arms no
+           commit, marks nothing, leaves `tabBufferUnsaved` false — and the next repaint replaces it,
+           with clause 5 unable to help because `markShared` is what never ran. `readOnly` is what
+           "degrades to a read-only-ish local buffer" was always trying to say. */
+        collabCtx.leave();
+        const editor = view.monacoEditor;
+        if (editor && editor.getModel() === model) {
+          editor.updateOptions({ readOnly: true });
+        }
       });
   } else {
-    sourceContent(tab, lang)
+    sourceContent(tab)
       .then((content) => {
         const editor = view.monacoEditor;
         // The model identity says "this load is still for this buffer"; `bufferMovedOn` says "and
@@ -470,6 +500,11 @@ async function mountSourceEditor(
     },
   );
   view.monacoEditor = sourceEditor;
+  /* WHOSE BUFFER THIS IS, in the one spelling the dock's editor already used.
+     `tab` was named only by the closures below, so a caller holding a `Tab` — the ⌘W gate, the quit
+     gate — could ask the function editor whether the buffer was its tab's and had no way to ask
+     this one at all. Half an answer is what let a source tab close over unprompted typing. */
+  sourceEditor._editingTab = tab;
 
   // The debounce holder goes on the editor, not in this closure. A closure variable is reachable
   // Only from inside `mountSourceEditor`, which is why `disposeSourceEditor` had nothing to cancel
@@ -493,8 +528,9 @@ async function mountSourceEditor(
       sourceEditor._ignoreNextChange = false;
       return;
     }
-    // A keystroke: the buffer is ahead of the document until the commit lands.
-    writes.markAhead();
+    // A keystroke: the buffer is ahead of the document until the commit lands, and the text is the
+    // User's own — which is the narrower fact the close and quit gates read.
+    writes.markTyped();
     writes.arm(BUFFER_COMMIT, 600, async () => {
       /* `tab` is the tab this editor was MOUNTED for, captured above and never re-read. It used to
          be `activeTab.value` — whatever was focused when the timer fired — which is the same
@@ -512,6 +548,16 @@ async function mountSourceEditor(
             tab.documentPath,
             sourceEditor.getValue(),
           );
+          /* AND THE TAB IS ASKED AGAIN, because the parse is an await and the check above it is
+             not. The whole reason `tabIsLive` is here is that a parse written into a closed tab is
+             a parse nothing will ever read — and the window that closes the tab is precisely this
+             one: `commitTabBuffers` is called by two destroyers (⌘W / the × via `requestClose`,
+             and the preview slot's replacement in `openTab`), and the second cannot wait for a
+             promise. Checked before the await as well as after, because a flush that starts on a
+             dead tab should not pay for a format round trip to find out. */
+          if (!tabIsLive(tab)) {
+            return;
+          }
           tab.doc.document = document as JxMutableNode;
           tab.doc.content.frontmatter = frontmatter;
           tab.doc.dirty = true;
@@ -528,13 +574,13 @@ async function mountSourceEditor(
         } catch {
           // Invalid JSON — same: unparseable is a reason to keep the buffer, not to resync over it.
         }
-      } else {
-        // A language with no parse back (a handlers `.js` file): the tab is dirty because the
-        // Buffer changed, and the DOCUMENT still has no representation of what it says. So this is
-        // The one commit that leaves the buffer ahead on success — a re-sync here would replace the
-        // Author's JavaScript with `String(document)`, which is not the same text and never was.
-        tab.doc.dirty = true;
       }
+      /* There is no third branch, and the one that used to be here could not have worked.
+         It marked the tab DIRTY for text the document has no representation of — `sourceContent`
+         answered `doc.document?.toString?.()`, i.e. `"[object Object]"` — so ⌘S would have written
+         that string to disk. It only ever ran for a `.js` document tab, and nothing opens one:
+         `files.ts`, `file-ops.ts` and the project-URL open all end at `noFormatError` for an
+         extension no format class claims, so a document tab is a format tab or it is JSON. */
     });
   });
 }
@@ -668,12 +714,15 @@ function renderCanvasImpl(surface: CanvasSurface) {
      while it has moved on — that would reformat under the cursor (the source view is the editing
      surface here, mirroring the panel draft-state behaviour). This branch is where the rule was
      first written, as a bare `!editor.hasTextFocus()`; `services/monaco-buffer.ts` is where it
-     lives now, and it gained the two clauses this spelling was missing — a buffer holding text the
-     document has not been given (the user typed, then clicked away; or a `.js` buffer the document
-     has no parse for at all) and an editor disposed inside the round trip. */
+     lives now, and it gained the clauses this spelling was missing — a buffer holding text the
+     document has not been given (the user typed, then clicked away), an editor disposed inside the
+     round trip, and clause 5: a CO-EDITED buffer, which this write does not merely overwrite but
+     PUBLISHES over, to every peer in the room. The text below is `serializeDocument` of a structure
+     tree the source reconciler parsed out of that same shared text, so on a co-edited tab this was
+     the round trip asserting itself over its own input on every repaint. */
   if (canvasMode === "source" && view.monacoEditor && !modeChanged) {
     const editor = view.monacoEditor;
-    sourceContent(tab, sourceLang(tab))
+    sourceContent(tab)
       .then((newVal) => {
         if (view.monacoEditor !== editor) {
           return;

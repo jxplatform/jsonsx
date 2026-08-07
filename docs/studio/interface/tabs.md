@@ -52,6 +52,8 @@ Jx Studio does **not** auto-save. Edits live in the open document until you save
 
 Closing a document with unsaved changes asks first, and the question has three answers: **Save** writes the file and then closes, **Close Without Saving** throws the edits away, and **Cancel** leaves the tab where it was. A save that fails leaves the tab open and still unsaved, with the reason in [Problems](/docs/studio/interface/problems-and-progress) — the close never outruns the write. :kbd[⌘W] and the tab's **×** ask the same question. Studio skips it only when a collaborator is still in the document, because the shared session keeps the edits.
 
+**Text still in a code editor counts.** Closing settles whatever you have typed in a [Code view or a function body](/docs/studio/logic/code) before it decides whether to ask, so a document whose only unsaved change is the word you were halfway through still gets the question rather than closing quietly.
+
 Undo and redo are per document as well: each keeps its own history, so :kbd[⌘Z] in one never unwinds work in another.
 
 :::doc-note
