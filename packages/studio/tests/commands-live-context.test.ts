@@ -18,11 +18,18 @@ import {
 import { editorKindOf } from "../src/tabs/tab";
 import { createLiveContext, isTextEntryFocused } from "../src/commands/live-context";
 import { shell, resetProjectShell } from "../src/shell";
-import { activeTab, closeAllTabs } from "../src/workspace/workspace";
+import {
+  activeTab,
+  closeAllTabs,
+  openTab,
+  splitRight,
+  workspace,
+} from "../src/workspace/workspace";
 import { componentRegistry } from "../src/files/components";
 import { setProjectState } from "../src/store";
 import { transactDoc, mutateRemoveNode } from "../src/tabs/transact";
 import type { GitStatusResult, StudioPlatform } from "../src/types";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { LiveContextSources } from "../src/commands/live-context";
 
 let canvasMode = "design";
@@ -117,12 +124,26 @@ describe("document and editor", () => {
     expect(context().document.canUndo).toBe(true);
   });
 
-  test("no tab is a closed document in no editor", () => {
+  test("no tab is a closed document in no editor — but still one pane", () => {
     closeAllTabs();
     const ctx = context();
     expect(ctx.document.open).toBe(false);
     expect(ctx.editor.kind).toBe("none");
-    expect(ctx.pane.count).toBe(0);
+    // This asserted 0, and `tests/panes.test.ts`'s "the grid is never zero panes" asserted 1 about
+    // The same field. Both were green, because the live projection counted `workspace.tabOrder` —
+    // The FOCUSED pane's strip — while the default counted panes. A pane with no tab in it is
+    // Still a pane, and the primary is never removed.
+    expect(ctx.pane.count).toBe(1);
+    expect(ctx.pane.derived).toBe(false);
+  });
+
+  /* The projection said "panes land in P3" through P3 and P8 alike, so it could never answer 2. */
+  test("a split grid is two panes, and the projection says so", () => {
+    resetWorkspaceWithTab({ children: [], tagName: "div" } as unknown as JxMutableNode);
+    openTab({ document: { tagName: "div" }, documentPath: "b.json", id: "b" });
+    splitRight();
+    expect(workspace.panes.length).toBe(2);
+    expect(context().pane.count).toBe(2);
   });
 
   test.each([

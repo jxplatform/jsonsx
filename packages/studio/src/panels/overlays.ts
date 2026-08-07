@@ -11,7 +11,10 @@ import { updateActivePanelHeaders } from "../canvas/canvas-utils";
 import type { EffectScope } from "@vue/reactivity";
 
 interface OverlaysCtx {
-  getCanvasMode: () => string;
+  // No `getCanvasMode`. It was declared here and supplied by the bootstrap for as long as this
+  // Interface has existed, and this module never called it — a focus reader wired into a surface
+  // With no use for it, which is one more edge for the pane rule to walk and one more thing a
+  // Reader has to rule out.
   isEditing: () => boolean;
   renderBlockActionBar: () => void;
 }

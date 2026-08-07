@@ -16,7 +16,6 @@ import type { CanvasPanel } from "../src/types";
    binding still sees what the render mutated. */
 const canvasPanels = activeCanvasSurface().panels;
 
-let canvasMode = "design";
 let isEditingFlag = false;
 let renderBlockActionBar: ReturnType<typeof mock>;
 
@@ -40,7 +39,6 @@ function makePanel(mediaName = "base"): CanvasPanel {
 
 async function mountAndFlush() {
   mount({
-    getCanvasMode: () => canvasMode,
     isEditing: () => isEditingFlag,
     renderBlockActionBar: renderBlockActionBar as unknown as () => void,
   });
@@ -49,7 +47,6 @@ async function mountAndFlush() {
 
 beforeEach(() => {
   document.body.innerHTML = "";
-  canvasMode = "design";
   isEditingFlag = false;
   renderBlockActionBar = mock(() => {});
   resetWorkspaceWithTab({

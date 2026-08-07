@@ -380,7 +380,6 @@ paneContext.mount(primaryCell?.chrome ?? document.createElement("div"), {
 });
 
 overlaysPanel.mount({
-  getCanvasMode,
   isEditing,
   renderBlockActionBar,
 });

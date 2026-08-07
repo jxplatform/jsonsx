@@ -1344,6 +1344,57 @@ describe("iframe canvas inline-edit bridge", () => {
     expect(channels[0]!.posts.some((p) => p.kind === "enterEdit")).toBe(false);
   });
 
+  /*
+   * "No longer active" and "no longer shown here" are the same question with one stage and
+   * different questions with two, and the test above cannot tell them apart: `openTab` moves the
+   * pane's displayed tab AND the focus in one step, so it passes either way.
+   *
+   * This is the case that separates them. The side pane still displays the tab it owes a caret to;
+   * the primary merely holds focus. Asking the focus drops the caret the user is mid-word in.
+   */
+  test("a host still showing its tab re-enters, even when the other pane has focus", async () => {
+    const { focusPane, openTab, splitRight } = await import("../src/workspace/workspace");
+    await mountReady();
+
+    // A SECOND host, in the secondary pane's own stage — the pane that will lose focus. The first
+    // Host stays in the primary, which is what `mountReady` registers.
+    const sideTab = openTab({
+      document: { tagName: "div" },
+      documentPath: "side.json",
+      id: "side-tab",
+    });
+    activateTab(sideTab.id);
+    splitRight();
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+
+    const sideStage = document.createElement("div");
+    sideStage.className = "pane-stage";
+    sideStage.dataset.jxRegion = "pane.secondary";
+    document.body.append(sideStage);
+    registerCanvasSurface(SECONDARY_PANE, sideStage);
+    const sideCanvas = document.createElement("div");
+    sideStage.append(sideCanvas);
+    await mountIframeCanvas(1, {} as never, sideCanvas, null, sideTab.id);
+    const side = channels.at(-1)!;
+    side.deliver({ kind: "ready" });
+    side.deliver({ gen: 1, kind: "renderComplete" });
+
+    side.deliver({
+      after: { textContent: "lo" },
+      before: { textContent: "Hi" },
+      kind: "editSplit",
+      path: ["children", 0],
+    });
+
+    // Focus leaves for the primary. The side pane still DISPLAYS the tab this host owes a caret to.
+    focusPane(PRIMARY_PANE);
+    expect(workspace.activeTabId).not.toBe(sideTab.id);
+    side.posts.length = 0;
+    side.deliver({ gen: 1, kind: "patchComplete" });
+
+    expect(side.posts).toContainEqual({ kind: "enterEdit", path: ["children", 1] });
+  });
+
   test("editInsert applies and re-enters on the resulting path once the DOM acks", async () => {
     await mountReady();
     channels[0]!.posts.length = 0;

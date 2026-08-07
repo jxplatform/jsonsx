@@ -2318,10 +2318,14 @@ function onDomUpdated(state: HostState, gen: number): void {
   if (state.pendingEnterEdit && gen >= state.pendingEnterEdit.minGen) {
     const { offset, path } = state.pendingEnterEdit;
     state.pendingEnterEdit = null;
-    // Re-enter only when this host still shows the ACTIVE tab — a background tab's iframe renders a
-    // Different doc, so re-entering there would grab the wrong element (the commit itself already
-    // Landed in the right tab via hostTab routing).
-    if (state.tabId !== null && state.tabId === workspace.activeTabId) {
+    /* Re-enter only when this host STILL SHOWS THE TAB IT OWES THE CARET TO — which is a question
+       about this host's pane, not about the focus. A background tab's iframe renders a different
+       document, so re-entering there would grab the wrong element; the commit itself already landed
+       in the right tab via `hostTab` routing.
+       This asked `workspace.activeTabId` for two phases, which is the same question only while
+       there is one stage. With two, the side pane could be displaying its tab, holding a caret it
+       owed, and drop it because the PRIMARY had focus. */
+    if (state.tabId !== null && state.tabId === tabOfContainer(state.canvasEl)?.id) {
       reenterEdit(state, path, offset);
     }
   }
