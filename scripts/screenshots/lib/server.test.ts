@@ -55,12 +55,15 @@ afterEach(async () => {
 describe("assertBundleFresh", () => {
   test("passes when the bundle is newer than every studio source file", async () => {
     const root = await fakeRepo({ bundleAgeMs: 30_000 });
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(assertBundleFresh(root)).resolves.toBeUndefined();
   });
 
   test("names the source file the bundle is behind, so the report is actionable", async () => {
     const root = await fakeRepo({ bundleAgeMs: -30_000 });
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(assertBundleFresh(root)).rejects.toThrow("stale bundle");
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(assertBundleFresh(root)).rejects.toThrow(
       "packages/studio/src/canvas/iframe-host.ts",
     );
@@ -71,11 +74,13 @@ describe("assertBundleFresh", () => {
     const nested = join(root, "packages/studio/src/canvas/deep/nested.ts");
     await mkdir(join(root, "packages/studio/src/canvas/deep"), { recursive: true });
     await writeFile(nested, "export const y = 2;\n");
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(assertBundleFresh(root)).rejects.toThrow("nested.ts");
   });
 
   test("a missing bundle is an error, not an implicit pass", async () => {
     const root = await fakeRepo({ bundleAgeMs: null });
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(assertBundleFresh(root)).rejects.toThrow("does not exist");
   });
 });
@@ -86,6 +91,7 @@ describe("ensureDevServer", () => {
     const served = Bun.serve({ fetch: () => new Response("ok"), port: 0 });
     try {
       const root = await fakeRepo({ bundleAgeMs: 30_000 });
+      // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
       await expect(
         ensureDevServer(
           { repoRoot: root, studioPath: "/", url: `http://127.0.0.1:${served.port}` },
@@ -113,6 +119,7 @@ describe("ensureDevServer", () => {
 
       // Same adoption, stale bundle: reuse is exactly the case the assertion exists for.
       const stale = await fakeRepo({ bundleAgeMs: -30_000 });
+      // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
       await expect(
         ensureDevServer({ repoRoot: stale, reuse: true, studioPath: "/", url }, () => {}),
       ).rejects.toThrow("stale bundle");
@@ -205,6 +212,7 @@ describe("overlayProject", () => {
   test("a project that does not exist fails naming the path, not the symptom", async () => {
     const root = await repoWithProject({ "project.json": "{}\n" });
     forgetOverlays();
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(overlayProject(root, "packages/starters/sites/ghost")).rejects.toThrow(
       "does not exist",
     );

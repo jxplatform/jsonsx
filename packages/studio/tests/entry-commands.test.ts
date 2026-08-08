@@ -243,6 +243,7 @@ describe("the records", () => {
   });
 
   test("newEntry refuses an argument naming no collection", async () => {
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(liveRegistry().run("content.newEntry", { collection: "nope" })).rejects.toThrow(
       /collection/,
     );

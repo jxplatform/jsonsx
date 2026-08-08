@@ -244,7 +244,10 @@ export function bufferWrites(buffer: MonacoBuffer): BufferWrites {
           // Arm cleared out from under it, and a flush of a key already executing must find nothing.
           timers.delete(key);
           runs.delete(key);
-          track(key, run());
+          /* Discarded deliberately: a timer that fires on its own has no caller to answer to.
+             `track` has already put the promise in `inFlight`, which is where a flush arriving
+             mid-run collects it — and per the contract above, `run` reports its own failures. */
+          void track(key, run());
         }, ms),
       );
     },

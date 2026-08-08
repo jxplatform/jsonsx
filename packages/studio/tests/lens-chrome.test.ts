@@ -705,7 +705,7 @@ describe("the tab strip in a derived pane", () => {
       expect(sideStripHost.querySelectorAll(".tab-strip-tab")).toHaveLength(1);
       scrolled.length = 0;
 
-      registry.run("pane.derive", { preset: "layout" });
+      await registry.run("pane.derive", { preset: "layout" });
       await flush();
 
       // Back where it started, under a derivation — and the strip scrolled to it.

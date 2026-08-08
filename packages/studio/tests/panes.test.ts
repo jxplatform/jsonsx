@@ -877,6 +877,7 @@ describe("pane.compareWith", () => {
     open("a");
     // `requires` is one sentence for the whole command and cannot express "in the other pane" —
     // The refusal depends on the argument, so it is a run-time RangeError.
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(registry.run("pane.compareWith", { path: "a.json" })).rejects.toThrow(RangeError);
     expect(compared).toEqual([]);
   });

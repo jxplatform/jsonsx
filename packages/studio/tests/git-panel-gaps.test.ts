@@ -714,6 +714,7 @@ describe("file rows", () => {
      failure the PANE can state, rather than an error banner over a document nobody asked about. */
   test("loadDiffForLens reads the same pair of texts the row click does", async () => {
     seedRepoUi();
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(loadDiffForLens("src/page.json", "M")).resolves.toEqual({
       currentContent: "CURRENT",
       filePath: "src/page.json",
@@ -732,6 +733,7 @@ describe("file rows", () => {
     const warned: unknown[] = [];
     console.warn = (...args: unknown[]) => warned.push(args[0]);
     try {
+      // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
       await expect(loadDiffForLens("src/page.json", "M")).resolves.toBeNull();
     } finally {
       console.warn = warn;

@@ -196,7 +196,7 @@ describe("the help.about record", () => {
 
   test("running it opens the modal", async () => {
     const [record] = aboutCommands();
-    record!.run(emptyContext(), undefined as never);
+    await record!.run(emptyContext(), undefined as never);
     await flush();
     expect(modal()).not.toBeNull();
     closeAboutModal();

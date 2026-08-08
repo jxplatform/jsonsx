@@ -567,7 +567,7 @@ describe("the old dispatch — twelve modifier chords", () => {
 
   test("Reset Zoom still works as a verb, from the pod and the palette", () => {
     activeTab.value!.session.ui.zoom = 2.5;
-    registry.run("canvas.zoomReset");
+    void registry.run("canvas.zoomReset");
     expect(activeTab.value!.session.ui.zoom).toBe(1);
     expect(setPan).toHaveBeenCalledWith(16, 16);
     expect(applyTransform).toHaveBeenCalled();
@@ -597,7 +597,7 @@ describe("the old dispatch — twelve modifier chords", () => {
     expect(tab.session.ui.editZoom).toBeCloseTo(1);
     tab.session.ui.editZoom = 2.4;
     // ⌘0 is the pane's now; Reset Zoom keeps the verb, and in Edit it is the CONTENT zoom it resets.
-    registry.run("canvas.zoomReset");
+    void registry.run("canvas.zoomReset");
     expect(tab.session.ui.editZoom).toBe(1);
     // The design-mode zoom and pan are untouched by edit-mode zoom shortcuts.
     expect(tab.session.ui.zoom).toBe(2);

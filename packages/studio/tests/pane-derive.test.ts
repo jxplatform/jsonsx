@@ -765,7 +765,9 @@ describe("applyDerivation", () => {
       ...deps,
       openFileInPane: (paneId, path) =>
         Promise.resolve().then(() => {
-          deps.openFileInPane(paneId, path);
+          // The point of this stub: the open lands a microtask LATE, so the assertion below
+          // `applyDerivation` can see the pane before it has arrived.
+          void deps.openFileInPane(paneId, path);
         }),
     };
 
@@ -788,6 +790,7 @@ describe("applyDerivation", () => {
        three checks in a bare Bun process with no DOM and a stack that names none of this. */
     const noop = noopDerivationDeps();
     expect(noop.openFileInPane(SECONDARY_PANE, "pages/index.json")).toBeUndefined();
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(noop.loadDiff("pages/index.json", "M")).resolves.toBeNull();
   });
 
