@@ -109,11 +109,22 @@ An entry embed **shadows** the shipped default rather than extending it, so it r
 ## Validation
 
 - Every consumer resolves the committed entry documents offline **with no file access at all**: each `$ref` is a root-relative JSON Pointer into the same document. No `node_modules`, no network, no editor configuration.
+- `jx validate` **reads**; `jx schema` writes. If a committed entry document is out of date, validation composes a fresh one in memory and reports against that, leaving the file on disk exactly as it is — a checker that edits what it is checking cannot tell you your repository is wrong.
 - `jx validate` validates the whole project tree: both committed entry documents for self-containment (any `$ref` that is a relative path, a URI, or a pointer to nothing fails), `project.json` against `./project.schema.json`, every component/page/layout against the bundled document schema, every project-local `*.class.json` against the class schema, and each fragment standalone. CI runs this over every project root in the repo.
 - Where a client fetches the canonical URLs instead (they are served from jxsuite.com), it gets the shipped defaults — the degradation is _under-suggestion_ of extension field extras, never false errors.
 
 :::doc-note
 Root pointers rather than a `$id`-keyed compound document, because VS Code's JSON language service — which Monaco embeds, so this covers Studio too — implements neither half of compound-document resolution. It resolves `#/…` against the document root instead of the enclosing `$id`, and it fetches anything with a URI before the `#` over the network rather than matching the resource embedded in the same file. Root pointers sidestep both and cost nothing under ajv.
+:::
+
+## Where core comes from
+
+A `@jxsuite/*` schema ref is always read from the **host** — the workspace running the generator — before any file sitting at the same path inside your project. Your own extension fragments keep resolving from the project, which is what the loader is for; what a project may not do is answer for the Jx core itself. If the host has no such package, composition stops and names the ref, rather than falling back.
+
+That refusal is deliberate. A starter pins published `@jxsuite/*` versions, so opening one in Studio installs a real `@jxsuite/schema` right beside a much newer workspace. When the project-local copy was allowed to win, one starter's committed `document.schema.json` was composed from a core nine minor versions behind — not just stale but **narrower than the starter's own content**, dropping the computed-children branch so that the starter's own pages failed to validate against its own schema. It went unnoticed for six weeks, because the file was only ever regenerated on the one machine with the stray install.
+
+:::doc-tip
+If composition fails with _"must resolve from the host workspace and does not"_, you are running the generator somewhere that has no `@jxsuite/schema` on its resolution path — install it in the workspace you are running from, rather than in the project being generated.
 :::
 
 ## Regenerating
