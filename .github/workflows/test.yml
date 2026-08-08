@@ -203,6 +203,7 @@ jobs:
       # Neither is expressible in the type system — `ViewState` has an index signature and a
       # module-level `let active` is well-typed — so the guard is a ratcheting allow-list.
       - run: bun --cwd packages/studio scripts/check-pane-singletons.ts
+      - run: bun --cwd packages/studio scripts/check-icons.ts
       # The derived pane's lens/companion discriminators (§18.4), each mutated in turn against the
       # ONE test file expected to notice. Two review rounds of that workstream each fixed the
       # defects they named and left as many behind, because a green suite says nothing about

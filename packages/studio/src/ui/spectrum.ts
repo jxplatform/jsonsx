@@ -106,6 +106,16 @@ import { IconTextAlignRight } from "@spectrum-web-components/icons-workflow/src/
 import { IconTextAlignJustify } from "@spectrum-web-components/icons-workflow/src/elements/IconTextAlignJustify.js";
 import { IconAlignTop } from "@spectrum-web-components/icons-workflow/src/elements/IconAlignTop.js";
 import { IconAlignBottom } from "@spectrum-web-components/icons-workflow/src/elements/IconAlignBottom.js";
+import { IconAlert } from "@spectrum-web-components/icons-workflow/src/elements/IconAlert.js";
+import { IconDeviceDesktop } from "@spectrum-web-components/icons-workflow/src/elements/IconDeviceDesktop.js";
+import { IconPlay } from "@spectrum-web-components/icons-workflow/src/elements/IconPlay.js";
+import { IconPlug } from "@spectrum-web-components/icons-workflow/src/elements/IconPlug.js";
+import { IconPublishCheck } from "@spectrum-web-components/icons-workflow/src/elements/IconPublishCheck.js";
+import { IconSearch } from "@spectrum-web-components/icons-workflow/src/elements/IconSearch.js";
+import { IconShare } from "@spectrum-web-components/icons-workflow/src/elements/IconShare.js";
+import { IconShowMenu } from "@spectrum-web-components/icons-workflow/src/elements/IconShowMenu.js";
+import { IconBranch1 } from "@spectrum-web-components/icons-workflow/src/elements/IconBranch1.js";
+import { IconRailLeft } from "@spectrum-web-components/icons-workflow/src/elements/IconRailLeft.js";
 import { IconAlignMiddle } from "@spectrum-web-components/icons-workflow/src/elements/IconAlignMiddle.js";
 import { IconAlignLeft } from "@spectrum-web-components/icons-workflow/src/elements/IconAlignLeft.js";
 import { IconAlignRight } from "@spectrum-web-components/icons-workflow/src/elements/IconAlignRight.js";
@@ -250,6 +260,16 @@ const components = [
   ["sp-icon-text-align-justify", IconTextAlignJustify],
   ["sp-icon-align-top", IconAlignTop],
   ["sp-icon-align-bottom", IconAlignBottom],
+  ["sp-icon-alert", IconAlert],
+  ["sp-icon-device-desktop", IconDeviceDesktop],
+  ["sp-icon-play", IconPlay],
+  ["sp-icon-plug", IconPlug],
+  ["sp-icon-publish-check", IconPublishCheck],
+  ["sp-icon-search", IconSearch],
+  ["sp-icon-share", IconShare],
+  ["sp-icon-show-menu", IconShowMenu],
+  ["sp-icon-branch-1", IconBranch1],
+  ["sp-icon-rail-left", IconRailLeft],
   ["sp-icon-align-middle", IconAlignMiddle],
   ["sp-icon-align-left", IconAlignLeft],
   ["sp-icon-align-right", IconAlignRight],

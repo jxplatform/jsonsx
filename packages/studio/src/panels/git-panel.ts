@@ -990,7 +990,9 @@ export function registerGitPanel(): void {
     title: "Source Control",
     level: "project",
     dock: "navigator",
-    icon: "sp-icon-git-branch",
+    // `sp-icon-git-branch` is not a Spectrum icon — the workflow set has no Git family at all, so
+    // This rendered nothing. `IconBranch1` is the branching-arrow glyph and is what it meant.
+    icon: "sp-icon-branch-1",
     badge: (ctx) => ctx.git.dirtyCount || null,
     // Through `deps`, not the local binding: `studio.ts` owns the wiring (the clone action and the
     // Diff-state setter come from the bootstrap), and the Navigator has injected it all along.

@@ -539,8 +539,21 @@ function csdTpl(controls: WindowControls, mac: boolean) {
 
 const RAIL_RIGHT_OPEN = html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`;
 const RAIL_RIGHT_CLOSE = html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`;
-const RAIL_LEFT_OPEN = html`<sp-icon-rail-left-open slot="icon"></sp-icon-rail-left-open>`;
-const RAIL_LEFT_CLOSE = html`<sp-icon-rail-left-close slot="icon"></sp-icon-rail-left-close>`;
+/* MIRRORED, because Spectrum ships no left-hand pair.
+   `IconRailRightOpen`/`Close` exist; `IconRailLeftOpen`/`Close` do not — the workflow set has only
+   the plain `IconRailLeft`. These two tags were written by symmetry with the two above and could
+   never have resolved, so the Navigator's toggle rendered an unregistered custom element: empty
+   space where an icon should be, for as long as the button has existed. A right-hand rail flipped
+   on X is exactly the left-hand one, and it keeps the pair visually identical to the Inspector's,
+   which is the point of them being a pair. */
+const RAIL_LEFT_OPEN = html`<sp-icon-rail-right-close
+  class="mirror-x"
+  slot="icon"
+></sp-icon-rail-right-close>`;
+const RAIL_LEFT_CLOSE = html`<sp-icon-rail-right-open
+  class="mirror-x"
+  slot="icon"
+></sp-icon-rail-right-open>`;
 const DOCK_BOTTOM = html`<sp-icon-align-bottom slot="icon"></sp-icon-align-bottom>`;
 
 /**

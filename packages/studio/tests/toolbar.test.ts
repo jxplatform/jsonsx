@@ -362,12 +362,39 @@ describe("the ⬢ overflow menu", () => {
 // ─── Dock toggles ─────────────────────────────────────────────────────────────
 
 describe("dock toggles", () => {
+  /*
+   * `querySelector` PROVES NOTHING ABOUT AN ICON.
+   *
+   * These three assertions read `sp-icon-rail-left-open` / `-close` and passed for as long as the
+   * Navigator's toggle rendered nothing at all: an unregistered custom element is still an element,
+   * so lit puts the tag in the DOM and the query finds it, upgraded or not. Spectrum ships no
+   * left-hand rail pair — only `rail-right-open`/`close` and a plain `IconRailLeft` — so those two
+   * tags could never resolve, and the button was an empty box from the day it was written.
+   *
+   * So these assert WHICH glyph the bar renders, mirrored or not — a question this file can answer.
+   * Whether that glyph is a registered element is a different question and a static one:
+   * `scripts/check-icons.ts` asks it of the whole package, and `tests/icons.test.ts` pins it. It
+   * cannot be asked here, because this file never loads `ui/spectrum.ts` and every icon would read
+   * as unregistered, including the ones that work.
+   */
+  function glyph(el: Element): string {
+    const icon = el.querySelector("[slot='icon']");
+    if (!icon) {
+      return "none";
+    }
+    const tag = icon.tagName.toLowerCase();
+    const mirrored = icon.classList.contains("mirror-x") ? " (mirrored)" : "";
+    return `${tag}${mirrored}`;
+  }
+
   test("each dock's glyph and pressed state follow the record it renders", async () => {
     toolbar.mount(root);
     await flush();
     const navigatorToggle = btn("Toggle Navigator Dock");
     expect(navigatorToggle.hasAttribute("selected")).toBe(true);
-    expect(navigatorToggle.querySelector("sp-icon-rail-left-close")).not.toBeNull();
+    // The Inspector's glyph, flipped: Spectrum has no left-hand pair, and mirroring keeps the
+    // Two dock toggles reading as one control rather than inventing a third shape.
+    expect(glyph(navigatorToggle)).toBe("sp-icon-rail-right-open (mirrored)");
     expect(navigatorToggle.getAttribute("title")).toBe("Toggle Navigator Dock (⌘B)");
 
     click(navigatorToggle);
@@ -398,8 +425,8 @@ describe("dock toggles", () => {
     shell.docks.bottom.collapsed = true;
     await flush();
     expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(false);
-    expect(root.querySelector("sp-icon-rail-right-open")).not.toBeNull();
-    expect(root.querySelector("sp-icon-rail-left-close")).not.toBeNull();
+    expect(glyph(btn("Toggle Inspector Dock"))).toBe("sp-icon-rail-right-open");
+    expect(glyph(btn("Toggle Navigator Dock"))).toBe("sp-icon-rail-right-open (mirrored)");
 
     toolbar.unmount();
     setInspectorTab("properties");
@@ -411,7 +438,7 @@ describe("dock toggles", () => {
     shell.docks.left.collapsed = true;
     toolbar.mount(root);
     await flush();
-    expect(root.querySelector("sp-icon-rail-left-open")).not.toBeNull();
+    expect(glyph(btn("Toggle Navigator Dock"))).toBe("sp-icon-rail-right-close (mirrored)");
   });
 });
 

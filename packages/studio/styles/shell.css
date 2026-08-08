@@ -70,6 +70,13 @@
 #toolbar sp-action-button {
   -webkit-app-region: no-drag;
 }
+/* An icon that means the same thing on the other side.
+   Spectrum's workflow set ships `rail-right-open`/`rail-right-close` and no left-hand pair, so the
+   Navigator's dock toggle reflects the Inspector's rather than inventing a third glyph — which is
+   also what keeps the two buttons reading as a pair. */
+.mirror-x {
+  transform: scaleX(-1);
+}
 .window-controls {
   margin-left: auto;
   flex-shrink: 0;

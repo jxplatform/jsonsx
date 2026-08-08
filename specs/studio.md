@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.1-draft
+**Version:** 0.9.2-draft
 **Status:** Partial
 **Updated:** 2026-08-08
 **License:** MIT
@@ -1108,7 +1108,7 @@ surface must print — live in [studio-ui-guidelines.md §12](studio-ui-guidelin
 | `category`    | `Category`                          | Groups palette rows: File, Edit, Selection, Insert, View, Document, Project, Source Control, Publish, Assistant, Collaborate, Help. |
 | `level`       | `Level`                             | **Required.** What the command acts on (§13.2). Checked against every declared placement.                                           |
 | `keyScope`    | `KeyScope`                          | Where the chord is live (§13.3). Defaults to `global`. Deliberately **not** the same field as `level`.                              |
-| `icon`        | `string`                            | Icon key, resolved through the shared icon map.                                                                                     |
+| `icon`        | `string`                            | An `sp-icon-*` tag name, which `ui/spectrum.ts` must register — see §13.5.                                                          |
 | `when`        | `(ctx) => boolean`                  | Hide entirely. Default: always visible.                                                                                             |
 | `enablement`  | `(ctx) => boolean`                  | Show but disable. Defaults to always-enabled once `when` holds.                                                                     |
 | `requires`    | `string`                            | ONE sentence — "an element selection". The disabled tooltip, the palette subtitle and the agent's refusal are all this string.      |
@@ -1215,9 +1215,20 @@ Control badge vanish when the last tab closed, and let two tabs disagree about t
 | `scripts/check-command-levels.ts` | A `menus` placement the level × placement matrix does not admit                           |
 | `scripts/check-chrome-budget.ts`  | More than five `commandbar/primary` commands, or more than four tabs in a dock            |
 | `scripts/check-shot-contract.ts`  | A script naming an id nothing declares, a `toggle*` id, or a selector where an id belongs |
+| `scripts/check-icons.ts`          | An `sp-icon-*` tag no element registers, or a registered element Spectrum does not ship   |
 
-All three run in CI, and `createCommandRegistry` applies the placement check again at registration so
+All four run in CI, and `createCommandRegistry` applies the placement check again at registration so
 a violation cannot reach a running app either.
+
+**An icon is checked because nothing else can see it.** A custom element the browser has never heard
+of is an `HTMLUnknownElement`: no shadow root, no content, no warning — an empty box the size of the
+missing glyph. The tag is a string in a template, so the type checker is silent; happy-dom is as
+content to render nothing as Chrome is, so a test asserting the element is present passes. Eleven
+shipped that way, and the only two that were ever reported were reported by a person looking at the
+app. Three of the eleven named icons Spectrum does not ship at all — `sp-icon-rail-left-open` and
+`-close` were written by symmetry with the right-hand pair, which exists — so the check reads the
+import behind each registration and asks whether the module is on disk, and a left-hand rail glyph
+is the mirrored right-hand one.
 
 **The scripting surface is a rendering, and these three rules are what make that true.**
 `window.__jxAutomation` (installed only under `?automation=1`) exposes `run(id, args)`, `seed(id,
@@ -1717,6 +1728,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.2-draft** (2026-08-08) — §13.5 adds scripts/check-icons.ts — an sp-icon-* tag no element registers, or a registered element Spectrum does not ship, is now a red PR; the command record's icon field described accurately as a tag name rather than a key into a map.
 - **0.9.1-draft** (2026-08-08) — §18.4 derived panes ship — a pane chosen by a standing rule rather than a document; a preset is a projection (Code, Diff — one document, two sessions), a follow (Layout, Component definition — genuinely different documents) or a filter (a breakpoint of the board already drawn); §14.1 holds because following is dispose-and-open, with four exclusions keeping one document to one tab; a pane holds a derivation or tabs, never both.
 - **0.9.0-draft** (2026-08-07) — §18 Panes rewritten for two live panes — the grid draws a keyed cell per pane and the stage handover is deleted; the editor-kind cap on the side pane is gone and a split is a real side-by-side; clicking into a pane focuses it; nothing drawn for a pane may resolve the focus, enforced by check-pane-singletons; §18.4 derived panes named as not built.
 - **0.8.0-draft** (2026-08-07) — Sub-documents withdrawn (§14.3) — the stack had no push, so nothing could enter it; §14.7 closing over unsaved work, and §4.2 source is batched so every exit settles first; the Bottom dock is three tabs and Diff is a pane editor kind (§16.3); §18 Panes — the two-pane cap as one predicate, one stage handed between panes, and no pane zoom until there is a grid to zoom.
@@ -1773,4 +1785,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.1-draft_
+_`@jxsuite/studio` Specification v0.9.2-draft_
